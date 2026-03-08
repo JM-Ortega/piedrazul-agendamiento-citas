@@ -1,0 +1,37 @@
+<nav class="bg-blue-700 shadow-lg sticky top-0 z-50">
+  <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+    <a class="text-white font-bold text-xl flex items-center gap-2">
+      <lucide-icon [img]="Hospital" [size]="28" class="text-white"></lucide-icon>
+      Piedrazul
+    </a>
+
+    <div class="flex items-center gap-4 flex-wrap">
+      @if (appService.currentRole() === 'scheduler') {
+        <a
+          routerLink="/agendador"
+          class="flex items-center gap-1 text-blue-100 hover:text-white text-sm transition-colors"
+        >
+          <lucide-icon [img]="ClipboardList" [size]="16"></lucide-icon> Citas
+        </a>
+        <a
+          routerLink="/agendador/nueva"
+          class="flex items-center gap-1 text-blue-100 hover:text-white text-sm transition-colors"
+        >
+          <lucide-icon [img]="Plus" [size]="16"></lucide-icon> Nueva Cita
+        </a>
+      }
+
+      @if (appService.currentRole()) {
+        <div class="flex items-center gap-1 text-blue-200 text-sm border-l border-blue-500 pl-4">
+          <lucide-icon [img]="User" [size]="16"></lucide-icon> {{ roleLabel() }}
+        </div>
+        <button
+          (click)="logout()"
+          class="flex items-center gap-1 bg-white bg-opacity-20 hover:bg-opacity-30 text-white text-sm px-3 py-2 rounded-lg transition-colors"
+        >
+          <lucide-icon [img]="LogOut" [size]="16"></lucide-icon> Salir
+        </button>
+      }
+    </div>
+  </div>
+</nav>
