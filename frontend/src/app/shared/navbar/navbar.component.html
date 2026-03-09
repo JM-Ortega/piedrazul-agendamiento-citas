@@ -1,37 +1,113 @@
-<nav class="bg-blue-700 shadow-lg sticky top-0 z-50">
-  <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-    <a class="text-white font-bold text-xl flex items-center gap-2">
-      <lucide-icon [img]="Hospital" [size]="28" class="text-white"></lucide-icon>
-      Piedrazul
+<header class="bg-blue-700 text-white shadow-lg sticky top-0 z-50">
+  <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+    <!-- Logo -->
+    <a routerLink="/" class="flex items-center gap-3 cursor-pointer">
+      <div class="bg-white rounded-full p-2">
+        <lucide-icon
+          [img]="Calendar"
+          [size]="28"
+          class="text-blue-700"
+        ></lucide-icon>
+      </div>
+      <div>
+        <span class="text-xl font-bold tracking-wide">Piedrazul Salud</span>
+        <p class="text-blue-200 text-sm hidden sm:block">Centro Médico</p>
+      </div>
     </a>
 
-    <div class="flex items-center gap-4 flex-wrap">
-      @if (appService.currentRole() === 'scheduler') {
+    <!-- Desktop Nav -->
+    <nav class="hidden md:flex items-center gap-2">
+      @if (appService.currentRole() === "scheduler") {
         <a
           routerLink="/agendador"
-          class="flex items-center gap-1 text-blue-100 hover:text-white text-sm transition-colors"
+          #rla4="routerLinkActive"
+          routerLinkActive
+          [routerLinkActiveOptions]="{ exact: true }"
+          [class]="
+            'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
+            (rla4.isActive
+              ? 'bg-white text-blue-700'
+              : 'text-white hover:bg-blue-600')
+          "
         >
-          <lucide-icon [img]="ClipboardList" [size]="16"></lucide-icon> Citas
+          <lucide-icon [img]="ClipboardList" [size]="20"></lucide-icon> Ver
+          Citas
         </a>
         <a
           routerLink="/agendador/nueva"
-          class="flex items-center gap-1 text-blue-100 hover:text-white text-sm transition-colors"
+          #rla5="routerLinkActive"
+          routerLinkActive
+          [class]="
+            'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
+            (rla5.isActive
+              ? 'bg-white text-blue-700'
+              : 'text-white hover:bg-blue-600')
+          "
         >
-          <lucide-icon [img]="Plus" [size]="16"></lucide-icon> Nueva Cita
+          <lucide-icon [img]="Calendar" [size]="20"></lucide-icon> Nueva Cita
         </a>
       }
 
       @if (appService.currentRole()) {
-        <div class="flex items-center gap-1 text-blue-200 text-sm border-l border-blue-500 pl-4">
-          <lucide-icon [img]="User" [size]="16"></lucide-icon> {{ roleLabel() }}
+        <div class="flex items-center gap-3 ml-4 pl-4 border-l border-blue-500">
+          <div class="flex items-center gap-2">
+            <div class="bg-blue-500 rounded-full p-1.5">
+              <lucide-icon [img]="User" [size]="18"></lucide-icon>
+            </div>
+            <span class="text-sm">{{ roleLabel() }}</span>
+          </div>
+          <button
+            (click)="logout()"
+            class="flex items-center gap-1 px-3 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition-colors text-sm"
+          >
+            <lucide-icon [img]="LogOut" [size]="16"></lucide-icon> Salir
+          </button>
         </div>
-        <button
-          (click)="logout()"
-          class="flex items-center gap-1 bg-white bg-opacity-20 hover:bg-opacity-30 text-white text-sm px-3 py-2 rounded-lg transition-colors"
+      }
+    </nav>
+
+    <!-- Mobile Menu Button -->
+    <button
+      class="md:hidden p-2 rounded-lg hover:bg-blue-600"
+      (click)="menuOpen.set(!menuOpen())"
+    >
+      @if (menuOpen()) {
+        <lucide-icon [img]="X" [size]="28"></lucide-icon>
+      } @else {
+        <lucide-icon [img]="Menu" [size]="28"></lucide-icon>
+      }
+    </button>
+  </div>
+
+  <!-- Mobile Nav -->
+  @if (menuOpen()) {
+    <div class="md:hidden bg-blue-800 px-4 py-3 space-y-2">
+      @if (appService.currentRole() === "scheduler") {
+        <a
+          routerLink="/agendador"
+          (click)="menuOpen.set(false)"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
         >
-          <lucide-icon [img]="LogOut" [size]="16"></lucide-icon> Salir
+          <lucide-icon [img]="ClipboardList" [size]="20"></lucide-icon> Ver
+          Citas
+        </a>
+        <a
+          routerLink="/agendador/nueva"
+          (click)="menuOpen.set(false)"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+        >
+          <lucide-icon [img]="Calendar" [size]="20"></lucide-icon> Nueva Cita
+        </a>
+      }
+
+      @if (appService.currentRole()) {
+        <button
+          (click)="logout(); menuOpen.set(false)"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white"
+        >
+          <lucide-icon [img]="LogOut" [size]="20"></lucide-icon> Cerrar Sesión
         </button>
       }
     </div>
-  </div>
-</nav>
+  }
+</header>

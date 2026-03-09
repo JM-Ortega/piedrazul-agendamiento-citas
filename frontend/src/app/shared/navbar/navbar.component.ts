@@ -1,5 +1,5 @@
-import { Component, computed, inject } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Component, computed, inject, signal } from '@angular/core';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import {
   Calendar,
   ClipboardList,
@@ -7,10 +7,12 @@ import {
   Hospital,
   LogOut,
   LucideAngularModule,
+  Menu,
   Plus,
   Settings,
   Stethoscope,
   User,
+  X,
 } from 'lucide-angular';
 import { AppService } from '../../services/app.service';
 
@@ -18,7 +20,7 @@ import { AppService } from '../../services/app.service';
   selector: 'app-navbar',
   templateUrl: './navbar.component.html',
   standalone: true,
-  imports: [RouterLink, LucideAngularModule],
+  imports: [RouterLink, RouterLinkActive, LucideAngularModule],
 })
 export class NavbarComponent {
   appService = inject(AppService);
@@ -33,6 +35,10 @@ export class NavbarComponent {
   readonly User = User;
   readonly LogOut = LogOut;
   readonly Hospital = Hospital;
+  readonly Menu = Menu;
+  readonly X = X;
+
+  menuOpen = signal(false);
 
   roleLabel = computed<string>(() => {
     switch (this.appService.currentRole()) {
@@ -43,7 +49,7 @@ export class NavbarComponent {
       case 'admin':
         return 'Administrador';
       case 'doctor':
-        return `Dr. ...`;
+        return `DR`;
       default:
         return '';
     }
