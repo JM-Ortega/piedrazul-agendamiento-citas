@@ -1,0 +1,123 @@
+<div class="min-h-screen bg-blue-50 py-8 px-4">
+  <div class="max-w-2xl mx-auto">
+    <div class="flex items-center gap-3 mb-6">
+      <button routerLink="/agendador" class="text-gray-500 hover:text-gray-700 text-2xl">←</button>
+      <h3 class="text-2xl font-bold text-blue-800">➕ Nueva Cita</h3>
+    </div>
+
+    @if (success()) {
+      <div class="bg-green-50 border border-green-300 text-green-700 px-6 py-4 rounded-2xl text-lg">
+        ✅ ¡Cita registrada con éxito!
+      </div>
+    }
+
+    @if (!success()) {
+      <div class="space-y-4">
+        <!-- Buscar paciente -->
+        <div class="bg-white rounded-2xl shadow-md p-6">
+          <h5 class="text-lg font-semibold text-gray-700 mb-4">1. Buscar Paciente</h5>
+          <div class="flex gap-2 mb-3">
+            <input
+              type="text"
+              [value]="documentId()"
+              (input)="documentId.set($any($event.target).value)"
+              placeholder="Número de documento"
+              class="flex-1 border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-3 outline-none"
+            />
+            <button
+              (click)="searchPatient()"
+              class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl transition-colors"
+            >
+              🔍 Buscar
+            </button>
+          </div>
+          @if (notFound()) {
+            <div class="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-xl">
+              Paciente no encontrado.
+            </div>
+          }
+          @if (foundPatient()) {
+            <div
+              class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl font-medium"
+            >
+              👤 {{ foundPatient().firstName }} {{ foundPatient().lastName }} — Doc:
+              {{ foundPatient().documentId }}
+            </div>
+          }
+        </div>
+
+        <!-- Seleccionar médico -->
+        @if (foundPatient()) {
+          <div class="bg-white rounded-2xl shadow-md p-6">
+            <h5 class="text-lg font-semibold text-gray-700 mb-4">2. Seleccionar Médico</h5>
+            <select
+              [value]="selectedDoctorId()"
+              (change)="onDoctorChange($any($event.target).value)"
+              class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-3 outline-none"
+            >
+              <option value="">Seleccione un médico...</option>
+                @for (doc of doctors(); track doc.id) {
+                <option [value]="doc.id">{{ doc.name }} — {{ doc.specialty }}</option>
+                }
+            </select>
+          </div>
+        }
+
+        <!-- Seleccionar fecha -->
+        @if (selectedDoctorId()) {
+          <div class="bg-white rounded-2xl shadow-md p-6">
+            <h5 class="text-lg font-semibold text-gray-700 mb-4">3. Seleccionar Fecha</h5>
+            <div class="flex flex-wrap gap-2">
+              @for (date of availableDates(); track date) {
+                <button
+                  (click)="selectDate(date)"
+                  class="px-4 py-2 rounded-xl text-sm font-medium border-2 transition-colors"
+                  [class]="
+                    selectedDate() === date
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-blue-300 text-blue-600 hover:bg-blue-50'
+                  "
+                >
+                  {{ formatDate(date) }}
+                </button>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Seleccionar hora -->
+        @if (selectedDate()) {
+          <div class="bg-white rounded-2xl shadow-md p-6">
+            <h5 class="text-lg font-semibold text-gray-700 mb-4">4. Seleccionar Hora</h5>
+            <div class="flex flex-wrap gap-2">
+              @for (slot of availableSlots(); track slot) {
+                <button
+                  (click)="selectedTime.set(slot)"
+                  class="px-4 py-2 rounded-xl font-medium border-2 transition-colors"
+                  [class]="
+                    selectedTime() === slot
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-blue-300 text-blue-600 hover:bg-blue-50'
+                  "
+                >
+                  🕐 {{ slot }}
+                </button>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Confirmar -->
+        @if (selectedTime()) {
+          <button
+            (click)="confirm()"
+            [disabled]="isLoading()"
+            class="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl text-xl font-semibold transition-colors shadow-lg disabled:opacity-50"
+          >
+            {{ isLoading() ? 'Registrando...' : '✅ Confirmar Cita' }}
+          </button>
+        }
+      </div>
+    }
+  </div>
+</div>
