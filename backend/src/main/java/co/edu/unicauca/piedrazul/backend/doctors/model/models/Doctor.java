@@ -1,22 +1,27 @@
-package co.edu.unicauca.piedrazul.backend.doctors.model;
+package co.edu.unicauca.piedrazul.backend.doctors.model.models;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "doctors")
 public class Doctor {
+    @Getter
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_doctor")
-    private long idDoctor;
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "id_doctor", updatable = false, nullable = false)
+    private UUID idDoctor;
 
     @Column(name = "id_user", nullable = false, unique = true)
-    private long idUser;
+    private UUID idUser;
 
+    @Setter
     @Column(name = "first_name", nullable = false, length = 100)
     private String firstName;
 
@@ -27,6 +32,7 @@ public class Doctor {
     @Column(name = "specialty", nullable = false)
     private Specialty specialty;
 
+    @Setter
     @Column(name = "status", nullable = false)
     private boolean status;
 
@@ -45,4 +51,20 @@ public class Doctor {
     @OneToMany(mappedBy = "idDoctor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Schedule> schedules = new ArrayList<>();
 
+    public Doctor(UUID idUser, String firstName, String lastName, Specialty specialty, boolean status, LocalDate laborStart,
+                  LocalDate laborEnd, int appointmentInterval, int scheduleableWeeks, List<Schedule> schedules) {
+        this.idUser = idUser;
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.specialty = specialty;
+        this.status = status;
+        this.laborStart = laborStart;
+        this.laborEnd = laborEnd;
+        this.appointmentInterval = appointmentInterval;
+        this.scheduleableWeeks = scheduleableWeeks;
+        this.schedules = schedules;
+    }
+
+    public Doctor() {
+    }
 }

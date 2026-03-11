@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.doctors.model;
+package co.edu.unicauca.piedrazul.backend.doctors.model.models;
 
 public enum Workday {
     LUNES,
