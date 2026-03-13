@@ -46,7 +46,7 @@ public class appointment {
     private LocalTime startTime;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "scheduling_origin")
+    @Column(name = "scheduling_origin", nullable = false)
     private enumSchedulingOrigin schedulingOrigin;
 
     public appointment(UUID idDoctor, UUID idPatient, enumSpecialty specialty, enumAppointmentState appointmentState, LocalDate date, LocalTime startTime, enumSchedulingOrigin schedulingOrigin) {
