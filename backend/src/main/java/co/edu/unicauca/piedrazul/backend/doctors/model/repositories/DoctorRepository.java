@@ -18,4 +18,8 @@ public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
 
     // Buscar por el ID de usuario vinculado
     Doctor findByIdUser(UUID idUser);
+
+    // Verifica si el doctor existe buscandolo por su ID
+    boolean existsById(UUID id);
+
 }
