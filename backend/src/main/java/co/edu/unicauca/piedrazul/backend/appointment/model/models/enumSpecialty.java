@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment.model.entity;
+package co.edu.unicauca.piedrazul.backend.appointment.model.models;
 
 public enum enumSpecialty {
     MEDICO_GENERAL,
