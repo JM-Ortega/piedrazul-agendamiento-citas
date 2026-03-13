@@ -2,12 +2,18 @@ package co.edu.unicauca.piedrazul.backend.doctors.model.models;
 
 import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+
+//Lombok
+@RequiredArgsConstructor
+@Setter
+@Getter
 
 @Entity
 @Table(name = "doctors")
@@ -63,8 +69,5 @@ public class Doctor {
         this.appointmentInterval = appointmentInterval;
         this.scheduleableWeeks = scheduleableWeeks;
         this.schedules = schedules;
-    }
-
-    public Doctor() {
     }
 }

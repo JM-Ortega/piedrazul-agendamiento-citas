@@ -2,13 +2,17 @@ package co.edu.unicauca.piedrazul.backend.doctors.model.models;
 
 import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalTime;
 import java.util.UUID;
 
+// Lombok
+@RequiredArgsConstructor
 @Setter
 @Getter
+
 @Entity
 @Table(name = "schedules")
 public class Schedule {
@@ -36,9 +40,5 @@ public class Schedule {
         this.startTime = startTime;
         this.endTime = endTime;
         this.workday = workday;
-    }
-
-    public Schedule() {
-
     }
 }
