@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { Doctor } from '../models/doctor.model';
 import { Patient } from '../models/patient.model';
+import { NewAppointment } from '../models/newAppointment.model';
 
 @Injectable({ providedIn: 'root' })
 export class NuevaCitaService {
@@ -32,12 +33,11 @@ export class NuevaCitaService {
     );
   }
 
-  addAppointment(data: {
-    patientId: string;
-    doctorId: string;
-    date: string;
-    time: string;
-  }): Observable<any> {
-    return this.http.post(`${this.apiUrl}/Appointment`,data);
+  addAppointment(data: NewAppointment): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/Appointment`, data);
+  }
+
+  addPatient(patient: Omit<Patient, 'id'>): Observable<Patient> {
+    return this.http.post<Patient>(`${this.apiUrl}/Patient`, patient);
   }
 }
