@@ -148,6 +148,11 @@ export class NewAppointmentSchedulerComponent {
   }
 
   goToDoctorStep() {
+    if (this.patientId) {
+      this.step = 2;
+      return;
+    }
+
     if (this.foundPatient) {
       this.patientId = this.foundPatient.id;
       this.step = 2;
