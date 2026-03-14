@@ -1,123 +1,290 @@
 <div class="min-h-screen bg-blue-50 py-8 px-4">
-  <div class="max-w-2xl mx-auto">
-    <div class="flex items-center gap-3 mb-6">
-      <button routerLink="/agendador" class="text-gray-500 hover:text-gray-700 text-2xl">←</button>
-      <h3 class="text-2xl font-bold text-blue-800">➕ Nueva Cita</h3>
+  <div class="max-w-3xl mx-auto">
+
+    <div class="mb-6">
+      <h1 class="text-blue-800 text-3xl font-bold">Nueva Cita</h1>
+      <p class="text-gray-500 text-lg mt-1">
+        Registre una cita para un paciente
+      </p>
     </div>
 
-    @if (success()) {
-      <div class="bg-green-50 border border-green-300 text-green-700 px-6 py-4 rounded-2xl text-lg">
-        ✅ ¡Cita registrada con éxito!
+    <!-- Step Tabs -->
+    <div class="flex gap-2 mb-6">
+      <div
+        *ngFor="let label of ['1. Paciente','2. Médico y Horario','3. Confirmar']; let i=index"
+        class="flex-1 text-center py-3 rounded-xl text-base font-medium transition-all"
+        [ngClass]="{
+          'bg-blue-600 text-white shadow': step === i+1,
+          'bg-green-100 text-green-700': step > i+1,
+          'bg-white text-gray-400 border border-gray-200': step < i+1
+        }"
+      >
+        {{label}}
       </div>
-    }
+    </div>
 
-    @if (!success()) {
-      <div class="space-y-4">
-        <!-- Buscar paciente -->
-        <div class="bg-white rounded-2xl shadow-md p-6">
-          <h5 class="text-lg font-semibold text-gray-700 mb-4">1. Buscar Paciente</h5>
-          <div class="flex gap-2 mb-3">
+    <div class="bg-white rounded-2xl shadow-xl p-8">
+      <!-- STEP 1 -->
+      <div *ngIf="step === 1" class="space-y-5">
+        <h2 class="text-blue-800 text-2xl mb-4">
+          Datos del Paciente
+        </h2>
+
+        <!-- Document Search -->
+        <div>
+          <label class="block text-gray-700 mb-2 text-lg">Buscar por Número de Documento</label>
+          <div class="flex gap-3">
             <input
               type="text"
-              [value]="documentId()"
-              (input)="documentId.set($any($event.target).value)"
-              placeholder="Número de documento"
-              class="flex-1 border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-3 outline-none"
+              [(ngModel)]="documentId"
+              (keydown.enter)="searchPatient()"
+              placeholder="Ingrese el número de documento"
+              class="flex-1 w-full border-2 border-blue-200 rounded-xl px-4 py-3"
             />
-            <button
-              (click)="searchPatient()"
-              class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl transition-colors"
-            >
-              🔍 Buscar
+
+            <button (click)="searchPatient()"
+              class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl"
+              >🔍 buscar<lucide-icon name="search" [size]="22"></lucide-icon>
             </button>
           </div>
-          @if (notFound()) {
-            <div class="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-xl">
-              Paciente no encontrado.
-            </div>
-          }
-          @if (foundPatient()) {
-            <div
-              class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl font-medium"
-            >
-              👤 {{ foundPatient().firstName }} {{ foundPatient().lastName }} — Doc:
-              {{ foundPatient().documentId }}
-            </div>
-          }
+          <label *ngIf="documentError" class="text-red-500 text-sm">
+            El número de documento debe contener solo números
+          </label>
         </div>
 
-        <!-- Seleccionar médico -->
-        @if (foundPatient()) {
-          <div class="bg-white rounded-2xl shadow-md p-6">
-            <h5 class="text-lg font-semibold text-gray-700 mb-4">2. Seleccionar Médico</h5>
-            <select
-              [value]="selectedDoctorId()"
-              (change)="onDoctorChange($any($event.target).value)"
-              class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-3 outline-none"
-            >
-              <option value="">Seleccione un médico...</option>
-                @for (doc of doctors(); track doc.id) {
-                <option [value]="doc.id">{{ doc.name }} — {{ doc.specialty }}</option>
-                }
-            </select>
+        <!-- Found Patient -->
+        <div *ngIf="foundPatient"
+            class="bg-green-50 border-2 border-green-300 rounded-xl p-5">
+          <div class="flex items-center gap-3 mb-2">
+            <lucide-icon name="check-circle" class="text-green-500" [size]="28"></lucide-icon>
+            <h3 class="text-green-800 text-xl font-semibold">
+              Paciente Encontrado
+            </h3>
           </div>
-        }
 
-        <!-- Seleccionar fecha -->
-        @if (selectedDoctorId()) {
-          <div class="bg-white rounded-2xl shadow-md p-6">
-            <h5 class="text-lg font-semibold text-gray-700 mb-4">3. Seleccionar Fecha</h5>
-            <div class="flex flex-wrap gap-2">
-              @for (date of availableDates(); track date) {
-                <button
-                  (click)="selectDate(date)"
-                  class="px-4 py-2 rounded-xl text-sm font-medium border-2 transition-colors"
-                  [class]="
-                    selectedDate() === date
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'border-blue-300 text-blue-600 hover:bg-blue-50'
-                  "
-                >
-                  {{ formatDate(date) }}
-                </button>
-              }
+          <div class="grid grid-cols-2 gap-3 text-base text-gray-700">
+            <div>
+              <p class="text-gray-500 text-sm">Nombre</p>
+              <p class="font-medium">
+                {{foundPatient.firstName}} {{foundPatient.lastName}}
+              </p>
+            </div>
+
+            <div>
+              <p class="text-gray-500 text-sm">Documento</p>
+              <p class="font-medium">{{foundPatient.documentId}}</p>
+            </div>
+
+            <div>
+              <p class="text-gray-500 text-sm">Celular</p>
+              <p class="font-medium">{{foundPatient.phone}}</p>
+            </div>
+
+            <div>
+              <p class="text-gray-500 text-sm">Género</p>
+              <p class="font-medium">{{foundPatient.gender}}</p>
             </div>
           </div>
-        }
+        </div>
 
-        <!-- Seleccionar hora -->
-        @if (selectedDate()) {
-          <div class="bg-white rounded-2xl shadow-md p-6">
-            <h5 class="text-lg font-semibold text-gray-700 mb-4">4. Seleccionar Hora</h5>
-            <div class="flex flex-wrap gap-2">
-              @for (slot of availableSlots(); track slot) {
-                <button
-                  (click)="selectedTime.set(slot)"
-                  class="px-4 py-2 rounded-xl font-medium border-2 transition-colors"
-                  [class]="
-                    selectedTime() === slot
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'border-blue-300 text-blue-600 hover:bg-blue-50'
-                  "
-                >
-                  🕐 {{ slot }}
-                </button>
-              }
+        <!-- New Patient -->
+        <div *ngIf="notFound" class="space-y-4">
+          <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+            ⚠️ No se encontró el paciente. Complete los datos para registrarlo.
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Nombres -->
+            <div>
+              <label>Nombres *</label>
+              <input
+                type="text"
+                [(ngModel)]="patientForm.firstName"
+                class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
+              />
+              <label *ngIf="firstNameError" class="text-red-500 text-sm">
+                Este campo es obligatorio
+              </label>
+            </div>
+            <!-- Apellidos -->
+            <div>
+              <label>Apellidos *</label>
+              <input
+                type="text"
+                [(ngModel)]="patientForm.lastName"
+                class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
+              />
+              <label *ngIf="lastNameError" class="text-red-500 text-sm">
+                Este campo es obligatorio
+              </label>
+            </div>
+            <!-- Celular -->
+            <div>
+              <label>Celular *</label>
+              <input
+                type="tel"
+                [(ngModel)]="patientForm.phone"
+                class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
+              />
+              <label *ngIf="phoneError" class="text-red-500 text-sm">
+                Ingrese un número de celular válido
+              </label>
+            </div>
+            <!-- Género -->
+            <div>
+              <label>Género *</label>
+              <select
+                [(ngModel)]="patientForm.gender"
+                class="w-full border-2 border-blue-200 rounded-xl px-4 py-3">
+                <option value="">Seleccione...</option>
+                <option value="Hombre">Hombre</option>
+                <option value="Mujer">Mujer</option>
+                <option value="Otro">Otro</option>
+              </select>
+              <label *ngIf="genderError" class="text-red-500 text-sm">
+                Este campo es obligatorio
+              </label>
+            </div>
+            <!-- Fecha nacimiento -->
+            <div>
+              <label>Fecha de Nacimiento</label>
+              <input
+                type="date"
+                 [(ngModel)]="patientForm.birthDate"
+                class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"/>
+              <label *ngIf="birthDateError" class="text-red-500 text-sm">
+                La fecha de nacimiento no válida (debe ser mayor a la actual)
+              </label>
+            </div>
+            <!-- Email -->
+            <div>
+              <label>Correo Electrónico</label>
+              <input
+                type="email"
+                [(ngModel)]="patientForm.email"
+                class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
+              />
+              <label *ngIf="emailError" class="text-red-500 text-sm">
+                El correo electrónico ingresado no es válido
+              </label>
             </div>
           </div>
-        }
-
-        <!-- Confirmar -->
-        @if (selectedTime()) {
-          <button
-            (click)="confirm()"
-            [disabled]="isLoading()"
-            class="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl text-xl font-semibold transition-colors shadow-lg disabled:opacity-50"
-          >
-            {{ isLoading() ? 'Registrando...' : '✅ Confirmar Cita' }}
-          </button>
-        }
+        </div>
+        <button [disabled]="isLoading"
+          *ngIf="foundPatient || notFound"
+          (click)="goToDoctorStep()"
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl text-xl">
+          Continuar →
+        </button>
       </div>
-    }
+
+      <!-- STEP 2 -->
+      <div *ngIf="step === 2" class="space-y-5">
+        <h2 class="text-blue-800 text-2xl mb-4">Seleccionar Médico y Horario</h2>
+        <div>
+          <label>Médico *</label>
+          <select
+            [(ngModel)]="selectedDoctorId"
+            (change)="onDoctorChange()"
+            class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
+          >
+            <option value="">Seleccione un médico...</option>
+            <option *ngFor="let d of doctors"
+                    [value]="d.id">
+              {{d.name}} — {{d.specialty}} (c/{{d.interval}} min)
+            </option>
+          </select>
+        </div>
+
+        <!-- Fecha -->
+        <div *ngIf="availableDates.length">
+          <label>Fecha Disponible *</label>
+          <select
+            [(ngModel)]="selectedDate"
+            (change)="selectDate(selectedDate)"
+            class="w-full border-2 border-blue-200 rounded-xl px-4 py-3">
+            <option value="">Seleccione...</option>
+            <option *ngFor="let date of availableDates"
+                    [value]="date">
+              {{formatDate(date)}}
+            </option>
+          </select>
+        </div>
+
+        <!-- Hours -->
+        <div *ngIf="availableSlots.length">
+          <label>Hora *</label>
+          <div class="grid grid-cols-4 sm:grid-cols-5 gap-2">
+            <button
+              *ngFor="let slot of availableSlots"
+              (click)="selectedTime = slot"
+              class="py-3 rounded-xl border-2 text-base font-semibold"
+              [ngClass]="{
+                'border-blue-500 bg-blue-600 text-white': selectedTime === slot,
+                'border-gray-200 hover:border-blue-400 text-blue-800': selectedTime !== slot
+              }"> {{slot}}
+            </button>
+          </div>
+        </div>
+
+        <div class="flex gap-4 mt-6">
+          <button
+            (click)="step=1"
+            class="border-2 border-gray-300 px-6 py-3 rounded-xl">
+            ← Atrás
+          </button>
+
+          <button
+            [disabled]="!selectedDoctorId || !selectedDate || !selectedTime"
+            (click)="step=3"
+            class="flex-1 bg-blue-600 text-white py-3 rounded-xl"
+          >
+            Revisar Cita →
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div *ngIf="step === 3">
+        <h2 class="text-blue-800 text-2xl mb-6">
+          Confirmar Cita
+        </h2>
+
+        <div class="bg-blue-50 rounded-xl p-6">
+          <h3 class="text-blue-700 text-lg font-semibold mb-3 flex items-center gap-2">
+            <lucide-icon name="user" [size]="20"></lucide-icon>
+            Datos del Paciente
+          </h3>
+
+          <p>
+            <strong>Nombre:</strong>
+            {{foundPatient?.firstName || patientForm.firstName}}
+            {{foundPatient?.lastName || patientForm.lastName}}
+          </p>
+
+          <p>
+            <strong>Documento:</strong>
+            {{foundPatient?.documentId || documentId}}
+          </p>
+
+          <p>
+            <strong>Celular:</strong>
+            {{foundPatient?.phone || patientForm.phone}}
+          </p>
+        </div>
+
+        <div class="flex gap-4 mt-8">
+          <button (click)="step=2"
+            class="border-2 border-gray-300 px-6 py-3 rounded-xl">
+            ← Atrás
+          </button>
+
+          <button (click)="confirm()"
+            class="flex-1 bg-green-600 text-white py-3 rounded-xl flex items-center justify-center gap-2">
+            <lucide-icon name="check-circle" [size]="24"></lucide-icon>
+            Confirmar y Registrar
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
