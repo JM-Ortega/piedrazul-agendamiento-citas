@@ -11,7 +11,6 @@ import java.util.UUID;
 //Servicio para peticiones externas
 @Service
 public class DoctorExternalServiceImpl implements DoctorExternalService {
-
     private final DoctorRepository doctorRepository;
 
     @Override

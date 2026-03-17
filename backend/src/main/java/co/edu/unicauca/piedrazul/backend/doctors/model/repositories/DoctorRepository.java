@@ -10,7 +10,7 @@ import java.util.UUID;
 
 @Repository
 public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
-    // Buscar doctores por especialidad (Muy útil para el frontend de Angular)
+    // Buscar doctores por especialidad
     List<Doctor> findBySpecialty(Specialty specialty);
 
     // Buscar solo los doctores que están activos
