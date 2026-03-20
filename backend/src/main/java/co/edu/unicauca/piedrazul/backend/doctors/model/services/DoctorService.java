@@ -6,12 +6,12 @@ import co.edu.unicauca.piedrazul.backend.doctors.model.exceptions.DateConflictEx
 import co.edu.unicauca.piedrazul.backend.doctors.model.models.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.model.models.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.model.repositories.DoctorRepository;
-import jakarta.persistence.EntityExistsException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 
 
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -162,6 +162,6 @@ public class DoctorService {
     }
 
     public List<Doctor> getDoctorBySpeciality(Specialty specialty) {
-        return doctorRepository.findBySpecialty(specialty);
+        return doctorRepository.findBySpecialty(Collections.singletonList(specialty));
     }
 }

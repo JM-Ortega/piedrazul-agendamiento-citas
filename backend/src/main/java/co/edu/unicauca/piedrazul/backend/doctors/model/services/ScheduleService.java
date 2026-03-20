@@ -3,27 +3,32 @@ package co.edu.unicauca.piedrazul.backend.doctors.model.services;
 import co.edu.unicauca.piedrazul.backend.doctors.model.models.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.model.models.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.model.models.Workday;
-import co.edu.unicauca.piedrazul.backend.doctors.model.repositories.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.doctors.model.repositories.ScheduleRepository;
 import jakarta.transaction.Transactional;
 
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 public class ScheduleService {
     private final ScheduleRepository scheduleRepository;
-    private final DoctorRepository doctorRepository;
 
-    public ScheduleService(ScheduleRepository scheduleRepository, DoctorRepository doctorRepository) {
+    public ScheduleService(ScheduleRepository scheduleRepository) {
         this.scheduleRepository = scheduleRepository;
-        this.doctorRepository = doctorRepository;
     }
 
     // Crear un horario para un doctor específico
     @Transactional
-    public Schedule addSchedule(UUID idDoctor, Schedule schedule) {
-        Doctor doctor = doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new RuntimeException("Doctor not found"));
+    public Schedule addSchedule(Doctor doctor, Schedule schedule) {
+        if (doctor == null || doctor.getIdDoctor() == null) {
+            throw new RuntimeException("Doctor must be provided");
+        }
+
+        boolean alreadyExistsForWorkday = scheduleRepository.findByDoctor(doctor).stream()
+                .anyMatch(existing -> existing.getWorkday().equals(schedule.getWorkday()));
+        if (alreadyExistsForWorkday) {
+            throw new RuntimeException("A schedule for " + schedule.getWorkday() + " already exists");
+        }
 
         schedule.setDoctor(doctor);
         return scheduleRepository.save(schedule);
@@ -31,9 +36,12 @@ public class ScheduleService {
 
     // Modificar el horario para un doctor en un día específico (Workday)
     @Transactional
-    public Schedule updateScheduleByWorkday(UUID idDoctor, Workday workday, Schedule newScheduleData) {
-        // Buscamos el horario existente para ese doctor y ese día
-        List<Schedule> schedules = scheduleRepository.findByIdDoctor(idDoctor);
+    public Schedule updateScheduleByWorkday(Doctor doctor, Workday workday, Schedule newScheduleData) {
+        if (doctor == null || doctor.getIdDoctor() == null) {
+            throw new RuntimeException("Doctor must be provided");
+        }
+
+        List<Schedule> schedules = scheduleRepository.findByDoctor(doctor);
 
         Schedule existingSchedule = schedules.stream()
                 .filter(s -> s.getWorkday().equals(workday))
@@ -47,7 +55,51 @@ public class ScheduleService {
         return scheduleRepository.save(existingSchedule);
     }
 
-    public List<Schedule> getSchedulesByDoctor(UUID idDoctor) {
-        return scheduleRepository.findByIdDoctor(idDoctor);
+    public List<Schedule> getSchedulesByDoctor(Doctor doctor) {
+        if (doctor == null || doctor.getIdDoctor() == null) {
+            throw new RuntimeException("Doctor must be provided");
+        }
+        return scheduleRepository.findByDoctor(doctor);
+    }
+
+    public List<LocalTime> getAvailableIntervalsByWorkday(Doctor doctor, Workday workday) {
+        if (doctor == null || doctor.getIdDoctor() == null) {
+            throw new RuntimeException("Doctor must be provided");
+        }
+
+        int appointmentInterval = doctor.getAppointmentInterval();
+        if (appointmentInterval <= 0) {
+            throw new RuntimeException("Doctor appointment interval must be greater than 0");
+        }
+
+        List<Schedule> schedules = scheduleRepository.findByDoctor(doctor).stream()
+                .filter(schedule -> schedule.getWorkday().equals(workday))
+                .toList();
+
+        if (schedules.isEmpty()) {
+            throw new RuntimeException("Doctor does not work on " + workday);
+        }
+        if (schedules.size() > 1) {
+            throw new RuntimeException("Doctor has more than one schedule for " + workday);
+        }
+
+        Schedule workdaySchedule = schedules.getFirst();
+
+        LocalTime startTime = workdaySchedule.getStartTime();
+        LocalTime endTime = workdaySchedule.getEndTime();
+        if (!startTime.isBefore(endTime)) {
+            throw new RuntimeException("Invalid schedule range for " + workday);
+        }
+
+        List<LocalTime> availableIntervals = new ArrayList<>();
+        LocalTime current = startTime;
+
+        // El slot es valido solo si cabe completo dentro del rango laboral.
+        while (!current.plusMinutes(appointmentInterval).isAfter(endTime)) {
+            availableIntervals.add(current);
+            current = current.plusMinutes(appointmentInterval);
+        }
+
+        return availableIntervals;
     }
 }

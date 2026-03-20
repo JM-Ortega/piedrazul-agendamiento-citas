@@ -11,11 +11,8 @@ import java.util.UUID;
 @Repository
 public interface ScheduleRepository extends JpaRepository<Schedule, UUID> {
     // Obtener todos los horarios de un doctor específico
-    List<Schedule> findByIdDoctor(Doctor doctor);
-
-    // Buscar horarios por el ID del doctor
-    List<Schedule> findByIdDoctor(UUID idDoctor);
+    List<Schedule> findByDoctor(Doctor doctor);
 
     // Buscar horarios de un doctor en un día de trabajo específico (ej. LUNES)
-    List<Schedule> findByIdDoctorAndWorkday(Doctor doctor, Object workday);
+    List<Schedule> findByDoctorAndWorkday(Doctor doctor, Object workday);
 }

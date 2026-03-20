@@ -14,7 +14,12 @@ import java.util.UUID;
 @Getter
 
 @Entity
-@Table(name = "schedules")
+@Table(
+        name = "schedules",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_schedule_doctor_workday", columnNames = {"id_doctor", "workday"})
+        }
+)
 public class Schedule {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)

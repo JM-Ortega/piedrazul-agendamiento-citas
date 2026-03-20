@@ -52,7 +52,7 @@ public class Doctor {
     @Column(name = "schedulable_weeks", nullable = false)
     private int schedulableWeeks;
 
-    @OneToMany(mappedBy = "idDoctor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "doctor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Schedule> schedules = new ArrayList<>();
 
     //Al momento de registrar/crearle una cuenta al doctor se le deben llenar todos estos campos,
