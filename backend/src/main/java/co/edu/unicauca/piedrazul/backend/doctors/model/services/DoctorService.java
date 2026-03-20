@@ -128,30 +128,6 @@ public class DoctorService {
         return DoctorResponse.fromEntity(updatedDoctor);
     }
 
-    // Deshabilitar al doctor (Cambiar status)
-    @Transactional
-    public Doctor setDoctorStatus(UUID idDoctor, boolean status, boolean force) {
-        Doctor doctor = doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new EntityNotFoundException("Doctor not found"));
-
-        LocalDate today = LocalDate.now();
-
-        // Si se intenta deshabilitar y hoy es antes de la fecha de inicio
-        if (!status && today.isBefore(doctor.getLaborStart()) && !force) {
-            throw new DateConflictException(
-                    "La fecha de fin quedará antes de la fecha de inicio. ¿Desea continuar?"
-            );
-        }
-
-        doctor.setStatus(status);
-
-        if (!status) {
-            doctor.setLaborEnd(today);
-        }
-
-        return doctorRepository.save(doctor);
-    }
-
     public List<Doctor> findAllDoctors() {
         return doctorRepository.findAll();
     }

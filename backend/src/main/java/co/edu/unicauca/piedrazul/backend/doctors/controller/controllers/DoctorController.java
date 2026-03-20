@@ -139,31 +139,6 @@ public class DoctorController {
     }
 
     /**
-     * Actualizar el estado de un doctor
-     * @param doctorId ID del doctor
-     * @param status Nuevo estado (true = habilitado, false = deshabilitado)
-     * @param force Forzar el cambio
-     * @return El doctor actualizado
-     */
-    @PutMapping("/{doctorId}/status")
-    public ResponseEntity<?> setDoctorStatus(
-            @PathVariable UUID doctorId,
-            @RequestParam boolean status,
-            @RequestParam(defaultValue = "false") boolean force
-    ) {
-        try {
-            Doctor doctor = doctorService.setDoctorStatus(doctorId, status, force);
-            return ResponseEntity.ok(DoctorResponse.fromEntity(doctor));
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Doctor not found: " + e.getMessage());
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error updating doctor status: " + e.getMessage());
-        }
-    }
-
-    /**
      * Actualizar el estado del doctor basado en las fechas de labor
      * (Se ejecuta automáticamente para sincronizar con la fecha actual)
      * @param doctorId ID del doctor
