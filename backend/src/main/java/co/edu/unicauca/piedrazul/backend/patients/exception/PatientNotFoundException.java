@@ -1,12 +1,14 @@
 package co.edu.unicauca.piedrazul.backend.patients.exception;
 
+import java.util.UUID;
+
 public class PatientNotFoundException extends RuntimeException {
 
-    public PatientNotFoundException(String documentNumber) {
-        super("Patient with document number " + documentNumber + " was not found");
+    public PatientNotFoundException(UUID id) {
+        super("Patient not found with id: " + id);
     }
 
-    public PatientNotFoundException() {
-        super("Patient was not found");
+    public PatientNotFoundException(String documentNumber) {
+        super("Patient not found with document number: " + documentNumber);
     }
 }
