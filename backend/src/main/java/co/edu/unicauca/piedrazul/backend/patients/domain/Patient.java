@@ -15,10 +15,11 @@ public class Patient {
     private UUID id;
 
     @Column(name = "user_id")
-    private UUID userId; // opcional
+    private UUID userId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "document_type", nullable = false, length = 20)
-    private String documentType;
+    private DocumentType documentType;
 
     @Column(name = "document_number", nullable = false, unique = true, length = 20)
     private String documentNumber;
@@ -35,8 +36,9 @@ public class Patient {
     @Column(name = "email")
     private String email;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "gender", nullable = false, length = 20)
-    private String gender;
+    private Gender gender;
 
     @Column(name = "birth_date", nullable = false)
     private LocalDate birthDate;
@@ -48,19 +50,18 @@ public class Patient {
     }
 
     public Patient(
-            String documentType,
+            DocumentType documentType,
             String documentNumber,
             String firstName,
             String lastName,
             String phone,
             String email,
-            String gender,
+            Gender gender,
             LocalDate birthDate,
             String guardianPhone,
             UUID userId
     ) {
-
-        if (documentType == null || documentType.isBlank())
+        if (documentType == null)
             throw new IllegalArgumentException("documentType is required");
 
         if (documentNumber == null || documentNumber.isBlank())
@@ -75,7 +76,7 @@ public class Patient {
         if (phone == null || phone.isBlank())
             throw new IllegalArgumentException("phone is required");
 
-        if (gender == null || gender.isBlank())
+        if (gender == null)
             throw new IllegalArgumentException("gender is required");
 
         if (birthDate == null)
@@ -93,7 +94,6 @@ public class Patient {
         this.userId = userId;
     }
 
-
     public UUID getId() {
         return id;
     }
@@ -102,7 +102,7 @@ public class Patient {
         return userId;
     }
 
-    public String getDocumentType() {
+    public DocumentType getDocumentType() {
         return documentType;
     }
 
@@ -126,7 +126,7 @@ public class Patient {
         return email;
     }
 
-    public String getGender() {
+    public Gender getGender() {
         return gender;
     }
 
