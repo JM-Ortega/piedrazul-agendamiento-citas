@@ -14,9 +14,9 @@
         *ngFor="let label of ['1. Paciente','2. Médico y Horario','3. Confirmar']; let i=index"
         class="flex-1 text-center py-3 rounded-xl text-base font-medium transition-all"
         [ngClass]="{
-          'bg-blue-600 text-white shadow': step === i+1,
-          'bg-green-100 text-green-700': step > i+1,
-          'bg-white text-gray-400 border border-gray-200': step < i+1
+          'bg-blue-600 text-white shadow': step() === i+1,
+          'bg-green-100 text-green-700': step() > i+1,
+          'bg-white text-gray-400 border border-gray-200': step() < i+1
         }"
       >
         {{label}}
@@ -24,11 +24,10 @@
     </div>
 
     <div class="bg-white rounded-2xl shadow-xl p-8">
+
       <!-- STEP 1 -->
-      <div *ngIf="step === 1" class="space-y-5">
-        <h2 class="text-blue-800 text-2xl mb-4">
-          Datos del Paciente
-        </h2>
+      <div *ngIf="step() === 1" class="space-y-5">
+        <h2 class="text-blue-800 text-2xl mb-4">Datos del Paciente</h2>
 
         <!-- Document Search -->
         <div>
@@ -36,59 +35,51 @@
           <div class="flex gap-3">
             <input
               type="text"
-              [(ngModel)]="documentId"
-              (keydown.enter)="searchPatient()"
+              [ngModel]="documentId()"
+              (ngModelChange)="documentId.set($event)"
+              (keyup.enter)="searchPatient()"
               placeholder="Ingrese el número de documento"
               class="flex-1 w-full border-2 border-blue-200 rounded-xl px-4 py-3"
             />
-
             <button (click)="searchPatient()"
-              class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl"
-              >🔍 buscar<lucide-icon name="search" [size]="22"></lucide-icon>
+              class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl">
+              🔍 buscar
             </button>
           </div>
-          <label *ngIf="documentError" class="text-red-500 text-sm">
+          <label *ngIf="documentError()" class="text-red-500 text-sm">
             El número de documento debe contener solo números
           </label>
         </div>
 
         <!-- Found Patient -->
-        <div *ngIf="foundPatient"
+        <div *ngIf="foundPatient() as p"
             class="bg-green-50 border-2 border-green-300 rounded-xl p-5">
           <div class="flex items-center gap-3 mb-2">
             <lucide-icon name="check-circle" class="text-green-500" [size]="28"></lucide-icon>
-            <h3 class="text-green-800 text-xl font-semibold">
-              Paciente Encontrado
-            </h3>
+            <h3 class="text-green-800 text-xl font-semibold">Paciente Encontrado</h3>
           </div>
-
           <div class="grid grid-cols-2 gap-3 text-base text-gray-700">
             <div>
               <p class="text-gray-500 text-sm">Nombre</p>
-              <p class="font-medium">
-                {{foundPatient.firstName}} {{foundPatient.lastName}}
-              </p>
+              <p class="font-medium">{{p.firstName}} {{p.lastName}}</p>
             </div>
-
             <div>
               <p class="text-gray-500 text-sm">Documento</p>
-              <p class="font-medium">{{foundPatient.documentId}}</p>
+              <p class="font-medium">{{p.documentId}}</p>
             </div>
-
             <div>
               <p class="text-gray-500 text-sm">Celular</p>
-              <p class="font-medium">{{foundPatient.phone}}</p>
+              <p class="font-medium">{{p.phone}}</p>
             </div>
-
             <div>
               <p class="text-gray-500 text-sm">Género</p>
-              <p class="font-medium">{{foundPatient.gender}}</p>
+              <p class="font-medium">{{p.gender}}</p>
             </div>
           </div>
         </div>
 
-        <!-- New Patient -->
-        <div *ngIf="notFound" class="space-y-4">
+        <!-- New Patient Form -->
+        <div *ngIf="notFound()" class="space-y-4">
           <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
             ⚠️ No se encontró el paciente. Complete los datos para registrarlo.
           </div>
@@ -98,10 +89,11 @@
               <label>Nombres *</label>
               <input
                 type="text"
-                [(ngModel)]="patientForm.firstName"
+                [ngModel]="getPatientField('firstName')"
+                (ngModelChange)="setPatientField('firstName', $event)"
                 class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
               />
-              <label *ngIf="firstNameError" class="text-red-500 text-sm">
+              <label *ngIf="firstNameError()" class="text-red-500 text-sm">
                 Este campo es obligatorio
               </label>
             </div>
@@ -110,10 +102,11 @@
               <label>Apellidos *</label>
               <input
                 type="text"
-                [(ngModel)]="patientForm.lastName"
+                [ngModel]="getPatientField('lastName')"
+                (ngModelChange)="setPatientField('lastName', $event)"
                 class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
               />
-              <label *ngIf="lastNameError" class="text-red-500 text-sm">
+              <label *ngIf="lastNameError()" class="text-red-500 text-sm">
                 Este campo es obligatorio
               </label>
             </div>
@@ -122,10 +115,11 @@
               <label>Celular *</label>
               <input
                 type="tel"
-                [(ngModel)]="patientForm.phone"
+                [ngModel]="getPatientField('phone')"
+                (ngModelChange)="setPatientField('phone', $event)"
                 class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
               />
-              <label *ngIf="phoneError" class="text-red-500 text-sm">
+              <label *ngIf="phoneError()" class="text-red-500 text-sm">
                 Ingrese un número de celular válido
               </label>
             </div>
@@ -133,14 +127,15 @@
             <div>
               <label>Género *</label>
               <select
-                [(ngModel)]="patientForm.gender"
+                [ngModel]="getPatientField('gender')"
+                (ngModelChange)="setPatientField('gender', $event)"
                 class="w-full border-2 border-blue-200 rounded-xl px-4 py-3">
                 <option value="">Seleccione...</option>
                 <option value="Hombre">Hombre</option>
                 <option value="Mujer">Mujer</option>
                 <option value="Otro">Otro</option>
               </select>
-              <label *ngIf="genderError" class="text-red-500 text-sm">
+              <label *ngIf="genderError()" class="text-red-500 text-sm">
                 Este campo es obligatorio
               </label>
             </div>
@@ -149,10 +144,12 @@
               <label>Fecha de Nacimiento</label>
               <input
                 type="date"
-                 [(ngModel)]="patientForm.birthDate"
-                class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"/>
-              <label *ngIf="birthDateError" class="text-red-500 text-sm">
-                La fecha de nacimiento no válida (debe ser mayor a la actual)
+                [ngModel]="getPatientField('birthDate')"
+                (ngModelChange)="setPatientField('birthDate', $event)"
+                class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
+              />
+              <label *ngIf="birthDateError()" class="text-red-500 text-sm">
+                Fecha de nacimiento no válida
               </label>
             </div>
             <!-- Email -->
@@ -160,17 +157,20 @@
               <label>Correo Electrónico</label>
               <input
                 type="email"
-                [(ngModel)]="patientForm.email"
+                [ngModel]="getPatientField('email')"
+                (ngModelChange)="setPatientField('email', $event)"
                 class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
               />
-              <label *ngIf="emailError" class="text-red-500 text-sm">
+              <label *ngIf="emailError()" class="text-red-500 text-sm">
                 El correo electrónico ingresado no es válido
               </label>
             </div>
           </div>
         </div>
-        <button [disabled]="isLoading"
-          *ngIf="foundPatient || notFound"
+
+        <button
+          [disabled]="isLoading()"
+          *ngIf="foundPatient() || notFound()"
           (click)="goToDoctorStep()"
           class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl text-xl">
           Continuar →
@@ -178,106 +178,89 @@
       </div>
 
       <!-- STEP 2 -->
-      <div *ngIf="step === 2" class="space-y-5">
+      <div *ngIf="step() === 2" class="space-y-5">
         <h2 class="text-blue-800 text-2xl mb-4">Seleccionar Médico y Horario</h2>
+
         <div>
           <label>Médico *</label>
           <select
-            [(ngModel)]="selectedDoctorId"
-            (change)="onDoctorChange()"
+            [ngModel]="selectedDoctorId()"
+            (ngModelChange)="onDoctorChange($event)"
             class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
           >
             <option value="">Seleccione un médico...</option>
-            <option *ngFor="let d of doctors"
-                    [value]="d.id">
-              {{d.name}} — {{d.specialty}} (c/{{d.interval}} min)
+            <option *ngFor="let d of doctors()" [value]="d.id">
+              {{d.name}} — {{d.specialty}}
             </option>
           </select>
         </div>
 
         <!-- Fecha -->
-        <div *ngIf="availableDates.length">
+        <div *ngIf="availableDates().length">
           <label>Fecha Disponible *</label>
           <select
-            [(ngModel)]="selectedDate"
-            (change)="selectDate(selectedDate)"
+            [ngModel]="selectedDate()"
+            (ngModelChange)="selectDate($event)"
             class="w-full border-2 border-blue-200 rounded-xl px-4 py-3">
             <option value="">Seleccione...</option>
-            <option *ngFor="let date of availableDates"
-                    [value]="date">
+            <option *ngFor="let date of availableDates()" [value]="date">
               {{formatDate(date)}}
             </option>
           </select>
         </div>
 
         <!-- Hours -->
-        <div *ngIf="availableSlots.length">
+        <div *ngIf="availableSlots().length">
           <label>Hora *</label>
           <div class="grid grid-cols-4 sm:grid-cols-5 gap-2">
             <button
-              *ngFor="let slot of availableSlots"
-              (click)="selectedTime = slot"
+              *ngFor="let slot of availableSlots()"
+              (click)="selectedTime.set(slot)"
               class="py-3 rounded-xl border-2 text-base font-semibold"
               [ngClass]="{
-                'border-blue-500 bg-blue-600 text-white': selectedTime === slot,
-                'border-gray-200 hover:border-blue-400 text-blue-800': selectedTime !== slot
-              }"> {{slot}}
+                'border-blue-500 bg-blue-600 text-white': selectedTime() === slot,
+                'border-gray-200 hover:border-blue-400 text-blue-800': selectedTime() !== slot
+              }">
+              {{slot}}
             </button>
           </div>
         </div>
 
         <div class="flex gap-4 mt-6">
           <button
-            (click)="step=1"
+            (click)="step.set(1)"
             class="border-2 border-gray-300 px-6 py-3 rounded-xl">
             ← Atrás
           </button>
-
           <button
-            [disabled]="!selectedDoctorId || !selectedDate || !selectedTime"
-            (click)="step=3"
-            class="flex-1 bg-blue-600 text-white py-3 rounded-xl"
-          >
+            [disabled]="!canGoToStep3()"
+            (click)="step.set(3)"
+            class="flex-1 bg-blue-600 text-white py-3 rounded-xl">
             Revisar Cita →
           </button>
         </div>
       </div>
 
       <!-- STEP 3 -->
-      <div *ngIf="step === 3">
-        <h2 class="text-blue-800 text-2xl mb-6">
-          Confirmar Cita
-        </h2>
+      <div *ngIf="step() === 3">
+        <h2 class="text-blue-800 text-2xl mb-6">Confirmar Cita</h2>
 
         <div class="bg-blue-50 rounded-xl p-6">
           <h3 class="text-blue-700 text-lg font-semibold mb-3 flex items-center gap-2">
             <lucide-icon name="user" [size]="20"></lucide-icon>
             Datos del Paciente
           </h3>
-
-          <p>
-            <strong>Nombre:</strong>
-            {{foundPatient?.firstName || patientForm.firstName}}
-            {{foundPatient?.lastName || patientForm.lastName}}
-          </p>
-
-          <p>
-            <strong>Documento:</strong>
-            {{foundPatient?.documentId || documentId}}
-          </p>
-
-          <p>
-            <strong>Celular:</strong>
-            {{foundPatient?.phone || patientForm.phone}}
-          </p>
+          <!-- Ahora se leen de computed(), sin lógica en el template -->
+          <p><strong>Nombre:</strong> {{confirmFirstName()}} {{confirmLastName()}}</p>
+          <p><strong>Documento:</strong> {{confirmDocument()}}</p>
+          <p><strong>Celular:</strong> {{confirmPhone()}}</p>
         </div>
 
         <div class="flex gap-4 mt-8">
-          <button (click)="step=2"
+          <button (click)="step.set(2)"
             class="border-2 border-gray-300 px-6 py-3 rounded-xl">
             ← Atrás
           </button>
-
           <button (click)="confirm()"
             class="flex-1 bg-green-600 text-white py-3 rounded-xl flex items-center justify-center gap-2">
             <lucide-icon name="check-circle" [size]="24"></lucide-icon>
@@ -285,6 +268,7 @@
           </button>
         </div>
       </div>
+
     </div>
   </div>
 </div>
