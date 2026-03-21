@@ -1,4 +1,4 @@
 package co.edu.unicauca.piedrazul.backend.appointment.external;
 
-public class AppointmentExternalServiceImpl {
+public class AppointmentExternalServiceImpl implements AppointmentExternalService{
 }
