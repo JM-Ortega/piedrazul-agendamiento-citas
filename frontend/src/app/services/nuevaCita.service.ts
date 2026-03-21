@@ -1,36 +1,35 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { Observable, of, tap, throwError } from 'rxjs';
-import { DoctorSelected } from '../pages/nueva-cita/DTO/doctorSelected.model';
 import { Patient } from '../models/patient.model';
-import { NewAppointment } from '../pages/nueva-cita/DTO/newAppointment.model';
+import { NewAppointment } from '../pages/nueva-cita/DTO/newAppointment';
+import { SpecialtyDoctor } from '../pages/nueva-cita/DTO/specialty-doctor';
 
 @Injectable({ providedIn: 'root' })
 export class NuevaCitaService {
   private http = inject(HttpClient);
   private apiUrl = 'https://API';
 
-  readonly doctors = signal<DoctorSelected[]>([]);
+  readonly doctors = signal<SpecialtyDoctor[]>([]);
 
-  getDoctors(): Observable<DoctorSelected[]> {
+  getDoctors(): Observable<SpecialtyDoctor[]> {
     if (this.doctors().length > 0) {
       return of(this.doctors());
     }
 
     //return this.http.get<Doctor[]>(`${this.apiUrl}/Doctor/doctors`).pipe(
-    return of<DoctorSelected[]>([
+    return of<SpecialtyDoctor[]>([
       {
-        id: '2',
-        name: 'Ibis Gonzales',
-        specialty: 'terapista'
+        specialty: 'terapista',
+        doctorId: '2',
+        doctorName: 'Ibis Gonzales'
       },
       {
-        id: '3',
-        name: 'Clara Gomez',
-        specialty: 'neurocirujano'
+        specialty: 'neurocirujano',
+        doctorId: '3',
+        doctorName: 'Clara Gomez'
       }
     ]).pipe(
-      // Sincroniza el signal interno cada vez que llegan datos frescos
       tap(data => this.doctors.set(data))
     );
   }
@@ -48,6 +47,32 @@ export class NuevaCitaService {
     return of(paciente);
   
    //return throwError(() => ({ status: 404 }));
+  }
+
+  getSpecialtiesWithDoctor(): Observable<SpecialtyDoctor[]> {
+    // return this.http.get<SpecialtyDoctor[]>(`${this.apiUrl}/Doctor/specialties-with-doctor`);
+    return of<SpecialtyDoctor[]>([
+      { specialty: 'Cardiología',     doctorId: '2', doctorName: 'Ibis Gonzales' },
+      { specialty: 'Neurología',      doctorId: '3', doctorName: 'Clara Gomez'   },
+      { specialty: 'Pediatría',       doctorId: '2', doctorName: 'Ibis Gonzales' },
+      { specialty: 'Traumatología',   doctorId: '3', doctorName: 'Clara Gomez'   },
+    ]);
+  }
+
+  getSpecialties(): Observable<string[]> {
+    // return this.http.get<string[]>(`${this.apiUrl}/Doctor/specialties`);
+    return of(['Cardiología', 'Neurología', 'Pediatría', 'Traumatología']);
+  }
+
+  getDoctorsBySpecialty(specialty: string): Observable<{ doctorId: string; doctorName: string }[]> {
+    // return this.http.get<...>(`${this.apiUrl}/Doctor/by-specialty/${specialty}`);
+    const map: Record<string, { doctorId: string; doctorName: string }[]> = {
+      'Cardiología':   [{ doctorId: '2', doctorName: 'Ibis Gonzales' }],
+      'Neurología':    [{ doctorId: '3', doctorName: 'Clara Gomez'   }],
+      'Pediatría':     [{ doctorId: '2', doctorName: 'Ibis Gonzales' }],
+      'Traumatología': [{ doctorId: '3', doctorName: 'Clara Gomez'   }],
+    };
+    return of(map[specialty] ?? []);
   }
 
   //return this.http.get<string[]>(`${this.apiUrl}/Doctor/${doctorId}/available-dates`);
