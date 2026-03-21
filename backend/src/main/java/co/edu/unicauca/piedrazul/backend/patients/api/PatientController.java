@@ -1,6 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.patients.api;
 
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.*;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.CreatePatientRequest;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.CreatePatientWithUserRequest;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.LinkUserAccountRequest;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientResponse;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientSummaryResponse;
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientService;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
@@ -11,7 +15,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/API/patients")
+@RequestMapping("/api/patients")
 public class PatientController {
 
     private final PatientService patientService;
@@ -20,7 +24,7 @@ public class PatientController {
         this.patientService = patientService;
     }
 
-    @PostMapping("/create")
+    @PostMapping
     public PatientResponse create(@Valid @RequestBody CreatePatientRequest request) {
         Patient patient = patientService.createPatient(
                 request.getDocumentType(),
@@ -37,7 +41,7 @@ public class PatientController {
         return toResponse(patient);
     }
 
-    @PostMapping("/create-with-user")
+    @PostMapping("/with-user")
     public PatientResponse createWithUser(@Valid @RequestBody CreatePatientWithUserRequest request) {
         Patient patient = patientService.createPatientWithUser(
                 request.getUsername(),
@@ -65,15 +69,15 @@ public class PatientController {
         return toResponse(patient);
     }
 
-    @GetMapping("/find-by-id/{id}")
+    @GetMapping("/{id}")
     public PatientResponse findById(@PathVariable UUID id) {
         Patient patient = patientService.findById(id)
-                .orElseThrow(PatientNotFoundException::new);
+                .orElseThrow(() -> new PatientNotFoundException(id));
 
         return toResponse(patient);
     }
 
-    @GetMapping("/find-by-document/{documentNumber}")
+    @GetMapping("/document/{documentNumber}")
     public PatientResponse findByDocument(@PathVariable String documentNumber) {
         Patient patient = patientService.findByDocumentNumber(documentNumber)
                 .orElseThrow(() -> new PatientNotFoundException(documentNumber));
@@ -81,7 +85,7 @@ public class PatientController {
         return toResponse(patient);
     }
 
-    @GetMapping("/find-all")
+    @GetMapping
     public List<PatientSummaryResponse> findAll() {
         return patientService.findAll()
                 .stream()
@@ -89,7 +93,7 @@ public class PatientController {
                 .toList();
     }
 
-    @GetMapping("/exists/{id}")
+    @GetMapping("/{id}/exists")
     public boolean existsById(@PathVariable UUID id) {
         return patientService.existsById(id);
     }

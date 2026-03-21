@@ -1,5 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.patients.api.dto;
 
+import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
+import co.edu.unicauca.piedrazul.backend.patients.domain.Gender;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -10,8 +12,8 @@ public class CreatePatientWithUserRequest {
     @NotBlank
     private String username;
 
-    @NotBlank
-    private String documentType;
+    @NotNull
+    private DocumentType documentType;
 
     @NotBlank
     private String documentNumber;
@@ -27,94 +29,51 @@ public class CreatePatientWithUserRequest {
 
     private String email;
 
-    @NotBlank
-    private String gender;
+    @NotNull
+    private Gender gender;
 
     @NotNull
     private LocalDate birthDate;
 
     private String guardianPhone;
 
-    public CreatePatientWithUserRequest() {
-    }
-
     public String getUsername() {
         return username;
     }
 
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getDocumentType() {
+    public DocumentType getDocumentType() {
         return documentType;
-    }
-
-    public void setDocumentType(String documentType) {
-        this.documentType = documentType;
     }
 
     public String getDocumentNumber() {
         return documentNumber;
     }
 
-    public void setDocumentNumber(String documentNumber) {
-        this.documentNumber = documentNumber;
-    }
-
     public String getFirstName() {
         return firstName;
-    }
-
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
     }
 
     public String getLastName() {
         return lastName;
     }
 
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
-
     public String getPhone() {
         return phone;
-    }
-
-    public void setPhone(String phone) {
-        this.phone = phone;
     }
 
     public String getEmail() {
         return email;
     }
 
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getGender() {
+    public Gender getGender() {
         return gender;
-    }
-
-    public void setGender(String gender) {
-        this.gender = gender;
     }
 
     public LocalDate getBirthDate() {
         return birthDate;
     }
 
-    public void setBirthDate(LocalDate birthDate) {
-        this.birthDate = birthDate;
-    }
-
     public String getGuardianPhone() {
         return guardianPhone;
-    }
-
-    public void setGuardianPhone(String guardianPhone) {
-        this.guardianPhone = guardianPhone;
     }
 }

@@ -1,6 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.patients.application;
 
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
+import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
+import co.edu.unicauca.piedrazul.backend.patients.domain.Gender;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
 import co.edu.unicauca.piedrazul.backend.patients.exception.InvalidPatientDataException;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyExistsException;
@@ -31,13 +33,13 @@ public class PatientService implements PatientModuleApi {
     }
 
     public Patient createPatient(
-            String documentType,
+            DocumentType documentType,
             String documentNumber,
             String firstName,
             String lastName,
             String phone,
             String email,
-            String gender,
+            Gender gender,
             LocalDate birthDate,
             String guardianPhone
     ) {
@@ -62,13 +64,13 @@ public class PatientService implements PatientModuleApi {
 
     public Patient createPatientWithUser(
             String username,
-            String documentType,
+            DocumentType documentType,
             String documentNumber,
             String firstName,
             String lastName,
             String phone,
             String email,
-            String gender,
+            Gender gender,
             LocalDate birthDate,
             String guardianPhone
     ) {
@@ -152,13 +154,13 @@ public class PatientService implements PatientModuleApi {
     }
 
     private Patient buildPatient(
-            String documentType,
+            DocumentType documentType,
             String documentNumber,
             String firstName,
             String lastName,
             String phone,
             String email,
-            String gender,
+            Gender gender,
             LocalDate birthDate,
             String guardianPhone,
             UUID userId

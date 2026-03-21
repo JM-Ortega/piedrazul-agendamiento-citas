@@ -1,35 +1,35 @@
 package co.edu.unicauca.piedrazul.backend.patients.api.dto;
 
+import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
+import co.edu.unicauca.piedrazul.backend.patients.domain.Gender;
+
 import java.time.LocalDate;
 import java.util.UUID;
 
 public class PatientResponse {
 
-    private UUID id;
-    private UUID userId;
-    private String documentType;
-    private String documentNumber;
-    private String firstName;
-    private String lastName;
-    private String phone;
-    private String email;
-    private String gender;
-    private LocalDate birthDate;
-    private String guardianPhone;
-
-    public PatientResponse() {
-    }
+    private final UUID id;
+    private final UUID userId;
+    private final DocumentType documentType;
+    private final String documentNumber;
+    private final String firstName;
+    private final String lastName;
+    private final String phone;
+    private final String email;
+    private final Gender gender;
+    private final LocalDate birthDate;
+    private final String guardianPhone;
 
     public PatientResponse(
             UUID id,
             UUID userId,
-            String documentType,
+            DocumentType documentType,
             String documentNumber,
             String firstName,
             String lastName,
             String phone,
             String email,
-            String gender,
+            Gender gender,
             LocalDate birthDate,
             String guardianPhone
     ) {
@@ -54,7 +54,7 @@ public class PatientResponse {
         return userId;
     }
 
-    public String getDocumentType() {
+    public DocumentType getDocumentType() {
         return documentType;
     }
 
@@ -78,7 +78,7 @@ public class PatientResponse {
         return email;
     }
 
-    public String getGender() {
+    public Gender getGender() {
         return gender;
     }
 
@@ -88,49 +88,5 @@ public class PatientResponse {
 
     public String getGuardianPhone() {
         return guardianPhone;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public void setUserId(UUID userId) {
-        this.userId = userId;
-    }
-
-    public void setDocumentType(String documentType) {
-        this.documentType = documentType;
-    }
-
-    public void setDocumentNumber(String documentNumber) {
-        this.documentNumber = documentNumber;
-    }
-
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
-
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
-
-    public void setPhone(String phone) {
-        this.phone = phone;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public void setGender(String gender) {
-        this.gender = gender;
-    }
-
-    public void setBirthDate(LocalDate birthDate) {
-        this.birthDate = birthDate;
-    }
-
-    public void setGuardianPhone(String guardianPhone) {
-        this.guardianPhone = guardianPhone;
     }
 }
