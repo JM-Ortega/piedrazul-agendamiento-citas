@@ -1,0 +1,197 @@
+package co.edu.unicauca.piedrazul.backend.patients.application;
+
+import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
+import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
+import co.edu.unicauca.piedrazul.backend.patients.exception.InvalidPatientDataException;
+import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyExistsException;
+import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyLinkedUserException;
+import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
+import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientRepository;
+import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
+import co.edu.unicauca.piedrazul.backend.user.domain.Role;
+import co.edu.unicauca.piedrazul.backend.user.domain.User;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Service
+@Transactional
+public class PatientService implements PatientModuleApi {
+
+    private final PatientRepository patientRepository;
+    private final UserModuleApi userModuleApi;
+
+    public PatientService(PatientRepository patientRepository, UserModuleApi userModuleApi) {
+        this.patientRepository = patientRepository;
+        this.userModuleApi = userModuleApi;
+    }
+
+    public Patient createPatient(
+            String documentType,
+            String documentNumber,
+            String firstName,
+            String lastName,
+            String phone,
+            String email,
+            String gender,
+            LocalDate birthDate,
+            String guardianPhone
+    ) {
+        validateDocumentNumber(documentNumber);
+        ensurePatientDoesNotExist(documentNumber);
+
+        Patient patient = buildPatient(
+                documentType,
+                documentNumber,
+                firstName,
+                lastName,
+                phone,
+                email,
+                gender,
+                birthDate,
+                guardianPhone,
+                null
+        );
+
+        return patientRepository.save(patient);
+    }
+
+    public Patient createPatientWithUser(
+            String username,
+            String documentType,
+            String documentNumber,
+            String firstName,
+            String lastName,
+            String phone,
+            String email,
+            String gender,
+            LocalDate birthDate,
+            String guardianPhone
+    ) {
+        validateUsername(username);
+        validateDocumentNumber(documentNumber);
+        ensurePatientDoesNotExist(documentNumber);
+
+        User user = userModuleApi.createUser(username, Role.PATIENT);
+
+        Patient patient = buildPatient(
+                documentType,
+                documentNumber,
+                firstName,
+                lastName,
+                phone,
+                email,
+                gender,
+                birthDate,
+                guardianPhone,
+                user.getId()
+        );
+
+        return patientRepository.save(patient);
+    }
+
+    public Patient linkUserToExistingPatient(String documentNumber, String username) {
+        validateDocumentNumber(documentNumber);
+        validateUsername(username);
+
+        Patient patient = getPatientByDocumentNumberOrThrow(documentNumber);
+        ensurePatientHasNoLinkedUser(patient);
+
+        User user = userModuleApi.createUser(username, Role.PATIENT);
+        patient.linkUser(user.getId());
+
+        return patientRepository.save(patient);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Patient> findById(UUID id) {
+        validateId(id);
+        return patientRepository.findById(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Patient> findByDocumentNumber(String documentNumber) {
+        validateDocumentNumber(documentNumber);
+        return patientRepository.findByDocumentNumber(documentNumber);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Patient> findAll() {
+        return patientRepository.findAll();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsById(UUID id) {
+        validateId(id);
+        return patientRepository.existsById(id);
+    }
+
+    private void ensurePatientDoesNotExist(String documentNumber) {
+        if (patientRepository.existsByDocumentNumber(documentNumber)) {
+            throw new PatientAlreadyExistsException(documentNumber);
+        }
+    }
+
+    private Patient getPatientByDocumentNumberOrThrow(String documentNumber) {
+        return patientRepository.findByDocumentNumber(documentNumber)
+                .orElseThrow(() -> new PatientNotFoundException(documentNumber));
+    }
+
+    private void ensurePatientHasNoLinkedUser(Patient patient) {
+        if (patient.hasUserAccount()) {
+            throw new PatientAlreadyLinkedUserException(patient.getId());
+        }
+    }
+
+    private Patient buildPatient(
+            String documentType,
+            String documentNumber,
+            String firstName,
+            String lastName,
+            String phone,
+            String email,
+            String gender,
+            LocalDate birthDate,
+            String guardianPhone,
+            UUID userId
+    ) {
+        return new Patient(
+                documentType,
+                documentNumber,
+                firstName,
+                lastName,
+                phone,
+                email,
+                gender,
+                birthDate,
+                guardianPhone,
+                userId
+        );
+    }
+
+    private void validateDocumentNumber(String documentNumber) {
+        if (documentNumber == null || documentNumber.isBlank()) {
+            throw new InvalidPatientDataException("Document number cannot be blank");
+        }
+    }
+
+    private void validateUsername(String username) {
+        if (username == null || username.isBlank()) {
+            throw new InvalidPatientDataException("Username cannot be blank");
+        }
+    }
+
+    private void validateId(UUID id) {
+        if (id == null) {
+            throw new InvalidPatientDataException("Id cannot be null");
+        }
+    }
+}
