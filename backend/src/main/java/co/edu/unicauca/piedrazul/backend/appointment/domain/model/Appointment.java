@@ -96,6 +96,35 @@ public class Appointment {
         );
     }
 
+    public static Appointment reconstruct  (UUID idAppointment,
+                                          UUID idDoctor,
+                                          UUID idPatient,
+                                          PatientInfo patientInfo,
+                                          Specialty specialty,
+                                          AppointmentState appointmentState,
+                                          LocalDate date,
+                                          AppointmentTime startTime,
+                                          SchedulingOrigin schedulingOrigin) {
+
+        // Usa el constructor privado igual que los otros factory methods
+        Appointment appointment = new Appointment(
+                idAppointment,
+                idDoctor,
+                idPatient,
+                patientInfo,
+                specialty,
+                date,
+                startTime,
+                schedulingOrigin
+        );
+
+        // Sobreescribe el estado con el que viene de la BD
+        // porque el constructor siempre pone AGENDADA
+        appointment.appointmentState = appointmentState;
+
+        return appointment;
+    }
+
     public boolean conflictsWith(AppointmentTime candidateTime, int intervalMinutes) {
         return this.startTime.conflictsWith(candidateTime, intervalMinutes);
     }

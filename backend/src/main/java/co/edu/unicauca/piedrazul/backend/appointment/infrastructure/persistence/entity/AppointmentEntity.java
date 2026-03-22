@@ -4,6 +4,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.FutureOrPresent;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDate;
@@ -12,6 +13,7 @@ import java.util.UUID;
 
 @Getter
 @Setter
+@NoArgsConstructor
 @Entity
 @Table(name = "appointment")
 public class AppointmentEntity {
@@ -54,20 +56,4 @@ public class AppointmentEntity {
     private SchedulingOrigin schedulingOrigin;
 
 
-    public AppointmentEntity(UUID idCita, UUID idDoctor, String doctorName, UUID idPatient, String patientName, PatientInfo patientInfo, Specialty specialty, AppointmentState appointmentState, LocalDate date, AppointmentTime startTime, SchedulingOrigin schedulingOrigin) {
-        this.idCita = idCita;
-        this.idDoctor = idDoctor;
-        this.doctorName = doctorName;
-        this.idPatient = idPatient;
-        this.patientName = patientName;
-        this.patientInfo = patientInfo;
-        this.specialty = specialty;
-        this.appointmentState = appointmentState;
-        this.date = date;
-        StartTime = startTime;
-        this.schedulingOrigin = schedulingOrigin;
-    }
-
-    public AppointmentEntity() {
-    }
 }
