@@ -88,11 +88,6 @@
             </p>
           </div>
 
-          <div *ngIf="errorMessage()"
-            class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-            ⚠️ {{errorMessage()}}
-          </div>
-
           <div *ngIf="foundPatient() as p"
             class="bg-green-50 border-2 border-green-300 rounded-xl p-5">
             <div class="flex items-center gap-3 mb-3">
@@ -195,6 +190,11 @@
           </div>
         </div>
 
+        <div *ngIf="errorMessage()"
+          class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm mt-5">
+          ⚠️ {{errorMessage()}}
+        </div>
+
         <div *ngIf="step() === 2" class="space-y-5">
           <h2 class="text-blue-800 text-2xl mb-4">
             {{ bookingMode() === 'specialty' ? 'Seleccionar Especialidad' : 'Seleccionar Especialidad y Médico' }}
@@ -285,7 +285,7 @@
           </div>
 
           <p class="text-3md text-gray-400 -mt-4">
-            Solo se muestran días hábiles del médico, excluyendo fines de semana y festivos colombianos.
+            Solo se muestran días hábiles del médico, excluyendo fines de semana y festivos.
           </p>
 
           <div *ngIf="selectedDate()"
