@@ -6,7 +6,7 @@ import javax.swing.text.html.Option;
 import java.util.UUID;
 
 public interface PatientRegistryPort {
-    Option<UUID> findPatientByCocumentNumber(String documentNumber);
+    // Option<UUID> findPatientByCocumentNumber(String documentNumber);
 
     UUID createPatient(PatientRegistrationData data);
 }
