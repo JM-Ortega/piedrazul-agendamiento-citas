@@ -36,7 +36,12 @@ public class Doctor {
     @Column(name = "identification", nullable = false, length = 100)
     private String identification;
 
+    @ElementCollection(targetClass = Specialty.class)
     @Enumerated(EnumType.STRING)
+    @CollectionTable(
+            name = "doctor_specialties",
+            joinColumns = @JoinColumn(name = "id_doctor", nullable = false)
+    )
     @Column(name = "specialty", nullable = false)
     private List<Specialty> specialty = new ArrayList<>();
 
@@ -52,16 +57,13 @@ public class Doctor {
     @Column(name = "appointment_interval", nullable = false)
     private int appointmentInterval;
 
-    @Column(name = "schedulable_weeks", nullable = false)
-    private int schedulableWeeks;
-
     @OneToMany(mappedBy = "doctor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Schedule> schedules = new ArrayList<>();
 
     //Al momento de registrar/crearle una cuenta al doctor se le deben llenar todos estos campos,
     // el registro de doctores deberia hacerlo solo el administrador
     public Doctor(UUID idUser, String firstName, String lastName, String identification, List<Specialty> specialty, boolean status, LocalDate laborStart,
-                  LocalDate laborEnd, int appointmentInterval, int schedulableWeeks, List<Schedule> schedules) {
+                  LocalDate laborEnd, int appointmentInterval, List<Schedule> schedules) {
         this.idUser = idUser;
         this.firstName = firstName;
         this.lastName = lastName;
@@ -71,7 +73,6 @@ public class Doctor {
         this.laborStart = laborStart;
         this.laborEnd = laborEnd;
         this.appointmentInterval = appointmentInterval;
-        this.schedulableWeeks = schedulableWeeks;
         this.schedules = schedules;
     }
 }
