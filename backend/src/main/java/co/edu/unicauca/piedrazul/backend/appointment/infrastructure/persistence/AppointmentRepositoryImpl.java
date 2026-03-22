@@ -2,10 +2,10 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
-import co.edu.unicauca.piedrazul.backend.doctors.model.services.DoctorExternalService;
+import jakarta.transaction.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -15,51 +15,19 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
 
     private final AppointmentJpaRepository jpaRepository;
     private final AppointmentMapper mapper;
-    //hace falta importar las interfaces de los modulos de doctor y paciente
-    //para poder usar los metodos findById y obtener los nombres
-    private final DoctorExternalService doctorPort;
-    //falta el de Juan
 
 
-
-    public AppointmentRepositoryImpl(AppointmentJpaRepository jpaRepository, AppointmentMapper mapper, DoctorExternalService doctorPort) {
+    public AppointmentRepositoryImpl(AppointmentJpaRepository jpaRepository, AppointmentMapper mapper) {
         this.jpaRepository = jpaRepository;
         this.mapper = mapper;
-        this.doctorPort = doctorPort;
     }
 
 
+    @Transactional
     @Override
-    public Appointment save(Appointment appointment) {
-
-        // Doctor siempre tiene cuenta, siempre consulto el modulo
-        String doctorName = doctorPort.doctorsName(appointment.getIdDoctor()).getFullName();
-
-        String patientName;
-
-        //Esto cambia segun la interfaz y el metodo que Juan exponga
-        if (appointment.getIdPatient() == null) {
-            // MANUAL — el paciente no tiene cuenta
-            // el nombre se contruye desde el VO PatientInfo
-            patientName = appointment.getPatientInfo().getFirstName()
-                    + " " + appointment.getPatientInfo().getLastName();
-        } else {
-            // AUTÓNOMA — el paciente sí tiene cuenta
-            // consultas el nombre al módulo de patients
-            patientName = patientPort.patientName(
-                    appointment.getIdPatient()
-            ).getFullName();
-        }
-
-        AppointmentEntity entity = mapper.toEntity(
-                appointment, doctorName, patientName
-        );
-
-
-        jpaRepository.save(mapper.toEntity(appointment, doctorName, patientName, patientName));
-
+    public void save(Appointment appointment) {
+        jpaRepository.save(mapper.toEntity(appointment));
     }
-
 
     @Override
     public void deleteById(UUID idCita) {

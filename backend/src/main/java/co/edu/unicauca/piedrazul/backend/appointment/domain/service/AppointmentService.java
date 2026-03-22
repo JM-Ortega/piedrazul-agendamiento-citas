@@ -18,7 +18,8 @@ public class AppointmentService {
     }
 
     // El agendador crea la cita manualmente
-    public Appointment scheduleManual(PatientInfo patientInfo,
+    public Appointment scheduleManual(String doctorName,
+                                      PatientInfo patientInfo,
                                       UUID idDoctor,
                                       Specialty specialty,
                                       LocalDate date,
@@ -35,12 +36,13 @@ public class AppointmentService {
         }
 
         return Appointment.scheduleManual(
-                idDoctor, patientInfo, specialty, date, startTime
+                doctorName, idDoctor, patientInfo, specialty, date, startTime
         );
     }
 
     // El paciente web agenda de forma autónoma
-    public Appointment scheduleAutonomous(UUID idPatient,
+    public Appointment scheduleAutonomous(String doctorName,
+                                          UUID idPatient,
                                           PatientInfo patientInfo,
                                           UUID idDoctor,
                                           Specialty specialty,
@@ -57,7 +59,7 @@ public class AppointmentService {
         }
 
         return Appointment.scheduleAutonomous(
-                idDoctor, idPatient, patientInfo, specialty, date, startTime
+                doctorName, idDoctor, idPatient, patientInfo, specialty, date, startTime
         );
     }
 

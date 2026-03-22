@@ -1,18 +1,14 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.model;
 
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
-@Getter
-@Setter
+
 public class Appointment {
     private final UUID idAppointment;
     private final UUID idDoctor;
+    private final String doctorName;
     private final UUID idPatient;
     private final PatientInfo  patientInfo;
     private final Specialty specialty;
@@ -24,20 +20,22 @@ public class Appointment {
     // Constructor privado — solo accesible desde los factory methods
     private Appointment(UUID idAppointment,
                         UUID idDoctor,
+                        String doctorName,
                         UUID idPatient,
                         PatientInfo patientInfo,
                         Specialty specialty,
                         LocalDate date,
                         AppointmentTime startTime,
                         SchedulingOrigin schedulingOrigin) {
-        this.idAppointment      = idAppointment;
-        this.idDoctor           = idDoctor;
-        this.idPatient          = idPatient;
-        this.patientInfo        = patientInfo;
-        this.specialty          = specialty;
-        this.date               = date;
-        this.startTime          = startTime;
-        this.schedulingOrigin   = schedulingOrigin;
+        this.idAppointment = idAppointment;
+        this.idDoctor = idDoctor;
+        this.doctorName = doctorName;
+        this.idPatient = idPatient;
+        this.patientInfo = patientInfo;
+        this.specialty = specialty;
+        this.date = date;
+        this.startTime = startTime;
+        this.schedulingOrigin = schedulingOrigin;
 
         // Siempre inicia en AGENDADA
         this.appointmentState   = AppointmentState.AGENDADA;
@@ -46,12 +44,14 @@ public class Appointment {
     // Factory Method 1
     // El agendador pasa los datos crudos del paciente
     // pacienteId es null porque el paciente no tiene cuenta aún
-    public static Appointment scheduleManual(UUID idDoctor,
+    public static Appointment scheduleManual(String doctorName,
+                                             UUID idDoctor,
                                              PatientInfo patientInfo,
                                              Specialty specialty,
                                              LocalDate date,
                                              AppointmentTime startTime) {
         Objects.requireNonNull(idDoctor,      "El médico es obligatorio");
+        Objects.requireNonNull(doctorName,      "El nombre del médico es obligatorio");
         Objects.requireNonNull(patientInfo,   "Los datos del paciente son obligatorios");
         Objects.requireNonNull(specialty,     "La especialidad es obligatoria");
         Objects.requireNonNull(date,          "La fecha es obligatoria");
@@ -60,6 +60,7 @@ public class Appointment {
         return new Appointment(
                 UUID.randomUUID(),
                 idDoctor,
+                doctorName,
                 null,
                 patientInfo,
                 specialty,
@@ -71,13 +72,15 @@ public class Appointment {
 
     // Factory Method 2
     // El paciente web agenda de forma autónoma entonces el idPatient siempre debe estar presente
-    public static Appointment scheduleAutonomous(UUID idDoctor,
+    public static Appointment scheduleAutonomous(String doctorName,
+                                                 UUID idDoctor,
                                                  UUID idPatient,
                                                  PatientInfo patientInfo,
                                                  Specialty specialty,
                                                  LocalDate date,
                                                  AppointmentTime startTime) {
         Objects.requireNonNull(idDoctor,    "El médico es obligatorio");
+        Objects.requireNonNull(doctorName,      "El nombre del médico es obligatorio");
         Objects.requireNonNull(idPatient,   "El pacienteId es obligatorio en agendamiento autónomo");
         Objects.requireNonNull(patientInfo, "Los datos del paciente son obligatorios");
         Objects.requireNonNull(specialty,   "La especialidad es obligatoria");
@@ -87,6 +90,7 @@ public class Appointment {
         return new Appointment(
                 UUID.randomUUID(),
                 idDoctor,
+                doctorName,
                 idPatient,
                 patientInfo,
                 specialty,
@@ -96,8 +100,9 @@ public class Appointment {
         );
     }
 
-    public static Appointment reconstruct  (UUID idAppointment,
+    public static Appointment reconstruct (UUID idAppointment,
                                           UUID idDoctor,
+                                          String doctorName,
                                           UUID idPatient,
                                           PatientInfo patientInfo,
                                           Specialty specialty,
@@ -110,6 +115,7 @@ public class Appointment {
         Appointment appointment = new Appointment(
                 idAppointment,
                 idDoctor,
+                doctorName,
                 idPatient,
                 patientInfo,
                 specialty,
@@ -126,14 +132,46 @@ public class Appointment {
     }
 
     public boolean conflictsWith(AppointmentTime candidateTime, int intervalMinutes) {
-        return this.startTime.conflictsWith(candidateTime, intervalMinutes);
+        return this.startTime.collidesWith(candidateTime, intervalMinutes);
+    }
+
+    public UUID getIdAppointment() {
+        return idAppointment;
+    }
+
+    public UUID getIdDoctor() {
+        return idDoctor;
+    }
+
+    public String getDoctorName() {
+        return doctorName;
+    }
+
+    public UUID getIdPatient() {
+        return idPatient;
+    }
+
+    public PatientInfo getPatientInfo() {
+        return patientInfo;
+    }
+
+    public Specialty getSpecialty() {
+        return specialty;
     }
 
     public AppointmentState getAppointmentState() {
         return appointmentState;
     }
 
+    public LocalDate getDate() {
+        return date;
+    }
+
     public AppointmentTime getStartTime() {
         return startTime;
+    }
+
+    public SchedulingOrigin getSchedulingOrigin() {
+        return schedulingOrigin;
     }
 }

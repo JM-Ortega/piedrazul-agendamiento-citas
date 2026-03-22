@@ -8,13 +8,11 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ScheduleM
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
-import org.jmolecules.ddd.annotation.Service;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-@Service
 public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppointmentUseCase {
     private final AppointmentRepository appointmentRepository;
     private final DoctorConfigConsultPort doctorConfigConsultPort;
@@ -35,6 +33,7 @@ public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppoi
         // 1. Obtiene la configuración del médico a través del puerto de salida
         int intervalMinutes = doctorConfigConsultPort
                 .getIntervalMinutesByDoctor(idDoctor);
+        String doctorName = doctorConfigConsultPort.getDoctorName(idDoctor);
 
         // 2. Obtiene las citas existentes del médico ese día a través del puerto de salida
         List<Appointment> existingAppointments = appointmentRepository
@@ -42,7 +41,7 @@ public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppoi
 
         // 3. Delega la lógica de negocio al servicio de dominio
         Appointment appointment = appointmentService.scheduleManual(
-                patientInfo, idDoctor, specialty,
+                doctorName, patientInfo, idDoctor, specialty,
                 date, startTime, intervalMinutes, existingAppointments
         );
 
