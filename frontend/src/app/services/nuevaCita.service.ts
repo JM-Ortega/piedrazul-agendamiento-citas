@@ -19,15 +19,15 @@ export class NuevaCitaService {
   }
 
   getSpecialties(): Observable<string[]> {
-    return this.http.get<string[]>(`${this.apiUrl}/Doctor/specialties`);
+    return this.http.get<string[]>(`${this.apiUrl}/Doctor/Doctors/specialty`);
   }
 
   getDoctorsBySpecialty(specialty: string): Observable<SpecialtyDoctor[]> {
-    return this.http.get<SpecialtyDoctor[]>(`${this.apiUrl}/Doctor/by-specialty/${specialty}`);
+    return this.http.get<SpecialtyDoctor[]>(`${this.apiUrl}/Doctor/specialty/${specialty}`);
   }
 
   getAvailableSlots(doctorId: string, date: string): Observable<string[]> {
-    return this.http.get<string[]>(`${this.apiUrl}/Doctor/${doctorId}/available-slots`,{ params: { date } });
+    return this.http.get<string[]>(`${this.apiUrl}/apointments/available-slots`,{ params: { doctorId, date } });
   }
 
   addAppointment(data: NewAppointment): Observable<void> {
