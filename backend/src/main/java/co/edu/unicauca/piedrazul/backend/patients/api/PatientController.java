@@ -1,12 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.patients.api;
 
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.CreatePatientRequest;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.CreatePatientWithUserRequest;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.LinkUserAccountRequest;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientResponse;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientSummaryResponse;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.*;
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientService;
-import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -26,7 +21,7 @@ public class PatientController {
 
     @PostMapping
     public PatientResponse create(@Valid @RequestBody CreatePatientRequest request) {
-        Patient patient = patientService.createPatient(
+        PatientData patient = patientService.createPatient(
                 request.getDocumentType(),
                 request.getDocumentNumber(),
                 request.getFirstName(),
@@ -43,7 +38,7 @@ public class PatientController {
 
     @PostMapping("/with-user")
     public PatientResponse createWithUser(@Valid @RequestBody CreatePatientWithUserRequest request) {
-        Patient patient = patientService.createPatientWithUser(
+        PatientData patient = patientService.createPatientWithUser(
                 request.getUsername(),
                 request.getDocumentType(),
                 request.getDocumentNumber(),
@@ -61,7 +56,7 @@ public class PatientController {
 
     @PostMapping("/link-user-account")
     public PatientResponse linkUserAccount(@Valid @RequestBody LinkUserAccountRequest request) {
-        Patient patient = patientService.linkUserToExistingPatient(
+        PatientData patient = patientService.linkUserToExistingPatient(
                 request.getDocumentNumber(),
                 request.getUsername()
         );
@@ -71,7 +66,7 @@ public class PatientController {
 
     @GetMapping("/{id}")
     public PatientResponse findById(@PathVariable UUID id) {
-        Patient patient = patientService.findById(id)
+        PatientData patient = patientService.findById(id)
                 .orElseThrow(() -> new PatientNotFoundException(id));
 
         return toResponse(patient);
@@ -79,7 +74,7 @@ public class PatientController {
 
     @GetMapping("/document/{documentNumber}")
     public PatientResponse findByDocument(@PathVariable String documentNumber) {
-        Patient patient = patientService.findByDocumentNumber(documentNumber)
+        PatientData patient = patientService.findByDocumentNumber(documentNumber)
                 .orElseThrow(() -> new PatientNotFoundException(documentNumber));
 
         return toResponse(patient);
@@ -98,28 +93,28 @@ public class PatientController {
         return patientService.existsById(id);
     }
 
-    private PatientResponse toResponse(Patient patient) {
+    private PatientResponse toResponse(PatientData patient) {
         return new PatientResponse(
-                patient.getId(),
-                patient.getUserId(),
-                patient.getDocumentType(),
-                patient.getDocumentNumber(),
-                patient.getFirstName(),
-                patient.getLastName(),
-                patient.getPhone(),
-                patient.getEmail(),
-                patient.getGender(),
-                patient.getBirthDate(),
-                patient.getGuardianPhone()
+                patient.id(),
+                patient.userId(),
+                patient.documentType(),
+                patient.documentNumber(),
+                patient.firstName(),
+                patient.lastName(),
+                patient.phone(),
+                patient.email(),
+                patient.gender(),
+                patient.birthDate(),
+                patient.guardianPhone()
         );
     }
 
-    private PatientSummaryResponse toSummaryResponse(Patient patient) {
+    private PatientSummaryResponse toSummaryResponse(PatientData patient) {
         return new PatientSummaryResponse(
-                patient.getId(),
-                patient.getDocumentNumber(),
-                patient.getFirstName(),
-                patient.getLastName()
+                patient.id(),
+                patient.documentNumber(),
+                patient.firstName(),
+                patient.lastName()
         );
     }
 }

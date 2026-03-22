@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.patients.application;
 
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientData;
 import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Gender;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
@@ -30,7 +31,8 @@ public class PatientService implements PatientModuleApi {
         this.userModuleApi = userModuleApi;
     }
 
-    public Patient createPatient(
+    @Override
+    public PatientData createPatient(
             DocumentType documentType,
             String documentNumber,
             String firstName,
@@ -57,10 +59,11 @@ public class PatientService implements PatientModuleApi {
                 null
         );
 
-        return patientRepository.save(patient);
+        Patient savedPatient = patientRepository.save(patient);
+        return toData(savedPatient);
     }
 
-    public Patient createPatientWithUser(
+    public PatientData createPatientWithUser(
             String username,
             DocumentType documentType,
             String documentNumber,
@@ -91,10 +94,11 @@ public class PatientService implements PatientModuleApi {
                 userId
         );
 
-        return patientRepository.save(patient);
+        Patient savedPatient = patientRepository.save(patient);
+        return toData(savedPatient);
     }
 
-    public Patient linkUserToExistingPatient(String documentNumber, String username) {
+    public PatientData linkUserToExistingPatient(String documentNumber, String username) {
         validateDocumentNumber(documentNumber);
         validateUsername(username);
 
@@ -104,27 +108,33 @@ public class PatientService implements PatientModuleApi {
         UUID userId = userModuleApi.createPatientUser(username);
         patient.linkUser(userId);
 
-        return patientRepository.save(patient);
+        Patient savedPatient = patientRepository.save(patient);
+        return toData(savedPatient);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Patient> findById(UUID id) {
+    public Optional<PatientData> findById(UUID id) {
         validateId(id);
-        return patientRepository.findById(id);
+        return patientRepository.findById(id)
+                .map(this::toData);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Patient> findByDocumentNumber(String documentNumber) {
+    public Optional<PatientData> findByDocumentNumber(String documentNumber) {
         validateDocumentNumber(documentNumber);
-        return patientRepository.findByDocumentNumber(documentNumber);
+        return patientRepository.findByDocumentNumber(documentNumber)
+                .map(this::toData);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Patient> findAll() {
-        return patientRepository.findAll();
+    public List<PatientData> findAll() {
+        return patientRepository.findAll()
+                .stream()
+                .map(this::toData)
+                .toList();
     }
 
     @Override
@@ -174,6 +184,22 @@ public class PatientService implements PatientModuleApi {
                 birthDate,
                 guardianPhone,
                 userId
+        );
+    }
+
+    private PatientData toData(Patient patient) {
+        return new PatientData(
+                patient.getId(),
+                patient.getUserId(),
+                patient.getDocumentType(),
+                patient.getDocumentNumber(),
+                patient.getFirstName(),
+                patient.getLastName(),
+                patient.getPhone(),
+                patient.getEmail(),
+                patient.getGender(),
+                patient.getBirthDate(),
+                patient.getGuardianPhone()
         );
     }
 

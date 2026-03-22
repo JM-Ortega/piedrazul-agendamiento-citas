@@ -1,8 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.patients;
 
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientData;
 import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Gender;
-import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -11,16 +11,15 @@ import java.util.UUID;
 
 public interface PatientModuleApi {
 
-    Optional<Patient> findById(UUID id);
+    Optional<PatientData> findById(UUID id);
 
-    Optional<Patient> findByDocumentNumber(String documentNumber);
+    Optional<PatientData> findByDocumentNumber(String documentNumber);
 
     boolean existsById(UUID id);
 
-    List<Patient> findAll();
+    List<PatientData> findAll();
 
-
-    Patient createPatient(
+    PatientData createPatient(
             DocumentType documentType,
             String documentNumber,
             String firstName,
@@ -31,5 +30,4 @@ public interface PatientModuleApi {
             LocalDate birthDate,
             String guardianPhone
     );
-
 }
