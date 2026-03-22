@@ -46,7 +46,7 @@ public class DoctorService {
         Doctor savedDoctor = doctorRepository.save(doctor);
 
         // 3. Crear el usuario
-        //userModuleApi.createUser(request.identification());
+        userModuleApi.createDoctorUser(request.identification());
 
         // 4. Retornar un DTO de respuesta
         return DoctorResponse.fromEntity(savedDoctor);
