@@ -2,7 +2,6 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import jakarta.transaction.Transactional;
@@ -51,7 +50,7 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
 
     @Override
     public boolean existsByDoctorDateAndTime(UUID idDoctor, LocalDate date, AppointmentTime startTime) {
-        return jpaRepository.existsByIdDoctorDateAndTime(idDoctor, date, startTime.getTime());
+        return jpaRepository.existsByIdDoctorAndDateAndStartTime(idDoctor, date, startTime.getTime());
     }
 
 }

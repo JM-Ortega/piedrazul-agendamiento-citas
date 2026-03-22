@@ -19,8 +19,8 @@ import java.util.UUID;
 public class AppointmentEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_appointment", nullable = false, unique = true)
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "id_appointment", updatable = false, nullable = false)
     private UUID idAppointment;
 
     @Column(name = "id_doctor",nullable = false)
@@ -48,7 +48,7 @@ public class AppointmentEntity {
     private LocalDate date;
 
     @Column(name = "start_time", nullable = false)
-    private LocalTime StartTime;
+    private LocalTime startTime;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "scheduling_origin", nullable = false)

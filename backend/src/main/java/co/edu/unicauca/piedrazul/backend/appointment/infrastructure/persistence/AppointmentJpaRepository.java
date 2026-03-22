@@ -1,6 +1,5 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -17,5 +16,5 @@ public interface AppointmentJpaRepository extends JpaRepository<AppointmentEntit
 
     List<AppointmentEntity> findByIdDoctorAndDate(UUID idDoctor, LocalDate date);
 
-    boolean existsByIdDoctorDateAndTime(UUID idDoctor, LocalDate date, LocalTime startTime);
+    boolean existsByIdDoctorAndDateAndStartTime(UUID idDoctor, LocalDate date, LocalTime startTime);
 }

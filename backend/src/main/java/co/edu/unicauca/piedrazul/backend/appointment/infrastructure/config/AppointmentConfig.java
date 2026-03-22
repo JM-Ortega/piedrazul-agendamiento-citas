@@ -14,11 +14,26 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientC
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.BusySlotService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
+@Configuration
 public class AppointmentConfig {
 
-    // Servicios de dominio
+    // --- ADAPTADORES DE INFRAESTRUCTURA (LOS PUERTOS DE SALIDA) ---
+
+    @Bean
+    public AppointmentRepository appointmentRepository(
+            AppointmentJpaRepository jpaRepository,
+            AppointmentMapper mapper) {
+        return new AppointmentRepositoryImpl(jpaRepository, mapper);
+    }
+
+    // --- SERVICIOS DE DOMINIO (LÓGICA PURA) ---
+
     @Bean
     public BusySlotService busySlotService() {
         return new BusySlotService();
@@ -35,7 +50,8 @@ public class AppointmentConfig {
         return new AppointmentService(busySlotService, slotTimeService);
     }
 
-    // Casos de uso
+    // --- CASOS DE USO (PUERTOS DE ENTRADA) ---
+
     @Bean
     public ListAppointmentsUseCase listAppointmentsUseCase(
             AppointmentRepository appointmentRepository) {
