@@ -1,14 +1,18 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
 import org.springframework.stereotype.Component;
+
+import java.util.UUID;
 
 @Component
 public class AppointmentMapper {
 
     //De dominio a JPA
-    public AppointmentEntity toEntity(Appointment appointment) {
+    public AppointmentEntity toEntity(Appointment appointment, String doctorName, String patientName) {
         if (appointment == null) {
             return null;
         }
@@ -19,31 +23,40 @@ public class AppointmentMapper {
         //Mapeo los valores de la entidad de dominio a la entidad JPA
         appointmentEntity.setIdCita(appointment.getIdAppointment());
         appointmentEntity.setIdDoctor(appointment.getIdDoctor());
+        appointmentEntity.setDoctorName(doctorName);
         appointmentEntity.setIdPatient(appointment.getIdPatient());
-        appointmentEntity.setPatientInfo(appointment.getPatientInfo());
+        appointmentEntity.setPatientName(patientName);
         appointmentEntity.setSpecialty(appointment.getSpecialty());
         appointmentEntity.setAppointmentState(appointment.getAppointmentState());
         appointmentEntity.setDate(appointment.getDate());
-        appointmentEntity.setStartTime(appointment.getStartTime());
+        appointmentEntity.setStartTime(appointment.getStartTime().getTime());
         appointmentEntity.setSchedulingOrigin(appointment.getSchedulingOrigin());
 
         return appointmentEntity;
 
     }
 
-    //de JPA  dominio
-    public AppointmentEntity toDomain(AppointmentEntity appointmentEntity) {
+    //de JPA a dominio
+    public Appointment toDomain(AppointmentEntity entity) {
 
-        return new Appointment(
-                appointmentEntity.getIdCita(),
-                appointmentEntity.getIdDoctor(),
-                appointmentEntity.getIdPatient(),
-                appointmentEntity.getPatientInfo(),
-                appointmentEntity.getSpecialty(),
-                appointmentEntity.getAppointmentState(),
-                appointmentEntity.getDate(),
-                appointmentEntity.getStartTime(),
-                appointmentEntity.getSchedulingOrigin()
+        if(entity == null) {
+            return null;
+        }
+
+        PatientInfo patientInfo = new PatientInfo(entity.getIdPatient(), entity.getPatientName());
+
+        AppointmentTime appointmentTime = new AppointmentTime(entity.getStartTime());
+
+        return Appointment.reconstruct(
+                entity.getIdCita(),
+                entity.getIdDoctor(),
+                entity.getIdPatient(),
+                patientInfo,
+                entity.getSpecialty(),
+                entity.getAppointmentState(),
+                entity.getDate(),
+                appointmentTime,
+                entity.getSchedulingOrigin()
         );
 
     }
