@@ -1,25 +1,37 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatNativeDateModule } from '@angular/material/core';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
+import { CalendarService } from '../../services/calendar.service';
 import { Patient } from '../../models/patient.model';
 import { NewAppointment } from './DTO/newAppointment';
 import { SpecialtyDoctor } from './DTO/specialty-doctor';
-import { LucideAngularModule, Search, CheckCircle, User, Stethoscope, UserSearch } from 'lucide-angular';
+import { LucideAngularModule, CheckCircle, User, Stethoscope, UserSearch } from 'lucide-angular';
 
 type BookingMode = 'specialty' | 'specialty-doctor' | null;
 
 @Component({
   selector: 'app-new-appointment-scheduler',
-  imports: [CommonModule, LucideAngularModule, FormsModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    LucideAngularModule,
+    MatDatepickerModule,
+    MatInputModule,
+    MatFormFieldModule,
+    MatNativeDateModule,
+  ],
   templateUrl: './new-appointment-scheduler.component.html'
 })
-export class NewAppointmentSchedulerComponent implements OnInit {
+export class NewAppointmentSchedulerComponent {
   private service = inject(NuevaCitaService);
   private router = inject(Router);
-
-  readonly doctors = this.service.doctors;
+  private calendarService = inject(CalendarService);
 
   // Modo de agendamiento 
   bookingMode = signal<BookingMode>(null);
@@ -27,7 +39,6 @@ export class NewAppointmentSchedulerComponent implements OnInit {
   // Estado de UI 
   step = signal(1);
   isLoading = signal(false);
-  success = signal(false);
   errorMessage = signal('');
 
   // Errores de validación
@@ -55,27 +66,34 @@ export class NewAppointmentSchedulerComponent implements OnInit {
     email: ''
   });
 
-  // Especialidad 
-  // Flujo "Por Especialidad"
+  // Especialidad / médico
   specialtiesWithDoctor = signal<SpecialtyDoctor[]>([]);
+  doctorsBySpecialty = signal<SpecialtyDoctor[]>([]);
+  noDoctorsFound        = signal(false);
+  noSpecialtyAvailable = signal(false);
+  selectedSpecialty = signal('');
+  assignedDoctor = signal<SpecialtyDoctor | null>(null);
+  selectedDoctorId = signal('');
+  selectedDoctorName = signal('');
+
   readonly uniqueSpecialties = computed(() =>
     [...new Set(this.specialtiesWithDoctor().map(s => s.specialty))]
   );
- 
-  selectedSpecialty = signal('');
-  assignedDoctor = signal<{ doctorId: string; doctorName: string } | null>(null);
 
-  // Flujo "Por Especialidad y Médico"
-  doctorsBySpecialty = signal<{ doctorId: string; doctorName: string }[]>([]);
-  selectedDoctorId   = signal('');
-  selectedDoctorName = signal('');
+  readonly effectiveDoctor = computed<SpecialtyDoctor | null>(() =>
+    this.bookingMode() === 'specialty'
+      ? this.assignedDoctor()
+      : (this.doctorsBySpecialty().find(d => d.doctorId === this.selectedDoctorId()) ?? null)
+  );
 
-  // Horario
-  selectedDate = signal('');
-  selectedTime = signal('');
-  availableDates = signal<string[]>([]);
+  readonly effectiveDoctorId = computed(() => this.effectiveDoctor()?.doctorId ?? '');
+
+  // Calendario
+  selectedDate   = signal<Date | null>(null);
+  selectedTime   = signal('');
   availableSlots = signal<string[]>([]);
 
+  // Guards de navegación
   readonly canGoToStep4 = computed(() =>
     !!this.selectedDate() && !!this.selectedTime()
   );
@@ -87,11 +105,19 @@ export class NewAppointmentSchedulerComponent implements OnInit {
     return !!this.selectedSpecialty() && !!this.selectedDoctorId();
   });
 
-  readonly effectiveDoctorId = computed(() =>
-    this.bookingMode() === 'specialty'
-      ? (this.assignedDoctor()?.doctorId ?? '')
-      : this.selectedDoctorId()
-  );
+  readonly dateFilter = computed(() => {
+    const doctor = this.effectiveDoctor();
+    if (!doctor) return () => false;
+    return this.calendarService.buildDateFilter(doctor);
+  });
+
+  readonly minDate = computed(() => this.calendarService.getMinDate());
+
+  readonly maxDate = computed(() => {
+    const doctor = this.effectiveDoctor();
+    if (!doctor) return this.calendarService.getMinDate();
+    return this.calendarService.getMaxDate(doctor);
+  });
 
   readonly confirmFirstName = computed(
     () => this.foundPatient()?.firstName ?? this.patientForm().firstName
@@ -111,23 +137,22 @@ export class NewAppointmentSchedulerComponent implements OnInit {
       : this.selectedDoctorName()
   );
 
-  readonly dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  readonly monthNames = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-  ];
-
-  ngOnInit(): void {
-    this.service.getDoctors().subscribe();
-  }
+  readonly confirmDate = computed(() => {
+    const d = this.selectedDate();
+    if (!d) return '';
+    const days   = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    return `${days[d.getDay()]} ${d.getDate()} de ${months[d.getMonth()]} de ${d.getFullYear()}`;
+  });
 
   // Selección de modo inicial
   selectMode(mode: BookingMode): void {
     this.bookingMode.set(mode);
     if (mode === 'specialty') {
-      this.service.getSpecialtiesWithDoctor().subscribe(
-        data => this.specialtiesWithDoctor.set(data)
-      );
+      this.service.getSpecialtiesWithDoctor().subscribe({
+        next: data => this.specialtiesWithDoctor.set(data),
+        error: () => this.noSpecialtyAvailable.set(true)
+      });
     }
   }
 
@@ -160,84 +185,81 @@ export class NewAppointmentSchedulerComponent implements OnInit {
   }
 
   goToSpecialtyStep(): void {
-    if (this.patientId()) {
-      this.step.set(2);
-      this._loadStep2Data();
-      return;
-    }
+    // Caso 1: ya tenemos patientId (paciente previamente registrado)
+    if (this.patientId()) { this._enterStep2(); return; }
+
+    // Caso 2: paciente encontrado en el backend
     if (this.foundPatient()) {
       this.patientId.set(this.foundPatient()!.id);
-      this.step.set(2);
-      this._loadStep2Data();
-      return;
+      this._enterStep2(); return;
     }
  
     // Validar formulario nuevo paciente
+    if (!this._validatePatientForm()) return;
+    const f = this.patientForm();
+    this.isLoading.set(true);
+    this.service.addPatient({
+      ...f,
+      documentId: this.documentId(),
+      birthDate: f.birthDate || undefined,
+      email:     f.email     || undefined
+    }).subscribe({
+      next: (id) => { this.isLoading.set(false); this.patientId.set(id); this._enterStep2(); },
+      error: ()  => { this.isLoading.set(false); this.errorMessage.set('No se pudo registrar el paciente.'); }
+    });
+  }
+
+  private _enterStep2(): void {
+    if (this.bookingMode() === 'specialty-doctor') {
+      this.service.getSpecialties().subscribe(specs =>
+        this.specialtiesWithDoctor.set(
+          specs.map(s => ({ specialty: s, doctorId: '', doctorName: '', fechaFinalTrabajo: null, workDays: [] }))
+        )
+      );
+    }
+    this.step.set(2);
+  }
+
+  private _validatePatientForm(): boolean {
     const f = this.patientForm();
     this.firstNameError.set(!f.firstName);
     this.lastNameError.set(!f.lastName);
     this.phoneError.set(!f.phone);
     this.genderError.set(!f.gender);
- 
-    const phoneValid     = this.validatePhone();
-    const birthDateValid = this.validateBirthDate();
-    const emailValid     = this.validateEmail();
- 
-    if (
-      this.firstNameError() || this.lastNameError() ||
-      this.phoneError()     || this.genderError()   ||
-      !phoneValid || !birthDateValid || !emailValid
-    ) { return; }
- 
-    const newPatient: Omit<Patient, 'id'> = {
-      ...f,
-      documentId: this.documentId(),
-      birthDate:  f.birthDate || undefined,
-      email:      f.email     || undefined
-    };
- 
-    this.isLoading.set(true);
-    this.service.addPatient(newPatient).subscribe({
-      next: (id) => {
-        this.isLoading.set(false);
-        this.patientId.set(id);
-        this.step.set(2);
-        this._loadStep2Data();
-      },
-      error: () => {
-        this.isLoading.set(false);
-        this.errorMessage.set('No se pudo registrar el paciente.');
-      }
-    });
+    const phoneOk     = this.validatePhone();
+    const birthDateOk = this.validateBirthDate();
+    const emailOk     = this.validateEmail();
+    return !this.firstNameError() && !this.lastNameError() &&
+           !this.phoneError()     && !this.genderError()   &&
+           phoneOk && birthDateOk && emailOk;
   }
 
-  private _loadStep2Data(): void {
-    if (this.bookingMode() === 'specialty-doctor') {
-      this.service.getSpecialties().subscribe(
-        specialties => {
-          this.specialtiesWithDoctor.set(
-            specialties.map(s => ({ specialty: s, doctorId: '', doctorName: '' }))
-          );
-        }
-      );
-    }
-  }
-
+  // Especialidad (y médico si aplica)
   onSpecialtyChange(specialty: string): void {
     this.selectedSpecialty.set(specialty);
     this.selectedDoctorId.set('');
     this.selectedDoctorName.set('');
- 
+    this.assignedDoctor.set(null);
+
     if (this.bookingMode() === 'specialty') {
+      this.noSpecialtyAvailable.set(false);
+      if (!specialty) return;
       const match = this.specialtiesWithDoctor().find(s => s.specialty === specialty);
-      this.assignedDoctor.set(
-        match ? { doctorId: match.doctorId, doctorName: match.doctorName } : null
-      );
+      this.assignedDoctor.set(match ?? null);
+      if (!match && specialty) this.noSpecialtyAvailable.set(true);
     } else {
       this.doctorsBySpecialty.set([]);
-      this.service.getDoctorsBySpecialty(specialty).subscribe(
-        docs => this.doctorsBySpecialty.set(docs)
-      );
+      this.noDoctorsFound.set(false);
+
+      if (!specialty) return;
+
+      this.service.getDoctorsBySpecialty(specialty).subscribe({
+        next: (docs) => {
+          this.doctorsBySpecialty.set(docs);
+          this.noDoctorsFound.set(docs.length === 0);
+        },
+        error: () => this.noDoctorsFound.set(true)
+      });
     }
   }
 
@@ -248,47 +270,53 @@ export class NewAppointmentSchedulerComponent implements OnInit {
   }
 
   goToScheduleStep(): void {
-    const docId = this.effectiveDoctorId();
-    this.selectedDate.set('');
+    this.selectedDate.set(null);
     this.selectedTime.set('');
     this.availableSlots.set([]);
-    this.service.getAvailableDates(docId).subscribe(
-      d => this.availableDates.set(d)
-    );
     this.step.set(3);
   }
 
-  selectDate(date: string): void {
+  resetStep2(): void {
+    this.selectedSpecialty.set('');
+    this.assignedDoctor.set(null);
+    this.selectedDoctorId.set('');
+    this.selectedDoctorName.set('');
+    this.doctorsBySpecialty.set([]);
+    this.noDoctorsFound.set(false);
+    this.noSpecialtyAvailable.set(false);
+  }
+
+  // Horario con Datepicker
+  onDateSelected(date: Date | null): void {
     this.selectedDate.set(date);
     this.selectedTime.set('');
-    this.service.getAvailableSlots(this.effectiveDoctorId(), date).subscribe(
-      s => this.availableSlots.set(s)
-    );
+    this.availableSlots.set([]);
+
+    if (!date) return;
+
+    const dateStr = date.toISOString().slice(0, 10);
+    this.service.getAvailableSlots(this.effectiveDoctorId(), dateStr)
+      .subscribe(slots => this.availableSlots.set(slots));
   }
 
-  formatDate(d: string): string {
-    const dt = new Date(d + 'T12:00:00');
-    return `${this.dayNames[dt.getDay()]} ${dt.getDate()} de ${this.monthNames[dt.getMonth()]}`;
-  }
-
+  // Confirmación
   confirm(): void {
-    if (!this.selectedDate() || !this.selectedTime() || !this.patientId() || !this.effectiveDoctorId()) {
-      return;
-    }
+    const date = this.selectedDate();
+    if (!date || !this.selectedTime() || !this.patientId() || !this.effectiveDoctorId()) return;
+
     this.isLoading.set(true);
     this.errorMessage.set('');
  
     const data: NewAppointment = {
       patientId: this.patientId()!,
       doctorId:  this.effectiveDoctorId(),
-      date:      this.selectedDate(),
+      date:      date.toISOString().slice(0, 10),
       time:      this.selectedTime()
     };
  
     this.service.addAppointment(data).subscribe({
       next: () => {
         this.isLoading.set(false);
-        this.success.set(true);
         setTimeout(() => this.router.navigate(['/agendador']), 1500);
       },
       error: (err) => {
