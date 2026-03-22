@@ -13,7 +13,4 @@ public interface DoctorConfigConsultPort {
 
     // Devuelve el intervalo entre citas configurado para el médico
     int getIntervalMinutesByDoctor(UUID idDoctor);
-
-    // Devuelve la especialidad del médico para el snapshot de la cita
-    Specialty getSpecialtyByDoctor(UUID idDoctor);
 }
