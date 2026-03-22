@@ -1,8 +1,9 @@
-package co.edu.unicauca.piedrazul.backend.doctors.model.repositories;
+package co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence;
 
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -19,6 +20,13 @@ public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
     // Buscar por el ID de usuario vinculado
     Doctor findByIdUser(UUID idUser);
 
+    // Buscar por el ID del doctor
+    Doctor findByIdDoctor(UUID idDoctor);
+
     // Verifica si el doctor existe buscandolo por su ID
     boolean existsById(UUID id);
+
+    // Devuelve todas las especialidades de los doctores activos, si repetir
+    @Query("SELECT DISTINCT s FROM Doctor d JOIN d.specialty s WHERE d.status = true")
+    List<Specialty> findAllDistinctSpecialtiesByActiveDoctors();
 }

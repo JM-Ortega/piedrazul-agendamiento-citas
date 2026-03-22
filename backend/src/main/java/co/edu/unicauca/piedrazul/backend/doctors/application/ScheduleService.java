@@ -1,9 +1,9 @@
-package co.edu.unicauca.piedrazul.backend.doctors.model.services;
+package co.edu.unicauca.piedrazul.backend.doctors.application;
 
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Workday;
-import co.edu.unicauca.piedrazul.backend.doctors.model.repositories.ScheduleRepository;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
+import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
 import jakarta.transaction.Transactional;
 
 import java.time.LocalTime;

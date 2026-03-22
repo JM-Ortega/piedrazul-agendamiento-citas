@@ -1,11 +1,12 @@
-package co.edu.unicauca.piedrazul.backend.doctors.model.services;
+package co.edu.unicauca.piedrazul.backend.doctors.application;
 
-import co.edu.unicauca.piedrazul.backend.doctors.controller.dtos.input.CreateDoctorRequest;
-import co.edu.unicauca.piedrazul.backend.doctors.controller.dtos.output.DoctorResponse;
-import co.edu.unicauca.piedrazul.backend.doctors.model.exceptions.DateConflictException;
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Specialty;
-import co.edu.unicauca.piedrazul.backend.doctors.model.repositories.DoctorRepository;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
+import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 
@@ -17,32 +18,37 @@ import java.util.UUID;
 
 public class DoctorService {
     private final DoctorRepository doctorRepository;
+    private final UserModuleApi userModuleApi;
 
-    public DoctorService(DoctorRepository doctorRepository) {
+    public DoctorService(DoctorRepository doctorRepository, UserModuleApi userModuleApi) {
         this.doctorRepository = doctorRepository;
+        this.userModuleApi = userModuleApi;
     }
 
     // Crear un nuevo doctor
     @Transactional
     public DoctorResponse createDoctor(CreateDoctorRequest request) {
-        // Mapeo de DTO a Entidad
+        // 1. Mapeo de DTO a Entidad
         Doctor doctor = new Doctor();
         doctor.setIdUser(request.idUser());
         doctor.setFirstName(request.firstName());
         doctor.setLastName(request.lastName());
+        doctor.setIdentification(request.identification());
         doctor.setSpecialty(request.specialty());
         doctor.setLaborStart(request.laborStart());
         doctor.setLaborEnd(request.laborEnd());
         doctor.setAppointmentInterval(request.appointmentInterval());
-        doctor.setSchedulableWeeks(request.schedulableWeeks());
         doctor.setSchedules(request.schedules());
         //Validamos si el estado del medico
         doctor.setStatus(calculateActiveStatus(request.laborStart(), request.laborEnd()));
 
-        // Persistencia
+        // 2. Persistencia
         Doctor savedDoctor = doctorRepository.save(doctor);
 
-        // 4. Retornar un DTO de respuesta (nunca la entidad @Entity)
+        // 3. Crear el usuario
+        //userModuleApi.createUser(request.identification());
+
+        // 4. Retornar un DTO de respuesta
         return DoctorResponse.fromEntity(savedDoctor);
     }
 
@@ -79,9 +85,8 @@ public class DoctorService {
         // 2. Cambiamos el estado (aquí forzamos true porque es la acción de habilitar)
         doctor.setStatus(true);
 
-        // !! Llamada al módulo de usuarios para habilitar el usuario del medico
         // 3. Reactivamos el usuario para que pueda loguearse
-        //userService.enableUser(doctor.getIdUser());
+        userModuleApi.activateUser(doctor.getIdUser());
 
         // 4. Guardamos y retornamos el DTO actualizado
         Doctor savedDoctor = doctorRepository.save(doctor);
@@ -118,9 +123,8 @@ public class DoctorService {
         // 4. Cambiar el estado del Doctor
         doctor.setStatus(false);
 
-        // !! Llamada al módulo de usuarios para habilitar el usuario del medico
         // 5. Desactivamos el usuario para que no pueda loguearse
-        //userService.disableUser(doctor.getIdUser());
+        userModuleApi.deactivateUser(doctor.getIdUser());
 
         // 6. Persistir cambios
         Doctor updatedDoctor = doctorRepository.save(doctor);
@@ -139,5 +143,9 @@ public class DoctorService {
 
     public List<Doctor> getDoctorBySpeciality(Specialty specialty) {
         return doctorRepository.findBySpecialty(Collections.singletonList(specialty));
+    }
+
+    public List<Specialty> getSpecialties (){
+        return doctorRepository.findAllDistinctSpecialtiesByActiveDoctors();
     }
 }

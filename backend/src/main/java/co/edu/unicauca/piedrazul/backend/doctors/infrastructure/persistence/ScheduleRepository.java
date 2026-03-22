@@ -1,7 +1,7 @@
-package co.edu.unicauca.piedrazul.backend.doctors.model.repositories;
+package co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence;
 
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Schedule;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

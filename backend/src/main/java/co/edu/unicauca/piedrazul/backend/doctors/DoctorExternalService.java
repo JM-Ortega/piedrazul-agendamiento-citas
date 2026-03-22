@@ -1,7 +1,9 @@
-package co.edu.unicauca.piedrazul.backend.doctors.model.services;
+package co.edu.unicauca.piedrazul.backend.doctors;
 
 import java.util.UUID;
 
 public interface DoctorExternalService {
     boolean existDoctor(UUID idDoctor);
+
+    String doctorsName(UUID idDoctor);
 }

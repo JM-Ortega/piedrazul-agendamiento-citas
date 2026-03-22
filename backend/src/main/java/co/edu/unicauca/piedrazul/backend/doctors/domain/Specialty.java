@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.doctors.model.models;
+package co.edu.unicauca.piedrazul.backend.doctors.domain;
 
 public enum Specialty {
     FISIOTERAPIA,

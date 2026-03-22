@@ -1,12 +1,12 @@
-package co.edu.unicauca.piedrazul.backend.doctors.controller.controllers;
+package co.edu.unicauca.piedrazul.backend.doctors.api;
 
-import co.edu.unicauca.piedrazul.backend.doctors.controller.dtos.input.CreateScheduleRequest;
-import co.edu.unicauca.piedrazul.backend.doctors.controller.dtos.output.AvailableIntervalsResponse;
-import co.edu.unicauca.piedrazul.backend.doctors.controller.dtos.output.ScheduleResponse;
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Workday;
-import co.edu.unicauca.piedrazul.backend.doctors.model.services.DoctorService;
-import co.edu.unicauca.piedrazul.backend.doctors.model.services.ScheduleService;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.AvailableIntervalsResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.ScheduleResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
+import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
+import co.edu.unicauca.piedrazul.backend.doctors.application.ScheduleService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;

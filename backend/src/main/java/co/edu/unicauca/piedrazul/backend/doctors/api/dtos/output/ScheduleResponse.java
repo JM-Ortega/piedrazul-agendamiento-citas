@@ -1,7 +1,7 @@
-package co.edu.unicauca.piedrazul.backend.doctors.controller.dtos.output;
+package co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output;
 
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Workday;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 
 import java.time.LocalTime;
 import java.util.UUID;
