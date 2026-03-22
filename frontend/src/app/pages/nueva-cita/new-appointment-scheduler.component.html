@@ -206,6 +206,11 @@
             </select>
           </div>
 
+          <p *ngIf="noSpecialtyAvailable()"
+            class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm">
+            ⚠️ No hay médicos disponibles para ninguna especialidad. Intente más tarde.
+          </p>
+
           <div *ngIf="bookingMode() === 'specialty' && assignedDoctor()">
             <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
               <lucide-icon name="user" [size]="22" class="text-blue-500 shrink-0"></lucide-icon>
@@ -228,6 +233,11 @@
               </option>
             </select>
           </div>
+
+          <p *ngIf="noDoctorsFound()" class="text-amber-600 bg-amber-50 border border-amber-200
+                    rounded-xl px-4 py-3 text-sm">
+            ⚠️ No hay médicos disponibles para esta especialidad en este momento.
+          </p>
 
           <div class="flex gap-4 mt-6">
             <button (click)="resetStep2(); step.set(1)"
