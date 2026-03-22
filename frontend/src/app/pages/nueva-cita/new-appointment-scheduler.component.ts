@@ -9,8 +9,8 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { CalendarService } from '../../services/calendar.service';
 import { Patient } from '../../models/patient.model';
-import { NewAppointment } from './DTO/newAppointment';
-import { SpecialtyDoctor } from './DTO/specialty-doctor';
+import { NewAppointment } from '../../DTOs/newAppointment';
+import { SpecialtyDoctor } from '../../DTOs/specialty-doctor';
 import { LucideAngularModule, CheckCircle, User, Stethoscope, UserSearch } from 'lucide-angular';
 
 type BookingMode = 'specialty' | 'specialty-doctor' | null;
