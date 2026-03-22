@@ -1,9 +1,17 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.model;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.*;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.GuardianRequiredException;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InconsistentPatientInfoException;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidBirthDateException;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidDocumentException;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidEmailException;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidPatientInfoException;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidPersonNameException;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidPhoneException;
 import org.jmolecules.ddd.annotation.ValueObject;
 
 import java.time.LocalDate;
+import java.time.Period;
 import java.util.Objects;
 
 @ValueObject
@@ -36,7 +44,7 @@ public class PatientInfo {
         this.lastName = normalizeRequired(lastName, "El apellido es obligatorio");
         this.phone = normalizeRequired(phone, "El celular es obligatorio");
         this.gender = validateRequired(gender, "El género es obligatorio");
-        this.birthDate = birthDate;
+        this.birthDate = validateRequired(birthDate, "La fecha de nacimiento es obligatoria");
         this.email = normalizeOptional(email);
         this.guardianPhone = normalizeOptional(guardianPhone);
 
@@ -68,7 +76,6 @@ public class PatientInfo {
     }
 
     private void validate() {
-
         if (!documentNumber.matches("\\d{6,12}")) {
             throw new InvalidDocumentException("El número de documento debe tener entre 6 y 12 dígitos");
         }
@@ -85,7 +92,7 @@ public class PatientInfo {
             throw new InvalidPhoneException("El celular debe contener entre 7 y 15 dígitos");
         }
 
-        if (birthDate != null && birthDate.isAfter(LocalDate.now())) {
+        if (birthDate.isAfter(LocalDate.now())) {
             throw new InvalidBirthDateException("La fecha de nacimiento no puede ser futura");
         }
 
@@ -93,21 +100,19 @@ public class PatientInfo {
             throw new InvalidEmailException("El correo no tiene un formato válido");
         }
 
-        if (birthDate != null) {
-            int age = java.time.Period.between(birthDate, LocalDate.now()).getYears();
+        int age = Period.between(birthDate, LocalDate.now()).getYears();
 
-            if (age < 18 && (guardianPhone == null || guardianPhone.isBlank())) {
-                throw new GuardianRequiredException("Para menores de edad se requiere teléfono del acudiente");
-            }
+        if (age < 18 && (guardianPhone == null || guardianPhone.isBlank())) {
+            throw new GuardianRequiredException("Para menores de edad se requiere teléfono del acudiente");
+        }
 
-            if (age < 18 && documentType == DocumentType.CEDULA) {
-                throw new InconsistentPatientInfoException("Un menor no puede tener cédula");
-            }
+        if (age < 18 && documentType == DocumentType.CEDULA) {
+            throw new InconsistentPatientInfoException("Un menor no puede tener cédula");
+        }
 
-            if (age >= 18 && (documentType == DocumentType.TARJETA_IDENTIDAD
-                    || documentType == DocumentType.REGISTRO_NACIMIENTO)) {
-                throw new InconsistentPatientInfoException("Un adulto no debería tener este tipo de documento");
-            }
+        if (age >= 18 && (documentType == DocumentType.TARJETA_IDENTIDAD
+                || documentType == DocumentType.REGISTRO_NACIMIENTO)) {
+            throw new InconsistentPatientInfoException("Un adulto no debería tener este tipo de documento");
         }
     }
 
@@ -132,6 +137,9 @@ public class PatientInfo {
         return value;
     }
 
+    public boolean isMinor() {
+        return Period.between(birthDate, LocalDate.now()).getYears() < 18;
+    }
 
     public DocumentType getDocumentType() {
         return documentType;
@@ -169,7 +177,6 @@ public class PatientInfo {
         return guardianPhone;
     }
 
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -200,6 +207,4 @@ public class PatientInfo {
                 guardianPhone
         );
     }
-
-
 }
