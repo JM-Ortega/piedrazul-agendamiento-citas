@@ -53,6 +53,41 @@ public class AppointmentController {
         return ResponseEntity.ok(slots);
     }
 
+    @PostMapping("/listByDoctorAndDate")
+    public ResponseEntity<List<AppointmentResponse>> listAppointmentByDoctorAndDate(
+            @RequestParam UUID idDoctor,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+
+        return ResponseEntity.ok(
+                //stream es para procesar cada elemento de lista uno por uno
+                //map mapea cada elemento de la lista a otro tipo, en este caso de Appointment a AppointmentResponse usando el mapper
+                listAppointmentsUseCase.listByDoctorAndDate(idDoctor, date)
+                        .stream()
+                        .map(citaDtoMapper::toResponse)  // usas el mapper directamente
+                        .toList()
+        );
+
+    }
+
+    @PostMapping("/listbyDate")
+    public ResponseEntity<List<AppointmentResponse>> listAppointmentByDate(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date){
+        return  ResponseEntity.ok(
+                listAppointmentsUseCase.listByDate(date).stream().map(citaDtoMapper::toResponse).toList()
+        );
+
+    }
+
+    @PostMapping("/listByDoctor")
+    public ResponseEntity<List<AppointmentResponse>> listByDoctorId(
+            @RequestParam UUID idDoctor){
+        return ResponseEntity.ok(
+                listAppointmentsUseCase.listByDoctorId(idDoctor).stream().map(citaDtoMapper::toResponse).toList()
+        );
+    }
+
+
+
     // Crear cita
     @PostMapping
     public ResponseEntity<AppointmentResponse> scheduleAppointment(
@@ -83,4 +118,6 @@ public class AppointmentController {
                 .status(HttpStatus.CREATED)
                 .body(citaDtoMapper.toResponse(appointment));
     }
+
+
 }

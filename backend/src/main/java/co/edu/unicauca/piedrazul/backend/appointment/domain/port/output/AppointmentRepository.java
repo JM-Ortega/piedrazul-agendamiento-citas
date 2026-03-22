@@ -12,11 +12,9 @@ public interface AppointmentRepository {
     // Metodos que solo hablan en terminos del dominio
     void save(Appointment appointment);
 
-    void deleteById(UUID idCita);
+
     List<Appointment> findByDoctorId(UUID idDoctor);
     List<Appointment> findByDate(LocalDate date);
     List<Appointment> findByDoctorIdAndDate(UUID idDoctor, LocalDate date);
 
-    // Verifica si ya existe una cita en ese slot antes de agendar
-    boolean existsByDoctorDateAndTime(UUID idDoctor, LocalDate date, AppointmentTime startTime);
 }

@@ -7,6 +7,15 @@ import java.util.List;
 import java.util.UUID;
 
 public interface ListAppointmentsUseCase {
+
     // Listar citas de un médico en una fecha
+    List<Appointment> listByIdDoctor(UUID idDoctor);
+
+
+    List<Appointment> listByDoctorId(UUID idDoctor);
+
     List<Appointment> listByDoctorAndDate(UUID idDoctor, LocalDate date);
+
+    List<Appointment> listByDate(LocalDate date);
+
 }

@@ -28,15 +28,12 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
         jpaRepository.save(mapper.toEntity(appointment));
     }
 
-    @Override
-    public void deleteById(UUID idCita) {
-        jpaRepository.deleteById(idCita);
-    }
 
     @Override
     public List<Appointment> findByDoctorId(UUID idDoctor) {
         return jpaRepository.findByIdDoctor(idDoctor).stream().map(mapper::toDomain).toList();
     }
+
 
     @Override
     public List<Appointment> findByDate(LocalDate date) {
@@ -48,9 +45,5 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
         return jpaRepository.findByIdDoctorAndDate(idDoctor, date).stream().map(mapper::toDomain).toList();
     }
 
-    @Override
-    public boolean existsByDoctorDateAndTime(UUID idDoctor, LocalDate date, AppointmentTime startTime) {
-        return jpaRepository.existsByIdDoctorAndDateAndStartTime(idDoctor, date, startTime.getTime());
-    }
 
 }

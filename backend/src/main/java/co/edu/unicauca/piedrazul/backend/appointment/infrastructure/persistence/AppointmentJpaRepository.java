@@ -10,11 +10,15 @@ import java.util.UUID;
 
 public interface AppointmentJpaRepository extends JpaRepository<AppointmentEntity, UUID> {
 
+    /*
+    List<AppointmentEntity> findByIdDoctor(UUID idDoctor);
+    */
+
     List<AppointmentEntity> findByIdDoctor(UUID idDoctor);
 
     List<AppointmentEntity> findByDate(LocalDate date);
 
     List<AppointmentEntity> findByIdDoctorAndDate(UUID idDoctor, LocalDate date);
 
-    boolean existsByIdDoctorAndDateAndStartTime(UUID idDoctor, LocalDate date, LocalTime startTime);
+
 }
