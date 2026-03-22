@@ -13,4 +13,7 @@ public interface DoctorConfigConsultPort {
 
     // Devuelve el intervalo entre citas configurado para el médico
     int getIntervalMinutesByDoctor(UUID idDoctor);
+
+    // Obtener el nombre del doctor
+    String getDoctorName(UUID idDoctor);
 }

@@ -6,8 +6,6 @@ import org.jmolecules.ddd.annotation.ValueObject;
 import java.time.LocalDate;
 import java.util.Objects;
 
-import static java.util.Objects.requireNonNull;
-
 @ValueObject
 public class PatientInfo {
 

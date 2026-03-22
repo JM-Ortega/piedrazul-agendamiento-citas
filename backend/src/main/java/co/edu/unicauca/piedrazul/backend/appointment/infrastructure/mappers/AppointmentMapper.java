@@ -12,7 +12,7 @@ import java.util.UUID;
 public class AppointmentMapper {
 
     //De dominio a JPA
-    public AppointmentEntity toEntity(Appointment appointment, String doctorName, String patientName) {
+    public AppointmentEntity toEntity(Appointment appointment) {
         if (appointment == null) {
             return null;
         }
@@ -21,11 +21,11 @@ public class AppointmentMapper {
         AppointmentEntity appointmentEntity = new AppointmentEntity();
 
         //Mapeo los valores de la entidad de dominio a la entidad JPA
-        appointmentEntity.setIdCita(appointment.getIdAppointment());
+        appointmentEntity.setIdAppointment(appointment.getIdAppointment());
         appointmentEntity.setIdDoctor(appointment.getIdDoctor());
-        appointmentEntity.setDoctorName(doctorName);
+        appointmentEntity.setDoctorName(appointment.getDoctorName());
         appointmentEntity.setIdPatient(appointment.getIdPatient());
-        appointmentEntity.setPatientName(patientName);
+        appointmentEntity.setPatientName(appointment.getPatientInfo().getFirstName() + " " + appointment.getPatientInfo().getLastName());
         appointmentEntity.setSpecialty(appointment.getSpecialty());
         appointmentEntity.setAppointmentState(appointment.getAppointmentState());
         appointmentEntity.setDate(appointment.getDate());
@@ -33,7 +33,6 @@ public class AppointmentMapper {
         appointmentEntity.setSchedulingOrigin(appointment.getSchedulingOrigin());
 
         return appointmentEntity;
-
     }
 
     //de JPA a dominio
@@ -43,21 +42,19 @@ public class AppointmentMapper {
             return null;
         }
 
-        PatientInfo patientInfo = new PatientInfo(entity.getIdPatient(), entity.getPatientName());
-
         AppointmentTime appointmentTime = new AppointmentTime(entity.getStartTime());
 
         return Appointment.reconstruct(
-                entity.getIdCita(),
+                entity.getIdAppointment(),
                 entity.getIdDoctor(),
+                entity.getDoctorName(),
                 entity.getIdPatient(),
-                patientInfo,
+                null,
                 entity.getSpecialty(),
                 entity.getAppointmentState(),
                 entity.getDate(),
                 appointmentTime,
                 entity.getSchedulingOrigin()
         );
-
     }
 }

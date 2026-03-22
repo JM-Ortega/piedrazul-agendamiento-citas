@@ -9,7 +9,7 @@ import java.util.UUID;
 
 public interface AppointmentRepository {
 
-    //Metodos que solo hablan en terminos del dominio
+    // Metodos que solo hablan en terminos del dominio
     void save(Appointment appointment);
 
     void deleteById(UUID idCita);

@@ -21,7 +21,7 @@ public class AppointmentEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_appointment", nullable = false, unique = true)
-    private UUID idCita;
+    private UUID idAppointment;
 
     @Column(name = "id_doctor",nullable = false)
     private UUID idDoctor;
@@ -34,7 +34,6 @@ public class AppointmentEntity {
 
     @Column(name = "patient_name", nullable = false)
     private String patientName;
-
 
     @Enumerated(EnumType.STRING)
     @Column(name = "specialty", nullable = false)
@@ -54,6 +53,4 @@ public class AppointmentEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "scheduling_origin", nullable = false)
     private SchedulingOrigin schedulingOrigin;
-
-
 }
