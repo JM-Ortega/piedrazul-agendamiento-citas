@@ -167,12 +167,7 @@ export class NewAppointmentSchedulerComponent {
         if (!patient) {
           this.patientForm.update(f => ({ ...f, documentId: this.documentId() }));
         }
-        if (this.bookingMode() === 'specialty') {
-          this.service.getSpecialtiesWithDoctor().subscribe({
-            next: data => this.specialtiesWithDoctor.set(data),
-            error: () => this.noSpecialtyAvailable.set(true)
-          });
-        }
+        this.loadSpecialtys();
       },
       error: (err) => {
         switch(err.status){
@@ -211,9 +206,18 @@ export class NewAppointmentSchedulerComponent {
       birthDate: f.birthDate || undefined,
       email:     f.email     || undefined
     }).subscribe({
-      next: (id) => { this.isLoading.set(false); this.patientId.set(id); this._enterStep2(); },
+      next: (id) => { this.isLoading.set(false); this.patientId.set(id); this._enterStep2(); this.loadSpecialtys()},
       error: ()  => { this.isLoading.set(false); this.errorMessage.set('No se pudo registrar el paciente.'); }
     });
+  }
+
+  loadSpecialtys():void{
+    if (this.bookingMode() === 'specialty') {
+      this.service.getSpecialtiesWithDoctor().subscribe({
+        next: data => this.specialtiesWithDoctor.set(data),
+        error: () => this.noSpecialtyAvailable.set(true)
+      });
+    }
   }
 
   private _enterStep2(): void {
