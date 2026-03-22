@@ -39,6 +39,28 @@ public class AppointmentService {
         );
     }
 
+    // El paciente web agenda de forma autónoma
+    public Appointment scheduleAutonomous(UUID idPatient,
+                                          PatientInfo patientInfo,
+                                          UUID idDoctor,
+                                          Specialty specialty,
+                                          LocalDate date,
+                                          AppointmentTime startTime,
+                                          int intervalMinutes,
+                                          List<Appointment> existingAppointments) {
+
+        // El dominio valida que el slot esté libre antes de crear la cita
+        if (busySlotService.isBusy(existingAppointments, startTime, intervalMinutes)) {
+            throw new SlotNotAvailableException(
+                    "El slot " + startTime + " ya está ocupado para este médico"
+            );
+        }
+
+        return Appointment.scheduleAutonomous(
+                idDoctor, idPatient, patientInfo, specialty, date, startTime
+        );
+    }
+
     // Franjas disponibles para mostrarle al frontend
     // doctorSlots viene del módulo de médicos ya calculadas para ese día
     // existingAppointments son las citas que ya existen en BD para ese médico y fecha
