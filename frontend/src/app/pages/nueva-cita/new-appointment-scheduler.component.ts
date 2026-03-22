@@ -148,12 +148,6 @@ export class NewAppointmentSchedulerComponent {
   // Selección de modo inicial
   selectMode(mode: BookingMode): void {
     this.bookingMode.set(mode);
-    if (mode === 'specialty') {
-      this.service.getSpecialtiesWithDoctor().subscribe({
-        next: data => this.specialtiesWithDoctor.set(data),
-        error: () => this.noSpecialtyAvailable.set(true)
-      });
-    }
   }
 
   // Búsqueda de paciente 
@@ -172,6 +166,12 @@ export class NewAppointmentSchedulerComponent {
         this.notFound.set(!patient);
         if (!patient) {
           this.patientForm.update(f => ({ ...f, documentId: this.documentId() }));
+        }
+        if (this.bookingMode() === 'specialty') {
+          this.service.getSpecialtiesWithDoctor().subscribe({
+            next: data => this.specialtiesWithDoctor.set(data),
+            error: () => this.noSpecialtyAvailable.set(true)
+          });
         }
       },
       error: (err) => {
