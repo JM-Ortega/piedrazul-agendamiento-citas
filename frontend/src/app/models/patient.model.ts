@@ -7,4 +7,5 @@ export interface Patient {
   gender: 'MASCULINO' | 'FEMENINO' | 'OTRO' | '';
   birthDate?: string;
   email?: string;
+  guardianPhone?: string;
 }
