@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.doctors.application;
 
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.SpecialtyDoctor;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
@@ -13,7 +14,9 @@ import jakarta.transaction.Transactional;
 
 import java.time.LocalDate;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class DoctorService {
@@ -147,5 +150,26 @@ public class DoctorService {
 
     public List<Specialty> getSpecialties (){
         return doctorRepository.findAllDistinctSpecialtiesByActiveDoctors();
+    }
+
+    public List<SpecialtyDoctor> getSpecialtiesWithDoctor() {
+        List<Doctor> availableDoctors = doctorRepository.findAvailableDoctorsForSpecialtyAssignment(LocalDate.now());
+        if (availableDoctors.isEmpty()) {
+            throw new EntityNotFoundException("No hay médicos disponibles para las especialidades");
+        }
+
+        Map<Specialty, SpecialtyDoctor> specialtiesWithDoctor = new LinkedHashMap<>();
+
+        for (Doctor doctor : availableDoctors) {
+            for (Specialty specialty : doctor.getSpecialty()) {
+                specialtiesWithDoctor.putIfAbsent(specialty, SpecialtyDoctor.from(specialty, doctor));
+            }
+        }
+
+        if (specialtiesWithDoctor.isEmpty()) {
+            throw new EntityNotFoundException("No hay médicos disponibles para las especialidades");
+        }
+
+        return specialtiesWithDoctor.values().stream().toList();
     }
 }

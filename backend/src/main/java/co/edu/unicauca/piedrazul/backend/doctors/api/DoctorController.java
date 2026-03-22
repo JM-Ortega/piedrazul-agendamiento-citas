@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.doctors.api;
 
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.SpecialtyDoctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
@@ -18,8 +19,11 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/doctor/doctors")
 public class DoctorController {
-    @Autowired
-    private DoctorService doctorService;
+    private final DoctorService doctorService;
+
+    public DoctorController(DoctorService doctorService) {
+        this.doctorService = doctorService;
+    }
 
     /**
      * Crear un nuevo doctor
@@ -83,6 +87,23 @@ public class DoctorController {
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("Error al recuperar especialidades: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Obtiene un médico disponible por defecto para cada especialidad.
+     * @return Lista de especialidades con su médico asignado para agendamiento
+     */
+    @GetMapping("/specialty/with-doctor")
+    public ResponseEntity<?> getSpecialtiesWithDoctor() {
+        try {
+            List<SpecialtyDoctor> specialtiesWithDoctor = doctorService.getSpecialtiesWithDoctor();
+            return ResponseEntity.ok(specialtiesWithDoctor);
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Error al recuperar médicos por especialidad: " + e.getMessage());
         }
     }
 
@@ -172,4 +193,6 @@ public class DoctorController {
                     .body("Error al actualizar el estado del médico: " + e.getMessage());
         }
     }
+
+
 }
