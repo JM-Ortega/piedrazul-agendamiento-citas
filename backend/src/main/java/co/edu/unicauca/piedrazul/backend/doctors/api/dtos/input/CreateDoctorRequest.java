@@ -14,6 +14,7 @@ public record CreateDoctorRequest(
         @NotBlank UUID idUser,
         @NotBlank String firstName,
         @NotBlank String lastName,
+        @NotBlank String identification,
         @NotNull List<Specialty> specialty,
         LocalDate laborStart,
         LocalDate laborEnd,
