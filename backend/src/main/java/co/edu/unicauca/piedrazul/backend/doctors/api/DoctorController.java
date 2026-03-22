@@ -33,7 +33,7 @@ public class DoctorController {
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error creating doctor: " + e.getMessage());
+                    .body("Error al crear al médico: " + e.getMessage());
         }
     }
 
@@ -51,7 +51,7 @@ public class DoctorController {
             return ResponseEntity.ok(responses);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error retrieving doctors: " + e.getMessage());
+                    .body("Error al recuperar a los médicos: " + e.getMessage());
         }
     }
 
@@ -67,7 +67,22 @@ public class DoctorController {
             return ResponseEntity.ok(DoctorResponse.fromEntity(doctor));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Doctor not found: " + e.getMessage());
+                    .body("Doctor no encontrado: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Obtiene las especialidades de los medicos activos
+     * @return Lista de especialidades
+     */
+    @GetMapping("/specialty")
+    public ResponseEntity<?> getSpecialties() {
+        try {
+            List<Specialty> specialties = doctorService.getSpecialties();
+            return ResponseEntity.ok(specialties);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Error al recuperar especialidades: " + e.getMessage());
         }
     }
 
@@ -86,7 +101,7 @@ public class DoctorController {
             return ResponseEntity.ok(responses);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error retrieving doctors by specialty: " + e.getMessage());
+                    .body("Error al recuperar médicos por especialidad: " + e.getMessage());
         }
     }
 
@@ -111,7 +126,7 @@ public class DoctorController {
                     .body("Doctor not found: " + e.getMessage());
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error enabling doctor: " + e.getMessage());
+                    .body("Error habilitando doctor: " + e.getMessage());
         }
     }
 
@@ -134,7 +149,7 @@ public class DoctorController {
                     .body("Doctor not found: " + e.getMessage());
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error disabling doctor: " + e.getMessage());
+                    .body("Error deshabilitando doctor: " + e.getMessage());
         }
     }
 
@@ -154,7 +169,7 @@ public class DoctorController {
                     .body("Doctor not found: " + e.getMessage());
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error updating doctor status: " + e.getMessage());
+                    .body("Error al actualizar el estado del médico: " + e.getMessage());
         }
     }
 }

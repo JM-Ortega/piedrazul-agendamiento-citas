@@ -4,4 +4,6 @@ import java.util.UUID;
 
 public interface DoctorExternalService {
     boolean existDoctor(UUID idDoctor);
+
+    String doctorsName(UUID idDoctor);
 }

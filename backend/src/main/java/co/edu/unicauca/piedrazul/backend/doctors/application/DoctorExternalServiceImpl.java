@@ -18,4 +18,9 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     public boolean existDoctor(UUID idDoctor) {
         return doctorRepository.existsById(idDoctor);
     }
+
+    @Override
+    public String doctorsName(UUID idDoctor) {
+        return doctorRepository.findByIdDoctor(idDoctor).getFirstName() + " " + doctorRepository.findByIdDoctor(idDoctor).getLastName();
+    }
 }

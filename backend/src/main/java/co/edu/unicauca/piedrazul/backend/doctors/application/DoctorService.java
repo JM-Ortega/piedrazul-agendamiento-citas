@@ -38,7 +38,6 @@ public class DoctorService {
         doctor.setLaborStart(request.laborStart());
         doctor.setLaborEnd(request.laborEnd());
         doctor.setAppointmentInterval(request.appointmentInterval());
-        doctor.setSchedulableWeeks(request.schedulableWeeks());
         doctor.setSchedules(request.schedules());
         //Validamos si el estado del medico
         doctor.setStatus(calculateActiveStatus(request.laborStart(), request.laborEnd()));
@@ -47,12 +46,10 @@ public class DoctorService {
         Doctor savedDoctor = doctorRepository.save(doctor);
 
         // 3. Crear el usuario
-        userModuleApi.createUser(request.identification(), "DOCTOR");
+        //userModuleApi.createUser(request.identification());
 
         // 4. Retornar un DTO de respuesta
         return DoctorResponse.fromEntity(savedDoctor);
-
-
     }
 
     private boolean calculateActiveStatus(LocalDate start, LocalDate end) {
@@ -126,7 +123,6 @@ public class DoctorService {
         // 4. Cambiar el estado del Doctor
         doctor.setStatus(false);
 
-        // !! Llamada al módulo de usuarios para habilitar el usuario del medico
         // 5. Desactivamos el usuario para que no pueda loguearse
         userModuleApi.deactivateUser(doctor.getIdUser());
 
@@ -147,5 +143,9 @@ public class DoctorService {
 
     public List<Doctor> getDoctorBySpeciality(Specialty specialty) {
         return doctorRepository.findBySpecialty(Collections.singletonList(specialty));
+    }
+
+    public List<Specialty> getSpecialties (){
+        return doctorRepository.findAllDistinctSpecialtiesByActiveDoctors();
     }
 }

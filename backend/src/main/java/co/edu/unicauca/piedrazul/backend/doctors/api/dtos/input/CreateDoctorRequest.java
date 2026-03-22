@@ -19,6 +19,5 @@ public record CreateDoctorRequest(
         LocalDate laborStart,
         LocalDate laborEnd,
         int appointmentInterval,
-        int schedulableWeeks,
         List<Schedule> schedules
 ) {}
