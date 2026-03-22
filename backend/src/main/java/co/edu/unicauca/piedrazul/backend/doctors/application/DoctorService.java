@@ -1,11 +1,11 @@
-package co.edu.unicauca.piedrazul.backend.doctors.model.services;
+package co.edu.unicauca.piedrazul.backend.doctors.application;
 
-import co.edu.unicauca.piedrazul.backend.doctors.controller.dtos.input.CreateDoctorRequest;
-import co.edu.unicauca.piedrazul.backend.doctors.controller.dtos.output.DoctorResponse;
-import co.edu.unicauca.piedrazul.backend.doctors.model.exceptions.DateConflictException;
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Specialty;
-import co.edu.unicauca.piedrazul.backend.doctors.model.repositories.DoctorRepository;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 

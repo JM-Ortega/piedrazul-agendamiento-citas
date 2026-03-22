@@ -1,7 +1,7 @@
-package co.edu.unicauca.piedrazul.backend.doctors.controller.dtos.input;
+package co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input;
 
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 

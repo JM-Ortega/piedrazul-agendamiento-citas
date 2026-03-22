@@ -1,10 +1,10 @@
-package co.edu.unicauca.piedrazul.backend.doctors.controller.controllers;
+package co.edu.unicauca.piedrazul.backend.doctors.api;
 
-import co.edu.unicauca.piedrazul.backend.doctors.controller.dtos.input.CreateDoctorRequest;
-import co.edu.unicauca.piedrazul.backend.doctors.controller.dtos.output.DoctorResponse;
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Specialty;
-import co.edu.unicauca.piedrazul.backend.doctors.model.services.DoctorService;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;

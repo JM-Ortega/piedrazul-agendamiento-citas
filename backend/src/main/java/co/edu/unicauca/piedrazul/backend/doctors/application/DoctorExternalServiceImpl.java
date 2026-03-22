@@ -1,6 +1,7 @@
-package co.edu.unicauca.piedrazul.backend.doctors.model.services;
+package co.edu.unicauca.piedrazul.backend.doctors.application;
 
-import co.edu.unicauca.piedrazul.backend.doctors.model.repositories.DoctorRepository;
+import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
+import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.UUID;

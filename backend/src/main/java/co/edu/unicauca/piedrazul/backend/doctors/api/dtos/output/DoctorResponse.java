@@ -1,6 +1,6 @@
-package co.edu.unicauca.piedrazul.backend.doctors.controller.dtos.output;
+package co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output;
 
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Doctor;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 
 import java.util.UUID;
 

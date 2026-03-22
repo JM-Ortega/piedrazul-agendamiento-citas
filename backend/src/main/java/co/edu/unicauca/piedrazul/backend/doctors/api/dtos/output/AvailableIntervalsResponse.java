@@ -1,6 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.doctors.controller.dtos.output;
-
-import co.edu.unicauca.piedrazul.backend.doctors.model.models.Workday;
+package co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output;
 
 import java.time.LocalTime;
 
