@@ -15,4 +15,6 @@ public interface DoctorExternalService {
     List<LocalTime> getSlotsByDoctor(UUID idDoctor, LocalDate date);
 
     int getIntervalMinutesByDoctor(UUID idDoctor);
+
+    String getDoctorName(UUID idDoctor);
 }

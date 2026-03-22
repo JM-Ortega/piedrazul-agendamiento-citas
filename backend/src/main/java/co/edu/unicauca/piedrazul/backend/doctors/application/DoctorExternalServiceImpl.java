@@ -42,6 +42,11 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
         return doctorRepository.findByIdDoctor(idDoctor).getAppointmentInterval();
     }
 
+    @Override
+    public String getDoctorName(UUID idDoctor) {
+        return doctorRepository.findByIdDoctor(idDoctor).getFirstName() + " " + doctorRepository.findByIdDoctor(idDoctor).getLastName();
+    }
+
     private static Workday toWorkday(DayOfWeek dayOfWeek) {
         return switch (dayOfWeek) {
             case MONDAY    -> Workday.LUNES;
