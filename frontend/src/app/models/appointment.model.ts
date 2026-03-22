@@ -5,5 +5,4 @@ export interface Appointment {
   date: string;
   time: string;
   status: 'confirmed' | 'pending' | 'cancelled';
-  notes?: string;
 }

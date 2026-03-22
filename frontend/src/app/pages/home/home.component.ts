@@ -1,11 +1,14 @@
-import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   Calendar,
   ClipboardCheck,
+  Clock,
   LucideAngularModule,
+  Phone,
   Settings,
+  Shield,
   Stethoscope,
 } from 'lucide-angular';
 import { AppService } from '../../services/app.service';
@@ -24,6 +27,9 @@ export class HomeComponent {
   readonly ClipboardCheck = ClipboardCheck;
   readonly Stethoscope = Stethoscope;
   readonly Settings = Settings;
+  readonly Clock = Clock;
+  readonly Shield = Shield;
+  readonly Phone = Phone;
 
   showModal = signal<'patient' | 'scheduler' | 'admin' | 'doctor' | null>(null);
   email = signal('');
