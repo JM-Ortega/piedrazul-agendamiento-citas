@@ -1,6 +1,12 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import {
+  NavigationStart,
+  Router,
+  RouterLink,
+  RouterLinkActive,
+} from '@angular/router';
+import {
+  AlertCircle,
   Calendar,
   ClipboardList,
   Home,
@@ -22,7 +28,7 @@ import { AppService } from '../../services/app.service';
   standalone: true,
   imports: [RouterLink, RouterLinkActive, LucideAngularModule],
 })
-export class NavbarComponent {
+export class NavbarComponent implements OnInit {
   appService = inject(AppService);
   private router = inject(Router);
 
@@ -37,8 +43,11 @@ export class NavbarComponent {
   readonly Hospital = Hospital;
   readonly Menu = Menu;
   readonly X = X;
+  readonly AlertCircle = AlertCircle;
+  readonly exactMatch = { exact: true };
 
   menuOpen = signal(false);
+  showLogoutModal = signal(false);
 
   roleLabel = computed<string>(() => {
     switch (this.appService.currentRole()) {
@@ -49,14 +58,41 @@ export class NavbarComponent {
       case 'admin':
         return 'Administrador';
       case 'doctor':
-        return `DR`;
+        return 'DR';
       default:
         return '';
     }
   });
 
-  logout(): void {
+  ngOnInit(): void {
+    // Empuja un estado inicial para poder detectar el retroceso
+    history.pushState(null, '', location.href);
+
+    this.router.events.subscribe((event) => {
+      if (
+        event instanceof NavigationStart &&
+        event.navigationTrigger === 'popstate' &&
+        this.appService.currentRole()
+      ) {
+        // Cancela el retroceso y muestra el modal
+        history.pushState(null, '', location.href);
+        this.showLogoutModal.set(true);
+      }
+    });
+  }
+
+  openLogoutModal(): void {
+    this.showLogoutModal.set(true);
+    this.menuOpen.set(false);
+  }
+
+  cancelLogout(): void {
+    this.showLogoutModal.set(false);
+  }
+
+  confirmLogout(): void {
     this.appService.logout();
+    this.showLogoutModal.set(false);
     this.router.navigate(['/']);
   }
 }
