@@ -15,4 +15,5 @@ public interface PatientModuleApi {
     boolean existsById(UUID id);
 
     List<Patient> findAll();
+
 }

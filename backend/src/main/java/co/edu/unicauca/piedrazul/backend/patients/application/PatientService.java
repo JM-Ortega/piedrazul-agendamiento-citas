@@ -10,8 +10,6 @@ import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyLinked
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientRepository;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
-import co.edu.unicauca.piedrazul.backend.user.domain.Role;
-import co.edu.unicauca.piedrazul.backend.user.domain.User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,7 +76,7 @@ public class PatientService implements PatientModuleApi {
         validateDocumentNumber(documentNumber);
         ensurePatientDoesNotExist(documentNumber);
 
-        User user = userModuleApi.createUser(username, Role.PATIENT);
+        UUID userId = userModuleApi.createPatientUser(username);
 
         Patient patient = buildPatient(
                 documentType,
@@ -90,7 +88,7 @@ public class PatientService implements PatientModuleApi {
                 gender,
                 birthDate,
                 guardianPhone,
-                user.getId()
+                userId
         );
 
         return patientRepository.save(patient);
@@ -103,8 +101,8 @@ public class PatientService implements PatientModuleApi {
         Patient patient = getPatientByDocumentNumberOrThrow(documentNumber);
         ensurePatientHasNoLinkedUser(patient);
 
-        User user = userModuleApi.createUser(username, Role.PATIENT);
-        patient.linkUser(user.getId());
+        UUID userId = userModuleApi.createPatientUser(username);
+        patient.linkUser(userId);
 
         return patientRepository.save(patient);
     }
