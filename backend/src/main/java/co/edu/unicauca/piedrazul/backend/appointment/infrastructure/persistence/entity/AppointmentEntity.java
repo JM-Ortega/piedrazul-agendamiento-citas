@@ -1,6 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.FutureOrPresent;
 import lombok.Getter;
@@ -23,10 +25,10 @@ public class AppointmentEntity {
     @Column(name = "id_appointment", updatable = false, nullable = false)
     private UUID idAppointment;
 
-    @Column(name = "id_doctor",nullable = false)
+    @Column(name = "id_doctor", nullable = false)
     private UUID idDoctor;
 
-    @Column(name =  "doctor_name", nullable = false)
+    @Column(name = "doctor_name", nullable = false)
     private String doctorName;
 
     @Column(name = "id_patient", nullable = false)
