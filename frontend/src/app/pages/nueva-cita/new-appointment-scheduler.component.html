@@ -84,8 +84,13 @@
               </button>
             </div>
             <p *ngIf="documentError()" class="text-red-500 text-sm mt-1">
-              El número de documento debe contener solo números
+              {{errorMessage()}}
             </p>
+          </div>
+
+          <div *ngIf="errorMessage()"
+            class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+            ⚠️ {{errorMessage()}}
           </div>
 
           <div *ngIf="foundPatient() as p"
@@ -176,7 +181,7 @@
           </div>
 
           <div class="flex gap-4 mt-2">
-            <button (click)="bookingMode.set(null)"
+            <button (click)="bookingMode.set(null); errorMessage.set('')"
               class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50">
               ← Cambiar modo
             </button>

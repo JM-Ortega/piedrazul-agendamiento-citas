@@ -159,9 +159,10 @@ export class NewAppointmentSchedulerComponent {
   // Búsqueda de paciente 
   searchPatient(): void {
     this.documentError.set(false);
+    this.errorMessage.set('');
 
     if (!/^[0-9]+$/.test(this.documentId())) {
-      this.documentError.set(true);
+      this.errorMessage.set('El número de documento debe contener solo números');
       return;
     }
 
@@ -174,11 +175,17 @@ export class NewAppointmentSchedulerComponent {
         }
       },
       error: (err) => {
-        if (err.status === 404) {
-          this.foundPatient.set(null);
-          this.notFound.set(true);
-        } else {
-          this.errorMessage.set('Error al buscar paciente');
+        switch(err.status){
+          case 404:
+            this.foundPatient.set(null);
+            this.notFound.set(true);
+            break;
+          case 0:
+            this.errorMessage.set('No se pudo conectar con el servidor. Intente mas tarde');
+            break;
+          default:
+            this.errorMessage.set('Error al buscar paciente');
+          break;
         }
       }
     });
