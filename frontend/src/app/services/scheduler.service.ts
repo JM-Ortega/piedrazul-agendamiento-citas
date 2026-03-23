@@ -7,7 +7,7 @@ import { dtoDoctor } from '../models/DTOs/dtoDoctor.model';
 @Injectable({ providedIn: 'root' })
 export class SchedulerService {
   private http = inject(HttpClient);
-  private apiUrl = 'https://API';
+  private apiUrl = 'https://api';
 
   getDoctors(): Observable<dtoDoctor[]> {
     return this.http.get<dtoDoctor[]>(`${this.apiUrl}/doctor/doctors`);
