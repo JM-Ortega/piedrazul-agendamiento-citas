@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.doctors.api;
 
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorDetailedResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorShortResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
@@ -50,6 +51,24 @@ public class DoctorController {
             List<Doctor> doctors = doctorService.findAllDoctors();
             List<DoctorShortResponse> responses = doctors.stream()
                     .map(DoctorShortResponse::fromEntity)
+                    .toList();
+            return ResponseEntity.ok(responses);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Error al recuperar a los médicos: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Listar todos los doctores
+     * @return Lista de todos los doctores
+     */
+    @GetMapping("/detailed")
+    public ResponseEntity<?> getAllDoctorsDetailed() {
+        try {
+            List<Doctor> doctors = doctorService.findAllDoctors();
+            List<DoctorDetailedResponse> responses = doctors.stream()
+                    .map(DoctorDetailedResponse::fromEntity)
                     .toList();
             return ResponseEntity.ok(responses);
         } catch (RuntimeException e) {
