@@ -93,10 +93,10 @@ export class NewAppointmentSchedulerComponent {
   readonly effectiveDoctor = computed<SpecialtyDoctor | null>(() =>
     this.bookingMode() === 'specialty'
       ? this.assignedDoctor()
-      : (this.doctorsBySpecialty().find(d => d.doctorId === this.selectedDoctorId()) ?? null)
+      : (this.doctorsBySpecialty().find(d => d.id === this.selectedDoctorId()) ?? null)
   );
 
-  readonly effectiveDoctorId = computed(() => this.effectiveDoctor()?.doctorId ?? '');
+  readonly effectiveDoctorId = computed(() => this.effectiveDoctor()?.id ?? '');
 
   // Calendario
   selectedDate   = signal<Date | null>(null);
@@ -153,7 +153,7 @@ export class NewAppointmentSchedulerComponent {
 
   readonly confirmDoctorName = computed(() =>
     this.bookingMode() === 'specialty'
-      ? (this.assignedDoctor()?.doctorName ?? '')
+      ? (this.assignedDoctor()?.name ?? '')
       : this.selectedDoctorName()
   );
 
@@ -242,10 +242,10 @@ export class NewAppointmentSchedulerComponent {
         this.specialtiesWithDoctor.set(
           specs.map(s => ({
             specialty: s,
-            doctorId: '',
-            doctorName: '',
-            fechaFinalTrabajo: null,
-            workDays: []
+            id: '',
+            name: '',
+            laborEnd: null,
+            workdays: []
           }))
         );
       },
@@ -349,8 +349,8 @@ export class NewAppointmentSchedulerComponent {
 
   onDoctorChange(doctorId: string): void {
     this.selectedDoctorId.set(doctorId);
-    const doc = this.doctorsBySpecialty().find(d => d.doctorId === doctorId);
-    this.selectedDoctorName.set(doc?.doctorName ?? '');
+    const doc = this.doctorsBySpecialty().find(d => d.id === doctorId);
+    this.selectedDoctorName.set(doc?.name ?? '');
   }
 
   onDocumentChange(value: string): void {

@@ -13,12 +13,12 @@ export class CalendarService {
     max30.setDate(max30.getDate() + 30);
 
     let effectiveMax = max30;
-    if (doctor.fechaFinalTrabajo) {
-      const doctorLimit = new Date(doctor.fechaFinalTrabajo + 'T12:00:00');
+    if (doctor.laborEnd) {
+      const doctorLimit = new Date(doctor.laborEnd + 'T12:00:00');
       if (doctorLimit < max30) effectiveMax = doctorLimit;
     }
 
-    const workDays = new Set(doctor.workDays);
+    const workDays = new Set(doctor.workdays);
 
     return (date: Date | null): boolean => {
       if (!date) return false;
@@ -49,8 +49,8 @@ export class CalendarService {
     const max30 = new Date();
     max30.setDate(max30.getDate() + 30);
 
-    if (doctor.fechaFinalTrabajo) {
-      const doctorLimit = new Date(doctor.fechaFinalTrabajo + 'T12:00:00');
+    if (doctor.laborEnd) {
+      const doctorLimit = new Date(doctor.laborEnd + 'T12:00:00');
       return doctorLimit < max30 ? doctorLimit : max30;
     }
     return max30;
