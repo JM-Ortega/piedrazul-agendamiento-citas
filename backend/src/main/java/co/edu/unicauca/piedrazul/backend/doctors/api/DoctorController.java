@@ -27,13 +27,13 @@ public class DoctorController {
     /**
      * Crear un nuevo doctor
      * @param request Datos del doctor
-     * @return El doctor creado
+     * @return Sin contenido
      */
     @PostMapping
     public ResponseEntity<?> createDoctor(@RequestBody CreateDoctorRequest request) {
         try {
-            DoctorResponse response = doctorService.createDoctor(request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            doctorService.createDoctor(request);
+            return ResponseEntity.noContent().build();
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("Error al crear al médico: " + e.getMessage());
@@ -113,7 +113,7 @@ public class DoctorController {
      * @param doctorId ID del doctor
      * @param laborStart Nueva fecha de inicio de labores
      * @param laborEnd Nueva fecha de fin de labores
-     * @return El doctor actualizado
+     * @return Sin contenido
      */
     @PutMapping("/{doctorId}/enable")
     public ResponseEntity<?> enableDoctor(
@@ -122,8 +122,8 @@ public class DoctorController {
             @RequestParam LocalDate laborEnd
     ) {
         try {
-            DoctorResponse response = doctorService.enableDoctor(doctorId, laborStart, laborEnd);
-            return ResponseEntity.ok(response);
+            doctorService.enableDoctor(doctorId, laborStart, laborEnd);
+            return ResponseEntity.noContent().build();
         } catch (EntityNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("Doctor not found: " + e.getMessage());
@@ -134,10 +134,79 @@ public class DoctorController {
     }
 
     /**
+     * Actualizar la fecha de inicio laboral de un doctor
+     * @param doctorId ID del doctor
+     * @param laborStart Nueva fecha de inicio
+     * @return Sin contenido
+     */
+    @PutMapping("/{doctorId}/labor-start")
+    public ResponseEntity<?> updateDoctorLaborStart(
+            @PathVariable UUID doctorId,
+            @RequestParam LocalDate laborStart
+    ) {
+        try {
+            doctorService.updateDoctorLaborStart(doctorId, laborStart);
+            return ResponseEntity.noContent().build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Doctor no encontrado: " + e.getMessage());
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Error actualizando la fecha de inicio: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Actualizar la fecha de finalización laboral de un doctor
+     * @param doctorId ID del doctor
+     * @param laborEnd Nueva fecha de finalización
+     * @return Sin contenido
+     */
+    @PutMapping("/{doctorId}/labor-end")
+    public ResponseEntity<?> updateDoctorLaborEnd(
+            @PathVariable UUID doctorId,
+            @RequestParam LocalDate laborEnd
+    ) {
+        try {
+            doctorService.updateDoctorLaborEnd(doctorId, laborEnd);
+            return ResponseEntity.noContent().build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Doctor no encontrado: " + e.getMessage());
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Error actualizando la fecha de finalización: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Actualizar el intervalo de atención de un doctor
+     * @param doctorId ID del doctor
+     * @param appointmentInterval Nuevo intervalo en minutos
+     * @return Sin contenido
+     */
+    @PutMapping("/{doctorId}/appointment-interval")
+    public ResponseEntity<?> updateDoctorAppointmentInterval(
+            @PathVariable UUID doctorId,
+            @RequestParam int appointmentInterval
+    ) {
+        try {
+            doctorService.updateDoctorAppointmentInterval(doctorId, appointmentInterval);
+            return ResponseEntity.noContent().build();
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Doctor no encontrado: " + e.getMessage());
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Error actualizando el intervalo de atención: " + e.getMessage());
+        }
+    }
+
+    /**
      * Deshabilitar un doctor
      * @param doctorId ID del doctor
      * @param force Forzar deshabilitación incluso si aún no ha iniciado labores
-     * @return El doctor actualizado
+     * @return Sin contenido
      */
     @PutMapping("/{doctorId}/disable")
     public ResponseEntity<?> disableDoctor(
@@ -145,8 +214,8 @@ public class DoctorController {
             @RequestParam(defaultValue = "false") boolean force
     ) {
         try {
-            DoctorResponse response = doctorService.disableDoctor(doctorId, force);
-            return ResponseEntity.ok(response);
+            doctorService.disableDoctor(doctorId, force);
+            return ResponseEntity.noContent().build();
         } catch (EntityNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("Doctor not found: " + e.getMessage());
