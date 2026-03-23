@@ -43,6 +43,7 @@ export class NewAppointmentSchedulerComponent {
   errorMessageSpecialty = signal('');
   errorMessageDoctors = signal('');
   errorMessageSlots = signal('');
+  showSuccessModal = signal(false);
 
   // Errores de validación
   docTypeError = signal(false);
@@ -456,7 +457,8 @@ export class NewAppointmentSchedulerComponent {
     this.service.addAppointment(data).subscribe({
       next: () => {
         this.isLoading.set(false);
-        setTimeout(() => this.router.navigate(['/agendador']), 1500);
+        this.showSuccessModal.set(true);
+        setTimeout(() => this.router.navigate(['/agendador']), 3000);
       },
       error: (err) => {
         this.isLoading.set(false);
@@ -473,6 +475,11 @@ export class NewAppointmentSchedulerComponent {
         }
       }
     });
+  }
+
+  goToScheduler() {
+    this.showSuccessModal.set(false);
+    this.router.navigate(['/agendador']);
   }
 
   resetPatientForm(): void {
