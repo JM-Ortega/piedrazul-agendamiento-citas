@@ -74,7 +74,8 @@
             <label class="block text-gray-700 mb-2 text-lg">Buscar por Número de Documento</label>
             <div class="flex gap-3">
               <input type="text"
-                [ngModel]="documentId()" (ngModelChange)="documentId.set($event)"
+                [ngModel]="documentId()" 
+                (ngModelChange)="onDocumentChange($event)"
                 (keyup.enter)="searchPatient()"
                 placeholder="Ingrese el número de documento"
                 class="flex-1 border-2 border-blue-200 rounded-xl px-4 py-3"/>
