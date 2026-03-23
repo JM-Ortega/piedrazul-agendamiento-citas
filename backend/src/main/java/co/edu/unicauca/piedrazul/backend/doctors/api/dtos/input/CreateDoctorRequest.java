@@ -1,13 +1,13 @@
 package co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input;
 
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
 public record CreateDoctorRequest(
         // Viene de Keycloak
@@ -15,8 +15,8 @@ public record CreateDoctorRequest(
         @NotBlank String lastName,
         @NotBlank String identification,
         @NotNull List<Specialty> specialty,
-        LocalDate laborStart,
+        @NotNull @NotEmpty LocalDate laborStart,
         LocalDate laborEnd,
-        int appointmentInterval,
+        @Positive int appointmentInterval,
         List<CreateScheduleRequest> schedules
 ) {}

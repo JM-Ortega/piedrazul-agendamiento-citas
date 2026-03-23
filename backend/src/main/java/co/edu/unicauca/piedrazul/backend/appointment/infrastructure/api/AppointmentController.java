@@ -6,6 +6,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.CitaDtoMapper;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,7 @@ public class AppointmentController {
     private final ScheduleManualAppointmentUseCase scheduleManualAppointmentUseCase;
     private final ScheduleAutonomousAppointmentUseCase scheduleAutonomousAppointmentUseCase;
     private final ListAppointmentsUseCase listAppointmentsUseCase;
+    private final GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase;
     private final CitaDtoMapper citaDtoMapper;
 
     public AppointmentController(
@@ -30,11 +32,13 @@ public class AppointmentController {
             ScheduleManualAppointmentUseCase scheduleManualAppointmentUseCase,
             ScheduleAutonomousAppointmentUseCase scheduleAutonomousAppointmentUseCase,
             ListAppointmentsUseCase listAppointmentsUseCase,
+            GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase,
             CitaDtoMapper citaDtoMapper) {
         this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
         this.scheduleManualAppointmentUseCase = scheduleManualAppointmentUseCase;
         this.scheduleAutonomousAppointmentUseCase = scheduleAutonomousAppointmentUseCase;
         this.listAppointmentsUseCase = listAppointmentsUseCase;
+        this.getSpecialtiesWithDoctorUseCase = getSpecialtiesWithDoctorUseCase;
         this.citaDtoMapper = citaDtoMapper;
     }
 
@@ -90,4 +94,8 @@ public class AppointmentController {
     }
 
     // Listar un médico por defecto para cada especialidad
+    @GetMapping("/specialties-with-doctor")
+    public ResponseEntity<List<DoctorResponse>> getSpecialtiesWithDoctor() {
+        return ResponseEntity.ok(getSpecialtiesWithDoctorUseCase.getSpecialtiesWithDoctor());
+    }
 }

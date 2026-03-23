@@ -47,7 +47,7 @@ public class Doctor {
     @Column(name = "status", nullable = false)
     private boolean status;
 
-    @Column(name = "labor_start")
+    @Column(name = "labor_start", nullable = false)
     private LocalDate laborStart;
 
     @Column(name = "labor_end")

@@ -3,16 +3,14 @@ package co.edu.unicauca.piedrazul.backend.doctors.application;
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import javax.print.Doc;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.time.DayOfWeek;
@@ -57,6 +55,26 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     public List<DoctorResponse> getActiveDoctors (){
         return doctorRepository.findByStatusTrue()
                 .stream()
+                .map(DoctorResponse::fromEntity)
+                .toList();
+    }
+
+    @Override
+    public List<UUID> getActiveDoctorIds() {
+        return doctorRepository.findByStatusTrue()
+                .stream()
+                .map(Doctor::getIdDoctor)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds) {
+        if (doctorIds == null || doctorIds.isEmpty()) {
+            return List.of();
+        }
+
+        return doctorRepository.findByIdDoctorIn(doctorIds).stream()
                 .map(DoctorResponse::fromEntity)
                 .toList();
     }

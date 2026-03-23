@@ -16,4 +16,10 @@ public interface DoctorConfigConsultPort {
 
     // Obtener el nombre del doctor
     String getDoctorName(UUID idDoctor);
+
+    // Obtener IDs de medicos activos
+    List<UUID> getActiveDoctorIds();
+
+    // Obtener informacion de medicos en una sola operacion por sus IDs
+    List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
 }
