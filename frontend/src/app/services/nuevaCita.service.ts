@@ -8,22 +8,22 @@ import { SpecialtyDoctor } from '../DTOs/specialty-doctor';
 @Injectable({ providedIn: 'root' })
 export class NuevaCitaService {
   private http = inject(HttpClient);
-  private apiUrl = 'https://API';
+  private apiUrl = 'https://api';
 
   getPatientByDocument(documentId: string): Observable<Patient | null> {
-    return this.http.get<Patient>(`${this.apiUrl}/Paciente/buscarPorId/${documentId}`);
+    return this.http.get<Patient>(`${this.apiUrl}/patients/document/${documentId}`);
   }
 
   getSpecialtiesWithDoctor(): Observable<SpecialtyDoctor[]> {
-    return this.http.get<SpecialtyDoctor[]>(`${this.apiUrl}/Doctor/specialties-with-doctor`);
+    return this.http.get<SpecialtyDoctor[]>(`${this.apiUrl}/doctor/specialties-with-doctor`);
   }
 
   getSpecialties(): Observable<string[]> {
-    return this.http.get<string[]>(`${this.apiUrl}/Doctor/Doctors/specialty`);
+    return this.http.get<string[]>(`${this.apiUrl}/doctor/doctors/specialty`);
   }
 
   getDoctorsBySpecialty(specialty: string): Observable<SpecialtyDoctor[]> {
-    return this.http.get<SpecialtyDoctor[]>(`${this.apiUrl}/Doctor/specialty/${specialty}`);
+    return this.http.get<SpecialtyDoctor[]>(`${this.apiUrl}/doctor/specialty/${specialty}`);
   }
 
   getAvailableSlots(doctorId: string, date: string): Observable<string[]> {
@@ -31,7 +31,7 @@ export class NuevaCitaService {
   }
 
   addAppointment(data: NewAppointment): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/Appointment`, data);
+    return this.http.post<void>(`${this.apiUrl}/appointment`, data);
   }
 
   addPatient(patient: Omit<Patient, 'id'>): Observable<string> {
