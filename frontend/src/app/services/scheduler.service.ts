@@ -10,7 +10,7 @@ export class SchedulerService {
   private apiUrl = 'https://API';
 
   getDoctors(): Observable<dtoDoctor[]> {
-    return this.http.get<dtoDoctor[]>(`${this.apiUrl}/doctors`);
+    return this.http.get<dtoDoctor[]>(`${this.apiUrl}/doctor/doctors`);
   }
 
   getAllAppointments(): Observable<dtoAppointment[]> {
@@ -18,23 +18,22 @@ export class SchedulerService {
   }
 
   getAppointmentsByDate(date: string): Observable<dtoAppointment[]> {
-    return this.http.get<dtoAppointment[]>(
-      `${this.apiUrl}/appointments/date/${date}`,
-    );
+    return this.http.get<dtoAppointment[]>(`${this.apiUrl}/appointments`, {
+      params: { date: date },
+    });
   }
-
   getAppointmentsByDoctor(doctorId: string): Observable<dtoAppointment[]> {
-    return this.http.get<dtoAppointment[]>(
-      `${this.apiUrl}/appointments/doctor/${doctorId}`,
-    );
+    return this.http.get<dtoAppointment[]>(`${this.apiUrl}/appointments`, {
+      params: { idDoctor: doctorId },
+    });
   }
 
   getAppointmentsByDateAndDoctor(
     date: string,
     doctorId: string,
   ): Observable<dtoAppointment[]> {
-    return this.http.get<dtoAppointment[]>(
-      `${this.apiUrl}/appointments/date/${date}/doctor/${doctorId}`,
-    );
+    return this.http.get<dtoAppointment[]>(`${this.apiUrl}/appointments`, {
+      params: { idDoctor: doctorId, date: date },
+    });
   }
 }
