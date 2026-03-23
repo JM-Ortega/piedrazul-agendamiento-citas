@@ -4,5 +4,5 @@ export interface Appointment {
   doctorId: string;
   date: string;
   time: string;
-  status: 'agendado' | 'pending' | 'cancelled';
+  status: 'AGENDADA' | 'ATENDIDA' | 'CANCELADA' | 'NO_ASISTIO' | 'REPROGRAMADA';
 }

@@ -52,9 +52,9 @@ public final class PatientInfoMapper {
         }
 
         return switch (source) {
-            case MALE -> Gender.MALE;
-            case FEMALE -> Gender.FEMALE;
-            case OTHER -> Gender.OTHER;
+            case MASCULINO -> Gender.MASCULINO;
+            case FEMENINO -> Gender.FEMENINO;
+            case OTRO -> Gender.OTRO;
         };
     }
 }

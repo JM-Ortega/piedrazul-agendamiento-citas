@@ -58,14 +58,15 @@ export class SchedulerDashboardComponent implements OnInit {
   todayCount = computed(
     () =>
       this.appointments().filter(
-        (a) => a.date === this.today && a.status !== 'cancelled',
+        (a) => a.date === this.today && a.appointmentState !== 'CANCELADA',
       ).length,
   );
 
   allActiveCount = computed(
-    () => this.appointments().filter((a) => a.status !== 'cancelled').length,
+    () =>
+      this.appointments().filter((a) => a.appointmentState !== 'CANCELADA')
+        .length,
   );
-
   results = computed(() => {
     let filtered = this.appointments();
 
@@ -85,7 +86,7 @@ export class SchedulerDashboardComponent implements OnInit {
   });
 
   activeResults = computed(() =>
-    this.results().filter((a) => a.status !== 'cancelled'),
+    this.results().filter((a) => a.appointmentState !== 'CANCELADA'),
   );
 
   ngOnInit(): void {
@@ -140,18 +141,22 @@ export class SchedulerDashboardComponent implements OnInit {
 
   statusLabel(s: string): string {
     const map: Record<string, string> = {
-      confirmed: 'Confirmada',
-      pending: 'Pendiente',
-      cancelled: 'Cancelada',
+      AGENDADA: 'Agendada',
+      ATENDIDA: 'Atendida',
+      CANCELADA: 'Cancelada',
+      NO_ASISTIO: 'No asistió',
+      REPROGRAMADA: 'Reprogramada',
     };
     return map[s] ?? s;
   }
 
   statusColor(s: string): string {
     const map: Record<string, string> = {
-      confirmed: 'bg-green-100 text-green-700',
-      pending: 'bg-yellow-100 text-yellow-700',
-      cancelled: 'bg-red-100 text-red-700',
+      AGENDADA: 'bg-blue-100 text-blue-700',
+      ATENDIDA: 'bg-green-100 text-green-700',
+      CANCELADA: 'bg-red-100 text-red-700',
+      NO_ASISTIO: 'bg-orange-100 text-orange-700',
+      REPROGRAMADA: 'bg-yellow-100 text-yellow-700',
     };
     return map[s] ?? '';
   }

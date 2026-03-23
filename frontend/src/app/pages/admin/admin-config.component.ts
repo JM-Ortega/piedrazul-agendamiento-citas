@@ -7,8 +7,11 @@ import {
   Clock,
   Edit3,
   LucideAngularModule,
+  Power,
+  PowerOff,
   Save,
   Settings,
+  X,
 } from 'lucide-angular';
 import { DaySchedule } from '../../models/daySchedule.model';
 import { Doctor } from '../../models/doctor.model';
@@ -28,6 +31,9 @@ export class AdminConfigComponent {
   readonly CheckCircle = CheckCircle;
   readonly ChevronDown = ChevronDown;
   readonly ChevronUp = ChevronUp;
+  readonly Power = Power;
+  readonly PowerOff = PowerOff;
+  readonly X = X;
 
   readonly DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   readonly DAY_FULL_LABELS = [
@@ -39,9 +45,8 @@ export class AdminConfigComponent {
     'Viernes',
     'Sábado',
   ];
-  readonly weekDays = [0, 1, 2, 3, 4, 5, 6];
+  readonly weekDays = [1, 2, 3, 4, 5];
 
-  // ── Datos quemados directamente ───────────────────────
   doctors = signal<Doctor[]>([
     {
       id: 'd1',
@@ -51,8 +56,8 @@ export class AdminConfigComponent {
       workDays: [1, 2, 3, 4, 5],
       startTime: '08:00',
       endTime: '16:00',
-      windowWeeks: 4,
       email: 'carlos@piedrazul.com',
+      enabled: true,
     },
     {
       id: 'd2',
@@ -62,19 +67,19 @@ export class AdminConfigComponent {
       workDays: [1, 2, 3, 4, 5],
       startTime: '09:00',
       endTime: '17:00',
-      windowWeeks: 3,
       email: 'maria@piedrazul.com',
+      enabled: true,
     },
     {
       id: 'd3',
       name: 'Dr. Andrés Torres',
       specialty: 'Quiropraxia',
       interval: 45,
-      workDays: [1, 2, 3, 4, 5, 6],
+      workDays: [1, 2, 3, 4, 5],
       startTime: '07:00',
       endTime: '15:00',
-      windowWeeks: 2,
       email: 'andres@piedrazul.com',
+      enabled: true,
     },
   ]);
 
@@ -82,7 +87,10 @@ export class AdminConfigComponent {
   editForm = signal<Doctor | null>(null);
   savedId = signal<string | null>(null);
   showDaySchedules = signal(false);
-
+  showConfirmModal = signal(false);
+  doctorToToggle = signal<Doctor | null>(null);
+  errorHorarioGlobal = signal('');
+  errorHorariosDia = signal<{ [day: number]: string }>({});
   totalSpecialties = computed(
     () => new Set(this.doctors().map((d) => d.specialty)).size,
   );
@@ -101,32 +109,70 @@ export class AdminConfigComponent {
       daySchedules: { ...(doctor.daySchedules ?? {}) },
     });
     this.savedId.set(null);
+    this.errorHorarioGlobal.set('');
+    this.errorHorariosDia.set({});
     this.showDaySchedules.set(false);
   }
 
   cancelEdit(): void {
     this.editingId.set(null);
     this.editForm.set(null);
+    this.errorHorarioGlobal.set('');
+    this.errorHorariosDia.set({});
   }
 
   save(): void {
     const form = this.editForm();
     if (!form) return;
+
+    if (
+      this.errorHorarioGlobal() ||
+      Object.keys(this.errorHorariosDia()).length > 0
+    )
+      return;
+    if (!this.horariosValidos()) return;
+
     this.doctors.update((list) =>
       list.map((d) => (d.id === form.id ? form : d)),
     );
     this.savedId.set(form.id);
     this.editingId.set(null);
     this.editForm.set(null);
+    this.errorHorarioGlobal.set('');
+    this.errorHorariosDia.set({});
     setTimeout(() => this.savedId.set(null), 3000);
+  }
+
+  horariosValidos(): boolean {
+    const form = this.editForm();
+    if (!form) return true;
+
+    if (form.startTime >= form.endTime) return false;
+
+    for (const day of form.workDays) {
+      const ds = form.daySchedules?.[day];
+      if (ds && ds.startTime >= ds.endTime) return false;
+    }
+
+    return true;
   }
 
   updateField(field: keyof Doctor, value: any): void {
     const form = this.editForm();
     if (!form) return;
-    this.editForm.set({ ...form, [field]: value });
-  }
+    const updated = { ...form, [field]: value };
+    this.editForm.set(updated);
 
+    if (field === 'startTime' || field === 'endTime') {
+      if (updated.startTime >= updated.endTime) {
+        this.errorHorarioGlobal.set(
+          'La hora de inicio no puede ser igual o posterior a la hora de fin.',
+        );
+      } else {
+        this.errorHorarioGlobal.set('');
+      }
+    }
+  }
   toggleDay(day: number): void {
     const form = this.editForm();
     if (!form) return;
@@ -152,6 +198,16 @@ export class AdminConfigComponent {
       [field]: value,
     };
     this.editForm.set({ ...form, daySchedules });
+
+    const ds = daySchedules[day];
+    const errors = { ...this.errorHorariosDia() };
+    if (ds.startTime >= ds.endTime) {
+      errors[day] =
+        'La hora de inicio no puede ser igual o posterior a la hora de fin.';
+    } else {
+      delete errors[day];
+    }
+    this.errorHorariosDia.set(errors);
   }
 
   resetDaySchedule(day: number): void {
@@ -185,5 +241,28 @@ export class AdminConfigComponent {
 
   getEditFormDayScheduleCount(): number {
     return Object.keys(this.editForm()?.daySchedules ?? {}).length;
+  }
+
+  openToggleModal(doctor: Doctor): void {
+    this.doctorToToggle.set(doctor);
+    this.showConfirmModal.set(true);
+  }
+
+  closeToggleModal(): void {
+    this.showConfirmModal.set(false);
+    this.doctorToToggle.set(null);
+  }
+
+  confirmToggle(): void {
+    const doctor = this.doctorToToggle();
+    if (!doctor) return;
+    this.doctors.update((list) =>
+      list.map((d) =>
+        d.id === doctor.id
+          ? { ...d, enabled: d.enabled === false ? true : false }
+          : d,
+      ),
+    );
+    this.closeToggleModal();
   }
 }

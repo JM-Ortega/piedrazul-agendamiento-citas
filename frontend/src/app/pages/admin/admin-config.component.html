@@ -17,7 +17,6 @@
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div class="bg-white rounded-2xl shadow p-5 text-center">
         <p class="text-4xl font-bold text-blue-600">{{ doctors().length }}</p>
-
         <p class="text-gray-500 text-base mt-1">Médicos / Terapistas</p>
       </div>
       <div class="bg-white rounded-2xl shadow p-5 text-center">
@@ -124,16 +123,6 @@
                     ></lucide-icon>
                     Intervalo: {{ doctor.interval }} min
                   </span>
-                  <span
-                    class="bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1"
-                  >
-                    <lucide-icon
-                      [img]="Calendar"
-                      [size]="14"
-                      class="text-blue-500"
-                    ></lucide-icon>
-                    Ventana: {{ doctor.windowWeeks }} sem
-                  </span>
                   <span class="bg-blue-50 px-3 py-1.5 rounded-lg">
                     {{ getWorkDayLabels(doctor.workDays) }}
                   </span>
@@ -145,11 +134,31 @@
                       Horarios personalizados por día
                     </span>
                   }
+
+                  <!-- Botón Habilitar/Deshabilitar -->
+                  <button
+                    (click)="openToggleModal(doctor)"
+                    class="flex items-center gap-2 px-4 py-1.5 rounded-lg font-semibold text-base transition-all"
+                    [class]="
+                      doctor.enabled !== false
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                        : 'bg-red-100 text-red-700 hover:bg-red-200'
+                    "
+                  >
+                    @if (doctor.enabled !== false) {
+                      <lucide-icon [img]="Power" [size]="16"></lucide-icon>
+                      Habilitado
+                    } @else {
+                      <lucide-icon [img]="PowerOff" [size]="16"></lucide-icon>
+                      Deshabilitado
+                    }
+                  </button>
                 </div>
+
                 @if (getDayScheduleKeys(doctor).length > 0) {
                   <div class="mt-3 flex flex-wrap gap-2">
                     @for (day of doctor.workDays; track day) {
-                      @if (doctor.daySchedules?.[day]) {
+                      @if (doctor.daySchedules?.[day] && day >= 1 && day <= 5) {
                         <span
                           class="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-3 py-1 rounded-lg"
                         >
@@ -167,8 +176,9 @@
             <!-- Edit Form -->
             @if (editingId() === doctor.id && editForm()) {
               <div class="px-5 pb-5 space-y-5 border-t border-blue-200 pt-5">
+                <!-- Hora inicio, hora fin, intervalo -->
                 <div
-                  class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+                  class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
                 >
                   <div>
                     <label class="block text-gray-700 mb-1 text-base"
@@ -180,7 +190,12 @@
                       (change)="
                         updateField('startTime', $any($event.target).value)
                       "
-                      class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                      class="w-full border-2 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                      [class]="
+                        errorHorarioGlobal()
+                          ? 'border-red-400'
+                          : 'border-blue-200'
+                      "
                     />
                   </div>
                   <div>
@@ -193,7 +208,12 @@
                       (change)="
                         updateField('endTime', $any($event.target).value)
                       "
-                      class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                      class="w-full border-2 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                      [class]="
+                        errorHorarioGlobal()
+                          ? 'border-red-400'
+                          : 'border-blue-200'
+                      "
                     />
                   </div>
                   <div>
@@ -212,21 +232,13 @@
                       class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
                     />
                   </div>
-                  <div>
-                    <label class="block text-gray-700 mb-1 text-base"
-                      >Ventana (semanas)</label
-                    >
-                    <input
-                      type="number"
-                      min="1"
-                      max="12"
-                      [value]="editForm()!.windowWeeks"
-                      (input)="
-                        updateField('windowWeeks', +$any($event.target).value)
-                      "
-                      class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
-                    />
-                  </div>
+
+                  <!-- Error horario global ocupa las 3 columnas -->
+                  @if (errorHorarioGlobal()) {
+                    <p class="text-red-500 text-sm col-span-full -mt-2">
+                      ⚠️ {{ errorHorarioGlobal() }}
+                    </p>
+                  }
                 </div>
 
                 <!-- Work Days -->
@@ -296,98 +308,118 @@
                           horario por defecto.
                         </p>
                         @for (day of editForm()!.workDays; track day) {
-                          <div
-                            class="rounded-xl border-2 p-4 transition-all"
-                            [class]="
-                              hasDayOverride(day)
-                                ? 'border-amber-300 bg-amber-50'
-                                : 'border-gray-100 bg-gray-50'
-                            "
-                          >
+                          @if (day >= 1 && day <= 5) {
                             <div
-                              class="flex flex-col sm:flex-row sm:items-center gap-3"
+                              class="rounded-xl border-2 p-4 transition-all"
+                              [class]="
+                                hasDayOverride(day)
+                                  ? 'border-amber-300 bg-amber-50'
+                                  : 'border-gray-100 bg-gray-50'
+                              "
                             >
                               <div
-                                class="flex items-center gap-3 sm:w-32 shrink-0"
+                                class="flex flex-col sm:flex-row sm:items-center gap-3"
                               >
                                 <div
-                                  class="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0"
-                                  [class]="
-                                    hasDayOverride(day)
-                                      ? 'bg-amber-400 text-white'
-                                      : 'bg-blue-100 text-blue-700'
-                                  "
+                                  class="flex items-center gap-3 sm:w-32 shrink-0"
                                 >
-                                  {{ DAY_LABELS[day] }}
+                                  <div
+                                    class="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0"
+                                    [class]="
+                                      hasDayOverride(day)
+                                        ? 'bg-amber-400 text-white'
+                                        : 'bg-blue-100 text-blue-700'
+                                    "
+                                  >
+                                    {{ DAY_LABELS[day] }}
+                                  </div>
+                                  <span
+                                    class="text-gray-700 text-base hidden sm:block"
+                                    >{{ DAY_FULL_LABELS[day] }}</span
+                                  >
                                 </div>
-                                <span
-                                  class="text-gray-700 text-base hidden sm:block"
-                                  >{{ DAY_FULL_LABELS[day] }}</span
+                                <div
+                                  class="flex flex-1 flex-wrap gap-3 items-end"
                                 >
-                              </div>
-                              <div
-                                class="flex flex-1 flex-wrap gap-3 items-end"
-                              >
-                                <div class="flex-1 min-w-[130px]">
-                                  <label
-                                    class="block text-gray-600 text-sm mb-1"
-                                    >Hora Inicio</label
-                                  >
-                                  <input
-                                    type="time"
-                                    [value]="
-                                      getDayScheduleValue(day, 'startTime')
-                                    "
-                                    (change)="
-                                      updateDaySchedule(
-                                        day,
-                                        'startTime',
-                                        $any($event.target).value
-                                      )
-                                    "
-                                    class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-3 py-2 text-base outline-none transition-colors bg-white"
-                                  />
+                                  <div class="flex-1 min-w-[130px]">
+                                    <label
+                                      class="block text-gray-600 text-sm mb-1"
+                                      >Hora Inicio</label
+                                    >
+                                    <input
+                                      type="time"
+                                      [value]="
+                                        getDayScheduleValue(day, 'startTime')
+                                      "
+                                      (change)="
+                                        updateDaySchedule(
+                                          day,
+                                          'startTime',
+                                          $any($event.target).value
+                                        )
+                                      "
+                                      class="w-full border-2 focus:border-blue-500 rounded-xl px-3 py-2 text-base outline-none transition-colors bg-white"
+                                      [class]="
+                                        errorHorariosDia()[day]
+                                          ? 'border-red-400'
+                                          : 'border-blue-200'
+                                      "
+                                    />
+                                  </div>
+                                  <div class="flex-1 min-w-[130px]">
+                                    <label
+                                      class="block text-gray-600 text-sm mb-1"
+                                      >Hora Fin</label
+                                    >
+                                    <input
+                                      type="time"
+                                      [value]="
+                                        getDayScheduleValue(day, 'endTime')
+                                      "
+                                      (change)="
+                                        updateDaySchedule(
+                                          day,
+                                          'endTime',
+                                          $any($event.target).value
+                                        )
+                                      "
+                                      class="w-full border-2 focus:border-blue-500 rounded-xl px-3 py-2 text-base outline-none transition-colors bg-white"
+                                      [class]="
+                                        errorHorariosDia()[day]
+                                          ? 'border-red-400'
+                                          : 'border-blue-200'
+                                      "
+                                    />
+                                  </div>
+                                  @if (hasDayOverride(day)) {
+                                    <button
+                                      (click)="resetDaySchedule(day)"
+                                      class="text-sm text-gray-400 hover:text-red-500 underline transition-colors pb-2 shrink-0"
+                                    >
+                                      Usar por defecto
+                                    </button>
+                                  }
                                 </div>
-                                <div class="flex-1 min-w-[130px]">
-                                  <label
-                                    class="block text-gray-600 text-sm mb-1"
-                                    >Hora Fin</label
-                                  >
-                                  <input
-                                    type="time"
-                                    [value]="
-                                      getDayScheduleValue(day, 'endTime')
-                                    "
-                                    (change)="
-                                      updateDaySchedule(
-                                        day,
-                                        'endTime',
-                                        $any($event.target).value
-                                      )
-                                    "
-                                    class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-3 py-2 text-base outline-none transition-colors bg-white"
-                                  />
-                                </div>
-                                @if (hasDayOverride(day)) {
-                                  <button
-                                    (click)="resetDaySchedule(day)"
-                                    class="text-sm text-gray-400 hover:text-red-500 underline transition-colors pb-2 shrink-0"
-                                  >
-                                    Usar por defecto
-                                  </button>
-                                }
                               </div>
+
+                              <!-- Error horario por día -->
+                              @if (errorHorariosDia()[day]) {
+                                <p
+                                  class="text-red-500 text-xs mt-2 sm:ml-[52px]"
+                                >
+                                  ⚠️ {{ errorHorariosDia()[day] }}
+                                </p>
+                              } @else if (!hasDayOverride(day)) {
+                                <p
+                                  class="text-xs text-gray-400 mt-2 sm:ml-[52px]"
+                                >
+                                  Usando horario por defecto:
+                                  {{ editForm()!.startTime }} –
+                                  {{ editForm()!.endTime }}
+                                </p>
+                              }
                             </div>
-                            @if (!hasDayOverride(day)) {
-                              <p
-                                class="text-xs text-gray-400 mt-2 sm:ml-[52px]"
-                              >
-                                Usando horario por defecto:
-                                {{ editForm()!.startTime }} –
-                                {{ editForm()!.endTime }}
-                              </p>
-                            }
-                          </div>
+                          }
                         }
                       </div>
                     }
@@ -421,19 +453,73 @@
           </p>
         </div>
         <div>
-          <p class="font-semibold text-white mb-1">📅 Ventana</p>
+          <p class="font-semibold text-white mb-1">📆 Días</p>
           <p>
-            Cantidad de semanas hacia el futuro en que se pueden agendar citas.
+            Seleccione los días de la semana (lunes a viernes) en que el médico
+            presta sus servicios.
           </p>
         </div>
         <div>
-          <p class="font-semibold text-white mb-1">📆 Días</p>
+          <p class="font-semibold text-white mb-1">
+            🔘 Habilitar / Deshabilitar
+          </p>
           <p>
-            Seleccione los días de la semana en que el médico presta sus
-            servicios.
+            Permite activar o desactivar un médico para que aparezca o no en el
+            sistema de agendamiento.
           </p>
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<!-- Modal Confirmar Toggle -->
+@if (showConfirmModal() && doctorToToggle()) {
+  <div
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    (click)="$event.target === $event.currentTarget && closeToggleModal()"
+  >
+    <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-xl font-bold text-gray-800">Confirmar Cambio</h3>
+        <button
+          (click)="closeToggleModal()"
+          class="text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <lucide-icon [img]="X" [size]="24"></lucide-icon>
+        </button>
+      </div>
+      <p class="text-gray-600 text-base mb-6">
+        ¿Está seguro de que desea
+        <strong>{{
+          doctorToToggle()!.enabled === false ? "habilitar" : "deshabilitar"
+        }}</strong>
+        a <strong>{{ doctorToToggle()!.name }}</strong
+        >?
+      </p>
+      <div class="flex flex-col-reverse sm:flex-row gap-3">
+        <button
+          (click)="closeToggleModal()"
+          class="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl transition-colors text-base font-medium"
+        >
+          Cancelar
+        </button>
+        <button
+          (click)="confirmToggle()"
+          class="flex-1 px-6 py-3 text-white rounded-xl transition-colors text-base font-medium flex items-center justify-center gap-2"
+          [class]="
+            doctorToToggle()!.enabled === false
+              ? 'bg-green-600 hover:bg-green-700'
+              : 'bg-red-600 hover:bg-red-700'
+          "
+        >
+          <lucide-icon [img]="Save" [size]="18"></lucide-icon>
+          Sí,
+          {{
+            doctorToToggle()!.enabled === false ? "Habilitar" : "Deshabilitar"
+          }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
