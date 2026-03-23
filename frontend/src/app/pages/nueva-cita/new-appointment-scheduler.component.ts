@@ -176,8 +176,8 @@ export class NewAppointmentSchedulerComponent {
     this.documentError.set(false);
     this.errorMessage.set('');
 
-    if (!/^[0-9]+$/.test(this.documentId())) {
-      this.errorMessage.set('El número de documento debe contener solo números');
+    if (!/^[0-9]{6,12}$/.test(this.documentId())) {
+      this.errorMessage.set('El número de documento solo debe contener entre 6 y 12 números');
       return;
     }
 
