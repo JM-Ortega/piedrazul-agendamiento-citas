@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+// Lo pidio Mar
 public record DoctorResponse(
         String specialty,
         UUID id,

@@ -2,7 +2,7 @@ package co.edu.unicauca.piedrazul.backend.doctors.application;
 
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.SpecialtyDoctor;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
@@ -14,9 +14,7 @@ import jakarta.transaction.Transactional;
 
 import java.time.LocalDate;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 public class DoctorService {
@@ -33,7 +31,6 @@ public class DoctorService {
     public DoctorResponse createDoctor(CreateDoctorRequest request) {
         // 1. Mapeo de DTO a Entidad
         Doctor doctor = new Doctor();
-        doctor.setIdUser(request.idUser());
         doctor.setFirstName(request.firstName());
         doctor.setLastName(request.lastName());
         doctor.setIdentification(request.identification());
@@ -41,15 +38,24 @@ public class DoctorService {
         doctor.setLaborStart(request.laborStart());
         doctor.setLaborEnd(request.laborEnd());
         doctor.setAppointmentInterval(request.appointmentInterval());
-        doctor.setSchedules(request.schedules());
-        //Validamos si el estado del medico
         doctor.setStatus(calculateActiveStatus(request.laborStart(), request.laborEnd()));
 
-        // 2. Persistencia
-        Doctor savedDoctor = doctorRepository.save(doctor);
+        List<Schedule> schedules = request.schedules().stream()
+                .map(s -> new Schedule(
+                        doctor,
+                        s.startTime(),
+                        s.endTime(),
+                        s.workday()
+                ))
+                .toList();
 
-        // 3. Crear el usuario
-        userModuleApi.createDoctorUser(request.identification());
+        doctor.setSchedules(schedules);
+
+        // 2. Crear el usuario
+        doctor.setIdUser(userModuleApi.createDoctorUser(request.identification()));
+
+        // 3. Persistencia
+        Doctor savedDoctor = doctorRepository.save(doctor);
 
         // 4. Retornar un DTO de respuesta
         return DoctorResponse.fromEntity(savedDoctor);
@@ -150,26 +156,5 @@ public class DoctorService {
 
     public List<Specialty> getSpecialties (){
         return doctorRepository.findAllDistinctSpecialtiesByActiveDoctors();
-    }
-
-    public List<SpecialtyDoctor> getSpecialtiesWithDoctor() {
-        List<Doctor> availableDoctors = doctorRepository.findAvailableDoctorsForSpecialtyAssignment(LocalDate.now());
-        if (availableDoctors.isEmpty()) {
-            throw new EntityNotFoundException("No hay médicos disponibles para las especialidades");
-        }
-
-        Map<Specialty, SpecialtyDoctor> specialtiesWithDoctor = new LinkedHashMap<>();
-
-        for (Doctor doctor : availableDoctors) {
-            for (Specialty specialty : doctor.getSpecialty()) {
-                specialtiesWithDoctor.putIfAbsent(specialty, SpecialtyDoctor.from(specialty, doctor));
-            }
-        }
-
-        if (specialtiesWithDoctor.isEmpty()) {
-            throw new EntityNotFoundException("No hay médicos disponibles para las especialidades");
-        }
-
-        return specialtiesWithDoctor.values().stream().toList();
     }
 }

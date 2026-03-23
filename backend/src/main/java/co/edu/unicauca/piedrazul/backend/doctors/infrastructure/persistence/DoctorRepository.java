@@ -26,18 +26,6 @@ public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
     // Buscar por el ID del doctor
     Doctor findByIdDoctor(UUID idDoctor);
 
-    @EntityGraph(attributePaths = {"specialty", "schedules"})
-    @Query("""
-            SELECT DISTINCT d
-            FROM Doctor d
-            JOIN d.specialty s
-            WHERE d.status = true
-              AND d.laborStart <= :today
-              AND d.laborEnd >= :today
-            ORDER BY d.laborEnd DESC, d.idDoctor ASC
-            """)
-    List<Doctor> findAvailableDoctorsForSpecialtyAssignment(@Param("today") LocalDate today);
-
     // Verifica si el doctor existe buscandolo por su ID
     boolean existsById(UUID id);
 

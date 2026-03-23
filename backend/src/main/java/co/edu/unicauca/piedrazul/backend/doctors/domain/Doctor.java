@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-//Lombok
 @RequiredArgsConstructor
 @Setter
 @Getter
@@ -18,13 +17,13 @@ import java.util.UUID;
 @Entity
 @Table(name = "doctors")
 public class Doctor {
-    @Getter
+
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id_doctor", updatable = false, nullable = false)
     private UUID idDoctor;
 
-    @Column(name = "id_user", nullable = false, unique = true)
+    @Column(name = "id_user", unique = true)
     private UUID idUser;
 
     @Column(name = "first_name", nullable = false, length = 100)
@@ -49,7 +48,7 @@ public class Doctor {
     private boolean status;
 
     @Column(name = "labor_start")
-    private LocalDate  laborStart;
+    private LocalDate laborStart;
 
     @Column(name = "labor_end")
     private LocalDate laborEnd;

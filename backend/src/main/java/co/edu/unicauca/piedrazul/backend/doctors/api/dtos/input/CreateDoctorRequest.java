@@ -11,7 +11,6 @@ import java.util.UUID;
 
 public record CreateDoctorRequest(
         // Viene de Keycloak
-        @NotBlank UUID idUser,
         @NotBlank String firstName,
         @NotBlank String lastName,
         @NotBlank String identification,
@@ -19,5 +18,5 @@ public record CreateDoctorRequest(
         LocalDate laborStart,
         LocalDate laborEnd,
         int appointmentInterval,
-        List<Schedule> schedules
+        List<CreateScheduleRequest> schedules
 ) {}

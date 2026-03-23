@@ -1,14 +1,18 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import javax.print.Doc;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.time.DayOfWeek;
@@ -34,6 +38,8 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
 
     @Override
     public List<LocalTime> getSlotsByDoctor(UUID idDoctor, LocalDate date) {
+
+
         return scheduleService.getAvailableIntervalsByWorkday(doctorRepository.findByIdDoctor(idDoctor), toWorkday(date.getDayOfWeek()));
     }
 
@@ -47,6 +53,14 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
         return doctorRepository.findByIdDoctor(idDoctor).getFirstName() + " " + doctorRepository.findByIdDoctor(idDoctor).getLastName();
     }
 
+    @Override
+    public List<DoctorResponse> getActiveDoctors (){
+        return doctorRepository.findByStatusTrue()
+                .stream()
+                .map(DoctorResponse::fromEntity)
+                .toList();
+    }
+
     private static Workday toWorkday(DayOfWeek dayOfWeek) {
         return switch (dayOfWeek) {
             case MONDAY    -> Workday.LUNES;
@@ -54,9 +68,8 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
             case WEDNESDAY -> Workday.MIERCOLES;
             case THURSDAY  -> Workday.JUEVES;
             case FRIDAY    -> Workday.VIERNES;
-            // Si tu enum Workday no tiene fines de semana, puedes lanzar la excepción aquí
+
             default -> throw new IllegalArgumentException("Día no laboral o inesperado: " + dayOfWeek);
         };
     }
-
 }

@@ -1,13 +1,12 @@
 package co.edu.unicauca.piedrazul.backend.doctors.api;
 
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorShortResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.SpecialtyDoctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -49,8 +48,8 @@ public class DoctorController {
     public ResponseEntity<?> getAllDoctors() {
         try {
             List<Doctor> doctors = doctorService.findAllDoctors();
-            List<DoctorResponse> responses = doctors.stream()
-                    .map(DoctorResponse::fromEntity)
+            List<DoctorShortResponse> responses = doctors.stream()
+                    .map(DoctorShortResponse::fromEntity)
                     .toList();
             return ResponseEntity.ok(responses);
         } catch (RuntimeException e) {
@@ -68,7 +67,7 @@ public class DoctorController {
     public ResponseEntity<?> getDoctorById(@PathVariable UUID doctorId) {
         try {
             Doctor doctor = doctorService.getDoctorById(doctorId);
-            return ResponseEntity.ok(DoctorResponse.fromEntity(doctor));
+            return ResponseEntity.ok(DoctorShortResponse.fromEntity(doctor));
         } catch (EntityNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body("Doctor no encontrado: " + e.getMessage());
@@ -87,23 +86,6 @@ public class DoctorController {
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("Error al recuperar especialidades: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Obtiene un médico disponible por defecto para cada especialidad.
-     * @return Lista de especialidades con su médico asignado para agendamiento
-     */
-    @GetMapping("/specialty/with-doctor")
-    public ResponseEntity<?> getSpecialtiesWithDoctor() {
-        try {
-            List<SpecialtyDoctor> specialtiesWithDoctor = doctorService.getSpecialtiesWithDoctor();
-            return ResponseEntity.ok(specialtiesWithDoctor);
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error al recuperar médicos por especialidad: " + e.getMessage());
         }
     }
 
