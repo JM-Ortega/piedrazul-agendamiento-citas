@@ -134,12 +134,22 @@ export class NewAppointmentSchedulerComponent {
   readonly confirmLastName = computed(
     () => this.foundPatient()?.lastName ?? this.patientForm().lastName
   );
+  readonly confirmDocumentType = computed(
+    () => this.foundPatient()?.documentType ?? this.patientForm().documentType
+  );
   readonly confirmDocument = computed(
     () => this.foundPatient()?.documentId ?? this.documentId()
   );
   readonly confirmPhone = computed(
     () => this.foundPatient()?.phone ?? this.patientForm().phone
   );
+  readonly confirmGender = computed(
+    () => this.foundPatient()?.gender ?? this.patientForm().gender
+  );
+  readonly confirmBirthDate = computed(
+    () => this.foundPatient()?.birthDate ?? this.patientForm().birthDate
+  );
+
   readonly confirmDoctorName = computed(() =>
     this.bookingMode() === 'specialty'
       ? (this.assignedDoctor()?.doctorName ?? '')
