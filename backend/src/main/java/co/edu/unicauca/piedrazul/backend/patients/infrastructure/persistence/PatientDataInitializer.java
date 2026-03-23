@@ -32,7 +32,7 @@ public class PatientDataInitializer implements ApplicationRunner {
                 "López",
                 "3001234567",
                 "maria.lopez@email.com",
-                Gender.FEMALE,
+                Gender.FEMENINO,
                 LocalDate.of(1990, 5, 15),
                 null,  // sin acudiente — mayor de edad
                 null   // sin cuenta de usuario aún
@@ -45,7 +45,7 @@ public class PatientDataInitializer implements ApplicationRunner {
                 "Martínez",
                 "3109876543",
                 "carlos.martinez@email.com",
-                Gender.MALE,
+                Gender.MASCULINO,
                 LocalDate.of(1985, 8, 22),
                 null,  // sin acudiente — mayor de edad
                 null   // sin cuenta de usuario aún
@@ -59,7 +59,7 @@ public class PatientDataInitializer implements ApplicationRunner {
                 "Pérez",
                 "3201112233",
                 null,              // email opcional
-                Gender.MALE,
+                Gender.MASCULINO,
                 LocalDate.of(2012, 3, 10),
                 "3204445566",      // teléfono del acudiente
                 null
