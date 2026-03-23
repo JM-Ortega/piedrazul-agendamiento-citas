@@ -34,10 +34,11 @@ export class NuevaCitaService {
   }
 
   getAvailableSlots(doctorId: string, date: string): Observable<string[]> {
-    return this.http.get<{workday: string; availableSlots: string[]}>(
-      `${this.apiUrl}/doctor/schedules/${doctorId}/available-intervals/${date}`,
+    return this.http.get<{ time: string }[]>(
+      `${this.apiUrl}/appointments/available-slots`,
+      { params: { doctorId, date } },
     ).pipe(
-      map(dto => dto?.availableSlots ?? [])
+      map(slots => slots.map(s => s.time))
     );
   }
 
