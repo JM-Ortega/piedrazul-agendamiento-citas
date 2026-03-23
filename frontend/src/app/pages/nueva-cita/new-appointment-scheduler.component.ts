@@ -186,7 +186,6 @@ export class NewAppointmentSchedulerComponent {
         this.notFound.set(!patient);
         if (!patient) {
           this.patientForm.update(f => ({ ...f, documentId: this.documentId() }));
-          this.goToSpecialtyStep();
         }
       },
       error: (err) => {
@@ -288,9 +287,9 @@ export class NewAppointmentSchedulerComponent {
 
   private _validatePatientForm(): boolean {
     const f = this.patientForm();
-    this.firstNameError.set(!f.firstName);
-    this.lastNameError.set(!f.lastName);
-    this.phoneError.set(!f.phone);
+    this.firstNameError.set(!f.firstName?.trim());
+    this.lastNameError.set(!f.lastName?.trim());
+    this.phoneError.set(!f.phone?.trim());
     this.genderError.set(!f.gender);
     this.birthDateError.set(!f.birthDate);
     this.docTypeError.set(!f.documentType);
@@ -299,7 +298,7 @@ export class NewAppointmentSchedulerComponent {
     const emailOk     = this.validateEmail();
     const guardianPhoneOk = this.validateGuardianPhoneMenor();
     return !this.docTypeError() && !this.firstNameError() && !this.lastNameError() &&
-           !this.phoneError()     && !this.genderError() && this.birthDateError()  &&
+           !this.phoneError()     && !this.genderError() && !this.birthDateError()  &&
            phoneOk && birthDateOk && emailOk && guardianPhoneOk;
   }
 
