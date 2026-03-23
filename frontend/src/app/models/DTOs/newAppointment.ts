@@ -2,7 +2,7 @@ export interface NewAppointment {
   doctorId: string;
   specialty: string;
   date: string;
-  time: string;
+  startTime: string;
   schedulingOrigin: 'AUTONOMO' | 'MANUAL';
   patientId?: string;
   documentType: string;

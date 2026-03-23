@@ -4,6 +4,7 @@ import { Observable, of, tap, throwError } from 'rxjs';
 import { Patient } from '../models/patient.model';
 import { NewAppointment } from '../models/DTOs/newAppointment';
 import { SpecialtyDoctor } from '../models/DTOs/specialty-doctor';
+import { map } from 'rxjs/operators';
 
 @Injectable({ providedIn: 'root' })
 export class NuevaCitaService {
@@ -33,14 +34,15 @@ export class NuevaCitaService {
   }
 
   getAvailableSlots(doctorId: string, date: string): Observable<string[]> {
-    return this.http.get<string[]>(
-      `${this.apiUrl}/apointments/available-slots`,
-      { params: { doctorId, date } },
+    return this.http.get<{workday: string; availableSlots: string[]}>(
+      `${this.apiUrl}/doctor/schedules/${doctorId}/available-intervals/${date}`,
+    ).pipe(
+      map(dto => dto?.availableSlots ?? [])
     );
   }
 
   addAppointment(data: NewAppointment): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/appointment`, data);
+    return this.http.post<void>(`${this.apiUrl}/appointments`, data);
   }
 
   addPatient(patient: Omit<Patient, 'id'>): Observable<string> {
