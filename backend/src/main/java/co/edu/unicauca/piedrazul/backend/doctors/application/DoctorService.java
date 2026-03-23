@@ -151,7 +151,7 @@ public class DoctorService {
     }
 
     public List<Doctor> getDoctorBySpeciality(Specialty specialty) {
-        return doctorRepository.findBySpecialty(Collections.singletonList(specialty));
+        return doctorRepository.findBySpecialtyContaining(specialty);
     }
 
     public List<Specialty> getSpecialties (){

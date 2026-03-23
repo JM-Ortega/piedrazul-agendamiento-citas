@@ -10,6 +10,7 @@ public class Appointment {
     private final UUID idDoctor;
     private final String doctorName;
     private final UUID idPatient;
+    private final String patientName;
     private final PatientInfo  patientInfo;
     private final Specialty specialty;
     private AppointmentState appointmentState;
@@ -22,6 +23,7 @@ public class Appointment {
                         UUID idDoctor,
                         String doctorName,
                         UUID idPatient,
+                        String patientName,
                         PatientInfo patientInfo,
                         Specialty specialty,
                         LocalDate date,
@@ -31,6 +33,7 @@ public class Appointment {
         this.idDoctor = idDoctor;
         this.doctorName = doctorName;
         this.idPatient = idPatient;
+        this.patientName = patientName;
         this.patientInfo = patientInfo;
         this.specialty = specialty;
         this.date = date;
@@ -47,22 +50,25 @@ public class Appointment {
     public static Appointment scheduleManual(String doctorName,
                                              UUID idDoctor,
                                              UUID idPatient,
+                                             String patientName,
                                              PatientInfo patientInfo,
                                              Specialty specialty,
                                              LocalDate date,
                                              AppointmentTime startTime) {
-        Objects.requireNonNull(idDoctor,      "El médico es obligatorio");
-        Objects.requireNonNull(doctorName,      "El nombre del médico es obligatorio");
-        Objects.requireNonNull(patientInfo,   "Los datos del paciente son obligatorios");
-        Objects.requireNonNull(specialty,     "La especialidad es obligatoria");
-        Objects.requireNonNull(date,          "La fecha es obligatoria");
-        Objects.requireNonNull(startTime,     "La hora es obligatoria");
+        Objects.requireNonNull(idDoctor,"El médico es obligatorio");
+        Objects.requireNonNull(doctorName, "El nombre del médico es obligatorio");
+        Objects.requireNonNull(patientInfo, "Los datos del paciente son obligatorios");
+        Objects.requireNonNull(specialty, "La especialidad es obligatoria");
+        Objects.requireNonNull(date, "La fecha es obligatoria");
+        Objects.requireNonNull(startTime, "La hora es obligatoria");
 
         return new Appointment(
-                UUID.randomUUID(),
+                //Se genera automáticamente por la anotación jpa si también lo hacemos aquí genera fallos
+                null,
                 idDoctor,
                 doctorName,
                 idPatient,
+                patientName,
                 patientInfo,
                 specialty,
                 date,
@@ -76,23 +82,25 @@ public class Appointment {
     public static Appointment scheduleAutonomous(String doctorName,
                                                  UUID idDoctor,
                                                  UUID idPatient,
+                                                 String patientName,
                                                  PatientInfo patientInfo,
                                                  Specialty specialty,
                                                  LocalDate date,
                                                  AppointmentTime startTime) {
-        Objects.requireNonNull(idDoctor,    "El médico es obligatorio");
-        Objects.requireNonNull(doctorName,      "El nombre del médico es obligatorio");
-        Objects.requireNonNull(idPatient,   "El pacienteId es obligatorio en agendamiento autónomo");
-        Objects.requireNonNull(patientInfo, "Los datos del paciente son obligatorios");
-        Objects.requireNonNull(specialty,   "La especialidad es obligatoria");
-        Objects.requireNonNull(date,        "La fecha es obligatoria");
-        Objects.requireNonNull(startTime,   "La hora es obligatoria");
+        Objects.requireNonNull(idDoctor, "El médico es obligatorio");
+        Objects.requireNonNull(doctorName, "El nombre del médico es obligatorio");
+        Objects.requireNonNull(idPatient, "El pacienteId es obligatorio en agendamiento autónomo");
+        Objects.requireNonNull(specialty, "La especialidad es obligatoria");
+        Objects.requireNonNull(date, "La fecha es obligatoria");
+        Objects.requireNonNull(startTime, "La hora es obligatoria");
 
         return new Appointment(
-                UUID.randomUUID(),
+                //Se genera automáticamente por la anotación jpa si también lo hacemos aquí genera fallos
+                null,
                 idDoctor,
                 doctorName,
                 idPatient,
+                patientName,
                 patientInfo,
                 specialty,
                 date,
@@ -105,6 +113,7 @@ public class Appointment {
                                           UUID idDoctor,
                                           String doctorName,
                                           UUID idPatient,
+                                           String patientName,
                                           PatientInfo patientInfo,
                                           Specialty specialty,
                                           AppointmentState appointmentState,
@@ -118,6 +127,7 @@ public class Appointment {
                 idDoctor,
                 doctorName,
                 idPatient,
+                patientName,
                 patientInfo,
                 specialty,
                 date,
@@ -132,47 +142,47 @@ public class Appointment {
         return appointment;
     }
 
-    public boolean conflictsWith(AppointmentTime candidateTime, int intervalMinutes) {
-        return this.startTime.collidesWith(candidateTime, intervalMinutes);
-    }
-
     public UUID getIdAppointment() {
         return idAppointment;
     }
 
-    public UUID getIdDoctor() {
-        return idDoctor;
-    }
-
-    public String getDoctorName() {
-        return doctorName;
-    }
-
-    public UUID getIdPatient() {
-        return idPatient;
-    }
-
-    public PatientInfo getPatientInfo() {
-        return patientInfo;
-    }
-
-    public Specialty getSpecialty() {
-        return specialty;
-    }
-
-    public AppointmentState getAppointmentState() {
-        return appointmentState;
-    }
-
-    public LocalDate getDate() {
-        return date;
+    public SchedulingOrigin getSchedulingOrigin() {
+        return schedulingOrigin;
     }
 
     public AppointmentTime getStartTime() {
         return startTime;
     }
 
-    public SchedulingOrigin getSchedulingOrigin() {
-        return schedulingOrigin;
+    public LocalDate getDate() {
+        return date;
+    }
+
+    public AppointmentState getAppointmentState() {
+        return appointmentState;
+    }
+
+    public Specialty getSpecialty() {
+        return specialty;
+    }
+
+    public PatientInfo getPatientInfo() {
+        return patientInfo;
+    }
+
+    public String getPatientName() {
+        return patientName;
+    }
+
+    public UUID getIdPatient() {
+        return idPatient;
+    }
+
+    public String getDoctorName() {
+        return doctorName;
+    }
+
+    public UUID getIdDoctor() {
+        return idDoctor;
     }
 }

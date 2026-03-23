@@ -5,6 +5,8 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetSpecia
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -18,6 +20,7 @@ import java.util.Set;
 import java.util.UUID;
 
 public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDoctorUseCase {
+    private static final Logger logger = LoggerFactory.getLogger(GetSpecialtiesWithDoctorUseCaseImpl.class);
     private final AppointmentRepository appointmentRepository;
     private final DoctorConfigConsultPort doctorConfigConsultPort;
 
@@ -32,8 +35,11 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
     public List<DoctorResponse> getSpecialtiesWithDoctor() {
         LocalDate from = LocalDate.now();
         LocalDate to = from.plusMonths(1);
+        logger.info("=== INICIANDO BÚSQUEDA DE ESPECIALIDADES CON DOCTORES ===");
+        logger.info("Rango de fechas: {} a {}", from, to);
 
         List<UUID> activeDoctorIds = doctorConfigConsultPort.getActiveDoctorIds();
+        logger.info("Médicos activos encontrados: {}", activeDoctorIds.size());
         if (activeDoctorIds.isEmpty()) {
             throw new NoAvailableDoctorsException("No hay medicos activos con disponibilidad.");
         }
@@ -42,12 +48,17 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
 
         for (UUID doctorId : activeDoctorIds) {
             int availableSlots = countAvailableSlotsForPeriod(doctorId, from, to);
+            logger.info("✓ Doctor {} tiene {} slots disponibles", doctorId, availableSlots);
             if (availableSlots > 0) {
                 availableSlotsByDoctor.put(doctorId, availableSlots);
+            } else {
+                logger.info("✗ Doctor {} DESCARTADO: sin slots disponibles", doctorId);
             }
         }
+        logger.info("Doctores con disponibilidad: {}", availableSlotsByDoctor.size());
 
         if (availableSlotsByDoctor.isEmpty()) {
+            logger.warn("No hay médicos con espacios disponibles");
             throw new NoAvailableDoctorsException("No hay medicos con espacios disponibles en el rango solicitado.");
         }
 
@@ -68,20 +79,25 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
         for (UUID doctorId : orderedDoctorIds) {
             DoctorResponse doctor = doctorInfoById.get(doctorId);
             if (doctor == null) {
+                logger.warn("Doctor {} no encontrado en info", doctorId);
                 continue;
             }
 
             List<String> specialties = extractSpecialties(doctor.specialty());
+            logger.info("Doctor {} ({}): especialidades disponibles: {}", doctorId, doctor.name(), specialties);
             String specialtyToAssign = specialties.stream()
                     .filter(s -> !selectedSpecialties.contains(s))
                     .findFirst()
                     .orElse(null);
 
             if (specialtyToAssign == null) {
+                logger.info("Doctor {} ({}) DESCARTADO: todas sus especialidades ya están asignadas. Especialidades ya seleccionadas: {}", 
+                    doctorId, doctor.name(), selectedSpecialties);
                 continue;
             }
 
             selectedSpecialties.add(specialtyToAssign);
+            logger.info("✓ Doctor {} ({}) SELECCIONADO para especialidad: {}", doctorId, doctor.name(), specialtyToAssign);
             result.add(new DoctorResponse(
                     specialtyToAssign,
                     doctor.id(),
@@ -91,29 +107,48 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
             ));
         }
 
+        logger.info("=== RESULTADO FINAL: {} médicos seleccionados ===", result.size());
         return result;
     }
 
     private int countAvailableSlotsForPeriod(UUID doctorId, LocalDate from, LocalDate to) {
+        logger.info("  [CONTANDO SLOTS] Doctor {} - Período: {} a {}", doctorId, from, to);
+        
         int total = 0;
         LocalDate current = from;
+        int daysChecked = 0;
+        int daysWithSlots = 0;
 
         while (!current.isAfter(to)) {
             try {
                 if (current.getDayOfWeek().getValue() > 5) {
+                    // Fin de semana
+                    logger.info("    {} - FIN DE SEMANA (día {})", current, current.getDayOfWeek().getValue());
                     current = current.plusDays(1);
                     continue;
                 }
 
+                daysChecked++;
                 int daySlots = doctorConfigConsultPort.getSlotsByDoctor(doctorId, current).size();
                 int occupied = appointmentRepository.findByDoctorIdAndDate(doctorId, current).size();
-                total += Math.max(daySlots - occupied, 0);
-            } catch (RuntimeException ignored) {
-                // Si el medico no trabaja ese dia o no tiene horario, se ignora.
+                int available = Math.max(daySlots - occupied, 0);
+                total += available;
+                
+                logger.info("    {} - Doctor {}: {} configurados, {} ocupados, {} disponibles", 
+                    current, doctorId, daySlots, occupied, available);
+                    
+                if (daySlots > 0) {
+                    daysWithSlots++;
+                }
+            } catch (RuntimeException e) {
+                logger.info("    {} - Doctor {} ERROR al consultar horario: {}", current, doctorId, e.getMessage());
             }
 
             current = current.plusDays(1);
         }
+        
+        logger.info("  [RESUMEN] Doctor {}: {} días laborales chequeados, {} con slots, {} TOTAL DISPONIBLES", 
+            doctorId, daysChecked, daysWithSlots, total);
 
         return total;
     }

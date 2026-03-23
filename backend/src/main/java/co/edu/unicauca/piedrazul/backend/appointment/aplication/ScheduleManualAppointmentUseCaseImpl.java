@@ -110,6 +110,7 @@ public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppoi
                 idPatient,
                 finalPatientInfo,
                 idDoctor,
+                finalPatientInfo.getFirstName() + " " + finalPatientInfo.getLastName(),
                 specialty,
                 date,
                 startTime,

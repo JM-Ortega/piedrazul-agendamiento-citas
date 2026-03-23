@@ -2,7 +2,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
 import org.springframework.stereotype.Component;
 
@@ -10,6 +10,11 @@ import java.util.UUID;
 
 @Component
 public class AppointmentMapper {
+    private final PatientConsultPort patientConsultPort;
+
+    public AppointmentMapper(PatientConsultPort patientConsultPort) {
+        this.patientConsultPort = patientConsultPort;
+    }
 
     //De dominio a JPA
     public AppointmentEntity toEntity(Appointment appointment) {
@@ -25,7 +30,8 @@ public class AppointmentMapper {
         appointmentEntity.setIdDoctor(appointment.getIdDoctor());
         appointmentEntity.setDoctorName(appointment.getDoctorName());
         appointmentEntity.setIdPatient(appointment.getIdPatient());
-        appointmentEntity.setPatientName(appointment.getPatientInfo().getFirstName() + " " + appointment.getPatientInfo().getLastName());
+        appointmentEntity.setPatientName(patientConsultPort.findById(appointment.getIdPatient()).getFirstName()
+                + " " + patientConsultPort.findById(appointment.getIdPatient()).getLastName());
         appointmentEntity.setSpecialty(appointment.getSpecialty());
         appointmentEntity.setAppointmentState(appointment.getAppointmentState());
         appointmentEntity.setDate(appointment.getDate());
@@ -49,6 +55,7 @@ public class AppointmentMapper {
                 entity.getIdDoctor(),
                 entity.getDoctorName(),
                 entity.getIdPatient(),
+                entity.getPatientName(),
                 null,
                 entity.getSpecialty(),
                 entity.getAppointmentState(),

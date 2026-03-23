@@ -47,8 +47,10 @@ public class ScheduleAutonomousAppointmentUseCaseImpl implements ScheduleAutonom
                 .findByDoctorIdAndDate(idDoctor, date);
 
         // 4. Delega la lógica de negocio al servicio de dominio
+        String patientName= patientConsultPort.findById(idPatient).getFirstName() + " " + patientConsultPort.findById(idPatient).getLastName();
+
         Appointment appointment = appointmentService.scheduleAutonomous(
-                doctorName, idPatient, null, idDoctor, specialty,
+                doctorName, idPatient, null, idDoctor, patientName, specialty,
                 date, startTime, intervalMinutes, existingAppointments
         );
 

@@ -24,6 +24,7 @@ public class AppointmentService {
                                       UUID idPatient,
                                       PatientInfo patientInfo,
                                       UUID idDoctor,
+                                      String patientName,
                                       Specialty specialty,
                                       LocalDate date,
                                       AppointmentTime startTime,
@@ -42,6 +43,7 @@ public class AppointmentService {
                 doctorName,
                 idDoctor,
                 idPatient,
+                patientName,
                 patientInfo,
                 specialty,
                 date,
@@ -54,6 +56,7 @@ public class AppointmentService {
                                           UUID idPatient,
                                           PatientInfo patientInfo,
                                           UUID idDoctor,
+                                          String patientName,
                                           Specialty specialty,
                                           LocalDate date,
                                           AppointmentTime startTime,
@@ -68,7 +71,14 @@ public class AppointmentService {
         }
 
         return Appointment.scheduleAutonomous(
-                doctorName, idDoctor, idPatient, patientInfo, specialty, date, startTime
+                doctorName,
+                idDoctor,
+                idPatient,
+                patientName,
+                patientInfo,
+                specialty,
+                date,
+                startTime
         );
     }
 

@@ -69,6 +69,8 @@ public class AppointmentController {
     public ResponseEntity<Void> scheduleAppointment(
             @RequestBody @Valid AppointmentRequest request) {
 
+        request.validate();
+
         Appointment appointment = switch (request.getSchedulingOrigin()) {
 
             // Agendador manual, el paciente no tiene cuenta

@@ -35,6 +35,6 @@ public class ListAppointmentsUseCaseImpl implements ListAppointmentsUseCase {
         }
 
         // Caso default: Si no llega nada se devuelve todas las citas
-        return Collections.emptyList();
+        return appointmentRepository.findAll();
     }
 }
