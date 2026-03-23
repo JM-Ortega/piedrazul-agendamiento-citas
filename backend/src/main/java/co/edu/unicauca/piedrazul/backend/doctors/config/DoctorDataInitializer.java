@@ -1,7 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.doctors.config;
 
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -9,17 +12,21 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 
 @Component
 @Order(1)
 public class DoctorDataInitializer implements ApplicationRunner {
 
     private final DoctorRepository doctorRepository;
+    private final DoctorService doctorService;
 
-    public DoctorDataInitializer(DoctorRepository doctorRepository) {
+    public DoctorDataInitializer(DoctorRepository doctorRepository, DoctorService doctorService) {
         this.doctorRepository = doctorRepository;
+        this.doctorService = doctorService;
     }
 
     @Override
@@ -27,40 +34,45 @@ public class DoctorDataInitializer implements ApplicationRunner {
 
         if (doctorRepository.count() > 0) return;
 
-        Doctor doctor1 = new Doctor();
-        doctor1.setIdUser(UUID.randomUUID());
-        doctor1.setFirstName("Clara Inés");
-        doctor1.setLastName("Córdoba");
-        doctor1.setIdentification("DOC-001");
-        doctor1.setSpecialty(List.of(Specialty.TERAPIA_NEURAL));
-        doctor1.setStatus(true);
-        doctor1.setLaborStart(LocalDate.of(2026, 1, 1));
-        doctor1.setLaborEnd(LocalDate.of(2026, 12, 31));
-        doctor1.setAppointmentInterval(5);
+        doctorService.createDoctor(new CreateDoctorRequest(
+                "Clara Inés",
+                "Córdoba",
+                "DOC-001",
+                List.of(Specialty.TERAPIA_NEURAL),
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 12, 31),
+                30,
+                List.of(new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(11,0,0), Workday.LUNES),
+                        new CreateScheduleRequest(LocalTime.of(5,0,0), LocalTime.of(11,0,0), Workday.MARTES),
+                        new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(9,0,0), Workday.JUEVES),
+                        new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(11,0,0), Workday.VIERNES))
+        ));
 
-        Doctor doctor2 = new Doctor();
-        doctor2.setIdUser(UUID.randomUUID());
-        doctor2.setFirstName("José Ignacio");
-        doctor2.setLastName("García");
-        doctor2.setIdentification("DOC-002");
-        doctor2.setSpecialty(List.of(Specialty.FISIOTERAPIA));
-        doctor2.setStatus(true);
-        doctor2.setLaborStart(LocalDate.of(2026, 1, 1));
-        doctor2.setLaborEnd(LocalDate.of(2026, 12, 31));
-        doctor2.setAppointmentInterval(10);
 
-        Doctor doctor3 = new Doctor();
-        doctor3.setIdUser(UUID.randomUUID());
-        doctor3.setFirstName("Armando");
-        doctor3.setLastName("Peña");
-        doctor3.setIdentification("DOC-003");
-        doctor3.setSpecialty(List.of(Specialty.QUIROPRAXIA));
-        doctor3.setStatus(true);
-        doctor3.setLaborStart(LocalDate.of(2026, 1, 1));
-        doctor3.setLaborEnd(LocalDate.of(2026, 12, 31));
-        doctor3.setAppointmentInterval(15);
+        doctorService.createDoctor(new CreateDoctorRequest(
+                "José Ignacio",
+                "García",
+                "DOC-002",
+                List.of(Specialty.FISIOTERAPIA),
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 12, 31),
+                40,
+                List.of(new CreateScheduleRequest(LocalTime.of(5,0,0), LocalTime.of(9,0,0), Workday.MARTES),
+                        new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(12,0,0), Workday.MIERCOLES),
+                        new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(10,0,0), Workday.VIERNES))
+        ));
 
-        doctorRepository.saveAll(List.of(doctor1, doctor2, doctor3));
+
+        doctorService.createDoctor(new CreateDoctorRequest(
+                "Armando",
+                "Peña",
+                "DOC-003",
+                List.of(Specialty.QUIROPRAXIA),
+                LocalDate.of(2026, 11, 1),
+                LocalDate.of(2026, 12, 31),
+                15,
+                Collections.emptyList()
+        ));
 
         System.out.println("✔ Médicos de prueba insertados");
     }
