@@ -1,6 +1,4 @@
 import { computed, Injectable, signal } from '@angular/core';
-import { Appointment } from '../models/appointment.model';
-import { Doctor} from '../models/doctor.model';
 import { Patient } from '../models/patient.model';
 import { UserRole } from '../models/user.model';
 
@@ -27,7 +25,10 @@ export class AppService {
   }
 
   loginAsAdmin(password: string): boolean {
-    //funcionalidad de login, conectar con back
+    if (password === 'admin123') {
+      this._currentRole.set('admin');
+      return true;
+    }
     return false;
   }
 

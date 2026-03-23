@@ -49,6 +49,23 @@
         </a>
       }
 
+      @if (appService.currentRole() === "admin") {
+        <a
+          routerLink="/admin"
+          #rla6="routerLinkActive"
+          routerLinkActive
+          [class]="
+            'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
+            (rla6.isActive
+              ? 'bg-white text-blue-700'
+              : 'text-white hover:bg-blue-600')
+          "
+        >
+          <lucide-angular [img]="Settings" [size]="20"></lucide-angular>
+          Configuración
+        </a>
+      }
+
       @if (appService.currentRole()) {
         <div class="flex items-center gap-3 ml-4 pl-4 border-l border-blue-500">
           <div class="flex items-center gap-2">
@@ -100,6 +117,17 @@
         >
           <lucide-angular [img]="Calendar" [size]="20"></lucide-angular>
           Nueva Cita
+        </a>
+      }
+
+      @if (appService.currentRole() === "admin") {
+        <a
+          routerLink="/admin"
+          (click)="menuOpen.set(false)"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+        >
+          <lucide-angular [img]="Settings" [size]="20"></lucide-angular>
+          Configuración
         </a>
       }
 
