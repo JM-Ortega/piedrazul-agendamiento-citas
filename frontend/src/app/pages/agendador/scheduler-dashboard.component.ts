@@ -8,9 +8,8 @@ import {
   Search,
   User,
 } from 'lucide-angular';
-import { Appointment } from '../../models/appointment.model';
-import { Doctor } from '../../models/doctor.model';
-import { Patient } from '../../models/patient.model';
+import { dtoAppointment } from '../../models/DTOs/dtoAppointment.model';
+import { dtoDoctor } from '../../models/DTOs/dtoDoctor.model';
 import { SchedulerService } from '../../services/scheduler.service';
 
 @Component({
@@ -45,34 +44,45 @@ export class SchedulerDashboardComponent implements OnInit {
     'diciembre',
   ];
 
-  doctors = signal<Doctor[]>([]);
-  private appointments = signal<Appointment[]>([]);
+  doctors = signal<dtoDoctor[]>([]);
+  private appointments = signal<dtoAppointment[]>([]);
 
-  filterDate = signal(this.today);
+  viewMode = signal<'all' | 'today'>('all');
+  filterDate = signal('');
   filterDoctor = signal('');
   searched = signal(false);
 
   selectedDoctor = computed(() =>
-    this.doctors().find((d) => d.id === this.filterDoctor()),
+    this.doctors().find((d) => d.name === this.filterDoctor()),
+  );
+  todayCount = computed(
+    () =>
+      this.appointments().filter(
+        (a) => a.date === this.today && a.status !== 'cancelled',
+      ).length,
   );
 
-  private allAppointments = computed(() =>
-    this.appointments()
-      .sort((a, b) => (a.time > b.time ? 1 : -1))
-      .map((a) => ({
-        ...a,
-        doctor: this.doctors().find((d) => d.id === a.doctorId),
-        patient: undefined as Patient | undefined,
-      })),
+  allActiveCount = computed(
+    () => this.appointments().filter((a) => a.status !== 'cancelled').length,
   );
 
-  results = computed(() =>
-    this.allAppointments().filter(
-      (a) =>
-        (!this.filterDoctor() || a.doctorId === this.filterDoctor()) &&
-        (!this.filterDate() || a.date === this.filterDate()),
-    ),
-  );
+  results = computed(() => {
+    let filtered = this.appointments();
+
+    if (this.viewMode() === 'today') {
+      filtered = filtered.filter((a) => a.date === this.today);
+    }
+    if (this.filterDoctor()) {
+      filtered = filtered.filter((a) => a.doctorName === this.filterDoctor());
+    }
+    if (this.filterDate()) {
+      filtered = filtered.filter((a) => a.date === this.filterDate());
+    }
+
+    return [...filtered].sort((a, b) =>
+      a.date === b.date ? (a.time > b.time ? 1 : -1) : a.date > b.date ? 1 : -1,
+    );
+  });
 
   activeResults = computed(() =>
     this.results().filter((a) => a.status !== 'cancelled'),
@@ -82,21 +92,45 @@ export class SchedulerDashboardComponent implements OnInit {
     this.schedulerService
       .getDoctors()
       .subscribe((data) => this.doctors.set(data));
-    this.schedulerService
-      .getAppointments()
-      .subscribe((data) => this.appointments.set(data));
+    this.schedulerService.getAllAppointments().subscribe((data) => {
+      this.appointments.set(data);
+      this.searched.set(true);
+    });
+  }
+  setViewMode(mode: 'all' | 'today'): void {
+    this.viewMode.set(mode);
   }
 
   search(): void {
-    this.schedulerService
-      .getAppointments(
-        this.filterDoctor() || undefined,
-        this.filterDate() || undefined,
-      )
-      .subscribe((data) => {
-        this.appointments.set(data);
-        this.searched.set(true);
-      });
+    const date = this.filterDate();
+    const doctorId = this.filterDoctor();
+    let request$;
+
+    if (date && doctorId) {
+      request$ = this.schedulerService.getAppointmentsByDateAndDoctor(
+        date,
+        doctorId,
+      );
+    } else if (date) {
+      request$ = this.schedulerService.getAppointmentsByDate(date);
+    } else if (doctorId) {
+      request$ = this.schedulerService.getAppointmentsByDoctor(doctorId);
+    } else {
+      request$ = this.schedulerService.getAllAppointments();
+    }
+
+    request$.subscribe((data) => {
+      this.appointments.set(data);
+      this.searched.set(true);
+    });
+  }
+
+  clearDoctorFilter(): void {
+    this.filterDoctor.set('');
+  }
+
+  clearDateFilter(): void {
+    this.filterDate.set('');
   }
 
   formatDate(dateStr: string): string {
