@@ -29,7 +29,7 @@ export class NuevaCitaService {
 
   getDoctorsBySpecialty(specialty: string): Observable<SpecialtyDoctor[]> {
     return this.http.get<SpecialtyDoctor[]>(
-      `${this.apiUrl}/doctor/specialty/${specialty}`,
+      `${this.apiUrl}/doctor/doctors/specialty/${specialty}`,
     );
   }
 

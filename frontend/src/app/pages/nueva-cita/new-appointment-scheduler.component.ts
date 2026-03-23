@@ -436,23 +436,36 @@ export class NewAppointmentSchedulerComponent {
  
     const f = this.patientForm();
 
-    const data: NewAppointment = {
-      doctorId:  this.effectiveDoctorId(),
+    const baseData = {
+      doctorId: this.effectiveDoctorId(),
       specialty: this.selectedSpecialty(),
-      date:      date.toISOString().slice(0, 10),
-      startTime:      this.selectedTime(),
-      schedulingOrigin: 'MANUAL',
-      patientId: this.patientId() || undefined,
-      documentType: f.documentType,
-      documentNumber: f.documentNumber,
-      firstName: f.firstName,
-      lastName: f.lastName,
-      phone: f.phone,
-      gender: f.gender,
-      birthDate: f.birthDate,
-      email: f.email || undefined,
-      guardianPhone: f.guardianPhone || undefined
+      documentType: this.confirmDocumentType(),
+      documentNumber: this.confirmDocument(),
+      firstName: this.confirmFirstName(),
+      lastName: this.confirmLastName(),
+      phone: this.confirmPhone(),
+      date: date.toISOString().slice(0, 10),
+      startTime: this.selectedTime(),
+      schedulingOrigin: 'MANUAL' as const,
+      gender: this.confirmGender(),
+      birthDate: this.confirmBirthDate()
+
     };
+
+    let data: NewAppointment;
+
+    if (this.patientId()) {
+      data = {
+        ...baseData,
+        patientId: this.patientId() || undefined
+      };
+    } else {
+      data = {
+        ...baseData,
+        email: f.email || undefined,
+        guardianPhone: f.guardianPhone || undefined
+      };
+    }
  
     this.service.addAppointment(data).subscribe({
       next: () => {
