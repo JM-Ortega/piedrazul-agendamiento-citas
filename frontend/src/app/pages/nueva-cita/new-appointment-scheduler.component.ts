@@ -42,6 +42,7 @@ export class NewAppointmentSchedulerComponent {
   errorMessage = signal('');
 
   // Errores de validación
+  docTypeError = signal(false);
   documentError = signal(false);
   firstNameError = signal(false);
   lastNameError = signal(false);
@@ -49,6 +50,7 @@ export class NewAppointmentSchedulerComponent {
   genderError = signal(false);
   birthDateError = signal(false);
   emailError = signal(false);
+  guardianPhoneError = signal(false);
 
   // Paciente
   documentId = signal('');
@@ -57,13 +59,15 @@ export class NewAppointmentSchedulerComponent {
   patientId = signal<string | null>(null);
 
   patientForm = signal<Omit<Patient, 'id'>>({
+    documentType: '',
     documentId: '',
     firstName: '',
     lastName: '',
     phone: '',
     gender: '',
     birthDate: '',
-    email: ''
+    email: '',
+    guardianPhone: ''
   });
 
   // Especialidad / médico
@@ -237,12 +241,15 @@ export class NewAppointmentSchedulerComponent {
     this.lastNameError.set(!f.lastName);
     this.phoneError.set(!f.phone);
     this.genderError.set(!f.gender);
+    this.birthDateError.set(!f.birthDate);
+    this.docTypeError.set(!f.documentType);
     const phoneOk     = this.validatePhone();
     const birthDateOk = this.validateBirthDate();
     const emailOk     = this.validateEmail();
-    return !this.firstNameError() && !this.lastNameError() &&
-           !this.phoneError()     && !this.genderError()   &&
-           phoneOk && birthDateOk && emailOk;
+    const guardianPhoneOk = this.validateGuardianPhoneMenor();
+    return !this.docTypeError() && !this.firstNameError() && !this.lastNameError() &&
+           !this.phoneError()     && !this.genderError() && this.birthDateError()  &&
+           phoneOk && birthDateOk && emailOk && guardianPhoneOk;
   }
 
   // Especialidad (y médico si aplica)
@@ -318,11 +325,24 @@ export class NewAppointmentSchedulerComponent {
     this.isLoading.set(true);
     this.errorMessage.set('');
  
+    const f = this.patientForm();
+
     const data: NewAppointment = {
-      patientId: this.patientId()!,
       doctorId:  this.effectiveDoctorId(),
+      specialty: this.selectedSpecialty(),
       date:      date.toISOString().slice(0, 10),
-      time:      this.selectedTime()
+      time:      this.selectedTime(),
+      schedulingOrigin: 'MANUAL',
+      patientId: this.patientId()!,
+      documentType: f.documentType,
+      documentNumber: f.documentId,
+      firstName: f.firstName,
+      lastName: f.lastName,
+      phone: f.phone,
+      gender: f.gender,
+      birthDate: f.birthDate,
+      email: f.email || undefined,
+      guardianPhone: f.guardianPhone || undefined
     };
  
     this.service.addAppointment(data).subscribe({
@@ -357,6 +377,34 @@ export class NewAppointmentSchedulerComponent {
     const valid = /^[0-9]{7,15}$/.test(phone);
     this.phoneError.set(!valid);
     return valid;
+  }
+
+  validateGuardianPhoneMenor(): boolean {
+    const f = this.patientForm();
+    if (!f.birthDate){
+      this.guardianPhoneError.set(false);
+      return true;
+    }
+    const birthDate = new Date(f.birthDate);
+    const today = new Date();
+
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+
+    if (monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {age--;}
+
+    if(age < 18){
+      if (!f.guardianPhone) {
+        this.guardianPhoneError.set(true);
+        return false;
+      }
+      const valid = /^[0-9]{7,15}$/.test(f.guardianPhone);
+      this.guardianPhoneError.set(!valid);
+      return valid;
+    }
+    return true;
   }
 
   validateBirthDate(): boolean {
