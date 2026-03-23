@@ -1,4 +1,4 @@
-import { DaySchedule } from "./daySchedule.model"; 
+import { DaySchedule } from './daySchedule.model';
 
 export interface Doctor {
   id: string;
@@ -8,7 +8,7 @@ export interface Doctor {
   workDays: number[];
   startTime: string;
   endTime: string;
-  windowWeeks: number;
   daySchedules?: { [day: number]: DaySchedule };
   email?: string;
+  enabled?: boolean;
 }

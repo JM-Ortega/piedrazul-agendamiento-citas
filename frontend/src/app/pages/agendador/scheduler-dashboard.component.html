@@ -338,7 +338,9 @@
                     class="border-b border-gray-100"
                     [class]="
                       (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50') +
-                      (apt.status === 'cancelled' ? ' opacity-60' : '')
+                      (apt.appointmentState === 'CANCELADA'
+                        ? ' opacity-60'
+                        : '')
                     "
                   >
                     @if (viewMode() !== "today") {
@@ -399,9 +401,9 @@
                     <td class="px-4 py-4">
                       <span
                         class="px-3 py-1.5 rounded-lg text-sm font-medium"
-                        [class]="statusColor(apt.status)"
+                        [class]="statusColor(apt.appointmentState)"
                       >
-                        {{ statusLabel(apt.status) }}
+                        {{ statusLabel(apt.appointmentState) }}
                       </span>
                     </td>
                   </tr>
