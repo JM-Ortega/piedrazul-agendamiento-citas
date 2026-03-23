@@ -4,7 +4,7 @@ export interface NewAppointment {
   date: string;
   time: string;
   schedulingOrigin: 'AUTONOMO' | 'MANUAL';
-  patientId: string;
+  patientId?: string;
   documentType: string;
   documentNumber: string;
   firstName: string;
