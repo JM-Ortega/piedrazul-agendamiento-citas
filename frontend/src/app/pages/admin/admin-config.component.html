@@ -1,0 +1,439 @@
+<div class="min-h-screen bg-blue-50 py-8 px-4">
+  <div class="max-w-5xl mx-auto space-y-6">
+    <!-- Header -->
+    <div
+      class="bg-gradient-to-r from-blue-800 to-blue-600 text-white rounded-2xl p-7 shadow-lg"
+    >
+      <h1 class="text-3xl font-bold flex items-center gap-3">
+        <lucide-icon [img]="Settings" [size]="34"></lucide-icon>
+        Panel de Administración
+      </h1>
+      <p class="text-blue-100 text-lg mt-2">
+        Configure los parámetros del sistema de agendamiento
+      </p>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="bg-white rounded-2xl shadow p-5 text-center">
+        <p class="text-4xl font-bold text-blue-600">{{ doctors().length }}</p>
+
+        <p class="text-gray-500 text-base mt-1">Médicos / Terapistas</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow p-5 text-center">
+        <p class="text-4xl font-bold text-blue-600">{{ totalSpecialties() }}</p>
+        <p class="text-gray-500 text-base mt-1">Especialidades</p>
+      </div>
+      <div class="bg-white rounded-2xl shadow p-5 text-center">
+        <p class="text-4xl font-bold text-blue-600">{{ avgInterval() }} min</p>
+        <p class="text-gray-500 text-base mt-1">Intervalo promedio</p>
+      </div>
+    </div>
+
+    <!-- Doctors -->
+    <div class="bg-white rounded-2xl shadow-md p-7">
+      <h2 class="text-blue-800 text-2xl mb-6 flex items-center gap-2">
+        <lucide-icon [img]="Edit3" [size]="24"></lucide-icon>
+        Configuración de Médicos y Terapistas
+      </h2>
+
+      <div class="space-y-4">
+        @for (doctor of doctors(); track doctor.id) {
+          <div
+            class="border-2 rounded-2xl transition-all"
+            [class]="
+              editingId() === doctor.id
+                ? 'border-blue-400 bg-blue-50'
+                : 'border-gray-100 bg-white'
+            "
+          >
+            <!-- Doctor Header -->
+            <div
+              class="flex flex-col sm:flex-row sm:items-center justify-between p-5 gap-3"
+            >
+              <div class="flex items-center gap-4">
+                <div
+                  class="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-lg font-bold shrink-0"
+                >
+                  {{ doctor.name.split(" ").slice(-2)[0][0]
+                  }}{{ doctor.name.split(" ").slice(-2)[1][0] }}
+                </div>
+                <div>
+                  <p class="text-blue-800 text-lg font-semibold">
+                    {{ doctor.name }}
+                  </p>
+                  <p class="text-gray-500 text-base">{{ doctor.specialty }}</p>
+                </div>
+              </div>
+
+              @if (savedId() === doctor.id) {
+                <span class="flex items-center gap-1 text-green-600 text-base">
+                  <lucide-icon [img]="CheckCircle" [size]="18"></lucide-icon>
+                  Guardado
+                </span>
+              }
+
+              @if (editingId() !== doctor.id) {
+                <button
+                  (click)="edit(doctor)"
+                  class="flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-700 px-5 py-2.5 rounded-xl transition-colors text-base"
+                >
+                  <lucide-icon [img]="Edit3" [size]="18"></lucide-icon>
+                  Editar
+                </button>
+              } @else {
+                <div class="flex gap-2">
+                  <button
+                    (click)="cancelEdit()"
+                    class="border-2 border-gray-300 text-gray-600 px-4 py-2 rounded-xl text-base hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    (click)="save()"
+                    class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl transition-colors text-base"
+                  >
+                    <lucide-icon [img]="Save" [size]="18"></lucide-icon>
+                    Guardar
+                  </button>
+                </div>
+              }
+            </div>
+
+            <!-- Summary -->
+            @if (editingId() !== doctor.id) {
+              <div class="px-5 pb-5 pt-0">
+                <div class="flex flex-wrap gap-3 text-sm text-gray-600">
+                  <span
+                    class="bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1"
+                  >
+                    <lucide-icon
+                      [img]="Clock"
+                      [size]="14"
+                      class="text-blue-500"
+                    ></lucide-icon>
+                    {{ doctor.startTime }} – {{ doctor.endTime }}
+                  </span>
+                  <span
+                    class="bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1"
+                  >
+                    <lucide-icon
+                      [img]="Clock"
+                      [size]="14"
+                      class="text-blue-500"
+                    ></lucide-icon>
+                    Intervalo: {{ doctor.interval }} min
+                  </span>
+                  <span
+                    class="bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1"
+                  >
+                    <lucide-icon
+                      [img]="Calendar"
+                      [size]="14"
+                      class="text-blue-500"
+                    ></lucide-icon>
+                    Ventana: {{ doctor.windowWeeks }} sem
+                  </span>
+                  <span class="bg-blue-50 px-3 py-1.5 rounded-lg">
+                    {{ getWorkDayLabels(doctor.workDays) }}
+                  </span>
+                  @if (getDayScheduleKeys(doctor).length > 0) {
+                    <span
+                      class="bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg flex items-center gap-1"
+                    >
+                      <lucide-icon [img]="Clock" [size]="14"></lucide-icon>
+                      Horarios personalizados por día
+                    </span>
+                  }
+                </div>
+                @if (getDayScheduleKeys(doctor).length > 0) {
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    @for (day of doctor.workDays; track day) {
+                      @if (doctor.daySchedules?.[day]) {
+                        <span
+                          class="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-3 py-1 rounded-lg"
+                        >
+                          {{ DAY_LABELS[day] }}:
+                          {{ doctor.daySchedules![day].startTime }} –
+                          {{ doctor.daySchedules![day].endTime }}
+                        </span>
+                      }
+                    }
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- Edit Form -->
+            @if (editingId() === doctor.id && editForm()) {
+              <div class="px-5 pb-5 space-y-5 border-t border-blue-200 pt-5">
+                <div
+                  class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+                >
+                  <div>
+                    <label class="block text-gray-700 mb-1 text-base"
+                      >Hora Inicio (por defecto)</label
+                    >
+                    <input
+                      type="time"
+                      [value]="editForm()!.startTime"
+                      (change)="
+                        updateField('startTime', $any($event.target).value)
+                      "
+                      class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 mb-1 text-base"
+                      >Hora Fin (por defecto)</label
+                    >
+                    <input
+                      type="time"
+                      [value]="editForm()!.endTime"
+                      (change)="
+                        updateField('endTime', $any($event.target).value)
+                      "
+                      class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 mb-1 text-base"
+                      >Intervalo (min)</label
+                    >
+                    <input
+                      type="number"
+                      min="5"
+                      max="120"
+                      step="5"
+                      [value]="editForm()!.interval"
+                      (input)="
+                        updateField('interval', +$any($event.target).value)
+                      "
+                      class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-gray-700 mb-1 text-base"
+                      >Ventana (semanas)</label
+                    >
+                    <input
+                      type="number"
+                      min="1"
+                      max="12"
+                      [value]="editForm()!.windowWeeks"
+                      (input)="
+                        updateField('windowWeeks', +$any($event.target).value)
+                      "
+                      class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <!-- Work Days -->
+                <div>
+                  <label class="block text-gray-700 mb-2 text-base"
+                    >Días de Atención</label
+                  >
+                  <div class="flex gap-2 flex-wrap">
+                    @for (day of weekDays; track day) {
+                      <button
+                        (click)="toggleDay(day)"
+                        class="w-14 py-3 rounded-xl text-base font-semibold border-2 transition-all"
+                        [class]="
+                          editForm()!.workDays.includes(day)
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'
+                        "
+                      >
+                        {{ DAY_LABELS[day] }}
+                      </button>
+                    }
+                  </div>
+                </div>
+
+                <!-- Per-day schedules -->
+                @if (editForm()!.workDays.length > 0) {
+                  <div
+                    class="border-2 border-blue-100 rounded-xl overflow-hidden"
+                  >
+                    <button
+                      (click)="showDaySchedules.set(!showDaySchedules())"
+                      class="w-full flex items-center justify-between px-5 py-3 bg-blue-50 hover:bg-blue-100 transition-colors text-blue-800 text-base"
+                    >
+                      <span class="flex items-center gap-2">
+                        <lucide-icon [img]="Clock" [size]="18"></lucide-icon>
+                        <span class="font-semibold"
+                          >Horarios específicos por día</span
+                        >
+                        @if (getEditFormDayScheduleCount() > 0) {
+                          <span
+                            class="bg-amber-400 text-white text-xs px-2 py-0.5 rounded-full"
+                          >
+                            {{ getEditFormDayScheduleCount() }} personalizado{{
+                              getEditFormDayScheduleCount() > 1 ? "s" : ""
+                            }}
+                          </span>
+                        }
+                      </span>
+                      @if (showDaySchedules()) {
+                        <lucide-icon
+                          [img]="ChevronUp"
+                          [size]="20"
+                        ></lucide-icon>
+                      } @else {
+                        <lucide-icon
+                          [img]="ChevronDown"
+                          [size]="20"
+                        ></lucide-icon>
+                      }
+                    </button>
+
+                    @if (showDaySchedules()) {
+                      <div class="p-4 space-y-3 bg-white">
+                        <p class="text-gray-500 text-sm">
+                          Puede establecer una hora de inicio y fin diferente
+                          para cada día. Si no se personaliza, se usará el
+                          horario por defecto.
+                        </p>
+                        @for (day of editForm()!.workDays; track day) {
+                          <div
+                            class="rounded-xl border-2 p-4 transition-all"
+                            [class]="
+                              hasDayOverride(day)
+                                ? 'border-amber-300 bg-amber-50'
+                                : 'border-gray-100 bg-gray-50'
+                            "
+                          >
+                            <div
+                              class="flex flex-col sm:flex-row sm:items-center gap-3"
+                            >
+                              <div
+                                class="flex items-center gap-3 sm:w-32 shrink-0"
+                              >
+                                <div
+                                  class="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0"
+                                  [class]="
+                                    hasDayOverride(day)
+                                      ? 'bg-amber-400 text-white'
+                                      : 'bg-blue-100 text-blue-700'
+                                  "
+                                >
+                                  {{ DAY_LABELS[day] }}
+                                </div>
+                                <span
+                                  class="text-gray-700 text-base hidden sm:block"
+                                  >{{ DAY_FULL_LABELS[day] }}</span
+                                >
+                              </div>
+                              <div
+                                class="flex flex-1 flex-wrap gap-3 items-end"
+                              >
+                                <div class="flex-1 min-w-[130px]">
+                                  <label
+                                    class="block text-gray-600 text-sm mb-1"
+                                    >Hora Inicio</label
+                                  >
+                                  <input
+                                    type="time"
+                                    [value]="
+                                      getDayScheduleValue(day, 'startTime')
+                                    "
+                                    (change)="
+                                      updateDaySchedule(
+                                        day,
+                                        'startTime',
+                                        $any($event.target).value
+                                      )
+                                    "
+                                    class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-3 py-2 text-base outline-none transition-colors bg-white"
+                                  />
+                                </div>
+                                <div class="flex-1 min-w-[130px]">
+                                  <label
+                                    class="block text-gray-600 text-sm mb-1"
+                                    >Hora Fin</label
+                                  >
+                                  <input
+                                    type="time"
+                                    [value]="
+                                      getDayScheduleValue(day, 'endTime')
+                                    "
+                                    (change)="
+                                      updateDaySchedule(
+                                        day,
+                                        'endTime',
+                                        $any($event.target).value
+                                      )
+                                    "
+                                    class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-3 py-2 text-base outline-none transition-colors bg-white"
+                                  />
+                                </div>
+                                @if (hasDayOverride(day)) {
+                                  <button
+                                    (click)="resetDaySchedule(day)"
+                                    class="text-sm text-gray-400 hover:text-red-500 underline transition-colors pb-2 shrink-0"
+                                  >
+                                    Usar por defecto
+                                  </button>
+                                }
+                              </div>
+                            </div>
+                            @if (!hasDayOverride(day)) {
+                              <p
+                                class="text-xs text-gray-400 mt-2 sm:ml-[52px]"
+                              >
+                                Usando horario por defecto:
+                                {{ editForm()!.startTime }} –
+                                {{ editForm()!.endTime }}
+                              </p>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="bg-blue-700 text-white rounded-2xl p-6">
+      <h3 class="text-xl mb-4">Guía de Configuración</h3>
+      <div
+        class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-blue-100 text-base"
+      >
+        <div>
+          <p class="font-semibold text-white mb-1">⏰ Franja Horaria</p>
+          <p>
+            Define el inicio y fin de la jornada del médico cada día de
+            atención. Puede personalizarse por día.
+          </p>
+        </div>
+        <div>
+          <p class="font-semibold text-white mb-1">🕐 Intervalo</p>
+          <p>
+            Tiempo en minutos entre cada cita. Determina el número de citas
+            disponibles por día.
+          </p>
+        </div>
+        <div>
+          <p class="font-semibold text-white mb-1">📅 Ventana</p>
+          <p>
+            Cantidad de semanas hacia el futuro en que se pueden agendar citas.
+          </p>
+        </div>
+        <div>
+          <p class="font-semibold text-white mb-1">📆 Días</p>
+          <p>
+            Seleccione los días de la semana en que el médico presta sus
+            servicios.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
