@@ -66,7 +66,7 @@ export class NewAppointmentSchedulerComponent {
 
   patientForm = signal<Omit<Patient, 'id'>>({
     documentType: '',
-    documentId: '',
+    documentNumber: '',
     firstName: '',
     lastName: '',
     phone: '',
@@ -139,7 +139,7 @@ export class NewAppointmentSchedulerComponent {
     () => this.foundPatient()?.documentType ?? this.patientForm().documentType
   );
   readonly confirmDocument = computed(
-    () => this.foundPatient()?.documentId ?? this.documentId()
+    () => this.foundPatient()?.documentNumber ?? this.documentId()
   );
   readonly confirmPhone = computed(
     () => this.foundPatient()?.phone ?? this.patientForm().phone
@@ -444,7 +444,7 @@ export class NewAppointmentSchedulerComponent {
       schedulingOrigin: 'MANUAL',
       patientId: this.patientId() || undefined,
       documentType: f.documentType,
-      documentNumber: f.documentId,
+      documentNumber: f.documentNumber,
       firstName: f.firstName,
       lastName: f.lastName,
       phone: f.phone,
@@ -484,7 +484,7 @@ export class NewAppointmentSchedulerComponent {
 
   resetPatientForm(): void {
     this.patientForm.set({
-      documentId: '',
+      documentNumber: '',
       documentType: '',
       firstName: '',
       lastName: '',

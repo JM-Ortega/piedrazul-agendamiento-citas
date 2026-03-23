@@ -1,7 +1,7 @@
 export interface Patient {
   id: string;
   documentType: 'REGISTRO_NACIMIENTO' | 'TARJETA_IDENTIDAD' | 'CEDULA' | 'PASAPORTE' | '';
-  documentId: string;
+  documentNumber: string;
   firstName: string;
   lastName: string;
   phone: string;
