@@ -15,6 +15,10 @@ spring:
     properties:
       hibernate:
         format_sql: ${JPA_FORMAT_SQL:true}
+  web:
+    error:
+      include-stacktrace: never
+      include-message: always
 
 server:
   port: ${SERVER_PORT:8080}
