@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.port.output;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -16,4 +16,7 @@ public interface DoctorConfigConsultPort {
 
     // Obtener el nombre del doctor
     String getDoctorName(UUID idDoctor);
+
+    // Trae todos los médicos activos con su configuración
+    List<DoctorResponse> getActiveDoctors();
 }

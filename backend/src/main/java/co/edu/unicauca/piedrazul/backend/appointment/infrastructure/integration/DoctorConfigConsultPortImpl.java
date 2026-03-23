@@ -3,6 +3,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -35,5 +36,10 @@ public class DoctorConfigConsultPortImpl implements DoctorConfigConsultPort {
     @Override
     public String getDoctorName(UUID idDoctor) {
         return doctorExternalService.getDoctorName(idDoctor);
+    }
+
+    @Override
+    public List<DoctorResponse> getActiveDoctors(){
+        return doctorExternalService.getActiveDoctors();
     }
 }
