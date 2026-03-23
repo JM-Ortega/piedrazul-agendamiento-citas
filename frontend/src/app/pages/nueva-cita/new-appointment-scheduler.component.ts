@@ -184,7 +184,9 @@ export class NewAppointmentSchedulerComponent {
       next: (patient) => {
         this.foundPatient.set(patient ?? null);
         this.notFound.set(!patient);
-        if (!patient) {
+        if (patient) {
+          this.resetPatientForm();
+        }else{
           this.patientForm.update(f => ({ ...f, documentId: this.documentId() }));
         }
       },
@@ -350,6 +352,19 @@ export class NewAppointmentSchedulerComponent {
     this.selectedDoctorName.set(doc?.doctorName ?? '');
   }
 
+  onDocumentChange(value: string): void {
+    this.documentId.set(value);
+
+    this.foundPatient.set(null);
+    this.notFound.set(false);
+    this.patientId.set(null);
+
+    this.documentError.set(false);
+    this.errorMessage.set('');
+
+    this.resetPatientForm();
+  }
+
   goToScheduleStep(): void {
     this.selectedDate.set(null);
     this.selectedTime.set('');
@@ -410,7 +425,10 @@ export class NewAppointmentSchedulerComponent {
   // Confirmación
   confirm(): void {
     const date = this.selectedDate();
-    if (!date || !this.selectedTime() || !this.patientId() || !this.effectiveDoctorId()) return;
+    
+    if (!date || !this.selectedTime() || !this.effectiveDoctorId()) {
+      return;
+    }
 
     this.isLoading.set(true);
     this.errorMessage.set('');
@@ -423,7 +441,7 @@ export class NewAppointmentSchedulerComponent {
       date:      date.toISOString().slice(0, 10),
       time:      this.selectedTime(),
       schedulingOrigin: 'MANUAL',
-      patientId: this.patientId()!,
+      patientId: this.patientId() || undefined,
       documentType: f.documentType,
       documentNumber: f.documentId,
       firstName: f.firstName,
@@ -455,6 +473,29 @@ export class NewAppointmentSchedulerComponent {
         }
       }
     });
+  }
+
+  resetPatientForm(): void {
+    this.patientForm.set({
+      documentId: '',
+      documentType: '',
+      firstName: '',
+      lastName: '',
+      phone: '',
+      gender: '',
+      birthDate: '',
+      email: '',
+      guardianPhone: ''
+    });
+
+    this.firstNameError.set(false);
+    this.lastNameError.set(false);
+    this.phoneError.set(false);
+    this.genderError.set(false);
+    this.birthDateError.set(false);
+    this.emailError.set(false);
+    this.guardianPhoneError.set(false);
+    this.docTypeError.set(false);
   }
 
   getPatientField<K extends keyof Omit<Patient, 'id'>>(key: K): Omit<Patient, 'id'>[K] {
