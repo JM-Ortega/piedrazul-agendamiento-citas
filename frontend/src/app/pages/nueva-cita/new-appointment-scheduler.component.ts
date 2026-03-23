@@ -392,9 +392,10 @@ export class NewAppointmentSchedulerComponent {
     this.noSlotsAvailable.set(false);
 
     if (!date) return;
+    const dayName = this.getDayName(date);
 
     const dateStr = date.toISOString().slice(0, 10);
-    this.service.getAvailableSlots(this.effectiveDoctorId(), dateStr)
+    this.service.getAvailableSlots(this.effectiveDoctorId(), dayName)
       .subscribe({
         next: (slots) => {
           this.availableSlots.set(slots);
@@ -440,7 +441,7 @@ export class NewAppointmentSchedulerComponent {
       doctorId:  this.effectiveDoctorId(),
       specialty: this.selectedSpecialty(),
       date:      date.toISOString().slice(0, 10),
-      time:      this.selectedTime(),
+      startTime:      this.selectedTime(),
       schedulingOrigin: 'MANUAL',
       patientId: this.patientId() || undefined,
       documentType: f.documentType,
@@ -572,5 +573,18 @@ export class NewAppointmentSchedulerComponent {
     const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     this.emailError.set(!valid);
     return valid;
+  }
+
+  getDayName(date: Date): string {
+    const days = [
+      'DOMINGO',
+      'LUNES',
+      'MARTES',
+      'MIERCOLES',
+      'JUEVES',
+      'VIERNES',
+      'SABADO'
+    ];
+    return days[date.getDay()];
   }
 }
