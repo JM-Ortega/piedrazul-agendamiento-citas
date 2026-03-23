@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { isHoliday } from 'colombian-holidays';
-import { SpecialtyDoctor } from '../DTOs/specialty-doctor';
+import { SpecialtyDoctor } from '../models/DTOs/specialty-doctor';
 
 @Injectable({ providedIn: 'root' })
 export class CalendarService {

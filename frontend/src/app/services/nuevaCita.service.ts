@@ -2,8 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { Observable, of, tap, throwError } from 'rxjs';
 import { Patient } from '../models/patient.model';
-import { NewAppointment } from '../DTOs/newAppointment';
-import { SpecialtyDoctor } from '../DTOs/specialty-doctor';
+import { NewAppointment } from '../models/DTOs/newAppointment';
+import { SpecialtyDoctor } from '../models/DTOs/specialty-doctor';
 
 @Injectable({ providedIn: 'root' })
 export class NuevaCitaService {
