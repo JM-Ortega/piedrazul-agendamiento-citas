@@ -46,13 +46,13 @@ public class AppointmentRequest {
 
     // Se valida dependiendo del tipo de agendamiento
     public void validate() {
-        if (schedulingOrigin == SchedulingOrigin.WEB
+        if (schedulingOrigin == SchedulingOrigin.AUTONOMO
                 && patientId == null) {
             throw new IllegalArgumentException(
                     "El id del paciente es obligatorio para agendamiento autónomo"
             );
         }
-        if (schedulingOrigin == SchedulingOrigin.WHATSAPP
+        if (schedulingOrigin == SchedulingOrigin.MANUAL
                 && (documentNumber == null || firstName == null || phone == null)) {
             throw new IllegalArgumentException(
                     "El numero de documento, nombre completo y teléfono son obligatorios para agendamiento manual"

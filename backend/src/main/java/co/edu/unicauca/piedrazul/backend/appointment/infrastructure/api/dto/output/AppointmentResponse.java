@@ -5,17 +5,18 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrig
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.UUID;
 
+// Solicitado por Nicolle
 public record AppointmentResponse(
         UUID idAppointment,
-        UUID idDoctor,
-        String patientName,
-        String patientPhone,
-        String documentNumber,
-        Specialty specialty,
         LocalDate date,
-        String startTime,
+        LocalTime startTime,
         AppointmentState appointmentState,
-        SchedulingOrigin schedulingOrigin
+        String doctorName,
+        Specialty specialty,
+        String patientFirstName,
+        String patientLastName,
+        String documentNumber
 ) {}

@@ -1,11 +1,13 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientSnapshot;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.PatientInfoMapper;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -23,4 +25,14 @@ public class PatientConsultPortImpl implements PatientConsultPort {
                 .map(PatientInfoMapper::toPatientInfo)
                 .orElseThrow(() -> new RuntimeException("Patient not found: " + idPatient));
     }
+
+    @Override
+    public Optional<PatientSnapshot> findByDocumentNumber(String documentNumber) {
+        return patientModuleApi.findByDocumentNumber(documentNumber)
+                .map(patientData -> new PatientSnapshot(
+                        patientData.id(),
+                        PatientInfoMapper.toPatientInfo(patientData)
+                ));
+    }
+
 }

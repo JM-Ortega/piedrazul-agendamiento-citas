@@ -46,6 +46,7 @@ public class Appointment {
     // pacienteId es null porque el paciente no tiene cuenta aún
     public static Appointment scheduleManual(String doctorName,
                                              UUID idDoctor,
+                                             UUID idPatient,
                                              PatientInfo patientInfo,
                                              Specialty specialty,
                                              LocalDate date,
@@ -61,12 +62,12 @@ public class Appointment {
                 UUID.randomUUID(),
                 idDoctor,
                 doctorName,
-                null,
+                idPatient,
                 patientInfo,
                 specialty,
                 date,
                 startTime,
-                SchedulingOrigin.WHATSAPP
+                SchedulingOrigin.MANUAL
         );
     }
 
@@ -96,7 +97,7 @@ public class Appointment {
                 specialty,
                 date,
                 startTime,
-                SchedulingOrigin.WEB
+                SchedulingOrigin.AUTONOMO
         );
     }
 

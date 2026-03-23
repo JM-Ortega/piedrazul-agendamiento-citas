@@ -45,5 +45,8 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
         return jpaRepository.findByIdDoctorAndDate(idDoctor, date).stream().map(mapper::toDomain).toList();
     }
 
-
+    @Override
+    public List<Appointment> findAll(){
+        return jpaRepository.findAll().stream().map(mapper::toDomain).toList();
+    }
 }

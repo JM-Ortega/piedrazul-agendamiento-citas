@@ -31,7 +31,7 @@ public class AppointmentEntity {
     @Column(name = "doctor_name", nullable = false)
     private String doctorName;
 
-    @Column(name = "id_patient", nullable = false)
+    @Column(name = "id_patient", nullable = true)
     private UUID idPatient;
 
     @Column(name = "patient_name", nullable = false)

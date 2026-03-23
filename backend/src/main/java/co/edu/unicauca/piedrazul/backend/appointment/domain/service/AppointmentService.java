@@ -1,8 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.service;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.SlotNotAvailableException;
-
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -19,6 +21,7 @@ public class AppointmentService {
 
     // El agendador crea la cita manualmente
     public Appointment scheduleManual(String doctorName,
+                                      UUID idPatient,
                                       PatientInfo patientInfo,
                                       UUID idDoctor,
                                       Specialty specialty,
@@ -27,16 +30,22 @@ public class AppointmentService {
                                       int intervalMinutes,
                                       List<Appointment> existingAppointments) {
 
+
         // El dominio valida que el slot esté libre antes de crear la cita
-        if (busySlotService.isBusy(
-                existingAppointments, startTime, intervalMinutes)) {
+        if (busySlotService.isBusy(existingAppointments, startTime, intervalMinutes)) {
             throw new SlotNotAvailableException(
                     "El slot " + startTime + " ya está ocupado para este médico"
             );
         }
 
         return Appointment.scheduleManual(
-                doctorName, idDoctor, patientInfo, specialty, date, startTime
+                doctorName,
+                idDoctor,
+                idPatient,
+                patientInfo,
+                specialty,
+                date,
+                startTime
         );
     }
 

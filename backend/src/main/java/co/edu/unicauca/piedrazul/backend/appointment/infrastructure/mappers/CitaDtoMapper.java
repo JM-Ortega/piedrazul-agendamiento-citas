@@ -13,15 +13,14 @@ public class CitaDtoMapper {
     public AppointmentResponse toResponse(Appointment appointment) {
         return new AppointmentResponse(
                 appointment.getIdAppointment(),
-                appointment.getIdDoctor(),
-                appointment.getPatientInfo().getFirstName() + " " + appointment.getPatientInfo().getLastName(),
-                appointment.getPatientInfo().getPhone(),
-                appointment.getPatientInfo().getDocumentNumber(),
-                appointment.getSpecialty(),
                 appointment.getDate(),
-                appointment.getStartTime().getTime().toString(),
+                appointment.getStartTime().getTime(),
                 appointment.getAppointmentState(),
-                appointment.getSchedulingOrigin()
+                appointment.getDoctorName(),
+                appointment.getSpecialty(),
+                appointment.getPatientInfo().getFirstName(),
+                appointment.getPatientInfo().getLastName(),
+                appointment.getPatientInfo().getDocumentNumber()
         );
     }
 

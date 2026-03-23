@@ -14,7 +14,11 @@ public interface AppointmentRepository {
 
 
     List<Appointment> findByDoctorId(UUID idDoctor);
+
     List<Appointment> findByDate(LocalDate date);
+
     List<Appointment> findByDoctorIdAndDate(UUID idDoctor, LocalDate date);
+
+    List<Appointment> findAll();
 
 }

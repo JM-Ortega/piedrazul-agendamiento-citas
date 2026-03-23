@@ -1,19 +1,19 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api;
 
+import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.NoDoctorsAvailableException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAvailableSlotsUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ListAppointmentsUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ScheduleAutonomousAppointmentUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ScheduleManualAppointmentUseCase;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentResponse;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.SpecialtyDoctorResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.CitaDtoMapper;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -26,6 +26,7 @@ public class AppointmentController {
     private final ScheduleManualAppointmentUseCase scheduleManualAppointmentUseCase;
     private final ScheduleAutonomousAppointmentUseCase scheduleAutonomousAppointmentUseCase;
     private final ListAppointmentsUseCase listAppointmentsUseCase;
+    private final GetAvailableDoctorsBySpecialtyUseCase getAvailableDoctorsBySpecialtyUseCase;
     private final CitaDtoMapper citaDtoMapper;
 
     public AppointmentController(
@@ -33,11 +34,13 @@ public class AppointmentController {
             ScheduleManualAppointmentUseCase scheduleManualAppointmentUseCase,
             ScheduleAutonomousAppointmentUseCase scheduleAutonomousAppointmentUseCase,
             ListAppointmentsUseCase listAppointmentsUseCase,
+            GetAvailableDoctorsBySpecialtyUseCase getAvailableDoctorsBySpecialtyUseCase,
             CitaDtoMapper citaDtoMapper) {
         this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
         this.scheduleManualAppointmentUseCase = scheduleManualAppointmentUseCase;
         this.scheduleAutonomousAppointmentUseCase = scheduleAutonomousAppointmentUseCase;
         this.listAppointmentsUseCase = listAppointmentsUseCase;
+        this.getAvailableDoctorsBySpecialtyUseCase = getAvailableDoctorsBySpecialtyUseCase;
         this.citaDtoMapper = citaDtoMapper;
     }
 
@@ -53,50 +56,25 @@ public class AppointmentController {
         return ResponseEntity.ok(slots);
     }
 
-    @PostMapping("/listByDoctorAndDate")
-    public ResponseEntity<List<AppointmentResponse>> listAppointmentByDoctorAndDate(
-            @RequestParam UUID idDoctor,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+    // Un unico método para listar por idDoctor, por fecha, por ambos o para pasar todas las citas que hay
+    @GetMapping
+    public ResponseEntity<List<AppointmentResponse>> list(
+            @RequestParam(required = false) UUID idDoctor,
+            @RequestParam(required = false) LocalDate date) {
 
-        return ResponseEntity.ok(
-                //stream es para procesar cada elemento de lista uno por uno
-                //map mapea cada elemento de la lista a otro tipo, en este caso de Appointment a AppointmentResponse usando el mapper
-                listAppointmentsUseCase.listByDoctorAndDate(idDoctor, date)
-                        .stream()
-                        .map(citaDtoMapper::toResponse)  // usas el mapper directamente
-                        .toList()
-        );
-
+        // Mapper para pasar de Domain a DTO
+        return ResponseEntity.ok(listAppointmentsUseCase.listBy(idDoctor, date).stream().map(citaDtoMapper::toResponse).toList());
     }
-
-    @PostMapping("/listbyDate")
-    public ResponseEntity<List<AppointmentResponse>> listAppointmentByDate(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date){
-        return  ResponseEntity.ok(
-                listAppointmentsUseCase.listByDate(date).stream().map(citaDtoMapper::toResponse).toList()
-        );
-
-    }
-
-    @PostMapping("/listByDoctor")
-    public ResponseEntity<List<AppointmentResponse>> listByDoctorId(
-            @RequestParam UUID idDoctor){
-        return ResponseEntity.ok(
-                listAppointmentsUseCase.listByDoctorId(idDoctor).stream().map(citaDtoMapper::toResponse).toList()
-        );
-    }
-
-
 
     // Crear cita
     @PostMapping
-    public ResponseEntity<AppointmentResponse> scheduleAppointment(
+    public ResponseEntity<Void> scheduleAppointment(
             @RequestBody @Valid AppointmentRequest request) {
 
         Appointment appointment = switch (request.getSchedulingOrigin()) {
 
             // Agendador manual, el paciente no tiene cuenta
-            case WHATSAPP -> scheduleManualAppointmentUseCase.scheduleManual(
+            case MANUAL -> scheduleManualAppointmentUseCase.scheduleManual(
                     citaDtoMapper.toPatientInfo(request),
                     request.getDoctorId(),
                     request.getSpecialty(),
@@ -105,7 +83,7 @@ public class AppointmentController {
             );
 
             // Paciente agenda por la web, ya tiene cuenta en el sistema
-            case WEB -> scheduleAutonomousAppointmentUseCase.scheduleAutonomous(
+            case AUTONOMO -> scheduleAutonomousAppointmentUseCase.scheduleAutonomous(
                     request.getPatientId(),
                     request.getDoctorId(),
                     request.getSpecialty(),
@@ -114,10 +92,18 @@ public class AppointmentController {
             );
         };
 
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(citaDtoMapper.toResponse(appointment));
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-
+    // Listar un médico por defecto para cada especialidad
+    @GetMapping("/specialties-with-doctor")
+    public ResponseEntity<List<SpecialtyDoctorResponse>> getSpecialtiesWithDoctor() {
+        try {
+            List<SpecialtyDoctorResponse> response =
+                    getAvailableDoctorsBySpecialtyUseCase.getSpecialtiesWithDoctor();
+            return ResponseEntity.ok(response);
+        } catch (NoDoctorsAvailableException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage());
+        }
+    }
 }
