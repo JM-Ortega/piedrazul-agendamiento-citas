@@ -40,6 +40,9 @@ export class NewAppointmentSchedulerComponent {
   step = signal(1);
   isLoading = signal(false);
   errorMessage = signal('');
+  errorMessageSpecialty = signal('');
+  errorMessageDoctors = signal('');
+  errorMessageSlots = signal('');
 
   // Errores de validación
   docTypeError = signal(false);
@@ -51,6 +54,8 @@ export class NewAppointmentSchedulerComponent {
   birthDateError = signal(false);
   emailError = signal(false);
   guardianPhoneError = signal(false);
+  noSlotsAvailable = signal(false);
+  specialtyError = signal(false);
 
   // Paciente
   documentId = signal('');
@@ -156,6 +161,7 @@ export class NewAppointmentSchedulerComponent {
 
   // Búsqueda de paciente 
   searchPatient(): void {
+    this.foundPatient.set(null);
     this.documentError.set(false);
     this.errorMessage.set('');
 
@@ -170,8 +176,8 @@ export class NewAppointmentSchedulerComponent {
         this.notFound.set(!patient);
         if (!patient) {
           this.patientForm.update(f => ({ ...f, documentId: this.documentId() }));
+          this.goToSpecialtyStep();
         }
-        this.loadSpecialtys();
       },
       error: (err) => {
         switch(err.status){
@@ -191,48 +197,83 @@ export class NewAppointmentSchedulerComponent {
   }
 
   goToSpecialtyStep(): void {
-    // Caso 1: ya tenemos patientId (paciente previamente registrado)
-    if (this.patientId()) { this._enterStep2(); return; }
-
-    // Caso 2: paciente encontrado en el backend
+    // Caso 1: paciente encontrado en el backend
     if (this.foundPatient()) {
       this.patientId.set(this.foundPatient()!.id);
-      this._enterStep2(); return;
+      this._enterStep2(); 
+      return;
     }
  
-    // Validar formulario nuevo paciente
+    //caso 2: no se encontró, validar formulario del nuevo paciente
     if (!this._validatePatientForm()) return;
-    const f = this.patientForm();
-    this.isLoading.set(true);
-    this.service.addPatient({
-      ...f,
-      documentId: this.documentId(),
-      birthDate: f.birthDate || undefined,
-      email:     f.email     || undefined
-    }).subscribe({
-      next: (id) => { this.isLoading.set(false); this.patientId.set(id); this._enterStep2(); this.loadSpecialtys()},
-      error: ()  => { this.isLoading.set(false); this.errorMessage.set('No se pudo registrar el paciente.'); }
-    });
-  }
-
-  loadSpecialtys():void{
-    if (this.bookingMode() === 'specialty') {
-      this.service.getSpecialtiesWithDoctor().subscribe({
-        next: data => this.specialtiesWithDoctor.set(data),
-        error: () => this.noSpecialtyAvailable.set(true)
-      });
-    }
+    this._enterStep2(); 
   }
 
   private _enterStep2(): void {
-    if (this.bookingMode() === 'specialty-doctor') {
-      this.service.getSpecialties().subscribe(specs =>
-        this.specialtiesWithDoctor.set(
-          specs.map(s => ({ specialty: s, doctorId: '', doctorName: '', fechaFinalTrabajo: null, workDays: [] }))
-        )
-      );
-    }
     this.step.set(2);
+    if (this.bookingMode() === 'specialty-doctor') {
+        this.loadSpecialties();
+      }else{
+        this.loadSpecialtysWhitDoctor();
+      }
+    }
+
+    loadSpecialties(): void {
+      this.service.getSpecialties().subscribe({
+      next: (specs) => {
+        if (!specs || specs.length === 0) {
+          this.noSpecialtyAvailable.set(true);
+          this.errorMessageSpecialty.set('⚠️ No hay especialidades disponibles.');
+          return;
+        }
+
+        this.specialtiesWithDoctor.set(
+          specs.map(s => ({
+            specialty: s,
+            doctorId: '',
+            doctorName: '',
+            fechaFinalTrabajo: null,
+            workDays: []
+          }))
+        );
+      },
+      error: (err) => {
+        this.noSpecialtyAvailable.set(true);
+
+        switch(err.status){
+          case 404:
+            this.errorMessageSpecialty.set('⚠️ No hay médicos disponibles para ninguna especialidad. Intente más tarde.');
+            break;
+          case 0:
+            this.errorMessageSpecialty.set('No se pudo conectar con el servidor. Intente mas tarde');
+            break;
+          default:
+            this.errorMessageSpecialty.set('Error al obtener especialidades');
+        }
+      }
+    });
+  }
+
+  loadSpecialtysWhitDoctor():void{
+    if (this.bookingMode() === 'specialty') {
+      this.service.getSpecialtiesWithDoctor().subscribe({
+        next: data => this.specialtiesWithDoctor.set(data),
+        error: (err) => { 
+          this.noSpecialtyAvailable.set(true);
+          switch(err.status){
+            case 404:
+              this.errorMessageSpecialty.set('⚠️ No hay médicos disponibles para ninguna especialidad. Intente más tarde.');
+              break;
+            case 0:
+              this.errorMessageSpecialty.set('No se pudo conectar con el servidor. Intente mas tarde');
+              break;
+            default:
+              this.errorMessageSpecialty.set('Error al obtener las especialidades');
+            break;
+          }
+        } 
+      });
+    }
   }
 
   private _validatePatientForm(): boolean {
@@ -276,7 +317,20 @@ export class NewAppointmentSchedulerComponent {
           this.doctorsBySpecialty.set(docs);
           this.noDoctorsFound.set(docs.length === 0);
         },
-        error: () => this.noDoctorsFound.set(true)
+        error: (err) => {
+          this.noDoctorsFound.set(true)
+          switch (err.status) {
+            case 404:
+              this.errorMessageDoctors.set('⚠️ No hay médicos disponibles para esta especialidad.');
+              break;
+            case 0:
+              this.errorMessageDoctors.set('No se pudo conectar con el servidor. Intente más tarde.');
+              break;
+            default:
+              this.errorMessageDoctors.set('Error al obtener los médicos.');
+              break;
+          }
+        }
       });
     }
   }
@@ -309,12 +363,39 @@ export class NewAppointmentSchedulerComponent {
     this.selectedDate.set(date);
     this.selectedTime.set('');
     this.availableSlots.set([]);
+    this.errorMessageSlots.set('');
+    this.noSlotsAvailable.set(false);
 
     if (!date) return;
 
     const dateStr = date.toISOString().slice(0, 10);
     this.service.getAvailableSlots(this.effectiveDoctorId(), dateStr)
-      .subscribe(slots => this.availableSlots.set(slots));
+      .subscribe({
+        next: (slots) => {
+          this.availableSlots.set(slots);
+
+          if (slots.length === 0) {
+            this.noSlotsAvailable.set(true);
+            this.errorMessageSlots.set('⚠️ No hay horarios disponibles para esta fecha.');
+          }
+        },
+        error: (err) =>{
+          this.availableSlots.set([]);
+          this.noSlotsAvailable.set(true);
+
+          switch (err.status) {
+            case 404:
+              this.errorMessageSlots.set('⚠️ No hay horarios disponibles para esta fecha.');
+              break;
+            case 0:
+              this.errorMessageSlots.set('No se pudo conectar con el servidor. Intente más tarde.');
+              break;
+            default:
+              this.errorMessageSlots.set('Error al obtener los horarios.');
+              break;
+          }
+        }
+      });
   }
 
   // Confirmación
@@ -352,11 +433,17 @@ export class NewAppointmentSchedulerComponent {
       },
       error: (err) => {
         this.isLoading.set(false);
-        this.errorMessage.set(
-          err.status === 409
-            ? 'El horario ya fue tomado por otro usuario.'
-            : 'Ocurrió un error al registrar la cita.'
-        );
+        switch (err.status) {
+          case 0:
+            this.errorMessage.set('No se pudo conectar con el servidor. Intente más tarde.');
+            break;
+          case 409:
+            this.errorMessage.set('⚠️ El horario ya fue tomado por otro usuario.');
+            break;
+          default:
+            this.errorMessage.set('Ocurrió un error al registrar la cita.');
+            break;
+        }
       }
     });
   }
