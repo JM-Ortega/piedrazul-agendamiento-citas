@@ -11,7 +11,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientC
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientRegistryPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.BusySlotService;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.service.DoctorAvailabilityService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
@@ -47,11 +46,6 @@ public class AppointmentConfig {
     public AppointmentService appointmentService(BusySlotService busySlotService,
                                                  SlotTimeService slotTimeService) {
         return new AppointmentService(busySlotService, slotTimeService);
-    }
-
-    @Bean
-    public DoctorAvailabilityService doctorAvailabilityService(BusySlotService busySlotService){
-        return new DoctorAvailabilityService(busySlotService);
     }
 
     // --- CASOS DE USO (PUERTOS DE ENTRADA) ---
@@ -101,19 +95,6 @@ public class AppointmentConfig {
                 appointmentRepository,
                 doctorConfigConsultPort,
                 appointmentService
-        );
-    }
-
-    @Bean
-    public GetAvailableDoctorsBySpecialtyUseCaseImpl getAvailableDoctorsBySpecialtyUseCase(
-            DoctorConfigConsultPort doctorConfigConsultPort,
-            AppointmentRepository appointmentRepository,
-            DoctorAvailabilityService doctorAvailabilityService
-    ){
-        return new GetAvailableDoctorsBySpecialtyUseCaseImpl(
-                doctorConfigConsultPort,
-                appointmentRepository,
-                doctorAvailabilityService
         );
     }
 }

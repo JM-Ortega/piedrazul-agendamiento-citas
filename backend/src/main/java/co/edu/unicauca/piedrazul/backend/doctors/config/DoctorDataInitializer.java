@@ -34,6 +34,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
         doctor1.setIdentification("DOC-001");
         doctor1.setSpecialty(List.of(Specialty.TERAPIA_NEURAL));
         doctor1.setStatus(true);
+        doctor1.setLaborStart(LocalDate.of(2026, 1, 1));
         doctor1.setLaborEnd(LocalDate.of(2026, 12, 31));
         doctor1.setAppointmentInterval(5);
 
@@ -44,6 +45,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
         doctor2.setIdentification("DOC-002");
         doctor2.setSpecialty(List.of(Specialty.FISIOTERAPIA));
         doctor2.setStatus(true);
+        doctor1.setLaborStart(LocalDate.of(2026, 1, 1));
         doctor2.setLaborEnd(LocalDate.of(2026, 12, 31));
         doctor2.setAppointmentInterval(10);
 
@@ -54,6 +56,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
         doctor3.setIdentification("DOC-003");
         doctor3.setSpecialty(List.of(Specialty.QUIROPRAXIA));
         doctor3.setStatus(true);
+        doctor1.setLaborStart(LocalDate.of(2026, 1, 1));
         doctor3.setLaborEnd(LocalDate.of(2026, 12, 31));
         doctor3.setAppointmentInterval(15);
 

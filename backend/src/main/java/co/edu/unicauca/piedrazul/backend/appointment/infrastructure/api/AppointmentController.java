@@ -1,19 +1,16 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.NoDoctorsAvailableException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentResponse;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.SpecialtyDoctorResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.CitaDtoMapper;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -26,7 +23,6 @@ public class AppointmentController {
     private final ScheduleManualAppointmentUseCase scheduleManualAppointmentUseCase;
     private final ScheduleAutonomousAppointmentUseCase scheduleAutonomousAppointmentUseCase;
     private final ListAppointmentsUseCase listAppointmentsUseCase;
-    private final GetAvailableDoctorsBySpecialtyUseCase getAvailableDoctorsBySpecialtyUseCase;
     private final CitaDtoMapper citaDtoMapper;
 
     public AppointmentController(
@@ -34,13 +30,11 @@ public class AppointmentController {
             ScheduleManualAppointmentUseCase scheduleManualAppointmentUseCase,
             ScheduleAutonomousAppointmentUseCase scheduleAutonomousAppointmentUseCase,
             ListAppointmentsUseCase listAppointmentsUseCase,
-            GetAvailableDoctorsBySpecialtyUseCase getAvailableDoctorsBySpecialtyUseCase,
             CitaDtoMapper citaDtoMapper) {
         this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
         this.scheduleManualAppointmentUseCase = scheduleManualAppointmentUseCase;
         this.scheduleAutonomousAppointmentUseCase = scheduleAutonomousAppointmentUseCase;
         this.listAppointmentsUseCase = listAppointmentsUseCase;
-        this.getAvailableDoctorsBySpecialtyUseCase = getAvailableDoctorsBySpecialtyUseCase;
         this.citaDtoMapper = citaDtoMapper;
     }
 
@@ -96,14 +90,4 @@ public class AppointmentController {
     }
 
     // Listar un médico por defecto para cada especialidad
-    @GetMapping("/specialties-with-doctor")
-    public ResponseEntity<List<SpecialtyDoctorResponse>> getSpecialtiesWithDoctor() {
-        try {
-            List<SpecialtyDoctorResponse> response =
-                    getAvailableDoctorsBySpecialtyUseCase.getSpecialtiesWithDoctor();
-            return ResponseEntity.ok(response);
-        } catch (NoDoctorsAvailableException ex) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage());
-        }
-    }
 }
