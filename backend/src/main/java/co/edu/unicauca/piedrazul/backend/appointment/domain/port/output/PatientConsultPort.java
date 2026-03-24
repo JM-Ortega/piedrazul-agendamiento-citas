@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.domain.port.output;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientSnapshot;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.PatientRegistrationData;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -12,4 +13,5 @@ public interface PatientConsultPort {
 
     Optional<PatientSnapshot> findByDocumentNumber(String documentNumber);
 
+    UUID createPatient(PatientRegistrationData data);
 }

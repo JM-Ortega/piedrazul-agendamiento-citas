@@ -9,7 +9,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ScheduleM
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientRegistryPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.BusySlotService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
@@ -62,14 +61,12 @@ public class AppointmentConfig {
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService,
-            PatientConsultPort patientConsultPort,
-            PatientRegistryPort patientRegistryPort) {
+            PatientConsultPort patientConsultPort) {
         return new ScheduleManualAppointmentUseCaseImpl(
                 appointmentRepository,
                 doctorConfigConsultPort,
                 appointmentService,
-                patientConsultPort,
-                patientRegistryPort
+                patientConsultPort
         );
     }
 
