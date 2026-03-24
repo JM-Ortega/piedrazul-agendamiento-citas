@@ -118,10 +118,10 @@ export class NewAppointmentSchedulerComponent {
   readonly dateFilter = computed(() => {
     const doctor = this.effectiveDoctor();
     if (!doctor) return () => false;
-    return this.calendarService.buildDateFilter(doctor);
+    return this.calendarService.buildDateFilter(doctor, true);
   });
 
-  readonly minDate = computed(() => this.calendarService.getMinDate());
+  readonly minDate = computed(() => this.calendarService.getMinDate(true));
 
   readonly maxDate = computed(() => {
     const doctor = this.effectiveDoctor();
@@ -397,6 +397,12 @@ export class NewAppointmentSchedulerComponent {
     this.service.getAvailableSlots(this.effectiveDoctorId(), dateStr)
       .subscribe({
         next: (slots) => {
+          const today = new Date().toISOString().slice(0, 10);
+          if (dateStr === today) {
+            const horaMx = new Date(Date.now() + 10 * 60 * 1000);
+            const horaMxStr = `${String(horaMx.getHours()).padStart(2, '0')}:${String(horaMx.getMinutes()).padStart(2, '0')}`;
+            slots = slots.filter(s => s >= horaMxStr);
+          }
           this.availableSlots.set(slots);
 
           if (slots.length === 0) {
