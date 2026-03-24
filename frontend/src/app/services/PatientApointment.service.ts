@@ -11,8 +11,11 @@ export class PatientAppointmentService {
   readonly appointments = signal<AppointmentsPatient[]>([]);
 
   getAppointmentsByPatient(patientId: string): Observable<AppointmentsPatient[]> {
-    return this.http.get<AppointmentsPatient[]>(
-    `${this.apiUrl}/appointments/${patientId}`
-    );
-  }
+  return this.http.get<AppointmentsPatient[]>(
+    `${this.apiUrl}/appointments`,
+    {
+      params: { idPatient: patientId }
+    }
+  );
+}
 }
