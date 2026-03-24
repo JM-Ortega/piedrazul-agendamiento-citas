@@ -18,6 +18,7 @@ import {
   Settings,
   Stethoscope,
   User,
+  Users,
   X,
 } from 'lucide-angular';
 import { AppService } from '../../services/app.service';
@@ -39,6 +40,7 @@ export class NavbarComponent implements OnInit {
   readonly Stethoscope = Stethoscope;
   readonly Settings = Settings;
   readonly User = User;
+  readonly Users = Users;
   readonly LogOut = LogOut;
   readonly Hospital = Hospital;
   readonly Menu = Menu;
@@ -65,7 +67,6 @@ export class NavbarComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    // Empuja un estado inicial para poder detectar el retroceso
     history.pushState(null, '', location.href);
 
     this.router.events.subscribe((event) => {
@@ -74,7 +75,6 @@ export class NavbarComponent implements OnInit {
         event.navigationTrigger === 'popstate' &&
         this.appService.currentRole()
       ) {
-        // Cancela el retroceso y muestra el modal
         history.pushState(null, '', location.href);
         this.showLogoutModal.set(true);
       }

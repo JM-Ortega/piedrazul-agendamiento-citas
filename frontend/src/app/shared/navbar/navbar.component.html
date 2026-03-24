@@ -66,6 +66,7 @@
         </a>
       }
 
+      <!-- Usuario logueado -->
       @if (appService.currentRole()) {
         <div class="flex items-center gap-3 ml-4 pl-4 border-l border-blue-500">
           <div class="flex items-center gap-2">
@@ -82,6 +83,17 @@
             Salir
           </button>
         </div>
+      }
+
+      <!-- Sin sesión: botón Otros usuarios -->
+      @if (!appService.currentRole()) {
+        <a
+          routerLink="/acceso"
+          class="flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-white/40 hover:bg-white/10 text-white transition-all text-base"
+        >
+          <lucide-angular [img]="Users" [size]="18"></lucide-angular>
+          Otros usuarios
+        </a>
       }
     </nav>
 
@@ -131,6 +143,18 @@
         </a>
       }
 
+      <!-- Sin sesión móvil: Otros usuarios -->
+      @if (!appService.currentRole()) {
+        <a
+          routerLink="/acceso"
+          (click)="menuOpen.set(false)"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+        >
+          <lucide-angular [img]="Users" [size]="20"></lucide-angular>
+          Otros usuarios
+        </a>
+      }
+
       @if (appService.currentRole()) {
         <button
           (click)="openLogoutModal()"
@@ -144,7 +168,7 @@
   }
 </header>
 
-<!-- Logout Confirmation Modal -->
+<!-- Modal Cerrar Sesión -->
 @if (showLogoutModal()) {
   <div
     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
@@ -162,13 +186,10 @@
             class="text-red-600"
           ></lucide-angular>
         </div>
-
         <h2 class="text-2xl font-bold text-gray-800 mb-3">¿Cerrar Sesión?</h2>
-
         <p class="text-gray-600 text-lg mb-8">
           ¿Está seguro que desea salir de su cuenta?
         </p>
-
         <div class="flex flex-col-reverse sm:flex-row gap-3 w-full">
           <button
             (click)="cancelLogout()"
