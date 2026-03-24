@@ -81,7 +81,13 @@ export class SchedulerDashboardComponent implements OnInit {
     }
 
     return [...filtered].sort((a, b) =>
-      a.date === b.date ? (a.time > b.time ? 1 : -1) : a.date > b.date ? 1 : -1,
+      a.date === b.date
+        ? a.startTime > b.startTime
+          ? 1
+          : -1
+        : a.date > b.date
+          ? 1
+          : -1,
     );
   });
 

@@ -1,7 +1,7 @@
 export interface dtoAppointment {
-  id: string;
+  idAppointment: string;
   date: string;
-  time: string;
+  startTime: string;
   appointmentState:
     | 'AGENDADA'
     | 'ATENDIDA'
@@ -9,7 +9,7 @@ export interface dtoAppointment {
     | 'NO_ASISTIO'
     | 'REPROGRAMADA';
   doctorName: string;
-  doctorSpecialty: string;
+  specialty: string;
   patientFirstName: string;
   patientLastName: string;
   patientDocument: string;

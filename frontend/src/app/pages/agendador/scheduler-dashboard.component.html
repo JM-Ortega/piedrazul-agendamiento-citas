@@ -333,7 +333,11 @@
                 </tr>
               </thead>
               <tbody>
-                @for (apt of results(); track apt.id; let idx = $index) {
+                @for (
+                  apt of results();
+                  track apt.idAppointment;
+                  let idx = $index
+                ) {
                   <tr
                     class="border-b border-gray-100"
                     [class]="
@@ -365,7 +369,7 @@
                           class="text-blue-400 shrink-0"
                         ></lucide-angular>
                         <span class="text-blue-800 text-lg font-semibold">{{
-                          apt.time
+                          apt.startTime
                         }}</span>
                       </div>
                     </td>
@@ -395,7 +399,7 @@
                         {{ apt.doctorName }}
                       </p>
                       <p class="text-gray-400 text-sm">
-                        {{ apt.doctorSpecialty }}
+                        {{ apt.specialty }}
                       </p>
                     </td>
                     <td class="px-4 py-4">
