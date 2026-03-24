@@ -93,10 +93,10 @@ export class NewAppointmentSchedulerComponent {
   readonly effectiveDoctor = computed<SpecialtyDoctor | null>(() =>
     this.bookingMode() === 'specialty'
       ? this.assignedDoctor()
-      : (this.doctorsBySpecialty().find(d => d.doctorId === this.selectedDoctorId()) ?? null)
+      : (this.doctorsBySpecialty().find(d => d.id === this.selectedDoctorId()) ?? null)
   );
 
-  readonly effectiveDoctorId = computed(() => this.effectiveDoctor()?.doctorId ?? '');
+  readonly effectiveDoctorId = computed(() => this.effectiveDoctor()?.id ?? '');
 
   // Calendario
   selectedDate   = signal<Date | null>(null);
@@ -153,7 +153,7 @@ export class NewAppointmentSchedulerComponent {
 
   readonly confirmDoctorName = computed(() =>
     this.bookingMode() === 'specialty'
-      ? (this.assignedDoctor()?.doctorName ?? '')
+      ? (this.assignedDoctor()?.name ?? '')
       : this.selectedDoctorName()
   );
 
@@ -176,8 +176,8 @@ export class NewAppointmentSchedulerComponent {
     this.documentError.set(false);
     this.errorMessage.set('');
 
-    if (!/^[0-9]+$/.test(this.documentId())) {
-      this.errorMessage.set('El número de documento debe contener solo números');
+    if (!/^[0-9]{6,12}$/.test(this.documentId())) {
+      this.errorMessage.set('El número de documento solo debe contener entre 6 y 12 números');
       return;
     }
 
@@ -242,10 +242,10 @@ export class NewAppointmentSchedulerComponent {
         this.specialtiesWithDoctor.set(
           specs.map(s => ({
             specialty: s,
-            doctorId: '',
-            doctorName: '',
-            fechaFinalTrabajo: null,
-            workDays: []
+            id: '',
+            name: '',
+            laborEnd: null,
+            workdays: []
           }))
         );
       },
@@ -349,8 +349,8 @@ export class NewAppointmentSchedulerComponent {
 
   onDoctorChange(doctorId: string): void {
     this.selectedDoctorId.set(doctorId);
-    const doc = this.doctorsBySpecialty().find(d => d.doctorId === doctorId);
-    this.selectedDoctorName.set(doc?.doctorName ?? '');
+    const doc = this.doctorsBySpecialty().find(d => d.id === doctorId);
+    this.selectedDoctorName.set(doc?.name ?? '');
   }
 
   onDocumentChange(value: string): void {
@@ -436,23 +436,36 @@ export class NewAppointmentSchedulerComponent {
  
     const f = this.patientForm();
 
-    const data: NewAppointment = {
-      doctorId:  this.effectiveDoctorId(),
+    const baseData = {
+      doctorId: this.effectiveDoctorId(),
       specialty: this.selectedSpecialty(),
-      date:      date.toISOString().slice(0, 10),
-      time:      this.selectedTime(),
-      schedulingOrigin: 'MANUAL',
-      patientId: this.patientId() || undefined,
-      documentType: f.documentType,
-      documentNumber: f.documentNumber,
-      firstName: f.firstName,
-      lastName: f.lastName,
-      phone: f.phone,
-      gender: f.gender,
-      birthDate: f.birthDate,
-      email: f.email || undefined,
-      guardianPhone: f.guardianPhone || undefined
+      documentType: this.confirmDocumentType(),
+      documentNumber: this.confirmDocument(),
+      firstName: this.confirmFirstName(),
+      lastName: this.confirmLastName(),
+      phone: this.confirmPhone(),
+      date: date.toISOString().slice(0, 10),
+      startTime: this.selectedTime(),
+      schedulingOrigin: 'MANUAL' as const,
+      gender: this.confirmGender(),
+      birthDate: this.confirmBirthDate()
+
     };
+
+    let data: NewAppointment;
+
+    if (this.patientId()) {
+      data = {
+        ...baseData,
+        patientId: this.patientId() || undefined
+      };
+    } else {
+      data = {
+        ...baseData,
+        email: f.email || undefined,
+        guardianPhone: f.guardianPhone || undefined
+      };
+    }
  
     this.service.addAppointment(data).subscribe({
       next: () => {
