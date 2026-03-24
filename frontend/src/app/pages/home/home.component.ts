@@ -3,13 +3,10 @@ import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   Calendar,
-  ClipboardCheck,
   Clock,
   LucideAngularModule,
   Phone,
-  Settings,
   Shield,
-  Stethoscope,
 } from 'lucide-angular';
 import { AppService } from '../../services/app.service';
 
@@ -24,77 +21,41 @@ export class HomeComponent {
   private router = inject(Router);
 
   readonly Calendar = Calendar;
-  readonly ClipboardCheck = ClipboardCheck;
-  readonly Stethoscope = Stethoscope;
-  readonly Settings = Settings;
   readonly Clock = Clock;
   readonly Shield = Shield;
   readonly Phone = Phone;
 
-  showModal = signal<'patient' | 'scheduler' | 'admin' | 'doctor' | null>(null);
+  showModal = signal(false);
   email = signal('');
   password = signal('');
-  schedulerPass = signal('');
-  adminPass = signal('');
-  doctorEmail = signal('');
-  doctorPass = signal('');
   error = signal('');
 
-  openModal(type: 'patient' | 'scheduler' | 'admin' | 'doctor'): void {
-    this.closeAll();
-    this.showModal.set(type);
+  openModal(): void {
+    this.showModal.set(true);
+    this.error.set('');
   }
 
-  closeAll(): void {
-    this.showModal.set(null);
+  closeModal(): void {
+    this.showModal.set(false);
     this.error.set('');
     this.email.set('');
     this.password.set('');
-    this.schedulerPass.set('');
-    this.adminPass.set('');
-    this.doctorEmail.set('');
-    this.doctorPass.set('');
   }
 
   loginPatient(): void {
     if (this.appService.login(this.email(), this.password())) {
-      //Si el servicio acepta el ingreso del doctor, se debe tener un componente para que vaya a esa ruta /admin
       this.router.navigate(['/paciente']);
     } else {
       this.error.set('Correo o contraseña incorrectos');
     }
   }
 
-  loginScheduler(): void {
-    if (this.appService.loginAsScheduler(this.schedulerPass())) {
-      //si el servicio acepta el ingreso, se navega hasta el componente /agendador
-      this.router.navigate(['/agendador']);
-    } else {
-      this.error.set('Contraseña incorrecta');
-    }
-  }
-
-  loginAdmin(): void {
-    if (this.appService.loginAsAdmin(this.adminPass())) {
-      //Si el servicio acepta el ingreso del doctor, se debe tener un componente para que vaya a esa ruta /admin
-      this.router.navigate(['/admin']);
-    } else {
-      this.error.set('Contraseña incorrecta');
-    }
-  }
-
-  loginDoctor(): void {
-    if (this.appService.loginAsDoctor(this.doctorEmail(), this.doctorPass())) {
-      //Si el servicio acepta el ingreso del doctor, se debe tener un componente para que vaya a esa ruta /medico
-      this.router.navigate(['/medico']);
-    } else {
-      this.error.set('Correo o contraseña incorrectos');
-    }
-  }
-
   goRegister(): void {
-    this.closeAll();
-    //La idea es que se cree un componente para el registro y la ruta sea '/paciente/registro'
+    this.closeModal();
     this.router.navigate(['/paciente/registro']);
+  }
+
+  goAcceso(): void {
+    this.router.navigate(['/acceso']);
   }
 }

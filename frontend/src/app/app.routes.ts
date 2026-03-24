@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { AuthGuard } from './guards/auth.guard';
 
+import { AccesoComponent } from './pages/acceso/acceso.component';
 import { AdminConfigComponent } from './pages/admin/admin-config.component';
 import { SchedulerDashboardComponent } from './pages/agendador/scheduler-dashboard.component';
 import { HomeComponent } from './pages/home/home.component';
@@ -10,7 +11,13 @@ import { PatientDashboardComponent } from './pages/paciente/patient-dashboard.co
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
-  { path: 'agendador', component: SchedulerDashboardComponent },
+  { path: 'acceso', component: AccesoComponent },
+  {
+    path: 'agendador',
+    component: SchedulerDashboardComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'scheduler' },
+  },
   {
     path: 'agendador/nueva',
     component: NewAppointmentSchedulerComponent,

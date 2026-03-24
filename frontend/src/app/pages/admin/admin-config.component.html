@@ -41,7 +41,7 @@
     <!-- Doctors -->
     <div class="bg-white rounded-2xl shadow-md p-7">
       <h2 class="text-blue-800 text-2xl mb-6 flex items-center gap-2">
-        <lucide-icon [img]="Edit3" [size]="24"></lucide-icon>
+        <lucide-icon [img]="Pencil" [size]="24"></lucide-icon>
         Configuración de Médicos y Terapistas
       </h2>
 
@@ -119,7 +119,7 @@
                       : ''
                   "
                 >
-                  <lucide-icon [img]="Edit3" [size]="18"></lucide-icon>
+                  <lucide-icon [img]="Pencil" [size]="18"></lucide-icon>
                   Editar
                 </button>
               } @else {
@@ -267,9 +267,16 @@
                         "
                         class="w-full border-2 focus:border-purple-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
                         [class]="
-                          errorFechas() ? 'border-red-400' : 'border-purple-200'
+                          errorFechas() || errorFechaInicio()
+                            ? 'border-red-400'
+                            : 'border-purple-200'
                         "
                       />
+                      @if (errorFechaInicio()) {
+                        <p class="text-red-500 text-sm mt-1">
+                          ⚠️ {{ errorFechaInicio() }}
+                        </p>
+                      }
                     </div>
                     <div>
                       <label class="block text-gray-700 mb-1 text-base"
@@ -283,9 +290,16 @@
                         "
                         class="w-full border-2 focus:border-purple-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
                         [class]="
-                          errorFechas() ? 'border-red-400' : 'border-purple-200'
+                          errorFechas() || errorFechaFin()
+                            ? 'border-red-400'
+                            : 'border-purple-200'
                         "
                       />
+                      @if (errorFechaFin()) {
+                        <p class="text-red-500 text-sm mt-1">
+                          ⚠️ {{ errorFechaFin() }}
+                        </p>
+                      }
                     </div>
                   </div>
                   @if (errorFechas()) {
@@ -310,42 +324,63 @@
                   <div
                     class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
                   >
+                    <!-- Hora Inicio (por defecto) -->
                     <div>
                       <label class="block text-gray-700 mb-1 text-base"
                         >Hora Inicio (por defecto)</label
                       >
-                      <input
-                        type="time"
+                      <select
                         [value]="editForm()!.startTime"
                         (change)="
                           updateField('startTime', $any($event.target).value)
                         "
-                        class="w-full border-2 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                        class="w-full border-2 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors bg-white"
                         [class]="
                           errorHorarioGlobal()
                             ? 'border-red-400'
                             : 'border-blue-200'
                         "
-                      />
+                      >
+                        @for (t of timeOptions; track t) {
+                          <option
+                            [value]="t"
+                            [selected]="editForm()!.startTime === t"
+                          >
+                            {{ t }}
+                          </option>
+                        }
+                      </select>
                     </div>
+
+                    <!-- Hora Fin (por defecto) -->
                     <div>
                       <label class="block text-gray-700 mb-1 text-base"
                         >Hora Fin (por defecto)</label
                       >
-                      <input
-                        type="time"
+                      <select
                         [value]="editForm()!.endTime"
                         (change)="
                           updateField('endTime', $any($event.target).value)
                         "
-                        class="w-full border-2 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                        class="w-full border-2 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors bg-white"
                         [class]="
                           errorHorarioGlobal()
                             ? 'border-red-400'
                             : 'border-blue-200'
                         "
-                      />
+                      >
+                        @for (t of timeOptions; track t) {
+                          <option
+                            [value]="t"
+                            [selected]="editForm()!.endTime === t"
+                          >
+                            {{ t }}
+                          </option>
+                        }
+                      </select>
                     </div>
+
+                    <!-- Intervalo -->
                     <div>
                       <label class="block text-gray-700 mb-1 text-base"
                         >Intervalo (min)</label
@@ -362,8 +397,18 @@
                             +$any($event.target).value
                           )
                         "
-                        class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                        class="w-full border-2 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                        [class]="
+                          errorIntervalo()
+                            ? 'border-red-400'
+                            : 'border-blue-200'
+                        "
                       />
+                      @if (errorIntervalo()) {
+                        <p class="text-red-500 text-sm mt-1">
+                          ⚠️ {{ errorIntervalo() }}
+                        </p>
+                      }
                     </div>
                   </div>
                   @if (errorHorarioGlobal()) {
@@ -395,6 +440,11 @@
                       </button>
                     }
                   </div>
+                  @if (errorDias()) {
+                    <p class="text-red-500 text-sm mt-2">
+                      ⚠️ {{ errorDias() }}
+                    </p>
+                  }
                 </div>
 
                 <!-- Sección: Horarios por día -->
@@ -476,13 +526,13 @@
                                 <div
                                   class="flex flex-1 flex-wrap gap-3 items-end"
                                 >
+                                  <!-- Hora Inicio por día -->
                                   <div class="flex-1 min-w-[130px]">
                                     <label
                                       class="block text-gray-600 text-sm mb-1"
                                       >Hora Inicio</label
                                     >
-                                    <input
-                                      type="time"
+                                    <select
                                       [value]="
                                         getDayScheduleValue(day, 'startTime')
                                       "
@@ -499,15 +549,30 @@
                                           ? 'border-red-400'
                                           : 'border-blue-200'
                                       "
-                                    />
+                                    >
+                                      @for (t of timeOptions; track t) {
+                                        <option
+                                          [value]="t"
+                                          [selected]="
+                                            getDayScheduleValue(
+                                              day,
+                                              'startTime'
+                                            ) === t
+                                          "
+                                        >
+                                          {{ t }}
+                                        </option>
+                                      }
+                                    </select>
                                   </div>
+
+                                  <!-- Hora Fin por día -->
                                   <div class="flex-1 min-w-[130px]">
                                     <label
                                       class="block text-gray-600 text-sm mb-1"
                                       >Hora Fin</label
                                     >
-                                    <input
-                                      type="time"
+                                    <select
                                       [value]="
                                         getDayScheduleValue(day, 'endTime')
                                       "
@@ -524,8 +589,23 @@
                                           ? 'border-red-400'
                                           : 'border-blue-200'
                                       "
-                                    />
+                                    >
+                                      @for (t of timeOptions; track t) {
+                                        <option
+                                          [value]="t"
+                                          [selected]="
+                                            getDayScheduleValue(
+                                              day,
+                                              'endTime'
+                                            ) === t
+                                          "
+                                        >
+                                          {{ t }}
+                                        </option>
+                                      }
+                                    </select>
                                   </div>
+
                                   @if (hasDayOverride(day)) {
                                     <button
                                       (click)="resetDaySchedule(day)"
