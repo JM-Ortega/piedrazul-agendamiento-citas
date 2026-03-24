@@ -4,6 +4,18 @@ import { UserRole } from '../models/user.model';
 
 @Injectable({ providedIn: 'root' })
 export class AppService {
+  private _currentPatient = signal<Patient | null>({
+    id: '6d7d17f0-6a3e-43d2-83da-e57849a79266',
+    documentType: 'CEDULA',
+    documentNumber: '12345678',
+    firstName: 'Maria',
+    lastName: 'Lopez',
+    phone: '3001234567',
+    gender: 'FEMENINO',
+    birthDate: '1990-05-15',
+    email: 'maria.lopez@email.com'
+  });
+  readonly currentPatient = computed(() => this._currentPatient());
   private _currentUser = signal<Patient | null>(null);
   private _currentRole = signal<UserRole>(null);
 
@@ -12,6 +24,10 @@ export class AppService {
 
   login(email: string, password: string): boolean {
     //funcionalidad de login de paciente, conectar con back
+    if (password === 'patient123' && email === 'maria.lopez@email.com') {
+      this._currentRole.set('patient');
+      return true;
+    }
     return false;
   }
 
