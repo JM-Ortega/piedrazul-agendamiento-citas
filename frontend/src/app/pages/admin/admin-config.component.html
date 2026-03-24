@@ -29,6 +29,15 @@
       </div>
     </div>
 
+    <!-- Error de carga -->
+    @if (errorCarga()) {
+      <div
+        class="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-4 text-base"
+      >
+        ⚠️ {{ errorCarga() }}
+      </div>
+    }
+
     <!-- Doctors -->
     <div class="bg-white rounded-2xl shadow-md p-7">
       <h2 class="text-blue-800 text-2xl mb-6 flex items-center gap-2">
@@ -36,14 +45,22 @@
         Configuración de Médicos y Terapistas
       </h2>
 
+      @if (loading()) {
+        <div class="text-center text-gray-400 text-lg py-10">
+          Cargando médicos...
+        </div>
+      }
+
       <div class="space-y-4">
         @for (doctor of doctors(); track doctor.id) {
           <div
             class="border-2 rounded-2xl transition-all"
             [class]="
-              editingId() === doctor.id
-                ? 'border-blue-400 bg-blue-50'
-                : 'border-gray-100 bg-white'
+              doctor.status === false
+                ? 'border-gray-200 bg-gray-50 opacity-60'
+                : editingId() === doctor.id
+                  ? 'border-blue-400 bg-blue-50'
+                  : 'border-gray-100 bg-white'
             "
           >
             <!-- Doctor Header -->
@@ -52,16 +69,30 @@
             >
               <div class="flex items-center gap-4">
                 <div
-                  class="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-lg font-bold shrink-0"
+                  class="text-white rounded-full w-12 h-12 flex items-center justify-center text-lg font-bold shrink-0"
+                  [class]="
+                    doctor.status === false ? 'bg-gray-400' : 'bg-blue-600'
+                  "
                 >
                   {{ doctor.name.split(" ").slice(-2)[0][0]
                   }}{{ doctor.name.split(" ").slice(-2)[1][0] }}
                 </div>
                 <div>
-                  <p class="text-blue-800 text-lg font-semibold">
+                  <p
+                    class="text-blue-800 text-lg font-semibold flex items-center gap-2"
+                  >
                     {{ doctor.name }}
+                    @if (doctor.status === false) {
+                      <span
+                        class="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full"
+                      >
+                        Inactivo
+                      </span>
+                    }
                   </p>
-                  <p class="text-gray-500 text-base">{{ doctor.specialty }}</p>
+                  <p class="text-gray-500 text-base">
+                    {{ formatSpecialty(doctor.specialty) }}
+                  </p>
                 </div>
               </div>
 
@@ -75,7 +106,18 @@
               @if (editingId() !== doctor.id) {
                 <button
                   (click)="edit(doctor)"
-                  class="flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-700 px-5 py-2.5 rounded-xl transition-colors text-base"
+                  [disabled]="doctor.status === false"
+                  class="flex items-center gap-2 px-5 py-2.5 rounded-xl transition-colors text-base"
+                  [class]="
+                    doctor.status === false
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-blue-100 hover:bg-blue-200 text-blue-700 cursor-pointer'
+                  "
+                  [title]="
+                    doctor.status === false
+                      ? 'Habilite al médico para editar su configuración'
+                      : ''
+                  "
                 >
                   <lucide-icon [img]="Edit3" [size]="18"></lucide-icon>
                   Editar
@@ -90,7 +132,13 @@
                   </button>
                   <button
                     (click)="save()"
-                    class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl transition-colors text-base"
+                    [disabled]="!canSave()"
+                    class="flex items-center gap-2 px-5 py-2.5 rounded-xl transition-colors text-base"
+                    [class]="
+                      canSave()
+                        ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
+                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    "
                   >
                     <lucide-icon [img]="Save" [size]="18"></lucide-icon>
                     Guardar
@@ -99,9 +147,9 @@
               }
             </div>
 
-            <!-- Summary -->
+            <!-- Summary (vista lectura) -->
             @if (editingId() !== doctor.id) {
-              <div class="px-5 pb-5 pt-0">
+              <div class="px-5 pb-5 pt-0 space-y-2">
                 <div class="flex flex-wrap gap-3 text-sm text-gray-600">
                   <span
                     class="bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1"
@@ -121,12 +169,12 @@
                       [size]="14"
                       class="text-blue-500"
                     ></lucide-icon>
-                    Intervalo: {{ doctor.interval }} min
+                    Intervalo: {{ doctor.appointmentInterval }} min
                   </span>
                   <span class="bg-blue-50 px-3 py-1.5 rounded-lg">
-                    {{ getWorkDayLabels(doctor.workDays) }}
+                    {{ getWorkDayLabels(doctor.workdays) }}
                   </span>
-                  @if (getDayScheduleKeys(doctor).length > 0) {
+                  @if (hasRealDayOverrides(doctor)) {
                     <span
                       class="bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg flex items-center gap-1"
                     >
@@ -140,12 +188,12 @@
                     (click)="openToggleModal(doctor)"
                     class="flex items-center gap-2 px-4 py-1.5 rounded-lg font-semibold text-base transition-all"
                     [class]="
-                      doctor.enabled !== false
+                      doctor.status !== false
                         ? 'bg-green-100 text-green-700 hover:bg-green-200'
                         : 'bg-red-100 text-red-700 hover:bg-red-200'
                     "
                   >
-                    @if (doctor.enabled !== false) {
+                    @if (doctor.status !== false) {
                       <lucide-icon [img]="Power" [size]="16"></lucide-icon>
                       Habilitado
                     } @else {
@@ -155,17 +203,35 @@
                   </button>
                 </div>
 
-                @if (getDayScheduleKeys(doctor).length > 0) {
-                  <div class="mt-3 flex flex-wrap gap-2">
-                    @for (day of doctor.workDays; track day) {
-                      @if (doctor.daySchedules?.[day] && day >= 1 && day <= 5) {
-                        <span
-                          class="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-3 py-1 rounded-lg"
-                        >
-                          {{ DAY_LABELS[day] }}:
-                          {{ doctor.daySchedules![day].startTime }} –
-                          {{ doctor.daySchedules![day].endTime }}
-                        </span>
+                <!-- Período laboral -->
+                <div class="flex flex-wrap gap-3 text-sm text-gray-600">
+                  <span
+                    class="bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg flex items-center gap-1"
+                  >
+                    <lucide-icon [img]="Calendar" [size]="14"></lucide-icon>
+                    Período laboral: {{ doctor.laborStart }} –
+                    {{ doctor.laborEnd }}
+                  </span>
+                </div>
+
+                <!-- Horarios por día -->
+                @if (hasRealDayOverrides(doctor)) {
+                  <div class="flex flex-wrap gap-2">
+                    @for (day of doctor.workdays; track day) {
+                      @if (day >= 1 && day <= 5) {
+                        @let ds = doctor.daySchedules?.[day];
+                        @if (
+                          ds &&
+                          (ds.startTime !== doctor.startTime ||
+                            ds.endTime !== doctor.endTime)
+                        ) {
+                          <span
+                            class="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-3 py-1 rounded-lg"
+                          >
+                            {{ DAY_LABELS[day] }}: {{ ds.startTime }} –
+                            {{ ds.endTime }}
+                          </span>
+                        }
                       }
                     }
                   </div>
@@ -175,84 +241,152 @@
 
             <!-- Edit Form -->
             @if (editingId() === doctor.id && editForm()) {
-              <div class="px-5 pb-5 space-y-5 border-t border-blue-200 pt-5">
-                <!-- Hora inicio, hora fin, intervalo -->
-                <div
-                  class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-                >
-                  <div>
-                    <label class="block text-gray-700 mb-1 text-base"
-                      >Hora Inicio (por defecto)</label
-                    >
-                    <input
-                      type="time"
-                      [value]="editForm()!.startTime"
-                      (change)="
-                        updateField('startTime', $any($event.target).value)
-                      "
-                      class="w-full border-2 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
-                      [class]="
-                        errorHorarioGlobal()
-                          ? 'border-red-400'
-                          : 'border-blue-200'
-                      "
-                    />
+              <div class="px-5 pb-5 space-y-6 border-t border-blue-200 pt-5">
+                <!-- Sección: Período laboral -->
+                <div>
+                  <p
+                    class="text-gray-700 font-semibold text-base mb-3 flex items-center gap-2"
+                  >
+                    <lucide-icon
+                      [img]="Calendar"
+                      [size]="18"
+                      class="text-purple-500"
+                    ></lucide-icon>
+                    Período Laboral
+                  </p>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-gray-700 mb-1 text-base"
+                        >Fecha Inicio</label
+                      >
+                      <input
+                        type="date"
+                        [value]="editForm()!.laborStart"
+                        (change)="
+                          updateField('laborStart', $any($event.target).value)
+                        "
+                        class="w-full border-2 focus:border-purple-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                        [class]="
+                          errorFechas() ? 'border-red-400' : 'border-purple-200'
+                        "
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-gray-700 mb-1 text-base"
+                        >Fecha Fin</label
+                      >
+                      <input
+                        type="date"
+                        [value]="editForm()!.laborEnd"
+                        (change)="
+                          updateField('laborEnd', $any($event.target).value)
+                        "
+                        class="w-full border-2 focus:border-purple-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                        [class]="
+                          errorFechas() ? 'border-red-400' : 'border-purple-200'
+                        "
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label class="block text-gray-700 mb-1 text-base"
-                      >Hora Fin (por defecto)</label
-                    >
-                    <input
-                      type="time"
-                      [value]="editForm()!.endTime"
-                      (change)="
-                        updateField('endTime', $any($event.target).value)
-                      "
-                      class="w-full border-2 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
-                      [class]="
-                        errorHorarioGlobal()
-                          ? 'border-red-400'
-                          : 'border-blue-200'
-                      "
-                    />
-                  </div>
-                  <div>
-                    <label class="block text-gray-700 mb-1 text-base"
-                      >Intervalo (min)</label
-                    >
-                    <input
-                      type="number"
-                      min="5"
-                      max="120"
-                      step="5"
-                      [value]="editForm()!.interval"
-                      (input)="
-                        updateField('interval', +$any($event.target).value)
-                      "
-                      class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
-                    />
-                  </div>
+                  @if (errorFechas()) {
+                    <p class="text-red-500 text-sm mt-2">
+                      ⚠️ {{ errorFechas() }}
+                    </p>
+                  }
+                </div>
 
-                  <!-- Error horario global ocupa las 3 columnas -->
+                <!-- Sección: Horario semanal + intervalo -->
+                <div>
+                  <p
+                    class="text-gray-700 font-semibold text-base mb-3 flex items-center gap-2"
+                  >
+                    <lucide-icon
+                      [img]="Clock"
+                      [size]="18"
+                      class="text-blue-500"
+                    ></lucide-icon>
+                    Horario Semanal
+                  </p>
+                  <div
+                    class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+                  >
+                    <div>
+                      <label class="block text-gray-700 mb-1 text-base"
+                        >Hora Inicio (por defecto)</label
+                      >
+                      <input
+                        type="time"
+                        [value]="editForm()!.startTime"
+                        (change)="
+                          updateField('startTime', $any($event.target).value)
+                        "
+                        class="w-full border-2 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                        [class]="
+                          errorHorarioGlobal()
+                            ? 'border-red-400'
+                            : 'border-blue-200'
+                        "
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-gray-700 mb-1 text-base"
+                        >Hora Fin (por defecto)</label
+                      >
+                      <input
+                        type="time"
+                        [value]="editForm()!.endTime"
+                        (change)="
+                          updateField('endTime', $any($event.target).value)
+                        "
+                        class="w-full border-2 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                        [class]="
+                          errorHorarioGlobal()
+                            ? 'border-red-400'
+                            : 'border-blue-200'
+                        "
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-gray-700 mb-1 text-base"
+                        >Intervalo (min)</label
+                      >
+                      <input
+                        type="number"
+                        min="5"
+                        max="120"
+                        step="5"
+                        [value]="editForm()!.appointmentInterval"
+                        (input)="
+                          updateField(
+                            'appointmentInterval',
+                            +$any($event.target).value
+                          )
+                        "
+                        class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+                      />
+                    </div>
+                  </div>
                   @if (errorHorarioGlobal()) {
-                    <p class="text-red-500 text-sm col-span-full -mt-2">
+                    <p class="text-red-500 text-sm mt-2">
                       ⚠️ {{ errorHorarioGlobal() }}
                     </p>
                   }
                 </div>
 
-                <!-- Work Days -->
+                <!-- Sección: Días de atención -->
                 <div>
-                  <label class="block text-gray-700 mb-2 text-base"
-                    >Días de Atención</label
+                  <label
+                    class="block text-gray-700 mb-2 text-base font-semibold"
                   >
+                    Días de Atención
+                  </label>
                   <div class="flex gap-2 flex-wrap">
                     @for (day of weekDays; track day) {
                       <button
                         (click)="toggleDay(day)"
                         class="w-14 py-3 rounded-xl text-base font-semibold border-2 transition-all"
                         [class]="
-                          editForm()!.workDays.includes(day)
+                          editForm()!.workdays.includes(day)
                             ? 'bg-blue-600 text-white border-blue-600'
                             : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'
                         "
@@ -263,8 +397,8 @@
                   </div>
                 </div>
 
-                <!-- Per-day schedules -->
-                @if (editForm()!.workDays.length > 0) {
+                <!-- Sección: Horarios por día -->
+                @if (editForm()!.workdays.length > 0) {
                   <div
                     class="border-2 border-blue-100 rounded-xl overflow-hidden"
                   >
@@ -307,7 +441,7 @@
                           para cada día. Si no se personaliza, se usará el
                           horario por defecto.
                         </p>
-                        @for (day of editForm()!.workDays; track day) {
+                        @for (day of editForm()!.workdays; track day) {
                           @if (day >= 1 && day <= 5) {
                             <div
                               class="rounded-xl border-2 p-4 transition-all"
@@ -335,8 +469,9 @@
                                   </div>
                                   <span
                                     class="text-gray-700 text-base hidden sm:block"
-                                    >{{ DAY_FULL_LABELS[day] }}</span
                                   >
+                                    {{ DAY_FULL_LABELS[day] }}
+                                  </span>
                                 </div>
                                 <div
                                   class="flex flex-1 flex-wrap gap-3 items-end"
@@ -402,7 +537,6 @@
                                 </div>
                               </div>
 
-                              <!-- Error horario por día -->
                               @if (errorHorariosDia()[day]) {
                                 <p
                                   class="text-red-500 text-xs mt-2 sm:ml-[52px]"
@@ -438,6 +572,13 @@
       <div
         class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-blue-100 text-base"
       >
+        <div>
+          <p class="font-semibold text-white mb-1">📅 Período Laboral</p>
+          <p>
+            Fecha de inicio y fin del contrato o período de trabajo del médico
+            en la clínica.
+          </p>
+        </div>
         <div>
           <p class="font-semibold text-white mb-1">⏰ Franja Horaria</p>
           <p>
@@ -492,7 +633,7 @@
       <p class="text-gray-600 text-base mb-6">
         ¿Está seguro de que desea
         <strong>{{
-          doctorToToggle()!.enabled === false ? "habilitar" : "deshabilitar"
+          doctorToToggle()!.status === false ? "habilitar" : "deshabilitar"
         }}</strong>
         a <strong>{{ doctorToToggle()!.name }}</strong
         >?
@@ -508,7 +649,7 @@
           (click)="confirmToggle()"
           class="flex-1 px-6 py-3 text-white rounded-xl transition-colors text-base font-medium flex items-center justify-center gap-2"
           [class]="
-            doctorToToggle()!.enabled === false
+            doctorToToggle()!.status === false
               ? 'bg-green-600 hover:bg-green-700'
               : 'bg-red-600 hover:bg-red-700'
           "
@@ -516,8 +657,48 @@
           <lucide-icon [img]="Save" [size]="18"></lucide-icon>
           Sí,
           {{
-            doctorToToggle()!.enabled === false ? "Habilitar" : "Deshabilitar"
+            doctorToToggle()!.status === false ? "Habilitar" : "Deshabilitar"
           }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Modal Forzar Deshabilitación -->
+@if (showForceModal() && doctorToToggle()) {
+  <div
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    (click)="$event.target === $event.currentTarget && cancelForceDisable()"
+  >
+    <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-xl font-bold text-gray-800">⚠️ Atención</h3>
+        <button
+          (click)="cancelForceDisable()"
+          class="text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <lucide-icon [img]="X" [size]="24"></lucide-icon>
+        </button>
+      </div>
+      <p class="text-gray-600 text-base mb-4">{{ forceModalMessage() }}</p>
+      <p class="text-gray-700 text-base font-semibold mb-6">
+        ¿Desea forzar la deshabilitación de
+        <strong>{{ doctorToToggle()!.name }}</strong> de todas formas?
+      </p>
+      <div class="flex flex-col-reverse sm:flex-row gap-3">
+        <button
+          (click)="cancelForceDisable()"
+          class="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl transition-colors text-base font-medium"
+        >
+          Cancelar
+        </button>
+        <button
+          (click)="confirmForceDisable()"
+          class="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl transition-colors text-base font-medium flex items-center justify-center gap-2"
+        >
+          <lucide-icon [img]="PowerOff" [size]="18"></lucide-icon>
+          Sí, forzar
         </button>
       </div>
     </div>
