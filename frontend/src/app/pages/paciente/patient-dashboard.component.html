@@ -8,7 +8,7 @@
         </div>
         <div>
           <h1 class="text-3xl font-bold">
-            ¡Hola, {{ appService.currentUser()?.firstName }}!
+            ¡Hola, {{ appService.currentPatient()?.firstName }}!
           </h1>
           <p class="text-blue-100 text-lg mt-1">Bienvenido a su portal de citas médicas</p>
         </div>
@@ -20,29 +20,17 @@
       ⚠️ {{ errorMessage() }}
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-      <a routerLink="/paciente/agendar"
-        class="bg-white rounded-2xl shadow-md border-2 border-blue-100 hover:border-blue-400
-               p-7 flex items-center gap-5 transition-all hover:shadow-lg group">
+    <div>
+      <a
+        routerLink="/paciente/agendar"
+        class="w-full bg-white rounded-2xl shadow-md border-2 border-blue-100 hover:border-blue-400
+              p-7 flex items-center gap-5 transition-all hover:shadow-lg group">
         <div class="bg-blue-100 group-hover:bg-blue-200 rounded-full p-4 transition-colors flex-shrink-0">
           <lucide-icon [img]="PlusCircle" [size]="36" class="text-blue-600"></lucide-icon>
         </div>
         <div class="flex-1">
           <p class="text-blue-800 text-xl font-semibold">Agendar Nueva Cita</p>
           <p class="text-gray-500 text-base mt-1">Seleccione médico y horario</p>
-        </div>
-        <lucide-icon [img]="ChevronRight" [size]="24" class="text-blue-400"></lucide-icon>
-      </a>
-
-      <a routerLink="/paciente/mis-citas"
-        class="bg-white rounded-2xl shadow-md border-2 border-blue-100 hover:border-blue-400
-               p-7 flex items-center gap-5 transition-all hover:shadow-lg group">
-        <div class="bg-blue-100 group-hover:bg-blue-200 rounded-full p-4 transition-colors flex-shrink-0">
-          <lucide-icon [img]="CalendarDays" [size]="36" class="text-blue-600"></lucide-icon>
-        </div>
-        <div class="flex-1">
-          <p class="text-blue-800 text-xl font-semibold">Ver Mis Citas</p>
-          <p class="text-gray-500 text-base mt-1">Consulte sus citas activas</p>
         </div>
         <lucide-icon [img]="ChevronRight" [size]="24" class="text-blue-400"></lucide-icon>
       </a>

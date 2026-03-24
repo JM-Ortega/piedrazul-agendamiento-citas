@@ -52,7 +52,7 @@ export class NavbarComponent implements OnInit {
   roleLabel = computed<string>(() => {
     switch (this.appService.currentRole()) {
       case 'patient':
-        return `${this.appService.currentUser()?.firstName}`;
+        return 'Paciente';
       case 'scheduler':
         return 'Agendador';
       case 'admin':

@@ -57,7 +57,7 @@ export class PatientDashboardComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    const patientId = this.appService.currentUser()?.id;
+    const patientId = this.appService.currentPatient()?.id;
     if (!patientId) return;
 
     this.isLoading.set(true);
