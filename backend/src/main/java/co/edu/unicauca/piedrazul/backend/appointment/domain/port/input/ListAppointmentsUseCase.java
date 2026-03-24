@@ -7,5 +7,5 @@ import java.util.List;
 import java.util.UUID;
 
 public interface ListAppointmentsUseCase {
-    List<Appointment> listBy(UUID idDoctor, LocalDate date);
+    List<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date);
 }
