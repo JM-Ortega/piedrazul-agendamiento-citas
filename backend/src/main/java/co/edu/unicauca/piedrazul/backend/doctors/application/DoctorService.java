@@ -57,10 +57,14 @@ public class DoctorService {
         // 2. Crear el usuario
         doctor.setIdUser(userModuleApi.createDoctorUser(request.identification()));
 
-        // 3. Persistencia
+        // 3. Deshabilitar el usuario si el doctor no está activo
+        if (!doctor.isStatus())
+            userModuleApi.deactivateUser(doctor.getIdUser());
+
+        // 4. Persistencia
         Doctor savedDoctor = doctorRepository.save(doctor);
 
-        // 4. Retornar un DTO de respuesta
+        // 5. Retornar un DTO de respuesta
         return DoctorResponse.fromEntity(savedDoctor);
     }
 

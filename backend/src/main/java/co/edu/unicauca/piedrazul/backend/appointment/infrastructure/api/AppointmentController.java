@@ -54,14 +54,15 @@ public class AppointmentController {
         return ResponseEntity.ok(slots);
     }
 
-    // Un unico método para listar por idDoctor, por fecha, por ambos o para pasar todas las citas que hay
+    // Un unico método para listar por idDoctor, idPatient, fecha o combinaciones
     @GetMapping
     public ResponseEntity<List<AppointmentResponse>> list(
             @RequestParam(required = false) UUID idDoctor,
+            @RequestParam(required = false) UUID idPatient,
             @RequestParam(required = false) LocalDate date) {
 
         // Mapper para pasar de Domain a DTO
-        return ResponseEntity.ok(listAppointmentsUseCase.listBy(idDoctor, date).stream().map(citaDtoMapper::toResponse).toList());
+        return ResponseEntity.ok(listAppointmentsUseCase.listBy(idDoctor, idPatient, date).stream().map(citaDtoMapper::toResponse).toList());
     }
 
     // Crear cita

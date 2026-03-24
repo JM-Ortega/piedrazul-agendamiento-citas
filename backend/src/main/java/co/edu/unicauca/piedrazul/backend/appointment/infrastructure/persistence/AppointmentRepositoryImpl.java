@@ -1,7 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import jakarta.transaction.Transactional;
@@ -34,6 +33,11 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
         return jpaRepository.findByIdDoctor(idDoctor).stream().map(mapper::toDomain).toList();
     }
 
+    @Override
+    public List<Appointment> findByPatientId(UUID idPatient) {
+        return jpaRepository.findByIdPatient(idPatient).stream().map(mapper::toDomain).toList();
+    }
+
 
     @Override
     public List<Appointment> findByDate(LocalDate date) {
@@ -43,6 +47,21 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     @Override
     public List<Appointment> findByDoctorIdAndDate(UUID idDoctor, LocalDate date) {
         return jpaRepository.findByIdDoctorAndDate(idDoctor, date).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<Appointment> findByPatientIdAndDate(UUID idPatient, LocalDate date) {
+        return jpaRepository.findByIdPatientAndDate(idPatient, date).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<Appointment> findByDoctorIdAndPatientId(UUID idDoctor, UUID idPatient) {
+        return jpaRepository.findByIdDoctorAndIdPatient(idDoctor, idPatient).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<Appointment> findByDoctorIdAndPatientIdAndDate(UUID idDoctor, UUID idPatient, LocalDate date) {
+        return jpaRepository.findByIdDoctorAndIdPatientAndDate(idDoctor, idPatient, date).stream().map(mapper::toDomain).toList();
     }
 
     @Override
