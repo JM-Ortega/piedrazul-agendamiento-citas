@@ -76,7 +76,15 @@ public class AppointmentController {
 
             // Agendador manual, el paciente no tiene cuenta
             case MANUAL -> scheduleManualAppointmentUseCase.scheduleManual(
-                    citaDtoMapper.toPatientInfo(request),
+                    request.getDocumentType(),
+                    request.getDocumentNumber(),
+                    request.getFirstName(),
+                    request.getLastName(),
+                    request.getPhone(),
+                    request.getGender(),
+                    request.getBirthDate(),
+                    request.getEmail(),
+                    request.getGuardianPhone(),
                     request.getDoctorId(),
                     request.getSpecialty(),
                     request.getDate(),
