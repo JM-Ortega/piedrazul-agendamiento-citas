@@ -93,6 +93,10 @@ export class AdminConfigComponent implements OnInit {
   errorIntervalo = signal('');
   errorDias = signal('');
 
+  // ── Nuevos signals para error de guardado ─────────────────────────────────
+  errorGuardado = signal('');
+  showErrorGuardadoModal = signal(false);
+
   private originalWorkdays = signal<number[]>([]);
 
   totalSpecialties = computed(
@@ -227,7 +231,6 @@ export class AdminConfigComponent implements OnInit {
   // ── Edición ───────────────────────────────────────────────────────────────
 
   edit(doctor: Doctor): void {
-    if (doctor.status === false) return;
     this.editingId.set(doctor.id);
     this.editForm.set({
       ...doctor,
@@ -321,9 +324,7 @@ export class AdminConfigComponent implements OnInit {
 
     forkJoin(calls).subscribe({
       next: () => {
-        this.doctors.update((list) =>
-          list.map((d) => (d.id === form.id ? form : d)),
-        );
+        this.reloadDoctor(form.id, form); // ← reemplaza el update manual
         this.savedId.set(form.id);
         this.editingId.set(null);
         this.editForm.set(null);
@@ -332,10 +333,40 @@ export class AdminConfigComponent implements OnInit {
         this.errorFechas.set('');
         setTimeout(() => this.savedId.set(null), 3000);
       },
-      error: () => {},
+      error: (err) => {
+        const raw: string =
+          err?.error?.detail ??
+          'Error al guardar los cambios. Intente de nuevo.';
+
+        const detail = raw.startsWith('User is already active')
+          ? 'El médico ya está trabajando activamente. Debe deshabilitarlo primero para poder cambiar su período laboral.'
+          : raw;
+
+        this.errorGuardado.set(detail);
+        this.showErrorGuardadoModal.set(true);
+      },
     });
   }
-
+  private reloadDoctor(doctorId: string, fallback: Doctor): void {
+    forkJoin([
+      this.adminService.getDoctors(), // ← datos frescos del doctor (status incluido)
+      this.adminService.getSchedulesByDoctor(doctorId), // ← horarios frescos
+    ]).subscribe({
+      next: ([doctors, schedules]) => {
+        const freshDoctor = doctors.find((d) => d.id === doctorId) ?? fallback;
+        const mapped = this.mapSchedulesToDoctor(schedules, freshDoctor);
+        const updated: Doctor = { ...freshDoctor, ...mapped };
+        this.doctors.update((list) =>
+          list.map((d) => (d.id === doctorId ? updated : d)),
+        );
+      },
+      error: () => {
+        this.doctors.update((list) =>
+          list.map((d) => (d.id === doctorId ? fallback : d)),
+        );
+      },
+    });
+  }
   // ── Toggle enabled/disabled ───────────────────────────────────────────────
 
   openToggleModal(doctor: Doctor): void {
@@ -366,7 +397,7 @@ export class AdminConfigComponent implements OnInit {
           },
           error: (err) => {
             this.forceModalMessage.set(
-              err?.error ?? 'Error al habilitar el médico.',
+              err?.error?.detail ?? 'Error al habilitar el médico.',
             );
             this.closeToggleModal();
             this.showForceModal.set(true);
@@ -384,7 +415,8 @@ export class AdminConfigComponent implements OnInit {
       },
       error: (err) => {
         this.forceModalMessage.set(
-          err?.error ?? 'El médico tiene restricciones para ser deshabilitado.',
+          err?.error?.detail ??
+            'El médico tiene restricciones para ser deshabilitado.',
         );
         this.showConfirmModal.set(false);
         this.showForceModal.set(true);
@@ -407,7 +439,7 @@ export class AdminConfigComponent implements OnInit {
       },
       error: (err) => {
         this.forceModalMessage.set(
-          err?.error ?? 'Error al forzar la deshabilitación.',
+          err?.error?.detail ?? 'Error al forzar la deshabilitación.',
         );
       },
     });
@@ -419,13 +451,17 @@ export class AdminConfigComponent implements OnInit {
     this.forceModalMessage.set('');
   }
 
+  closeErrorGuardadoModal(): void {
+    this.showErrorGuardadoModal.set(false);
+    this.errorGuardado.set('');
+  }
+
   // ── Helpers de formulario ─────────────────────────────────────────────────
 
   horariosValidos(): boolean {
     const form = this.editForm();
     if (!form) return true;
     if (form.startTime >= form.endTime) return false;
-    // valida también franja vs intervalo
     const duracion =
       this.timeToMinutes(form.endTime) - this.timeToMinutes(form.startTime);
     if (duracion < form.appointmentInterval) return false;
@@ -467,7 +503,6 @@ export class AdminConfigComponent implements OnInit {
         this.errorIntervalo.set('El intervalo debe ser mayor a 0.');
       } else {
         this.errorIntervalo.set('');
-        // revalidar franja global al cambiar intervalo
         if (
           updated.startTime &&
           updated.endTime &&
@@ -480,7 +515,6 @@ export class AdminConfigComponent implements OnInit {
           );
           this.errorHorarioGlobal.set(error);
         }
-        // revalidar horarios por día al cambiar intervalo
         const errors = { ...this.errorHorariosDia() };
         for (const day of updated.workdays ?? []) {
           const ds = updated.daySchedules?.[day];
@@ -592,7 +626,6 @@ export class AdminConfigComponent implements OnInit {
     const daySchedules = { ...(form.daySchedules ?? {}) };
     delete daySchedules[day];
     this.editForm.set({ ...form, daySchedules });
-    // limpiar error del día al resetear
     const errors = { ...this.errorHorariosDia() };
     delete errors[day];
     this.errorHorariosDia.set(errors);

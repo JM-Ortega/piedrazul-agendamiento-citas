@@ -1,7 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.exception;
 
-public class PatientScheduleTimeConflictException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class PatientScheduleTimeConflictException extends AppointmentBusinessException {
     public PatientScheduleTimeConflictException(String message) {
-        super(message);
+        super(message, "PATIENT_TIME_CONFLICT", HttpStatus.CONFLICT);
     }
 }

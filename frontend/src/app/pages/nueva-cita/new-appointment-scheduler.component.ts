@@ -235,7 +235,7 @@ export class NewAppointmentSchedulerComponent {
       next: (specs) => {
         if (!specs || specs.length === 0) {
           this.noSpecialtyAvailable.set(true);
-          this.errorMessageSpecialty.set('⚠️ No hay especialidades disponibles.');
+          this.errorMessageSpecialty.set(' No hay especialidades disponibles.');
           return;
         }
 
@@ -252,9 +252,14 @@ export class NewAppointmentSchedulerComponent {
       error: (err) => {
         this.noSpecialtyAvailable.set(true);
 
+        const errorCode = err.error?.errorCode;
+        const detail = err.error?.detail;
+
+        if(err.status === 0){ this.errorMessageSpecialty.set(' No se pudo conectar con el servidor. Intente mas tarde.'); return;}
+
         switch(err.status){
           case 404:
-            this.errorMessageSpecialty.set('⚠️ No hay médicos disponibles para ninguna especialidad. Intente más tarde.');
+            this.errorMessageSpecialty.set(' No hay médicos disponibles para ninguna especialidad. Intente más tarde.');
             break;
           case 0:
             this.errorMessageSpecialty.set('No se pudo conectar con el servidor. Intente mas tarde');
@@ -273,8 +278,8 @@ export class NewAppointmentSchedulerComponent {
         error: (err) => { 
           this.noSpecialtyAvailable.set(true);
           switch(err.status){
-            case 404:
-              this.errorMessageSpecialty.set('⚠️ No hay médicos disponibles para ninguna especialidad. Intente más tarde.');
+            case 409:
+              this.errorMessageSpecialty.set('No hay médicos disponibles para ninguna especialidad. Intente más tarde.');
               break;
             case 0:
               this.errorMessageSpecialty.set('No se pudo conectar con el servidor. Intente mas tarde');
@@ -333,7 +338,7 @@ export class NewAppointmentSchedulerComponent {
           this.noDoctorsFound.set(true)
           switch (err.status) {
             case 404:
-              this.errorMessageDoctors.set('⚠️ No hay médicos disponibles para esta especialidad.');
+              this.errorMessageDoctors.set('No hay médicos disponibles para esta especialidad.');
               break;
             case 0:
               this.errorMessageDoctors.set('No se pudo conectar con el servidor. Intente más tarde.');
@@ -407,23 +412,24 @@ export class NewAppointmentSchedulerComponent {
 
           if (slots.length === 0) {
             this.noSlotsAvailable.set(true);
-            this.errorMessageSlots.set('⚠️ No hay horarios disponibles para esta fecha.');
+            this.errorMessageSlots.set(' No hay horarios disponibles para esta fecha.');
           }
         },
         error: (err) =>{
           this.availableSlots.set([]);
           this.noSlotsAvailable.set(true);
 
-          switch (err.status) {
-            case 404:
-              this.errorMessageSlots.set('⚠️ No hay horarios disponibles para esta fecha.');
-              break;
-            case 0:
-              this.errorMessageSlots.set('No se pudo conectar con el servidor. Intente más tarde.');
+          const errorCode = err.error?.errorCode;
+          const detail = err.error?.detail;
+
+          if(err.status === 0){ this.errorMessageSlots.set('No se pudo conectar con el servidor. Intente mas tarde.'); return;}
+
+          switch (errorCode) {
+            case 'SLOT_CONFLICT':
+              this.errorMessage.set(detail);
               break;
             default:
-              this.errorMessageSlots.set('Error al obtener los horarios.');
-              break;
+              this.errorMessage.set(detail || 'Error inesperado');
           }
         }
       });
@@ -481,19 +487,21 @@ export class NewAppointmentSchedulerComponent {
       },
       error: (err) => {
         this.isLoading.set(false);
-        switch (err.status) {
-          case 0:
-            this.errorMessage.set(' No se pudo conectar con el servidor. Intente más tarde.');
+
+        const errorCode = err.error?.errorCode;
+        const detail = err.error?.detail;
+
+        if(err.status === 0){ this.errorMessage.set('No se pudo conectar con el servidor. Intente mas tarde.'); return;}
+
+        switch (errorCode) {
+          case 'PATIENT_TIME_CONFLICT':
+            this.errorMessage.set(detail);
             break;
-          case 409:
-            this.errorMessage.set(' El horario ya fue tomado por otro usuario.');
-            break;
-          case 500:
-            this.errorMessage.set(' No puede registrar más de una cita para la misma especialidad.');
+          case 'PATIENT_SPECIALTY_CONFLICT':
+            this.errorMessage.set(detail);
             break;
           default:
-            this.errorMessage.set(' Ocurrió un error al registrar la cita.');
-            break;
+            this.errorMessage.set(detail || 'Error inesperado');
         }
       }
     });

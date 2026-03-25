@@ -1,7 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.exception;
 
-public class PatientAlreadyScheduledInSpecialtyException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class PatientAlreadyScheduledInSpecialtyException extends AppointmentBusinessException {
     public PatientAlreadyScheduledInSpecialtyException(String message) {
-        super(message);
+        super(message, "PATIENT_SPECIALTY_CONFLICT", HttpStatus.CONFLICT);
     }
 }

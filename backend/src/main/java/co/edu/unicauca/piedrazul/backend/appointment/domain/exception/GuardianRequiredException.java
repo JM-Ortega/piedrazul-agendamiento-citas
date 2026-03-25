@@ -1,7 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.exception;
 
-public class GuardianRequiredException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class GuardianRequiredException extends AppointmentBusinessException {
     public GuardianRequiredException(String message) {
-        super(message);
+        super(message, "GUARDIAN_REQUIRED", HttpStatus.BAD_REQUEST);
     }
 }

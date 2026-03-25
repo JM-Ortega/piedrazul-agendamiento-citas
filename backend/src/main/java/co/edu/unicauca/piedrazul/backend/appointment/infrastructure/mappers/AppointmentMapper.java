@@ -6,8 +6,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientC
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
 import org.springframework.stereotype.Component;
 
-import java.util.UUID;
-
 @Component
 public class AppointmentMapper {
     private final PatientConsultPort patientConsultPort;

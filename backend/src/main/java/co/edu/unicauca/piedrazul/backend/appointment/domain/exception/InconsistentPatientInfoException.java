@@ -1,7 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.exception;
 
-public class InconsistentPatientInfoException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class InconsistentPatientInfoException extends AppointmentBusinessException {
     public InconsistentPatientInfoException(String message) {
-        super(message);
+        super(message, "INCONSISTENT_PATIENT_INFO", HttpStatus.BAD_REQUEST);
     }
 }

@@ -1,7 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.doctors.exception;
 
-public class DateConflictException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class DateConflictException extends DoctorBusinessException {
     public DateConflictException(String message) {
-        super(message);
+        super(message, "DATE_CONFLICT", HttpStatus.CONFLICT);
     }
 }

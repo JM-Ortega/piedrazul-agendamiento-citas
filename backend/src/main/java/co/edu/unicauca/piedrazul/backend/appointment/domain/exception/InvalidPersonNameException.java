@@ -1,7 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.exception;
 
-public class InvalidPersonNameException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class InvalidPersonNameException extends AppointmentBusinessException {
     public InvalidPersonNameException(String message) {
-        super(message);
+        super(message, "INVALID_PERSON_NAME", HttpStatus.BAD_REQUEST);
     }
 }
