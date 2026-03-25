@@ -201,7 +201,7 @@ export class PatientNewAppointmentComponent {
 
           if (slots.length === 0) {
             this.noSlotsAvailable.set(true);
-            this.errorMessageSlots.set('⚠️ No hay horarios disponibles para esta fecha.');
+            this.errorMessageSlots.set(' No hay horarios disponibles para esta fecha.');
           }
         },
         error: (err) =>{
@@ -210,13 +210,13 @@ export class PatientNewAppointmentComponent {
 
           switch (err.status) {
             case 404:
-              this.errorMessageSlots.set('⚠️ No hay horarios disponibles para esta fecha.');
+              this.errorMessageSlots.set(' No hay horarios disponibles para esta fecha.');
               break;
             case 0:
-              this.errorMessageSlots.set('No se pudo conectar con el servidor. Intente más tarde.');
+              this.errorMessageSlots.set(' No se pudo conectar con el servidor. Intente más tarde.');
               break;
             default:
-              this.errorMessageSlots.set('Error al obtener los horarios.');
+              this.errorMessageSlots.set(' Error al obtener los horarios.');
               break;
           }
         }
@@ -239,7 +239,7 @@ export class PatientNewAppointmentComponent {
       documentType: this.currentPatient()?.documentType,
       documentNumber: this.currentPatient()?.documentNumber,
       firstName: this.currentPatient()?.firstName,
-      lastName: this.currentPatient()?.firstName,
+      lastName: this.currentPatient()?.lastName,
       phone: this.currentPatient()?.phone,
       date: date.toISOString().slice(0, 10),
       startTime: this.selectedTime(),
@@ -261,10 +261,13 @@ export class PatientNewAppointmentComponent {
         this.isLoading.set(false);
         switch (err.status) {
           case 0:
-            this.errorMessage.set('No se pudo conectar con el servidor. Intente más tarde.');
+            this.errorMessage.set(' No se pudo conectar con el servidor. Intente más tarde.');
             break;
           case 409:
-            this.errorMessage.set('⚠️ El horario ya fue tomado por otro usuario.');
+            this.errorMessage.set(' El horario ya fue tomado por otro usuario.');
+            break;
+          case 500:
+            this.errorMessage.set(' No puede registrar más de una cita para la misma especialidad.');
             break;
           default:
             this.errorMessage.set('Ocurrió un error al registrar la cita.');
@@ -272,6 +275,13 @@ export class PatientNewAppointmentComponent {
         }
       }
     });
+  }
+
+  goBackSchedule(): void {
+    this.errorMessage.set('');
+    this.success.set(false);
+    this.isLoading.set(false);
+    this.step.set(2);
   }
 
   goBack(): void {

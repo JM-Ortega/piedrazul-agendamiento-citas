@@ -483,13 +483,16 @@ export class NewAppointmentSchedulerComponent {
         this.isLoading.set(false);
         switch (err.status) {
           case 0:
-            this.errorMessage.set('No se pudo conectar con el servidor. Intente más tarde.');
+            this.errorMessage.set(' No se pudo conectar con el servidor. Intente más tarde.');
             break;
           case 409:
-            this.errorMessage.set('⚠️ El horario ya fue tomado por otro usuario.');
+            this.errorMessage.set(' El horario ya fue tomado por otro usuario.');
+            break;
+          case 500:
+            this.errorMessage.set(' No puede registrar más de una cita para la misma especialidad.');
             break;
           default:
-            this.errorMessage.set('Ocurrió un error al registrar la cita.');
+            this.errorMessage.set(' Ocurrió un error al registrar la cita.');
             break;
         }
       }

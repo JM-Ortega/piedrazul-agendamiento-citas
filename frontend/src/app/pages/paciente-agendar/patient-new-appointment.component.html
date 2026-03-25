@@ -184,7 +184,7 @@
 
           <div *ngIf="selectedDate() && noSlotsAvailable()"
             class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm">
-            {{errorMessageSlots()}}
+            ⚠️ {{errorMessageSlots()}}
           </div>
 
           <div class="flex gap-4 mt-2">
@@ -233,7 +233,7 @@
           </div>
 
           <div class="flex gap-4 mt-8">
-            <button (click)="step.set(2)"
+            <button (click)="goBackSchedule()"
               class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50">
               ← Atrás
             </button>
