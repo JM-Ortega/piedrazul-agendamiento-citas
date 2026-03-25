@@ -14,7 +14,6 @@ import jakarta.transaction.Transactional;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -116,7 +115,7 @@ public class DoctorService {
         doctor.setStatus(calculateActiveStatus(doctor.getLaborStart(), doctor.getLaborEnd()));
         syncUserStatus(doctor);
 
-        Doctor updatedDoctor = doctorRepository.save(doctor);
+        doctorRepository.save(doctor);
     }
 
     // Actualizar la fecha de finalización laboral de un doctor
@@ -141,7 +140,7 @@ public class DoctorService {
         doctor.setStatus(calculateActiveStatus(doctor.getLaborStart(), doctor.getLaborEnd()));
         syncUserStatus(doctor);
 
-        Doctor updatedDoctor = doctorRepository.save(doctor);
+        doctorRepository.save(doctor);
     }
 
     // Actualizar el intervalo de atención de un doctor, valida que al menos un horario del doctor pueda acomodar el nuevo intervalo
@@ -168,7 +167,7 @@ public class DoctorService {
         }
 
         doctor.setAppointmentInterval(newAppointmentInterval);
-        Doctor updatedDoctor = doctorRepository.save(doctor);
+        doctorRepository.save(doctor);
     }
 
     // Habilitar medico

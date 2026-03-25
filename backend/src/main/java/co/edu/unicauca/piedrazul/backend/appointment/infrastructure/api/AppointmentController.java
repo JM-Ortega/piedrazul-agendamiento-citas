@@ -1,6 +1,5 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
@@ -72,7 +71,7 @@ public class AppointmentController {
 
         request.validate();
 
-        Appointment appointment = switch (request.getSchedulingOrigin()) {
+        switch (request.getSchedulingOrigin()) {
 
             // Agendador manual, el paciente no tiene cuenta
             case MANUAL -> scheduleManualAppointmentUseCase.scheduleManual(
