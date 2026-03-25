@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.shared.infrastructure.api;
+package co.edu.unicauca.piedrazul.backend.shared;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;

@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.shared.domain.exception;
+package co.edu.unicauca.piedrazul.backend.shared;
 
 import org.springframework.http.HttpStatus;
 

@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.doctors.api;
 
-import co.edu.unicauca.piedrazul.backend.shared.domain.exception.BusinessException;
-import co.edu.unicauca.piedrazul.backend.shared.infrastructure.api.BaseExceptionHandler;
+import co.edu.unicauca.piedrazul.backend.shared.BusinessException;
+import co.edu.unicauca.piedrazul.backend.shared.BaseExceptionHandler;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;

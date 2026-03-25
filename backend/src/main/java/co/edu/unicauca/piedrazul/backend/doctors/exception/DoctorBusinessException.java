@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.doctors.exception;
 
-import co.edu.unicauca.piedrazul.backend.shared.domain.exception.BusinessException;
+import co.edu.unicauca.piedrazul.backend.shared.BusinessException;
 import org.springframework.http.HttpStatus;
 
 public abstract class DoctorBusinessException extends RuntimeException implements BusinessException {
