@@ -34,11 +34,21 @@ public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppoi
 
     // Agendador crea la cita manualmente
     @Override
-    public Appointment scheduleManual(PatientInfo patientInfo,
-                                      UUID idDoctor,
-                                      Specialty specialty,
-                                      LocalDate date,
-                                      AppointmentTime startTime) {
+    public Appointment scheduleManual(
+            DocumentType documentType,
+            String documentNumber,
+            String firstName,
+            String lastName,
+            String phone,
+            Gender gender,
+            LocalDate birthDate,
+            String email,
+            String guardianPhone,
+            UUID idDoctor,
+            Specialty specialty,
+            LocalDate date,
+            AppointmentTime startTime) {
+
         // 1. Obtiene la configuración del médico a través del puerto de salida
         int intervalMinutes = doctorConfigConsultPort
                 .getIntervalMinutesByDoctor(idDoctor);
@@ -47,9 +57,11 @@ public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppoi
         // 2. Obtiene las citas existentes del médico ese día a través del puerto de salida
         List<Appointment> existingAppointments = appointmentRepository
                 .findByDoctorIdAndDate(idDoctor, date);
+
         // 3. Buscar paciente por documento
         Optional<PatientSnapshot> existingPatient =
-                patientConsultPort.findByDocumentNumber(patientInfo.getDocumentNumber());
+                patientConsultPort.findByDocumentNumber(documentNumber);
+
         UUID idPatient = null;
         PatientInfo finalPatientInfo;
 
@@ -58,20 +70,32 @@ public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppoi
             idPatient = existingPatient.get().idPatient();
             finalPatientInfo = existingPatient.get().patientInfo();
         } else {
-            // No existe
+            // No existe → ahora sí se construye y valida el PatientInfo
+            PatientInfo patientInfo = PatientInfo.of(
+                    documentType,
+                    documentNumber,
+                    firstName,
+                    lastName,
+                    phone,
+                    gender,
+                    birthDate,
+                    email,
+                    guardianPhone
+            );
+
             finalPatientInfo = patientInfo;
 
             idPatient = patientConsultPort.createPatient(
                     new PatientRegistrationData(
-                            finalPatientInfo.getDocumentType(),
-                            finalPatientInfo.getDocumentNumber(),
-                            finalPatientInfo.getFirstName(),
-                            finalPatientInfo.getLastName(),
-                            finalPatientInfo.getPhone(),
-                            finalPatientInfo.getEmail(),
-                            finalPatientInfo.getGender(),
-                            finalPatientInfo.getBirthDate(),
-                            finalPatientInfo.getGuardianPhone()
+                            documentType,
+                            documentNumber,
+                            firstName,
+                            lastName,
+                            phone,
+                            email,
+                            gender,
+                            birthDate,
+                            guardianPhone
                     )
             );
         }
@@ -96,7 +120,6 @@ public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppoi
         appointmentRepository.save(appointment);
 
         return appointment;
-
     }
 
     private void validateUniqueScheduledAppointmentBySpecialty(UUID idPatient, Specialty specialty) {
