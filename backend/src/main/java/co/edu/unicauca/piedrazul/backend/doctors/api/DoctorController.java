@@ -7,8 +7,6 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
-import jakarta.persistence.EntityNotFoundException;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,13 +30,8 @@ public class DoctorController {
      */
     @PostMapping
     public ResponseEntity<?> createDoctor(@RequestBody CreateDoctorRequest request) {
-        try {
-            doctorService.createDoctor(request);
-            return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error al crear al médico: " + e.getMessage());
-        }
+        doctorService.createDoctor(request);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -47,16 +40,11 @@ public class DoctorController {
      */
     @GetMapping
     public ResponseEntity<?> getAllDoctors() {
-        try {
-            List<Doctor> doctors = doctorService.findAllDoctors();
-            List<DoctorShortResponse> responses = doctors.stream()
-                    .map(DoctorShortResponse::fromEntity)
-                    .toList();
-            return ResponseEntity.ok(responses);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error al recuperar a los médicos: " + e.getMessage());
-        }
+        List<Doctor> doctors = doctorService.findAllDoctors();
+        List<DoctorShortResponse> responses = doctors.stream()
+                .map(DoctorShortResponse::fromEntity)
+                .toList();
+        return ResponseEntity.ok(responses);
     }
 
     /**
@@ -65,16 +53,11 @@ public class DoctorController {
      */
     @GetMapping("/detailed")
     public ResponseEntity<?> getAllDoctorsDetailed() {
-        try {
-            List<Doctor> doctors = doctorService.findAllDoctors();
-            List<DoctorDetailedResponse> responses = doctors.stream()
-                    .map(DoctorDetailedResponse::fromEntity)
-                    .toList();
-            return ResponseEntity.ok(responses);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error al recuperar a los médicos: " + e.getMessage());
-        }
+        List<Doctor> doctors = doctorService.findAllDoctors();
+        List<DoctorDetailedResponse> responses = doctors.stream()
+                .map(DoctorDetailedResponse::fromEntity)
+                .toList();
+        return ResponseEntity.ok(responses);
     }
 
     /**
@@ -84,13 +67,8 @@ public class DoctorController {
      */
     @GetMapping("/{doctorId}")
     public ResponseEntity<?> getDoctorById(@PathVariable UUID doctorId) {
-        try {
-            Doctor doctor = doctorService.getDoctorById(doctorId);
-            return ResponseEntity.ok(DoctorShortResponse.fromEntity(doctor));
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Doctor no encontrado: " + e.getMessage());
-        }
+        Doctor doctor = doctorService.getDoctorById(doctorId);
+        return ResponseEntity.ok(DoctorShortResponse.fromEntity(doctor));
     }
 
     /**
@@ -99,13 +77,8 @@ public class DoctorController {
      */
     @GetMapping("/specialty")
     public ResponseEntity<?> getSpecialties() {
-        try {
-            List<Specialty> specialties = doctorService.getSpecialties();
-            return ResponseEntity.ok(specialties);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error al recuperar especialidades: " + e.getMessage());
-        }
+        List<Specialty> specialties = doctorService.getSpecialties();
+        return ResponseEntity.ok(specialties);
     }
 
     /**
@@ -115,16 +88,11 @@ public class DoctorController {
      */
     @GetMapping("/specialty/{specialty}")
     public ResponseEntity<?> getDoctorsBySpecialty(@PathVariable Specialty specialty) {
-        try {
-            List<Doctor> doctors = doctorService.getDoctorBySpeciality(specialty);
-            List<DoctorResponse> responses = doctors.stream()
-                    .map(DoctorResponse::fromEntity)
-                    .toList();
-            return ResponseEntity.ok(responses);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error al recuperar médicos por especialidad: " + e.getMessage());
-        }
+        List<Doctor> doctors = doctorService.getDoctorBySpeciality(specialty);
+        List<DoctorResponse> responses = doctors.stream()
+                .map(DoctorResponse::fromEntity)
+                .toList();
+        return ResponseEntity.ok(responses);
     }
 
     /**
@@ -140,16 +108,8 @@ public class DoctorController {
             @RequestParam LocalDate laborStart,
             @RequestParam LocalDate laborEnd
     ) {
-        try {
-            doctorService.enableDoctor(doctorId, laborStart, laborEnd);
-            return ResponseEntity.noContent().build();
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Doctor not found: " + e.getMessage());
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error habilitando doctor: " + e.getMessage());
-        }
+        doctorService.enableDoctor(doctorId, laborStart, laborEnd);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -163,16 +123,8 @@ public class DoctorController {
             @PathVariable UUID doctorId,
             @RequestParam LocalDate laborStart
     ) {
-        try {
-            doctorService.updateDoctorLaborStart(doctorId, laborStart);
-            return ResponseEntity.noContent().build();
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Doctor no encontrado: " + e.getMessage());
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error actualizando la fecha de inicio: " + e.getMessage());
-        }
+        doctorService.updateDoctorLaborStart(doctorId, laborStart);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -186,16 +138,8 @@ public class DoctorController {
             @PathVariable UUID doctorId,
             @RequestParam LocalDate laborEnd
     ) {
-        try {
-            doctorService.updateDoctorLaborEnd(doctorId, laborEnd);
-            return ResponseEntity.noContent().build();
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Doctor no encontrado: " + e.getMessage());
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error actualizando la fecha de finalización: " + e.getMessage());
-        }
+        doctorService.updateDoctorLaborEnd(doctorId, laborEnd);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -209,16 +153,8 @@ public class DoctorController {
             @PathVariable UUID doctorId,
             @RequestParam int appointmentInterval
     ) {
-        try {
-            doctorService.updateDoctorAppointmentInterval(doctorId, appointmentInterval);
-            return ResponseEntity.noContent().build();
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Doctor no encontrado: " + e.getMessage());
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error actualizando el intervalo de atención: " + e.getMessage());
-        }
+        doctorService.updateDoctorAppointmentInterval(doctorId, appointmentInterval);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -232,16 +168,8 @@ public class DoctorController {
             @PathVariable UUID doctorId,
             @RequestParam(defaultValue = "false") boolean force
     ) {
-        try {
-            doctorService.disableDoctor(doctorId, force);
-            return ResponseEntity.noContent().build();
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Doctor not found: " + e.getMessage());
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error deshabilitando doctor: " + e.getMessage());
-        }
+        doctorService.disableDoctor(doctorId, force);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -252,16 +180,8 @@ public class DoctorController {
      */
     @PutMapping("/{doctorId}/sync-status")
     public ResponseEntity<?> updateDoctorStatus(@PathVariable UUID doctorId) {
-        try {
-            doctorService.updateDoctorStatus(doctorId);
-            return ResponseEntity.noContent().build();
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Doctor not found: " + e.getMessage());
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error al actualizar el estado del médico: " + e.getMessage());
-        }
+        doctorService.updateDoctorStatus(doctorId);
+        return ResponseEntity.noContent().build();
     }
 
 

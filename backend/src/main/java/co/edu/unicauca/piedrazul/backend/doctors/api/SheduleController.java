@@ -7,9 +7,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import co.edu.unicauca.piedrazul.backend.doctors.application.ScheduleService;
-import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,26 +35,18 @@ public class SheduleController {
             @PathVariable UUID doctorId,
             @RequestBody CreateScheduleRequest request
     ) {
-        try {
-            var doctor = doctorService.getDoctorById(doctorId);
-            
-            Schedule schedule = new Schedule(
-                    doctor,
-                    request.startTime(),
-                    request.endTime(),
-                    request.workday()
-            );
-            
-            Schedule savedSchedule = scheduleService.addSchedule(doctor, schedule);
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(ScheduleResponse.fromEntity(savedSchedule));
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Doctor not found: " + e.getMessage());
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error creating schedule: " + e.getMessage());
-        }
+        var doctor = doctorService.getDoctorById(doctorId);
+
+        Schedule schedule = new Schedule(
+            doctor,
+            request.startTime(),
+            request.endTime(),
+            request.workday()
+        );
+
+        Schedule savedSchedule = scheduleService.addSchedule(doctor, schedule);
+        return ResponseEntity.status(201)
+            .body(ScheduleResponse.fromEntity(savedSchedule));
     }
 
     /**
@@ -72,25 +62,17 @@ public class SheduleController {
             @PathVariable Workday workday,
             @RequestBody CreateScheduleRequest request
     ) {
-        try {
-            var doctor = doctorService.getDoctorById(doctorId);
-            
-            Schedule newScheduleData = new Schedule(
-                    doctor,
-                    request.startTime(),
-                    request.endTime(),
-                    workday
-            );
-            
-            Schedule updatedSchedule = scheduleService.updateScheduleByWorkday(doctor, workday, newScheduleData);
-            return ResponseEntity.ok(ScheduleResponse.fromEntity(updatedSchedule));
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Doctor not found: " + e.getMessage());
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error updating schedule: " + e.getMessage());
-        }
+        var doctor = doctorService.getDoctorById(doctorId);
+
+        Schedule newScheduleData = new Schedule(
+            doctor,
+            request.startTime(),
+            request.endTime(),
+            workday
+        );
+
+        Schedule updatedSchedule = scheduleService.updateScheduleByWorkday(doctor, workday, newScheduleData);
+        return ResponseEntity.ok(ScheduleResponse.fromEntity(updatedSchedule));
     }
 
     /**
@@ -100,20 +82,12 @@ public class SheduleController {
      */
     @GetMapping("/{doctorId}")
     public ResponseEntity<?> getSchedulesByDoctor(@PathVariable UUID doctorId) {
-        try {
-            var doctor = doctorService.getDoctorById(doctorId);
-            List<Schedule> schedules = scheduleService.getSchedulesByDoctor(doctor);
-            List<ScheduleResponse> responses = schedules.stream()
-                    .map(ScheduleResponse::fromEntity)
-                    .toList();
-            return ResponseEntity.ok(responses);
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Doctor not found: " + e.getMessage());
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error retrieving schedules: " + e.getMessage());
-        }
+        var doctor = doctorService.getDoctorById(doctorId);
+        List<Schedule> schedules = scheduleService.getSchedulesByDoctor(doctor);
+        List<ScheduleResponse> responses = schedules.stream()
+                .map(ScheduleResponse::fromEntity)
+                .toList();
+        return ResponseEntity.ok(responses);
     }
 
     /**
@@ -127,22 +101,14 @@ public class SheduleController {
             @PathVariable UUID doctorId,
             @PathVariable Workday workday
     ) {
-        try {
-            var doctor = doctorService.getDoctorById(doctorId);
-            List<LocalTime> availableIntervals = scheduleService.getAvailableIntervalsByWorkday(doctor, workday);
-            
-            AvailableIntervalsResponse response = new AvailableIntervalsResponse(
-                    workday.toString(),
-                    availableIntervals
-            );
-            
-            return ResponseEntity.ok(response);
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Doctor not found: " + e.getMessage());
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Error retrieving available intervals: " + e.getMessage());
-        }
+        var doctor = doctorService.getDoctorById(doctorId);
+        List<LocalTime> availableIntervals = scheduleService.getAvailableIntervalsByWorkday(doctor, workday);
+
+        AvailableIntervalsResponse response = new AvailableIntervalsResponse(
+            workday.toString(),
+            availableIntervals
+        );
+
+        return ResponseEntity.ok(response);
     }
 }
