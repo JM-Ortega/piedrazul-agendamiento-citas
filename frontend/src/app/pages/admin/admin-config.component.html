@@ -106,18 +106,7 @@
               @if (editingId() !== doctor.id) {
                 <button
                   (click)="edit(doctor)"
-                  [disabled]="doctor.status === false"
-                  class="flex items-center gap-2 px-5 py-2.5 rounded-xl transition-colors text-base"
-                  [class]="
-                    doctor.status === false
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-blue-100 hover:bg-blue-200 text-blue-700 cursor-pointer'
-                  "
-                  [title]="
-                    doctor.status === false
-                      ? 'Habilite al médico para editar su configuración'
-                      : ''
-                  "
+                  class="flex items-center gap-2 px-5 py-2.5 rounded-xl transition-colors text-base bg-blue-100 hover:bg-blue-200 text-blue-700 cursor-pointer"
                 >
                   <lucide-icon [img]="Pencil" [size]="18"></lucide-icon>
                   Editar
@@ -182,8 +171,6 @@
                       Horarios personalizados por día
                     </span>
                   }
-
-                  <!-- Botón Habilitar/Deshabilitar -->
                   <button
                     (click)="openToggleModal(doctor)"
                     class="flex items-center gap-2 px-4 py-1.5 rounded-lg font-semibold text-base transition-all"
@@ -203,7 +190,6 @@
                   </button>
                 </div>
 
-                <!-- Período laboral -->
                 <div class="flex flex-wrap gap-3 text-sm text-gray-600">
                   <span
                     class="bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg flex items-center gap-1"
@@ -214,7 +200,6 @@
                   </span>
                 </div>
 
-                <!-- Horarios por día -->
                 @if (hasRealDayOverrides(doctor)) {
                   <div class="flex flex-wrap gap-2">
                     @for (day of doctor.workdays; track day) {
@@ -242,7 +227,7 @@
             <!-- Edit Form -->
             @if (editingId() === doctor.id && editForm()) {
               <div class="px-5 pb-5 space-y-6 border-t border-blue-200 pt-5">
-                <!-- Sección: Período laboral -->
+                <!-- Período Laboral -->
                 <div>
                   <p
                     class="text-gray-700 font-semibold text-base mb-3 flex items-center gap-2"
@@ -309,7 +294,7 @@
                   }
                 </div>
 
-                <!-- Sección: Horario semanal + intervalo -->
+                <!-- Horario Semanal -->
                 <div>
                   <p
                     class="text-gray-700 font-semibold text-base mb-3 flex items-center gap-2"
@@ -324,7 +309,6 @@
                   <div
                     class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
                   >
-                    <!-- Hora Inicio (por defecto) -->
                     <div>
                       <label class="block text-gray-700 mb-1 text-base"
                         >Hora Inicio (por defecto)</label
@@ -351,8 +335,6 @@
                         }
                       </select>
                     </div>
-
-                    <!-- Hora Fin (por defecto) -->
                     <div>
                       <label class="block text-gray-700 mb-1 text-base"
                         >Hora Fin (por defecto)</label
@@ -379,8 +361,6 @@
                         }
                       </select>
                     </div>
-
-                    <!-- Intervalo -->
                     <div>
                       <label class="block text-gray-700 mb-1 text-base"
                         >Intervalo (min)</label
@@ -418,13 +398,12 @@
                   }
                 </div>
 
-                <!-- Sección: Días de atención -->
+                <!-- Días de Atención -->
                 <div>
                   <label
                     class="block text-gray-700 mb-2 text-base font-semibold"
+                    >Días de Atención</label
                   >
-                    Días de Atención
-                  </label>
                   <div class="flex gap-2 flex-wrap">
                     @for (day of weekDays; track day) {
                       <button
@@ -447,7 +426,7 @@
                   }
                 </div>
 
-                <!-- Sección: Horarios por día -->
+                <!-- Horarios por día -->
                 @if (editForm()!.workdays.length > 0) {
                   <div
                     class="border-2 border-blue-100 rounded-xl overflow-hidden"
@@ -519,14 +498,12 @@
                                   </div>
                                   <span
                                     class="text-gray-700 text-base hidden sm:block"
+                                    >{{ DAY_FULL_LABELS[day] }}</span
                                   >
-                                    {{ DAY_FULL_LABELS[day] }}
-                                  </span>
                                 </div>
                                 <div
                                   class="flex flex-1 flex-wrap gap-3 items-end"
                                 >
-                                  <!-- Hora Inicio por día -->
                                   <div class="flex-1 min-w-[130px]">
                                     <label
                                       class="block text-gray-600 text-sm mb-1"
@@ -565,8 +542,6 @@
                                       }
                                     </select>
                                   </div>
-
-                                  <!-- Hora Fin por día -->
                                   <div class="flex-1 min-w-[130px]">
                                     <label
                                       class="block text-gray-600 text-sm mb-1"
@@ -605,7 +580,6 @@
                                       }
                                     </select>
                                   </div>
-
                                   @if (hasDayOverride(day)) {
                                     <button
                                       (click)="resetDaySchedule(day)"
@@ -616,7 +590,6 @@
                                   }
                                 </div>
                               </div>
-
                               @if (errorHorariosDia()[day]) {
                                 <p
                                   class="text-red-500 text-xs mt-2 sm:ml-[52px]"
@@ -781,6 +754,36 @@
           Sí, forzar
         </button>
       </div>
+    </div>
+  </div>
+}
+
+<!-- Modal Error al Guardar -->
+@if (showErrorGuardadoModal()) {
+  <div
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    (click)="closeErrorGuardadoModal()"
+  >
+    <div
+      class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-xl font-bold text-gray-800">⚠️ Error al guardar</h3>
+        <button
+          (click)="closeErrorGuardadoModal()"
+          class="text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <lucide-icon [img]="X" [size]="24"></lucide-icon>
+        </button>
+      </div>
+      <p class="text-gray-600 text-base mb-6">{{ errorGuardado() }}</p>
+      <button
+        (click)="closeErrorGuardadoModal()"
+        class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors text-base font-medium"
+      >
+        Entendido
+      </button>
     </div>
   </div>
 }
