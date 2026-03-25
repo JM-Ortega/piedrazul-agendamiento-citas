@@ -235,7 +235,7 @@ export class NewAppointmentSchedulerComponent {
       next: (specs) => {
         if (!specs || specs.length === 0) {
           this.noSpecialtyAvailable.set(true);
-          this.errorMessageSpecialty.set('⚠️ No hay especialidades disponibles.');
+          this.errorMessageSpecialty.set(' No hay especialidades disponibles.');
           return;
         }
 
@@ -255,7 +255,7 @@ export class NewAppointmentSchedulerComponent {
         const errorCode = err.error?.errorCode;
         const detail = err.error?.detail;
 
-        if(err.status === 0){ this.errorMessageSpecialty.set('No se pudo conectar con el servidor. Intente mas tarde.'); return;}
+        if(err.status === 0){ this.errorMessageSpecialty.set(' No se pudo conectar con el servidor. Intente mas tarde.'); return;}
 
         switch(err.status){
           case 404:
@@ -278,8 +278,8 @@ export class NewAppointmentSchedulerComponent {
         error: (err) => { 
           this.noSpecialtyAvailable.set(true);
           switch(err.status){
-            case 404:
-              this.errorMessageSpecialty.set('⚠️ No hay médicos disponibles para ninguna especialidad. Intente más tarde.');
+            case 409:
+              this.errorMessageSpecialty.set('No hay médicos disponibles para ninguna especialidad. Intente más tarde.');
               break;
             case 0:
               this.errorMessageSpecialty.set('No se pudo conectar con el servidor. Intente mas tarde');
@@ -338,7 +338,7 @@ export class NewAppointmentSchedulerComponent {
           this.noDoctorsFound.set(true)
           switch (err.status) {
             case 404:
-              this.errorMessageDoctors.set('⚠️ No hay médicos disponibles para esta especialidad.');
+              this.errorMessageDoctors.set('No hay médicos disponibles para esta especialidad.');
               break;
             case 0:
               this.errorMessageDoctors.set('No se pudo conectar con el servidor. Intente más tarde.');
@@ -412,7 +412,7 @@ export class NewAppointmentSchedulerComponent {
 
           if (slots.length === 0) {
             this.noSlotsAvailable.set(true);
-            this.errorMessageSlots.set('⚠️ No hay horarios disponibles para esta fecha.');
+            this.errorMessageSlots.set(' No hay horarios disponibles para esta fecha.');
           }
         },
         error: (err) =>{

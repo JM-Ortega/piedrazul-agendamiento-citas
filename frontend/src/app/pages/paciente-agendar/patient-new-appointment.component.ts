@@ -199,7 +199,7 @@ export class PatientNewAppointmentComponent {
         next: (slots) => {
           this.availableSlots.set(slots);
 
-          if (slots.length === 0) {
+          if (!slots || slots.length === 0) {
             this.noSlotsAvailable.set(true);
             this.errorMessageSlots.set(' No hay horarios disponibles para esta fecha.');
           }
