@@ -1,0 +1,169 @@
+<!-- Hero Principal -->
+<section
+  class="relative text-white overflow-hidden"
+  style="
+    background-image: url(&quot;/piedrazul.png&quot;);
+    background-size: cover;
+    background-position: center;
+    min-height: 560px;
+  "
+>
+  <div
+    class="absolute inset-0 bg-gradient-to-r from-gray-900/75 to-gray-700/60"
+  ></div>
+  <div
+    class="relative max-w-4xl mx-auto px-6 py-24 flex flex-col items-center text-center gap-8"
+  >
+    <p
+      class="text-blue-200 text-xl md:text-2xl font-medium tracking-wide uppercase"
+    >
+      Centro Médico
+    </p>
+    <h1 class="text-5xl md:text-7xl font-bold drop-shadow-lg leading-tight">
+      Piedra Azul
+    </h1>
+    <p class="text-blue-100 text-xl md:text-2xl max-w-2xl leading-relaxed">
+      Sistema de Gestión de Citas Médicas
+    </p>
+
+    <!-- Botón principal paciente -->
+    <button
+      (click)="openModal()"
+      class="flex items-center gap-4 bg-white text-blue-700 hover:bg-blue-50 font-bold px-12 py-7 rounded-2xl text-2xl md:text-3xl shadow-2xl transition-all hover:scale-105 active:scale-95 mt-4"
+    >
+      <lucide-angular [img]="Calendar" [size]="40"></lucide-angular>
+      Agendar mi Cita
+    </button>
+
+    <p class="text-blue-200 text-lg">
+      ¿Es usted personal del centro?
+      <button
+        (click)="goAcceso()"
+        class="underline text-white hover:text-blue-200 font-semibold transition-colors ml-1"
+      >
+        Ingrese aquí
+      </button>
+    </p>
+
+    <!-- Badges informativos -->
+    <div class="flex flex-wrap justify-center gap-4 text-blue-100 mt-2">
+      <div
+        class="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-5 py-3 rounded-xl"
+      >
+        <lucide-angular [img]="Clock" size="22" color="white"></lucide-angular>
+        <span class="text-lg">Lun – Vie · 7:00 AM a 12:00 M</span>
+      </div>
+      <div
+        class="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-5 py-3 rounded-xl"
+      >
+        <lucide-angular [img]="Shield" size="22" color="white"></lucide-angular>
+        <span class="text-lg">Sistema seguro</span>
+      </div>
+      <div
+        class="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-5 py-3 rounded-xl"
+      >
+        <lucide-angular [img]="Phone" size="22" color="white"></lucide-angular>
+        <span class="text-lg">Fácil de usar</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Info Section -->
+<section class="bg-blue-700 text-white py-12 px-4">
+  <div class="max-w-4xl mx-auto text-center">
+    <h2 class="text-3xl mb-4">¿Cómo llegar a Piedrazul?</h2>
+    <p class="text-blue-100 text-xl mb-4">
+      📍 Ubicación:
+      <span class="text-white">
+        <a
+          href="https://www.google.com/maps/place/Red+de+Servicio+%22Piedra+Azul%22+-+Consulta+de+medicina+alternativa/@2.4264893,-76.5721823,17z/data=!4m9!1m2!2m1!1sdonde+queda+ubicada+piedra+azul+popayan!3m5!1s0x8e30030054096d7f:0xb11a12b7d48d45cd!8m2!3d2.4264559!4d-76.5685225!16s%2Fg%2F11vq2js93m?entry=ttu&g_ep=EgoyMDI2MDMwNC4xIKXMDSoASAFQAw%3D%3D"
+          class="underline hover:text-blue-200"
+        >
+          Piedrazul - Popayán, Cauca, a 5 kilómetros de la ciudad
+        </a>
+      </span>
+    </p>
+    <p class="text-white text-lg">
+      📅 Horarios de atención: Lunes a Viernes de 7:00 AM a 12:00 M
+    </p>
+  </div>
+</section>
+
+<!-- Modal Paciente -->
+@if (showModal()) {
+  <div
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    (click)="closeModal()"
+  >
+    <div
+      class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="flex items-center gap-3 mb-6">
+        <div class="bg-blue-100 rounded-full p-3">
+          <lucide-angular
+            [img]="Calendar"
+            [size]="28"
+            class="text-blue-600"
+          ></lucide-angular>
+        </div>
+        <h2 class="text-blue-800 text-2xl font-bold">Ingreso de Paciente</h2>
+      </div>
+
+      @if (error()) {
+        <div
+          class="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-xl mb-4 text-base"
+        >
+          {{ error() }}
+        </div>
+      }
+
+      <div class="space-y-5">
+        <div>
+          <label class="block text-gray-700 mb-2 text-xl font-medium"
+            >Correo Electrónico</label
+          >
+          <input
+            type="email"
+            [value]="email()"
+            (input)="email.set($any($event.target).value)"
+            placeholder="tucorreo@email.com"
+            class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-4 text-xl outline-none transition-colors"
+          />
+        </div>
+        <div>
+          <label class="block text-gray-700 mb-2 text-xl font-medium"
+            >Contraseña</label
+          >
+          <input
+            type="password"
+            [value]="password()"
+            (input)="password.set($any($event.target).value)"
+            placeholder="••••••••"
+            class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-4 text-xl outline-none transition-colors"
+            (keydown.enter)="loginPatient()"
+          />
+        </div>
+        <button
+          (click)="loginPatient()"
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-xl text-2xl font-bold transition-colors"
+        >
+          Ingresar
+        </button>
+        <button
+          (click)="goRegister()"
+          class="w-full border-2 border-blue-300 text-blue-600 hover:bg-blue-50 py-4 rounded-xl text-xl transition-colors"
+        >
+          Crear cuenta nueva
+        </button>
+        <button
+          (click)="closeModal()"
+          class="w-full text-gray-400 hover:text-gray-600 py-2 text-lg transition-colors"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+}
