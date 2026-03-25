@@ -1,7 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.exception;
 
-public class InvalidEmailException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class InvalidEmailException extends AppointmentBusinessException {
     public InvalidEmailException(String message) {
-        super(message);
+        super(message, "INVALID_EMAIL", HttpStatus.BAD_REQUEST);
     }
 }

@@ -1,7 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.exception;
 
-public class InvalidPhoneException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class InvalidPhoneException extends AppointmentBusinessException {
     public InvalidPhoneException(String message) {
-        super(message);
+        super(message, "INVALID_PHONE", HttpStatus.BAD_REQUEST);
     }
 }

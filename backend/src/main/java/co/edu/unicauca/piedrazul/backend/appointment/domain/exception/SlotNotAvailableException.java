@@ -1,7 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.exception;
 
-public class SlotNotAvailableException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class SlotNotAvailableException extends AppointmentBusinessException {
     public SlotNotAvailableException(String message) {
-        super(message);
+        super(message, "SLOT_CONFLICT", HttpStatus.CONFLICT);
     }
 }
