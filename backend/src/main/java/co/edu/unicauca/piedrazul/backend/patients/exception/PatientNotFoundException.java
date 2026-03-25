@@ -12,7 +12,7 @@ public class PatientNotFoundException extends PatientBusinessException {
 
     public PatientNotFoundException(String documentNumber) {
         super(
-                "Patient not found with document number: " + documentNumber,
+                "Paciente no encontrado con numero de documento: " + documentNumber,
                 "PATIENT_NOT_FOUND",
                 HttpStatus.NOT_FOUND
         );
