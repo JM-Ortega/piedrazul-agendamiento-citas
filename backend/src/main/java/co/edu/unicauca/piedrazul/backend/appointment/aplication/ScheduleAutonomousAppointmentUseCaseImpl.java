@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.aplication;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientAlreadyScheduledInSpecialtyException;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientScheduleTimeConflictException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
@@ -49,6 +50,7 @@ public class ScheduleAutonomousAppointmentUseCaseImpl implements ScheduleAutonom
                 .findByDoctorIdAndDate(idDoctor, date);
 
         validateUniqueScheduledAppointmentBySpecialty(idPatient, specialty);
+        validateNoTimeConflictForPatient(idPatient, date, startTime);
 
         // 4. Delega la lógica de negocio al servicio de dominio
         String patientName= patientConsultPort.findById(idPatient).getFirstName() + " " + patientConsultPort.findById(idPatient).getLastName();
@@ -64,16 +66,29 @@ public class ScheduleAutonomousAppointmentUseCaseImpl implements ScheduleAutonom
         return appointment;
     }
 
-        private void validateUniqueScheduledAppointmentBySpecialty(UUID idPatient, Specialty specialty) {
-                boolean hasScheduledInSameSpecialty = appointmentRepository.findByPatientId(idPatient)
-                                .stream()
-                                .anyMatch(appointment -> appointment.getSpecialty() == specialty
-                                                && appointment.getAppointmentState() == AppointmentState.AGENDADA);
+    private void validateUniqueScheduledAppointmentBySpecialty(UUID idPatient, Specialty specialty) {
+        boolean hasScheduledInSameSpecialty = appointmentRepository.findByPatientId(idPatient)
+                .stream()
+                .anyMatch(appointment -> appointment.getSpecialty() == specialty
+                        && appointment.getAppointmentState() == AppointmentState.AGENDADA);
 
-                if (hasScheduledInSameSpecialty) {
-                        throw new PatientAlreadyScheduledInSpecialtyException(
-                                        "El paciente ya tiene una cita AGENDADA para la especialidad " + specialty
-                        );
-                }
+        if (hasScheduledInSameSpecialty) {
+            throw new PatientAlreadyScheduledInSpecialtyException(
+                    "El paciente ya tiene una cita AGENDADA para la especialidad " + specialty
+            );
         }
+    }
+
+    private void validateNoTimeConflictForPatient(UUID idPatient, LocalDate date, AppointmentTime startTime) {
+        boolean hasTimeConflict = appointmentRepository.findByPatientIdAndDate(idPatient, date)
+                .stream()
+                .anyMatch(appointment -> appointment.getStartTime().equals(startTime)
+                        && appointment.getAppointmentState().isActive());
+
+        if (hasTimeConflict) {
+            throw new PatientScheduleTimeConflictException(
+                    "El paciente ya tiene una cita activa para la fecha " + date + " a las " + startTime.getTime()
+            );
+        }
+    }
 }
