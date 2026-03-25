@@ -1,7 +1,5 @@
 package co.edu.unicauca.piedrazul.backend.doctors;
 
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
-
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -18,9 +16,9 @@ public interface DoctorExternalService {
 
     String getDoctorName(UUID idDoctor);
 
-    List<DoctorResponse> getActiveDoctors ();
+    List<DoctorPublicInfo> getActiveDoctors ();
 
     List<UUID> getActiveDoctorIds();
 
-    List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
+    List<DoctorPublicInfo> getDoctorInfoByIds(List<UUID> doctorIds);
 }

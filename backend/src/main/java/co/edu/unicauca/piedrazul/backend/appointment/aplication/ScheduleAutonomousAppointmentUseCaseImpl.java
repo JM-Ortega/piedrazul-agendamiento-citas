@@ -38,7 +38,6 @@ public class ScheduleAutonomousAppointmentUseCaseImpl implements ScheduleAutonom
     @Override
     public Appointment scheduleAutonomous(UUID idPatient, UUID idDoctor, Specialty specialty, LocalDate date, AppointmentTime startTime) {
         // 1. Obtiene datos del paciente a través del puerto de salida (módulo de pacientes)
-        //PatientInfo patientInfo = patientConsultPort.findById(idPatient);
         String doctorName = doctorConfigConsultPort.getDoctorName(idDoctor);
 
         // 2. Obtiene configuración del médico a través del puerto de salida

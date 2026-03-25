@@ -2,7 +2,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.aplication;
 
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetSpecialtiesWithDoctorUseCase;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.DoctorPublicInfo;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,7 +16,7 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
 	}
 
 	@Override
-	public List<DoctorResponse> getSpecialtiesWithDoctor() {
+	public List<DoctorPublicInfo> getSpecialtiesWithDoctor() {
 		return getSpecialtiesWithDoctorUseCase.getSpecialtiesWithDoctor();
 	}
 }

@@ -4,7 +4,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.NoAvailabl
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetSpecialtiesWithDoctorUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.DoctorPublicInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +32,7 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
     }
 
     @Override
-    public List<DoctorResponse> getSpecialtiesWithDoctor() {
+    public List<DoctorPublicInfo> getSpecialtiesWithDoctor() {
         LocalDate from = LocalDate.now();
         LocalDate to = from.plusMonths(1);
         logger.info("=== INICIANDO BÚSQUEDA DE ESPECIALIDADES CON DOCTORES ===");
@@ -67,17 +67,17 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
                 .map(Map.Entry::getKey)
                 .toList();
 
-        List<DoctorResponse> doctorsInfo = doctorConfigConsultPort.getDoctorInfoByIds(orderedDoctorIds);
-        Map<UUID, DoctorResponse> doctorInfoById = new LinkedHashMap<>();
-        for (DoctorResponse doctor : doctorsInfo) {
+        List<DoctorPublicInfo> doctorsInfo = doctorConfigConsultPort.getDoctorInfoByIds(orderedDoctorIds);
+        Map<UUID, DoctorPublicInfo> doctorInfoById = new LinkedHashMap<>();
+        for (DoctorPublicInfo doctor : doctorsInfo) {
             doctorInfoById.put(doctor.id(), normalizeDoctorResponse(doctor));
         }
 
         Set<String> selectedSpecialties = new HashSet<>();
-        List<DoctorResponse> result = new ArrayList<>();
+        List<DoctorPublicInfo> result = new ArrayList<>();
 
         for (UUID doctorId : orderedDoctorIds) {
-            DoctorResponse doctor = doctorInfoById.get(doctorId);
+            DoctorPublicInfo doctor = doctorInfoById.get(doctorId);
             if (doctor == null) {
                 logger.warn("Doctor {} no encontrado en info", doctorId);
                 continue;
@@ -98,7 +98,7 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
 
             selectedSpecialties.add(specialtyToAssign);
             logger.info("✓ Doctor {} ({}) SELECCIONADO para especialidad: {}", doctorId, doctor.name(), specialtyToAssign);
-            result.add(new DoctorResponse(
+                result.add(new DoctorPublicInfo(
                     specialtyToAssign,
                     doctor.id(),
                     doctor.name(),
@@ -153,7 +153,7 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
         return total;
     }
 
-    private DoctorResponse normalizeDoctorResponse(DoctorResponse doctor) {
+    private DoctorPublicInfo normalizeDoctorResponse(DoctorPublicInfo doctor) {
         List<Integer> normalizedWorkdays = doctor.workdays() == null
                 ? List.of()
                 : doctor.workdays().stream()
@@ -165,7 +165,7 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
         List<String> specialties = extractSpecialties(doctor.specialty());
         String normalizedSpecialty = specialties.isEmpty() ? "SIN_ESPECIALIDAD" : specialties.getFirst();
 
-        return new DoctorResponse(
+        return new DoctorPublicInfo(
                 normalizedSpecialty,
                 doctor.id(),
                 doctor.name(),
