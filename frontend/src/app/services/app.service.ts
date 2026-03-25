@@ -5,7 +5,7 @@ import { UserRole } from '../models/user.model';
 @Injectable({ providedIn: 'root' })
 export class AppService {
   private _currentPatient = signal<Patient | null>({
-    id: '6d7d17f0-6a3e-43d2-83da-e57849a79266',
+    id: '1758aac8-628a-44ee-9fea-aa2e0aab389a',
     documentType: 'CEDULA',
     documentNumber: '12345678',
     firstName: 'Maria',
@@ -13,7 +13,7 @@ export class AppService {
     phone: '3001234567',
     gender: 'FEMENINO',
     birthDate: '1990-05-15',
-    email: 'maria.lopez@email.com'
+    email: 'maria.lopez@email.com',
   });
   readonly currentPatient = computed(() => this._currentPatient());
   private _currentUser = signal<Patient | null>(null);
