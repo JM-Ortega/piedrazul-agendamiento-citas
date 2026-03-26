@@ -1,14 +1,15 @@
 package co.edu.unicauca.piedrazul.backend.patients.application;
 
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientData;
-import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
-import co.edu.unicauca.piedrazul.backend.patients.domain.Gender;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
 import co.edu.unicauca.piedrazul.backend.patients.exception.InvalidPatientDataException;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyExistsException;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyLinkedUserException;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
+import co.edu.unicauca.piedrazul.backend.patients.infrastructure.mappers.PatientApiMapper;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientRepository;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import org.springframework.stereotype.Service;
@@ -33,13 +34,13 @@ public class PatientService implements PatientModuleApi {
 
     @Override
     public PatientData createPatient(
-            DocumentType documentType,
+            PatientDocumentType documentType,
             String documentNumber,
             String firstName,
             String lastName,
             String phone,
             String email,
-            Gender gender,
+            PatientGender gender,
             LocalDate birthDate,
             String guardianPhone
     ) {
@@ -65,13 +66,13 @@ public class PatientService implements PatientModuleApi {
 
     public PatientData createPatientWithUser(
             String username,
-            DocumentType documentType,
+            PatientDocumentType documentType,
             String documentNumber,
             String firstName,
             String lastName,
             String phone,
             String email,
-            Gender gender,
+            PatientGender gender,
             LocalDate birthDate,
             String guardianPhone
     ) {
@@ -162,25 +163,25 @@ public class PatientService implements PatientModuleApi {
     }
 
     private Patient buildPatient(
-            DocumentType documentType,
+            PatientDocumentType documentType,
             String documentNumber,
             String firstName,
             String lastName,
             String phone,
             String email,
-            Gender gender,
+            PatientGender gender,
             LocalDate birthDate,
             String guardianPhone,
             UUID userId
     ) {
         return new Patient(
-                documentType,
+                PatientApiMapper.toDomainDocumentType(documentType),
                 documentNumber,
                 firstName,
                 lastName,
                 phone,
                 email,
-                gender,
+                PatientApiMapper.toDomainGender(gender),
                 birthDate,
                 guardianPhone,
                 userId
@@ -188,19 +189,7 @@ public class PatientService implements PatientModuleApi {
     }
 
     private PatientData toData(Patient patient) {
-        return new PatientData(
-                patient.getId(),
-                patient.getUserId(),
-                patient.getDocumentType(),
-                patient.getDocumentNumber(),
-                patient.getFirstName(),
-                patient.getLastName(),
-                patient.getPhone(),
-                patient.getEmail(),
-                patient.getGender(),
-                patient.getBirthDate(),
-                patient.getGuardianPhone()
-        );
+        return PatientApiMapper.toPatientData(patient);
     }
 
     private void validateDocumentNumber(String documentNumber) {
