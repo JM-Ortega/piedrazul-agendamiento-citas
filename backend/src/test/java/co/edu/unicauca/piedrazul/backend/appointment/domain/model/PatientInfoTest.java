@@ -376,7 +376,7 @@ class PatientInfoTest {
 
     @Test
     void ofShouldAcceptNullEmailAsOptional() {
-        PatientInfo info = buildAdulto();
+
         // buildAdulto usa email válido, pero validamos que null también pasa
         PatientInfo sinEmail = PatientInfo.of(
                 DocumentType.CEDULA,
