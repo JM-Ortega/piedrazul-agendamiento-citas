@@ -98,6 +98,35 @@ export class AdminConfigComponent implements OnInit {
   showErrorGuardadoModal = signal(false);
 
   private originalWorkdays = signal<number[]>([]);
+  private originalDoctor = signal<Doctor | null>(null);
+
+  hasChanges = computed(() => {
+    const form = this.editForm();
+    const orig = this.originalDoctor();
+    if (!form || !orig) return false;
+
+    if (
+      form.appointmentInterval !== orig.appointmentInterval ||
+      form.laborStart !== orig.laborStart ||
+      form.laborEnd !== orig.laborEnd ||
+      form.startTime !== orig.startTime ||
+      form.endTime !== orig.endTime
+    )
+      return true;
+
+    const formDays = [...(form.workdays ?? [])].sort((a, b) => a - b);
+    const origDays = [...(orig.workdays ?? [])].sort((a, b) => a - b);
+    if (JSON.stringify(formDays) !== JSON.stringify(origDays)) return true;
+
+    for (const day of formDays) {
+      const fd = form.daySchedules?.[day];
+      const od = orig.daySchedules?.[day];
+      if (fd?.startTime !== od?.startTime || fd?.endTime !== od?.endTime)
+        return true;
+    }
+
+    return false;
+  });
 
   totalSpecialties = computed(
     () => new Set(this.doctors().map((d) => d.specialty)).size,
@@ -114,6 +143,7 @@ export class AdminConfigComponent implements OnInit {
 
   canSave = computed(() => {
     return (
+      this.hasChanges() &&
       !this.errorHorarioGlobal() &&
       !this.errorFechas() &&
       !this.errorFechaInicio() &&
@@ -238,20 +268,19 @@ export class AdminConfigComponent implements OnInit {
       daySchedules: { ...(doctor.daySchedules ?? {}) },
     });
     this.originalWorkdays.set([...(doctor.workdays ?? [])]);
+    this.originalDoctor.set({
+      ...doctor,
+      workdays: [...(doctor.workdays ?? [])],
+      daySchedules: { ...(doctor.daySchedules ?? {}) },
+    });
     this.savedId.set(null);
-    this.errorHorarioGlobal.set('');
-    this.errorHorariosDia.set({});
-    this.errorFechas.set('');
-    this.errorFechaInicio.set('');
-    this.errorFechaFin.set('');
-    this.errorIntervalo.set('');
-    this.errorDias.set('');
     this.showDaySchedules.set(false);
+    this.validateForm(); // ← debe ser lo ÚLTIMO, sin ningún .set('') después
   }
-
   cancelEdit(): void {
     this.editingId.set(null);
     this.editForm.set(null);
+    this.originalDoctor.set(null);
     this.errorHorarioGlobal.set('');
     this.errorHorariosDia.set({});
     this.errorFechas.set('');
@@ -676,7 +705,83 @@ export class AdminConfigComponent implements OnInit {
       return ds.startTime !== doctor.startTime || ds.endTime !== doctor.endTime;
     });
   }
+  private validateForm(): void {
+    const form = this.editForm();
+    if (!form) return;
 
+    // Horario global
+    if (!form.startTime || !form.endTime) {
+      this.errorHorarioGlobal.set(
+        'La hora de inicio y hora de fin son obligatorias.',
+      );
+    } else if (form.startTime >= form.endTime) {
+      this.errorHorarioGlobal.set(
+        'La hora de inicio no puede ser igual o posterior a la hora de fin.',
+      );
+    } else {
+      this.errorHorarioGlobal.set(
+        this.validateFranjaVsIntervalo(
+          form.startTime,
+          form.endTime,
+          form.appointmentInterval,
+        ),
+      );
+    }
+
+    // Intervalo
+    if (!form.appointmentInterval || form.appointmentInterval <= 0) {
+      this.errorIntervalo.set('El intervalo debe ser mayor a 0.');
+    } else {
+      this.errorIntervalo.set('');
+    }
+
+    // Fechas laborales
+    if (!form.laborStart) {
+      this.errorFechaInicio.set('La fecha de inicio es obligatoria.');
+    } else {
+      this.errorFechaInicio.set('');
+    }
+
+    if (!form.laborEnd) {
+      this.errorFechaFin.set('La fecha de fin es obligatoria.');
+    } else {
+      this.errorFechaFin.set('');
+    }
+
+    if (form.laborStart && form.laborEnd && form.laborStart >= form.laborEnd) {
+      this.errorFechas.set(
+        'La fecha de inicio no puede ser igual o posterior a la fecha de fin.',
+      );
+    } else {
+      this.errorFechas.set('');
+    }
+
+    // Días
+    if (!(form.workdays ?? []).length) {
+      this.errorDias.set('Debe seleccionar al menos un día de atención.');
+    } else {
+      this.errorDias.set('');
+    }
+
+    // Horarios por día
+    const errors: { [day: number]: string } = {};
+    for (const day of form.workdays ?? []) {
+      const ds = form.daySchedules?.[day];
+      if (!ds) continue;
+      if (ds.startTime >= ds.endTime) {
+        errors[day] =
+          'La hora de inicio no puede ser igual o posterior a la hora de fin.';
+      } else {
+        const err = this.validateFranjaVsIntervalo(
+          ds.startTime,
+          ds.endTime,
+          form.appointmentInterval,
+        );
+        if (err) errors[day] = err;
+      }
+    }
+    this.errorHorariosDia.set(errors);
+  }
   getEditFormDayScheduleCount(): number {
     return Object.keys(this.editForm()?.daySchedules ?? {}).length;
   }

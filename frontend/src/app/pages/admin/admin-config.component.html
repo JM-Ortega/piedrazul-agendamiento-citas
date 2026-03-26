@@ -325,6 +325,13 @@
                             : 'border-blue-200'
                         "
                       >
+                        <option
+                          value=""
+                          disabled
+                          [selected]="!editForm()!.startTime"
+                        >
+                          -- Seleccionar --
+                        </option>
                         @for (t of timeOptions; track t) {
                           <option
                             [value]="t"
@@ -351,6 +358,13 @@
                             : 'border-blue-200'
                         "
                       >
+                        <option
+                          value=""
+                          disabled
+                          [selected]="!editForm()!.endTime"
+                        >
+                          -- Seleccionar --
+                        </option>
                         @for (t of timeOptions; track t) {
                           <option
                             [value]="t"
