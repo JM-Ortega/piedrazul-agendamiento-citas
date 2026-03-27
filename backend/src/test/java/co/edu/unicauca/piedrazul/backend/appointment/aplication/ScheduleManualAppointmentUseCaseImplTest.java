@@ -34,7 +34,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -75,7 +74,6 @@ class ScheduleManualAppointmentUseCaseImplTest {
     void scheduleManualShouldCreatePatientAndSaveAppointmentWhenPatientDoesNotExist() {
         UUID idDoctor  = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
-        PatientInfo patientInfo = buildAdultoPatientInfo();
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
         LocalDate date = LocalDate.now().plusDays(1);
         Appointment expectedAppointment = buildAppointment(idDoctor, idPatient, startTime, date);
