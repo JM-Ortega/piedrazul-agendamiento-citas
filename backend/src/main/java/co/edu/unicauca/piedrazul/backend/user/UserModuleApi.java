@@ -1,20 +1,20 @@
 package co.edu.unicauca.piedrazul.backend.user;
 
-import co.edu.unicauca.piedrazul.backend.user.domain.Role;
-import co.edu.unicauca.piedrazul.backend.user.domain.User;
-
-import java.util.Optional;
 import java.util.UUID;
 
 public interface UserModuleApi {
 
-    User createUser(String username, Role role);
+    UUID createPatientUser(String username);
 
-    Optional<User> findById(UUID id);
+    UUID createDoctorUser(String username);
 
-    Optional<User> findByUsername(String username);
+    UUID createSchedulerUser(String username);
 
-    User activateUser(UUID id);
+    UUID createAdminUser(String username);
 
-    User deactivateUser(UUID id);
+    boolean existsById(UUID id);
+
+    void activateUser(UUID id);
+
+    void deactivateUser(UUID id);
 }

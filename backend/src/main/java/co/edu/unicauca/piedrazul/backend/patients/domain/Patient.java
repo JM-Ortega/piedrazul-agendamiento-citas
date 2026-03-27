@@ -1,5 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.patients.domain;
 
+import co.edu.unicauca.piedrazul.backend.patients.exception.InvalidPatientDataException;
+import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyLinkedUserException;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
@@ -62,25 +64,25 @@ public class Patient {
             UUID userId
     ) {
         if (documentType == null)
-            throw new IllegalArgumentException("documentType is required");
+            throw new InvalidPatientDataException("documentType is required");
 
         if (documentNumber == null || documentNumber.isBlank())
-            throw new IllegalArgumentException("documentNumber is required");
+            throw new InvalidPatientDataException("documentNumber is required");
 
         if (firstName == null || firstName.isBlank())
-            throw new IllegalArgumentException("firstName is required");
+            throw new InvalidPatientDataException("firstName is required");
 
         if (lastName == null || lastName.isBlank())
-            throw new IllegalArgumentException("lastName is required");
+            throw new InvalidPatientDataException("lastName is required");
 
         if (phone == null || phone.isBlank())
-            throw new IllegalArgumentException("phone is required");
+            throw new InvalidPatientDataException("phone is required");
 
         if (gender == null)
-            throw new IllegalArgumentException("gender is required");
+            throw new InvalidPatientDataException("gender is required");
 
         if (birthDate == null)
-            throw new IllegalArgumentException("birthDate is required");
+            throw new InvalidPatientDataException("birthDate is required");
 
         this.documentType = documentType;
         this.documentNumber = documentNumber;
@@ -144,11 +146,11 @@ public class Patient {
 
     public void linkUser(UUID userId) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId cannot be null");
+            throw new InvalidPatientDataException("userId cannot be null");
         }
 
         if (this.userId != null) {
-            throw new IllegalStateException("patient already has a user linked");
+            throw new PatientAlreadyLinkedUserException();
         }
 
         this.userId = userId;

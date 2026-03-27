@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.patients.api.dto;
 
-import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
-import co.edu.unicauca.piedrazul.backend.patients.domain.Gender;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -10,26 +10,26 @@ public class PatientResponse {
 
     private final UUID id;
     private final UUID userId;
-    private final DocumentType documentType;
+    private final PatientDocumentType documentType;
     private final String documentNumber;
     private final String firstName;
     private final String lastName;
     private final String phone;
     private final String email;
-    private final Gender gender;
+    private final PatientGender gender;
     private final LocalDate birthDate;
     private final String guardianPhone;
 
     public PatientResponse(
             UUID id,
             UUID userId,
-            DocumentType documentType,
+            PatientDocumentType documentType,
             String documentNumber,
             String firstName,
             String lastName,
             String phone,
             String email,
-            Gender gender,
+            PatientGender gender,
             LocalDate birthDate,
             String guardianPhone
     ) {
@@ -54,7 +54,7 @@ public class PatientResponse {
         return userId;
     }
 
-    public DocumentType getDocumentType() {
+    public PatientDocumentType getDocumentType() {
         return documentType;
     }
 
@@ -78,7 +78,7 @@ public class PatientResponse {
         return email;
     }
 
-    public Gender getGender() {
+    public PatientGender getGender() {
         return gender;
     }
 

@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.patients.api.dto;
 
-import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
-import co.edu.unicauca.piedrazul.backend.patients.domain.Gender;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -13,7 +13,7 @@ public class CreatePatientWithUserRequest {
     private String username;
 
     @NotNull
-    private DocumentType documentType;
+    private PatientDocumentType documentType;
 
     @NotBlank
     private String documentNumber;
@@ -30,7 +30,7 @@ public class CreatePatientWithUserRequest {
     private String email;
 
     @NotNull
-    private Gender gender;
+    private PatientGender gender;
 
     @NotNull
     private LocalDate birthDate;
@@ -41,7 +41,7 @@ public class CreatePatientWithUserRequest {
         return username;
     }
 
-    public DocumentType getDocumentType() {
+    public PatientDocumentType getDocumentType() {
         return documentType;
     }
 
@@ -65,7 +65,7 @@ public class CreatePatientWithUserRequest {
         return email;
     }
 
-    public Gender getGender() {
+    public PatientGender getGender() {
         return gender;
     }
 

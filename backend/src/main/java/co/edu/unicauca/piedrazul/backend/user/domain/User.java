@@ -1,7 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.user.domain;
 
+import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
+import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyActiveException;
+import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyInactiveException;
 import jakarta.persistence.*;
-import org.hibernate.annotations.UuidGenerator;
+
 import java.util.UUID;
 
 @Entity
@@ -28,11 +31,13 @@ public class User {
     }
 
     public User(String username, Role role) {
+
         if (username == null || username.isBlank()) {
-            throw new IllegalArgumentException("username cannot be blank");
+            throw new InvalidUserDataException("Username cannot be blank");
         }
+
         if (role == null) {
-            throw new IllegalArgumentException("role cannot be null");
+            throw new InvalidUserDataException("Role cannot be null");
         }
 
         this.username = username;
@@ -41,10 +46,16 @@ public class User {
     }
 
     public void activate() {
+        if (this.accountStatus == AccountStatus.ACTIVE) {
+            throw new UserAlreadyActiveException(this.id);
+        }
         this.accountStatus = AccountStatus.ACTIVE;
     }
 
     public void deactivate() {
+        if (this.accountStatus == AccountStatus.INACTIVE) {
+            throw new UserAlreadyInactiveException(this.id);
+        }
         this.accountStatus = AccountStatus.INACTIVE;
     }
 
