@@ -34,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -82,7 +83,7 @@ class ScheduleManualAppointmentUseCaseImplTest {
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
         // Paciente NO existe → findByDocumentNumber devuelve vacío
-        when(patientConsultPort.findByDocumentNumber(patientInfo.getDocumentNumber()))
+        when(patientConsultPort.findByDocumentNumber("12345678"))
                 .thenReturn(Optional.empty());
         // Se crea el paciente y se obtiene su nuevo id
         when(patientConsultPort.createPatient(any(PatientRegistrationData.class)))
@@ -93,7 +94,21 @@ class ScheduleManualAppointmentUseCaseImplTest {
                 any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
         )).thenReturn(expectedAppointment);
 
-        Appointment result = useCase.scheduleManual(patientInfo, idDoctor, Specialty.FISIOTERAPIA, date, startTime);
+        Appointment result = useCase.scheduleManual(
+                DocumentType.CEDULA,
+                "12345678",          // documentNumber
+                "Carlos",            // firstName
+                "Gomez",             // lastName
+                "3001234567",        // phone
+                Gender.MASCULINO,
+                LocalDate.of(1990, 6, 15),
+                "carlos@correo.com",
+                null,                // guardianPhone
+                idDoctor,
+                Specialty.FISIOTERAPIA,
+                date,
+                startTime
+        );
 
         assertThat(result).isEqualTo(expectedAppointment);
         // Debe haber creado el paciente en el módulo externo
@@ -112,7 +127,7 @@ class ScheduleManualAppointmentUseCaseImplTest {
 
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
-        when(patientConsultPort.findByDocumentNumber(patientInfo.getDocumentNumber()))
+        when(patientConsultPort.findByDocumentNumber("12345678"))
                 .thenReturn(Optional.empty());
         when(patientConsultPort.createPatient(any(PatientRegistrationData.class)))
                 .thenReturn(idPatient);
@@ -122,7 +137,21 @@ class ScheduleManualAppointmentUseCaseImplTest {
                 any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
         )).thenReturn(buildAppointment(idDoctor, idPatient, startTime, date));
 
-        useCase.scheduleManual(patientInfo, idDoctor, Specialty.FISIOTERAPIA, date, startTime);
+        useCase.scheduleManual(
+                DocumentType.CEDULA,
+                "12345678",          // documentNumber
+                "Carlos",            // firstName
+                "Gomez",             // lastName
+                "3001234567",        // phone
+                Gender.MASCULINO,
+                LocalDate.of(1990, 6, 15),
+                "carlos@correo.com",
+                null,                // guardianPhone
+                idDoctor,
+                Specialty.FISIOTERAPIA,
+                date,
+                startTime
+        );
 
         // Capturamos el argumento real que se le pasó a createPatient para verificar
         // que los datos del PatientInfo se mapearon correctamente
@@ -152,7 +181,7 @@ class ScheduleManualAppointmentUseCaseImplTest {
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
         // Paciente SÍ existe → findByDocumentNumber devuelve el snapshot
-        when(patientConsultPort.findByDocumentNumber(patientInfo.getDocumentNumber()))
+        when(patientConsultPort.findByDocumentNumber("12345678"))
                 .thenReturn(Optional.of(new PatientSnapshot(idPatient, patientInfo)));
         when(appointmentRepository.findByPatientId(idPatient)).thenReturn(List.of());
         when(appointmentRepository.findByPatientIdAndDate(idPatient, date)).thenReturn(List.of());
@@ -160,7 +189,21 @@ class ScheduleManualAppointmentUseCaseImplTest {
                 any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
         )).thenReturn(buildAppointment(idDoctor, idPatient, startTime, date));
 
-        useCase.scheduleManual(patientInfo, idDoctor, Specialty.FISIOTERAPIA, date, startTime);
+        useCase.scheduleManual(
+                DocumentType.CEDULA,
+                "12345678",          // documentNumber
+                "Carlos",            // firstName
+                "Gomez",             // lastName
+                "3001234567",        // phone
+                Gender.MASCULINO,
+                LocalDate.of(1990, 6, 15),
+                "carlos@correo.com",
+                null,                // guardianPhone
+                idDoctor,
+                Specialty.FISIOTERAPIA,
+                date,
+                startTime
+        );
 
         // Nunca debe crear un nuevo paciente si ya existe
         verify(patientConsultPort, never()).createPatient(any(PatientRegistrationData.class));
@@ -177,7 +220,7 @@ class ScheduleManualAppointmentUseCaseImplTest {
 
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
-        when(patientConsultPort.findByDocumentNumber(patientInfo.getDocumentNumber()))
+        when(patientConsultPort.findByDocumentNumber("12345678"))
                 .thenReturn(Optional.of(new PatientSnapshot(idPatientReal, patientInfo)));
         when(appointmentRepository.findByPatientId(idPatientReal)).thenReturn(List.of());
         when(appointmentRepository.findByPatientIdAndDate(idPatientReal, date)).thenReturn(List.of());
@@ -187,7 +230,21 @@ class ScheduleManualAppointmentUseCaseImplTest {
                 any(), idPatientCaptor.capture(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
         )).thenReturn(buildAppointment(idDoctor, idPatientReal, startTime, date));
 
-        useCase.scheduleManual(patientInfo, idDoctor, Specialty.FISIOTERAPIA, date, startTime);
+        useCase.scheduleManual(
+                DocumentType.CEDULA,
+                "12345678",          // documentNumber
+                "Carlos",            // firstName
+                "Gomez",             // lastName
+                "3001234567",        // phone
+                Gender.MASCULINO,
+                LocalDate.of(1990, 6, 15),
+                "carlos@correo.com",
+                null,                // guardianPhone
+                idDoctor,
+                Specialty.FISIOTERAPIA,
+                date,
+                startTime
+        );
 
         // El id que se le pasa a scheduleManual debe ser el del paciente existente
         assertThat(idPatientCaptor.getValue()).isEqualTo(idPatientReal);
@@ -207,7 +264,7 @@ class ScheduleManualAppointmentUseCaseImplTest {
 
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
-        when(patientConsultPort.findByDocumentNumber(patientInfo.getDocumentNumber()))
+        when(patientConsultPort.findByDocumentNumber("12345678"))
                 .thenReturn(Optional.of(new PatientSnapshot(idPatient, patientInfo)));
 
         // Ya tiene una cita AGENDADA en FISIOTERAPIA
@@ -219,7 +276,21 @@ class ScheduleManualAppointmentUseCaseImplTest {
                 .thenReturn(List.of(citaExistente));
 
         assertThatThrownBy(() ->
-                useCase.scheduleManual(patientInfo, idDoctor, Specialty.FISIOTERAPIA, date, startTime)
+                useCase.scheduleManual(
+                        DocumentType.CEDULA,
+                        "12345678",          // documentNumber
+                        "Carlos",            // firstName
+                        "Gomez",             // lastName
+                        "3001234567",        // phone
+                        Gender.MASCULINO,
+                        LocalDate.of(1990, 6, 15),
+                        "carlos@correo.com",
+                        null,                // guardianPhone
+                        idDoctor,
+                        Specialty.FISIOTERAPIA,
+                        date,
+                        startTime
+                )
         )
                 .isInstanceOf(PatientAlreadyScheduledInSpecialtyException.class)
                 .hasMessageContaining("ya tiene una cita AGENDADA para la especialidad");
@@ -242,7 +313,7 @@ class ScheduleManualAppointmentUseCaseImplTest {
 
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
-        when(patientConsultPort.findByDocumentNumber(patientInfo.getDocumentNumber()))
+        when(patientConsultPort.findByDocumentNumber("12345678"))
                 .thenReturn(Optional.of(new PatientSnapshot(idPatient, patientInfo)));
 
         Appointment cancelada = buildAppointmentWithState(
@@ -255,7 +326,21 @@ class ScheduleManualAppointmentUseCaseImplTest {
                 any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
         )).thenReturn(buildAppointment(idDoctor, idPatient, startTime, date));
 
-        useCase.scheduleManual(patientInfo, idDoctor, Specialty.FISIOTERAPIA, date, startTime);
+        useCase.scheduleManual(
+                DocumentType.CEDULA,
+                "12345678",          // documentNumber
+                "Carlos",            // firstName
+                "Gomez",             // lastName
+                "3001234567",        // phone
+                Gender.MASCULINO,
+                LocalDate.of(1990, 6, 15),
+                "carlos@correo.com",
+                null,                // guardianPhone
+                idDoctor,
+                Specialty.FISIOTERAPIA,
+                date,
+                startTime
+        );
 
         verify(appointmentRepository).save(any(Appointment.class));
     }
@@ -271,7 +356,7 @@ class ScheduleManualAppointmentUseCaseImplTest {
 
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
-        when(patientConsultPort.findByDocumentNumber(patientInfo.getDocumentNumber()))
+        when(patientConsultPort.findByDocumentNumber("12345678"))
                 .thenReturn(Optional.of(new PatientSnapshot(idPatient, patientInfo)));
 
         Appointment otraEspecialidad = buildAppointmentWithState(
@@ -285,7 +370,21 @@ class ScheduleManualAppointmentUseCaseImplTest {
                 any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
         )).thenReturn(buildAppointment(idDoctor, idPatient, startTime, date));
 
-        useCase.scheduleManual(patientInfo, idDoctor, Specialty.FISIOTERAPIA, date, startTime);
+        useCase.scheduleManual(
+                DocumentType.CEDULA,
+                "12345678",          // documentNumber
+                "Carlos",            // firstName
+                "Gomez",             // lastName
+                "3001234567",        // phone
+                Gender.MASCULINO,
+                LocalDate.of(1990, 6, 15),
+                "carlos@correo.com",
+                null,                // guardianPhone
+                idDoctor,
+                Specialty.FISIOTERAPIA,
+                date,
+                startTime
+        );
 
         verify(appointmentRepository).save(any(Appointment.class));
     }
@@ -304,7 +403,7 @@ class ScheduleManualAppointmentUseCaseImplTest {
 
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
-        when(patientConsultPort.findByDocumentNumber(patientInfo.getDocumentNumber()))
+        when(patientConsultPort.findByDocumentNumber("12345678"))
                 .thenReturn(Optional.of(new PatientSnapshot(idPatient, patientInfo)));
         when(appointmentRepository.findByPatientId(idPatient)).thenReturn(List.of());
 
@@ -317,7 +416,21 @@ class ScheduleManualAppointmentUseCaseImplTest {
                 .thenReturn(List.of(conflicto));
 
         assertThatThrownBy(() ->
-                useCase.scheduleManual(patientInfo, idDoctor, Specialty.FISIOTERAPIA, date, startTime)
+                useCase.scheduleManual(
+                        DocumentType.CEDULA,
+                        "12345678",          // documentNumber
+                        "Carlos",            // firstName
+                        "Gomez",             // lastName
+                        "3001234567",        // phone
+                        Gender.MASCULINO,
+                        LocalDate.of(1990, 6, 15),
+                        "carlos@correo.com",
+                        null,                // guardianPhone
+                        idDoctor,
+                        Specialty.FISIOTERAPIA,
+                        date,
+                        startTime
+                )
         )
                 .isInstanceOf(PatientScheduleTimeConflictException.class)
                 .hasMessageContaining("ya tiene una cita activa");
@@ -339,7 +452,7 @@ class ScheduleManualAppointmentUseCaseImplTest {
 
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
-        when(patientConsultPort.findByDocumentNumber(patientInfo.getDocumentNumber()))
+        when(patientConsultPort.findByDocumentNumber("12345678"))
                 .thenReturn(Optional.of(new PatientSnapshot(idPatient, patientInfo)));
         when(appointmentRepository.findByPatientId(idPatient)).thenReturn(List.of());
 
@@ -353,7 +466,21 @@ class ScheduleManualAppointmentUseCaseImplTest {
                 any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
         )).thenReturn(buildAppointment(idDoctor, idPatient, startTime, date));
 
-        useCase.scheduleManual(patientInfo, idDoctor, Specialty.FISIOTERAPIA, date, startTime);
+        useCase.scheduleManual(
+                DocumentType.CEDULA,
+                "12345678",          // documentNumber
+                "Carlos",            // firstName
+                "Gomez",             // lastName
+                "3001234567",        // phone
+                Gender.MASCULINO,
+                LocalDate.of(1990, 6, 15),
+                "carlos@correo.com",
+                null,                // guardianPhone
+                idDoctor,
+                Specialty.FISIOTERAPIA,
+                date,
+                startTime
+        );
 
         verify(appointmentRepository).save(any(Appointment.class));
     }
@@ -373,7 +500,7 @@ class ScheduleManualAppointmentUseCaseImplTest {
 
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
-        when(patientConsultPort.findByDocumentNumber(patientInfo.getDocumentNumber()))
+        when(patientConsultPort.findByDocumentNumber("12345678"))
                 .thenReturn(Optional.of(new PatientSnapshot(idPatient, patientInfo)));
         when(appointmentRepository.findByPatientId(idPatient)).thenReturn(List.of());
         when(appointmentRepository.findByPatientIdAndDate(idPatient, date)).thenReturn(List.of());
@@ -381,7 +508,21 @@ class ScheduleManualAppointmentUseCaseImplTest {
                 any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
         )).thenReturn(expectedAppointment);
 
-        useCase.scheduleManual(patientInfo, idDoctor, Specialty.FISIOTERAPIA, date, startTime);
+        useCase.scheduleManual(
+                DocumentType.CEDULA,
+                "12345678",          // documentNumber
+                "Carlos",            // firstName
+                "Gomez",             // lastName
+                "3001234567",        // phone
+                Gender.MASCULINO,
+                LocalDate.of(1990, 6, 15),
+                "carlos@correo.com",
+                null,                // guardianPhone
+                idDoctor,
+                Specialty.FISIOTERAPIA,
+                date,
+                startTime
+        );
 
         // Verifica que cada colaborador fue invocado exactamente una vez
         verify(doctorConfigConsultPort, times(1)).getIntervalMinutesByDoctor(idDoctor);

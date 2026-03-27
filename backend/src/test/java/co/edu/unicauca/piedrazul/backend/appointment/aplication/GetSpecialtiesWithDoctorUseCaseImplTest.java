@@ -4,7 +4,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.NoAvailabl
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.DoctorPublicInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -81,7 +81,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
     @Test
     void getSpecialtiesWithDoctorShouldReturnDoctorWhenHasAvailableSlots() {
         UUID idDoctor = UUID.randomUUID();
-        DoctorResponse doctorResponse = new DoctorResponse(
+        DoctorPublicInfo   doctorInfo = new DoctorPublicInfo(
                 "FISIOTERAPIA", idDoctor, "Dr. Lopez",
                 LocalDate.now().plusMonths(6), List.of(1, 2, 3)
         );
@@ -93,9 +93,9 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
         when(appointmentRepository.findByDoctorIdAndDate(eq(idDoctor), any(LocalDate.class)))
                 .thenReturn(List.of());
         when(doctorConfigConsultPort.getDoctorInfoByIds(List.of(idDoctor)))
-                .thenReturn(List.of(doctorResponse));
+                .thenReturn(List.of(doctorInfo));
 
-        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor();
+        List<DoctorPublicInfo> result = useCase.getSpecialtiesWithDoctor();
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().id()).isEqualTo(idDoctor);
@@ -126,11 +126,11 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
         when(appointmentRepository.findByDoctorIdAndDate(eq(idDoctor2), any(LocalDate.class)))
                 .thenReturn(List.of());
 
-        DoctorResponse response1 = new DoctorResponse(
+        DoctorPublicInfo response1 = new DoctorPublicInfo(
                 "FISIOTERAPIA", idDoctor1, "Dr. Lopez",
                 LocalDate.now().plusMonths(6), List.of(1)
         );
-        DoctorResponse response2 = new DoctorResponse(
+        DoctorPublicInfo response2 = new DoctorPublicInfo(
                 "QUIROPRAXIA", idDoctor2, "Dr. Gomez",
                 LocalDate.now().plusMonths(6), List.of(1, 2)
         );
@@ -140,7 +140,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
         when(doctorConfigConsultPort.getDoctorInfoByIds(List.of(idDoctor2, idDoctor1)))
                 .thenReturn(List.of(response2, response1));
 
-        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor();
+        List<DoctorPublicInfo> result = useCase.getSpecialtiesWithDoctor();
 
         // El primero debe ser el que tiene más slots
         assertThat(result.getFirst().id()).isEqualTo(idDoctor2);
@@ -161,11 +161,11 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
                 .thenReturn(List.of());
 
         // Ambos tienen la misma especialidad
-        DoctorResponse response1 = new DoctorResponse(
+        DoctorPublicInfo response1 = new DoctorPublicInfo(
                 "FISIOTERAPIA", idDoctor1, "Dr. Lopez",
                 LocalDate.now().plusMonths(6), List.of(1)
         );
-        DoctorResponse response2 = new DoctorResponse(
+        DoctorPublicInfo response2 = new DoctorPublicInfo(
                 "FISIOTERAPIA", idDoctor2, "Dr. Gomez",
                 LocalDate.now().plusMonths(6), List.of(1)
         );
@@ -173,11 +173,12 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
         when(doctorConfigConsultPort.getDoctorInfoByIds(any()))
                 .thenReturn(List.of(response1, response2));
 
-        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor();
+        List<DoctorPublicInfo> result = useCase.getSpecialtiesWithDoctor();
 
         // Solo debe aparecer una vez FISIOTERAPIA
         assertThat(result).hasSize(1);
-        assertThat(result.stream().map(DoctorResponse::specialty).distinct().count())
+        assertThat(result.stream().map(DoctorPublicInfo::specialty).distinct().count())
                 .isEqualTo(1);
     }
+
 }
