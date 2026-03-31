@@ -15,14 +15,15 @@ import java.util.List;
 import java.util.UUID;
 import java.time.DayOfWeek;
 
-// Lombok
-@RequiredArgsConstructor
-
-//Servicio para peticiones externas
-@Service
+// Servicio para peticiones externas
 public class DoctorExternalServiceImpl implements DoctorExternalService {
     private final DoctorRepository doctorRepository;
     private final ScheduleService scheduleService;
+
+    public DoctorExternalServiceImpl(DoctorRepository doctorRepository, ScheduleService scheduleService) {
+        this.doctorRepository = doctorRepository;
+        this.scheduleService = scheduleService;
+    }
 
     @Override
     public boolean existDoctor(UUID idDoctor) {

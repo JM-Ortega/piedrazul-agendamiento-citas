@@ -18,11 +18,13 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/doctor/schedules")
 public class SheduleController {
-    @Autowired
-    private ScheduleService scheduleService;
+    private final ScheduleService scheduleService;
+    private final DoctorService doctorService;
 
-    @Autowired
-    private DoctorService doctorService;
+    public SheduleController(ScheduleService scheduleService, DoctorService doctorService) {
+        this.scheduleService = scheduleService;
+        this.doctorService = doctorService;
+    }
 
     /**
      * Crear un nuevo horario para un doctor
