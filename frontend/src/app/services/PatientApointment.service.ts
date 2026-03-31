@@ -2,20 +2,20 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { AppointmentsPatient } from '../models/DTOs/appointmentsPatient';
+import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class PatientAppointmentService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8080/api';
+  private apiUrl = environment.apiUrl;
 
   readonly appointments = signal<AppointmentsPatient[]>([]);
 
-  getAppointmentsByPatient(patientId: string): Observable<AppointmentsPatient[]> {
-  return this.http.get<AppointmentsPatient[]>(
-    `${this.apiUrl}/appointments`,
-    {
-      params: { idPatient: patientId }
-    }
-  );
-}
+  getAppointmentsByPatient(
+    patientId: string,
+  ): Observable<AppointmentsPatient[]> {
+    return this.http.get<AppointmentsPatient[]>(`${this.apiUrl}/appointments`, {
+      params: { idPatient: patientId },
+    });
+  }
 }

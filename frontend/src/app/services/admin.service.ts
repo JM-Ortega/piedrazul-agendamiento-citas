@@ -3,11 +3,12 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { Doctor } from '../models/doctor.model';
 import { dtoSchedule } from '../models/DTOs/dtoSchedule.model';
+import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class AdminService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8080/api';
+  private apiUrl = environment.apiUrl;
 
   // ── Doctors ──────────────────────────────────────────────────────────────
 

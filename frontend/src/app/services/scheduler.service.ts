@@ -3,11 +3,12 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { dtoAppointment } from '../models/DTOs/dtoAppointment.model';
 import { dtoDoctor } from '../models/DTOs/dtoDoctor.model';
+import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class SchedulerService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8080/api';
+  private apiUrl = environment.apiUrl;
 
   getDoctors(): Observable<dtoDoctor[]> {
     return this.http.get<dtoDoctor[]>(`${this.apiUrl}/doctor/doctors`);

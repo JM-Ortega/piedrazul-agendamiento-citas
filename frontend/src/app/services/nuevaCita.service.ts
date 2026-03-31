@@ -5,11 +5,12 @@ import { Patient } from '../models/patient.model';
 import { NewAppointment } from '../models/DTOs/newAppointment';
 import { SpecialtyDoctor } from '../models/DTOs/specialty-doctor';
 import { map } from 'rxjs/operators';
+import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class NuevaCitaService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8080/api';
+  private apiUrl = environment.apiUrl;
 
   getPatientByDocument(documentId: string): Observable<Patient | null> {
     return this.http.get<Patient>(
@@ -34,12 +35,11 @@ export class NuevaCitaService {
   }
 
   getAvailableSlots(doctorId: string, date: string): Observable<string[]> {
-    return this.http.get<{ time: string }[]>(
-      `${this.apiUrl}/appointments/available-slots`,
-      { params: { doctorId, date } },
-    ).pipe(
-      map(slots => slots.map(s => s.time))
-    );
+    return this.http
+      .get<
+        { time: string }[]
+      >(`${this.apiUrl}/appointments/available-slots`, { params: { doctorId, date } })
+      .pipe(map((slots) => slots.map((s) => s.time)));
   }
 
   addAppointment(data: NewAppointment): Observable<void> {
