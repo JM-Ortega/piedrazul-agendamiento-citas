@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.port.output;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
-import co.edu.unicauca.piedrazul.backend.doctors.DoctorPublicInfo;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -20,6 +20,6 @@ public interface DoctorConfigConsultPort {
     // Obtener IDs de medicos activos
     List<UUID> getActiveDoctorIds();
 
-    // Obtener informacion de medicos en una sola operacion por sus IDs
-    List<DoctorPublicInfo> getDoctorInfoByIds(List<UUID> doctorIds);
+    // Obtener información de medicos en una sola operación por sus IDs
+    List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
 }
