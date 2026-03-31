@@ -5,7 +5,7 @@ import { Patient } from '../models/patient.model';
 import { NewAppointment } from '../models/DTOs/newAppointment';
 import { SpecialtyDoctor } from '../models/DTOs/specialty-doctor';
 import { map } from 'rxjs/operators';
-import { environment } from '../../environments/environment.development';
+import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class NuevaCitaService {

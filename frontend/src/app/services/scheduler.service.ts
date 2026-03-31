@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { dtoAppointment } from '../models/DTOs/dtoAppointment.model';
 import { dtoDoctor } from '../models/DTOs/dtoDoctor.model';
-import { environment } from '../../environments/environment.development';
+import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class SchedulerService {
