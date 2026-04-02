@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.config;
+package co.edu.unicauca.piedrazul.backend.config.web;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
