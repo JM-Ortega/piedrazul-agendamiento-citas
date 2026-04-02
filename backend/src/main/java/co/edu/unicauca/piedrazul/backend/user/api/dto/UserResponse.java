@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.user.api.dto;
 
 import co.edu.unicauca.piedrazul.backend.user.domain.AccountStatus;
-import co.edu.unicauca.piedrazul.backend.user.domain.Role;
+import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 
 import java.util.UUID;
 

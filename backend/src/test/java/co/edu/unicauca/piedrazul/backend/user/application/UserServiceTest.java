@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.user.application;
 
 import co.edu.unicauca.piedrazul.backend.user.domain.AccountStatus;
-import co.edu.unicauca.piedrazul.backend.user.domain.Role;
+import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 import co.edu.unicauca.piedrazul.backend.user.domain.User;
 import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
 import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyActiveException;
