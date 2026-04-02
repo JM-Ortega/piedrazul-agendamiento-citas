@@ -12,11 +12,9 @@ import java.util.UUID;
 
 public class AppointmentService {
     private final BusySlotService busySlotService;
-    private final  SlotTimeService slotTimeService;
 
-    public AppointmentService(BusySlotService busySlotService, SlotTimeService slotTimeService) {
+    public AppointmentService(BusySlotService busySlotService) {
         this.busySlotService = busySlotService;
-        this.slotTimeService = slotTimeService;
     }
 
     // El agendador crea la cita manualmente
@@ -82,14 +80,4 @@ public class AppointmentService {
         );
     }
 
-    // Franjas disponibles para mostrarle al frontend
-    // doctorSlots viene del módulo de médicos ya calculadas para ese día
-    // existingAppointments son las citas que ya existen en BD para ese médico y fecha
-    public List<AppointmentTime> getAvailableSlots(List<AppointmentTime> doctorSlots,
-                                                   List<Appointment> existingAppointments,
-                                                   int intervalMinutes) {
-        return slotTimeService.calculateAvailable(
-                doctorSlots, existingAppointments, intervalMinutes
-        );
-    }
 }

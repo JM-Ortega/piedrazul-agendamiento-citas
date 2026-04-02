@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment.aplication;
+package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
@@ -10,7 +10,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrig
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,7 +36,7 @@ class GetAvailableSlotsUseCaseImplTest {
     private DoctorConfigConsultPort doctorConfigConsultPort;
 
     @Mock
-    private AppointmentService appointmentService;
+        private SlotTimeService slotTimeService;
 
     private GetAvailableSlotsUseCaseImpl useCase;
 
@@ -45,7 +45,7 @@ class GetAvailableSlotsUseCaseImplTest {
         useCase = new GetAvailableSlotsUseCaseImpl(
                 appointmentRepository,
                 doctorConfigConsultPort,
-                appointmentService
+                slotTimeService
         );
     }
 
@@ -72,7 +72,7 @@ class GetAvailableSlotsUseCaseImplTest {
         when(doctorConfigConsultPort.getSlotsByDoctor(idDoctor, date)).thenReturn(doctorSlots);
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(existingAppointments);
         when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor)).thenReturn(30);
-        when(appointmentService.getAvailableSlots(doctorSlots, existingAppointments, 30))
+        when(slotTimeService.calculateAvailable(doctorSlots, existingAppointments, 30))
                 .thenReturn(availableSlots);
 
         List<AppointmentTime> result = useCase.getAvailableSlots(idDoctor, date);
@@ -95,7 +95,7 @@ class GetAvailableSlotsUseCaseImplTest {
         when(doctorConfigConsultPort.getSlotsByDoctor(idDoctor, date)).thenReturn(doctorSlots);
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(existingAppointments);
         when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor)).thenReturn(30);
-        when(appointmentService.getAvailableSlots(doctorSlots, existingAppointments, 30))
+        when(slotTimeService.calculateAvailable(doctorSlots, existingAppointments, 30))
                 .thenReturn(List.of());
 
         List<AppointmentTime> result = useCase.getAvailableSlots(idDoctor, date);
@@ -116,7 +116,7 @@ class GetAvailableSlotsUseCaseImplTest {
         when(doctorConfigConsultPort.getSlotsByDoctor(idDoctor, date)).thenReturn(doctorSlots);
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
         when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor)).thenReturn(30);
-        when(appointmentService.getAvailableSlots(doctorSlots, List.of(), 30))
+        when(slotTimeService.calculateAvailable(doctorSlots, List.of(), 30))
                 .thenReturn(doctorSlots);
 
         List<AppointmentTime> result = useCase.getAvailableSlots(idDoctor, date);
@@ -136,14 +136,14 @@ class GetAvailableSlotsUseCaseImplTest {
         when(doctorConfigConsultPort.getSlotsByDoctor(idDoctor, date)).thenReturn(List.of());
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
         when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor)).thenReturn(30);
-        when(appointmentService.getAvailableSlots(List.of(), List.of(), 30)).thenReturn(List.of());
+        when(slotTimeService.calculateAvailable(List.of(), List.of(), 30)).thenReturn(List.of());
 
         useCase.getAvailableSlots(idDoctor, date);
 
         verify(doctorConfigConsultPort).getSlotsByDoctor(idDoctor, date);
         verify(appointmentRepository).findByDoctorIdAndDate(idDoctor, date);
         verify(doctorConfigConsultPort).getIntervalMinutesByDoctor(idDoctor);
-        verify(appointmentService).getAvailableSlots(List.of(), List.of(), 30);
+        verify(slotTimeService).calculateAvailable(List.of(), List.of(), 30);
     }
 
     // ─────────────────────────────────────────────
