@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.user.domain;
+package co.edu.unicauca.piedrazul.backend.shared.auth;
 
 public enum Role {
     ADMIN,
