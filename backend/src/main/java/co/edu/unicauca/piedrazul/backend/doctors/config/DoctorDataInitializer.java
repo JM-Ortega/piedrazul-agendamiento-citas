@@ -36,7 +36,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
         doctorService.createDoctor(new CreateDoctorRequest(
                 "Clara Inés",
                 "Córdoba",
-                "DOC-001",
+                "11000000",
                 List.of(Specialty.TERAPIA_NEURAL),
                 LocalDate.of(2026, 1, 1),
                 LocalDate.of(2026, 12, 31),
@@ -52,7 +52,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
         doctorService.createDoctor(new CreateDoctorRequest(
                 "José Ignacio",
                 "García",
-                "DOC-002",
+                "12000000",
                 List.of(Specialty.FISIOTERAPIA),
                 LocalDate.of(2026, 1, 1),
                 LocalDate.of(2026, 12, 31),
@@ -67,7 +67,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
         doctorService.createDoctor(new CreateDoctorRequest(
                 "Armando",
                 "Peña",
-                "DOC-003",
+                "13000000",
                 List.of(Specialty.QUIROPRAXIA),
                 LocalDate.of(2026, 11, 1),
                 LocalDate.of(2026, 12, 31),

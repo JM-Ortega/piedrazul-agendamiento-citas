@@ -53,7 +53,7 @@ public class DoctorService {
         doctor.setSchedules(schedules);
 
         // 2. Crear el usuario
-        doctor.setIdUser(userModuleApi.createDoctorUser(
+        doctor.setIdUser(userModuleApi.getOrCreateDoctorUser(
                 request.identification(),
                 request.firstName(),
                 request.lastName(),

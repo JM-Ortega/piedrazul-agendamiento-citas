@@ -90,7 +90,7 @@ public class PatientService implements PatientModuleApi {
         validateDocumentNumber(documentNumber);
         ensurePatientDoesNotExist(documentNumber);
 
-        UUID userId = userModuleApi.createPatientUser(
+        UUID userId = userModuleApi.getOrCreatePatientUser(
                 username,
                 firstName,
                 lastName,
@@ -146,7 +146,7 @@ public class PatientService implements PatientModuleApi {
                 code
         );
 
-        UUID userId = userModuleApi.createPatientUser(
+        UUID userId = userModuleApi.getOrCreatePatientUser(
                 documentNumber,
                 patient.getFirstName(),
                 patient.getLastName(),
