@@ -1,11 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.config;
 
 import co.edu.unicauca.piedrazul.backend.appointment.aplication.*;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAvailableSlotsUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetSpecialtiesWithDoctorUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ListAppointmentsUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ScheduleAutonomousAppointmentUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ScheduleManualAppointmentUseCase;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
@@ -103,6 +99,16 @@ public class AppointmentConfig {
         return new GetSpecialtiesWithDoctorUseCaseImpl(
                 appointmentRepository,
                 doctorConfigConsultPort
+        );
+    }
+
+    @Bean
+    public ListMyAppointmentsUseCase listMyAppointmentsUseCase(
+            AppointmentRepository appointmentRepository,
+            PatientConsultPort patientConsultPort) {
+        return new ListMyAppointmentsUseCaseImpl(
+                appointmentRepository,
+                patientConsultPort
         );
     }
 }

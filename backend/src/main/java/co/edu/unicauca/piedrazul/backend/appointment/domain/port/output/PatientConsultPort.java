@@ -13,5 +13,7 @@ public interface PatientConsultPort {
 
     Optional<PatientSnapshot> findByDocumentNumber(String documentNumber);
 
+    Optional<PatientSnapshot> findByUserId(UUID userId);
+
     UUID createPatient(PatientRegistrationData data);
 }

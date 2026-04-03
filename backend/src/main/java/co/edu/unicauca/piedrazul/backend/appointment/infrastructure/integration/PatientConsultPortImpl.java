@@ -39,6 +39,15 @@ public class PatientConsultPortImpl implements PatientConsultPort {
     }
 
     @Override
+    public Optional<PatientSnapshot> findByUserId(UUID userId) {
+        return patientModuleApi.findByUserId(userId)
+                .map(p -> new PatientSnapshot(
+                        p.id(),
+                        PatientInfoMapper.toPatientInfo(p)
+                ));
+    }
+
+    @Override
     public UUID createPatient(PatientRegistrationData data) {
 
         PatientData created = patientModuleApi.createPatient(
