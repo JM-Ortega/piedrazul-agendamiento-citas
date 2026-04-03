@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.config;
 
-import co.edu.unicauca.piedrazul.backend.appointment.aplication.*;
+import co.edu.unicauca.piedrazul.backend.appointment.application.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
@@ -39,9 +39,8 @@ public class AppointmentConfig {
     }
 
     @Bean
-    public AppointmentService appointmentService(BusySlotService busySlotService,
-                                                 SlotTimeService slotTimeService) {
-        return new AppointmentService(busySlotService, slotTimeService);
+    public AppointmentService appointmentService(BusySlotService busySlotService) {
+        return new AppointmentService(busySlotService);
     }
 
     // --- CASOS DE USO (PUERTOS DE ENTRADA) ---
@@ -84,21 +83,23 @@ public class AppointmentConfig {
     public GetAvailableSlotsUseCase getAvailableSlotsUseCase(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
-            AppointmentService appointmentService) {
+            SlotTimeService slotTimeService) {
         return new GetAvailableSlotsUseCaseImpl(
                 appointmentRepository,
                 doctorConfigConsultPort,
-                appointmentService
+                slotTimeService
         );
     }
 
     @Bean
     public GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase(
             AppointmentRepository appointmentRepository,
-            DoctorConfigConsultPort doctorConfigConsultPort) {
+            DoctorConfigConsultPort doctorConfigConsultPort,
+            SlotTimeService slotTimeService) {
         return new GetSpecialtiesWithDoctorUseCaseImpl(
                 appointmentRepository,
-                doctorConfigConsultPort
+                doctorConfigConsultPort,
+                slotTimeService
         );
     }
 

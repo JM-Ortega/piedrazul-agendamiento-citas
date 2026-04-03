@@ -1,11 +1,11 @@
-package co.edu.unicauca.piedrazul.backend.appointment.aplication;
+package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAvailableSlotsUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -15,15 +15,15 @@ import java.util.UUID;
 public class GetAvailableSlotsUseCaseImpl implements GetAvailableSlotsUseCase {
     private final AppointmentRepository appointmentRepository;
     private final DoctorConfigConsultPort doctorConfigConsultPort;
-    private final AppointmentService appointmentService;
+        private final SlotTimeService slotTimeService;
 
     public GetAvailableSlotsUseCaseImpl(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
-            AppointmentService appointmentService) {
+                        SlotTimeService slotTimeService) {
         this.appointmentRepository   = appointmentRepository;
         this.doctorConfigConsultPort = doctorConfigConsultPort;
-        this.appointmentService      = appointmentService;
+                this.slotTimeService = slotTimeService;
     }
 
     // Obtener franjas disponibles para mostrarle al frontend antes de agendar
@@ -42,8 +42,6 @@ public class GetAvailableSlotsUseCaseImpl implements GetAvailableSlotsUseCase {
                 .getIntervalMinutesByDoctor(idDoctor);
 
         // 4. Delega al servicio de dominio el filtrado de slots disponibles
-        return appointmentService.getAvailableSlots(
-                doctorSlots, existingAppointments, intervalMinutes
-        );
+        return slotTimeService.calculateAvailable(doctorSlots, existingAppointments, intervalMinutes);
     }
 }

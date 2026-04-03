@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment.aplication;
+package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;

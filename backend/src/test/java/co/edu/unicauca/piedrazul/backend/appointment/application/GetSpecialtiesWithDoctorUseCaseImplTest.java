@@ -1,9 +1,10 @@
-package co.edu.unicauca.piedrazul.backend.appointment.aplication;
+package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.NoAvailableDoctorsException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -31,13 +33,17 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
     @Mock
     private DoctorConfigConsultPort doctorConfigConsultPort;
 
+        @Mock
+        private SlotTimeService slotTimeService;
+
     private GetSpecialtiesWithDoctorUseCaseImpl useCase;
 
     @BeforeEach
     void setUp() {
         useCase = new GetSpecialtiesWithDoctorUseCaseImpl(
                 appointmentRepository,
-                doctorConfigConsultPort
+                doctorConfigConsultPort,
+                slotTimeService
         );
     }
 
@@ -68,6 +74,9 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
                 .thenReturn(List.of());
         when(appointmentRepository.findByDoctorIdAndDate(eq(idDoctor), any(LocalDate.class)))
                 .thenReturn(List.of());
+        when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor)).thenReturn(30);
+        when(slotTimeService.calculateAvailable(any(), any(), anyInt()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         assertThatThrownBy(() -> useCase.getSpecialtiesWithDoctor())
                 .isInstanceOf(NoAvailableDoctorsException.class)
@@ -92,6 +101,9 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
                 .thenReturn(List.of(new AppointmentTime(LocalTime.of(9, 0))));
         when(appointmentRepository.findByDoctorIdAndDate(eq(idDoctor), any(LocalDate.class)))
                 .thenReturn(List.of());
+        when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor)).thenReturn(30);
+        when(slotTimeService.calculateAvailable(any(), any(), anyInt()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
         when(doctorConfigConsultPort.getDoctorInfoByIds(List.of(idDoctor)))
                 .thenReturn(List.of(doctorInfo));
 
@@ -115,6 +127,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
                 .thenReturn(List.of(new AppointmentTime(LocalTime.of(9, 0))));
         when(appointmentRepository.findByDoctorIdAndDate(eq(idDoctor1), any(LocalDate.class)))
                 .thenReturn(List.of());
+        when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor1)).thenReturn(30);
 
         // Doctor 2 — 3 slots disponibles
         when(doctorConfigConsultPort.getSlotsByDoctor(eq(idDoctor2), any(LocalDate.class)))
@@ -125,6 +138,9 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
                 ));
         when(appointmentRepository.findByDoctorIdAndDate(eq(idDoctor2), any(LocalDate.class)))
                 .thenReturn(List.of());
+        when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor2)).thenReturn(30);
+        when(slotTimeService.calculateAvailable(any(), any(), anyInt()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         DoctorResponse response1 = new DoctorResponse(
                 "FISIOTERAPIA", idDoctor1, "Dr. Lopez",
@@ -159,6 +175,9 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
                 .thenReturn(List.of(new AppointmentTime(LocalTime.of(9, 0))));
         when(appointmentRepository.findByDoctorIdAndDate(any(UUID.class), any(LocalDate.class)))
                 .thenReturn(List.of());
+        when(doctorConfigConsultPort.getIntervalMinutesByDoctor(any(UUID.class))).thenReturn(30);
+        when(slotTimeService.calculateAvailable(any(), any(), anyInt()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         // Ambos tienen la misma especialidad
         DoctorResponse response1 = new DoctorResponse(
