@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.config.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -30,6 +31,10 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/error").permitAll()
                         .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/patients/document/*/public").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/patients/with-user").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/patients/link-user-account/request-code").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/patients/link-user-account/confirm").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
