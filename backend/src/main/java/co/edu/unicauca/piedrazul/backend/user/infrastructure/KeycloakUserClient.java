@@ -12,6 +12,7 @@ import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -68,6 +69,27 @@ public class KeycloakUserClient {
         return UUID.fromString(keycloakId);
     }
 
+    public Optional<UUID> findUserIdByUsername(String username) {
+        if (username == null || username.isBlank()) {
+            return Optional.empty();
+        }
+
+        List<UserRepresentation> users = keycloak.realm(props.getRealm())
+                .users()
+                .searchByUsername(username, true);
+
+        return users.stream()
+                .findFirst()
+                .map(UserRepresentation::getId)
+                .map(UUID::fromString);
+    }
+
+    public void assignRoleIfMissing(UUID keycloakId, Role role) {
+        if (!hasRealmRole(keycloakId, role)) {
+            assignRealmRole(keycloakId.toString(), role);
+        }
+    }
+
     public void activateUser(UUID keycloakId) {
         UserRepresentation user = new UserRepresentation();
         user.setEnabled(true);
@@ -96,6 +118,18 @@ public class KeycloakUserClient {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    private boolean hasRealmRole(UUID keycloakId, Role role) {
+        List<RoleRepresentation> assignedRoles = keycloak.realm(props.getRealm())
+                .users()
+                .get(keycloakId.toString())
+                .roles()
+                .realmLevel()
+                .listAll();
+
+        return assignedRoles.stream()
+                .anyMatch(assignedRole -> assignedRole.getName().equals(role.name()));
     }
 
     private void assignRealmRole(String keycloakId, Role role) {

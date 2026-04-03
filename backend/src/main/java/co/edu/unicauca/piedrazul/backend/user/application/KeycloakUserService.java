@@ -17,27 +17,75 @@ public class KeycloakUserService implements UserModuleApi {
     }
 
     @Override
-    public UUID createPatientUser(String username, String firstName, String lastName,
-                                  String email, String password) {
-        return keycloakClient.createUser(username, firstName, lastName, email, password, Role.PATIENT);
+    public UUID getOrCreatePatientUser(
+            String username,
+            String firstName,
+            String lastName,
+            String email,
+            String password
+    ) {
+        return getOrCreateUserWithRole(
+                username,
+                firstName,
+                lastName,
+                email,
+                password,
+                Role.PATIENT
+        );
     }
 
     @Override
-    public UUID createDoctorUser(String username, String firstName, String lastName,
-                                 String email, String password) {
-        return keycloakClient.createUser(username, firstName, lastName, email, password, Role.DOCTOR);
+    public UUID getOrCreateDoctorUser(
+            String username,
+            String firstName,
+            String lastName,
+            String email,
+            String password
+    ) {
+        return getOrCreateUserWithRole(
+                username,
+                firstName,
+                lastName,
+                email,
+                password,
+                Role.DOCTOR
+        );
     }
 
     @Override
-    public UUID createSchedulerUser(String username, String firstName, String lastName,
-                                    String email, String password) {
-        return keycloakClient.createUser(username, firstName, lastName, email, password, Role.SCHEDULER);
+    public UUID getOrCreateSchedulerUser(
+            String username,
+            String firstName,
+            String lastName,
+            String email,
+            String password
+    ) {
+        return getOrCreateUserWithRole(
+                username,
+                firstName,
+                lastName,
+                email,
+                password,
+                Role.SCHEDULER
+        );
     }
 
     @Override
-    public UUID createAdminUser(String username, String firstName, String lastName,
-                                String email, String password) {
-        return keycloakClient.createUser(username, firstName, lastName, email, password, Role.ADMIN);
+    public UUID getOrCreateAdminUser(
+            String username,
+            String firstName,
+            String lastName,
+            String email,
+            String password
+    ) {
+        return getOrCreateUserWithRole(
+                username,
+                firstName,
+                lastName,
+                email,
+                password,
+                Role.ADMIN
+        );
     }
 
     @Override
@@ -53,5 +101,30 @@ public class KeycloakUserService implements UserModuleApi {
     @Override
     public void deactivateUser(UUID id) {
         keycloakClient.deactivateUser(id);
+    }
+
+    private UUID getOrCreateUserWithRole(
+            String username,
+            String firstName,
+            String lastName,
+            String email,
+            String password,
+            Role role
+    ) {
+        return keycloakClient.findUserIdByUsername(username)
+                .map(userId -> {
+                    keycloakClient.assignRoleIfMissing(userId, role);
+                    return userId;
+                })
+                .orElseGet(() ->
+                        keycloakClient.createUser(
+                                username,
+                                firstName,
+                                lastName,
+                                email,
+                                password,
+                                role
+                        )
+                );
     }
 }
