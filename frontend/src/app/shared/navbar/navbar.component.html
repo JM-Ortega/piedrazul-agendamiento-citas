@@ -17,7 +17,7 @@
 
     <!-- Desktop Nav -->
     <nav class="hidden md:flex items-center gap-2">
-      @if (appService.currentRole() === "scheduler") {
+      @if (appService.hasRole("SCHEDULER")) {
         <a
           routerLink="/agendador"
           #rla4="routerLinkActive"
@@ -49,7 +49,7 @@
         </a>
       }
 
-      @if (appService.currentRole() === "admin") {
+      @if (appService.hasRole("ADMIN")) {
         <a
           routerLink="/admin"
           #rla6="routerLinkActive"
@@ -66,6 +66,23 @@
         </a>
       }
 
+      @if (appService.hasRole("PATIENT")) {
+        <a
+          routerLink="/paciente"
+          #rla7="routerLinkActive"
+          routerLinkActive
+          [class]="
+            'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
+            (rla7.isActive
+              ? 'bg-white text-blue-700'
+              : 'text-white hover:bg-blue-600')
+          "
+        >
+          <lucide-angular [img]="User" [size]="20"></lucide-angular>
+          Mi Portal
+        </a>
+      }
+
       <!-- Usuario logueado -->
       @if (appService.currentRole()) {
         <div class="flex items-center gap-3 ml-4 pl-4 border-l border-blue-500">
@@ -73,7 +90,14 @@
             <div class="bg-blue-500 rounded-full p-1.5">
               <lucide-angular [img]="User" [size]="18"></lucide-angular>
             </div>
-            <span class="text-sm">{{ roleLabel() }}</span>
+            <div class="flex flex-col leading-tight">
+              <span class="text-sm font-semibold">{{
+                appService.firstName()
+              }}</span>
+              <span class="text-xs text-blue-200">{{
+                appService.activeRoleLabel()
+              }}</span>
+            </div>
           </div>
           <button
             (click)="openLogoutModal()"
@@ -85,7 +109,7 @@
         </div>
       }
 
-      <!-- Sin sesión: botón Otros usuarios -->
+      <!-- Sin sesión -->
       @if (!appService.currentRole()) {
         <a
           routerLink="/acceso"
@@ -113,7 +137,7 @@
   <!-- Mobile Nav -->
   @if (menuOpen()) {
     <div class="md:hidden bg-blue-800 px-4 py-3 space-y-2">
-      @if (appService.currentRole() === "scheduler") {
+      @if (appService.hasRole("SCHEDULER")) {
         <a
           routerLink="/agendador"
           (click)="menuOpen.set(false)"
@@ -132,7 +156,7 @@
         </a>
       }
 
-      @if (appService.currentRole() === "admin") {
+      @if (appService.hasRole("ADMIN")) {
         <a
           routerLink="/admin"
           (click)="menuOpen.set(false)"
@@ -143,7 +167,18 @@
         </a>
       }
 
-      <!-- Sin sesión móvil: Otros usuarios -->
+      @if (appService.hasRole("PATIENT")) {
+        <a
+          routerLink="/paciente"
+          (click)="menuOpen.set(false)"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+        >
+          <lucide-angular [img]="User" [size]="20"></lucide-angular>
+          Mi Portal
+        </a>
+      }
+
+      <!-- Sin sesión móvil -->
       @if (!appService.currentRole()) {
         <a
           routerLink="/acceso"

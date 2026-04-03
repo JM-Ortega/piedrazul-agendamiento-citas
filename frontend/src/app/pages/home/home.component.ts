@@ -1,6 +1,6 @@
-    import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
 import {
   Calendar,
   Clock,
@@ -8,16 +8,17 @@ import {
   Phone,
   Shield,
 } from 'lucide-angular';
-import { AppService } from '../../services/app.service';
+import Keycloak from 'keycloak-js';
+import { AppointmentModalComponent } from '../../components/appointment-modal/appointment-modal.component';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [LucideAngularModule, CommonModule, AppointmentModalComponent],
   templateUrl: './home.component.html',
 })
 export class HomeComponent {
-  private appService = inject(AppService);
+  private keycloak = inject(Keycloak);
   private router = inject(Router);
 
   readonly Calendar = Calendar;
@@ -25,37 +26,23 @@ export class HomeComponent {
   readonly Shield = Shield;
   readonly Phone = Phone;
 
-  showModal = signal(false);
-  email = signal('');
-  password = signal('');
-  error = signal('');
+  showModal = false;
 
-  openModal(): void {
-    this.showModal.set(true);
-    this.error.set('');
-  }
-
-  closeModal(): void {
-    this.showModal.set(false);
-    this.error.set('');
-    this.email.set('');
-    this.password.set('');
-  }
-
-  loginPatient(): void {
-    if (this.appService.login(this.email(), this.password())) {
-      this.router.navigate(['/paciente']);
+  agendarCita(): void {
+    if (this.keycloak.authenticated) {
+      this.router.navigate(['/paciente/agendar']);
     } else {
-      this.error.set('Correo o contraseña incorrectos');
+      this.showModal = true;
     }
   }
 
-  goRegister(): void {
-    this.closeModal();
-    this.router.navigate(['/paciente/registro']);
-  }
-
   goAcceso(): void {
-    this.router.navigate(['/acceso']);
+    if (this.keycloak.authenticated) {
+      this.router.navigate(['/acceso']);
+    } else {
+      this.keycloak.login({
+        redirectUri: window.location.origin + '/acceso',
+      });
+    }
   }
 }

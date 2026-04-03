@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import {
   NavigationStart,
   Router,
@@ -51,21 +51,6 @@ export class NavbarComponent implements OnInit {
   menuOpen = signal(false);
   showLogoutModal = signal(false);
 
-  roleLabel = computed<string>(() => {
-    switch (this.appService.currentRole()) {
-      case 'patient':
-        return 'Paciente';
-      case 'scheduler':
-        return 'Agendador';
-      case 'admin':
-        return 'Administrador';
-      case 'doctor':
-        return 'DR';
-      default:
-        return '';
-    }
-  });
-
   ngOnInit(): void {
     history.pushState(null, '', location.href);
 
@@ -91,8 +76,7 @@ export class NavbarComponent implements OnInit {
   }
 
   confirmLogout(): void {
-    this.appService.logout();
     this.showLogoutModal.set(false);
-    this.router.navigate(['/']);
+    this.appService.logout();
   }
 }
