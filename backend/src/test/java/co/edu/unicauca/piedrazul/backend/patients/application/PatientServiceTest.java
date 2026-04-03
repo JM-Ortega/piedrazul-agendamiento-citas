@@ -83,7 +83,7 @@ class PatientServiceTest {
         Patient patient = buildPatient(userId);
 
         when(patientRepository.existsByDocumentNumber("123")).thenReturn(false);
-        when(userModuleApi.createPatientUser("juan", "Juan", "Perez", "mail@test.com", "Pass123!"))
+        when(userModuleApi.getOrCreatePatientUser("juan", "Juan", "Perez", "mail@test.com", "Pass123!"))
                 .thenReturn(userId);
         when(patientRepository.save(any())).thenReturn(patient);
 
@@ -102,7 +102,7 @@ class PatientServiceTest {
         );
 
         assertThat(result).isNotNull();
-        verify(userModuleApi).createPatientUser("juan", "Juan", "Perez", "mail@test.com", "Pass123!");
+        verify(userModuleApi).getOrCreatePatientUser("juan", "Juan", "Perez", "mail@test.com", "Pass123!");
         verify(patientRepository).save(any());
     }
 
@@ -131,7 +131,7 @@ class PatientServiceTest {
         Patient patient = buildPatient(null);
 
         when(patientRepository.findByDocumentNumber("123")).thenReturn(Optional.of(patient));
-        when(userModuleApi.createPatientUser("juan", "Juan", "Perez", "mail@test.com", "Pass123!"))
+        when(userModuleApi.getOrCreatePatientUser("juan", "Juan", "Perez", "mail@test.com", "Pass123!"))
                 .thenReturn(userId);
         when(patientRepository.save(any())).thenReturn(patient);
 
@@ -165,7 +165,7 @@ class PatientServiceTest {
                         "123", "juan", "Juan", "Perez", "mail@test.com", "Pass123!"
                 )).isInstanceOf(PatientAlreadyLinkedUserException.class);
 
-        verify(userModuleApi, never()).createPatientUser(any(), any(), any(), any(), any());
+        verify(userModuleApi, never()).getOrCreatePatientUser(any(), any(), any(), any(), any());
     }
 
     @Test
