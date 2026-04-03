@@ -5,11 +5,13 @@ import { environment } from '../../environments/environment';
 import { Patient } from '../models/patient.model';
 
 export interface PatientPublicResponse {
-  documentType: string;
+  documentType: string | null;
   maskedDocument: string;
-  firstName: string;
-  lastName: string;
+  firstName: string | null;
+  lastName: string | null;
+  patientExists: boolean;
   hasUserAccount: boolean;
+  hasSystemUser: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -27,6 +29,7 @@ export class PatientService {
     );
   }
 
+  // consulta el estado público del documento
   getPublicByDocument(
     documentNumber: string,
   ): Observable<PatientPublicResponse> {
@@ -35,6 +38,7 @@ export class PatientService {
     );
   }
 
+  // crea paciente nuevo con cuenta nueva
   createWithUser(data: {
     username: string;
     password: string;
@@ -51,6 +55,7 @@ export class PatientService {
     return this.http.post<Patient>(`${this.apiUrl}/patients/with-user`, data);
   }
 
+  // solicita OTP para vincular o completar registro
   requestLinkUserAccountCode(data: {
     documentNumber: string;
   }): Observable<void> {
@@ -60,10 +65,11 @@ export class PatientService {
     );
   }
 
+  // confirma OTP y crea o vincula la cuenta según el caso
   confirmLinkUserAccount(data: {
     documentNumber: string;
     code: string;
-    password: string;
+    password?: string;
   }): Observable<Patient> {
     return this.http.post<Patient>(
       `${this.apiUrl}/patients/link-user-account/confirm`,
