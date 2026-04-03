@@ -41,12 +41,13 @@ public class DoctorDataInitializer implements ApplicationRunner {
                 LocalDate.of(2026, 1, 1),
                 LocalDate.of(2026, 12, 31),
                 30,
-                List.of(new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(11,0,0), Workday.LUNES),
-                        new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(11,0,0), Workday.MARTES),
-                        new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(9,0,0), Workday.JUEVES),
-                        new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(11,0,0), Workday.VIERNES))
+                List.of(new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(11, 0, 0), Workday.LUNES),
+                        new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(11, 0, 0), Workday.MARTES),
+                        new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.JUEVES),
+                        new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(11, 0, 0), Workday.VIERNES)),
+                "clara.cordoba@piedrazul.dev",
+                "Doctor123!"
         ));
-
 
         doctorService.createDoctor(new CreateDoctorRequest(
                 "José Ignacio",
@@ -56,11 +57,12 @@ public class DoctorDataInitializer implements ApplicationRunner {
                 LocalDate.of(2026, 1, 1),
                 LocalDate.of(2026, 12, 31),
                 40,
-                List.of(new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(9,0,0), Workday.MARTES),
-                        new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(12,0,0), Workday.MIERCOLES),
-                        new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(10,0,0), Workday.VIERNES))
+                List.of(new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.MARTES),
+                        new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.MIERCOLES),
+                        new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(10, 0, 0), Workday.VIERNES)),
+                "jose.garcia@piedrazul.dev",
+                "Doctor123!"
         ));
-
 
         doctorService.createDoctor(new CreateDoctorRequest(
                 "Armando",
@@ -70,7 +72,9 @@ public class DoctorDataInitializer implements ApplicationRunner {
                 LocalDate.of(2026, 11, 1),
                 LocalDate.of(2026, 12, 31),
                 15,
-                Collections.emptyList()
+                Collections.emptyList(),
+                "armando.pena@piedrazul.dev",
+                "Doctor123!"
         ));
 
         System.out.println("✔ Médicos de prueba insertados");

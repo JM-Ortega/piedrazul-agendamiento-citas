@@ -4,13 +4,12 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequ
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
-
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -54,7 +53,13 @@ public class DoctorService {
         doctor.setSchedules(schedules);
 
         // 2. Crear el usuario
-        doctor.setIdUser(userModuleApi.createDoctorUser(request.identification()));
+        doctor.setIdUser(userModuleApi.createDoctorUser(
+                request.identification(),
+                request.firstName(),
+                request.lastName(),
+                request.email(),
+                request.password()
+        ));
 
         // 3. Deshabilitar el usuario si el doctor no está activo
         if (!doctor.isStatus())
