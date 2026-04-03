@@ -4,6 +4,7 @@ import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientData;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientPublicResponse;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
 import co.edu.unicauca.piedrazul.backend.patients.exception.InvalidPatientDataException;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyExistsException;
@@ -12,6 +13,8 @@ import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundExcep
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.mappers.PatientApiMapper;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientRepository;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
+import co.edu.unicauca.piedrazul.backend.verification.VerificationModuleApi;
+import co.edu.unicauca.piedrazul.backend.verification.api.VerificationPurpose;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,10 +29,16 @@ public class PatientService implements PatientModuleApi {
 
     private final PatientRepository patientRepository;
     private final UserModuleApi userModuleApi;
+    private final VerificationModuleApi verificationModuleApi;
 
-    public PatientService(PatientRepository patientRepository, UserModuleApi userModuleApi) {
+    public PatientService(
+            PatientRepository patientRepository,
+            UserModuleApi userModuleApi,
+            VerificationModuleApi verificationModuleApi
+    ) {
         this.patientRepository = patientRepository;
         this.userModuleApi = userModuleApi;
+        this.verificationModuleApi = verificationModuleApi;
     }
 
     @Override
@@ -60,12 +69,12 @@ public class PatientService implements PatientModuleApi {
                 null
         );
 
-        Patient savedPatient = patientRepository.save(patient);
-        return toData(savedPatient);
+        return toData(patientRepository.save(patient));
     }
 
     public PatientData createPatientWithUser(
             String username,
+            String password,
             PatientDocumentType documentType,
             String documentNumber,
             String firstName,
@@ -77,10 +86,17 @@ public class PatientService implements PatientModuleApi {
             String guardianPhone
     ) {
         validateUsername(username);
+        validatePassword(password);
         validateDocumentNumber(documentNumber);
         ensurePatientDoesNotExist(documentNumber);
 
-        UUID userId = userModuleApi.createPatientUser(username);
+        UUID userId = userModuleApi.createPatientUser(
+                username,
+                firstName,
+                lastName,
+                email,
+                password
+        );
 
         Patient patient = buildPatient(
                 documentType,
@@ -95,22 +111,60 @@ public class PatientService implements PatientModuleApi {
                 userId
         );
 
-        Patient savedPatient = patientRepository.save(patient);
-        return toData(savedPatient);
+        return toData(patientRepository.save(patient));
     }
 
-    public PatientData linkUserToExistingPatient(String documentNumber, String username) {
+    public void requestLinkUserAccountCode(String documentNumber) {
         validateDocumentNumber(documentNumber);
-        validateUsername(username);
+
+        Patient patient = getPatientByDocumentNumberOrThrow(documentNumber);
+        ensurePatientHasNoLinkedUser(patient);
+        validatePhone(patient.getPhone());
+
+        verificationModuleApi.requestCode(
+                documentNumber,
+                VerificationPurpose.LINK_PATIENT_ACCOUNT,
+                patient.getPhone()
+        );
+    }
+
+    public PatientData confirmLinkUserAccount(
+            String documentNumber,
+            String code,
+            String password
+    ) {
+        validateDocumentNumber(documentNumber);
+        validateCode(code);
+        validatePassword(password);
 
         Patient patient = getPatientByDocumentNumberOrThrow(documentNumber);
         ensurePatientHasNoLinkedUser(patient);
 
-        UUID userId = userModuleApi.createPatientUser(username);
+        verificationModuleApi.verifyCode(
+                documentNumber,
+                VerificationPurpose.LINK_PATIENT_ACCOUNT,
+                code
+        );
+
+        UUID userId = userModuleApi.createPatientUser(
+                documentNumber,
+                patient.getFirstName(),
+                patient.getLastName(),
+                patient.getEmail(),
+                password
+        );
+
         patient.linkUser(userId);
 
-        Patient savedPatient = patientRepository.save(patient);
-        return toData(savedPatient);
+        return toData(patientRepository.save(patient));
+    }
+
+    public Optional<PatientData> findByUserId(UUID userId) {
+        if (userId == null) {
+            throw new InvalidPatientDataException("UserId cannot be null");
+        }
+        return patientRepository.findByUserId(userId)
+                .map(this::toData);
     }
 
     @Override
@@ -143,6 +197,13 @@ public class PatientService implements PatientModuleApi {
     public boolean existsById(UUID id) {
         validateId(id);
         return patientRepository.existsById(id);
+    }
+
+    @Transactional(readOnly = true)
+    public PatientPublicResponse findPublicByDocumentNumber(String documentNumber) {
+        validateDocumentNumber(documentNumber);
+        Patient patient = getPatientByDocumentNumberOrThrow(documentNumber);
+        return PatientPublicResponse.from(patient);
     }
 
     private void ensurePatientDoesNotExist(String documentNumber) {
@@ -201,6 +262,24 @@ public class PatientService implements PatientModuleApi {
     private void validateUsername(String username) {
         if (username == null || username.isBlank()) {
             throw new InvalidPatientDataException("Username cannot be blank");
+        }
+    }
+
+    private void validatePassword(String password) {
+        if (password == null || password.isBlank()) {
+            throw new InvalidPatientDataException("Password cannot be blank");
+        }
+    }
+
+    private void validateCode(String code) {
+        if (code == null || code.isBlank()) {
+            throw new InvalidPatientDataException("Code cannot be blank");
+        }
+    }
+
+    private void validatePhone(String phone) {
+        if (phone == null || phone.isBlank()) {
+            throw new InvalidPatientDataException("Patient phone cannot be blank");
         }
     }
 

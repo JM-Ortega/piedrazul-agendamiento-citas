@@ -83,11 +83,13 @@ class PatientServiceTest {
         Patient patient = buildPatient(userId);
 
         when(patientRepository.existsByDocumentNumber("123")).thenReturn(false);
-        when(userModuleApi.createPatientUser("juan")).thenReturn(userId);
+        when(userModuleApi.createPatientUser("juan", "Juan", "Perez", "mail@test.com", "Pass123!"))
+                .thenReturn(userId);
         when(patientRepository.save(any())).thenReturn(patient);
 
         PatientData result = patientService.createPatientWithUser(
                 "juan",
+                "Pass123!",
                 PatientDocumentType.CEDULA,
                 "123",
                 "Juan",
@@ -100,7 +102,7 @@ class PatientServiceTest {
         );
 
         assertThat(result).isNotNull();
-        verify(userModuleApi).createPatientUser("juan");
+        verify(userModuleApi).createPatientUser("juan", "Juan", "Perez", "mail@test.com", "Pass123!");
         verify(patientRepository).save(any());
     }
 
@@ -108,6 +110,7 @@ class PatientServiceTest {
     void createPatientWithUserShouldThrowWhenUsernameInvalid() {
         assertThatThrownBy(() -> patientService.createPatientWithUser(
                 " ",
+                "Pass123!",
                 PatientDocumentType.CEDULA,
                 "123",
                 "Juan",
@@ -128,14 +131,16 @@ class PatientServiceTest {
         Patient patient = buildPatient(null);
 
         when(patientRepository.findByDocumentNumber("123")).thenReturn(Optional.of(patient));
-        when(userModuleApi.createPatientUser("juan")).thenReturn(userId);
+        when(userModuleApi.createPatientUser("juan", "Juan", "Perez", "mail@test.com", "Pass123!"))
+                .thenReturn(userId);
         when(patientRepository.save(any())).thenReturn(patient);
 
-        PatientData result = patientService.linkUserToExistingPatient("123", "juan");
+        PatientData result = patientService.linkUserToExistingPatient(
+                "123", "juan", "Juan", "Perez", "mail@test.com", "Pass123!"
+        );
 
         assertThat(result).isNotNull();
         assertThat(patient.getUserId()).isEqualTo(userId);
-
         verify(patientRepository).save(patient);
     }
 
@@ -144,8 +149,9 @@ class PatientServiceTest {
         when(patientRepository.findByDocumentNumber("123")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
-                patientService.linkUserToExistingPatient("123", "juan"))
-                .isInstanceOf(PatientNotFoundException.class);
+                patientService.linkUserToExistingPatient(
+                        "123", "juan", "Juan", "Perez", "mail@test.com", "Pass123!"
+                )).isInstanceOf(PatientNotFoundException.class);
     }
 
     @Test
@@ -155,10 +161,11 @@ class PatientServiceTest {
         when(patientRepository.findByDocumentNumber("123")).thenReturn(Optional.of(patient));
 
         assertThatThrownBy(() ->
-                patientService.linkUserToExistingPatient("123", "juan"))
-                .isInstanceOf(PatientAlreadyLinkedUserException.class);
+                patientService.linkUserToExistingPatient(
+                        "123", "juan", "Juan", "Perez", "mail@test.com", "Pass123!"
+                )).isInstanceOf(PatientAlreadyLinkedUserException.class);
 
-        verify(userModuleApi, never()).createPatientUser(any());
+        verify(userModuleApi, never()).createPatientUser(any(), any(), any(), any(), any());
     }
 
     @Test
