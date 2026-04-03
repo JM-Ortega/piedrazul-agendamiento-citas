@@ -20,6 +20,8 @@
     "@angular/platform-browser-dynamic": "^19.2.0",
     "@angular/router": "^19.2.0",
     "colombian-holidays": "^5.0.10",
+    "keycloak-angular": "^19.0.2",
+    "keycloak-js": "^26.2.3",
     "lucide-angular": "^0.577.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",

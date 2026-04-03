@@ -1,60 +1,91 @@
-import { computed, Injectable, signal } from '@angular/core';
-import { Patient } from '../models/patient.model';
-import { UserRole } from '../models/user.model';
+import { Injectable, inject, computed } from '@angular/core';
+import { Router, NavigationEnd } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { filter, map } from 'rxjs';
+import Keycloak from 'keycloak-js';
+import {
+  KEYCLOAK_EVENT_SIGNAL,
+  KeycloakEventType,
+  ReadyArgs,
+} from 'keycloak-angular';
 
 @Injectable({ providedIn: 'root' })
 export class AppService {
-  private _currentPatient = signal<Patient | null>({
-    id: '1758aac8-628a-44ee-9fea-aa2e0aab389a',
-    documentType: 'CEDULA',
-    documentNumber: '12345678',
-    firstName: 'Maria',
-    lastName: 'Lopez',
-    phone: '3001234567',
-    gender: 'FEMENINO',
-    birthDate: '1990-05-15',
-    email: 'maria.lopez@email.com',
+  private keycloak = inject(Keycloak);
+  private keycloakEvent = inject(KEYCLOAK_EVENT_SIGNAL);
+  private router = inject(Router);
+
+  private currentUrl = toSignal(
+    this.router.events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      map((e) => (e as NavigationEnd).urlAfterRedirects),
+    ),
+    { initialValue: this.router.url },
+  );
+
+  readonly isAuthenticated = computed(() => {
+    const event = this.keycloakEvent();
+    return event.type === KeycloakEventType.Ready
+      ? (event.args as ReadyArgs)
+      : (this.keycloak.authenticated ?? false);
   });
-  readonly currentPatient = computed(() => this._currentPatient());
-  private _currentUser = signal<Patient | null>(null);
-  private _currentRole = signal<UserRole>(null);
 
-  readonly currentUser = computed(() => this._currentUser());
-  readonly currentRole = computed(() => this._currentRole());
+  readonly currentRole = computed<string | null>(() => {
+    this.keycloakEvent();
+    if (!this.keycloak.authenticated) return null;
+    const roles = this.keycloak.realmAccess?.roles ?? [];
+    if (roles.includes('ADMIN')) return 'ADMIN';
+    if (roles.includes('SCHEDULER')) return 'SCHEDULER';
+    if (roles.includes('DOCTOR')) return 'DOCTOR';
+    if (roles.includes('PATIENT')) return 'PATIENT';
+    return null;
+  });
 
-  login(email: string, password: string): boolean {
-    //funcionalidad de login de paciente, conectar con back
-    if (password === 'patient123' && email === 'maria.lopez@email.com') {
-      this._currentRole.set('patient');
-      return true;
-    }
-    return false;
+  readonly firstName = computed<string>(() => {
+    this.keycloakEvent();
+    return this.keycloak.tokenParsed?.['given_name'] ?? '';
+  });
+
+  readonly lastName = computed<string>(() => {
+    this.keycloakEvent();
+    return this.keycloak.tokenParsed?.['family_name'] ?? '';
+  });
+
+  readonly fullName = computed<string>(() => {
+    this.keycloakEvent();
+    return this.keycloak.tokenParsed?.['name'] ?? '';
+  });
+
+  readonly keycloakId = computed<string | null>(() => {
+    this.keycloakEvent();
+    return this.keycloak.tokenParsed?.['sub'] ?? null;
+  });
+
+  hasRole(role: string): boolean {
+    this.keycloakEvent();
+    return this.keycloak.realmAccess?.roles?.includes(role) ?? false;
   }
 
-  loginAsScheduler(password: string): boolean {
-    //se deja así para probar por ahora en front
-    if (password === 'scheduler123') {
-      this._currentRole.set('scheduler');
-      return true;
-    }
-    return false;
-  }
+  readonly activeRoleLabel = computed<string>(() => {
+    this.keycloakEvent();
+    const url = this.currentUrl();
+    if (url.startsWith('/admin')) return 'Administrador';
+    if (url.startsWith('/agendador')) return 'Agendador';
+    if (url.startsWith('/paciente')) return 'Paciente';
+    if (url.startsWith('/medico')) return 'Médico';
+    return this.roleLabel();
+  });
 
-  loginAsAdmin(password: string): boolean {
-    if (password === 'admin123') {
-      this._currentRole.set('admin');
-      return true;
-    }
-    return false;
-  }
-
-  loginAsDoctor(email: string, password: string): boolean {
-    //funcionalidad de login, conectar con back
-    return false;
+  private roleLabel(): string {
+    const roles = this.keycloak.realmAccess?.roles ?? [];
+    if (roles.includes('ADMIN')) return 'Administrador';
+    if (roles.includes('SCHEDULER')) return 'Agendador';
+    if (roles.includes('DOCTOR')) return 'Médico';
+    if (roles.includes('PATIENT')) return 'Paciente';
+    return '';
   }
 
   logout(): void {
-    this._currentUser.set(null);
-    this._currentRole.set(null);
+    this.keycloak.logout({ redirectUri: window.location.origin });
   }
 }
