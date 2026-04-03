@@ -19,7 +19,12 @@ import {
 import Keycloak from 'keycloak-js';
 
 type RegistroStep = 1 | 2 | 3;
-type PatientStatus = 'idle' | 'found' | 'already-linked' | 'not-found';
+type PatientStatus =
+  | 'idle'
+  | 'found'
+  | 'already-linked'
+  | 'not-found'
+  | 'existing-user';
 
 @Component({
   selector: 'app-registro',
@@ -72,9 +77,15 @@ export class RegistroComponent {
 
   readonly isNewPatient = computed(() => this.patientStatus() === 'not-found');
   readonly isExistingPatient = computed(() => this.patientStatus() === 'found');
+  readonly isExistingSystemUser = computed(
+    () => this.patientStatus() === 'existing-user',
+  );
   readonly isAlreadyLinked = computed(
     () => this.patientStatus() === 'already-linked',
   );
+
+  // solo paciente nuevo real define contraseña
+  readonly requiresPassword = computed(() => this.isNewPatient());
 
   readonly isMinorPatient = computed(() => {
     if (!this.isNewPatient()) return false;
@@ -83,11 +94,16 @@ export class RegistroComponent {
 
   readonly displayName = computed(() => {
     const p = this.foundPatient();
-    if (p) return `${p.firstName} ${p.lastName}`;
+
+    if (p?.firstName || p?.lastName) {
+      return `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim();
+    }
+
     const f = this.form();
     if (f.firstName || f.lastName) {
       return `${f.firstName} ${f.lastName}`.trim();
     }
+
     return '';
   });
 
@@ -114,12 +130,26 @@ export class RegistroComponent {
         this.isLoading.set(false);
         this.foundPatient.set(patient);
 
+        // paciente ya vinculado
         if (patient.hasUserAccount) {
           this.patientStatus.set('already-linked');
           return;
         }
 
-        this.patientStatus.set('found');
+        // paciente existente sin cuenta
+        if (patient.patientExists) {
+          this.patientStatus.set('found');
+          return;
+        }
+
+        // existe usuario del sistema pero no paciente
+        if (patient.hasSystemUser) {
+          this.patientStatus.set('existing-user');
+          return;
+        }
+
+        // fallback defensivo
+        this.patientStatus.set('not-found');
       },
       error: (err) => {
         this.isLoading.set(false);
@@ -201,6 +231,7 @@ export class RegistroComponent {
     this.errorMessage.set('');
     this.successMessage.set('');
 
+    // paciente existente sin cuenta
     if (this.isExistingPatient()) {
       this.patientService
         .requestLinkUserAccountCode({
@@ -219,6 +250,26 @@ export class RegistroComponent {
       return;
     }
 
+    // usuario existente del sistema sin perfil paciente
+    if (this.isExistingSystemUser()) {
+      this.patientService
+        .requestLinkUserAccountCode({
+          documentNumber: this.documentNumber(),
+        })
+        .subscribe({
+          next: () => {
+            this.isLoading.set(false);
+            this.successMessage.set(
+              'Se generó un código de verificación. Por ahora revísalo en la consola del backend.',
+            );
+            this.step.set(3);
+          },
+          error: (err) => this.handleError(err),
+        });
+      return;
+    }
+
+    // paciente nuevo real
     const f = this.form();
 
     this.patientService
@@ -252,7 +303,8 @@ export class RegistroComponent {
       .confirmLinkUserAccount({
         documentNumber: this.documentNumber(),
         code: this.verificationCode(),
-        password: this.password(),
+        // solo enviar password si aplica
+        password: this.requiresPassword() ? this.password() : undefined,
       })
       .subscribe({
         next: () => this.onSuccess(),
@@ -260,7 +312,18 @@ export class RegistroComponent {
       });
   }
 
-  setFormField(key: string, value: string): void {
+  setFormField(
+    key:
+      | 'documentType'
+      | 'firstName'
+      | 'lastName'
+      | 'phone'
+      | 'gender'
+      | 'birthDate'
+      | 'guardianPhone'
+      | 'email',
+    value: string,
+  ): void {
     const numericFields = ['phone', 'guardianPhone'];
     const normalizedValue = numericFields.includes(key)
       ? value.replace(/[^\d]/g, '')
@@ -273,8 +336,18 @@ export class RegistroComponent {
     }
   }
 
-  getFormField(key: string): string {
-    return (this.form() as any)[key] ?? '';
+  getFormField(
+    key:
+      | 'documentType'
+      | 'firstName'
+      | 'lastName'
+      | 'phone'
+      | 'gender'
+      | 'birthDate'
+      | 'guardianPhone'
+      | 'email',
+  ): string {
+    return this.form()[key] ?? '';
   }
 
   private onSuccess(): void {
@@ -329,6 +402,7 @@ export class RegistroComponent {
   private validateStep1(): boolean {
     const newErrors: Record<string, string> = {};
 
+    // solo validar formulario completo para paciente nuevo
     if (this.isNewPatient()) {
       const f = this.form();
 
@@ -385,12 +459,16 @@ export class RegistroComponent {
   private validateStep2(): boolean {
     const newErrors: Record<string, string> = {};
 
-    if (this.password().length < 8) {
-      newErrors['password'] = 'La contraseña debe tener al menos 8 caracteres';
-    }
+    // solo validar contraseña si se va a crear usuario nuevo
+    if (this.requiresPassword()) {
+      if (this.password().length < 8) {
+        newErrors['password'] =
+          'La contraseña debe tener al menos 8 caracteres';
+      }
 
-    if (this.password() !== this.confirmPassword()) {
-      newErrors['confirmPassword'] = 'Las contraseñas no coinciden';
+      if (this.password() !== this.confirmPassword()) {
+        newErrors['confirmPassword'] = 'Las contraseñas no coinciden';
+      }
     }
 
     this.errors.set(newErrors);
