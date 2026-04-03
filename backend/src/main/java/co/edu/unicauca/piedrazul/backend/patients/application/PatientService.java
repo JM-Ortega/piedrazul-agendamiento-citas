@@ -86,17 +86,25 @@ public class PatientService implements PatientModuleApi {
             String guardianPhone
     ) {
         validateUsername(username);
-        validatePassword(password);
         validateDocumentNumber(documentNumber);
+        validateUsernameMatchesDocumentNumber(username, documentNumber);
         ensurePatientDoesNotExist(documentNumber);
 
-        UUID userId = userModuleApi.getOrCreatePatientUser(
-                username,
-                firstName,
-                lastName,
-                email,
-                password
-        );
+        UUID userId = userModuleApi.findUserIdByUsername(username)
+                .orElseGet(() -> {
+                    validatePassword(password);
+                    return userModuleApi.getOrCreatePatientUser(
+                            username,
+                            firstName,
+                            lastName,
+                            email,
+                            password
+                    );
+                });
+
+        if (userModuleApi.findUserIdByUsername(username).isPresent()) {
+            userModuleApi.ensurePatientRole(userId);
+        }
 
         Patient patient = buildPatient(
                 documentType,
@@ -135,7 +143,6 @@ public class PatientService implements PatientModuleApi {
     ) {
         validateDocumentNumber(documentNumber);
         validateCode(code);
-        validatePassword(password);
 
         Patient patient = getPatientByDocumentNumberOrThrow(documentNumber);
         ensurePatientHasNoLinkedUser(patient);
@@ -146,13 +153,22 @@ public class PatientService implements PatientModuleApi {
                 code
         );
 
-        UUID userId = userModuleApi.getOrCreatePatientUser(
-                documentNumber,
-                patient.getFirstName(),
-                patient.getLastName(),
-                patient.getEmail(),
-                password
-        );
+        Optional<UUID> existingUserId = userModuleApi.findUserIdByUsername(documentNumber);
+
+        UUID userId = existingUserId.orElseGet(() -> {
+            validatePassword(password);
+            return userModuleApi.getOrCreatePatientUser(
+                    documentNumber,
+                    patient.getFirstName(),
+                    patient.getLastName(),
+                    patient.getEmail(),
+                    password
+            );
+        });
+
+        if (existingUserId.isPresent()) {
+            userModuleApi.ensurePatientRole(userId);
+        }
 
         patient.linkUser(userId);
 
@@ -202,8 +218,22 @@ public class PatientService implements PatientModuleApi {
     @Transactional(readOnly = true)
     public PatientPublicResponse findPublicByDocumentNumber(String documentNumber) {
         validateDocumentNumber(documentNumber);
-        Patient patient = getPatientByDocumentNumberOrThrow(documentNumber);
-        return PatientPublicResponse.from(patient);
+
+        Optional<Patient> patientOpt =
+                patientRepository.findByDocumentNumber(documentNumber);
+
+        boolean hasSystemUser =
+                userModuleApi.findUserIdByUsername(documentNumber).isPresent();
+
+        if (patientOpt.isPresent()) {
+            return PatientPublicResponse.from(patientOpt.get(), hasSystemUser);
+        }
+
+        if (hasSystemUser) {
+            return PatientPublicResponse.fromSystemUserOnly(documentNumber);
+        }
+
+        throw new PatientNotFoundException(documentNumber);
     }
 
     private void ensurePatientDoesNotExist(String documentNumber) {
@@ -262,6 +292,12 @@ public class PatientService implements PatientModuleApi {
     private void validateUsername(String username) {
         if (username == null || username.isBlank()) {
             throw new InvalidPatientDataException("Username cannot be blank");
+        }
+    }
+
+    private void validateUsernameMatchesDocumentNumber(String username, String documentNumber) {
+        if (!username.equals(documentNumber)) {
+            throw new InvalidPatientDataException("Username must match document number");
         }
     }
 

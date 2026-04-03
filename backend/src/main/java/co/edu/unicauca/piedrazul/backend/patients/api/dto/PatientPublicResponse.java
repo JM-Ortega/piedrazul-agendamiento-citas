@@ -7,15 +7,34 @@ public record PatientPublicResponse(
         String maskedDocument,
         String firstName,
         String lastName,
-        boolean hasUserAccount
+        boolean patientExists,
+        boolean hasUserAccount,
+        boolean hasSystemUser
 ) {
-    public static PatientPublicResponse from(Patient patient) {
+
+    // Caso: existe paciente en dominio
+    public static PatientPublicResponse from(Patient patient, boolean hasSystemUser) {
         return new PatientPublicResponse(
                 patient.getDocumentType().toString(),
                 maskDocument(patient.getDocumentNumber()),
                 patient.getFirstName(),
                 patient.getLastName(),
-                patient.hasUserAccount()
+                true,
+                patient.hasUserAccount(),
+                hasSystemUser
+        );
+    }
+
+    // Caso: NO existe paciente pero sí existe usuario del sistema
+    public static PatientPublicResponse fromSystemUserOnly(String documentNumber) {
+        return new PatientPublicResponse(
+                null,
+                maskDocument(documentNumber),
+                null,
+                null,
+                false,
+                false,
+                true
         );
     }
 
