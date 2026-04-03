@@ -1,19 +1,26 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatNativeDateModule } from '@angular/material/core';
-import { LucideAngularModule, CheckCircle, Stethoscope, UserSearch } from 'lucide-angular';
+import {
+  LucideAngularModule,
+  CheckCircle,
+  Stethoscope,
+  UserSearch,
+} from 'lucide-angular';
 import { FormsModule } from '@angular/forms';
 
 import { AppService } from '../../services/app.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { CalendarService } from '../../services/calendar.service';
 import { PatientAppointmentService } from '../../services/PatientApointment.service';
+import { PatientService } from '../../services/patient.service';
 import { NewAppointment } from '../../models/DTOs/newAppointment';
 import { SpecialtyDoctor } from '../../models/DTOs/specialty-doctor';
+import { Patient } from '../../models/patient.model';
 
 type BookingMode = 'specialty' | 'specialty-doctor' | null;
 
@@ -27,53 +34,58 @@ type BookingMode = 'specialty' | 'specialty-doctor' | null;
     MatInputModule,
     MatFormFieldModule,
     MatNativeDateModule,
-    FormsModule
+    FormsModule,
   ],
-  templateUrl: './patient-new-appointment.component.html'
+  templateUrl: './patient-new-appointment.component.html',
 })
-export class PatientNewAppointmentComponent {
-  private appService            = inject(AppService);
-  private citaService           = inject(NuevaCitaService);
-  private calendarService       = inject(CalendarService);
-  private appointmentService    = inject(PatientAppointmentService);
-  private router                = inject(Router);
+export class PatientNewAppointmentComponent implements OnInit {
+  protected appService = inject(AppService);
+  private citaService = inject(NuevaCitaService);
+  private calendarService = inject(CalendarService);
+  private appointmentService = inject(PatientAppointmentService);
+  private patientService = inject(PatientService);
+  private router = inject(Router);
 
-  readonly CheckCircle  = CheckCircle;
-  readonly Stethoscope  = Stethoscope;
-  readonly UserSearch   = UserSearch;
+  readonly CheckCircle = CheckCircle;
+  readonly Stethoscope = Stethoscope;
+  readonly UserSearch = UserSearch;
+
+  // Datos del paciente desde el backend
+  currentPatient = signal<Patient | null>(null);
 
   bookingMode = signal<BookingMode>(null);
-
-  step         = signal(1);
-  isLoading    = signal(false);
+  step = signal(1);
+  isLoading = signal(false);
   errorMessage = signal('');
-  success      = signal(false);
+  success = signal(false);
   errorMessageSlots = signal('');
   noSlotsAvailable = signal(false);
 
   specialtiesWithDoctor = signal<SpecialtyDoctor[]>([]);
-  doctorsBySpecialty    = signal<SpecialtyDoctor[]>([]);
-  selectedSpecialty     = signal('');
-  assignedDoctor        = signal<SpecialtyDoctor | null>(null);
-  selectedDoctorId      = signal('');
-  selectedDoctorName    = signal('');
-  noDoctorsFound        = signal(false);
-  noSpecialtyAvailable  = signal(false);
+  doctorsBySpecialty = signal<SpecialtyDoctor[]>([]);
+  selectedSpecialty = signal('');
+  assignedDoctor = signal<SpecialtyDoctor | null>(null);
+  selectedDoctorId = signal('');
+  selectedDoctorName = signal('');
+  noDoctorsFound = signal(false);
+  noSpecialtyAvailable = signal(false);
 
-  readonly uniqueSpecialties = computed(() =>
-    [...new Set(this.specialtiesWithDoctor().map(s => s.specialty))]
-  );
+  readonly uniqueSpecialties = computed(() => [
+    ...new Set(this.specialtiesWithDoctor().map((s) => s.specialty)),
+  ]);
 
   readonly effectiveDoctor = computed<SpecialtyDoctor | null>(() =>
     this.bookingMode() === 'specialty'
       ? this.assignedDoctor()
-      : (this.doctorsBySpecialty().find(d => d.id === this.selectedDoctorId()) ?? null)
+      : (this.doctorsBySpecialty().find(
+          (d) => d.id === this.selectedDoctorId(),
+        ) ?? null),
   );
 
   readonly effectiveDoctorId = computed(() => this.effectiveDoctor()?.id ?? '');
 
-  selectedDate   = signal<Date | null>(null);
-  selectedTime   = signal('');
+  selectedDate = signal<Date | null>(null);
+  selectedTime = signal('');
   availableSlots = signal<string[]>([]);
 
   readonly dateFilter = computed(() => {
@@ -88,34 +100,54 @@ export class PatientNewAppointmentComponent {
     if (!doctor) return this.calendarService.getMinDate();
     return this.calendarService.getMaxDate(doctor);
   });
-  readonly confirmDocumentType = computed(() => this.currentPatient()?.documentType ?? '');
 
   readonly canGoToStep2 = computed(() =>
     this.bookingMode() === 'specialty'
       ? !!this.selectedSpecialty() && !!this.assignedDoctor()
-      : !!this.selectedSpecialty() && !!this.selectedDoctorId()
+      : !!this.selectedSpecialty() && !!this.selectedDoctorId(),
   );
 
-  readonly canGoToStep3 = computed(() =>
-    !!this.selectedDate() && !!this.selectedTime()
+  readonly canGoToStep3 = computed(
+    () => !!this.selectedDate() && !!this.selectedTime(),
   );
 
   readonly confirmDoctorName = computed(() =>
     this.bookingMode() === 'specialty'
       ? (this.assignedDoctor()?.name ?? '')
-      : this.selectedDoctorName()
+      : this.selectedDoctorName(),
   );
 
   readonly confirmDate = computed(() => {
     const d = this.selectedDate();
     if (!d) return '';
-    const days   = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-    const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
-                    'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const months = [
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
+    ];
     return `${days[d.getDay()]} ${d.getDate()} de ${months[d.getMonth()]} de ${d.getFullYear()}`;
   });
 
-  readonly currentPatient = computed(() => this.appService.currentPatient());
+  ngOnInit(): void {
+    // Carga datos del paciente desde el backend usando el keycloakId del token
+    this.patientService.getMe().subscribe({
+      next: (patient) => this.currentPatient.set(patient),
+      error: () => {
+        // Si no existe el paciente en la DB aún, no bloqueamos el flujo
+        // El backend lo creará con los datos mínimos del token
+      },
+    });
+  }
 
   selectMode(mode: BookingMode): void {
     this.bookingMode.set(mode);
@@ -123,15 +155,22 @@ export class PatientNewAppointmentComponent {
 
     if (mode === 'specialty') {
       this.citaService.getSpecialtiesWithDoctor().subscribe({
-        next: data => this.specialtiesWithDoctor.set(data),
-        error: () => this.noSpecialtyAvailable.set(true)
+        next: (data) => this.specialtiesWithDoctor.set(data),
+        error: () => this.noSpecialtyAvailable.set(true),
       });
     } else {
       this.citaService.getSpecialties().subscribe({
-        next: specs => this.specialtiesWithDoctor.set(
-          specs.map(s => ({ specialty: s, id: '', name: '', laborEnd: null, workdays: [] }))
-        ),
-        error: () => this.noSpecialtyAvailable.set(true)
+        next: (specs) =>
+          this.specialtiesWithDoctor.set(
+            specs.map((s) => ({
+              specialty: s,
+              id: '',
+              name: '',
+              laborEnd: null,
+              workdays: [],
+            })),
+          ),
+        error: () => this.noSpecialtyAvailable.set(true),
       });
     }
   }
@@ -147,24 +186,26 @@ export class PatientNewAppointmentComponent {
     if (!specialty) return;
 
     if (this.bookingMode() === 'specialty') {
-      const match = this.specialtiesWithDoctor().find(s => s.specialty === specialty);
+      const match = this.specialtiesWithDoctor().find(
+        (s) => s.specialty === specialty,
+      );
       this.assignedDoctor.set(match ?? null);
       if (!match) this.noSpecialtyAvailable.set(true);
     } else {
       this.doctorsBySpecialty.set([]);
       this.citaService.getDoctorsBySpecialty(specialty).subscribe({
-        next: docs => {
+        next: (docs) => {
           this.doctorsBySpecialty.set(docs);
           this.noDoctorsFound.set(docs.length === 0);
         },
-        error: () => this.noDoctorsFound.set(true)
+        error: () => this.noDoctorsFound.set(true),
       });
     }
   }
 
   onDoctorChange(doctorId: string): void {
     this.selectedDoctorId.set(doctorId);
-    const doc = this.doctorsBySpecialty().find(d => d.id === doctorId);
+    const doc = this.doctorsBySpecialty().find((d) => d.id === doctorId);
     this.selectedDoctorName.set(doc?.name ?? '');
   }
 
@@ -194,25 +235,29 @@ export class PatientNewAppointmentComponent {
     if (!date) return;
 
     const dateStr = date.toISOString().slice(0, 10);
-    this.citaService.getAvailableSlots(this.effectiveDoctorId(), dateStr)
+    this.citaService
+      .getAvailableSlots(this.effectiveDoctorId(), dateStr)
       .subscribe({
         next: (slots) => {
           this.availableSlots.set(slots);
-
           if (!slots || slots.length === 0) {
             this.noSlotsAvailable.set(true);
-            this.errorMessageSlots.set(' No hay horarios disponibles para esta fecha.');
+            this.errorMessageSlots.set(
+              'No hay horarios disponibles para esta fecha.',
+            );
           }
         },
-        error: (err) =>{
+        error: (err) => {
           this.availableSlots.set([]);
           this.noSlotsAvailable.set(true);
-
           const errorCode = err.error?.errorCode;
           const detail = err.error?.detail;
-
-          if(err.status === 0){ this.errorMessageSlots.set('No se pudo conectar con el servidor. Intente mas tarde.'); return;}
-
+          if (err.status === 0) {
+            this.errorMessageSlots.set(
+              'No se pudo conectar con el servidor. Intente más tarde.',
+            );
+            return;
+          }
           switch (errorCode) {
             case 'SLOT_CONFLICT':
               this.errorMessage.set(detail);
@@ -220,15 +265,22 @@ export class PatientNewAppointmentComponent {
             default:
               this.errorMessage.set(detail || 'Error inesperado');
           }
-        }
+        },
       });
   }
 
   confirm(): void {
-    const date      = this.selectedDate();
-    const patientId = this.currentPatient()?.id;
+    const date = this.selectedDate();
+    const patient = this.currentPatient();
+    const patientId = patient?.id ?? this.appService.keycloakId();
 
-    if (!date || !this.selectedTime() || !this.effectiveDoctorId() || !patientId) return;
+    if (
+      !date ||
+      !this.selectedTime() ||
+      !this.effectiveDoctorId() ||
+      !patientId
+    )
+      return;
 
     this.isLoading.set(true);
     this.errorMessage.set('');
@@ -237,46 +289,49 @@ export class PatientNewAppointmentComponent {
       patientId,
       doctorId: this.effectiveDoctorId(),
       specialty: this.selectedSpecialty(),
-      documentType: this.currentPatient()?.documentType,
-      documentNumber: this.currentPatient()?.documentNumber,
-      firstName: this.currentPatient()?.firstName,
-      lastName: this.currentPatient()?.lastName,
-      phone: this.currentPatient()?.phone,
       date: date.toISOString().slice(0, 10),
       startTime: this.selectedTime(),
-      schedulingOrigin: 'AUTONOMO' as const,
-      gender: this.currentPatient()?.gender,
-      birthDate: this.currentPatient()?.birthDate
+      schedulingOrigin: 'AUTONOMO',
+      documentType: patient?.documentType,
+      documentNumber: patient?.documentNumber,
+      firstName: patient?.firstName,
+      lastName: patient?.lastName,
+      phone: patient?.phone,
+      gender: patient?.gender,
+      birthDate: patient?.birthDate,
+      email: patient?.email,
     };
 
     this.citaService.addAppointment(data).subscribe({
       next: () => {
         this.isLoading.set(false);
         this.success.set(true);
-        this.appointmentService.getAppointmentsByPatient(patientId).subscribe(
-          appts => this.appointmentService.appointments.set(appts)
-        );
+        this.appointmentService
+          .getAppointmentsByPatient(patientId)
+          .subscribe((appts) =>
+            this.appointmentService.appointments.set(appts),
+          );
         setTimeout(() => this.router.navigate(['/paciente']), 3000);
       },
       error: (err) => {
         this.isLoading.set(false);
-
         const errorCode = err.error?.errorCode;
         const detail = err.error?.detail;
-
-        if(err.status === 0){ this.errorMessage.set('No se pudo conectar con el servidor. Intente mas tarde.'); return;}
-
+        if (err.status === 0) {
+          this.errorMessage.set(
+            'No se pudo conectar con el servidor. Intente más tarde.',
+          );
+          return;
+        }
         switch (errorCode) {
           case 'PATIENT_TIME_CONFLICT':
-            this.errorMessage.set(detail);
-            break;
           case 'PATIENT_SPECIALTY_CONFLICT':
             this.errorMessage.set(detail);
             break;
           default:
             this.errorMessage.set(detail || 'Error inesperado');
         }
-      }
+      },
     });
   }
 
