@@ -27,6 +27,8 @@ services:
       - "${KC_PORT}:${KC_PORT}"
     volumes:
       - ../keycloak/realm:/opt/keycloak/data/import
+      - ../keycloak/themes/dist/keycloak-theme/keycloak-theme-for-kc-all-other-versions.jar:/opt/keycloak/providers/keycloak-theme.jar
+
     depends_on:
       postgres:
         condition: service_healthy
