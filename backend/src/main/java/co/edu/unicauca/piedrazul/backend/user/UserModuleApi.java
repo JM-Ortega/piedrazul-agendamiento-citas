@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.user;
 
+import java.util.Optional;
 import java.util.UUID;
 
 public interface UserModuleApi {
@@ -15,6 +16,10 @@ public interface UserModuleApi {
 
     UUID getOrCreateAdminUser(String username, String firstName, String lastName,
                               String email, String password);
+
+    Optional<UUID> findUserIdByUsername(String username);
+
+    void ensurePatientRole(UUID userId);
 
     boolean existsById(UUID id);
 

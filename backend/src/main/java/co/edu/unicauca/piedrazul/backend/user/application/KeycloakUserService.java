@@ -5,6 +5,7 @@ import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.KeycloakUserClient;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -126,5 +127,15 @@ public class KeycloakUserService implements UserModuleApi {
                                 role
                         )
                 );
+    }
+
+    @Override
+    public Optional<UUID> findUserIdByUsername(String username) {
+        return keycloakClient.findUserIdByUsername(username);
+    }
+
+    @Override
+    public void ensurePatientRole(UUID userId) {
+        keycloakClient.assignRoleIfMissing(userId, Role.PATIENT);
     }
 }
