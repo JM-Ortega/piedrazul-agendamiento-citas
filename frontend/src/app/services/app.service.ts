@@ -25,8 +25,9 @@ export class AppService {
 
   readonly isAuthenticated = computed(() => {
     const event = this.keycloakEvent();
+
     return event.type === KeycloakEventType.Ready
-      ? (event.args as ReadyArgs)
+      ? ((event.args as ReadyArgs) ?? false)
       : (this.keycloak.authenticated ?? false);
   });
 
