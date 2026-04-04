@@ -117,7 +117,7 @@ public class AppointmentController {
                     request.getDate(),
                     new AppointmentTime(request.getStartTime())
             );
-        };
+        }
 
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
