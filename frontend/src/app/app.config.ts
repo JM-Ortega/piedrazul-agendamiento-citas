@@ -23,8 +23,13 @@ import {
   INCLUDE_BEARER_TOKEN_INTERCEPTOR_CONFIG,
 } from 'keycloak-angular';
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const apiBasePattern = escapeRegex(environment.apiUrl);
 const apiUrlCondition = createInterceptorCondition({
-  urlPattern: /^http:\/\/localhost:8080\/api(\/.*)?$/i,
+  urlPattern: new RegExp(`^${apiBasePattern}(\\/.*)?$`, 'i'),
   bearerPrefix: 'Bearer',
 });
 
