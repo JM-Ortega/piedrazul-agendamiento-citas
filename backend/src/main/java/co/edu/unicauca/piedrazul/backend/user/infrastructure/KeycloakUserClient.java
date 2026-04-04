@@ -2,6 +2,9 @@ package co.edu.unicauca.piedrazul.backend.user.infrastructure;
 
 import co.edu.unicauca.piedrazul.backend.config.security.KeycloakProperties;
 import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.user.exception.IdentityProviderException;
+import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
+import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsException;
 import jakarta.ws.rs.core.Response;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
@@ -9,6 +12,8 @@ import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -17,6 +22,8 @@ import java.util.UUID;
 
 @Component
 public class KeycloakUserClient {
+
+    private static final Logger log = LoggerFactory.getLogger(KeycloakUserClient.class);
 
     private final Keycloak keycloak;
     private final KeycloakProperties props;
@@ -32,8 +39,14 @@ public class KeycloakUserClient {
                 .build();
     }
 
-    public UUID createUser(String username, String firstName, String lastName,
-                           String email, String password, Role role) {
+    public UUID createUser(
+            String username,
+            String firstName,
+            String lastName,
+            String email,
+            String password,
+            Role role
+    ) {
         RealmResource realm = keycloak.realm(props.getRealm());
 
         CredentialRepresentation credential = new CredentialRepresentation();
@@ -50,19 +63,53 @@ public class KeycloakUserClient {
         user.setEmailVerified(true);
         user.setCredentials(List.of(credential));
 
-        Response response = realm.users().create(user);
+        String keycloakId;
 
-        if (response.getStatus() == 409) {
-            throw new RuntimeException("Usuario ya existe en Keycloak: " + username);
+        try (Response response = realm.users().create(user)) {
+            int status = response.getStatus();
+
+            if (status == Response.Status.CONFLICT.getStatusCode()) {
+                throw new UserAlreadyExistsException(username);
+            }
+
+            if (status == Response.Status.BAD_REQUEST.getStatusCode()) {
+                String errorBody = response.hasEntity() ? response.readEntity(String.class) : "";
+                log.warn(
+                        "Datos inválidos al crear usuario en Keycloak. username={}, status={}, body={}",
+                        username,
+                        status,
+                        errorBody
+                );
+                throw new InvalidUserDataException("Datos inválidos para crear el usuario");
+            }
+
+            if (status != Response.Status.CREATED.getStatusCode()) {
+                String errorBody = response.hasEntity() ? response.readEntity(String.class) : "";
+                log.error(
+                        "Error al crear usuario en Keycloak. username={}, status={}, body={}",
+                        username,
+                        status,
+                        errorBody
+                );
+                throw new IdentityProviderException(
+                        "No se pudo crear el usuario en el proveedor de identidad"
+                );
+            }
+
+            String location = response.getHeaderString("Location");
+            if (location == null || location.isBlank()) {
+                log.error(
+                        "Keycloak creó usuario sin header Location. username={}, status={}",
+                        username,
+                        status
+                );
+                throw new IdentityProviderException(
+                        "No se pudo obtener el identificador del usuario creado"
+                );
+            }
+
+            keycloakId = location.substring(location.lastIndexOf('/') + 1);
         }
-
-        if (response.getStatus() != 201) {
-            throw new RuntimeException("Error al crear usuario en Keycloak. Status: "
-                    + response.getStatus() + " - " + response.readEntity(String.class));
-        }
-
-        String location = response.getHeaderString("Location");
-        String keycloakId = location.substring(location.lastIndexOf('/') + 1);
 
         assignRealmRole(keycloakId, role);
 
