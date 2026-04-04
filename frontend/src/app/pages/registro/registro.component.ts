@@ -84,8 +84,9 @@ export class RegistroComponent {
     () => this.patientStatus() === 'already-linked',
   );
 
-  // solo paciente nuevo real define contraseña
-  readonly requiresPassword = computed(() => this.isNewPatient());
+  readonly requiresPassword = computed(
+    () => this.isNewPatient() || this.isExistingPatient(),
+  );
 
   readonly isMinorPatient = computed(() => {
     if (!this.isNewPatient()) return false;
