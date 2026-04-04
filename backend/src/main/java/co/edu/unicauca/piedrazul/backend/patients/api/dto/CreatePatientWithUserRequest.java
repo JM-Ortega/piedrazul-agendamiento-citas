@@ -37,6 +37,9 @@ public class CreatePatientWithUserRequest {
 
     private String guardianPhone;
 
+    @NotBlank
+    private String password;
+
     public String getUsername() {
         return username;
     }
@@ -76,4 +79,8 @@ public class CreatePatientWithUserRequest {
     public String getGuardianPhone() {
         return guardianPhone;
     }
+
+    public String getPassword() {
+    return password;
+}
 }

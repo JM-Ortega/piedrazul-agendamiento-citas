@@ -66,7 +66,7 @@ class DoctorServiceTest {
                 List.of(new CreateScheduleRequest(LocalTime.of(8, 0), LocalTime.of(12, 0), Workday.LUNES))
         );
 
-        when(userModuleApi.createDoctorUser("123456")).thenReturn(userId);
+        when(userModuleApi.getOrCreateDoctorUser("123456")).thenReturn(userId);
         when(doctorRepository.save(any(Doctor.class))).thenAnswer(invocation -> {
             Doctor doctor = invocation.getArgument(0);
             doctor.setIdDoctor(doctorId);
@@ -79,7 +79,7 @@ class DoctorServiceTest {
         assertThat(response.name()).isEqualTo("Laura Perez");
         assertThat(response.workdays()).containsExactly(1);
 
-        verify(userModuleApi).createDoctorUser("123456");
+        verify(userModuleApi).getOrCreateDoctorUser("123456");
         verify(userModuleApi).deactivateUser(userId);
         verify(userModuleApi, never()).activateUser(any(UUID.class));
         verify(doctorRepository).save(any(Doctor.class));
@@ -103,7 +103,7 @@ class DoctorServiceTest {
                 .hasMessageContaining("fecha de finalización es obligatoria");
 
         verify(doctorRepository, never()).save(any(Doctor.class));
-        verify(userModuleApi, never()).createDoctorUser(any(String.class));
+        verify(userModuleApi, never()).getOrCreateDoctorUser(any(String.class));
     }
 
     @Test

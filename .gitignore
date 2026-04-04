@@ -341,5 +341,8 @@ dist/
 # logs
 *.log
 
+infra/keycloak/themes/keycloakify-starter/node_modules/
+infra/keycloak/themes/keycloakify-starter/dist/
+infra/keycloak/themes/dist/
 
 # Edit at https://www.toptal.com/developers/gitignore?templates=java,node,angular,jetbrains,visualstudiocode

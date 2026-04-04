@@ -16,5 +16,7 @@ public record CreateDoctorRequest(
         @NotNull LocalDate laborStart,
         LocalDate laborEnd,
         @Positive int appointmentInterval,
-        List<CreateScheduleRequest> schedules
+        List<CreateScheduleRequest> schedules,
+        String email,
+        @NotBlank String password
 ) {}

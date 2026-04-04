@@ -1,11 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.config;
 
 import co.edu.unicauca.piedrazul.backend.appointment.application.*;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAvailableSlotsUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetSpecialtiesWithDoctorUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ListAppointmentsUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ScheduleAutonomousAppointmentUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ScheduleManualAppointmentUseCase;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
@@ -15,6 +11,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeServ
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
+import co.edu.unicauca.piedrazul.backend.appointment.application.ListMyAppointmentsUseCaseImpl;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -104,6 +101,16 @@ public class AppointmentConfig {
                 appointmentRepository,
                 doctorConfigConsultPort,
                 slotTimeService
+        );
+    }
+
+    @Bean
+    public ListMyAppointmentsUseCase listMyAppointmentsUseCase(
+            AppointmentRepository appointmentRepository,
+            PatientConsultPort patientConsultPort) {
+        return new ListMyAppointmentsUseCaseImpl(
+                appointmentRepository,
+                patientConsultPort
         );
     }
 }

@@ -36,41 +36,45 @@ public class DoctorDataInitializer implements ApplicationRunner {
         doctorService.createDoctor(new CreateDoctorRequest(
                 "Clara Inés",
                 "Córdoba",
-                "DOC-001",
+                "11000000",
                 List.of(Specialty.TERAPIA_NEURAL),
                 LocalDate.of(2026, 1, 1),
                 LocalDate.of(2026, 12, 31),
                 30,
-                List.of(new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(11,0,0), Workday.LUNES),
-                        new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(11,0,0), Workday.MARTES),
-                        new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(9,0,0), Workday.JUEVES),
-                        new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(11,0,0), Workday.VIERNES))
+                List.of(new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(11, 0, 0), Workday.LUNES),
+                        new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(11, 0, 0), Workday.MARTES),
+                        new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.JUEVES),
+                        new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(11, 0, 0), Workday.VIERNES)),
+                "clara.cordoba@piedrazul.dev",
+                "Doctor123!"
         ));
-
 
         doctorService.createDoctor(new CreateDoctorRequest(
                 "José Ignacio",
                 "García",
-                "DOC-002",
+                "12000000",
                 List.of(Specialty.FISIOTERAPIA),
                 LocalDate.of(2026, 1, 1),
                 LocalDate.of(2026, 12, 31),
                 40,
-                List.of(new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(9,0,0), Workday.MARTES),
-                        new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(12,0,0), Workday.MIERCOLES),
-                        new CreateScheduleRequest(LocalTime.of(7,0,0), LocalTime.of(10,0,0), Workday.VIERNES))
+                List.of(new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.MARTES),
+                        new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.MIERCOLES),
+                        new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(10, 0, 0), Workday.VIERNES)),
+                "jose.garcia@piedrazul.dev",
+                "Doctor123!"
         ));
-
 
         doctorService.createDoctor(new CreateDoctorRequest(
                 "Armando",
                 "Peña",
-                "DOC-003",
+                "13000000",
                 List.of(Specialty.QUIROPRAXIA),
                 LocalDate.of(2026, 11, 1),
                 LocalDate.of(2026, 12, 31),
                 15,
-                Collections.emptyList()
+                Collections.emptyList(),
+                "armando.pena@piedrazul.dev",
+                "Doctor123!"
         ));
 
         System.out.println("✔ Médicos de prueba insertados");

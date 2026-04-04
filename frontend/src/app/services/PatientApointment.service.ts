@@ -18,4 +18,10 @@ export class PatientAppointmentService {
       params: { idPatient: patientId },
     });
   }
+
+  getMyAppointments(): Observable<AppointmentsPatient[]> {
+    return this.http.get<AppointmentsPatient[]>(
+      `${this.apiUrl}/appointments/me`,
+    );
+  }
 }

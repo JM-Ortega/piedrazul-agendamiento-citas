@@ -10,6 +10,8 @@ import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -25,6 +27,7 @@ public class AppointmentController {
     private final ListAppointmentsUseCase listAppointmentsUseCase;
     private final GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase;
     private final CitaDtoMapper citaDtoMapper;
+    private final ListMyAppointmentsUseCase listMyAppointmentsUseCase;
 
     public AppointmentController(
             GetAvailableSlotsUseCase getAvailableSlotsUseCase,
@@ -32,13 +35,15 @@ public class AppointmentController {
             ScheduleAutonomousAppointmentUseCase scheduleAutonomousAppointmentUseCase,
             ListAppointmentsUseCase listAppointmentsUseCase,
             GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase,
-            CitaDtoMapper citaDtoMapper) {
+            CitaDtoMapper citaDtoMapper,
+            ListMyAppointmentsUseCase listMyAppointmentsUseCase) {
         this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
         this.scheduleManualAppointmentUseCase = scheduleManualAppointmentUseCase;
         this.scheduleAutonomousAppointmentUseCase = scheduleAutonomousAppointmentUseCase;
         this.listAppointmentsUseCase = listAppointmentsUseCase;
         this.getSpecialtiesWithDoctorUseCase = getSpecialtiesWithDoctorUseCase;
         this.citaDtoMapper = citaDtoMapper;
+        this.listMyAppointmentsUseCase = listMyAppointmentsUseCase;
     }
 
     // Franjas disponibles según el médico y la fecha
@@ -62,6 +67,20 @@ public class AppointmentController {
 
         // Mapper para pasar de Domain a DTO
         return ResponseEntity.ok(listAppointmentsUseCase.listBy(idDoctor, idPatient, date).stream().map(citaDtoMapper::toResponse).toList());
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<List<AppointmentResponse>> listMyAppointments(
+            @AuthenticationPrincipal Jwt jwt) {
+
+        UUID userId = UUID.fromString(jwt.getSubject());
+
+        return ResponseEntity.ok(
+                listMyAppointmentsUseCase.execute(userId)
+                        .stream()
+                        .map(citaDtoMapper::toResponse)
+                        .toList()
+        );
     }
 
     // Crear cita
@@ -98,7 +117,7 @@ public class AppointmentController {
                     request.getDate(),
                     new AppointmentTime(request.getStartTime())
             );
-        };
+        }
 
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
