@@ -11,7 +11,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeServ
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
-import co.edu.unicauca.piedrazul.backend.appointment.aplication.ListMyAppointmentsUseCaseImpl;
+import co.edu.unicauca.piedrazul.backend.appointment.application.ListMyAppointmentsUseCaseImpl;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
