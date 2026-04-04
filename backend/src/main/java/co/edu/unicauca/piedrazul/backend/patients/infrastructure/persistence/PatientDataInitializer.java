@@ -17,16 +17,20 @@ public class PatientDataInitializer implements ApplicationRunner {
     private final PatientRepository patientRepository;
     private final PatientService patientService;
 
-    public PatientDataInitializer(PatientRepository patientRepository, PatientService patientService) {
+    public PatientDataInitializer(
+            PatientRepository patientRepository,
+            PatientService patientService
+    ) {
         this.patientRepository = patientRepository;
         this.patientService = patientService;
     }
 
     @Override
     public void run(ApplicationArguments args) {
-        if (patientRepository.count() > 0) return;
+        if (patientRepository.count() > 0) {
+            return;
+        }
 
-        // Paciente sin cuenta
         patientService.createPatient(
                 PatientDocumentType.CEDULA,
                 "12345678",
@@ -39,7 +43,6 @@ public class PatientDataInitializer implements ApplicationRunner {
                 null
         );
 
-        // Paciente sin cuenta
         patientService.createPatient(
                 PatientDocumentType.CEDULA,
                 "87654321",
@@ -52,7 +55,6 @@ public class PatientDataInitializer implements ApplicationRunner {
                 null
         );
 
-        // Menor de edad sin cuenta
         patientService.createPatient(
                 PatientDocumentType.TARJETA_IDENTIDAD,
                 "11122233",
@@ -65,9 +67,8 @@ public class PatientDataInitializer implements ApplicationRunner {
                 "3204445566"
         );
 
-        // Paciente CON cuenta en Keycloak para pruebas
         patientService.createPatientWithUser(
-                "Patient",
+                "20202020202",
                 "Patient123!",
                 PatientDocumentType.CEDULA,
                 "20202020202",
