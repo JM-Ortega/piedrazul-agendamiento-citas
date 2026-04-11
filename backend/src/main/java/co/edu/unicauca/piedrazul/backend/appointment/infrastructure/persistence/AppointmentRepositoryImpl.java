@@ -7,6 +7,7 @@ import jakarta.transaction.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public class AppointmentRepositoryImpl implements AppointmentRepository {
@@ -14,12 +15,10 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     private final AppointmentJpaRepository jpaRepository;
     private final AppointmentMapper mapper;
 
-
     public AppointmentRepositoryImpl(AppointmentJpaRepository jpaRepository, AppointmentMapper mapper) {
         this.jpaRepository = jpaRepository;
         this.mapper = mapper;
     }
-
 
     @Transactional
     @Override
@@ -27,6 +26,11 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
         jpaRepository.save(mapper.toEntity(appointment));
     }
 
+    //metodo para el modulo de historia clinica
+    @Override
+    public Optional<Appointment> findById(UUID idAppointment) {
+        return jpaRepository.findById(idAppointment).map(mapper::toDomain);
+    }
 
     @Override
     public List<Appointment> findByDoctorId(UUID idDoctor) {

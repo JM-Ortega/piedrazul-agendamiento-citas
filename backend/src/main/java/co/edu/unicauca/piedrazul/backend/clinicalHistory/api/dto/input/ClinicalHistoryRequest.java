@@ -1,4 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.input;
 
-public record ClinicalHistoryRequest() {
-}
+import java.util.UUID;
+
+public record ClinicalHistoryRequest(
+        UUID idAppointment,
+        String description
+) {}
