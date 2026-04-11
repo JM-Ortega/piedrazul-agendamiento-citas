@@ -1,0 +1,18 @@
+# Default: convertir a LF en el repo
+* text=auto eol=lf
+
+# Scripts (CRÍTICO)
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Docker
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Opcional: evitar problemas en SQL
+*.sql text eol=lf
+
+# Windows scripts (si algún día tienes)
+*.bat text eol=crlf
+*.ps1 text eol=crlf
