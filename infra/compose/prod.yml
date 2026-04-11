@@ -7,6 +7,7 @@ networks:
 include:
   - ./db.yml
   - ./keycloak.yml
+  - ./backend.yml
 
 services:
   keycloak:
