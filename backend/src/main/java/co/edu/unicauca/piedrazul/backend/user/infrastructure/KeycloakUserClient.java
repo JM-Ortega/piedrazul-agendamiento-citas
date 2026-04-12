@@ -7,7 +7,6 @@ import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException
 import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsException;
 import jakarta.ws.rs.core.Response;
 import org.keycloak.admin.client.Keycloak;
-import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
@@ -28,15 +27,9 @@ public class KeycloakUserClient {
     private final Keycloak keycloak;
     private final KeycloakProperties props;
 
-    public KeycloakUserClient(KeycloakProperties props) {
+    public KeycloakUserClient(Keycloak keycloak, KeycloakProperties props) {
+        this.keycloak = keycloak;
         this.props = props;
-        this.keycloak = KeycloakBuilder.builder()
-                .serverUrl(props.getServerUrl())
-                .realm(props.getRealm())
-                .clientId(props.getClientId())
-                .clientSecret(props.getClientSecret())
-                .grantType("client_credentials")
-                .build();
     }
 
     public UUID createUser(
