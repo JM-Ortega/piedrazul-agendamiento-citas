@@ -21,7 +21,7 @@ terraform {
     organization = "Piedrazul"
 
     workspaces {
-      name = "piedrazul-infra"
+      name = "piedrazul-hetzner"
     }
   }
 }

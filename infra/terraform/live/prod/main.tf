@@ -1,5 +1,6 @@
 module "firewall" {
-  source = "../../modules/firewall"
+  source = "../../modules/hetzner/firewall"
+
 
   name        = local.firewall_name
   ssh_sources = ["0.0.0.0/0", "::/0"]
@@ -7,7 +8,7 @@ module "firewall" {
 }
 
 module "server" {
-  source = "../../modules/server"
+  source = "../../modules/hetzner/server"
 
   name               = local.server_name
   server_type        = var.server_type
