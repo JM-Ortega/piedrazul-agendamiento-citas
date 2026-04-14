@@ -9,7 +9,7 @@ variable "server_ip" {
 }
 
 variable "project" {
-  description = "Nombre del proyecto — usado para construir los subdominios"
+  description = "Nombre del proyecto - usado para construir los subdominios"
   type        = string
 }
 
