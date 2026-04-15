@@ -60,9 +60,11 @@ jobs:
           comment: "Apply desde GitHub Actions — commit ${{ github.sha }}"
 
       - name: Fail if apply did not finish cleanly
-        if: ${{ steps.apply.outputs.run_status != 'applied' }}
+        if: |
+          steps.run.outputs.run_status != 'applied' &&
+          steps.run.outputs.run_status != 'planned_and_finished'
         run: |
           echo "HCP Terraform apply did not finish cleanly"
-          echo "Status: ${{ steps.apply.outputs.run_status }}"
+          echo "Status: ${{ steps.run.outputs.run_status }}"
           echo "${{ steps.run.outputs.run_link }}"
           exit 1
