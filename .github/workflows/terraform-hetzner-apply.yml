@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - feat/repo-structure-cicd # ← temporal para pruebas
     paths:
       - "infra/terraform/live/prod/**"
       - "infra/terraform/modules/hetzner/**"
