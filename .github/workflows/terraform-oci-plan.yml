@@ -1,0 +1,110 @@
+name: Terraform — OCI Plan
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "infra/terraform/live/oci/**"
+      - "infra/terraform/modules/oci/**"
+      - "infra/terraform/modules/dns/**"
+      - "infra/terraform/modules/pages/**"
+      - ".github/workflows/terraform-oci-*.yml"
+
+concurrency:
+  group: terraform-oci-${{ github.head_ref }}
+  cancel-in-progress: true
+
+env:
+  TF_CLOUD_ORGANIZATION: "Piedrazul"
+  TF_API_TOKEN: "${{ secrets.TF_API_TOKEN }}"
+  TF_WORKSPACE: "piedrazul-oci"
+  CONFIG_DIRECTORY: "infra/terraform"
+
+jobs:
+  plan:
+    name: Speculative plan — OCI
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Upload configuration
+        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@v1.3.2
+        id: upload
+        with:
+          workspace: ${{ env.TF_WORKSPACE }}
+          directory: ${{ env.CONFIG_DIRECTORY }}
+          speculative: true
+
+      - name: Create plan run
+        uses: hashicorp/tfc-workflows-github/actions/create-run@v1.3.2
+        id: run
+        continue-on-error: true
+        with:
+          workspace: ${{ env.TF_WORKSPACE }}
+          configuration_version: ${{ steps.upload.outputs.configuration_version_id }}
+          plan_only: true
+          message: "PR #${{ github.event.pull_request.number }} — OCI speculative plan"
+
+      - name: Get plan output
+        uses: hashicorp/tfc-workflows-github/actions/plan-output@v1.3.2
+        id: plan_output
+        with:
+          plan: ${{ steps.run.outputs.plan_id }}
+
+      - name: Upsert plan comment on PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const marker = '<!-- hcp-terraform-oci-plan -->';  // ← cambia
+            const body = `${marker}
+            ### Terraform Plan — OCI \`${{ steps.run.outputs.run_status }}\`
+
+            | | Count |
+            |---|---|
+            | Add | ${{ steps.plan_output.outputs.add }} |
+            | Change | ${{ steps.plan_output.outputs.change }} |
+            | Destroy | ${{ steps.plan_output.outputs.destroy }} |
+
+            **Workspace:** \`${{ env.TF_WORKSPACE }}\`
+            **Commit:** \`${{ github.sha }}\`
+            **Triggered by:** @${{ github.actor }}
+
+            [Ver plan completo en HCP Terraform](${{ steps.run.outputs.run_link }})`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail if run did not finish cleanly
+        if: ${{ steps.run.outputs.run_status != 'planned_and_finished' }}
+        run: |
+          echo "HCP Terraform run did not finish cleanly"
+          echo "Status: ${{ steps.run.outputs.run_status }}"
+          echo "${{ steps.run.outputs.run_link }}"
+          exit 1
