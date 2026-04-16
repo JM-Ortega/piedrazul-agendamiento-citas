@@ -9,7 +9,7 @@ resource "hcloud_server" "main" {
   firewall_ids = var.firewall_ids
 
   # Bootstrap inicial del servidor usando cloud-init (template de Terraform)
-  user_data = templatefile("${path.module}/templates/cloud-init.tftpl", {
+  user_data = templatefile("${path.module}/../../../shared/templates/cloud-init.tftpl", {
     ssh_public_keys    = var.ssh_public_keys
     ops_ssh_public_key = var.ops_ssh_public_key
   })

@@ -30,7 +30,7 @@ module "server" {
 
   ssh_public_keys = [var.ansible_ssh_public_key]
 
-  user_data = templatefile("${path.module}/../../modules/hetzner/server/templates/cloud-init.tftpl", {
+  user_data = templatefile("${path.module}/../../../shared/templates/cloud-init.tftpl", {
     ssh_public_keys    = [var.ansible_ssh_public_key]
     ops_ssh_public_key = var.ops_ssh_public_key
   })
