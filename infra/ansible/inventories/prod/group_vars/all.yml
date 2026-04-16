@@ -1,0 +1,23 @@
+---
+# infra/ansible/inventories/prod/group_vars/all.yml
+
+# Directorios
+app_dir: /opt/piedrazul
+compose_project_name: piedrazul
+compose_file: "{{ app_dir }}/prod.yml"
+compose_src_dir: "{{ playbook_dir }}/../../compose"
+
+# Container registry
+ghcr_registry: ghcr.io
+ghcr_namespace: jm-ortega/piedrazul-agendamiento-citas
+backend_image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/backend"
+
+# Dominio base
+base_domain: narvaezlab.dev
+
+# Keycloak
+kc_realm: piedrazul
+kc_port: 8180
+kc_backend_client_id: piedrazul-backend
+kc_bootstrap_admin_user: kc-bootstrap
+kc_admin_user: kc-admin
