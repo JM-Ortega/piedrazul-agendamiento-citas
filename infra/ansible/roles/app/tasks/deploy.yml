@@ -1,0 +1,51 @@
+---
+# Rollout de nueva imagen. No toca Keycloak ni secretos.
+# Requiere image_tag disponible como variable (inyectada por el workflow).
+
+# Preservar KC_BACKEND_CLIENT_SECRET
+- name: Leer .env existente
+  ansible.builtin.slurp:
+    src: "{{ app_dir }}/.env"
+  register: app_env_file
+  no_log: true
+
+- name: Extraer KC_BACKEND_CLIENT_SECRET del .env existente
+  ansible.builtin.set_fact:
+    app_kc_backend_secret: >-
+      {{ (app_env_file.content | b64decode).split('\n')
+         | select('match', '^KC_BACKEND_CLIENT_SECRET=')
+         | map('regex_replace', '^KC_BACKEND_CLIENT_SECRET=', '')
+         | first | default('') }}
+  no_log: true
+
+# Actualizar image.env con el nuevo tag
+- name: Actualizar image.env
+  ansible.builtin.copy:
+    content: "IMAGE_TAG={{ image_tag }}\n"
+    dest: "{{ app_dir }}/image.env"
+    owner: ansible
+    group: ansible
+    mode: "0640"
+
+# Regenerar .env
+- name: Actualizar .env
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ app_dir }}/.env"
+    owner: ansible
+    group: ansible
+    mode: "0640"
+  no_log: true
+
+# Pull y deploy en un solo paso
+- name: Desplegar nueva imagen
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}"
+    project_name: "{{ compose_project_name }}"
+    files:
+      - prod.yml
+    state: present
+    pull: always
+    env_files:
+      - .env
+      - image.env

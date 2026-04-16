@@ -1,0 +1,124 @@
+---
+# Fase de identidad: crea admin permanente, aplica KC_BACKEND_CLIENT_SECRET,
+# elimina bootstrap temporal. Corre UNA SOLA VEZ por marker en disco.
+# Requiere que setup.yml haya establecido app_kc_backend_secret como set_fact.
+
+- name: Verificar si Keycloak ya fue inicializado
+  ansible.builtin.stat:
+    path: "{{ app_dir }}/.keycloak_initialized"
+  register: app_kc_initialized
+
+- name: Inicializar identidad Keycloak
+  when: not app_kc_initialized.stat.exists
+  block:
+    # Readiness
+    - name: Esperar que Keycloak esté disponible (puerto management 9000)
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9000/health/ready"
+        status_code: 200
+      register: app_kc_health
+      until: app_kc_health.status == 200
+      retries: 30
+      delay: 10
+
+    # Esperar import del realm
+    # El healthcheck responde 200 cuando KC arranca, pero --import-realm
+    # puede completarse después. Este paso espera hasta que el realm exista.
+    - name: Esperar que el realm piedrazul esté importado
+      community.general.keycloak_realm:
+        auth_keycloak_url: "http://127.0.0.1:{{ kc_port }}"
+        auth_realm: master
+        auth_client_id: admin-cli
+        auth_username: "{{ kc_bootstrap_admin_user }}"
+        auth_password: "{{ lookup('env', 'KC_BOOTSTRAP_ADMIN_PASSWORD') }}"
+        realm: "{{ kc_realm }}"
+        state: present
+      register: app_realm_check
+      until: app_realm_check is not failed
+      retries: 12
+      delay: 5
+      no_log: true
+
+    # Admin permanente en master realm
+    - name: Crear usuario admin permanente en master realm
+      community.general.keycloak_user:
+        auth_keycloak_url: "http://127.0.0.1:{{ kc_port }}"
+        auth_realm: master
+        auth_client_id: admin-cli
+        auth_username: "{{ kc_bootstrap_admin_user }}"
+        auth_password: "{{ lookup('env', 'KC_BOOTSTRAP_ADMIN_PASSWORD') }}"
+        realm: master
+        username: "{{ kc_admin_user }}"
+        enabled: true
+        email_verified: true
+        credentials:
+          - type: password
+            value: "{{ lookup('env', 'KC_ADMIN_PASSWORD') }}"
+            temporary: false
+        state: present
+      register: app_kc_permanent_user
+      no_log: true
+
+    - name: Asignar rol admin al usuario permanente
+      community.general.keycloak_user_rolemapping:
+        auth_keycloak_url: "http://127.0.0.1:{{ kc_port }}"
+        auth_realm: master
+        auth_client_id: admin-cli
+        auth_username: "{{ kc_bootstrap_admin_user }}"
+        auth_password: "{{ lookup('env', 'KC_BOOTSTRAP_ADMIN_PASSWORD') }}"
+        realm: master
+        uid: "{{ app_kc_permanent_user.end_state.id }}"
+        roles:
+          - name: admin
+        state: present
+      no_log: true
+
+    # Client secret en realm piedrazul
+    - name: Aplicar KC_BACKEND_CLIENT_SECRET al client piedrazul-backend
+      community.general.keycloak_client:
+        auth_keycloak_url: "http://127.0.0.1:{{ kc_port }}"
+        auth_realm: master
+        auth_client_id: admin-cli
+        auth_username: "{{ kc_admin_user }}"
+        auth_password: "{{ lookup('env', 'KC_ADMIN_PASSWORD') }}"
+        realm: "{{ kc_realm }}"
+        client_id: "{{ kc_backend_client_id }}"
+        secret: "{{ app_kc_backend_secret }}"
+        state: present
+      no_log: true
+
+    # Eliminar usuario bootstrap temporal
+    - name: Eliminar usuario bootstrap temporal
+      community.general.keycloak_user:
+        auth_keycloak_url: "http://127.0.0.1:{{ kc_port }}"
+        auth_realm: master
+        auth_client_id: admin-cli
+        auth_username: "{{ kc_admin_user }}"
+        auth_password: "{{ lookup('env', 'KC_ADMIN_PASSWORD') }}"
+        realm: master
+        username: "{{ kc_bootstrap_admin_user }}"
+        state: absent
+      no_log: true
+
+    # Reiniciar backend para que tome el secret correcto
+    - name: Reiniciar backend
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        project_name: "{{ compose_project_name }}"
+        files:
+          - prod.yml
+        services:
+          - backend
+        state: restarted
+        env_files:
+          - .env
+          - image.env
+
+    # Marker de inicialización
+    - name: Crear marker .keycloak_initialized
+      ansible.builtin.file:
+        path: "{{ app_dir }}/.keycloak_initialized"
+        state: touch
+        owner: ansible
+        group: ansible
+        mode: "0444"

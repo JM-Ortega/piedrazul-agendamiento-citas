@@ -1,6 +1,4 @@
 ---
-# infra/ansible/inventories/prod/group_vars/all.yml
-
 # Directorios
 app_dir: /opt/piedrazul
 compose_project_name: piedrazul
