@@ -8,6 +8,7 @@ include:
   - ./db.yml
   - ./keycloak.yml
   - ./backend.yml
+  - ./traefik.yml
 
 services:
   keycloak:
@@ -24,3 +25,13 @@ services:
       - "traefik.http.routers.keycloak.entrypoints=websecure"
       - "traefik.http.routers.keycloak.tls.certresolver=letsencrypt"
       - "traefik.http.services.keycloak.loadbalancer.server.port=${KC_PORT}"
+
+  backend:
+    expose:
+      - "8080"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`${API_PUBLIC_DOMAIN}`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.backend.loadbalancer.server.port=8080"
