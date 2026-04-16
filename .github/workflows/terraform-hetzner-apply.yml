@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    environment: production
+    environment: production-hetzner
 
     steps:
       - uses: actions/checkout@v4
