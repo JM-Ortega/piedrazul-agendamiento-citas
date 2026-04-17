@@ -1,14 +1,14 @@
 import { Routes } from '@angular/router';
 import { AuthGuard } from './guards/auth.guard';
 
-import { AccesoComponent } from './pages/acceso/acceso.component';
-import { AdminConfigComponent } from './pages/admin/admin-config.component';
-import { SchedulerDashboardComponent } from './pages/agendador/scheduler-dashboard.component';
-import { HomeComponent } from './pages/home/home.component';
-import { NewAppointmentSchedulerComponent } from './pages/nueva-cita/new-appointment-scheduler.component';
-import { PatientNewAppointmentComponent } from './pages/paciente-agendar/patient-new-appointment.component';
-import { PatientDashboardComponent } from './pages/paciente/patient-dashboard.component';
-import { RegistroComponent } from './pages/registro/registro.component';
+import { AccesoComponent } from './design-system/pages/acceso/acceso.component';
+import { AdminConfigComponent } from './features/admin/admin-config.component';
+import { SchedulerDashboardComponent } from './features/appointment/pages/agendador-listar-citas/scheduler-dashboard.component';
+import { HomeComponent } from './design-system/pages/home/home.component';
+import { NewAppointmentSchedulerComponent } from './features/appointment/pages/agendador-agendar/new-appointment-scheduler.component';
+import { PatientNewAppointmentComponent } from './features/appointment/pages/paciente-agendar/patient-new-appointment.component';
+import { PatientDashboardComponent } from './features/appointment/pages/paciente-listar-citas/patient-dashboard.component';
+import { RegistroComponent } from './features/registro/registro.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },

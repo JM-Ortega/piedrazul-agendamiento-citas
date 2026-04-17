@@ -1,9 +1,9 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { Observable, of, tap, throwError } from 'rxjs';
-import { Patient } from '../models/patient.model';
-import { NewAppointment } from '../models/DTOs/newAppointment';
-import { SpecialtyDoctor } from '../models/DTOs/specialty-doctor';
+import { Patient } from '../models/interfaces/patient.model';
+import { NewAppointment } from '../models/dtos/newAppointment.dto';
+import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
 import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 

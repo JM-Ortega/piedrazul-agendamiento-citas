@@ -1,8 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Doctor } from '../models/doctor.model';
-import { dtoSchedule } from '../models/DTOs/dtoSchedule.model';
+import { Doctor } from '../models/interfaces/doctor.model';
+import { dtoSchedule } from '../models/dtos/schedule.dto';
 import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
