@@ -1,14 +1,11 @@
-<!-- booking-schedule-selector.component.html -->
 <div class="space-y-6">
   <h2 class="text-blue-800 text-2xl mb-2">Seleccionar Horario</h2>
 
-  <!-- Resumen del médico seleccionado -->
   <div *ngIf="state.effectiveDoctor()" class="flex items-center gap-2 text-sm text-gray-500">
     <lucide-angular [img]="UserSearch" [size]="16"></lucide-angular>
     <span>{{ state.effectiveDoctor()!.name }} · {{ state.selectedSpecialty() }}</span>
   </div>
 
-  <!-- Datepicker de fecha -->
   <div>
     <label class="block text-gray-700 mb-2 font-medium">Fecha *</label>
     <mat-form-field appearance="outline" class="w-full">
@@ -31,7 +28,6 @@
     </p>
   </div>
 
-  <!-- Fecha seleccionada formateada -->
   <div
     *ngIf="state.selectedDate()"
     class="bg-blue-50 rounded-xl px-4 py-3 text-blue-800 font-medium"
@@ -39,7 +35,6 @@
     📅 {{ state.confirmDate() }}
   </div>
 
-  <!-- Grilla de slots disponibles -->
   <div *ngIf="state.availableSlots().length > 0">
     <label class="block text-gray-700 mb-2 font-medium">Hora *</label>
     <div class="grid grid-cols-4 sm:grid-cols-5 gap-2">
@@ -57,7 +52,6 @@
     </div>
   </div>
 
-  <!-- Aviso sin slots disponibles -->
   <div
     *ngIf="state.selectedDate() && noSlotsAvailable"
     class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm"
@@ -65,7 +59,6 @@
     ⚠️ {{ errorMessageSlots }}
   </div>
 
-  <!-- Navegación -->
   <div class="flex gap-4 mt-2">
     <button
       (click)="goBack()"

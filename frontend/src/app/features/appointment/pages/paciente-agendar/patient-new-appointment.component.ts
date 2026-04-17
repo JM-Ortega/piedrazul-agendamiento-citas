@@ -7,7 +7,6 @@ import { PatientService } from '../../../../services/patient.service';
 import { Patient } from '../../../../models/interfaces/patient.model';
 import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
 import { AppointmentConfirmedEvent } from '../../../../models/interfaces/appointmentConfirmedEvent.model';
-import { PatientSnapshot } from '../../../../models/interfaces/patientSnapshot.model';
 
 @Component({
   selector: 'app-patient-new-appointment',
@@ -30,7 +29,7 @@ export class PatientNewAppointmentComponent implements OnInit {
    * Snapshot que se pasa al componente atómico.
    * Combina los datos del backend con los datos mínimos del token en caso de que el paciente aún no exista en la base de datos.
    */
-  readonly patientSnapshot = computed<PatientSnapshot>(() => {
+  readonly patientSnapshot = computed<Partial<Patient>>(() => { 
     const patient = this.currentPatient();
     return {
       id: patient?.id ?? this.appService.keycloakId() ?? undefined,
@@ -43,7 +42,7 @@ export class PatientNewAppointmentComponent implements OnInit {
       birthDate:      patient?.birthDate,
       email:          patient?.email,
     };
-  });
+   });
 
   ngOnInit(): void {
     // Carga datos del paciente desde el backend usando el keycloakId del token

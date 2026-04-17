@@ -5,14 +5,8 @@ import { LucideAngularModule, UserSearch } from 'lucide-angular';
 import { BookingStateService } from '../../booking-state.service';
 
 /**
- * BookingSpecialtySelectorComponent
- *
- * Responsabilidad única: permitir al usuario elegir una especialidad y,
+ * Permite al usuario elegir una especialidad y,
  * si el modo es 'specialty-doctor', también un médico de esa especialidad.
- *
- * Lee las listas de especialidades/médicos desde BookingStateService
- * (ya precargadas por el orquestador) y escribe la selección de vuelta
- * en el mismo servicio.
  */
 @Component({
   selector: 'app-booking-specialty-selector',
@@ -26,10 +20,7 @@ export class BookingSpecialtySelectorComponent {
 
   protected state = inject(BookingStateService);
 
-  /** Avanzar al step de horario. */
   advance = output<void>();
-
-  /** Retroceder: al step de paciente (agendador) o al selector de modo (paciente). */
   back = output<void>();
 
   onSpecialtyChange(specialty: string): void {
@@ -45,16 +36,10 @@ export class BookingSpecialtySelectorComponent {
       this.state.assignedDoctor.set(match ?? null);
     } else {
       this.state.doctorsBySpecialty.set([]);
-      // La carga de médicos se hace en el orquestador para mantener
-      // la lógica de red fuera de este componente de presentación.
-      // Notificamos vía el advance para que el orquestador decida.
-      // NOTA: para la carga reactiva de médicos al cambiar especialidad
-      // usamos un output específico que el orquestador escucha.
       this.specialtyChanged.emit(specialty);
     }
   }
 
-  /** Notifica al orquestador que cambió la especialidad (para cargar médicos). */
   specialtyChanged = output<string>();
 
   onDoctorChange(doctorId: string): void {

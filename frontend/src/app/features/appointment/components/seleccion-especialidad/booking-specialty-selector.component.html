@@ -1,10 +1,8 @@
-<!-- booking-specialty-selector.component.html -->
 <div class="space-y-5">
   <h2 class="text-blue-800 text-2xl mb-4">
     {{ state.bookingMode() === 'specialty' ? 'Seleccionar Especialidad' : 'Seleccionar Especialidad y Médico' }}
   </h2>
 
-  <!-- Selector de especialidad -->
   <div>
     <label class="block text-gray-700 mb-1">Especialidad *</label>
     <select
@@ -17,7 +15,6 @@
     </select>
   </div>
 
-  <!-- Aviso sin especialidades disponibles -->
   <p
     *ngIf="state.noSpecialtyAvailable()"
     class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm"
@@ -25,7 +22,6 @@
     ⚠️ {{ state.errorMessageSpecialty() }}
   </p>
 
-  <!-- Médico asignado automáticamente (modo 'specialty') -->
   <div *ngIf="state.bookingMode() === 'specialty' && state.assignedDoctor()">
     <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
       <lucide-angular [img]="UserSearch" [size]="22" class="text-blue-500 shrink-0"></lucide-angular>
@@ -36,7 +32,6 @@
     </div>
   </div>
 
-  <!-- Selector de médico (modo 'specialty-doctor') -->
   <div *ngIf="state.bookingMode() === 'specialty-doctor' && state.doctorsBySpecialty().length > 0">
     <label class="block text-gray-700 mb-1">Médico *</label>
     <select
@@ -49,7 +44,6 @@
     </select>
   </div>
 
-  <!-- Aviso sin médicos disponibles para la especialidad -->
   <p
     *ngIf="state.noDoctorsFound()"
     class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm"
@@ -57,7 +51,6 @@
     ⚠️ {{ state.errorMessageDoctors() }}
   </p>
 
-  <!-- Navegación -->
   <div class="flex gap-4 mt-6">
     <button
       (click)="goBack()"

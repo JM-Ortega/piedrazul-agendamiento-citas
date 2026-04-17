@@ -1,38 +1,26 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { Patient } from '../../models/interfaces/patient.model';
 import { SpecialtyDoctor } from '../../models/dtos/specialty-doctor.dto';
-import { PatientSnapshot } from '../../models/interfaces/patientSnapshot.model';
 import { BookingMode } from '../../models/types/bookingMode.type';
 import { BookingContext } from '../../models/types/bookingContext.type';
 /**
  * BookingStateService
  *
  * Servicio de estado compartido para el flujo de agendamiento de citas.
- * Actúa como la única fuente de verdad (single source of truth) para todos
- * los componentes hermanos del flujo: patient-lookup, specialty-selector,
+ * Actúa como la única fuente de verdad para todos los componentes 
+ * hermanos del flujo: patient-lookup, specialty-selector,
  * schedule-selector y confirm.
- *
- * Debe proveerse en el componente orquestador (AppointmentBookingComponent)
- * usando providers: [BookingStateService], de modo que cada instancia del
- * flujo tenga su propio estado aislado.
  */
 @Injectable()
 export class BookingStateService {
  
-  // ── Contexto ────────────────────────────────────────────────────────────
-  /** Define el rol que inicia el flujo. Se asigna una sola vez desde el orquestador. */
   context = signal<BookingContext>('patient');
  
   readonly isSchedulerContext = computed(() => this.context() === 'scheduler');
  
-  // ── Navegación ───────────────────────────────────────────────────────────
   bookingMode = signal<BookingMode>(null);
   step        = signal<number>(1);
  
-  /**
-   * Índices de cada step según el contexto.
-   * El agendador tiene un step extra al inicio (búsqueda de paciente).
-   */
   readonly patientLookupStep = computed(() => this.isSchedulerContext() ? 1 : null);
   readonly specialtyStep     = computed(() => this.isSchedulerContext() ? 2 : 1);
   readonly scheduleStep      = computed(() => this.isSchedulerContext() ? 3 : 2);
@@ -56,14 +44,8 @@ export class BookingStateService {
       : 'Su cita fue registrada exitosamente.'
   );
  
-  // ── Estado del paciente ──────────────────────────────────────────────────
- 
-  /**
-   * Datos del paciente autenticado.
-   * Solo se usa en contexto 'patient'; el agendador resuelve el paciente
-   * mediante foundPatient / patientForm.
-   */
-  patientSnapshot = signal<PatientSnapshot | null>(null);
+  // Datos del paciente autenticado.
+  patientSnapshot = signal<Partial<Patient> | null>(null);
  
   // Agendador: resultado de búsqueda por documento
   foundPatient = signal<Patient | null>(null);
@@ -83,7 +65,7 @@ export class BookingStateService {
     guardianPhone:  '',
   });
  
-  // ── Estado de especialidad y médico ──────────────────────────────────────
+  //Estado de especialidad y médico
   specialtiesWithDoctor = signal<SpecialtyDoctor[]>([]);
   doctorsBySpecialty    = signal<SpecialtyDoctor[]>([]);
   selectedSpecialty     = signal<string>('');
@@ -108,18 +90,15 @@ export class BookingStateService {
  
   readonly effectiveDoctorId = computed(() => this.effectiveDoctor()?.id ?? '');
  
-  // ── Estado de horario ─────────────────────────────────────────────────────
+  //Estado de horario
   selectedDate   = signal<Date | null>(null);
   selectedTime   = signal<string>('');
   availableSlots = signal<string[]>([]);
  
-  // ── Estado de UI global (confirmación, carga, éxito) ─────────────────────
   isLoading    = signal<boolean>(false);
   errorMessage = signal<string>('');
   success      = signal<boolean>(false);
- 
-  // ── Datos consolidados para la pantalla de confirmación ──────────────────
- 
+  
   readonly confirmFirstName = computed(() =>
     this.isSchedulerContext()
       ? (this.foundPatient()?.firstName ?? this.patientForm().firstName)
@@ -176,9 +155,7 @@ export class BookingStateService {
                     'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     return `${days[d.getDay()]} ${d.getDate()} de ${months[d.getMonth()]} de ${d.getFullYear()}`;
   });
- 
-  // ── Guards de navegación ──────────────────────────────────────────────────
- 
+  
   readonly canGoToScheduleStep = computed(() =>
     this.bookingMode() === 'specialty'
       ? !!this.selectedSpecialty() && !!this.assignedDoctor()
@@ -188,9 +165,7 @@ export class BookingStateService {
   readonly canGoToConfirmStep = computed(() =>
     !!this.selectedDate() && !!this.selectedTime()
   );
- 
-  // ── Helpers ───────────────────────────────────────────────────────────────
- 
+  
   formatLocalDate(date: Date): string {
     return date.getFullYear() + '-' +
       String(date.getMonth() + 1).padStart(2, '0') + '-' +
@@ -203,7 +178,6 @@ export class BookingStateService {
       : (this.patientSnapshot()?.id ?? '');
   }
  
-  // ── Resets parciales ──────────────────────────────────────────────────────
   resetSpecialtyState(): void {
     this.selectedSpecialty.set('');
     this.assignedDoctor.set(null);

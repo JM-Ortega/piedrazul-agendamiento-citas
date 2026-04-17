@@ -7,13 +7,8 @@ import { NewAppointment } from '../../../../models/dtos/newAppointment.dto';
 import { AppointmentConfirmedEvent } from '../../../../models/interfaces/appointmentConfirmedEvent.model';
 
 /**
- * BookingConfirmComponent
- *
- * Responsabilidad única: mostrar el resumen completo de la cita a confirmar
+ * Mostrar el resumen completo de la cita a confirmar
  * y ejecutar la llamada al backend para registrarla.
- *
- * Lee todos los datos necesarios desde BookingStateService.
- * Emite eventos al orquestador para que gestione la navegación post-confirmación.
  */
 @Component({
   selector: 'app-booking-confirm',
@@ -30,10 +25,8 @@ export class BookingConfirmComponent {
   protected state     = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
 
-  /** La cita fue registrada exitosamente. */
   confirmed = output<AppointmentConfirmedEvent>();
 
-  /** El usuario quiere retroceder al step de horario. */
   back = output<void>();
 
   confirm(): void {

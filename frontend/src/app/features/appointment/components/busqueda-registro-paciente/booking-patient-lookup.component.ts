@@ -7,14 +7,8 @@ import { NuevaCitaService } from '../../../../services/nuevaCita.service';
 import { Patient } from '../../../../models/interfaces/patient.model';
 
 /**
- * BookingPatientLookupComponent
- *
- * Responsabilidad única: búsqueda de un paciente por número de documento
+ * Búsqueda de un paciente por número de documento
  * y, si no existe, captura de los datos para registrarlo.
- *
- * Solo se usa en el contexto 'scheduler' (step 1 del agendador).
- * Escribe sus resultados en BookingStateService para que el resto
- * del flujo los consuma.
  */
 @Component({
   selector: 'app-booking-patient-lookup',
@@ -29,12 +23,10 @@ export class BookingPatientLookupComponent {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
 
-  // Estado local del paso (no necesita persistir fuera de este componente)
   documentId    = signal('');
   documentError = signal(false);
   errorMessage  = signal('');
 
-  // Errores de validación del formulario de nuevo paciente
   docTypeError       = signal(false);
   firstNameError     = signal(false);
   lastNameError      = signal(false);
@@ -44,13 +36,8 @@ export class BookingPatientLookupComponent {
   emailError         = signal(false);
   guardianPhoneError = signal(false);
 
-  /** Notifica al orquestador que se puede avanzar al siguiente step. */
   advance = output<void>();
-
-  /** Notifica al orquestador que se quiere cambiar el modo de agendamiento. */
   changeMode = output<void>();
-
-  // ── Búsqueda ──────────────────────────────────────────────────────────────
 
   onDocumentChange(value: string): void {
     this.documentId.set(value);
@@ -81,7 +68,6 @@ export class BookingPatientLookupComponent {
           this.state.patientId.set(patient.id);
           this.state.resetPatientForm();
         } else {
-          // Pre-carga el documento en el formulario para no re-ingresarlo
           this.state.patientForm.update(f => ({ ...f, documentNumber: this.documentId() }));
         }
       },
@@ -102,8 +88,6 @@ export class BookingPatientLookupComponent {
     });
   }
 
-  // ── Helpers del formulario de nuevo paciente ──────────────────────────────
-
   getPatientField<K extends keyof Omit<Patient, 'id'>>(key: K): Omit<Patient, 'id'>[K] {
     return this.state.patientForm()[key];
   }
@@ -111,8 +95,6 @@ export class BookingPatientLookupComponent {
   setPatientField<K extends keyof Omit<Patient, 'id'>>(key: K, value: Omit<Patient, 'id'>[K]): void {
     this.state.patientForm.update(f => ({ ...f, [key]: value }));
   }
-
-  // ── Navegación ────────────────────────────────────────────────────────────
 
   goToSpecialtyStep(): void {
     if (this.state.foundPatient()) {
@@ -133,8 +115,6 @@ export class BookingPatientLookupComponent {
     this.state.resetPatientForm();
     this.changeMode.emit();
   }
-
-  // ── Validaciones privadas ─────────────────────────────────────────────────
 
   private _validatePatientForm(): boolean {
     const f = this.state.patientForm();

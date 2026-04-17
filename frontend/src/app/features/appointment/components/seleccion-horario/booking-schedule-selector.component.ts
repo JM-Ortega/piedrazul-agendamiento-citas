@@ -11,9 +11,7 @@ import { CalendarService } from '../../../../services/calendar.service';
 import { NuevaCitaService } from '../../../../services/nuevaCita.service';
 
 /**
- * BookingScheduleSelectorComponent
- *
- * Responsabilidad única: permitir al usuario elegir una fecha y hora
+ * Permite al usuario elegir una fecha y hora
  * disponible para la cita, dado el médico ya seleccionado.
  *
  * Carga los slots disponibles llamando al servicio cuando cambia la fecha.
@@ -45,13 +43,8 @@ export class BookingScheduleSelectorComponent {
   noSlotsAvailable  = false;
   errorMessageSlots = '';
 
-  /** Avanzar al step de confirmación. */
   advance = output<void>();
-
-  /** Retroceder al step de especialidad. */
   back = output<void>();
-
-  // ── Computed para el datepicker ───────────────────────────────────────────
 
   readonly dateFilter = computed(() => {
     const doctor = this.state.effectiveDoctor();
@@ -69,8 +62,6 @@ export class BookingScheduleSelectorComponent {
     return this.calendarService.getMaxDate(doctor);
   });
 
-  // ── Selección de fecha y carga de slots ───────────────────────────────────
-
   onDateSelected(date: Date | null): void {
     this.state.selectedDate.set(date);
     this.state.selectedTime.set('');
@@ -84,7 +75,6 @@ export class BookingScheduleSelectorComponent {
 
     this.citaService.getAvailableSlots(this.state.effectiveDoctorId(), dateStr).subscribe({
       next: (slots) => {
-        // El agendador puede agendar para hoy; filtra slots ya pasados + 10 min de margen.
         if (this.state.isSchedulerContext()) {
           const today = this.state.formatLocalDate(new Date());
           if (dateStr === today) {
@@ -113,8 +103,6 @@ export class BookingScheduleSelectorComponent {
       },
     });
   }
-
-  // ── Navegación ────────────────────────────────────────────────────────────
 
   goToConfirm(): void {
     this.advance.emit();
