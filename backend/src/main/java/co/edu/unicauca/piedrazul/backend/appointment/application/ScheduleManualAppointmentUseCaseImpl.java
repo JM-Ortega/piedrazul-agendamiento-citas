@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
+import co.edu.unicauca.piedrazul.backend.appointment.application.events.AppointmentCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientAlreadyScheduledInSpecialtyException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientScheduleTimeConflictException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
@@ -9,6 +10,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorCo
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.PatientRegistrationData;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -20,16 +22,33 @@ public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppoi
     private final DoctorConfigConsultPort doctorConfigConsultPort;
     private final AppointmentService appointmentService;
     private final PatientConsultPort patientConsultPort;
+    private final ApplicationEventPublisher eventPublisher;
+
+    public ScheduleManualAppointmentUseCaseImpl(
+            AppointmentRepository appointmentRepository,
+            DoctorConfigConsultPort doctorConfigConsultPort,
+            AppointmentService appointmentService,
+            PatientConsultPort patientConsultPort,
+            ApplicationEventPublisher eventPublisher) {
+        this.appointmentRepository   = appointmentRepository;
+        this.doctorConfigConsultPort = doctorConfigConsultPort;
+        this.appointmentService      = appointmentService;
+        this.patientConsultPort = patientConsultPort;
+        this.eventPublisher = eventPublisher;
+    }
 
     public ScheduleManualAppointmentUseCaseImpl(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService,
             PatientConsultPort patientConsultPort) {
-        this.appointmentRepository   = appointmentRepository;
-        this.doctorConfigConsultPort = doctorConfigConsultPort;
-        this.appointmentService      = appointmentService;
-        this.patientConsultPort = patientConsultPort;
+        this(
+                appointmentRepository,
+                doctorConfigConsultPort,
+                appointmentService,
+                patientConsultPort,
+                event -> { }
+        );
     }
 
     // Agendador crea la cita manualmente
@@ -47,7 +66,8 @@ public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppoi
             UUID idDoctor,
             Specialty specialty,
             LocalDate date,
-            AppointmentTime startTime) {
+            AppointmentTime startTime,
+            String performedBy) {
 
         // 1. Obtiene la configuración del médico a través del puerto de salida
         int intervalMinutes = doctorConfigConsultPort
@@ -118,8 +138,44 @@ public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppoi
         );
 
         appointmentRepository.save(appointment);
+        eventPublisher.publishEvent(new AppointmentCreatedEvent(
+                appointment.getIdAppointment().toString(),
+                performedBy
+        ));
 
         return appointment;
+    }
+
+    public Appointment scheduleManual(
+            DocumentType documentType,
+            String documentNumber,
+            String firstName,
+            String lastName,
+            String phone,
+            Gender gender,
+            LocalDate birthDate,
+            String email,
+            String guardianPhone,
+            UUID idDoctor,
+            Specialty specialty,
+            LocalDate date,
+            AppointmentTime startTime) {
+        return scheduleManual(
+                documentType,
+                documentNumber,
+                firstName,
+                lastName,
+                phone,
+                gender,
+                birthDate,
+                email,
+                guardianPhone,
+                idDoctor,
+                specialty,
+                date,
+                startTime,
+                "system"
+        );
     }
 
     private void validateUniqueScheduledAppointmentBySpecialty(UUID idPatient, Specialty specialty) {

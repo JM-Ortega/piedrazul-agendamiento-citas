@@ -86,9 +86,11 @@ public class AppointmentController {
     // Crear cita
     @PostMapping
     public ResponseEntity<Void> scheduleAppointment(
-            @RequestBody @Valid AppointmentRequest request) {
+            @RequestBody @Valid AppointmentRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
 
         request.validate();
+        String performedBy = resolvePerformedBy(jwt);
 
         switch (request.getSchedulingOrigin()) {
 
@@ -106,7 +108,8 @@ public class AppointmentController {
                     request.getDoctorId(),
                     request.getSpecialty(),
                     request.getDate(),
-                    new AppointmentTime(request.getStartTime())
+                    new AppointmentTime(request.getStartTime()),
+                    performedBy
             );
 
             // Paciente agenda por la web, ya tiene cuenta en el sistema
@@ -115,7 +118,8 @@ public class AppointmentController {
                     request.getDoctorId(),
                     request.getSpecialty(),
                     request.getDate(),
-                    new AppointmentTime(request.getStartTime())
+                    new AppointmentTime(request.getStartTime()),
+                    performedBy
             );
         }
 
@@ -126,5 +130,14 @@ public class AppointmentController {
     @GetMapping("/specialties-with-doctor")
     public ResponseEntity<List<DoctorResponse>> getSpecialtiesWithDoctor() {
         return ResponseEntity.ok(getSpecialtiesWithDoctorUseCase.getSpecialtiesWithDoctor());
+    }
+
+    private String resolvePerformedBy(Jwt jwt) {
+        String preferredUsername = jwt.getClaimAsString("preferred_username");
+        if (preferredUsername != null && !preferredUsername.isBlank()) {
+            return preferredUsername;
+        }
+
+        return jwt.getSubject();
     }
 }
