@@ -1,0 +1,239 @@
+import { Injectable, signal, computed } from '@angular/core';
+import { Patient } from '../../models/interfaces/patient.model';
+import { SpecialtyDoctor } from '../../models/dtos/specialty-doctor.dto';
+import { PatientSnapshot } from '../../models/interfaces/patientSnapshot.model';
+import { BookingMode } from '../../models/types/bookingMode.type';
+import { BookingContext } from '../../models/types/bookingContext.type';
+/**
+ * BookingStateService
+ *
+ * Servicio de estado compartido para el flujo de agendamiento de citas.
+ * Actúa como la única fuente de verdad (single source of truth) para todos
+ * los componentes hermanos del flujo: patient-lookup, specialty-selector,
+ * schedule-selector y confirm.
+ *
+ * Debe proveerse en el componente orquestador (AppointmentBookingComponent)
+ * usando providers: [BookingStateService], de modo que cada instancia del
+ * flujo tenga su propio estado aislado.
+ */
+@Injectable()
+export class BookingStateService {
+ 
+  // ── Contexto ────────────────────────────────────────────────────────────
+  /** Define el rol que inicia el flujo. Se asigna una sola vez desde el orquestador. */
+  context = signal<BookingContext>('patient');
+ 
+  readonly isSchedulerContext = computed(() => this.context() === 'scheduler');
+ 
+  // ── Navegación ───────────────────────────────────────────────────────────
+  bookingMode = signal<BookingMode>(null);
+  step        = signal<number>(1);
+ 
+  /**
+   * Índices de cada step según el contexto.
+   * El agendador tiene un step extra al inicio (búsqueda de paciente).
+   */
+  readonly patientLookupStep = computed(() => this.isSchedulerContext() ? 1 : null);
+  readonly specialtyStep     = computed(() => this.isSchedulerContext() ? 2 : 1);
+  readonly scheduleStep      = computed(() => this.isSchedulerContext() ? 3 : 2);
+  readonly confirmStep       = computed(() => this.isSchedulerContext() ? 4 : 3);
+ 
+  readonly stepLabels = computed(() =>
+    this.isSchedulerContext()
+      ? ['1. Paciente', '2. Especialidad', '3. Horario', '4. Confirmar']
+      : ['1. Especialidad', '2. Horario', '3. Confirmar']
+  );
+ 
+  readonly modeSelectionLabel = computed(() =>
+    this.isSchedulerContext()
+      ? '¿Cómo desea agendar la cita?'
+      : '¿Cómo desea agendar su cita?'
+  );
+ 
+  readonly successMessage = computed(() =>
+    this.isSchedulerContext()
+      ? 'La cita fue registrada exitosamente.'
+      : 'Su cita fue registrada exitosamente.'
+  );
+ 
+  // ── Estado del paciente ──────────────────────────────────────────────────
+ 
+  /**
+   * Datos del paciente autenticado.
+   * Solo se usa en contexto 'patient'; el agendador resuelve el paciente
+   * mediante foundPatient / patientForm.
+   */
+  patientSnapshot = signal<PatientSnapshot | null>(null);
+ 
+  // Agendador: resultado de búsqueda por documento
+  foundPatient = signal<Patient | null>(null);
+  notFound     = signal<boolean>(false);
+  patientId    = signal<string | null>(null);
+ 
+  // Agendador: formulario para registrar paciente nuevo
+  patientForm = signal<Omit<Patient, 'id'>>({
+    documentType:   '',
+    documentNumber: '',
+    firstName:      '',
+    lastName:       '',
+    phone:          '',
+    gender:         '',
+    birthDate:      '',
+    email:          '',
+    guardianPhone:  '',
+  });
+ 
+  // ── Estado de especialidad y médico ──────────────────────────────────────
+  specialtiesWithDoctor = signal<SpecialtyDoctor[]>([]);
+  doctorsBySpecialty    = signal<SpecialtyDoctor[]>([]);
+  selectedSpecialty     = signal<string>('');
+  assignedDoctor        = signal<SpecialtyDoctor | null>(null);
+  selectedDoctorId      = signal<string>('');
+  selectedDoctorName    = signal<string>('');
+
+  noSpecialtyAvailable   = signal<boolean>(false);
+  errorMessageSpecialty  = signal<string>('');
+  noDoctorsFound         = signal<boolean>(false);
+  errorMessageDoctors    = signal<string>('');  
+ 
+  readonly uniqueSpecialties = computed(() =>
+    [...new Set(this.specialtiesWithDoctor().map(s => s.specialty))]
+  );
+ 
+  readonly effectiveDoctor = computed<SpecialtyDoctor | null>(() =>
+    this.bookingMode() === 'specialty'
+      ? this.assignedDoctor()
+      : (this.doctorsBySpecialty().find(d => d.id === this.selectedDoctorId()) ?? null)
+  );
+ 
+  readonly effectiveDoctorId = computed(() => this.effectiveDoctor()?.id ?? '');
+ 
+  // ── Estado de horario ─────────────────────────────────────────────────────
+  selectedDate   = signal<Date | null>(null);
+  selectedTime   = signal<string>('');
+  availableSlots = signal<string[]>([]);
+ 
+  // ── Estado de UI global (confirmación, carga, éxito) ─────────────────────
+  isLoading    = signal<boolean>(false);
+  errorMessage = signal<string>('');
+  success      = signal<boolean>(false);
+ 
+  // ── Datos consolidados para la pantalla de confirmación ──────────────────
+ 
+  readonly confirmFirstName = computed(() =>
+    this.isSchedulerContext()
+      ? (this.foundPatient()?.firstName ?? this.patientForm().firstName)
+      : (this.patientSnapshot()?.firstName ?? '')
+  );
+ 
+  readonly confirmLastName = computed(() =>
+    this.isSchedulerContext()
+      ? (this.foundPatient()?.lastName ?? this.patientForm().lastName)
+      : (this.patientSnapshot()?.lastName ?? '')
+  );
+ 
+  readonly confirmDocumentType = computed(() =>
+    this.isSchedulerContext()
+      ? (this.foundPatient()?.documentType ?? this.patientForm().documentType)
+      : (this.patientSnapshot()?.documentType ?? '')
+  );
+ 
+  readonly confirmDocument = computed(() =>
+    this.isSchedulerContext()
+      ? (this.foundPatient()?.documentNumber ?? this.patientForm().documentNumber)
+      : (this.patientSnapshot()?.documentNumber ?? '')
+  );
+ 
+  readonly confirmPhone = computed(() =>
+    this.isSchedulerContext()
+      ? (this.foundPatient()?.phone ?? this.patientForm().phone)
+      : (this.patientSnapshot()?.phone ?? '')
+  );
+ 
+  readonly confirmGender = computed(() =>
+    this.isSchedulerContext()
+      ? (this.foundPatient()?.gender ?? this.patientForm().gender)
+      : (this.patientSnapshot()?.gender ?? '')
+  );
+ 
+  readonly confirmBirthDate = computed(() =>
+    this.isSchedulerContext()
+      ? (this.foundPatient()?.birthDate ?? this.patientForm().birthDate)
+      : (this.patientSnapshot()?.birthDate ?? '')
+  );
+ 
+  readonly confirmDoctorName = computed(() =>
+    this.bookingMode() === 'specialty'
+      ? (this.assignedDoctor()?.name ?? '')
+      : this.selectedDoctorName()
+  );
+ 
+  readonly confirmDate = computed(() => {
+    const d = this.selectedDate();
+    if (!d) return '';
+    const days   = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                    'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    return `${days[d.getDay()]} ${d.getDate()} de ${months[d.getMonth()]} de ${d.getFullYear()}`;
+  });
+ 
+  // ── Guards de navegación ──────────────────────────────────────────────────
+ 
+  readonly canGoToScheduleStep = computed(() =>
+    this.bookingMode() === 'specialty'
+      ? !!this.selectedSpecialty() && !!this.assignedDoctor()
+      : !!this.selectedSpecialty() && !!this.selectedDoctorId()
+  );
+ 
+  readonly canGoToConfirmStep = computed(() =>
+    !!this.selectedDate() && !!this.selectedTime()
+  );
+ 
+  // ── Helpers ───────────────────────────────────────────────────────────────
+ 
+  formatLocalDate(date: Date): string {
+    return date.getFullYear() + '-' +
+      String(date.getMonth() + 1).padStart(2, '0') + '-' +
+      String(date.getDate()).padStart(2, '0');
+  }
+ 
+  resolvePatientId(): string {
+    return this.isSchedulerContext()
+      ? (this.patientId() ?? '')
+      : (this.patientSnapshot()?.id ?? '');
+  }
+ 
+  // ── Resets parciales ──────────────────────────────────────────────────────
+  resetSpecialtyState(): void {
+    this.selectedSpecialty.set('');
+    this.assignedDoctor.set(null);
+    this.selectedDoctorId.set('');
+    this.selectedDoctorName.set('');
+    this.doctorsBySpecialty.set([]);
+    this.specialtiesWithDoctor.set([]);
+    this.noSpecialtyAvailable.set(false);
+    this.errorMessageSpecialty.set('');
+    this.noDoctorsFound.set(false);
+    this.errorMessageDoctors.set('');
+  }
+ 
+  resetScheduleState(): void {
+    this.selectedDate.set(null);
+    this.selectedTime.set('');
+    this.availableSlots.set([]);
+  }
+ 
+  resetPatientForm(): void {
+    this.patientForm.set({
+      documentNumber: '',
+      documentType:   '',
+      firstName:      '',
+      lastName:       '',
+      phone:          '',
+      gender:         '',
+      birthDate:      '',
+      email:          '',
+      guardianPhone:  '',
+    });
+  }
+}

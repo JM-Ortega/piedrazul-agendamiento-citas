@@ -1,0 +1,99 @@
+<!-- Hero Principal -->
+<section
+  class="relative text-white overflow-hidden flex items-center"
+  style="
+    background-image: url(&quot;/piedrazul.png&quot;);
+    background-size: cover;
+    background-position: center;
+    min-height: calc(100vh - 80px);
+  "
+>
+  <div
+    class="absolute inset-0 bg-gradient-to-r from-gray-900/75 to-gray-700/60"
+  ></div>
+
+  <div
+    class="relative max-w-4xl mx-auto px-6 py-12 flex flex-col items-center text-center gap-8"
+  >
+    <p
+      class="text-blue-200 text-xl md:text-2xl font-medium tracking-wide uppercase"
+    >
+      Centro Médico
+    </p>
+
+    <h1 class="text-5xl md:text-7xl font-bold drop-shadow-lg leading-tight">
+      Piedra Azul
+    </h1>
+
+    <p class="text-blue-100 text-xl md:text-2xl max-w-2xl leading-relaxed">
+      Sistema de Gestión de Citas Médicas
+    </p>
+
+    <button
+      (click)="agendarCita()"
+      class="flex items-center gap-4 bg-white text-blue-700 hover:bg-blue-50 font-bold px-12 py-7 rounded-2xl text-2xl md:text-3xl shadow-2xl transition-all hover:scale-105 active:scale-95 mt-4"
+    >
+      <lucide-angular [img]="Calendar" [size]="40"></lucide-angular>
+      Agendar mi Cita
+    </button>
+
+    <p class="text-blue-200 text-lg">
+      ¿Es usted personal del centro?
+      <button
+        (click)="goAcceso()"
+        class="underline text-white hover:text-blue-200 font-semibold transition-colors ml-1"
+      >
+        Ingrese aquí
+      </button>
+    </p>
+
+    <div class="flex flex-wrap justify-center gap-4 text-blue-100 mt-2">
+      <div
+        class="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-5 py-3 rounded-xl"
+      >
+        <lucide-angular [img]="Clock" color="white" size="22"></lucide-angular>
+        <span class="text-lg">Lun – Vie · 7:00 AM a 12:00 M</span>
+      </div>
+
+      <div
+        class="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-5 py-3 rounded-xl"
+      >
+        <lucide-angular [img]="Shield" color="white" size="22"></lucide-angular>
+        <span class="text-lg">Sistema seguro</span>
+      </div>
+
+      <div
+        class="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-5 py-3 rounded-xl"
+      >
+        <lucide-angular [img]="Phone" color="white" size="22"></lucide-angular>
+        <span class="text-lg">Fácil de usar</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Info Section -->
+<section class="bg-blue-700 text-white py-12 px-4">
+  <div class="max-w-4xl mx-auto text-center">
+    <h2 class="text-3xl mb-4">¿Cómo llegar a Piedrazul?</h2>
+
+    <p class="text-blue-100 text-xl mb-4">
+      📍 Ubicación:
+      <span class="text-white">
+        <a
+          class="underline hover:text-blue-200"
+          href="https://www.google.com/maps/place/Red+de+Servicio+%22Piedra+Azul%22+-+Consulta+de+medicina+alternativa/@2.4264893,-76.5721823,17z/data=!4m9!1m2!2m1!1sdonde+queda+ubicada+piedra+azul+popayan!3m5!1s0x8e30030054096d7f:0xb11a12b7d48d45cd!8m2!3d2.4264559!4d-76.5685225!16s%2Fg%2F11vq2js93m?entry=ttu&g_ep=EgoyMDI2MDMwNC4xIKXMDSoASAFQAw%3D%3D"
+        >
+          Piedrazul - Popayán, Cauca, a 5 kilómetros de la ciudad
+        </a>
+      </span>
+    </p>
+
+    <p class="text-white text-lg">
+      📅 Horarios de atención: Lunes a Viernes de 7:00 AM a 12:00 M
+    </p>
+  </div>
+</section>
+@if (showModal) {
+  <app-appointment-modal (close)="showModal = false" />
+}

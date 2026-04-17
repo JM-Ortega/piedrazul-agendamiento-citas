@@ -1,0 +1,72 @@
+<!-- booking-confirm.component.html -->
+<div>
+  <h2 class="text-blue-800 text-2xl mb-6">Confirmar Cita</h2>
+
+  <div class="space-y-4">
+
+    <!-- Bloque de datos del paciente -->
+    <div class="bg-blue-50 rounded-xl p-5">
+      <h3 class="text-blue-700 font-semibold mb-3 flex items-center gap-2">
+        <lucide-angular [img]="UserSearch" [size]="18"></lucide-angular>
+        Paciente
+      </h3>
+      <p><strong>Nombre:</strong> {{ state.confirmFirstName() }} {{ state.confirmLastName() }}</p>
+
+      <!-- Datos extendidos solo para el agendador -->
+      <ng-container *ngIf="state.isSchedulerContext()">
+        <p><strong>Tipo de Documento:</strong> {{ state.confirmDocumentType() }}</p>
+        <p><strong>Documento:</strong> {{ state.confirmDocument() }}</p>
+        <p><strong>Celular:</strong> {{ state.confirmPhone() }}</p>
+        <p><strong>Género:</strong> {{ state.confirmGender() }}</p>
+        <p><strong>Fecha de Nacimiento:</strong> {{ state.confirmBirthDate() }}</p>
+      </ng-container>
+
+      <!-- Solo número de documento para el paciente -->
+      <ng-container *ngIf="!state.isSchedulerContext()">
+        <p *ngIf="state.confirmDocument()">
+          <strong>Documento:</strong> {{ state.confirmDocument() }}
+        </p>
+      </ng-container>
+    </div>
+
+    <!-- Bloque de datos de la cita -->
+    <div class="bg-purple-50 rounded-xl p-5">
+      <h3 class="text-purple-700 font-semibold mb-3 flex items-center gap-2">
+        <lucide-angular [img]="Stethoscope" [size]="18"></lucide-angular>
+        Cita
+      </h3>
+      <p><strong>Especialidad:</strong> {{ state.selectedSpecialty() }}</p>
+      <p><strong>Médico:</strong> {{ state.confirmDoctorName() }}</p>
+      <p><strong>Fecha:</strong> {{ state.confirmDate() }}</p>
+      <p><strong>Hora:</strong> {{ state.selectedTime() }}</p>
+    </div>
+
+  </div>
+
+  <!-- Error de confirmación -->
+  <div
+    *ngIf="state.errorMessage()"
+    class="mt-4 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4"
+  >
+    ⚠️ {{ state.errorMessage() }}
+  </div>
+
+  <!-- Navegación -->
+  <div class="flex gap-4 mt-8">
+    <button
+      (click)="goBack()"
+      class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+    >
+      ← Atrás
+    </button>
+    <button
+      (click)="confirm()"
+      [disabled]="state.isLoading()"
+      class="flex-1 bg-green-600 text-white py-3 rounded-xl flex items-center
+             justify-center gap-2 hover:bg-green-700 transition-colors disabled:opacity-50"
+    >
+      <lucide-angular [img]="CheckCircle" [size]="22"></lucide-angular>
+      Confirmar y Registrar
+    </button>
+  </div>
+</div>

@@ -1,0 +1,103 @@
+<!-- appointment-booking.component.html -->
+
+<!-- ══════════════════════════════════════════════════════════════
+     SELECTOR DE MODO
+     Visible antes de iniciar el flujo de steps.
+     ══════════════════════════════════════════════════════════════ -->
+<div *ngIf="state.bookingMode() === null">
+  <app-booking-mode-selector
+    (modeSelected)="onModeSelected($event)"
+  ></app-booking-mode-selector>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     FLUJO DE STEPS
+     ══════════════════════════════════════════════════════════════ -->
+<div *ngIf="state.bookingMode() !== null">
+
+  <!-- Indicador de progreso -->
+  <div class="flex gap-2 mb-6">
+    <div
+      *ngFor="let label of state.stepLabels(); let i = index"
+      class="flex-1 text-center py-2 rounded-xl text-sm font-medium transition-all"
+      [ngClass]="{
+        'bg-blue-600 text-white shadow':                    state.step() === i + 1,
+        'bg-green-100 text-green-700':                      state.step() > i + 1,
+        'bg-white text-gray-400 border border-gray-200':    state.step() < i + 1
+      }"
+    >
+      {{ label }}
+    </div>
+  </div>
+
+  <!-- Contenedor de steps -->
+  <div class="bg-white rounded-2xl shadow-xl p-8">
+
+    <!-- Step: Búsqueda de paciente (solo agendador, step 1) -->
+    <app-booking-patient-lookup
+      *ngIf="state.isSchedulerContext() && state.step() === state.patientLookupStep()"
+      (advance)="onPatientLookupAdvance()"
+      (changeMode)="onPatientLookupChangeMode()"
+    ></app-booking-patient-lookup>
+
+    <!-- Step: Selección de especialidad y médico -->
+    <app-booking-specialty-selector
+      *ngIf="state.step() === state.specialtyStep()"
+      (advance)="onSpecialtyAdvance()"
+      (back)="onSpecialtyBack()"
+      (specialtyChanged)="onSpecialtyChanged($event)"
+    ></app-booking-specialty-selector>
+
+    <!-- Step: Selección de fecha y hora -->
+    <app-booking-schedule-selector
+      *ngIf="state.step() === state.scheduleStep()"
+      (advance)="onScheduleAdvance()"
+      (back)="onScheduleBack()"
+    ></app-booking-schedule-selector>
+
+    <!-- Step: Confirmación -->
+    <app-booking-confirm
+      *ngIf="state.step() === state.confirmStep() && !state.success()"
+      (confirmed)="onConfirmed($event)"
+      (back)="onConfirmBack()"
+    ></app-booking-confirm>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL DE ÉXITO
+     ══════════════════════════════════════════════════════════════ -->
+@if (state.success()) {
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-8 shadow-xl text-center w-80">
+      <div
+        class="flex items-center justify-center w-20 h-20 rounded-full bg-green-100
+               mx-auto mb-5 animate-bounce"
+      >
+        <svg
+          class="w-10 h-10 text-green-500"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          viewBox="0 0 24 24"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+      <h2 class="text-2xl font-bold text-gray-800 mb-2">¡Cita Agendada!</h2>
+      <p class="text-gray-500 text-sm mb-8">
+        {{ state.successMessage() }}<br />
+        Será redirigido en unos segundos...
+      </p>
+      <button
+        (click)="onSuccessGoBack()"
+        class="w-full py-3 px-6 rounded-xl font-semibold text-white
+               bg-gradient-to-r from-green-500 to-emerald-600 shadow-lg
+               hover:shadow-xl hover:scale-[1.03] active:scale-[0.98] transition-all duration-200"
+      >
+        Volver al Inicio
+      </button>
+    </div>
+  </div>
+}
