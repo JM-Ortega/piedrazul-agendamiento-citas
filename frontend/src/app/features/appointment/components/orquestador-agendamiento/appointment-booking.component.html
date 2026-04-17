@@ -1,54 +1,59 @@
-<div *ngIf="state.bookingMode() === null">
+@if (state.bookingMode() === null) {
   <app-booking-mode-selector
     (modeSelected)="onModeSelected($event)"
   ></app-booking-mode-selector>
-</div>
+}
 
-<div *ngIf="state.bookingMode() !== null">
+@if (state.bookingMode() !== null) {
 
   <div class="flex gap-2 mb-6">
-    <div
-      *ngFor="let label of state.stepLabels(); let i = index"
-      class="flex-1 text-center py-2 rounded-xl text-sm font-medium transition-all"
-      [ngClass]="{
-        'bg-blue-600 text-white shadow':                    state.step() === i + 1,
-        'bg-green-100 text-green-700':                      state.step() > i + 1,
-        'bg-white text-gray-400 border border-gray-200':    state.step() < i + 1
-      }"
-    >
-      {{ label }}
-    </div>
+    @for (label of state.stepLabels(); track label; let i = $index) {
+      <div
+        class="flex-1 text-center py-2 rounded-xl text-sm font-medium transition-all"
+        [ngClass]="{
+          'bg-blue-600 text-white shadow':                 state.step() === i + 1,
+          'bg-green-100 text-green-700':                   state.step() > i + 1,
+          'bg-white text-gray-400 border border-gray-200': state.step() < i + 1
+        }"
+      >
+        {{ label }}
+      </div>
+    }
   </div>
 
   <div class="bg-white rounded-2xl shadow-xl p-8">
 
-    <app-booking-patient-lookup
-      *ngIf="state.isSchedulerContext() && state.step() === state.patientLookupStep()"
-      (advance)="onPatientLookupAdvance()"
-      (changeMode)="onPatientLookupChangeMode()"
-    ></app-booking-patient-lookup>
+    @if (state.isSchedulerContext() && state.step() === state.patientLookupStep()) {
+      <app-booking-patient-lookup
+        (advance)="onPatientLookupAdvance()"
+        (changeMode)="onPatientLookupChangeMode()"
+      ></app-booking-patient-lookup>
+    }
 
-    <app-booking-specialty-selector
-      *ngIf="state.step() === state.specialtyStep()"
-      (advance)="onSpecialtyAdvance()"
-      (back)="onSpecialtyBack()"
-      (specialtyChanged)="onSpecialtyChanged($event)"
-    ></app-booking-specialty-selector>
+    @if (state.step() === state.specialtyStep()) {
+      <app-booking-specialty-selector
+        (advance)="onSpecialtyAdvance()"
+        (back)="onSpecialtyBack()"
+        (specialtyChanged)="onSpecialtyChanged($event)"
+      ></app-booking-specialty-selector>
+    }
 
-    <app-booking-schedule-selector
-      *ngIf="state.step() === state.scheduleStep()"
-      (advance)="onScheduleAdvance()"
-      (back)="onScheduleBack()"
-    ></app-booking-schedule-selector>
+    @if (state.step() === state.scheduleStep()) {
+      <app-booking-schedule-selector
+        (advance)="onScheduleAdvance()"
+        (back)="onScheduleBack()"
+      ></app-booking-schedule-selector>
+    }
 
-    <app-booking-confirm
-      *ngIf="state.step() === state.confirmStep() && !state.success()"
-      (confirmed)="onConfirmed($event)"
-      (back)="onConfirmBack()"
-    ></app-booking-confirm>
+    @if (state.step() === state.confirmStep() && !state.success()) {
+      <app-booking-confirm
+        (confirmed)="onConfirmed($event)"
+        (back)="onConfirmBack()"
+      ></app-booking-confirm>
+    }
 
   </div>
-</div>
+}
 
 @if (state.success()) {
   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

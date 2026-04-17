@@ -11,45 +11,49 @@
       class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
     >
       <option value="">Seleccione una especialidad...</option>
-      <option *ngFor="let s of state.uniqueSpecialties()" [value]="s">{{ s }}</option>
+      @for (s of state.uniqueSpecialties(); track s) {
+        <option [value]="s">{{ s }}</option>
+      }
     </select>
   </div>
 
-  <p
-    *ngIf="state.noSpecialtyAvailable()"
-    class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm"
-  >
-    ⚠️ {{ state.errorMessageSpecialty() }}
-  </p>
+  @if (state.noSpecialtyAvailable()) {
+    <p class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm">
+      ⚠️ {{ state.errorMessageSpecialty() }}
+    </p>
+  }
 
-  <div *ngIf="state.bookingMode() === 'specialty' && state.assignedDoctor()">
+  @if (state.bookingMode() === 'specialty' && state.assignedDoctor(); as doctor) {
     <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
       <lucide-angular [img]="UserSearch" [size]="22" class="text-blue-500 shrink-0"></lucide-angular>
       <div>
         <p class="text-gray-500 text-sm">Médico asignado</p>
-        <p class="text-blue-800 font-semibold">{{ state.assignedDoctor()!.name }}</p>
+        <p class="text-blue-800 font-semibold">{{ doctor.name }}</p>
       </div>
     </div>
-  </div>
+  }
 
-  <div *ngIf="state.bookingMode() === 'specialty-doctor' && state.doctorsBySpecialty().length > 0">
-    <label class="block text-gray-700 mb-1">Médico *</label>
-    <select
-      [ngModel]="state.selectedDoctorId()"
-      (ngModelChange)="onDoctorChange($event)"
-      class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
-    >
-      <option value="">Seleccione un médico...</option>
-      <option *ngFor="let d of state.doctorsBySpecialty()" [value]="d.id">{{ d.name }}</option>
-    </select>
-  </div>
+  @if (state.bookingMode() === 'specialty-doctor' && state.doctorsBySpecialty().length > 0) {
+    <div>
+      <label class="block text-gray-700 mb-1">Médico *</label>
+      <select
+        [ngModel]="state.selectedDoctorId()"
+        (ngModelChange)="onDoctorChange($event)"
+        class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
+      >
+        <option value="">Seleccione un médico...</option>
+        @for (d of state.doctorsBySpecialty(); track d.id) {
+          <option [value]="d.id">{{ d.name }}</option>
+        }
+      </select>
+    </div>
+  }
 
-  <p
-    *ngIf="state.noDoctorsFound()"
-    class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm"
-  >
-    ⚠️ {{ state.errorMessageDoctors() }}
-  </p>
+  @if (state.noDoctorsFound()) {
+    <p class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm">
+      ⚠️ {{ state.errorMessageDoctors() }}
+    </p>
+  }
 
   <div class="flex gap-4 mt-6">
     <button

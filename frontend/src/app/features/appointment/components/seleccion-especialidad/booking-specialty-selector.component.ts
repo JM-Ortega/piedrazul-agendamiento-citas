@@ -1,5 +1,4 @@
 import { Component, inject, output } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, UserSearch } from 'lucide-angular';
 import { BookingStateService } from '../../booking-state.service';
@@ -11,7 +10,7 @@ import { BookingStateService } from '../../booking-state.service';
 @Component({
   selector: 'app-booking-specialty-selector',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [FormsModule, LucideAngularModule],
   templateUrl: './booking-specialty-selector.component.html',
 })
 export class BookingSpecialtySelectorComponent {

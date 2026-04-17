@@ -1,5 +1,4 @@
 import { Component, inject, output } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { LucideAngularModule, CheckCircle, Stethoscope, UserSearch } from 'lucide-angular';
 import { BookingStateService } from '../../booking-state.service';
 import { NuevaCitaService } from '../../../../services/nuevaCita.service';
@@ -13,7 +12,7 @@ import { AppointmentConfirmedEvent } from '../../../../models/interfaces/appoint
 @Component({
   selector: 'app-booking-confirm',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [LucideAngularModule],
   templateUrl: './booking-confirm.component.html',
 })
 export class BookingConfirmComponent {

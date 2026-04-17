@@ -1,5 +1,4 @@
 import { Component, inject, output, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, CheckCircle } from 'lucide-angular';
 import { BookingStateService } from '../../booking-state.service';
@@ -13,7 +12,7 @@ import { Patient } from '../../../../models/interfaces/patient.model';
 @Component({
   selector: 'app-booking-patient-lookup',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [ FormsModule, LucideAngularModule],
   templateUrl: './booking-patient-lookup.component.html',
 })
 export class BookingPatientLookupComponent {
