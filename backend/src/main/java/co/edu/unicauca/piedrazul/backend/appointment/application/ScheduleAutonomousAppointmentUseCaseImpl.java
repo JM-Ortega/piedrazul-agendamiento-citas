@@ -84,13 +84,14 @@ public class ScheduleAutonomousAppointmentUseCaseImpl implements ScheduleAutonom
                 existingAppointments
         );
 
-        appointmentRepository.save(appointment);
+        Appointment saved = appointmentRepository.save(appointment);
+
         eventPublisher.publishEvent(new AppointmentCreatedEvent(
-                appointment.getIdAppointment().toString(),
+                saved.getIdAppointment().toString(),
                 performedBy
         ));
 
-        return appointment;
+        return saved;
     }
 
     public Appointment scheduleAutonomous(

@@ -23,8 +23,8 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
 
     @Transactional
     @Override
-    public void save(Appointment appointment) {
-        jpaRepository.save(mapper.toEntity(appointment));
+    public Appointment save(Appointment appointment) {
+        return mapper.toDomain(jpaRepository.save(mapper.toEntity(appointment)));
     }
 
 
