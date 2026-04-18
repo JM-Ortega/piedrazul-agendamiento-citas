@@ -68,8 +68,8 @@
     dest: "{{ app_dir }}/postgres/"
     owner: ansible
     group: ansible
-    directory_mode: "0750"
-    mode: "0750"
+    directory_mode: "0755"
+    mode: "0755"
 
 # .env
 - name: Generar .env desde template
