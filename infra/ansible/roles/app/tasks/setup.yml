@@ -1,5 +1,5 @@
----
-# Crea directorios, copia compose files y assets, genera .env y levanta el stack.
+# Crea directorios, copia compose files y assets, genera .env
+# y levanta solo la infraestructura base (sin backend).
 # Idempotente: si .env ya existe, preserva KC_BACKEND_CLIENT_SECRET existente.
 
 - name: Crear directorio de la aplicación
@@ -51,7 +51,6 @@
     group: ansible
     directory_mode: "0750"
     mode: "0640"
-  notify: Restart app stack
 
 # Assets del stack
 - name: Copiar directorio keycloak
@@ -62,7 +61,6 @@
     group: ansible
     directory_mode: "0750"
     mode: "0640"
-  notify: Restart app stack
 
 - name: Copiar directorio postgres
   ansible.builtin.copy:
@@ -72,7 +70,6 @@
     group: ansible
     directory_mode: "0750"
     mode: "0750"
-  notify: Restart app stack
 
 # .env
 - name: Generar .env desde template
@@ -83,19 +80,18 @@
     group: ansible
     mode: "0640"
   no_log: true
-  notify: Restart app stack
 
-# Flush handlers antes de levantar el stack
-- name: Aplicar handlers pendientes
-  ansible.builtin.meta: flush_handlers
-
-# Stack
-- name: Levantar stack completo
+# Levantar solo infraestructura base (sin backend)
+- name: Levantar servicios de infraestructura
   community.docker.docker_compose_v2:
     project_src: "{{ app_dir }}"
     project_name: "{{ compose_project_name }}"
     files:
       - prod.yml
+    services:
+      - postgres
+      - keycloak
+      - traefik
     state: present
     env_files:
       - .env

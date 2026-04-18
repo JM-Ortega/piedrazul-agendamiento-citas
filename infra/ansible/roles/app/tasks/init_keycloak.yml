@@ -100,20 +100,6 @@
         state: absent
       no_log: true
 
-    # Reiniciar backend para que tome el secret correcto
-    - name: Reiniciar backend
-      community.docker.docker_compose_v2:
-        project_src: "{{ app_dir }}"
-        project_name: "{{ compose_project_name }}"
-        files:
-          - prod.yml
-        services:
-          - backend
-        state: restarted
-        env_files:
-          - .env
-          - image.env
-
     # Marker de inicialización
     - name: Crear marker .keycloak_initialized
       ansible.builtin.file:
