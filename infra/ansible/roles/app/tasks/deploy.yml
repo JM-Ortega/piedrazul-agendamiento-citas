@@ -2,20 +2,30 @@
 # Rollout de nueva imagen. No toca Keycloak ni secretos.
 # Requiere image_tag disponible como variable (inyectada por el workflow).
 
-# Preservar KC_BACKEND_CLIENT_SECRET
-- name: Leer .env existente
+# Validar que .env existe y tiene claves críticas
+- name: Verificar que .env existe
+  ansible.builtin.stat:
+    path: "{{ app_dir }}/.env"
+  register: app_env_stat
+
+- name: Fallar si .env no existe
+  ansible.builtin.fail:
+    msg: ".env no existe en {{ app_dir }} — corre host_config primero"
+  when: not app_env_stat.stat.exists
+
+- name: Leer .env para validación
   ansible.builtin.slurp:
     src: "{{ app_dir }}/.env"
   register: app_env_file
   no_log: true
 
-- name: Extraer KC_BACKEND_CLIENT_SECRET del .env existente
-  ansible.builtin.set_fact:
-    app_kc_backend_secret: >-
-      {{ (app_env_file.content | b64decode).split('\n')
-         | select('match', '^KC_BACKEND_CLIENT_SECRET=')
-         | map('regex_replace', '^KC_BACKEND_CLIENT_SECRET=', '')
-         | first | default('') }}
+- name: Validar que KC_BACKEND_CLIENT_SECRET no está vacío
+  ansible.builtin.assert:
+    that:
+      - >-
+        (app_env_file.content | b64decode).split('\n') | select('match',
+        '^KC_BACKEND_CLIENT_SECRET=.+') | list | length > 0
+    fail_msg: "KC_BACKEND_CLIENT_SECRET está vacío en .env — corre host_config primero"
   no_log: true
 
 # Actualizar image.env con el nuevo tag
@@ -27,23 +37,15 @@
     group: ansible
     mode: "0640"
 
-# Regenerar .env
-- name: Actualizar .env
-  ansible.builtin.template:
-    src: env.j2
-    dest: "{{ app_dir }}/.env"
-    owner: ansible
-    group: ansible
-    mode: "0640"
-  no_log: true
-
-# Pull y deploy en un solo paso
+# Desplegar nueva imagen
 - name: Desplegar nueva imagen
   community.docker.docker_compose_v2:
     project_src: "{{ app_dir }}/compose"
     project_name: "{{ compose_project_name }}"
     files:
       - prod.yml
+    services:
+      - backend
     state: present
     pull: always
     env_files:

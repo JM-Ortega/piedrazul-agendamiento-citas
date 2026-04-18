@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      JPA_DDL_AUTO: validate
+      JPA_DDL_AUTO: update
       JPA_SHOW_SQL: "false"
       JPA_FORMAT_SQL: "false"
       DB_HOST: postgres

@@ -12,11 +12,13 @@ include:
 
 services:
   keycloak:
-    command: ["start", "--import-realm"]
+    command: [ "start", "--import-realm" ]
     environment:
       KC_HOSTNAME: ${KC_HOSTNAME}
       KC_HOSTNAME_STRICT: "true"
       KC_PROXY_HEADERS: xforwarded
+    ports:
+      - "127.0.0.1:${KC_PORT}:${KC_PORT}"
     expose:
       - "${KC_PORT}"
     labels:
