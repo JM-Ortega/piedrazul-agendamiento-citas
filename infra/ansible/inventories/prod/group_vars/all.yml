@@ -2,7 +2,7 @@
 # Directorios
 app_dir: /opt/piedrazul
 compose_project_name: piedrazul
-compose_file: "{{ app_dir }}/prod.yml"
+compose_file: "{{ app_dir }}/compose/prod.yml"
 compose_src_dir: "{{ playbook_dir }}/../../compose"
 
 # Container registry

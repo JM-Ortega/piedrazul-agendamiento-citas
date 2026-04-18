@@ -40,12 +40,12 @@
 # Pull y deploy en un solo paso
 - name: Desplegar nueva imagen
   community.docker.docker_compose_v2:
-    project_src: "{{ app_dir }}"
+    project_src: "{{ app_dir }}/compose"
     project_name: "{{ compose_project_name }}"
     files:
       - prod.yml
     state: present
     pull: always
     env_files:
-      - .env
-      - image.env
+      - ../.env
+      - ../image.env

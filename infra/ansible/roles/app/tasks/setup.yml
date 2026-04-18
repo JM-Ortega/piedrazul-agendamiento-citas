@@ -46,7 +46,7 @@
 - name: Copiar archivos compose al servidor
   ansible.builtin.copy:
     src: "{{ compose_src_dir }}/"
-    dest: "{{ app_dir }}/"
+    dest: "{{ app_dir }}/compose/"
     owner: ansible
     group: ansible
     directory_mode: "0750"
@@ -81,10 +81,20 @@
     mode: "0640"
   no_log: true
 
+# image.env — solo si no existe (deploy.yml lo actualiza con el tag real)
+- name: Copiar image.env al servidor
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../image.env"
+    dest: "{{ app_dir }}/image.env"
+    owner: ansible
+    group: ansible
+    mode: "0640"
+    force: false
+
 # Levantar solo infraestructura base (sin backend)
 - name: Levantar servicios de infraestructura
   community.docker.docker_compose_v2:
-    project_src: "{{ app_dir }}"
+    project_src: "{{ app_dir }}/compose"
     project_name: "{{ compose_project_name }}"
     files:
       - prod.yml
@@ -94,5 +104,5 @@
       - traefik
     state: present
     env_files:
-      - .env
-      - image.env
+      - ../.env
+      - ../image.env
