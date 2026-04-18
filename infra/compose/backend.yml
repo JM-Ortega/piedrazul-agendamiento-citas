@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ghcr.io/${GITHUB_OWNER}/${GITHUB_REPO}:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GITHUB_OWNER}/${GITHUB_REPO}/backend:${IMAGE_TAG}
     container_name: backend
     restart: unless-stopped
     environment:
