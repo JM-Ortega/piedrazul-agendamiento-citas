@@ -2,7 +2,7 @@ name: Deploy — Hetzner
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/repo-structure-cicd]
     paths:
       - "backend/**"
       - "!backend/.idea/**"
@@ -130,6 +130,9 @@ jobs:
   deploy:
     name: Deploy Hetzner
     needs: resolve
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/_deploy-server.yml
     secrets: inherit
     with:
