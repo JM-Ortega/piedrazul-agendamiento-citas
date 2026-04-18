@@ -19,7 +19,7 @@ services:
       KC_METRICS_ENABLED: "true"
     volumes:
       - ../keycloak/realm:/opt/keycloak/data/import
-      - ../keycloak/themes/dist/keycloak-theme/keycloak-theme-for-kc-all-other-versions.jar:/opt/keycloak/providers/keycloak-theme.jar
+      - ../keycloak/themes/keycloak-theme/keycloak-theme-for-kc-all-other-versions.jar:/opt/keycloak/providers/keycloak-theme.jar
     depends_on:
       postgres:
         condition: service_healthy
@@ -31,7 +31,11 @@ services:
       test:
         [
           "CMD-SHELL",
-          "{ printf 'HEAD /health/ready HTTP/1.0\r\n\r\n' >&0; grep 'HTTP/1.0 200'; } 0<>/dev/tcp/localhost/9000",
+          "{ printf 'HEAD /health/ready HTTP/1.0\r
+
+            \r
+
+            ' >&0; grep 'HTTP/1.0 200'; } 0<>/dev/tcp/localhost/9000",
         ]
       interval: 10s
       timeout: 5s

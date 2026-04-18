@@ -7,10 +7,10 @@ export default defineConfig({
         react(),
         keycloakify({
             accountThemeImplementation: "none",
-            keycloakifyBuildDirPath: "../../dist/keycloak-theme",
+            keycloakifyBuildDirPath: "../../keycloak-theme",
             environmentVariables: [
-              { name: "REGISTER_URL", default: "http://localhost:4200/registro" }
-]
+                { name: "REGISTER_URL", default: "http://localhost:4200/registro" }
+            ]
         })
     ]
 });
