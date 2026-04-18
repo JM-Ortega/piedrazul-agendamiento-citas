@@ -1,0 +1,143 @@
+name: Deploy — Hetzner
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "!backend/.idea/**"
+      - "!backend/target/**"
+      - "infra/ansible/**"
+      - "infra/compose/**"
+      - "infra/keycloak/realm/**"
+      - "infra/keycloak/themes/dist/**"
+      - "infra/postgres/**"
+      - ".github/workflows/deploy-hetzner.yml"
+      - ".github/workflows/_deploy-server.yml"
+  workflow_dispatch:
+    inputs:
+      run_host_config:
+        description: "Correr configuración del servidor"
+        type: boolean
+        default: false
+      run_build:
+        description: "Construir nueva imagen del backend"
+        type: boolean
+        default: true
+      run_app_deploy:
+        description: "Desplegar aplicación"
+        type: boolean
+        default: true
+      image_tag:
+        description: "Tag específico para rollback (vacío = construir nueva)"
+        type: string
+        default: ""
+      force_init_keycloak:
+        description: "Forzar re-inicialización de Keycloak"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-hetzner-main
+  cancel-in-progress: false
+
+jobs:
+  # Detectar qué cambió (solo en push)
+  classify:
+    name: Detectar cambios
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      ansible: ${{ steps.filter.outputs.ansible }}
+      app: ${{ steps.filter.outputs.app }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detectar archivos cambiados
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - "backend/**"
+              - "!backend/.idea/**"
+              - "!backend/target/**"
+            ansible:
+              - "infra/ansible/**"
+            app:
+              - "infra/compose/**"
+              - "infra/keycloak/realm/**"
+              - "infra/keycloak/themes/dist/**"
+              - "infra/postgres/**"
+
+  # Normalizar inputs según evento
+  resolve:
+    name: Resolver parámetros
+    runs-on: ubuntu-latest
+    needs: classify
+    if: |
+      always() &&
+      (needs.classify.result == 'success' || needs.classify.result == 'skipped')
+    outputs:
+      run_build: ${{ steps.params.outputs.run_build }}
+      run_host_config: ${{ steps.params.outputs.run_host_config }}
+      run_app_deploy: ${{ steps.params.outputs.run_app_deploy }}
+      image_tag: ${{ steps.params.outputs.image_tag }}
+      force_init_keycloak: ${{ steps.params.outputs.force_init_keycloak }}
+    steps:
+      - name: Determinar parámetros según evento
+        id: params
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "push" ]; then
+            BACKEND="${{ needs.classify.outputs.backend }}"
+            ANSIBLE="${{ needs.classify.outputs.ansible }}"
+            APP="${{ needs.classify.outputs.app }}"
+
+            # run_build: solo si cambió backend
+            echo "run_build=${BACKEND}" >> $GITHUB_OUTPUT
+
+            # run_host_config: solo si cambió ansible
+            echo "run_host_config=${ANSIBLE}" >> $GITHUB_OUTPUT
+
+            # run_app_deploy: si cambió backend O app
+            if [ "$BACKEND" = "true" ] || [ "$APP" = "true" ]; then
+              echo "run_app_deploy=true" >> $GITHUB_OUTPUT
+            else
+              echo "run_app_deploy=false" >> $GITHUB_OUTPUT
+            fi
+
+            echo "image_tag=" >> $GITHUB_OUTPUT
+            echo "force_init_keycloak=false" >> $GITHUB_OUTPUT
+
+          else
+            # workflow_dispatch — usar inputs directamente
+            echo "run_build=${{ inputs.run_build }}" >> $GITHUB_OUTPUT
+            echo "run_host_config=${{ inputs.run_host_config }}" >> $GITHUB_OUTPUT
+            echo "run_app_deploy=${{ inputs.run_app_deploy }}" >> $GITHUB_OUTPUT
+            echo "image_tag=${{ inputs.image_tag }}" >> $GITHUB_OUTPUT
+            echo "force_init_keycloak=${{ inputs.force_init_keycloak }}" >> $GITHUB_OUTPUT
+          fi
+
+  # Llamar al reusable
+  deploy:
+    name: Deploy Hetzner
+    needs: resolve
+    uses: ./.github/workflows/_deploy-server.yml
+    secrets: inherit
+    with:
+      workspace_id: ${{ vars.TF_WORKSPACE_HETZNER_ID }}
+      ansible_host: vps
+      github_environment: production-hetzner
+      run_build: ${{ needs.resolve.outputs.run_build == 'true' }}
+      run_host_config: ${{ needs.resolve.outputs.run_host_config == 'true' }}
+      run_app_deploy: ${{ needs.resolve.outputs.run_app_deploy == 'true' }}
+      image_tag: ${{ needs.resolve.outputs.image_tag }}
+      force_init_keycloak: ${{ needs.resolve.outputs.force_init_keycloak == 'true' }}
