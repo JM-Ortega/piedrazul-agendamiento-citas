@@ -13,13 +13,15 @@
   block:
     # Readiness
     - name: Esperar que Keycloak esté disponible (puerto management 9000)
-      ansible.builtin.uri:
-        url: "http://127.0.0.1:9000/health/ready"
-        status_code: 200
+      ansible.builtin.command:
+        cmd: >
+          docker inspect keycloak --format="{{ '{{' }}.State.Health.Status{{
+          '}}' }}"
       register: app_kc_health
-      until: app_kc_health.status == 200
+      until: app_kc_health.stdout == "healthy"
       retries: 30
       delay: 10
+      changed_when: false
 
     # Esperar import del realm
     # El healthcheck responde 200 cuando KC arranca, pero --import-realm
