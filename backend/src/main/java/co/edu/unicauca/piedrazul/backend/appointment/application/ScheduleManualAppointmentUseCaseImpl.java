@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
-import co.edu.unicauca.piedrazul.backend.appointment.application.events.AppointmentCreatedEvent;
+import co.edu.unicauca.piedrazul.backend.shared.events.AppointmentCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientAlreadyScheduledInSpecialtyException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientScheduleTimeConflictException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;

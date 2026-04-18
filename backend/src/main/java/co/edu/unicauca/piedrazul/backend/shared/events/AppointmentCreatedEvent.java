@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment.application.events;
+package co.edu.unicauca.piedrazul.backend.shared.events;
 
 public record AppointmentCreatedEvent(
         String appointmentId,
