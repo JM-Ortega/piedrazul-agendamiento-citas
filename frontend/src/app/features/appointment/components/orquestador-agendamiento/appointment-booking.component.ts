@@ -2,7 +2,8 @@ import { Component, inject, Input, OnInit, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { BookingStateService } from '../../booking-state.service';
 import { BookingModeSelectorComponent } from '../modo-agendamiento/booking-mode-selector.component';
-import { BookingPatientLookupComponent } from '../busqueda-registro-paciente/booking-patient-lookup.component';
+import { BookingPatientSearchComponent } from '../../components/busqueda-paciente/booking-patient-search.component';
+import { BookingPatientRegisterComponent } from '../../components/registro-paciente/booking-patient-register.component';
 import { BookingSpecialtySelectorComponent } from '../../../appointment/components/seleccion-especialidad/booking-specialty-selector.component';
 import { BookingScheduleSelectorComponent } from '../../../appointment/components/seleccion-horario/booking-schedule-selector.component';
 import { BookingConfirmComponent } from '../confirmacion/booking-confirm.component';
@@ -15,12 +16,6 @@ import { BookingMode } from '../../../../models/types/bookingMode.type';
 /**
  * Coordina el flujo de agendamiento componiendo los
  * componentes hermanos en el orden correcto según el contexto y step actual.
- * Se provee BookingStateService a nivel de este componente para que cada
- * instancia del flujo tenga su propio estado aislado.
- *
- * Contextos soportados:
- *   - 'patient':    3 steps (Especialidad → Horario → Confirmar)
- *   - 'scheduler':  4 steps (Paciente → Especialidad → Horario → Confirmar)
  */
 @Component({
   selector: 'app-appointment-booking',
@@ -29,7 +24,8 @@ import { BookingMode } from '../../../../models/types/bookingMode.type';
   imports: [
     CommonModule,
     BookingModeSelectorComponent,
-    BookingPatientLookupComponent,
+    BookingPatientSearchComponent,
+    BookingPatientRegisterComponent,
     BookingSpecialtySelectorComponent,
     BookingScheduleSelectorComponent,
     BookingConfirmComponent,
@@ -50,27 +46,56 @@ export class AppointmentBookingComponent implements OnInit {
   appointmentConfirmed = output<AppointmentConfirmedEvent>();
   goBack = output<void>();
 
+  patientSubStep: 'search' | 'register' = 'search';
+  
+  get isPatientStep(): boolean {
+    return this.state.isSchedulerContext() &&
+           this.state.step() === this.state.patientLookupStep();
+  }
+ 
   ngOnInit(): void {
     this.state.context.set(this.context);
   }
 
   onModeSelected(mode: BookingMode): void {
     if (!this.state.isSchedulerContext()) {
-      this._loadSpecialtiesForMode(mode);
+      this.loadSpecialtiesForMode(mode);
     }
   }
-
-  onPatientLookupAdvance(): void {
-    this._loadSpecialtiesForMode(this.state.bookingMode());
+ 
+  // Eventos de BookingPatientSearch
+  onPatientConfirmed(): void {
+    this.loadSpecialtiesForMode(this.state.bookingMode());
     this.state.step.set(this.state.specialtyStep());
   }
 
-  onPatientLookupChangeMode(): void {
+  onPatientMissing(): void {
+    this.patientSubStep = 'register';
+  }
+ 
+  onSearchChangeMode(): void {
+    this.patientSubStep = 'search';
+    this.state.bookingMode.set(null);
     this.state.step.set(1);
   }
 
+  // Eventos de BookingPatientRegister 
+  onRegisterAdvance(): void {
+    this.loadSpecialtiesForMode(this.state.bookingMode());
+    this.state.step.set(this.state.specialtyStep());
+  }
+ 
+  onRegisterGoBack(): void {
+    this.patientSubStep = 'search';
+    this.state.notFound.set(false);
+    this.state.searchQuery.set('');
+    this.state.searchSuggestions.set([]);
+    this.state.searchError.set('');
+  }
+ 
+  // Eventos de BookingSpecialtySelector 
   onSpecialtyChanged(specialty: string): void {
-    this._loadDoctorsBySpecialty(specialty);
+    this.loadDoctorsBySpecialty(specialty);
   }
 
   onSpecialtyAdvance(): void {
@@ -78,7 +103,9 @@ export class AppointmentBookingComponent implements OnInit {
   }
 
   onSpecialtyBack(): void {
+    this.state.resetSpecialtyState();
     if (this.state.isSchedulerContext()) {
+      this.patientSubStep = this.state.notFound() ? 'register' : 'search';
       this.state.step.set(this.state.patientLookupStep()!);
     } else {
       this.state.bookingMode.set(null);
@@ -107,18 +134,18 @@ export class AppointmentBookingComponent implements OnInit {
   }
 
   // Carga de datos
-  private _loadSpecialtiesForMode(mode: BookingMode): void {
+  private loadSpecialtiesForMode(mode: BookingMode): void {
     this.state.noSpecialtyAvailable.set(false);
     this.state.errorMessageSpecialty.set('');
 
     if (mode === 'specialty') {
-      this._loadSpecialtiesWithDoctor();
+      this.loadSpecialtiesWithDoctor();
     } else if (mode === 'specialty-doctor') {
-      this._loadSpecialties();
+      this.loadSpecialties();
     }
   }
 
-  private _loadSpecialtiesWithDoctor(): void {
+  private loadSpecialtiesWithDoctor(): void {
     this.citaService.getSpecialtiesWithDoctor().subscribe({
       next: (data) => this.state.specialtiesWithDoctor.set(data),
       error: (err) => {
@@ -137,7 +164,7 @@ export class AppointmentBookingComponent implements OnInit {
     });
   }
 
-  private _loadSpecialties(): void {
+  private loadSpecialties(): void {
     this.citaService.getSpecialties().subscribe({
       next: (specs) => {
         if (!specs || specs.length === 0) {
@@ -151,16 +178,16 @@ export class AppointmentBookingComponent implements OnInit {
       },
       error: (err) => {
         this.state.noSpecialtyAvailable.set(true);
-        if (err.status === 0) {
-          this.state.errorMessageSpecialty.set('No se pudo conectar con el servidor. Intente más tarde.');
-          return;
-        }
-        this.state.errorMessageSpecialty.set('Error al obtener las especialidades.');
+        this.state.errorMessageSpecialty.set(
+          err.status === 0
+            ? 'No se pudo conectar con el servidor. Intente más tarde.'
+            : 'Error al obtener las especialidades.'
+        );
       },
     });
   }
 
-  private _loadDoctorsBySpecialty(specialty: string): void {
+  private loadDoctorsBySpecialty(specialty: string): void {
     this.state.noDoctorsFound.set(false);
     this.state.errorMessageDoctors.set('');
     this.state.doctorsBySpecialty.set([]);

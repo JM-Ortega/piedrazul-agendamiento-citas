@@ -23,11 +23,22 @@
 
   <div class="bg-white rounded-2xl shadow-xl p-8">
 
-    @if (state.isSchedulerContext() && state.step() === state.patientLookupStep()) {
-      <app-booking-patient-lookup
-        (advance)="onPatientLookupAdvance()"
-        (changeMode)="onPatientLookupChangeMode()"
-      ></app-booking-patient-lookup>
+    @if (isPatientStep) {
+
+      @if (patientSubStep === 'search') {
+        <app-booking-patient-search
+          (patientConfirmed)="onPatientConfirmed()"
+          (patientMissing)="onPatientMissing()"
+          (changeMode)="onSearchChangeMode()"
+        ></app-booking-patient-search>
+      }
+
+      @if (patientSubStep === 'register') {
+        <app-booking-patient-register
+          (advance)="onRegisterAdvance()"
+          (goBack)="onRegisterGoBack()"
+        ></app-booking-patient-register>
+      }
     }
 
     @if (state.step() === state.specialtyStep()) {
