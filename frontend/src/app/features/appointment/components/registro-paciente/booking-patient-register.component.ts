@@ -29,6 +29,14 @@ export class BookingPatientRegisterComponent {
   birthDateError = signal(false);
   emailError = signal(false);
   guardianPhoneError = signal(false);
+  firstNameErrorMsg = signal('');
+  lastNameErrorMsg = signal('');
+  emailErrorMsg = signal('');
+
+  private readonly NAME_MAX_LENGTH = 30;
+  private readonly EMAIL_MAX_LENGTH = 100;
+  private readonly VALID_NAME_REGEX = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s\-]+$/;
+  private readonly VALID_EMAIL_REGEX = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
 
   getPatientField<K extends keyof Omit<Patient, 'id'>>(
     key: K,
@@ -57,14 +65,24 @@ export class BookingPatientRegisterComponent {
     const f = this.state.patientForm();
 
     this.docTypeError.set(!f.documentType);
-    this.firstNameError.set(!f.firstName?.trim());
-    this.lastNameError.set(!f.lastName?.trim());
-    this.phoneError.set(!f.phone?.trim());
     this.genderError.set(!f.gender);
     this.birthDateError.set(!f.birthDate);
+    if (!f.firstName?.trim()) {
+      this.firstNameError.set(true);
+      this.firstNameErrorMsg.set('Este campo es obligatorio');
+    }
+    if (!f.lastName?.trim()) {
+      this.lastNameError.set(true);
+      this.lastNameErrorMsg.set('Este campo es obligatorio');
+    }
+    if (!f.phone?.trim()) {
+      this.phoneError.set(true);
+    }
 
     const phoneOk = this.validatePhone();
     const birthDateOk = this.validateBirthDate();
+    const firstNameOk = this.validateName('firstName');
+    const lastNameOk = this.validateName('lastName');
     const emailOk = this.validateEmail();
     const guardianPhoneOk = this.validateGuardianPhone();
 
@@ -77,9 +95,35 @@ export class BookingPatientRegisterComponent {
       !this.birthDateError() &&
       phoneOk &&
       birthDateOk &&
+      firstNameOk &&
+      lastNameOk &&
       emailOk &&
       guardianPhoneOk
     );
+  }
+
+  private validateName(field: 'firstName' | 'lastName'): boolean {
+    const value = this.state.patientForm()[field]?.trim() ?? '';
+    const errorSignal = field === 'firstName' ? this.firstNameError : this.lastNameError;
+    const msgSignal = field === 'firstName' ? this.firstNameErrorMsg : this.lastNameErrorMsg;
+
+    if (!value) return false;
+
+    if (value.length > this.NAME_MAX_LENGTH) {
+      errorSignal.set(true);
+      msgSignal.set(`Se permiten ingresar máximo ${this.NAME_MAX_LENGTH} caracteres`);
+      return false;
+    }
+
+    if (!this.VALID_NAME_REGEX.test(value)) {
+      errorSignal.set(true);
+      msgSignal.set('Solo se permiten letras, espacios y guión medio (-)');
+      return false;
+    }
+
+    errorSignal.set(false);
+    msgSignal.set('');
+    return true;
   }
 
   private validatePhone(): boolean {
@@ -105,9 +149,22 @@ export class BookingPatientRegisterComponent {
   private validateEmail(): boolean {
     const email = this.state.patientForm().email;
     if (!email) return true;
-    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    this.emailError.set(!valid);
-    return valid;
+
+    if (email.length > this.EMAIL_MAX_LENGTH) {
+      this.emailError.set(true);
+      this.emailErrorMsg.set(`El correo no puede superar los ${this.EMAIL_MAX_LENGTH} caracteres`);
+      return false;
+    }
+
+    if (!this.VALID_EMAIL_REGEX.test(email)) {
+      this.emailError.set(true);
+      this.emailErrorMsg.set('Correo electrónico no válido. Evite caracteres especiales como \', ", <, >');
+      return false;
+    }
+
+    this.emailError.set(false);
+    this.emailErrorMsg.set('');
+    return true;
   }
 
   private validateGuardianPhone(): boolean {
@@ -144,5 +201,8 @@ export class BookingPatientRegisterComponent {
     this.birthDateError.set(false);
     this.emailError.set(false);
     this.guardianPhoneError.set(false);
+    this.firstNameErrorMsg.set('');
+    this.lastNameErrorMsg.set('');
+    this.emailErrorMsg.set('');
   }
 }

@@ -92,7 +92,7 @@ export class BookingPatientSearchComponent implements OnDestroy {
   onSearchExact(): void {
     const query = this.state.searchQuery().trim();
     if (query.length < 6) {
-      this.state.searchError.set('El número de documento debe tener al menos 6 dígitos.');
+      this.state.searchError.set('El número de documento debe ser numérico y tener al menos 6 dígitos.');
       return;
     }
     this.showSuggestions.set(false);
