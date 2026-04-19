@@ -8,6 +8,7 @@ import {
 import {
   AlertCircle,
   Calendar,
+  CalendarDays,
   ClipboardList,
   Home,
   Hospital,
@@ -46,6 +47,7 @@ export class NavbarComponent implements OnInit {
   readonly Menu = Menu;
   readonly X = X;
   readonly AlertCircle = AlertCircle;
+  readonly CalendarDays = CalendarDays;
   readonly exactMatch = { exact: true };
 
   menuOpen = signal(false);

@@ -65,6 +65,21 @@
           <lucide-angular [img]="Stethoscope" [size]="20"></lucide-angular>
           Mis Citas
         </a>
+        <a
+          routerLink="/medico/citas"
+          #rla9="routerLinkActive"
+          routerLinkActive
+          [routerLinkActiveOptions]="exactMatch"
+          [class]="
+            'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
+            (rla9.isActive
+              ? 'bg-white text-blue-700'
+              : 'text-white hover:bg-blue-600')
+          "
+        >
+          <lucide-angular [img]="CalendarDays" [size]="20"></lucide-angular>
+          Todas las Citas
+        </a>
       }
 
       @if (appService.hasRole("ADMIN")) {
@@ -182,6 +197,14 @@
         >
           <lucide-angular [img]="Stethoscope" [size]="20"></lucide-angular>
           Mis Citas
+        </a>
+        <a
+          routerLink="/medico/citas"
+          (click)="menuOpen.set(false)"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+        >
+          <lucide-angular [img]="CalendarDays" [size]="20"></lucide-angular>
+          Todas las Citas
         </a>
       }
 
