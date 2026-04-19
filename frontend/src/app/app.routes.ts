@@ -2,12 +2,13 @@ import { Routes } from '@angular/router';
 import { AuthGuard } from './guards/auth.guard';
 
 import { AccesoComponent } from './design-system/pages/acceso/acceso.component';
-import { AdminConfigComponent } from './features/admin/admin-config.component';
-import { SchedulerDashboardComponent } from './features/appointment/pages/agendador-listar-citas/scheduler-dashboard.component';
 import { HomeComponent } from './design-system/pages/home/home.component';
+import { AdminConfigComponent } from './features/admin/admin-config.component';
 import { NewAppointmentSchedulerComponent } from './features/appointment/pages/agendador-agendar/new-appointment-scheduler.component';
+import { SchedulerDashboardComponent } from './features/appointment/pages/agendador-listar-citas/scheduler-dashboard.component';
 import { PatientNewAppointmentComponent } from './features/appointment/pages/paciente-agendar/patient-new-appointment.component';
 import { PatientDashboardComponent } from './features/appointment/pages/paciente-listar-citas/patient-dashboard.component';
+import { DoctorDashboardComponent } from './features/doctor-dashboard/doctor-dashboard.component';
 import { RegistroComponent } from './features/registro/registro.component';
 
 export const routes: Routes = [
@@ -31,6 +32,12 @@ export const routes: Routes = [
     component: AdminConfigComponent,
     canActivate: [AuthGuard],
     data: { role: 'ADMIN' },
+  },
+  {
+    path: 'medico',
+    component: DoctorDashboardComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'DOCTOR' },
   },
   {
     path: 'paciente/agendar',
