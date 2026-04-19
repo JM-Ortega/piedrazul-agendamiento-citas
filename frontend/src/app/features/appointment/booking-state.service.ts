@@ -3,12 +3,11 @@ import { Patient } from '../../models/interfaces/patient.model';
 import { SpecialtyDoctor } from '../../models/dtos/specialty-doctor.dto';
 import { BookingMode } from '../../models/types/bookingMode.type';
 import { BookingContext } from '../../models/types/bookingContext.type';
+import { PatientSuggestion } from '../../models/dtos/patient-suggestion.dto';
 /**
- * BookingStateService
- *
  * Servicio de estado compartido para el flujo de agendamiento de citas.
  * Actúa como la única fuente de verdad para todos los componentes 
- * hermanos del flujo: patient-lookup, specialty-selector,
+ * hermanos del flujo: patient-search, patient-register, specialty-selector,
  * schedule-selector y confirm.
  */
 @Injectable()
@@ -52,6 +51,11 @@ export class BookingStateService {
   notFound     = signal<boolean>(false);
   patientId    = signal<string | null>(null);
  
+  searchQuery = signal<string>('');
+  searchSuggestions = signal<PatientSuggestion[]>([]);
+  searchLoading = signal<boolean>(false);
+  searchError = signal<string>('');
+  
   // Agendador: formulario para registrar paciente nuevo
   patientForm = signal<Omit<Patient, 'id'>>({
     documentType:   '',
@@ -176,6 +180,16 @@ export class BookingStateService {
     return this.isSchedulerContext()
       ? (this.patientId() ?? '')
       : (this.patientSnapshot()?.id ?? '');
+  }
+  
+  resetSearchState(): void {
+    this.searchQuery.set('');
+    this.searchSuggestions.set([]);
+    this.searchLoading.set(false);
+    this.searchError.set('');
+    this.foundPatient.set(null);
+    this.notFound.set(false);
+    this.patientId.set(null);
   }
  
   resetSpecialtyState(): void {
