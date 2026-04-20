@@ -231,7 +231,7 @@
       }
     </div>
 
-    <!-- ── Exportar (nuevo) ────────────────────────────────────────────────── -->
+    <!-- ── Exportar ────────────────────────────────────────────────────────── -->
     @if (results().length > 0) {
       <div
         class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200"
@@ -458,7 +458,7 @@
       </div>
     }
 
-    <!-- ── Modal de Exportación (nuevo) ──────────────────────────────────── -->
+    <!-- ── Modal de Exportación ───────────────────────────────────────────── -->
     @if (showExportModal()) {
       <div
         class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
@@ -557,12 +557,12 @@
                 </button>
 
                 <button
-                  (click)="exportFormat.set('word')"
+                  (click)="exportFormat.set('csv')"
                   [class]="
                     'p-4 rounded-lg border transition-all ' +
-                    (exportFormat() === 'word'
-                      ? 'border-blue-600 bg-blue-50 shadow-md'
-                      : 'border-gray-300 hover:border-blue-400 bg-white')
+                    (exportFormat() === 'csv'
+                      ? 'border-orange-600 bg-orange-50 shadow-md'
+                      : 'border-gray-300 hover:border-orange-400 bg-white')
                   "
                 >
                   <div class="flex flex-col items-center gap-2">
@@ -570,8 +570,8 @@
                       [img]="FileText"
                       [size]="32"
                       [class]="
-                        exportFormat() === 'word'
-                          ? 'text-blue-600'
+                        exportFormat() === 'csv'
+                          ? 'text-orange-600'
                           : 'text-gray-500'
                       "
                     >
@@ -579,12 +579,12 @@
                     <span
                       [class]="
                         'text-base font-semibold ' +
-                        (exportFormat() === 'word'
-                          ? 'text-blue-700'
+                        (exportFormat() === 'csv'
+                          ? 'text-orange-700'
                           : 'text-gray-700')
                       "
                     >
-                      Word
+                      CSV
                     </span>
                   </div>
                 </button>
@@ -642,24 +642,32 @@
             <div class="flex gap-3 pt-4 border-t border-gray-200">
               <button
                 (click)="showExportModal.set(false)"
-                class="flex-1 px-6 py-3.5 border border-gray-300 text-gray-700 rounded-lg text-base font-semibold hover:bg-gray-50 transition-colors"
+                [disabled]="exportingInProgress()"
+                class="flex-1 px-6 py-3.5 border border-gray-300 text-gray-700 rounded-lg text-base font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>
               <button
                 (click)="handleExport()"
-                [disabled]="!hasSelectedColumns()"
+                [disabled]="!hasSelectedColumns() || exportingInProgress()"
                 [class]="
                   'flex-1 px-6 py-3.5 rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2 ' +
-                  (hasSelectedColumns()
+                  (hasSelectedColumns() && !exportingInProgress()
                     ? colors().button + ' text-white'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed')
                 "
               >
-                <lucide-angular [img]="Download" [size]="20"></lucide-angular>
-                Exportar {{ results().length }} Cita{{
-                  results().length !== 1 ? "s" : ""
-                }}
+                @if (exportingInProgress()) {
+                  <span
+                    class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"
+                  ></span>
+                  Obteniendo datos...
+                } @else {
+                  <lucide-angular [img]="Download" [size]="20"></lucide-angular>
+                  Exportar {{ results().length }} Cita{{
+                    results().length !== 1 ? "s" : ""
+                  }}
+                }
               </button>
             </div>
           </div>

@@ -1,16 +1,5 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import {
-  AlignmentType,
-  Document as DocxDocument,
-  Packer,
-  Paragraph,
-  Table,
-  TableCell,
-  TableRow,
-  TextRun,
-  WidthType,
-} from 'docx';
 import { saveAs } from 'file-saver';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -31,10 +20,14 @@ import {
   User,
   UserCircle,
 } from 'lucide-angular';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
 import { AppointmentsPatient } from '../../../../models/dtos/appointments.dto';
 import { dtoDoctor } from '../../../../models/dtos/doctor.dto';
+import { Patient } from '../../../../models/interfaces/patient.model';
 import { SchedulerService } from '../../../../services/scheduler.service';
+
 // ── Tipos explícitos para evitar errores de inferencia en templates ──────────
 type ExportColumnKey =
   | 'date'
@@ -109,7 +102,8 @@ export class SchedulerDashboardComponent implements OnInit {
 
   // ── Export signals ────────────────────────────────────────────────────────
   showExportModal = signal(false);
-  exportFormat = signal<'excel' | 'pdf' | 'word'>('excel');
+  exportFormat = signal<'excel' | 'pdf' | 'csv'>('excel');
+  exportingInProgress = signal(false);
   exportColumns = signal<ExportColumns>({
     date: true,
     time: true,
@@ -198,11 +192,11 @@ export class SchedulerDashboardComponent implements OnInit {
         };
       default:
         return {
-          header: 'bg-blue-700',
-          border: 'border-blue-600',
-          bg: 'bg-blue-50',
-          icon: 'text-blue-600',
-          button: 'bg-blue-600 hover:bg-blue-700',
+          header: 'bg-orange-700',
+          border: 'border-orange-600',
+          bg: 'bg-orange-50',
+          icon: 'text-orange-600',
+          button: 'bg-orange-600 hover:bg-orange-700',
         };
     }
   });
@@ -289,19 +283,34 @@ export class SchedulerDashboardComponent implements OnInit {
       ? '#16a34a'
       : this.exportFormat() === 'pdf'
         ? '#dc2626'
-        : '#2563eb';
+        : '#ea580c';
   }
 
-  private buildExportRows(): Record<string, string>[] {
+  // Resuelve los teléfonos en paralelo via getByDocument antes de exportar
+  private resolvePhones() {
+    const apts = this.results();
+    const requests = apts.map((apt) =>
+      apt.documentNumber
+        ? this.schedulerService
+            .getByDocument(apt.documentNumber)
+            .pipe(catchError(() => of(null)))
+        : of(null),
+    );
+    return forkJoin(requests as any);
+  }
+
+  private buildExportRows(
+    patients: (Patient | null)[],
+  ): Record<string, string>[] {
     const cols = this.exportColumns();
-    return this.results().map((apt) => {
+    return this.results().map((apt, i) => {
       const row: Record<string, string> = {};
       if (cols.date) row['Fecha'] = this.formatDate(apt.date);
       if (cols.time) row['Hora'] = apt.startTime;
       if (cols.patient)
         row['Paciente'] = `${apt.patientFirstName} ${apt.patientLastName}`;
       if (cols.documentId) row['Documento'] = apt.documentNumber ?? '';
-      if (cols.phone) row['Teléfono'] = (apt as any).phone ?? '';
+      if (cols.phone) row['Teléfono'] = patients[i]?.phone ?? '';
       if (cols.doctor) row['Médico'] = apt.doctorName ?? '';
       if (cols.specialty) row['Especialidad'] = apt.specialty ?? '';
       if (cols.status) row['Estado'] = this.statusLabel(apt.appointmentState);
@@ -310,11 +319,36 @@ export class SchedulerDashboardComponent implements OnInit {
   }
 
   handleExport(): void {
-    const data = this.buildExportRows();
+    if (!this.hasSelectedColumns()) return;
+    this.exportingInProgress.set(true);
+
+    // Si el teléfono no está en las columnas seleccionadas, exporta directamente
+    if (!this.exportColumns().phone) {
+      const data = this.buildExportRows(this.results().map(() => null));
+      this.generateFile(data);
+      this.exportingInProgress.set(false);
+      this.showExportModal.set(false);
+      return;
+    }
+
+    this.resolvePhones().subscribe({
+      next: (patients) => {
+        const data = this.buildExportRows(patients as (Patient | null)[]);
+        this.generateFile(data);
+        this.exportingInProgress.set(false);
+        this.showExportModal.set(false);
+      },
+      error: () => {
+        this.exportingInProgress.set(false);
+        this.showExportModal.set(false);
+      },
+    });
+  }
+
+  private generateFile(data: Record<string, string>[]): void {
     if (this.exportFormat() === 'excel') this.exportToExcel(data);
     else if (this.exportFormat() === 'pdf') this.exportToPDF(data);
-    else this.exportToWord(data);
-    this.showExportModal.set(false);
+    else this.exportToCSV(data);
   }
 
   private exportToExcel(data: Record<string, string>[]): void {
@@ -342,60 +376,25 @@ export class SchedulerDashboardComponent implements OnInit {
     doc.save(`Citas_${this.today}.pdf`);
   }
 
-  private async exportToWord(data: Record<string, string>[]): Promise<void> {
-    const headers = Object.keys(data[0] ?? {});
-    const tableRows = [
-      new TableRow({
-        children: headers.map(
-          (h) =>
-            new TableCell({
-              children: [
-                new Paragraph({
-                  alignment: AlignmentType.CENTER,
-                  children: [new TextRun({ text: h, bold: true })], // ← corregido
-                }),
-              ],
-              shading: { fill: '2563EB' },
-            }),
-        ),
-      }),
-      ...data.map(
-        (row) =>
-          new TableRow({
-            children: Object.values(row).map(
-              (val) =>
-                new TableCell({
-                  children: [new Paragraph({ text: String(val) })],
-                }),
-            ),
-          }),
+  private exportToCSV(data: Record<string, string>[]): void {
+    if (data.length === 0) return;
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+      headers.join(','),
+      ...data.map((row) =>
+        headers
+          .map((header) => {
+            const value = String(row[header] || '');
+            return value.includes(',') ||
+              value.includes('\n') ||
+              value.includes('"')
+              ? `"${value.replace(/"/g, '""')}"`
+              : value;
+          })
+          .join(','),
       ),
-    ];
-
-    const docx = new DocxDocument({
-      sections: [
-        {
-          children: [
-            new Paragraph({
-              text: 'Reporte de Citas - Piedrazul Salud',
-              heading: 'Heading1',
-              alignment: AlignmentType.CENTER,
-            }),
-            new Paragraph({
-              text: `Generado: ${this.formatDate(this.today)}`,
-              alignment: AlignmentType.CENTER,
-            }),
-            new Paragraph({ text: '' }),
-            new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              rows: tableRows,
-            }),
-          ],
-        },
-      ],
-    });
-
-    const blob = await Packer.toBlob(docx);
-    saveAs(blob, `Citas_${this.today}.docx`);
+    ].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, `Citas_${this.today}.csv`);
   }
 }

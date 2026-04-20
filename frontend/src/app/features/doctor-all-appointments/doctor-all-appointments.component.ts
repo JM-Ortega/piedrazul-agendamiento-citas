@@ -1,16 +1,5 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import {
-  AlignmentType,
-  Document as DocxDocument,
-  Packer,
-  Paragraph,
-  Table,
-  TableCell,
-  TableRow,
-  TextRun,
-  WidthType,
-} from 'docx';
 import { saveAs } from 'file-saver';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -36,7 +25,7 @@ import { SchedulerService } from '../../services/scheduler.service';
 
 type ExportColumnKey = 'date' | 'time' | 'patient' | 'documentId' | 'status';
 type ExportColumns = Record<ExportColumnKey, boolean>;
-type ExportFormat = 'excel' | 'pdf' | 'word';
+type ExportFormat = 'excel' | 'pdf' | 'csv';
 type FilterDate = 'all' | 'today' | 'upcoming' | 'past';
 type FilterStatus =
   | 'all'
@@ -173,11 +162,11 @@ export class DoctorAllAppointmentsComponent {
         };
       default:
         return {
-          header: 'bg-blue-700',
-          border: 'border-blue-600',
-          bg: 'bg-blue-50',
-          icon: 'text-blue-600',
-          button: 'bg-blue-600 hover:bg-blue-700',
+          header: 'bg-orange-700',
+          border: 'border-orange-600',
+          bg: 'bg-orange-50',
+          icon: 'text-orange-600',
+          button: 'bg-orange-600 hover:bg-orange-700',
         };
     }
   });
@@ -251,7 +240,7 @@ export class DoctorAllAppointmentsComponent {
       ? '#16a34a'
       : this.exportFormat() === 'pdf'
         ? '#dc2626'
-        : '#2563eb';
+        : '#ea580c';
   }
 
   toggleColumn(key: ExportColumnKey): void {
@@ -260,10 +249,6 @@ export class DoctorAllAppointmentsComponent {
 
   isColumnChecked(key: ExportColumnKey): boolean {
     return this.exportColumns()[key];
-  }
-
-  goToHistory(documentNumber: string): void {
-    this.router.navigate(['/medico/historia', documentNumber]);
   }
 
   // ── Export ────────────────────────────────────────────────────────────────
@@ -285,7 +270,7 @@ export class DoctorAllAppointmentsComponent {
     const data = this.buildExportRows();
     if (this.exportFormat() === 'excel') this.exportToExcel(data);
     else if (this.exportFormat() === 'pdf') this.exportToPDF(data);
-    else this.exportToWord(data);
+    else this.exportToCSV(data);
     this.showExportModal.set(false);
   }
 
@@ -315,64 +300,25 @@ export class DoctorAllAppointmentsComponent {
     doc.save(`Mis_Citas_${this.today}.pdf`);
   }
 
-  private async exportToWord(data: Record<string, string>[]): Promise<void> {
-    const headers = Object.keys(data[0] ?? {});
-    const tableRows = [
-      new TableRow({
-        children: headers.map(
-          (h) =>
-            new TableCell({
-              children: [
-                new Paragraph({
-                  alignment: AlignmentType.CENTER,
-                  children: [new TextRun({ text: h, bold: true })],
-                }),
-              ],
-              shading: { fill: '2563EB' },
-            }),
-        ),
-      }),
-      ...data.map(
-        (row) =>
-          new TableRow({
-            children: Object.values(row).map(
-              (val) =>
-                new TableCell({
-                  children: [new Paragraph({ text: String(val) })],
-                }),
-            ),
-          }),
+  private exportToCSV(data: Record<string, string>[]): void {
+    if (data.length === 0) return;
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+      headers.join(','),
+      ...data.map((row) =>
+        headers
+          .map((header) => {
+            const value = String(row[header] || '');
+            return value.includes(',') ||
+              value.includes('\n') ||
+              value.includes('"')
+              ? `"${value.replace(/"/g, '""')}"`
+              : value;
+          })
+          .join(','),
       ),
-    ];
-
-    const docx = new DocxDocument({
-      sections: [
-        {
-          children: [
-            new Paragraph({
-              text: 'Reporte de Mis Citas - Piedrazul Salud',
-              heading: 'Heading1',
-              alignment: AlignmentType.CENTER,
-            }),
-            new Paragraph({
-              text: `Médico: ${this.currentDoctor()?.name}`,
-              alignment: AlignmentType.CENTER,
-            }),
-            new Paragraph({
-              text: `Generado: ${this.formatDate(this.today)}`,
-              alignment: AlignmentType.CENTER,
-            }),
-            new Paragraph({ text: '' }),
-            new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              rows: tableRows,
-            }),
-          ],
-        },
-      ],
-    });
-
-    const blob = await Packer.toBlob(docx);
-    saveAs(blob, `Mis_Citas_${this.today}.docx`);
+    ].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, `Mis_Citas_${this.today}.csv`);
   }
 }
