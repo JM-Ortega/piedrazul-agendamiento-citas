@@ -19,9 +19,9 @@ export class NuevaCitaService {
     );
   }
 
-  getPatientSuggestionsByDocument(prefix: string): Observable<PatientSuggestion[]> {
+  getPatientSuggestionsByDocument(documentPrefix: string): Observable<PatientSuggestion[]> {
     return this.http.get<PatientSuggestion[]>(
-      `${this.apiUrl}/patients/suggestions/document`, { params: { prefix } },);
+      `${this.apiUrl}/patients/search/by-document-prefix`, { params: { documentPrefix } },);
   }
 
   getSpecialtiesWithDoctor(): Observable<SpecialtyDoctor[]> {
