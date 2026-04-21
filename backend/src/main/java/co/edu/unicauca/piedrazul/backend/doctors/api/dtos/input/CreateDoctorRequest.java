@@ -12,6 +12,7 @@ public record CreateDoctorRequest(
         @NotBlank String firstName,
         @NotBlank String lastName,
         @NotBlank String identification,
+        @NotBlank String phone,
         @NotNull List<Specialty> specialty,
         @NotNull LocalDate laborStart,
         LocalDate laborEnd,

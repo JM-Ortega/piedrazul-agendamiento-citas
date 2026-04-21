@@ -55,6 +55,15 @@ public class ScheduleService {
         return scheduleRepository.save(existingSchedule);
     }
 
+    @Transactional
+    public void deleteScheduleByWorkday(Doctor doctor, Workday workday) {
+        if (doctor == null || doctor.getIdDoctor() == null) {
+            throw new IllegalArgumentException("Doctor must be provided");
+        }
+
+        scheduleRepository.deleteByDoctorAndWorkday(doctor, workday);
+    }
+
     public List<Schedule> getSchedulesByDoctor(Doctor doctor) {
         if (doctor == null || doctor.getIdDoctor() == null) {
             throw new RuntimeException("Doctor must be provided");

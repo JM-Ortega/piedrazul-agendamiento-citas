@@ -77,6 +77,22 @@ public class SheduleController {
     }
 
     /**
+     * Eliminar el horario de un doctor para un día específico
+     * @param doctorId
+     * @param workday
+     * @return
+     */
+    @DeleteMapping("/{doctorId}/{workday}")
+    public ResponseEntity<?> deleteSchedule(
+            @PathVariable UUID doctorId,
+            @PathVariable Workday workday
+    ) {
+        var doctor = doctorService.getDoctorById(doctorId);
+        scheduleService.deleteScheduleByWorkday(doctor, workday);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
      * Obtener todos los horarios de un doctor
      * @param doctorId ID del doctor
      * @return Lista de horarios del doctor
