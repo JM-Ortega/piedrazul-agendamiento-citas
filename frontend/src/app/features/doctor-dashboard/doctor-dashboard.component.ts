@@ -1,24 +1,14 @@
-import {
-  Component,
-  computed,
-  effect,
-  inject,
-  OnInit,
-  signal,
-} from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { KEYCLOAK_EVENT_SIGNAL } from 'keycloak-angular';
 import {
   Calendar,
   Clock,
   FileText,
   LucideAngularModule,
-  Phone,
   User,
 } from 'lucide-angular';
 import { AppointmentsPatient } from '../../models/dtos/appointments.dto';
 import { Doctor } from '../../models/interfaces/doctor.model';
-import { AppService } from '../../services/app.service';
 import { DoctorService } from '../../services/doctor.service';
 
 @Component({
@@ -29,24 +19,17 @@ import { DoctorService } from '../../services/doctor.service';
 })
 export class DoctorDashboardComponent implements OnInit {
   private doctorService = inject(DoctorService);
-  private appService = inject(AppService);
   private router = inject(Router);
-  private keycloakEvent = inject(KEYCLOAK_EVENT_SIGNAL);
 
-  // ── Lucide icons ──────────────────────────────────────────────────────────
   readonly Calendar = Calendar;
   readonly Clock = Clock;
   readonly FileText = FileText;
-  readonly Phone = Phone;
   readonly User = User;
 
-  // ── Signals ───────────────────────────────────────────────────────────────
   today = new Date().toISOString().split('T')[0];
   currentDoctor = signal<Doctor | null>(null);
   private appointments = signal<AppointmentsPatient[]>([]);
-  private loaded = signal(false); // ← evita llamadas duplicadas
 
-  // ── Computed ──────────────────────────────────────────────────────────────
   todaysAppointments = computed(() =>
     [...this.appointments()]
       .filter(
@@ -68,52 +51,19 @@ export class DoctorDashboardComponent implements OnInit {
       ).length,
   );
 
-  constructor() {
-    effect(() => {
-      const event = this.keycloakEvent();
-      const keycloakId = this.appService.keycloakId();
-
-      console.log('event type:', event.type);
-      console.log('keycloakId:', keycloakId);
-      console.log('loaded:', this.loaded());
-
-      if (!keycloakId || this.loaded()) return;
-
-      this.loaded.set(true);
-      this.loadDoctor(keycloakId);
-    });
-  }
-
-  ngOnInit(): void {}
-
-  // ── Data loading ──────────────────────────────────────────────────────────
-  private loadDoctor(keycloakId: string): void {
-    console.log('loadDoctor llamado con:', keycloakId);
-
-    this.doctorService.getMe(keycloakId).subscribe({
+  ngOnInit(): void {
+    this.doctorService.getMe().subscribe({
       next: (doctor) => {
-        console.log('doctor recibido:', doctor);
-        if (!doctor) {
-          console.log('doctor undefined → redirigiendo');
-          this.router.navigate(['/']);
-          return;
-        }
         this.currentDoctor.set(doctor);
-        this.doctorService
-          .getTodayAppointmentsByDoctor(doctor.id)
-          .subscribe((data) => {
-            console.log('appointments:', data);
-            this.appointments.set(data);
-          });
+        this.doctorService.getTodayAppointmentsByDoctor(doctor.id).subscribe({
+          next: (data) => this.appointments.set(data),
+          error: () => this.appointments.set([]),
+        });
       },
-      error: (err) => {
-        console.log('error en getMe:', err);
-        this.router.navigate(['/']);
-      },
+      error: () => this.router.navigate(['/']),
     });
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
   formatDate(dateStr: string): string {
     const date = new Date(dateStr + 'T12:00:00');
     return new Intl.DateTimeFormat('es-CO', {
@@ -144,9 +94,5 @@ export class DoctorDashboardComponent implements OnInit {
       REPROGRAMADA: 'Pendiente',
     };
     return map[state] ?? state;
-  }
-
-  goToHistory(patientId: number | string): void {
-    this.router.navigate(['/medico/historia', patientId]);
   }
 }

@@ -184,7 +184,7 @@ export class DoctorAllAppointmentsComponent {
 
   // ── Data loading ──────────────────────────────────────────────────────────
   private loadData(keycloakId: string): void {
-    this.doctorService.getMe(keycloakId).subscribe({
+    this.doctorService.getMe().subscribe({
       next: (doctor) => {
         if (!doctor) {
           this.router.navigate(['/']);
