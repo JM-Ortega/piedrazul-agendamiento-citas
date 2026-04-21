@@ -8,7 +8,7 @@
   <!-- Statistics Cards -->
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
     <div
-      class="bg-gradient-to-br from-blue-600 to-blue-500 text-white rounded-xl shadow-lg p-6"
+      class="bg-linear-to-br from-blue-600 to-blue-500 text-white rounded-xl shadow-lg p-6"
     >
       <p class="text-blue-100 text-sm uppercase tracking-wide mb-1">
         Total de Citas
@@ -16,7 +16,7 @@
       <p class="text-4xl font-bold">{{ stats().total }}</p>
     </div>
     <div
-      class="bg-gradient-to-br from-green-600 to-green-500 text-white rounded-xl shadow-lg p-6"
+      class="bg-linear-to-br from-green-600 to-green-500 text-white rounded-xl shadow-lg p-6"
     >
       <p class="text-green-100 text-sm uppercase tracking-wide mb-1">
         Próximas Citas
@@ -24,7 +24,7 @@
       <p class="text-4xl font-bold">{{ stats().upcoming }}</p>
     </div>
     <div
-      class="bg-gradient-to-br from-yellow-600 to-yellow-500 text-white rounded-xl shadow-lg p-6"
+      class="bg-linear-to-br from-yellow-600 to-yellow-500 text-white rounded-xl shadow-lg p-6"
     >
       <p class="text-yellow-100 text-sm uppercase tracking-wide mb-1">
         Pendientes
@@ -86,7 +86,7 @@
   <!-- Export Section -->
   @if (filteredAppointments().length > 0) {
     <div
-      class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200 mb-6"
+      class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200 mb-6"
     >
       <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div class="flex items-center gap-3">
@@ -157,7 +157,7 @@
               <div class="flex items-start gap-4">
                 <div
                   [class]="
-                    'rounded-xl p-4 text-center min-w-[90px] ' +
+                    'rounded-xl p-4 text-center min-w-22.5 ' +
                     (apt.appointmentState === 'CANCELADA'
                       ? 'bg-gray-300 text-gray-600'
                       : isPast(apt.date)
@@ -206,7 +206,7 @@
               </div>
 
               <!-- Right: Status & Action -->
-              <div class="flex flex-col gap-3 lg:items-end lg:min-w-[200px]">
+              <div class="flex flex-col gap-3 lg:items-end lg:min-w-50">
                 <span
                   [class]="
                     'px-4 py-2 rounded-lg border-2 text-base font-medium text-center ' +
