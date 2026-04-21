@@ -8,7 +8,7 @@
   <!-- Statistics Cards -->
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
     <div
-      class="bg-linear-to-br from-blue-600 to-blue-500 text-white rounded-xl shadow-lg p-6"
+      class="bg-gradient-to-br from-blue-600 to-blue-500 text-white rounded-xl shadow-lg p-6"
     >
       <p class="text-blue-100 text-sm uppercase tracking-wide mb-1">
         Total de Citas
@@ -16,7 +16,7 @@
       <p class="text-4xl font-bold">{{ stats().total }}</p>
     </div>
     <div
-      class="bg-linear-to-br from-green-600 to-green-500 text-white rounded-xl shadow-lg p-6"
+      class="bg-gradient-to-br from-green-600 to-green-500 text-white rounded-xl shadow-lg p-6"
     >
       <p class="text-green-100 text-sm uppercase tracking-wide mb-1">
         Próximas Citas
@@ -24,7 +24,7 @@
       <p class="text-4xl font-bold">{{ stats().upcoming }}</p>
     </div>
     <div
-      class="bg-linear-to-br from-yellow-600 to-yellow-500 text-white rounded-xl shadow-lg p-6"
+      class="bg-gradient-to-br from-yellow-600 to-yellow-500 text-white rounded-xl shadow-lg p-6"
     >
       <p class="text-yellow-100 text-sm uppercase tracking-wide mb-1">
         Pendientes
@@ -36,10 +36,11 @@
   <!-- Filters -->
   <div class="bg-white rounded-xl shadow-md border-2 border-blue-100 p-6 mb-6">
     <div class="flex items-center gap-2 mb-4 text-blue-800">
-      <lucide-icon [img]="Filter" [size]="20" />
+      <lucide-angular [img]="Filter" [size]="20"></lucide-angular>
       <h3 class="text-lg font-semibold">Filtros</h3>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <!-- Filtro fecha -->
       <div>
         <label class="block text-gray-700 text-base mb-2">Por Fecha</label>
         <select
@@ -48,11 +49,22 @@
           class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         >
           <option value="all">Todas las fechas</option>
-          <option value="today">Solo hoy</option>
+          <option value="specific">Fecha específica</option>
           <option value="upcoming">Próximas</option>
           <option value="past">Pasadas</option>
         </select>
+
+        @if (filterDate() === "specific") {
+          <input
+            type="date"
+            [value]="filterSpecificDate()"
+            (change)="filterSpecificDate.set($any($event.target).value)"
+            class="w-full mt-2 border-2 border-blue-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        }
       </div>
+
+      <!-- Filtro estado -->
       <div>
         <label class="block text-gray-700 text-base mb-2">Por Estado</label>
         <select
@@ -74,12 +86,16 @@
   <!-- Export Section -->
   @if (filteredAppointments().length > 0) {
     <div
-      class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200 mb-6"
+      class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200 mb-6"
     >
       <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div class="flex items-center gap-3">
           <div class="bg-green-500 rounded-full p-3">
-            <lucide-icon [img]="Download" class="text-white" [size]="28" />
+            <lucide-angular
+              [img]="Download"
+              class="text-white"
+              [size]="28"
+            ></lucide-angular>
           </div>
           <div>
             <h3 class="text-green-800 text-xl font-bold">
@@ -98,7 +114,7 @@
           (click)="showExportModal.set(true)"
           class="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-colors shadow-lg"
         >
-          <lucide-icon [img]="FileSpreadsheet" [size]="24" />
+          <lucide-angular [img]="FileSpreadsheet" [size]="24"></lucide-angular>
           Exportar Citas
         </button>
       </div>
@@ -114,11 +130,11 @@
 
     @if (filteredAppointments().length === 0) {
       <div class="text-center py-16">
-        <lucide-icon
+        <lucide-angular
           [img]="Calendar"
           class="mx-auto text-gray-300 mb-4"
           [size]="64"
-        />
+        ></lucide-angular>
         <p class="text-gray-500 text-xl">
           No hay citas que coincidan con los filtros seleccionados
         </p>
@@ -141,7 +157,7 @@
               <div class="flex items-start gap-4">
                 <div
                   [class]="
-                    'rounded-xl p-4 text-center min-w-22.5 ' +
+                    'rounded-xl p-4 text-center min-w-[90px] ' +
                     (apt.appointmentState === 'CANCELADA'
                       ? 'bg-gray-300 text-gray-600'
                       : isPast(apt.date)
@@ -159,7 +175,7 @@
                   <div
                     class="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-current/30"
                   >
-                    <lucide-icon [img]="Clock" [size]="14" />
+                    <lucide-angular [img]="Clock" [size]="14"></lucide-angular>
                     <span class="text-sm font-semibold">{{
                       apt.startTime
                     }}</span>
@@ -172,27 +188,25 @@
                     {{ apt.patientFirstName }} {{ apt.patientLastName }}
                   </h3>
                   <div class="flex items-center gap-2 text-gray-700">
-                    <lucide-icon
+                    <lucide-angular
                       [img]="CreditCard"
                       [size]="16"
                       class="text-blue-600"
-                    />
+                    ></lucide-angular>
                     <span class="text-base">Doc: {{ apt.documentNumber }}</span>
                   </div>
                   @if (
                     isPast(apt.date) && apt.appointmentState !== "CANCELADA"
                   ) {
-                    <span
-                      class="inline-block mt-2 text-sm text-gray-500 italic"
+                    <span class="inline-block mt-2 text-sm text-gray-500 italic"
+                      >(Cita pasada)</span
                     >
-                      (Cita pasada)
-                    </span>
                   }
                 </div>
               </div>
 
               <!-- Right: Status & Action -->
-              <div class="flex flex-col gap-3 lg:items-end lg:min-w-50">
+              <div class="flex flex-col gap-3 lg:items-end lg:min-w-[200px]">
                 <span
                   [class]="
                     'px-4 py-2 rounded-lg border-2 text-base font-medium text-center ' +
@@ -204,7 +218,7 @@
                 <button
                   class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg transition-colors text-base"
                 >
-                  <lucide-icon [img]="FileText" [size]="18" />
+                  <lucide-angular [img]="FileText" [size]="18"></lucide-angular>
                   Ver Historia Clínica
                 </button>
               </div>
@@ -230,7 +244,7 @@
         "
       >
         <div class="flex items-center gap-3">
-          <lucide-icon [img]="Download" [size]="28" />
+          <lucide-angular [img]="Download" [size]="28"></lucide-angular>
           <h2 class="text-2xl font-bold">Exportar Reporte de Citas</h2>
         </div>
         <button
@@ -287,7 +301,7 @@
                 "
               >
                 <div class="flex flex-col items-center gap-2">
-                  <lucide-icon
+                  <lucide-angular
                     [img]="fmt.icon"
                     [size]="32"
                     [class]="
@@ -295,7 +309,7 @@
                         ? fmt.activeIcon
                         : 'text-gray-500'
                     "
-                  />
+                  ></lucide-angular>
                   <span
                     [class]="
                       'text-base font-semibold ' +
@@ -334,13 +348,13 @@
                   class="w-5 h-5 cursor-pointer"
                   [style.accentColor]="accentColor()"
                 />
-                <lucide-icon
+                <lucide-angular
                   [img]="col.icon"
                   [size]="18"
                   [class]="
                     isColumnChecked(col.key) ? colors().icon : 'text-gray-400'
                   "
-                />
+                ></lucide-angular>
                 <span class="text-sm text-gray-700">{{ col.label }}</span>
               </label>
             }
@@ -360,24 +374,32 @@
         <div class="flex gap-3 pt-4 border-t border-gray-200">
           <button
             (click)="showExportModal.set(false)"
-            class="flex-1 px-6 py-3.5 border border-gray-300 text-gray-700 rounded-lg text-base font-semibold hover:bg-gray-50 transition-colors"
+            [disabled]="exportingInProgress()"
+            class="flex-1 px-6 py-3.5 border border-gray-300 text-gray-700 rounded-lg text-base font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancelar
           </button>
           <button
             (click)="handleExport()"
-            [disabled]="!hasSelectedColumns()"
+            [disabled]="!hasSelectedColumns() || exportingInProgress()"
             [class]="
               'flex-1 px-6 py-3.5 rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2 ' +
-              (hasSelectedColumns()
+              (hasSelectedColumns() && !exportingInProgress()
                 ? colors().button + ' text-white'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed')
             "
           >
-            <lucide-icon [img]="Download" [size]="20" />
-            Exportar {{ filteredAppointments().length }} Cita{{
-              filteredAppointments().length !== 1 ? "s" : ""
-            }}
+            @if (exportingInProgress()) {
+              <span
+                class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"
+              ></span>
+              Obteniendo datos...
+            } @else {
+              <lucide-angular [img]="Download" [size]="20"></lucide-angular>
+              Exportar {{ filteredAppointments().length }} Cita{{
+                filteredAppointments().length !== 1 ? "s" : ""
+              }}
+            }
           </button>
         </div>
       </div>

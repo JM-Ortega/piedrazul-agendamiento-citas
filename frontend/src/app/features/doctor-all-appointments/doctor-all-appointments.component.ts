@@ -14,19 +14,28 @@ import {
   FileText,
   Filter,
   LucideAngularModule,
+  Phone,
   UserCircle,
 } from 'lucide-angular';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
 import { AppointmentsPatient } from '../../models/dtos/appointments.dto';
 import { Doctor } from '../../models/interfaces/doctor.model';
-import { AppService } from '../../services/app.service';
+import { Patient } from '../../models/interfaces/patient.model';
 import { DoctorService } from '../../services/doctor.service';
 import { SchedulerService } from '../../services/scheduler.service';
 
-type ExportColumnKey = 'date' | 'time' | 'patient' | 'documentId' | 'status';
+type ExportColumnKey =
+  | 'date'
+  | 'time'
+  | 'patient'
+  | 'documentId'
+  | 'phone'
+  | 'status';
 type ExportColumns = Record<ExportColumnKey, boolean>;
 type ExportFormat = 'excel' | 'pdf' | 'csv';
-type FilterDate = 'all' | 'today' | 'upcoming' | 'past';
+type FilterDate = 'all' | 'specific' | 'upcoming' | 'past';
 type FilterStatus =
   | 'all'
   | 'AGENDADA'
@@ -49,7 +58,6 @@ interface ColumnDef {
 })
 export class DoctorAllAppointmentsComponent {
   private router = inject(Router);
-  private appService = inject(AppService);
   private doctorService = inject(DoctorService);
   private schedulerService = inject(SchedulerService);
   private keycloakEvent = inject(KEYCLOAK_EVENT_SIGNAL);
@@ -64,15 +72,18 @@ export class DoctorAllAppointmentsComponent {
   readonly CreditCard = CreditCard;
   readonly UserCircle = UserCircle;
   readonly CheckCircle = CheckCircle;
+  readonly Phone = Phone;
 
   // ── State ─────────────────────────────────────────────────────────────────
   today = new Date().toISOString().split('T')[0];
   currentDoctor = signal<Doctor | null>(null);
   private allAppointments = signal<AppointmentsPatient[]>([]);
   private loaded = signal(false);
+  exportingInProgress = signal(false);
 
   filterStatus = signal<FilterStatus>('all');
   filterDate = signal<FilterDate>('all');
+  filterSpecificDate = signal<string>('');
   showExportModal = signal(false);
   exportFormat = signal<ExportFormat>('excel');
   exportColumns = signal<ExportColumns>({
@@ -80,6 +91,7 @@ export class DoctorAllAppointmentsComponent {
     time: true,
     patient: true,
     documentId: true,
+    phone: true,
     status: true,
   });
 
@@ -103,6 +115,7 @@ export class DoctorAllAppointmentsComponent {
     { key: 'time', label: 'Hora de la Cita', icon: Clock },
     { key: 'patient', label: 'Nombre del Paciente', icon: UserCircle },
     { key: 'documentId', label: 'Documento de Identidad', icon: CreditCard },
+    { key: 'phone', label: 'Teléfono del Paciente', icon: Phone },
     { key: 'status', label: 'Estado de la Cita', icon: CheckCircle },
   ];
 
@@ -113,8 +126,8 @@ export class DoctorAllAppointmentsComponent {
     if (this.filterStatus() !== 'all')
       result = result.filter((a) => a.appointmentState === this.filterStatus());
 
-    if (this.filterDate() === 'today')
-      result = result.filter((a) => a.date === this.today);
+    if (this.filterDate() === 'specific' && this.filterSpecificDate())
+      result = result.filter((a) => a.date === this.filterSpecificDate());
     else if (this.filterDate() === 'upcoming')
       result = result.filter(
         (a) => a.date >= this.today && a.appointmentState !== 'CANCELADA',
@@ -175,15 +188,14 @@ export class DoctorAllAppointmentsComponent {
   constructor() {
     effect(() => {
       this.keycloakEvent();
-      const keycloakId = this.appService.keycloakId();
-      if (!keycloakId || this.loaded()) return;
+      if (this.loaded()) return;
       this.loaded.set(true);
-      this.loadData(keycloakId);
+      this.loadData();
     });
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
-  private loadData(keycloakId: string): void {
+  private loadData(): void {
     this.doctorService.getMe().subscribe({
       next: (doctor) => {
         if (!doctor) {
@@ -252,26 +264,66 @@ export class DoctorAllAppointmentsComponent {
   }
 
   // ── Export ────────────────────────────────────────────────────────────────
-  private buildExportRows(): Record<string, string>[] {
+  private resolvePhones() {
+    const requests = this.filteredAppointments().map((apt) =>
+      apt.documentNumber
+        ? this.schedulerService
+            .getByDocument(apt.documentNumber)
+            .pipe(catchError(() => of(null)))
+        : of(null),
+    );
+    return forkJoin(requests as any);
+  }
+
+  private buildExportRows(
+    patients: (Patient | null)[],
+  ): Record<string, string>[] {
     const cols = this.exportColumns();
-    return this.filteredAppointments().map((apt) => {
+    return this.filteredAppointments().map((apt, i) => {
       const row: Record<string, string> = {};
       if (cols.date) row['Fecha'] = this.formatDate(apt.date);
       if (cols.time) row['Hora'] = apt.startTime;
       if (cols.patient)
         row['Paciente'] = `${apt.patientFirstName} ${apt.patientLastName}`;
       if (cols.documentId) row['Documento'] = apt.documentNumber;
+      if (cols.phone) row['Teléfono'] = patients[i]?.phone ?? '';
       if (cols.status) row['Estado'] = this.statusLabel(apt.appointmentState);
       return row;
     });
   }
 
   handleExport(): void {
-    const data = this.buildExportRows();
+    if (!this.hasSelectedColumns()) return;
+    this.exportingInProgress.set(true);
+
+    if (!this.exportColumns().phone) {
+      const data = this.buildExportRows(
+        this.filteredAppointments().map(() => null),
+      );
+      this.generateFile(data);
+      this.exportingInProgress.set(false);
+      this.showExportModal.set(false);
+      return;
+    }
+
+    this.resolvePhones().subscribe({
+      next: (patients) => {
+        const data = this.buildExportRows(patients as (Patient | null)[]);
+        this.generateFile(data);
+        this.exportingInProgress.set(false);
+        this.showExportModal.set(false);
+      },
+      error: () => {
+        this.exportingInProgress.set(false);
+        this.showExportModal.set(false);
+      },
+    });
+  }
+
+  private generateFile(data: Record<string, string>[]): void {
     if (this.exportFormat() === 'excel') this.exportToExcel(data);
     else if (this.exportFormat() === 'pdf') this.exportToPDF(data);
     else this.exportToCSV(data);
-    this.showExportModal.set(false);
   }
 
   private exportToExcel(data: Record<string, string>[]): void {
@@ -307,13 +359,11 @@ export class DoctorAllAppointmentsComponent {
       headers.join(','),
       ...data.map((row) =>
         headers
-          .map((header) => {
-            const value = String(row[header] || '');
-            return value.includes(',') ||
-              value.includes('\n') ||
-              value.includes('"')
-              ? `"${value.replace(/"/g, '""')}"`
-              : value;
+          .map((h) => {
+            const val = String(row[h] || '');
+            return val.includes(',') || val.includes('\n') || val.includes('"')
+              ? `"${val.replace(/"/g, '""')}"`
+              : val;
           })
           .join(','),
       ),
