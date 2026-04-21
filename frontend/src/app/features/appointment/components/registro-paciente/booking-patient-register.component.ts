@@ -31,24 +31,98 @@ export class BookingPatientRegisterComponent {
   guardianPhoneError = signal(false);
   firstNameErrorMsg = signal('');
   lastNameErrorMsg = signal('');
+  phoneErrorMsg = signal('');
   emailErrorMsg = signal('');
+  guardianPhoneErrorMsg = signal('');
+  birthDateErrorMsg = signal('Ingrese una fecha de nacimiento válida');
+  firstNameLimitMsg = signal('');
+  lastNameLimitMsg = signal('');
+  phoneLimitMsg = signal('');
+  emailLimitMsg = signal('');
+  guardianPhoneLimitMsg = signal('');
 
-  private readonly NAME_MAX_LENGTH = 30;
-  private readonly EMAIL_MAX_LENGTH = 100;
+  readonly NAME_MAX = 30;
+  readonly EMAIL_MAX = 100;
+  readonly PHONE_MAX = 15;
+  readonly PHONE_MIN = 7;
+
   private readonly VALID_NAME_REGEX = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s\-]+$/;
   private readonly VALID_EMAIL_REGEX = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+  private readonly INVALID_EMAIL_CHARS = /['"<>()[\]\\,;:{}|^~`!#$%&*=?/]/;
 
-  getPatientField<K extends keyof Omit<Patient, 'id'>>(
-    key: K,
-  ): Omit<Patient, 'id'>[K] {
+  private timers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+  getPatientField<K extends keyof Omit<Patient, 'id'>>(key: K): Omit<Patient, 'id'>[K] {
     return this.state.patientForm()[key];
   }
 
-  setPatientField<K extends keyof Omit<Patient, 'id'>>(
-    key: K,
-    value: Omit<Patient, 'id'>[K],
-  ): void {
+  setPatientField<K extends keyof Omit<Patient, 'id'>>(key: K, value: Omit<Patient, 'id'>[K]): void {
     this.state.patientForm.update((f) => ({ ...f, [key]: value }));
+  }
+
+  handleNameInput(event: Event, field: 'firstName' | 'lastName'): void {
+    const el    = event.target as HTMLInputElement;
+    const value = el.value;
+    const limitMsg = field === 'firstName' ? this.firstNameLimitMsg : this.lastNameLimitMsg;
+
+    if (value.length > this.NAME_MAX) {
+      el.value = value.slice(0, this.NAME_MAX);
+      this.setPatientField(field, el.value as any);
+      this.flash(limitMsg, `Solo se permiten máximo ${this.NAME_MAX} caracteres`, field);
+    } else {
+      this.setPatientField(field, value as any);
+      limitMsg.set('');
+    }
+  }
+
+  handlePhoneInput(event: Event): void {
+    const el     = event.target as HTMLInputElement;
+    const digits = el.value.replace(/\D/g, '');
+
+    if (digits.length > this.PHONE_MAX) {
+      el.value = digits.slice(0, this.PHONE_MAX);
+      this.setPatientField('phone', el.value as any);
+      this.flash(this.phoneLimitMsg, `Solo se permiten máximo ${this.PHONE_MAX} dígitos`, 'phone');
+    } else {
+      el.value = digits;
+      this.setPatientField('phone', digits as any);
+      this.phoneLimitMsg.set('');
+    }
+  }
+
+  handleEmailInput(event: Event): void {
+    const el    = event.target as HTMLInputElement;
+    const value = el.value;
+
+    if (value.length > this.EMAIL_MAX) {
+      el.value = value.slice(0, this.EMAIL_MAX);
+      this.setPatientField('email', el.value as any);
+      this.flash(this.emailLimitMsg, `Solo se permiten máximo ${this.EMAIL_MAX} caracteres`, 'email');
+    } else {
+      this.setPatientField('email', value as any);
+      this.emailLimitMsg.set('');
+    }
+  }
+
+  handleGuardianPhoneInput(event: Event): void {
+    const el     = event.target as HTMLInputElement;
+    const digits = el.value.replace(/\D/g, '');
+
+    if (digits.length > this.PHONE_MAX) {
+      el.value = digits.slice(0, this.PHONE_MAX);
+      this.setPatientField('guardianPhone', el.value as any);
+      this.flash(this.guardianPhoneLimitMsg, `Solo se permiten máximo ${this.PHONE_MAX} dígitos`, 'gphone');
+    } else {
+      el.value = digits;
+      this.setPatientField('guardianPhone', digits as any);
+      this.guardianPhoneLimitMsg.set('');
+    }
+  }
+
+  private flash(sig: ReturnType<typeof signal<string>>, text: string, key: string): void {
+    sig.set(text);
+    if (this.timers[key]) clearTimeout(this.timers[key]);
+    this.timers[key] = setTimeout(() => sig.set(''), 3000);
   }
 
   onContinue(): void {
@@ -57,108 +131,148 @@ export class BookingPatientRegisterComponent {
   }
 
   onGoBack(): void {
-    this.clearErrors();
+    this.clearAllErrors();
     this.goBack.emit();
   }
 
   private validateForm(): boolean {
     const f = this.state.patientForm();
 
-    this.docTypeError.set(!f.documentType);
-    this.genderError.set(!f.gender);
-    this.birthDateError.set(!f.birthDate);
-    if (!f.firstName?.trim()) {
-      this.firstNameError.set(true);
-      this.firstNameErrorMsg.set('Este campo es obligatorio');
-    }
-    if (!f.lastName?.trim()) {
-      this.lastNameError.set(true);
-      this.lastNameErrorMsg.set('Este campo es obligatorio');
-    }
-    if (!f.phone?.trim()) {
-      this.phoneError.set(true);
-    }
+    const docTypeOk = this.validateDocType(f.documentType);
+    const genderOk = this.validateGender(f.gender);
+    const fnOk = this.validateNameField('firstName', f.firstName);
+    const lnOk = this.validateNameField('lastName', f.lastName);
+    const phoneOk = this.validatePhoneField(f.phone);
+    const birthOk = this.validateBirthDate(f.birthDate, f.documentType);
+    const emailOk = this.validateEmailField(f.email);
+    const gPhoneOk = this.validateGuardianPhone(f);
 
-    const phoneOk = this.validatePhone();
-    const birthDateOk = this.validateBirthDate();
-    const firstNameOk = this.validateName('firstName');
-    const lastNameOk = this.validateName('lastName');
-    const emailOk = this.validateEmail();
-    const guardianPhoneOk = this.validateGuardianPhone();
-
-    return (
-      !this.docTypeError() &&
-      !this.firstNameError() &&
-      !this.lastNameError() &&
-      !this.phoneError() &&
-      !this.genderError() &&
-      !this.birthDateError() &&
-      phoneOk &&
-      birthDateOk &&
-      firstNameOk &&
-      lastNameOk &&
-      emailOk &&
-      guardianPhoneOk
-    );
+    return docTypeOk && genderOk && fnOk && lnOk && phoneOk && birthOk && emailOk && gPhoneOk;
   }
 
-  private validateName(field: 'firstName' | 'lastName'): boolean {
-    const value = this.state.patientForm()[field]?.trim() ?? '';
-    const errorSignal = field === 'firstName' ? this.firstNameError : this.lastNameError;
-    const msgSignal = field === 'firstName' ? this.firstNameErrorMsg : this.lastNameErrorMsg;
+  private validateDocType(value: string | undefined): boolean {
+    const ok = !!value;
+    this.docTypeError.set(!ok);
+    return ok;
+  }
 
-    if (!value) return false;
+  private validateGender(value: string | undefined): boolean {
+    const ok = !!value;
+    this.genderError.set(!ok);
+    return ok;
+  }
 
-    if (value.length > this.NAME_MAX_LENGTH) {
-      errorSignal.set(true);
-      msgSignal.set(`Se permiten ingresar máximo ${this.NAME_MAX_LENGTH} caracteres`);
+  private validateNameField(field: 'firstName' | 'lastName', value: string | undefined): boolean {
+    const errorSig = field === 'firstName' ? this.firstNameError    : this.lastNameError;
+    const msgSig   = field === 'firstName' ? this.firstNameErrorMsg : this.lastNameErrorMsg;
+    const trimmed  = value?.trim() ?? '';
+
+    if (!trimmed) {
+      errorSig.set(true);
+      msgSig.set('Este campo es obligatorio');
       return false;
     }
-
-    if (!this.VALID_NAME_REGEX.test(value)) {
-      errorSignal.set(true);
-      msgSignal.set('Solo se permiten letras, espacios y guión medio (-)');
+    if (trimmed.length > this.NAME_MAX) {
+      errorSig.set(true);
+      msgSig.set(`Se permiten ingresar máximo ${this.NAME_MAX} caracteres`);
       return false;
     }
-
-    errorSignal.set(false);
-    msgSignal.set('');
+    if (!this.VALID_NAME_REGEX.test(trimmed)) {
+      errorSig.set(true);
+      msgSig.set('Solo se permiten letras, espacios y guión medio (-)');
+      return false;
+    }
+    errorSig.set(false);
+    msgSig.set('');
     return true;
   }
 
-  private validatePhone(): boolean {
-    const phone = this.state.patientForm().phone;
-    if (!phone) return true;
-    const valid = /^[0-9]{7,15}$/.test(phone);
-    this.phoneError.set(!valid);
-    return valid;
+  private validatePhoneField(value: string | undefined): boolean {
+    const trimmed = value?.trim() ?? '';
+
+    if (!trimmed) {
+      this.phoneError.set(true);
+      this.phoneErrorMsg.set('Este campo es obligatorio');
+      return false;
+    }
+    if (trimmed.length < this.PHONE_MIN) {
+      this.phoneError.set(true);
+      this.phoneErrorMsg.set(`El número debe tener al menos ${this.PHONE_MIN} dígitos`);
+      return false;
+    }
+    if (!/^[0-9]{7,15}$/.test(trimmed)) {
+      this.phoneError.set(true);
+      this.phoneErrorMsg.set(`Ingrese un número válido (entre ${this.PHONE_MIN} y ${this.PHONE_MAX} dígitos)`);
+      return false;
+    }
+    this.phoneError.set(false);
+    this.phoneErrorMsg.set('');
+    return true;
   }
 
-  private validateBirthDate(): boolean {
-    const birthDate = this.state.patientForm().birthDate;
-    if (!birthDate) return true;
-    const today = new Date();
-    const input = new Date(birthDate);
-    today.setHours(0, 0, 0, 0);
-    input.setHours(0, 0, 0, 0);
-    const valid = input < today;
-    this.birthDateError.set(!valid);
-    return valid;
-  }
-
-  private validateEmail(): boolean {
-    const email = this.state.patientForm().email;
-    if (!email) return true;
-
-    if (email.length > this.EMAIL_MAX_LENGTH) {
-      this.emailError.set(true);
-      this.emailErrorMsg.set(`El correo no puede superar los ${this.EMAIL_MAX_LENGTH} caracteres`);
+  private validateBirthDate(value: string | undefined, documentType: string | undefined): boolean {
+    if (!value) {
+      this.birthDateError.set(true);
+      this.birthDateErrorMsg.set('Ingrese una fecha de nacimiento válida');
       return false;
     }
 
-    if (!this.VALID_EMAIL_REGEX.test(email)) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const input = new Date(value); input.setHours(0, 0, 0, 0);
+
+    if (input >= today) {
+      this.birthDateError.set(true);
+      this.birthDateErrorMsg.set('La fecha de nacimiento debe ser anterior a hoy');
+      return false;
+    }
+
+    if (documentType === 'CEDULA' || documentType === 'PASAPORTE') {
+      const age = this.calcAge(input);
+      if (age < 18) {
+        this.birthDateError.set(true);
+        this.birthDateErrorMsg.set(
+          'La fecha ingresada indica que el paciente es menor de edad. ' +
+          'Para Cédula o Pasaporte el paciente debe tener 18 años o más.'
+        );
+        return false;
+      }
+    }
+
+    this.birthDateError.set(false);
+    this.birthDateErrorMsg.set('');
+    return true;
+  }
+
+  private calcAge(birthDate: Date): number {
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+    return age;
+  }
+
+  private validateEmailField(value: string | undefined): boolean {
+    if (!value) {
+      this.emailError.set(false);
+      this.emailErrorMsg.set('');
+      return true;
+    }
+
+    if (value.length > this.EMAIL_MAX) {
       this.emailError.set(true);
-      this.emailErrorMsg.set('Correo electrónico no válido. Evite caracteres especiales como \', ", <, >');
+      this.emailErrorMsg.set(`El correo no puede superar los ${this.EMAIL_MAX} caracteres`);
+      return false;
+    }
+
+    if (this.INVALID_EMAIL_CHARS.test(value)) {
+      this.emailError.set(true);
+      this.emailErrorMsg.set("No se permiten caracteres especiales como ', \", <, >, (, ), [, ], etc.");
+      return false;
+    }
+
+    if (!this.VALID_EMAIL_REGEX.test(value)) {
+      this.emailError.set(true);
+      this.emailErrorMsg.set('La estructura del correo no es válida. Ejemplo: nombre@dominio.com');
       return false;
     }
 
@@ -167,32 +281,34 @@ export class BookingPatientRegisterComponent {
     return true;
   }
 
-  private validateGuardianPhone(): boolean {
-    const f = this.state.patientForm();
-    if (!f.birthDate) {
-      this.guardianPhoneError.set(false);
-      return true;
-    }
-
-    const birth = new Date(f.birthDate);
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-
-    if (age < 18) {
-      if (!f.guardianPhone) {
+  private validateGuardianPhone(f: Omit<Patient, 'id'>): boolean {
+    if (f.guardianPhone) {
+      if (!/^[0-9]{7,15}$/.test(f.guardianPhone)) {
         this.guardianPhoneError.set(true);
+        this.guardianPhoneErrorMsg.set(`Ingrese un número válido (entre ${this.PHONE_MIN} y ${this.PHONE_MAX} dígitos)`);
         return false;
       }
-      const valid = /^[0-9]{7,15}$/.test(f.guardianPhone);
-      this.guardianPhoneError.set(!valid);
-      return valid;
+      this.guardianPhoneError.set(false);
+      this.guardianPhoneErrorMsg.set('');
+    }
+
+    if (!f.birthDate) return true;
+    const age = this.calcAge(new Date(f.birthDate));
+
+    if (age < 18 && !f.guardianPhone) {
+      this.guardianPhoneError.set(true);
+      this.guardianPhoneErrorMsg.set('El celular del acudiente es obligatorio para menores de 18 años');
+      return false;
+    }
+
+    if (age >= 18) {
+      this.guardianPhoneError.set(false);
+      this.guardianPhoneErrorMsg.set('');
     }
     return true;
   }
 
-  private clearErrors(): void {
+  private clearAllErrors(): void {
     this.docTypeError.set(false);
     this.firstNameError.set(false);
     this.lastNameError.set(false);
@@ -203,6 +319,14 @@ export class BookingPatientRegisterComponent {
     this.guardianPhoneError.set(false);
     this.firstNameErrorMsg.set('');
     this.lastNameErrorMsg.set('');
+    this.phoneErrorMsg.set('');
     this.emailErrorMsg.set('');
+    this.guardianPhoneErrorMsg.set('');
+    this.birthDateErrorMsg.set('Ingrese una fecha de nacimiento válida');
+    this.firstNameLimitMsg.set('');
+    this.lastNameLimitMsg.set('');
+    this.phoneLimitMsg.set('');
+    this.emailLimitMsg.set('');
+    this.guardianPhoneLimitMsg.set('');
   }
 }
