@@ -1,9 +1,10 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 import { AppointmentsPatient } from '../models/dtos/appointments.dto';
 import { dtoDoctor } from '../models/dtos/doctor.dto';
-import { environment } from '../../environments/environment';
+import { Patient } from '../models/interfaces/patient.model';
 
 @Injectable({ providedIn: 'root' })
 export class SchedulerService {
@@ -36,5 +37,10 @@ export class SchedulerService {
     return this.http.get<AppointmentsPatient[]>(`${this.apiUrl}/appointments`, {
       params: { idDoctor: doctorId, date: date },
     });
+  }
+  getByDocument(documentNumber: string): Observable<Patient> {
+    return this.http.get<Patient>(
+      `${this.apiUrl}/patients/document/${documentNumber}`,
+    );
   }
 }

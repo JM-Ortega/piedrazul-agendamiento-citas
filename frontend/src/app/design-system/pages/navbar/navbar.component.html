@@ -17,6 +17,7 @@
 
     <!-- Desktop Nav -->
     <nav class="hidden md:flex items-center gap-2">
+      <!-- Nav items según rol activo -->
       @if (appService.hasRole("SCHEDULER")) {
         <a
           routerLink="/agendador"
@@ -46,6 +47,39 @@
         >
           <lucide-angular [img]="Calendar" [size]="20"></lucide-angular>
           Nueva Cita
+        </a>
+      }
+
+      @if (appService.hasRole("DOCTOR")) {
+        <a
+          routerLink="/medico"
+          #rla8="routerLinkActive"
+          routerLinkActive
+          [routerLinkActiveOptions]="exactMatch"
+          [class]="
+            'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
+            (rla8.isActive
+              ? 'bg-white text-blue-700'
+              : 'text-white hover:bg-blue-600')
+          "
+        >
+          <lucide-angular [img]="Stethoscope" [size]="20"></lucide-angular>
+          Mis Citas
+        </a>
+        <a
+          routerLink="/medico/citas"
+          #rla9="routerLinkActive"
+          routerLinkActive
+          [routerLinkActiveOptions]="exactMatch"
+          [class]="
+            'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
+            (rla9.isActive
+              ? 'bg-white text-blue-700'
+              : 'text-white hover:bg-blue-600')
+          "
+        >
+          <lucide-angular [img]="CalendarDays" [size]="20"></lucide-angular>
+          Todas las Citas
         </a>
       }
 
@@ -86,19 +120,94 @@
       <!-- Usuario logueado -->
       @if (appService.currentRole()) {
         <div class="flex items-center gap-3 ml-4 pl-4 border-l border-blue-500">
-          <div class="flex items-center gap-2">
-            <div class="bg-blue-500 rounded-full p-1.5">
-              <lucide-angular [img]="User" [size]="18"></lucide-angular>
+          <!-- Selector de rol (solo si tiene varios) -->
+          @if (appService.hasMultipleRoles()) {
+            <div class="relative">
+              <button
+                (click)="toggleRoleDropdown()"
+                class="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 px-3 py-2 rounded-lg transition-colors"
+              >
+                <div class="bg-blue-500 rounded-full p-1">
+                  <lucide-angular [img]="User" [size]="16"></lucide-angular>
+                </div>
+                <div class="flex flex-col leading-tight text-left">
+                  <span class="text-sm font-semibold">{{
+                    appService.firstName()
+                  }}</span>
+                  <span class="text-xs text-blue-200">{{
+                    appService.activeRoleLabel()
+                  }}</span>
+                </div>
+                <lucide-angular
+                  [img]="ChevronDown"
+                  [size]="16"
+                  [class]="
+                    'text-blue-200 transition-transform duration-200 ' +
+                    (showRoleDropdown() ? 'rotate-180' : '')
+                  "
+                ></lucide-angular>
+              </button>
+
+              <!-- Dropdown roles -->
+              @if (showRoleDropdown()) {
+                <div
+                  class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50"
+                  (click)="$event.stopPropagation()"
+                >
+                  <div class="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                    <p
+                      class="text-gray-500 text-xs uppercase tracking-wide font-semibold"
+                    >
+                      Cambiar rol
+                    </p>
+                  </div>
+                  @for (role of appService.allRoles(); track role) {
+                    <button
+                      (click)="selectRole(role)"
+                      [class]="
+                        'w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ' +
+                        (appService.currentRole() === role
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'text-gray-700 hover:bg-gray-50')
+                      "
+                    >
+                      <lucide-angular
+                        [img]="roleConfig[role].icon"
+                        [size]="20"
+                        [class]="roleConfig[role].color"
+                      ></lucide-angular>
+                      <span class="flex-1 text-base font-medium">{{
+                        roleConfig[role].label
+                      }}</span>
+                      @if (appService.currentRole() === role) {
+                        <lucide-angular
+                          [img]="Check"
+                          [size]="18"
+                          class="text-blue-600"
+                        ></lucide-angular>
+                      }
+                    </button>
+                  }
+                </div>
+              }
             </div>
-            <div class="flex flex-col leading-tight">
-              <span class="text-sm font-semibold">{{
-                appService.firstName()
-              }}</span>
-              <span class="text-xs text-blue-200">{{
-                appService.activeRoleLabel()
-              }}</span>
+          } @else {
+            <!-- Un solo rol: diseño original -->
+            <div class="flex items-center gap-2">
+              <div class="bg-blue-500 rounded-full p-1.5">
+                <lucide-angular [img]="User" [size]="18"></lucide-angular>
+              </div>
+              <div class="flex flex-col leading-tight">
+                <span class="text-sm font-semibold">{{
+                  appService.firstName()
+                }}</span>
+                <span class="text-xs text-blue-200">{{
+                  appService.activeRoleLabel()
+                }}</span>
+              </div>
             </div>
-          </div>
+          }
+
           <button
             (click)="openLogoutModal()"
             class="flex items-center gap-1 px-3 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition-colors text-sm"
@@ -156,6 +265,25 @@
         </a>
       }
 
+      @if (appService.hasRole("DOCTOR")) {
+        <a
+          routerLink="/medico"
+          (click)="menuOpen.set(false)"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+        >
+          <lucide-angular [img]="Stethoscope" [size]="20"></lucide-angular>
+          Mis Citas
+        </a>
+        <a
+          routerLink="/medico/citas"
+          (click)="menuOpen.set(false)"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+        >
+          <lucide-angular [img]="CalendarDays" [size]="20"></lucide-angular>
+          Todas las Citas
+        </a>
+      }
+
       @if (appService.hasRole("ADMIN")) {
         <a
           routerLink="/admin"
@@ -178,7 +306,41 @@
         </a>
       }
 
-      <!-- Sin sesión móvil -->
+      <!-- Selector de rol en mobile -->
+      @if (appService.hasMultipleRoles()) {
+        <div class="border-t border-blue-700 pt-2 mt-2">
+          <p
+            class="text-blue-300 text-xs uppercase tracking-wide px-4 py-2 font-semibold"
+          >
+            Cambiar rol
+          </p>
+          @for (role of appService.allRoles(); track role) {
+            <button
+              (click)="selectRole(role)"
+              [class]="
+                'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ' +
+                (appService.currentRole() === role
+                  ? 'bg-white/20 text-white'
+                  : 'text-blue-200 hover:bg-blue-600')
+              "
+            >
+              <lucide-angular
+                [img]="roleConfig[role].icon"
+                [size]="20"
+              ></lucide-angular>
+              <span class="flex-1 text-base">{{ roleConfig[role].label }}</span>
+              @if (appService.currentRole() === role) {
+                <lucide-angular
+                  [img]="Check"
+                  [size]="18"
+                  class="text-white"
+                ></lucide-angular>
+              }
+            </button>
+          }
+        </div>
+      }
+
       @if (!appService.currentRole()) {
         <a
           routerLink="/acceso"
@@ -202,6 +364,11 @@
     </div>
   }
 </header>
+
+<!-- Overlay para cerrar dropdown al hacer click fuera -->
+@if (showRoleDropdown()) {
+  <div class="fixed inset-0 z-40" (click)="showRoleDropdown.set(false)"></div>
+}
 
 <!-- Modal Cerrar Sesión -->
 @if (showLogoutModal()) {
