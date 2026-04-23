@@ -3,6 +3,7 @@ import { AuthGuard } from './guards/auth.guard';
 
 import { AccesoComponent } from './design-system/pages/acceso/acceso.component';
 import { HomeComponent } from './design-system/pages/home/home.component';
+import { AdminUsersComponent } from './features/admin-users/admin-users.component';
 import { AdminConfigComponent } from './features/admin/admin-config.component';
 import { NewAppointmentSchedulerComponent } from './features/appointment/pages/agendador-agendar/new-appointment-scheduler.component';
 import { SchedulerDashboardComponent } from './features/appointment/pages/agendador-listar-citas/scheduler-dashboard.component';
@@ -31,6 +32,12 @@ export const routes: Routes = [
   {
     path: 'admin',
     component: AdminConfigComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'ADMIN' },
+  },
+  {
+    path: 'admin/usuarios', // ← añadir
+    component: AdminUsersComponent,
     canActivate: [AuthGuard],
     data: { role: 'ADMIN' },
   },

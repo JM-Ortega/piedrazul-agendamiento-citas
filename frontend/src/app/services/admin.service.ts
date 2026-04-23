@@ -1,10 +1,10 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { dtoSchedule } from '../models/dtos/schedule.dto';
 import { Doctor } from '../models/interfaces/doctor.model';
-
+import { SystemUser } from '../models/interfaces/system-user.model';
 @Injectable({ providedIn: 'root' })
 export class AdminService {
   private http = inject(HttpClient);
@@ -98,5 +98,62 @@ export class AdminService {
     return this.http.delete<void>(
       `${this.apiUrl}/doctor/schedules/${doctorId}/${workday}`,
     );
+  }
+
+  getSchedulers(): Observable<SystemUser[]> {
+    return of([
+      {
+        id: 'sch-1',
+        firstName: 'Laura',
+        lastName: 'Pérez',
+        documentId: '1023456780',
+        roles: ['scheduler'],
+      },
+      {
+        id: 'sch-2',
+        firstName: 'Carlos',
+        lastName: 'Rodríguez',
+        documentId: '2034567891',
+        roles: ['scheduler'],
+      },
+      {
+        id: 'sch-3',
+        firstName: 'Valeria',
+        lastName: 'Torres',
+        documentId: '3045678902',
+        roles: ['scheduler'],
+      },
+    ]);
+  }
+
+  getBothRoleUsers(): Observable<SystemUser[]> {
+    return of([
+      {
+        id: 'both-1',
+        firstName: 'María',
+        lastName: 'González',
+        documentId: '4056789013',
+        roles: ['doctor', 'scheduler'],
+        doctorData: {
+          specialty: 'Fisioterapia',
+          startTime: '07:00',
+          endTime: '12:00',
+          interval: 30,
+        },
+      },
+      {
+        id: 'both-2',
+        firstName: 'Andrés',
+        lastName: 'Muñoz',
+        documentId: '5067890124',
+        roles: ['doctor', 'scheduler'],
+        doctorData: {
+          specialty: 'Medicina General',
+          startTime: '08:00',
+          endTime: '12:00',
+          interval: 20,
+        },
+      },
+    ]);
   }
 }
