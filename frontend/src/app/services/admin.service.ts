@@ -1,9 +1,9 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Doctor } from '../models/interfaces/doctor.model';
-import { dtoSchedule } from '../models/dtos/schedule.dto';
 import { environment } from '../../environments/environment';
+import { dtoSchedule } from '../models/dtos/schedule.dto';
+import { Doctor } from '../models/interfaces/doctor.model';
 
 @Injectable({ providedIn: 'root' })
 export class AdminService {
@@ -92,6 +92,11 @@ export class AdminService {
     return this.http.put<dtoSchedule>(
       `${this.apiUrl}/doctor/schedules/${doctorId}/${workday}`,
       { startTime, endTime, workday },
+    );
+  }
+  deleteSchedule(doctorId: string, workday: string): Observable<void> {
+    return this.http.delete<void>(
+      `${this.apiUrl}/doctor/schedules/${doctorId}/${workday}`,
     );
   }
 }

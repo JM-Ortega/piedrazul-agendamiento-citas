@@ -25,6 +25,7 @@ export interface DoctorSaveEvent {
   form: Doctor;
   originalDoctor: Doctor;
   originalWorkdays: number[];
+  removedWorkdays: number[];
 }
 
 @Component({
@@ -216,10 +217,16 @@ export class DoctorEditFormComponent implements OnInit {
     const form = this.editForm();
     const orig = this.originalDoctor();
     if (!form || !orig) return;
+
+    const removedWorkdays = this.originalWorkdays().filter(
+      (day) => !form.workdays.includes(day),
+    );
+
     this.saved.emit({
       form,
       originalDoctor: orig,
       originalWorkdays: this.originalWorkdays(),
+      removedWorkdays, // ← añadir
     });
   }
 }

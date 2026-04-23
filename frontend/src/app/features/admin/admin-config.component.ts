@@ -114,7 +114,7 @@ export class AdminConfigComponent implements OnInit {
   }
 
   onFormSaved(event: DoctorSaveEvent): void {
-    const { form, originalDoctor, originalWorkdays } = event;
+    const { form, originalDoctor, originalWorkdays, removedWorkdays } = event; // ← añadir removedWorkdays
     const calls: any[] = [];
 
     if (originalDoctor.appointmentInterval !== form.appointmentInterval)
@@ -128,6 +128,13 @@ export class AdminConfigComponent implements OnInit {
       calls.push(this.adminService.updateLaborStart(form.id, form.laborStart));
     if (originalDoctor.laborEnd !== form.laborEnd)
       calls.push(this.adminService.updateLaborEnd(form.id, form.laborEnd));
+
+    // ← añadir este bloque
+    removedWorkdays.forEach((day) => {
+      const workday = this.DAY_TO_WORKDAY[day];
+      if (workday)
+        calls.push(this.adminService.deleteSchedule(form.id, workday));
+    });
 
     (form.workdays ?? []).forEach((day) => {
       const workday = this.DAY_TO_WORKDAY[day];
