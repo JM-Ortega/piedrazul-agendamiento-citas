@@ -1,16 +1,19 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
+import co.edu.unicauca.piedrazul.backend.shared.events.AppointmentCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientAlreadyScheduledInSpecialtyException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientScheduleTimeConflictException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ScheduleAutonomousAppointmentUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -21,47 +24,90 @@ public class ScheduleAutonomousAppointmentUseCaseImpl implements ScheduleAutonom
     private final PatientConsultPort patientConsultPort;
     private final DoctorConfigConsultPort doctorConfigConsultPort;
     private final AppointmentService appointmentService;
+    private final ApplicationEventPublisher eventPublisher;
+
+    public ScheduleAutonomousAppointmentUseCaseImpl(
+            AppointmentRepository appointmentRepository,
+            PatientConsultPort patientConsultPort,
+            DoctorConfigConsultPort doctorConfigConsultPort,
+            AppointmentService appointmentService,
+            ApplicationEventPublisher eventPublisher) {
+        this.appointmentRepository = appointmentRepository;
+        this.patientConsultPort = patientConsultPort;
+        this.doctorConfigConsultPort = doctorConfigConsultPort;
+        this.appointmentService = appointmentService;
+        this.eventPublisher = eventPublisher;
+    }
 
     public ScheduleAutonomousAppointmentUseCaseImpl(
             AppointmentRepository appointmentRepository,
             PatientConsultPort patientConsultPort,
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService) {
-        this.appointmentRepository   = appointmentRepository;
-        this.patientConsultPort      = patientConsultPort;
-        this.doctorConfigConsultPort = doctorConfigConsultPort;
-        this.appointmentService      = appointmentService;
+        this(
+                appointmentRepository,
+                patientConsultPort,
+                doctorConfigConsultPort,
+                appointmentService,
+                event -> { }
+        );
     }
 
-    // Paciente agenda de forma autónoma por la web
     @Override
-    public Appointment scheduleAutonomous(UUID idPatient, UUID idDoctor, Specialty specialty, LocalDate date, AppointmentTime startTime) {
-        // 1. Obtiene datos del paciente a través del puerto de salida (módulo de pacientes)
+    public Appointment scheduleAutonomous(
+            UUID idPatient,
+            UUID idDoctor,
+            Specialty specialty,
+            LocalDate date,
+            AppointmentTime startTime,
+            String performedBy) {
         String doctorName = doctorConfigConsultPort.getDoctorName(idDoctor);
-
-        // 2. Obtiene configuración del médico a través del puerto de salida
-        int intervalMinutes = doctorConfigConsultPort
-                .getIntervalMinutesByDoctor(idDoctor);
-
-        // 3. Obtiene citas existentes del médico ese día
-        List<Appointment> existingAppointments = appointmentRepository
-                .findByDoctorIdAndDate(idDoctor, date);
+        int intervalMinutes = doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor);
+        List<Appointment> existingAppointments = appointmentRepository.findByDoctorIdAndDate(idDoctor, date);
 
         validateUniqueScheduledAppointmentBySpecialty(idPatient, specialty);
         validateNoTimeConflictForPatient(idPatient, date, startTime);
 
-        // 4. Delega la lógica de negocio al servicio de dominio
-        String patientName= patientConsultPort.findById(idPatient).getFirstName() + " " + patientConsultPort.findById(idPatient).getLastName();
+        PatientInfo patient = patientConsultPort.findById(idPatient);
+        String patientName = patient.getFirstName() + " " + patient.getLastName();
 
         Appointment appointment = appointmentService.scheduleAutonomous(
-                doctorName, idPatient, null, idDoctor, patientName, specialty,
-                date, startTime, intervalMinutes, existingAppointments
+                doctorName,
+                idPatient,
+                null,
+                idDoctor,
+                patientName,
+                specialty,
+                date,
+                startTime,
+                intervalMinutes,
+                existingAppointments
         );
 
-        // 5. Persiste a través del puerto de salida
-        appointmentRepository.save(appointment);
+        Appointment saved = appointmentRepository.save(appointment);
 
-        return appointment;
+        eventPublisher.publishEvent(new AppointmentCreatedEvent(
+                saved.getIdAppointment().toString(),
+                performedBy
+        ));
+
+        return saved;
+    }
+
+    public Appointment scheduleAutonomous(
+            UUID idPatient,
+            UUID idDoctor,
+            Specialty specialty,
+            LocalDate date,
+            AppointmentTime startTime) {
+        return scheduleAutonomous(
+                idPatient,
+                idDoctor,
+                specialty,
+                date,
+                startTime,
+                "system"
+        );
     }
 
     private void validateUniqueScheduledAppointmentBySpecialty(UUID idPatient, Specialty specialty) {

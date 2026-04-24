@@ -12,6 +12,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.Appo
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.application.ListMyAppointmentsUseCaseImpl;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -57,12 +58,14 @@ public class AppointmentConfig {
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService,
-            PatientConsultPort patientConsultPort) {
+            PatientConsultPort patientConsultPort,
+            ApplicationEventPublisher eventPublisher) {
         return new ScheduleManualAppointmentUseCaseImpl(
                 appointmentRepository,
                 doctorConfigConsultPort,
                 appointmentService,
-                patientConsultPort
+                patientConsultPort,
+                eventPublisher
         );
     }
 
@@ -71,12 +74,14 @@ public class AppointmentConfig {
             AppointmentRepository appointmentRepository,
             PatientConsultPort patientConsultPort,
             DoctorConfigConsultPort doctorConfigConsultPort,
-            AppointmentService appointmentService) {
+            AppointmentService appointmentService,
+            ApplicationEventPublisher eventPublisher) {
         return new ScheduleAutonomousAppointmentUseCaseImpl(
                 appointmentRepository,
                 patientConsultPort,
                 doctorConfigConsultPort,
-                appointmentService
+                appointmentService,
+                eventPublisher
         );
     }
 
