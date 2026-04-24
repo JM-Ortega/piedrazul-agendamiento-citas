@@ -8,10 +8,13 @@ import { BookingSpecialtySelectorComponent } from '../../../appointment/componen
 import { BookingScheduleSelectorComponent } from '../../../appointment/components/seleccion-horario/booking-schedule-selector.component';
 import { BookingConfirmComponent } from '../confirmacion/booking-confirm.component';
 import { NuevaCitaService } from '../../../../services/nuevaCita.service';
+import { DoctorService } from '../../../../services/doctor.service';
+import { SpecialtyDoctor } from '../../../../models/dtos/specialty-doctor.dto';
 import { Patient } from '../../../../models/interfaces/patient.model';
 import { AppointmentConfirmedEvent } from '../../../../models/interfaces/appointmentConfirmedEvent.model';
 import { BookingContext } from '../../../../models/types/bookingContext.type';
 import { BookingMode } from '../../../../models/types/bookingMode.type';
+import { forkJoin } from 'rxjs';
 
 /**
  * Coordina el flujo de agendamiento componiendo los
@@ -36,25 +39,74 @@ export class AppointmentBookingComponent implements OnInit {
 
   protected state     = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
+  private doctorService = inject(DoctorService);
 
   @Input() context: BookingContext = 'patient';
 
   //Datos del paciente autenticado
   @Input() set patientData(value: Partial<Patient> | null) { this.state.patientSnapshot.set(value); }
 
-  //Outputs
+  @Input() set documentNumber(value: string) {
+    if (value) { this.pendingDocumentNumber = value; }
+  }
+  private pendingDocumentNumber = '';
+
+  // Outputs
   appointmentConfirmed = output<AppointmentConfirmedEvent>();
   goBack = output<void>();
 
   patientSubStep: 'search' | 'register' = 'search';
   
   get isPatientStep(): boolean {
-    return this.state.isSchedulerContext() &&
-           this.state.step() === this.state.patientLookupStep();
+    return this.state.isSchedulerContext() && this.state.step() === this.state.patientLookupStep();
   }
  
   ngOnInit(): void {
     this.state.context.set(this.context);
+    if (this.state.isDoctorContext()) {
+      this.initDoctorContext();
+    }
+  }
+
+  private initDoctorContext(): void {
+    this.state.bookingMode.set('specialty-doctor');
+    this.state.step.set(this.state.specialtyStep());
+
+    this.doctorService.getMe().subscribe({
+      next: (doctor) => {
+        this.state.doctorSnapshot.set(doctor);
+        const cleanSpecialty = doctor.specialty.replace(/[\[\]]/g, '');
+        this.state.selectedSpecialty.set(cleanSpecialty);
+        this.loadSpecialtiesForMode('specialty-doctor');
+        const doctors$ = this.citaService.getDoctorsBySpecialty(cleanSpecialty);
+
+        if (this.pendingDocumentNumber) {
+          const patient$ = this.citaService.getPatientByDocument(this.pendingDocumentNumber);
+          forkJoin({ doctors: doctors$, patient: patient$ }).subscribe({
+            next: ({ doctors, patient }) => {
+              this.applyDoctorsPreselection(doctors, doctor.id, doctor.name);
+              this.state.foundPatient.set(patient);
+              this.state.patientId.set(patient?.id ?? null);
+              this.state.step.set(this.state.scheduleStep());
+            },
+            error: () => {
+              this.state.step.set(this.state.scheduleStep());
+            },
+          });
+        } else {
+          doctors$.subscribe({
+            next: (docs) => {
+              this.applyDoctorsPreselection(docs, doctor.id, doctor.name);
+              this.state.step.set(this.state.scheduleStep());
+            },
+            error: () => this.state.step.set(this.state.scheduleStep()),
+          });
+        }
+      },
+      error: () => {
+        this.loadSpecialtiesForMode('specialty-doctor');
+      },
+    });
   }
 
   onModeSelected(mode: BookingMode): void {
@@ -107,9 +159,13 @@ export class AppointmentBookingComponent implements OnInit {
     if (this.state.isSchedulerContext()) {
       this.patientSubStep = this.state.notFound() ? 'register' : 'search';
       this.state.step.set(this.state.patientLookupStep()!);
-    } else {
-      this.state.bookingMode.set(null);
+      return;
     }
+    if (this.state.isDoctorContext()) {
+      this.goBack.emit();
+      return;
+    }
+    this.state.bookingMode.set(null);
   }
 
   onScheduleAdvance(): void {
@@ -118,6 +174,9 @@ export class AppointmentBookingComponent implements OnInit {
 
   onScheduleBack(): void {
     this.state.step.set(this.state.specialtyStep());
+    if (this.state.isDoctorContext()) {
+      this.restoreDoctorPreselection();
+    }
   }
 
   onConfirmBack(): void {
@@ -212,6 +271,39 @@ export class AppointmentBookingComponent implements OnInit {
           default:
             this.state.errorMessageDoctors.set('Error al obtener los médicos.');
         }
+      },
+    });
+  }
+
+  private applyDoctorsPreselection(docs: SpecialtyDoctor[], doctorId: string, doctorName: string): void {
+    this.state.doctorsBySpecialty.set(docs);
+    this.state.noDoctorsFound.set(docs.length === 0);
+    if (docs.length === 0) {
+      this.state.errorMessageDoctors.set('No hay médicos disponibles para esta especialidad.');
+      return;
+    }
+    const self = docs.find(d => d.id === doctorId);
+    this.state.selectedDoctorId.set(self?.id ?? doctorId);
+    this.state.selectedDoctorName.set(self?.name ?? doctorName);
+  }
+
+  private restoreDoctorPreselection(): void {
+    const doctor = this.state.doctorSnapshot();
+    if (!doctor) return;
+
+    const cleanSpecialty = doctor.specialty.replace(/[\[\]]/g, '');
+
+    if (
+      this.state.selectedSpecialty() === cleanSpecialty &&
+      this.state.selectedDoctorId()
+    ) return;
+
+    this.state.selectedSpecialty.set(cleanSpecialty);
+    this.citaService.getDoctorsBySpecialty(cleanSpecialty).subscribe({
+      next: (docs) => this.applyDoctorsPreselection(docs, doctor.id, doctor.name),
+      error: () => {
+        this.state.selectedDoctorId.set(doctor.id);
+        this.state.selectedDoctorName.set(doctor.name);
       },
     });
   }
