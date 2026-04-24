@@ -11,6 +11,7 @@ import { PatientDashboardComponent } from './features/appointment/pages/paciente
 import { DoctorAllAppointmentsComponent } from './features/doctor-all-appointments/doctor-all-appointments.component';
 import { DoctorDashboardComponent } from './features/doctor-dashboard/doctor-dashboard.component';
 import { RegistroComponent } from './features/registro/registro.component';
+import { NewAppointmentDoctorComponent  } from './features/appointment/pages/doctor-agendar/new-appointment-doctor.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -43,6 +44,12 @@ export const routes: Routes = [
   {
     path: 'medico/citas',
     component: DoctorAllAppointmentsComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'DOCTOR' },
+  },
+  {
+    path: 'medico/nueva-cita',
+    component: NewAppointmentDoctorComponent,
     canActivate: [AuthGuard],
     data: { role: 'DOCTOR' },
   },
