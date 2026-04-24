@@ -4,6 +4,8 @@ import { SpecialtyDoctor } from '../../models/dtos/specialty-doctor.dto';
 import { BookingMode } from '../../models/types/bookingMode.type';
 import { BookingContext } from '../../models/types/bookingContext.type';
 import { PatientSuggestion } from '../../models/dtos/patient-suggestion.dto';
+import { Doctor } from '../../models/interfaces/doctor.model';
+
 /**
  * Servicio de estado compartido para el flujo de agendamiento de citas.
  * Actúa como la única fuente de verdad para todos los componentes 
@@ -17,6 +19,8 @@ export class BookingStateService {
  
   readonly isSchedulerContext = computed(() => this.context() === 'scheduler');
  
+  readonly isDoctorContext = computed(() => this.context() === 'doctor');
+
   bookingMode = signal<BookingMode>(null);
   step        = signal<number>(1);
  
@@ -24,26 +28,24 @@ export class BookingStateService {
   readonly specialtyStep     = computed(() => this.isSchedulerContext() ? 2 : 1);
   readonly scheduleStep      = computed(() => this.isSchedulerContext() ? 3 : 2);
   readonly confirmStep       = computed(() => this.isSchedulerContext() ? 4 : 3);
- 
-  readonly stepLabels = computed(() =>
-    this.isSchedulerContext()
-      ? ['1. Paciente', '2. Especialidad', '3. Horario', '4. Confirmar']
-      : ['1. Especialidad', '2. Horario', '3. Confirmar']
-  );
- 
+
+  readonly stepLabels = computed(() => {
+    if (this.isSchedulerContext()) return ['1. Paciente', '2. Especialidad', '3. Horario', '4. Confirmar'];
+    if (this.isDoctorContext())    return ['1. Especialidad', '2. Horario', '3. Confirmar'];
+    return ['1. Especialidad', '2. Horario', '3. Confirmar'];
+  });
+
   readonly modeSelectionLabel = computed(() =>
     this.isSchedulerContext()
       ? '¿Cómo desea agendar la cita?'
       : '¿Cómo desea agendar su cita?'
   );
- 
-  readonly successMessage = computed(() =>
-    this.isSchedulerContext()
-      ? 'La cita fue registrada exitosamente.'
-      : 'Su cita fue registrada exitosamente.'
-  );
- 
-  // Datos del paciente autenticado.
+
+  readonly successMessage = computed(() => {
+    if (this.isSchedulerContext() || this.isDoctorContext()) return 'La cita fue registrada exitosamente.';
+    return 'Su cita fue registrada exitosamente.';
+  });
+
   patientSnapshot = signal<Partial<Patient> | null>(null);
  
   // Agendador: resultado de búsqueda por documento
@@ -68,8 +70,8 @@ export class BookingStateService {
     email:          '',
     guardianPhone:  '',
   });
- 
-  //Estado de especialidad y médico
+
+  doctorSnapshot = signal<Doctor | null>(null);
   specialtiesWithDoctor = signal<SpecialtyDoctor[]>([]);
   doctorsBySpecialty    = signal<SpecialtyDoctor[]>([]);
   selectedSpecialty     = signal<string>('');
@@ -85,13 +87,16 @@ export class BookingStateService {
   readonly uniqueSpecialties = computed(() =>
     [...new Set(this.specialtiesWithDoctor().map(s => s.specialty))]
   );
- 
-  readonly effectiveDoctor = computed<SpecialtyDoctor | null>(() =>
-    this.bookingMode() === 'specialty'
+
+  readonly effectiveDoctor = computed<SpecialtyDoctor | null>(() => {
+    if (this.isDoctorContext()) {
+      return this.doctorsBySpecialty().find(d => d.id === this.selectedDoctorId()) ?? null;
+    }
+    return this.bookingMode() === 'specialty'
       ? this.assignedDoctor()
-      : (this.doctorsBySpecialty().find(d => d.id === this.selectedDoctorId()) ?? null)
-  );
- 
+      : (this.doctorsBySpecialty().find(d => d.id === this.selectedDoctorId()) ?? null);
+  });
+
   readonly effectiveDoctorId = computed(() => this.effectiveDoctor()?.id ?? '');
  
   //Estado de horario
@@ -102,55 +107,56 @@ export class BookingStateService {
   isLoading    = signal<boolean>(false);
   errorMessage = signal<string>('');
   success      = signal<boolean>(false);
-  
-  readonly confirmFirstName = computed(() =>
-    this.isSchedulerContext()
-      ? (this.foundPatient()?.firstName ?? this.patientForm().firstName)
-      : (this.patientSnapshot()?.firstName ?? '')
-  );
- 
-  readonly confirmLastName = computed(() =>
-    this.isSchedulerContext()
-      ? (this.foundPatient()?.lastName ?? this.patientForm().lastName)
-      : (this.patientSnapshot()?.lastName ?? '')
-  );
- 
-  readonly confirmDocumentType = computed(() =>
-    this.isSchedulerContext()
-      ? (this.foundPatient()?.documentType ?? this.patientForm().documentType)
-      : (this.patientSnapshot()?.documentType ?? '')
-  );
- 
-  readonly confirmDocument = computed(() =>
-    this.isSchedulerContext()
-      ? (this.foundPatient()?.documentNumber ?? this.patientForm().documentNumber)
-      : (this.patientSnapshot()?.documentNumber ?? '')
-  );
- 
-  readonly confirmPhone = computed(() =>
-    this.isSchedulerContext()
-      ? (this.foundPatient()?.phone ?? this.patientForm().phone)
-      : (this.patientSnapshot()?.phone ?? '')
-  );
- 
-  readonly confirmGender = computed(() =>
-    this.isSchedulerContext()
-      ? (this.foundPatient()?.gender ?? this.patientForm().gender)
-      : (this.patientSnapshot()?.gender ?? '')
-  );
- 
-  readonly confirmBirthDate = computed(() =>
-    this.isSchedulerContext()
-      ? (this.foundPatient()?.birthDate ?? this.patientForm().birthDate)
-      : (this.patientSnapshot()?.birthDate ?? '')
-  );
- 
-  readonly confirmDoctorName = computed(() =>
-    this.bookingMode() === 'specialty'
+
+  readonly confirmFirstName = computed(() => {
+    if (this.isSchedulerContext()) return this.foundPatient()?.firstName ?? this.patientForm().firstName;
+    if (this.isDoctorContext())    return this.foundPatient()?.firstName ?? '';
+    return this.patientSnapshot()?.firstName ?? '';
+  });
+
+  readonly confirmLastName = computed(() => {
+    if (this.isSchedulerContext()) return this.foundPatient()?.lastName ?? this.patientForm().lastName;
+    if (this.isDoctorContext())    return this.foundPatient()?.lastName ?? '';
+    return this.patientSnapshot()?.lastName ?? '';
+  });
+
+  readonly confirmDocumentType = computed(() => {
+    if (this.isSchedulerContext()) return this.foundPatient()?.documentType ?? this.patientForm().documentType;
+    if (this.isDoctorContext())    return this.foundPatient()?.documentType ?? '';
+    return this.patientSnapshot()?.documentType ?? '';
+  });
+
+  readonly confirmDocument = computed(() => {
+    if (this.isSchedulerContext()) return this.foundPatient()?.documentNumber ?? this.patientForm().documentNumber;
+    if (this.isDoctorContext())    return this.foundPatient()?.documentNumber ?? '';
+    return this.patientSnapshot()?.documentNumber ?? '';
+  });
+
+  readonly confirmPhone = computed(() => {
+    if (this.isSchedulerContext()) return this.foundPatient()?.phone ?? this.patientForm().phone;
+    if (this.isDoctorContext())    return this.foundPatient()?.phone ?? '';
+    return this.patientSnapshot()?.phone ?? '';
+  });
+
+  readonly confirmGender = computed(() => {
+    if (this.isSchedulerContext()) return this.foundPatient()?.gender ?? this.patientForm().gender;
+    if (this.isDoctorContext())    return this.foundPatient()?.gender ?? '';
+    return this.patientSnapshot()?.gender ?? '';
+  });
+
+  readonly confirmBirthDate = computed(() => {
+    if (this.isSchedulerContext()) return this.foundPatient()?.birthDate ?? this.patientForm().birthDate;
+    if (this.isDoctorContext())    return this.foundPatient()?.birthDate ?? '';
+    return this.patientSnapshot()?.birthDate ?? '';
+  });
+
+  readonly confirmDoctorName = computed(() => {
+    if (this.isDoctorContext()) return this.selectedDoctorName();
+    return this.bookingMode() === 'specialty'
       ? (this.assignedDoctor()?.name ?? '')
-      : this.selectedDoctorName()
-  );
- 
+      : this.selectedDoctorName();
+  });
+
   readonly confirmDate = computed(() => {
     const d = this.selectedDate();
     if (!d) return '';
@@ -159,13 +165,16 @@ export class BookingStateService {
                     'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     return `${days[d.getDay()]} ${d.getDate()} de ${months[d.getMonth()]} de ${d.getFullYear()}`;
   });
-  
-  readonly canGoToScheduleStep = computed(() =>
-    this.bookingMode() === 'specialty'
+
+  readonly canGoToScheduleStep = computed(() => {
+    if (this.isDoctorContext()) {
+      return !!this.selectedSpecialty() && !!this.selectedDoctorId();
+    }
+    return this.bookingMode() === 'specialty'
       ? !!this.selectedSpecialty() && !!this.assignedDoctor()
-      : !!this.selectedSpecialty() && !!this.selectedDoctorId()
-  );
- 
+      : !!this.selectedSpecialty() && !!this.selectedDoctorId();
+  });
+
   readonly canGoToConfirmStep = computed(() =>
     !!this.selectedDate() && !!this.selectedTime()
   );
@@ -177,9 +186,8 @@ export class BookingStateService {
   }
  
   resolvePatientId(): string {
-    return this.isSchedulerContext()
-      ? (this.patientId() ?? '')
-      : (this.patientSnapshot()?.id ?? '');
+    if (this.isSchedulerContext() || this.isDoctorContext()) return this.patientId() ?? '';
+    return this.patientSnapshot()?.id ?? '';
   }
   
   resetSearchState(): void {
