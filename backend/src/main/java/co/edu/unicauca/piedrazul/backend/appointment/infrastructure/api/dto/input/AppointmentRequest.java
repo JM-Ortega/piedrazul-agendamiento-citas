@@ -1,10 +1,14 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input;
 
+import co.edu.unicauca.piedrazul.backend.config.security.sanitization.Sanitize;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import org.springframework.format.annotation.DateTimeFormat;
 
@@ -35,13 +39,37 @@ public class AppointmentRequest {
 
     // Solo obligatorios en agendamiento manual
     private DocumentType documentType;
+
+    @Size(max = 30)
+    @Pattern(regexp = "^[A-Za-z0-9._-]{5,30}$")
+    @Sanitize
     private String documentNumber;
+
+    @Size(min = 2, max = 60)
+    @Pattern(regexp = "^[\\p{L} '-]{2,60}$")
+    @Sanitize
     private String firstName;
+
+    @Size(min = 2, max = 60)
+    @Pattern(regexp = "^[\\p{L} '-]{2,60}$")
+    @Sanitize
     private String lastName;
+
+    @Pattern(regexp = "^[0-9]{7,15}$")
+    @Sanitize
     private String phone;
+
     private Gender gender;
+
     private LocalDate birthDate; // opcional
+
+    @Email
+    @Size(max = 120)
+    @Sanitize
     private String email;        // opcional
+
+    @Pattern(regexp = "^[0-9]{7,15}$")
+    @Sanitize
     private String guardianPhone; // opcional, para pacientes menores de edad
 
     // Se valida dependiendo del tipo de agendamiento
@@ -53,10 +81,14 @@ public class AppointmentRequest {
             );
         }
         if (schedulingOrigin == SchedulingOrigin.MANUAL
-                && (documentNumber == null || firstName == null || phone == null)) {
+                && (isBlank(documentNumber) || isBlank(firstName) || isBlank(phone))) {
             throw new IllegalArgumentException(
                     "El numero de documento, nombre completo y teléfono son obligatorios para agendamiento manual"
             );
         }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }
