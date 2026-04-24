@@ -1,1 +1,1 @@
-export type BookingContext = 'patient' | 'scheduler';
+export type BookingContext = 'patient' | 'scheduler' | 'doctor';
