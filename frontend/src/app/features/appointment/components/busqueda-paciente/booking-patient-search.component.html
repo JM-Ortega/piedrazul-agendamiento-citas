@@ -13,11 +13,11 @@
             inputmode="numeric"
             [ngModel]="state.searchQuery()"
             (ngModelChange)="onQueryChange($event)"
+            (input)="handleDocInput($event)"
             (keyup.enter)="onSearchExact()"
             (blur)="closeSuggestions()"
             (focus)="showSuggestions.set(state.searchSuggestions().length > 0)"
             placeholder="Ingrese el número de documento"
-            maxlength="12"
             autocomplete="off"
             class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 pr-10"
           />
@@ -71,9 +71,9 @@
       </p>
     }
 
-    <p class="text-gray-400 text-xs mt-1 text-right">
-      {{ state.searchQuery().length }} / 12
-    </p>
+    @if (docInputWarning()) {
+      <p class="text-red-500 text-sm mt-1">{{ docInputWarning() }}</p>
+    }
 
     @if (state.searchError()) {
       <p class="text-red-500 text-sm mt-1">{{ state.searchError() }}</p>

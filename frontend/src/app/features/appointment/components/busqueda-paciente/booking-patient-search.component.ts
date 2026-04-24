@@ -9,6 +9,7 @@ import { PatientSuggestion } from '../../../../models/dtos/patient-suggestion.dt
 
 const MIN_CHARS = 3;
 const MAX_DOC_LENGTH = 12;
+const MIN_DOC_LENGTH = 6;
 
 /**
  * Localizar un paciente existente mediante
@@ -31,6 +32,9 @@ export class BookingPatientSearchComponent implements OnDestroy {
   patientMissing = output<void>();
   changeMode = output<void>();
   showSuggestions = signal(false);
+
+  docInputWarning = signal('');
+  private docWarnTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly searchInput$ = new Subject<string>();
   private readonly destroy$ = new Subject<void>();
@@ -63,8 +67,6 @@ export class BookingPatientSearchComponent implements OnDestroy {
         },
         error: () => {
           this.state.searchLoading.set(false);
-          this.state.searchSuggestions.set([]);
-          this.state.searchError.set('Error al buscar sugerencias. Intente más tarde.');
         },
       });
   }
@@ -72,6 +74,27 @@ export class BookingPatientSearchComponent implements OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  handleDocInput(event: Event): void {
+    const el    = event.target as HTMLInputElement;
+    const raw   = el.value;
+    const digits = raw.replace(/\D/g, '');
+    if (digits !== raw) {
+      el.value = digits;
+      this.flashWarning('Solo se permiten números en este campo');
+    }
+    if (digits.length > MAX_DOC_LENGTH) {
+      el.value = digits.slice(0, MAX_DOC_LENGTH);
+      this.flashWarning(`Solo se permiten máximo ${MAX_DOC_LENGTH} dígitos`);
+    }
+    this.onQueryChange(el.value);
+  }
+
+  private flashWarning(text: string): void {
+    this.docInputWarning.set(text);
+    if (this.docWarnTimer) clearTimeout(this.docWarnTimer);
+    this.docWarnTimer = setTimeout(() => this.docInputWarning.set(''), 3000);
   }
 
   onQueryChange(value: string): void {
@@ -91,8 +114,8 @@ export class BookingPatientSearchComponent implements OnDestroy {
 
   onSearchExact(): void {
     const query = this.state.searchQuery().trim();
-    if (query.length < 6) {
-      this.state.searchError.set('El número de documento debe ser numérico y tener al menos 6 dígitos.');
+    if (query.length < MIN_DOC_LENGTH) {
+      this.state.searchError.set(`El número de documento debe ser numérico y tener al menos ${MIN_DOC_LENGTH} dígitos.`);
       return;
     }
     this.showSuggestions.set(false);
