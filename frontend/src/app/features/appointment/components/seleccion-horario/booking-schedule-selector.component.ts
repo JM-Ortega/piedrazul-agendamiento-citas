@@ -49,11 +49,11 @@ export class BookingScheduleSelectorComponent {
   readonly dateFilter = computed(() => {
     const doctor = this.state.effectiveDoctor();
     if (!doctor) return () => false;
-    return this.calendarService.buildDateFilter(doctor, this.state.isSchedulerContext());
+    return this.calendarService.buildDateFilter(doctor, this.state.isSchedulerContext() || this.state.isDoctorContext());
   });
 
   readonly minDate = computed(() =>
-    this.calendarService.getMinDate(this.state.isSchedulerContext())
+    this.calendarService.getMinDate(this.state.isSchedulerContext() || this.state.isDoctorContext())
   );
 
   readonly maxDate = computed(() => {
