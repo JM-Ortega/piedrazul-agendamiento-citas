@@ -31,7 +31,6 @@ type PatientStatus =
   standalone: true,
   imports: [CommonModule, FormsModule, LucideAngularModule],
   templateUrl: './registro.component.html',
-  styleUrl: './registro.component.css',
 })
 export class RegistroComponent {
   private patientService = inject(PatientService);
