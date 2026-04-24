@@ -5,6 +5,7 @@ import {
   Clock,
   FileText,
   LucideAngularModule,
+  Plus,
   User,
 } from 'lucide-angular';
 import { AppointmentsPatient } from '../../models/dtos/appointments.dto';
@@ -25,6 +26,7 @@ export class DoctorDashboardComponent implements OnInit {
   readonly Clock = Clock;
   readonly FileText = FileText;
   readonly User = User;
+  readonly Plus = Plus;
 
   today = new Date().toISOString().split('T')[0];
   currentDoctor = signal<Doctor | null>(null);
@@ -61,6 +63,12 @@ export class DoctorDashboardComponent implements OnInit {
         });
       },
       error: () => this.router.navigate(['/']),
+    });
+  }
+
+  scheduleNewAppointment(documentNumber: string): void {
+    this.router.navigate(['/medico/nueva-cita'], {
+      queryParams: { documentNumber },
     });
   }
 
