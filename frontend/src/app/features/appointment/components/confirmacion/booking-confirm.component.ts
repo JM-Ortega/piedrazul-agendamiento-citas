@@ -35,7 +35,7 @@ export class BookingConfirmComponent {
     this.state.isLoading.set(true);
     this.state.errorMessage.set('');
 
-    const data = this._buildPayload(date);
+    const data = this.buildPayload(date);
 
     this.citaService.addAppointment(data).subscribe({
       next: () => {
@@ -70,7 +70,7 @@ export class BookingConfirmComponent {
     this.back.emit();
   }
 
-  private _buildPayload(date: Date): NewAppointment {
+  private buildPayload(date: Date): NewAppointment {
     const base = {
       doctorId:       this.state.effectiveDoctorId(),
       specialty:      this.state.selectedSpecialty(),
@@ -85,7 +85,7 @@ export class BookingConfirmComponent {
       birthDate:      this.state.confirmBirthDate(),
     };
 
-    if (this.state.isSchedulerContext()) {
+    if (this.state.isSchedulerContext() || this.state.isDoctorContext()) {
       const f = this.state.patientForm();
       return {
         ...base,
