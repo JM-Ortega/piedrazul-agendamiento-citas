@@ -162,6 +162,8 @@
                   type="text"
                   [ngModel]="getFormField('firstName')"
                   (ngModelChange)="setFormField('firstName', $event)"
+                  (input)="handleNameInput($event, 'firstName')"
+                  placeholder="Nombres del paciente"
                   class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
                   [ngClass]="
                     errors()['firstName']
@@ -169,7 +171,9 @@
                       : 'border-blue-200 focus:border-blue-500'
                   "
                 />
-                @if (errors()["firstName"]) {
+                @if (firstNameLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ firstNameLimitMsg() }}</p>
+                } @else if (errors()["firstName"]) {
                   <p class="text-red-500 text-sm mt-1">
                     {{ errors()["firstName"] }}
                   </p>
@@ -184,6 +188,8 @@
                   type="text"
                   [ngModel]="getFormField('lastName')"
                   (ngModelChange)="setFormField('lastName', $event)"
+                  (input)="handleNameInput($event, 'lastName')"
+                  placeholder="Apellidos del paciente"
                   class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
                   [ngClass]="
                     errors()['lastName']
@@ -191,7 +197,9 @@
                       : 'border-blue-200 focus:border-blue-500'
                   "
                 />
-                @if (errors()["lastName"]) {
+                @if (lastNameLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ lastNameLimitMsg() }}</p>
+                } @else if (errors()["lastName"]) {
                   <p class="text-red-500 text-sm mt-1">
                     {{ errors()["lastName"] }}
                   </p>
@@ -208,6 +216,8 @@
                   pattern="[0-9]*"
                   [ngModel]="getFormField('phone')"
                   (ngModelChange)="setFormField('phone', $event)"
+                  (input)="handlePhoneInput($event)"
+                  placeholder="Ej: 3001234567"
                   class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
                   [ngClass]="
                     errors()['phone']
@@ -215,7 +225,9 @@
                       : 'border-blue-200 focus:border-blue-500'
                   "
                 />
-                @if (errors()["phone"]) {
+                @if (phoneLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ phoneLimitMsg() }}</p>
+                } @else if (errors()["phone"]) {
                   <p class="text-red-500 text-sm mt-1">
                     {{ errors()["phone"] }}
                   </p>
@@ -256,7 +268,6 @@
                   type="date"
                   [ngModel]="getFormField('birthDate')"
                   (ngModelChange)="setFormField('birthDate', $event)"
-                  [max]="today()"
                   class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
                   [ngClass]="
                     errors()['birthDate']
@@ -280,6 +291,7 @@
                   type="email"
                   [ngModel]="getFormField('email')"
                   (ngModelChange)="setFormField('email', $event)"
+                  (input)="handleEmailInput($event)"
                   placeholder="tucorreo@ejemplo.com"
                   class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
                   [ngClass]="
@@ -288,7 +300,9 @@
                       : 'border-blue-200 focus:border-blue-500'
                   "
                 />
-                @if (errors()["email"]) {
+                @if (emailLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ emailLimitMsg() }}</p>
+                } @else if (errors()["email"]) {
                   <p class="text-red-500 text-sm mt-1">
                     {{ errors()["email"] }}
                   </p>
@@ -312,6 +326,8 @@
                   pattern="[0-9]*"
                   [ngModel]="getFormField('guardianPhone')"
                   (ngModelChange)="setFormField('guardianPhone', $event)"
+                  (input)="handleGuardianPhoneInput($event)"
+                  placeholder="Ej: 3009876543"
                   class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
                   [ngClass]="
                     errors()['guardianPhone']
@@ -319,7 +335,9 @@
                       : 'border-blue-200 focus:border-blue-500'
                   "
                 />
-                @if (errors()["guardianPhone"]) {
+                @if (guardianPhoneLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ guardianPhoneLimitMsg() }}</p>
+                } @else if (errors()["guardianPhone"]) {
                   <p class="text-red-500 text-sm mt-1">
                     {{ errors()["guardianPhone"] }}
                   </p>
@@ -399,6 +417,8 @@
                   type="text"
                   [ngModel]="getFormField('firstName')"
                   (ngModelChange)="setFormField('firstName', $event)"
+                  (input)="handleNameInput($event, 'firstName')"
+                  placeholder="Nombres del paciente"
                   class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
                   [ngClass]="
                     errors()['firstName']
@@ -406,7 +426,9 @@
                       : 'border-blue-200 focus:border-blue-500'
                   "
                 />
-                @if (errors()["firstName"]) {
+                @if (firstNameLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ firstNameLimitMsg() }}</p>
+                } @else if (errors()["firstName"]) {
                   <p class="text-red-500 text-sm mt-1">
                     {{ errors()["firstName"] }}
                   </p>
@@ -421,6 +443,8 @@
                   type="text"
                   [ngModel]="getFormField('lastName')"
                   (ngModelChange)="setFormField('lastName', $event)"
+                  (input)="handleNameInput($event, 'lastName')"
+                  placeholder="Apellidos del paciente"
                   class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
                   [ngClass]="
                     errors()['lastName']
@@ -428,7 +452,9 @@
                       : 'border-blue-200 focus:border-blue-500'
                   "
                 />
-                @if (errors()["lastName"]) {
+                @if (lastNameLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ lastNameLimitMsg() }}</p>
+                } @else if (errors()["lastName"]) {
                   <p class="text-red-500 text-sm mt-1">
                     {{ errors()["lastName"] }}
                   </p>
@@ -445,6 +471,8 @@
                   pattern="[0-9]*"
                   [ngModel]="getFormField('phone')"
                   (ngModelChange)="setFormField('phone', $event)"
+                  (input)="handlePhoneInput($event)"
+                  placeholder="Ej: 3001234567"
                   class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
                   [ngClass]="
                     errors()['phone']
@@ -452,7 +480,9 @@
                       : 'border-blue-200 focus:border-blue-500'
                   "
                 />
-                @if (errors()["phone"]) {
+                @if (phoneLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ phoneLimitMsg() }}</p>
+                } @else if (errors()["phone"]) {
                   <p class="text-red-500 text-sm mt-1">
                     {{ errors()["phone"] }}
                   </p>
@@ -493,7 +523,6 @@
                   type="date"
                   [ngModel]="getFormField('birthDate')"
                   (ngModelChange)="setFormField('birthDate', $event)"
-                  [max]="today()"
                   class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
                   [ngClass]="
                     errors()['birthDate']
@@ -517,6 +546,7 @@
                   type="email"
                   [ngModel]="getFormField('email')"
                   (ngModelChange)="setFormField('email', $event)"
+                  (input)="handleEmailInput($event)"
                   placeholder="tucorreo@ejemplo.com"
                   class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
                   [ngClass]="
@@ -525,7 +555,9 @@
                       : 'border-blue-200 focus:border-blue-500'
                   "
                 />
-                @if (errors()["email"]) {
+                @if (emailLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ emailLimitMsg() }}</p>
+                } @else if (errors()["email"]) {
                   <p class="text-red-500 text-sm mt-1">
                     {{ errors()["email"] }}
                   </p>
@@ -549,6 +581,8 @@
                   pattern="[0-9]*"
                   [ngModel]="getFormField('guardianPhone')"
                   (ngModelChange)="setFormField('guardianPhone', $event)"
+                  (input)="handleGuardianPhoneInput($event)"
+                  placeholder="Ej: 3009876543"
                   class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
                   [ngClass]="
                     errors()['guardianPhone']
@@ -556,7 +590,9 @@
                       : 'border-blue-200 focus:border-blue-500'
                   "
                 />
-                @if (errors()["guardianPhone"]) {
+                @if (guardianPhoneLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ guardianPhoneLimitMsg() }}</p>
+                } @else if (errors()["guardianPhone"]) {
                   <p class="text-red-500 text-sm mt-1">
                     {{ errors()["guardianPhone"] }}
                   </p>
