@@ -226,13 +226,13 @@ export class BookingPatientRegisterComponent {
       return false;
     }
 
-    if (documentType === 'CEDULA' || documentType === 'PASAPORTE') {
+    if (documentType === 'CEDULA') {
       const age = this.calcAge(input);
       if (age < 18) {
         this.birthDateError.set(true);
         this.birthDateErrorMsg.set(
           'La fecha ingresada indica que el paciente es menor de edad. ' +
-          'Para Cédula o Pasaporte el paciente debe tener 18 años o más.'
+          'Para Cédula el paciente debe tener 18 años o más.'
         );
         return false;
       }

@@ -570,12 +570,12 @@ export class RegistroComponent {
       return 'La fecha de nacimiento debe ser anterior a hoy';
     }
 
-    if (documentType === 'CEDULA' || documentType === 'PASAPORTE') {
+    if (documentType === 'CEDULA') {
       const age = this.calcAge(input);
       if (age < 18) {
         return (
           'La fecha ingresada indica que el paciente es menor de edad. ' +
-          'Para Cédula o Pasaporte el paciente debe tener 18 años o más.'
+          'Para Cédula el paciente debe tener 18 años o más.'
         );
       }
     }
