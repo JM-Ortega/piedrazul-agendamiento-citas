@@ -3,6 +3,7 @@ package co.edu.unicauca.piedrazul.backend.doctors.config;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
@@ -36,6 +37,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
         doctorService.createDoctor(new CreateDoctorRequest(
                 "Clara Inés",
                 "Córdoba",
+                DocumentType.CEDULA,
                 "11000000",
                 "3208337463",
                 List.of(Specialty.TERAPIA_NEURAL),
@@ -53,6 +55,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
         doctorService.createDoctor(new CreateDoctorRequest(
                 "José Ignacio",
                 "García",
+                DocumentType.CEDULA,
                 "12000000",
                 "3147826393",
                 List.of(Specialty.FISIOTERAPIA),
@@ -69,6 +72,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
         doctorService.createDoctor(new CreateDoctorRequest(
                 "Armando",
                 "Peña",
+                DocumentType.CEDULA,
                 "13000000",
                 "314738447",
                 List.of(Specialty.QUIROPRAXIA),
