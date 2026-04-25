@@ -9,5 +9,5 @@ public record AppointmentReportRow(
         UUID idPatient,
         String patientFullName,
         LocalDate date,
-        LocalTime starTime
+        LocalTime startTime
 ){}

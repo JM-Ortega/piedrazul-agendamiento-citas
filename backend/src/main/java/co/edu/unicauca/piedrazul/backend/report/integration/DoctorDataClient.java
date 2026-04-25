@@ -1,9 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.report.integration;
 
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
+import org.springframework.stereotype.Component;
 
 import java.util.UUID;
-
+@Component
 public class DoctorDataClient {
 
     private final DoctorExternalService doctorExternalService;

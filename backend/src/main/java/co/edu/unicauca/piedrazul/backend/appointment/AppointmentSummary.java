@@ -11,8 +11,7 @@ public record AppointmentSummary(
         UUID idDoctor,
         UUID idPatient,
         LocalDate date,
-        LocalTime starTime,
+        LocalTime startTime,
         AppointmentState state
-
 ) {
 }

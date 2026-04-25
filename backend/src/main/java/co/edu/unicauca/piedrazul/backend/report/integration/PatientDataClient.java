@@ -1,9 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.report.integration;
 
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
+import org.springframework.stereotype.Component;
 
 import java.util.UUID;
-
+@Component
 public class PatientDataClient {
 
     private final PatientModuleApi patientModuleApi;
