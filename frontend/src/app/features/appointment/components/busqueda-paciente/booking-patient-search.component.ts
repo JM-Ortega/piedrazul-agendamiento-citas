@@ -79,14 +79,14 @@ export class BookingPatientSearchComponent implements OnDestroy {
   handleDocInput(event: Event): void {
     const el    = event.target as HTMLInputElement;
     const raw   = el.value;
-    const digits = raw.replace(/\D/g, '');
-    if (digits !== raw) {
-      el.value = digits;
-      this.flashWarning('Solo se permiten números en este campo');
+    const clean = raw.replace(/[^a-zA-Z0-9]/g, '');
+    if (clean !== raw) {
+      el.value = clean;
+      this.flashWarning('Solo se permiten letras y números, sin caracteres especiales');
     }
-    if (digits.length > MAX_DOC_LENGTH) {
-      el.value = digits.slice(0, MAX_DOC_LENGTH);
-      this.flashWarning(`Solo se permiten máximo ${MAX_DOC_LENGTH} dígitos`);
+    if (clean.length > MAX_DOC_LENGTH) {
+      el.value = clean.slice(0, MAX_DOC_LENGTH);
+      this.flashWarning(`Solo se permiten máximo ${MAX_DOC_LENGTH} caracteres`);
     }
     this.onQueryChange(el.value);
   }
@@ -98,24 +98,24 @@ export class BookingPatientSearchComponent implements OnDestroy {
   }
 
   onQueryChange(value: string): void {
-    const onlyDigits = value.replace(/\D/g, '').slice(0, MAX_DOC_LENGTH);
  
-    this.state.searchQuery.set(onlyDigits);
+    const clean = value.replace(/[^a-zA-Z0-9]/g, '').slice(0, MAX_DOC_LENGTH);
+    this.state.searchQuery.set(clean);
     this.state.searchError.set('');
     this.clearResult();
  
-    if (onlyDigits.trim().length < MIN_CHARS) {
+    if (clean.trim().length < MIN_CHARS) {
       this.state.searchSuggestions.set([]);
       this.showSuggestions.set(false);
     }
  
-    this.searchInput$.next(onlyDigits);
+    this.searchInput$.next(clean);
   }
 
   onSearchExact(): void {
     const query = this.state.searchQuery().trim();
     if (query.length < MIN_DOC_LENGTH) {
-      this.state.searchError.set(`El número de documento debe ser numérico y tener al menos ${MIN_DOC_LENGTH} dígitos.`);
+      this.state.searchError.set(`El documento debe tener al menos ${MIN_DOC_LENGTH} caracteres alfanuméricos.`);
       return;
     }
     this.showSuggestions.set(false);

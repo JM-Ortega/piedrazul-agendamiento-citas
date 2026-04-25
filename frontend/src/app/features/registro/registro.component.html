@@ -53,6 +53,7 @@
                 type="text"
                 [ngModel]="documentNumber()"
                 (ngModelChange)="onDocumentChange($event)"
+                (input)="handleDocInput($event)"
                 (keyup.enter)="searchPatient()"
                 placeholder="Ingresa tu número de documento"
                 class="flex-1 border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors"
@@ -66,6 +67,9 @@
                 Buscar
               </button>
             </div>
+            @if (docInputWarning()) {
+              <p class="text-red-500 text-sm mt-1">{{ docInputWarning() }}</p>
+            }
             @if (errors()["documentNumber"]) {
               <p class="text-red-500 text-sm mt-1">
                 {{ errors()["documentNumber"] }}

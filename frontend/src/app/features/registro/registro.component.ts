@@ -74,6 +74,33 @@ export class RegistroComponent {
 
   errors = signal<Record<string, string>>({});
 
+  docInputWarning = signal('');
+  private docWarnTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private readonly DOC_MAX = 12;
+  private readonly INVALID_DOC_CHARS = /[^a-zA-Z0-9]/g;
+
+  handleDocInput(event: Event): void {
+    const el    = event.target as HTMLInputElement;
+    const raw   = el.value;
+    const clean = raw.replace(this.INVALID_DOC_CHARS, '');
+    if (clean !== raw) {
+      el.value = clean;
+      this.flashDocWarning('Solo se permiten letras y números, sin caracteres especiales');
+    }
+    if (clean.length > this.DOC_MAX) {
+      el.value = clean.slice(0, this.DOC_MAX);
+      this.flashDocWarning(`Solo se permiten máximo ${this.DOC_MAX} caracteres`);
+    }
+    this.onDocumentChange(el.value);
+  }
+
+  private flashDocWarning(text: string): void {
+    this.docInputWarning.set(text);
+    if (this.docWarnTimer) clearTimeout(this.docWarnTimer);
+    this.docWarnTimer = setTimeout(() => this.docInputWarning.set(''), 3000);
+  }
+
   readonly NAME_MAX = 30;
   readonly EMAIL_MAX = 100;
   readonly PHONE_MAX = 15;
@@ -133,9 +160,9 @@ export class RegistroComponent {
 
     const doc = this.documentNumber().trim();
 
-    if (!/^[0-9]{6,12}$/.test(doc)) {
+    if (!/^[a-zA-Z0-9]{1,12}$/.test(doc)) {
       this.errors.set({
-        documentNumber: 'Ingresa un número de documento válido (6-12 dígitos)',
+        documentNumber: 'Ingresa un documento válido (máximo 12 caracteres alfanuméricos, sin caracteres especiales)',
       });
       return;
     }
