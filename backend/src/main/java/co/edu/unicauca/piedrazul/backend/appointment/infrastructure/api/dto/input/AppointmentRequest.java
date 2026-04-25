@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input;
 
 import co.edu.unicauca.piedrazul.backend.config.security.sanitization.Sanitize;
+import co.edu.unicauca.piedrazul.backend.config.security.validation.ValidDocument;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
@@ -17,6 +18,7 @@ import java.time.LocalTime;
 import java.util.UUID;
 
 @Getter
+@ValidDocument
 public class AppointmentRequest {
     @NotNull(message = "El médico es obligatorio")
     private UUID doctorId;
@@ -40,8 +42,7 @@ public class AppointmentRequest {
     // Solo obligatorios en agendamiento manual
     private DocumentType documentType;
 
-    @Size(max = 30)
-    @Pattern(regexp = "^[A-Za-z0-9._-]{5,30}$")
+    @Size(max = 20)
     @Sanitize
     private String documentNumber;
 

@@ -1,6 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input;
 
 import co.edu.unicauca.piedrazul.backend.config.security.sanitization.Sanitize;
+import co.edu.unicauca.piedrazul.backend.config.security.validation.ValidDocument;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -12,6 +14,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.List;
 
+@ValidDocument(documentField = "identification", typeField = "documentType")
 public record CreateDoctorRequest(
         @Size(min = 2, max = 60)
         @Pattern(regexp = "^[\\p{L} '-]{2,60}$")
@@ -23,8 +26,10 @@ public record CreateDoctorRequest(
         @NotBlank @Sanitize
         String lastName,
 
-        @Size(max = 12)
-        @Pattern(regexp = "^[A-Za-z0-9._-]{5,30}$")
+        @NotNull
+        DocumentType documentType,
+
+        @Size(max = 20)
         @NotBlank @Sanitize
         String identification,
 

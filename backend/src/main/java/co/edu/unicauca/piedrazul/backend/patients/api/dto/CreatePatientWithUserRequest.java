@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.patients.api.dto;
 
 import co.edu.unicauca.piedrazul.backend.config.security.sanitization.Sanitize;
+import co.edu.unicauca.piedrazul.backend.config.security.validation.ValidDocument;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
 import jakarta.validation.constraints.Email;
@@ -11,6 +12,7 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
+@ValidDocument
 public class CreatePatientWithUserRequest {
 
     @NotBlank
@@ -23,8 +25,7 @@ public class CreatePatientWithUserRequest {
     private PatientDocumentType documentType;
 
     @NotBlank
-    @Size(max = 12)
-    @Pattern(regexp = "^[A-Za-z0-9._-]{5,30}$")
+    @Size(max = 20)
     @Sanitize
     private String documentNumber;
 
