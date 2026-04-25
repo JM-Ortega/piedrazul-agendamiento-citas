@@ -7,9 +7,9 @@ import {
   LucideAngularModule,
   User,
 } from 'lucide-angular';
-import { AppointmentsPatient } from '../../models/dtos/appointments.dto';
-import { Doctor } from '../../models/interfaces/doctor.model';
-import { DoctorService } from '../../services/doctor.service';
+import { AppointmentsPatient } from '../../../models/dtos/appointments.dto';
+import { Doctor } from '../../../models/interfaces/doctor.model';
+import { DoctorService } from '../../../services/doctor.service';
 
 @Component({
   selector: 'app-doctor-dashboard',

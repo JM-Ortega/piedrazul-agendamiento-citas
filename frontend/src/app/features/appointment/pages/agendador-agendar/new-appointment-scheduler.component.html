@@ -1,6 +1,5 @@
 <div class="min-h-screen bg-blue-50 py-8 px-4">
   <div class="max-w-3xl mx-auto">
-
     <div class="mb-6">
       <button
         (click)="goToScheduler()"
@@ -9,7 +8,9 @@
         ← Volver al inicio
       </button>
       <h1 class="text-blue-800 text-3xl font-bold">Nueva Cita</h1>
-      <p class="text-gray-500 text-lg mt-1">Registre una cita para un paciente</p>
+      <p class="text-gray-500 text-lg mt-1">
+        Registre una cita para un paciente
+      </p>
     </div>
 
     <app-appointment-booking
@@ -17,6 +18,5 @@
       (appointmentConfirmed)="onAppointmentConfirmed($event)"
       (goBack)="goToScheduler()"
     ></app-appointment-booking>
-
   </div>
 </div>

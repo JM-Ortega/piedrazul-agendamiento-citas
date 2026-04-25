@@ -20,11 +20,11 @@ import {
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
-import { AppointmentsPatient } from '../../models/dtos/appointments.dto';
-import { Doctor } from '../../models/interfaces/doctor.model';
-import { Patient } from '../../models/interfaces/patient.model';
-import { DoctorService } from '../../services/doctor.service';
-import { SchedulerService } from '../../services/scheduler.service';
+import { AppointmentsPatient } from '../../../models/dtos/appointments.dto';
+import { Doctor } from '../../../models/interfaces/doctor.model';
+import { Patient } from '../../../models/interfaces/patient.model';
+import { DoctorService } from '../../../services/doctor.service';
+import { SchedulerService } from '../../../services/scheduler.service';
 
 type ExportColumnKey =
   | 'date'
