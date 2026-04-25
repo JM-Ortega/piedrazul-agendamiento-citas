@@ -26,8 +26,20 @@ export class DoctorDashboardComponent implements OnInit {
   readonly FileText = FileText;
   readonly User = User;
 
-  today = new Date().toISOString().split('T')[0];
+  today = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
   currentDoctor = signal<Doctor | null>(null);
+
+  formattedSpecialty = computed(() => {
+    const spec = this.currentDoctor()?.specialty ?? '';
+    return spec
+      .replace(/[\[\]"]/g, '')
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .replace(/^\w/, (c) => c.toUpperCase());
+  });
   private appointments = signal<AppointmentsPatient[]>([]);
 
   todaysAppointments = computed(() =>

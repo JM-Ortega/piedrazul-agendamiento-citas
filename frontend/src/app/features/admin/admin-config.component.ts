@@ -129,7 +129,7 @@ export class AdminConfigComponent implements OnInit {
     if (originalDoctor.laborEnd !== form.laborEnd)
       calls.push(this.adminService.updateLaborEnd(form.id, form.laborEnd));
 
-    // ← añadir este bloque
+   
     removedWorkdays.forEach((day) => {
       const workday = this.DAY_TO_WORKDAY[day];
       if (workday)
