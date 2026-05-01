@@ -10,6 +10,8 @@ import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyLinked
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientRepository;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
+import co.edu.unicauca.piedrazul.backend.verification.VerificationModuleApi;
+import co.edu.unicauca.piedrazul.backend.verification.api.VerificationPurpose;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,13 +27,16 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PatientServiceTest {
-    /*
+
 
     @Mock
     private PatientRepository patientRepository;
 
     @Mock
     private UserModuleApi userModuleApi;
+
+    @Mock
+    private VerificationModuleApi verificationModuleApi;
 
     @InjectMocks
     private PatientService patientService;
@@ -79,17 +84,19 @@ class PatientServiceTest {
     }
 
     @Test
-    void createPatientWithUserShouldCreateUserAndPatient() {
+    void createPatientWithUserShouldCreateUserAndPatientWhenSystemUserDoesNotExist() {
         UUID userId = UUID.randomUUID();
         Patient patient = buildPatient(userId);
 
         when(patientRepository.existsByDocumentNumber("123")).thenReturn(false);
-        when(userModuleApi.getOrCreatePatientUser("juan", "Juan", "Perez", "mail@test.com", "Pass123!"))
+        when(userModuleApi.findUserIdByUsername("123"))
+                .thenReturn(Optional.empty(), Optional.empty());
+        when(userModuleApi.getOrCreatePatientUser("123", "Juan", "Perez", "mail@test.com", "Pass123!"))
                 .thenReturn(userId);
         when(patientRepository.save(any())).thenReturn(patient);
 
         PatientData result = patientService.createPatientWithUser(
-                "juan",
+                "123",
                 "Pass123!",
                 PatientDocumentType.CEDULA,
                 "123",
@@ -103,7 +110,38 @@ class PatientServiceTest {
         );
 
         assertThat(result).isNotNull();
-        verify(userModuleApi).getOrCreatePatientUser("juan", "Juan", "Perez", "mail@test.com", "Pass123!");
+        verify(userModuleApi).getOrCreatePatientUser("123", "Juan", "Perez", "mail@test.com", "Pass123!");
+        verify(userModuleApi, never()).ensurePatientRole(any());
+        verify(patientRepository).save(any());
+    }
+
+    @Test
+    void createPatientWithUserShouldReuseExistingUserAndEnsurePatientRole() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = buildPatient(userId);
+
+        when(patientRepository.existsByDocumentNumber("123")).thenReturn(false);
+        when(userModuleApi.findUserIdByUsername("123"))
+                .thenReturn(Optional.of(userId), Optional.of(userId));
+        when(patientRepository.save(any())).thenReturn(patient);
+
+        PatientData result = patientService.createPatientWithUser(
+                "123",
+                "Pass123!",
+                PatientDocumentType.CEDULA,
+                "123",
+                "Juan",
+                "Perez",
+                "300",
+                "mail@test.com",
+                PatientGender.MASCULINO,
+                LocalDate.now(),
+                "111"
+        );
+
+        assertThat(result).isNotNull();
+        verify(userModuleApi, never()).getOrCreatePatientUser(any(), any(), any(), any(), any());
+        verify(userModuleApi).ensurePatientRole(userId);
         verify(patientRepository).save(any());
     }
 
@@ -121,52 +159,155 @@ class PatientServiceTest {
                 PatientGender.MASCULINO,
                 LocalDate.now(),
                 "111"
-        )).isInstanceOf(InvalidPatientDataException.class);
+        )).isInstanceOf(InvalidPatientDataException.class)
+          .hasMessage("Username cannot be blank");
 
         verifyNoInteractions(userModuleApi);
     }
 
     @Test
-    void linkUserToExistingPatientShouldLinkCorrectly() {
-        UUID userId = UUID.randomUUID();
+    void createPatientWithUserShouldThrowWhenUsernameDoesNotMatchDocumentNumber() {
+        assertThatThrownBy(() -> patientService.createPatientWithUser(
+                "juan",
+                "Pass123!",
+                PatientDocumentType.CEDULA,
+                "123",
+                "Juan",
+                "Perez",
+                "300",
+                "mail@test.com",
+                PatientGender.MASCULINO,
+                LocalDate.now(),
+                "111"
+        )).isInstanceOf(InvalidPatientDataException.class)
+          .hasMessage("Username must match document number");
+
+        verifyNoInteractions(userModuleApi);
+        verify(patientRepository, never()).save(any());
+    }
+
+    @Test
+    void requestLinkUserAccountCodeShouldRequestCodeWhenPatientIsValid() {
         Patient patient = buildPatient(null);
 
         when(patientRepository.findByDocumentNumber("123")).thenReturn(Optional.of(patient));
-        when(userModuleApi.getOrCreatePatientUser("juan", "Juan", "Perez", "mail@test.com", "Pass123!"))
-                .thenReturn(userId);
-        when(patientRepository.save(any())).thenReturn(patient);
 
-        PatientData result = patientService.linkUserToExistingPatient(
-                "123", "juan", "Juan", "Perez", "mail@test.com", "Pass123!"
+        patientService.requestLinkUserAccountCode("123");
+
+        verify(verificationModuleApi).requestCode(
+                "123",
+                VerificationPurpose.LINK_PATIENT_ACCOUNT,
+                "300"
         );
-
-        assertThat(result).isNotNull();
-        assertThat(patient.getUserId()).isEqualTo(userId);
-        verify(patientRepository).save(patient);
     }
 
     @Test
-    void linkUserToExistingPatientShouldThrowWhenPatientNotFound() {
+    void requestLinkUserAccountCodeShouldThrowWhenPatientNotFound() {
         when(patientRepository.findByDocumentNumber("123")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() ->
-                patientService.linkUserToExistingPatient(
-                        "123", "juan", "Juan", "Perez", "mail@test.com", "Pass123!"
-                )).isInstanceOf(PatientNotFoundException.class);
+        assertThatThrownBy(() -> patientService.requestLinkUserAccountCode("123"))
+                .isInstanceOf(PatientNotFoundException.class);
+
+        verifyNoInteractions(verificationModuleApi);
     }
 
     @Test
-    void linkUserToExistingPatientShouldThrowWhenAlreadyLinked() {
+    void requestLinkUserAccountCodeShouldThrowWhenAlreadyLinked() {
         Patient patient = buildPatient(UUID.randomUUID());
 
         when(patientRepository.findByDocumentNumber("123")).thenReturn(Optional.of(patient));
 
-        assertThatThrownBy(() ->
-                patientService.linkUserToExistingPatient(
-                        "123", "juan", "Juan", "Perez", "mail@test.com", "Pass123!"
-                )).isInstanceOf(PatientAlreadyLinkedUserException.class);
+        assertThatThrownBy(() -> patientService.requestLinkUserAccountCode("123"))
+                .isInstanceOf(PatientAlreadyLinkedUserException.class);
 
+        verifyNoInteractions(verificationModuleApi);
+    }
+
+    @Test
+    void confirmLinkUserAccountShouldCreateAndLinkUserWhenSystemUserDoesNotExist() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = buildPatient(null);
+
+        when(patientRepository.findByDocumentNumber("123")).thenReturn(Optional.of(patient));
+        when(userModuleApi.findUserIdByUsername("123")).thenReturn(Optional.empty());
+        when(userModuleApi.getOrCreatePatientUser("123", "Juan", "Perez", "mail@test.com", "Pass123!"))
+                .thenReturn(userId);
+        when(patientRepository.save(any())).thenReturn(patient);
+
+        PatientData result = patientService.confirmLinkUserAccount(
+                "123",
+                "999999",
+                "Pass123!"
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(patient.getUserId()).isEqualTo(userId);
+
+        verify(verificationModuleApi).verifyCode(
+                "123",
+                VerificationPurpose.LINK_PATIENT_ACCOUNT,
+                "999999"
+        );
+        verify(userModuleApi).getOrCreatePatientUser("123", "Juan", "Perez", "mail@test.com", "Pass123!");
+        verify(userModuleApi, never()).ensurePatientRole(any());
+        verify(patientRepository).save(patient);
+    }
+
+    @Test
+    void confirmLinkUserAccountShouldReuseExistingUserAndEnsurePatientRole() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = buildPatient(null);
+
+        when(patientRepository.findByDocumentNumber("123")).thenReturn(Optional.of(patient));
+        when(userModuleApi.findUserIdByUsername("123")).thenReturn(Optional.of(userId));
+        when(patientRepository.save(any())).thenReturn(patient);
+
+        PatientData result = patientService.confirmLinkUserAccount(
+                "123",
+                "999999",
+                "ignored-password"
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(patient.getUserId()).isEqualTo(userId);
+
+        verify(verificationModuleApi).verifyCode(
+                "123",
+                VerificationPurpose.LINK_PATIENT_ACCOUNT,
+                "999999"
+        );
         verify(userModuleApi, never()).getOrCreatePatientUser(any(), any(), any(), any(), any());
+        verify(userModuleApi).ensurePatientRole(userId);
+        verify(patientRepository).save(patient);
+    }
+
+    @Test
+    void confirmLinkUserAccountShouldThrowWhenPatientNotFound() {
+        when(patientRepository.findByDocumentNumber("123")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> patientService.confirmLinkUserAccount(
+                "123",
+                "999999",
+                "Pass123!"
+        )).isInstanceOf(PatientNotFoundException.class);
+
+        verify(verificationModuleApi, never()).verifyCode(any(), any(), any());
+    }
+
+    @Test
+    void confirmLinkUserAccountShouldThrowWhenAlreadyLinked() {
+        Patient patient = buildPatient(UUID.randomUUID());
+
+        when(patientRepository.findByDocumentNumber("123")).thenReturn(Optional.of(patient));
+
+        assertThatThrownBy(() -> patientService.confirmLinkUserAccount(
+                "123",
+                "999999",
+                "Pass123!"
+        )).isInstanceOf(PatientAlreadyLinkedUserException.class);
+
+        verify(verificationModuleApi, never()).verifyCode(any(), any(), any());
+        verifyNoInteractions(userModuleApi);
     }
 
     @Test
@@ -218,5 +359,5 @@ class PatientServiceTest {
         );
     }
 
-     */
+
 }

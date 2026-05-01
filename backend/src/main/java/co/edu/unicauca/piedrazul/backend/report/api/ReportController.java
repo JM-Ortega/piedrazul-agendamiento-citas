@@ -23,9 +23,7 @@ public class ReportController {
         this.reportService = reportService;
     }
 
-    // CORREGIDO: @GetMapping → @PostMapping
-    // GET no admite body en Spring; el body era ignorado y todos los campos llegaban null,
-    // causando los errores de validación @NotNull.
+
     @PostMapping("/appointments/export")
     public ResponseEntity<byte[]> export(@RequestBody @Valid ExportRequestDto request) {
         byte[] archivo = reportService.export(request);
@@ -33,7 +31,7 @@ public class ReportController {
         String contentType;
         String extension;
 
-        // ACTUALIZADO: se agrega el caso PDF
+
         switch (request.format()) {
             case EXCEL -> { contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"; extension = ".xlsx"; }
             case PDF   -> { contentType = "application/pdf"; extension = ".pdf"; }

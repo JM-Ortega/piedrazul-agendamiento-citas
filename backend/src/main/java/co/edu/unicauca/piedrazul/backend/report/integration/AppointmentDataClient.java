@@ -17,7 +17,11 @@ public class AppointmentDataClient {
         this.appointmentExternalService = appointmentExternalService;
     }
 
+
+
     public List<AppointmentSummary> getAppointmentForDoctorsToday(UUID doctorId, AppointmentStateFilter state) {
-        return appointmentExternalService.findByDoctorAndDate(doctorId, LocalDate.now(), state.name());
+        // Si state es null, pasa null al servicio externo (traer todas)
+        String stateName = state != null ? state.name() : null;
+        return appointmentExternalService.findByDoctorAndDate(doctorId, LocalDate.now(), stateName);
     }
 }
