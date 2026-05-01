@@ -19,12 +19,8 @@ import {
 } from 'lucide-angular';
 import { AppointmentsPatient } from '../../../../models/dtos/appointments.dto';
 import { dtoDoctor } from '../../../../models/dtos/doctor.dto';
-import {
-  AppointmentExportRequest,
-  ExportColumnBackend,
-  ExportFormatBackend,
-  SchedulerService,
-} from '../../../../services/scheduler.service';
+import { SchedulerService } from '../../../../services/scheduler.service';
+import { ExportModalComponent } from '../../../export-modal/export-modal.component';
 
 type ExportColumnKey =
   | 'date'
@@ -44,41 +40,11 @@ interface ColumnDef {
   icon: any;
 }
 
-/** Mapa frontend-key → columna backend */
-const COLUMN_MAP: Record<ExportColumnKey, ExportColumnBackend> = {
-  date: 'FECHA_CITA',
-  time: 'HORA_CITA',
-  patient: 'NOMBRE_PACIENTE',
-  documentId: 'DOCUMENTO_IDENTIDAD',
-  phone: 'TELEFONO_PACIENTE',
-  doctor: 'NOMBRE_MEDICO',
-  specialty: 'ESPECIALIDAD',
-  status: 'ESTADO_CITA',
-};
-
-const FORMAT_MAP: Record<'excel' | 'pdf' | 'csv', ExportFormatBackend> = {
-  excel: 'EXCEL',
-  pdf: 'PDF',
-  csv: 'CSV',
-};
-
-const MIME_MAP: Record<'excel' | 'pdf' | 'csv', string> = {
-  excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  pdf: 'application/pdf',
-  csv: 'text/csv;charset=utf-8;',
-};
-
-const EXT_MAP: Record<'excel' | 'pdf' | 'csv', string> = {
-  excel: 'xlsx',
-  pdf: 'pdf',
-  csv: 'csv',
-};
-
 @Component({
   selector: 'app-scheduler-dashboard',
   templateUrl: './scheduler-dashboard.component.html',
   standalone: true,
-  imports: [RouterLink, LucideAngularModule],
+  imports: [RouterLink, LucideAngularModule, ExportModalComponent],
 })
 export class SchedulerDashboardComponent implements OnInit {
   private schedulerService = inject(SchedulerService);
@@ -130,19 +96,6 @@ export class SchedulerDashboardComponent implements OnInit {
 
   // ── Export signals ────────────────────────────────────────────────────────
   showExportModal = signal(false);
-  exportFormat = signal<'excel' | 'pdf' | 'csv'>('excel');
-  exportingInProgress = signal(false);
-  exportError = signal<string | null>(null);
-  exportColumns = signal<ExportColumns>({
-    date: true,
-    time: true,
-    patient: true,
-    documentId: true,
-    phone: true,
-    doctor: true,
-    specialty: true,
-    status: true,
-  });
 
   readonly columnDefs: ColumnDef[] = [
     { key: 'date', label: 'Fecha de la Cita', icon: Calendar },
@@ -199,46 +152,6 @@ export class SchedulerDashboardComponent implements OnInit {
   activeResults = computed(() =>
     this.results().filter((a) => a.appointmentState !== 'CANCELADA'),
   );
-
-  hasSelectedColumns = computed(() =>
-    Object.values(this.exportColumns()).some((v) => v),
-  );
-
-  /** Columnas backend actualmente seleccionadas */
-  private selectedBackendColumns = computed<ExportColumnBackend[]>(() =>
-    (Object.entries(this.exportColumns()) as [ExportColumnKey, boolean][])
-      .filter(([, v]) => v)
-      .map(([k]) => COLUMN_MAP[k]),
-  );
-
-  colors = computed(() => {
-    switch (this.exportFormat()) {
-      case 'excel':
-        return {
-          header: 'bg-green-700',
-          border: 'border-green-600',
-          bg: 'bg-green-50',
-          icon: 'text-green-600',
-          button: 'bg-green-600 hover:bg-green-700',
-        };
-      case 'pdf':
-        return {
-          header: 'bg-red-700',
-          border: 'border-red-600',
-          bg: 'bg-red-50',
-          icon: 'text-red-600',
-          button: 'bg-red-600 hover:bg-red-700',
-        };
-      default:
-        return {
-          header: 'bg-orange-700',
-          border: 'border-orange-600',
-          bg: 'bg-orange-50',
-          icon: 'text-orange-600',
-          button: 'bg-orange-600 hover:bg-orange-700',
-        };
-    }
-  });
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
@@ -310,71 +223,5 @@ export class SchedulerDashboardComponent implements OnInit {
       REPROGRAMADA: 'bg-yellow-100 text-yellow-700',
     };
     return map[s] ?? '';
-  }
-
-  // ── Export helpers ────────────────────────────────────────────────────────
-  toggleColumn(key: ExportColumnKey): void {
-    this.exportColumns.update((cols) => ({ ...cols, [key]: !cols[key] }));
-  }
-
-  isColumnChecked(key: ExportColumnKey): boolean {
-    return this.exportColumns()[key];
-  }
-
-  accentColor(): string {
-    return this.exportFormat() === 'excel'
-      ? '#16a34a'
-      : this.exportFormat() === 'pdf'
-        ? '#dc2626'
-        : '#ea580c';
-  }
-
-  /**
-   * Construye el payload para el backend.
-   * - idDoctor → el doctor filtrado actualmente, o null si es "todos"
-   * - state    → el estado filtrado actualmente, o null si es "todos"
-   * - columns  → solo las columnas seleccionadas en el modal
-   */
-  private buildPayload(): AppointmentExportRequest {
-    const doctor = this.selectedDoctor();
-    const status = this.filterStatus();
-
-    return {
-      idDoctor: doctor?.id ?? null,
-      format: FORMAT_MAP[this.exportFormat()],
-      columns: this.selectedBackendColumns(),
-      state: status || null,
-    };
-  }
-
-  handleExport(): void {
-    if (!this.hasSelectedColumns()) return;
-
-    this.exportingInProgress.set(true);
-    this.exportError.set(null);
-
-    const payload = this.buildPayload();
-    const fmt = this.exportFormat();
-
-    this.schedulerService.exportAppointments(payload).subscribe({
-      next: (blob) => {
-        const typedBlob = new Blob([blob], { type: MIME_MAP[fmt] });
-        const url = URL.createObjectURL(typedBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `Citas_${this.today}.${EXT_MAP[fmt]}`;
-        link.click();
-        URL.revokeObjectURL(url);
-
-        this.exportingInProgress.set(false);
-        this.showExportModal.set(false);
-      },
-      error: () => {
-        this.exportError.set(
-          'Ocurrió un error al generar el reporte. Intente nuevamente.',
-        );
-        this.exportingInProgress.set(false);
-      },
-    });
   }
 }
