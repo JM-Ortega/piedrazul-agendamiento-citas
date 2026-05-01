@@ -71,19 +71,29 @@
             <div
               class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
             >
-              <!-- Lado izquierdo: hora + datos paciente -->
+              <!-- Lado izquierdo: hora + estado + datos paciente -->
               <div class="flex-1">
                 <div class="flex items-start gap-4">
-                  <!-- Hora -->
-                  <div
-                    class="bg-blue-500 text-white rounded-xl px-4 py-3 text-center min-w-20"
-                  >
-                    <div class="flex items-center gap-1 justify-center">
-                      <lucide-angular
-                        [img]="Clock"
-                        [size]="18"
-                      ></lucide-angular>
-                      <span class="text-xl">{{ apt.startTime }}</span>
+                  <div class="flex flex-col items-start gap-2">
+                    <!--Estado-->
+                    <span
+                      class="px-4 py-2 rounded-lg border-2 text-base font-medium"
+                      [class]="statusColor(apt.appointmentState)"
+                    >
+                      {{ statusLabel(apt.appointmentState) }}
+                    </span>
+
+                    <!-- Hora -->
+                    <div
+                      class="bg-blue-500 text-white rounded-xl px-4 py-3 text-center min-w-20"
+                    >
+                      <div class="flex items-center gap-1 justify-center">
+                        <lucide-angular
+                          [img]="Clock"
+                          [size]="18"
+                        ></lucide-angular>
+                        <span class="text-xl">{{ apt.startTime }}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -106,20 +116,8 @@
                 </div>
               </div>
 
-              <!-- Lado derecho: estado + botón -->
+              <!-- Lado derecho: botones historia clinica y reagendar -->
               <div class="flex flex-col gap-3 lg:items-end">
-                <span
-                  class="px-4 py-2 rounded-lg border-2 text-base font-medium"
-                  [class]="statusColor(apt.appointmentState)"
-                >
-                  {{ statusLabel(apt.appointmentState) }}
-                </span>
-                <button
-                  class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg transition-colors text-base"
-                >
-                  <lucide-angular [img]="FileText" [size]="18"></lucide-angular>
-                  Ver Historia Clínica
-                </button>
                 <button
                   (click)="scheduleNewAppointment(apt.documentNumber)"
                   class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white
@@ -127,6 +125,12 @@
                 >
                   <lucide-angular [img]="Plus" [size]="18"></lucide-angular>
                   Nueva Cita
+                </button>
+                <button
+                  class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg transition-colors text-base"
+                >
+                  <lucide-angular [img]="FileText" [size]="18"></lucide-angular>
+                  Ver Historia Clínica
                 </button>
               </div>
             </div>
