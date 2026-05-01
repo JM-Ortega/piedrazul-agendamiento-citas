@@ -5,6 +5,7 @@ import { environment } from '../../environments/environment';
 import { dtoSchedule } from '../models/dtos/schedule.dto';
 import { Doctor } from '../models/interfaces/doctor.model';
 import { SystemUser } from '../models/interfaces/system-user.model';
+import { CreateSchedulerRequest } from '../models/dtos/create-scheduler-request.dto';
 
 @Injectable({ providedIn: 'root' })
 export class AdminService {
@@ -178,5 +179,15 @@ export class AdminService {
         (u) => u.roles.includes('doctor') && u.roles.includes('scheduler'),
       ),
     ]);
+  }
+
+  // ── System Users ──────────────────────────────────────────────────────────
+
+  getSystemUsers(): Observable<SystemUser[]> {
+    return this.http.get<SystemUser[]>(`${this.apiUrl}/admin/system-users`);
+  }
+
+  createScheduler(request: CreateSchedulerRequest): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/admin/schedulers`, request);
   }
 }
