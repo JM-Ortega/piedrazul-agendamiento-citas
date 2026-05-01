@@ -116,6 +116,13 @@ public class KeycloakUserClient {
         return UUID.fromString(keycloakId);
     }
 
+    public List<UserRepresentation> findUsersByRole(Role role) {
+        return keycloak.realm(props.getRealm())
+                .roles()
+                .get(role.name())
+                .getUserMembers();
+    }
+
     public Optional<UUID> findUserIdByUsername(String username) {
         if (username == null || username.isBlank()) {
             return Optional.empty();
@@ -132,7 +139,7 @@ public class KeycloakUserClient {
     }
 
     public void assignRoleIfMissing(UUID keycloakId, Role role) {
-        if (!hasRealmRole(keycloakId, role)) {
+        if (!userHasRole(keycloakId, role)) {
             assignRealmRole(keycloakId.toString(), role);
         }
     }
@@ -167,7 +174,7 @@ public class KeycloakUserClient {
         }
     }
 
-    private boolean hasRealmRole(UUID keycloakId, Role role) {
+    public boolean userHasRole(UUID keycloakId, Role role) {
         List<RoleRepresentation> assignedRoles = keycloak.realm(props.getRealm())
                 .users()
                 .get(keycloakId.toString())

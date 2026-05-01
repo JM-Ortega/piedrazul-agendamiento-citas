@@ -65,6 +65,22 @@ export class AdminUsersComponent implements OnInit {
     this.loading.set(true);
     this.errorCarga.set('');
 
+    this.adminService.getSystemUsers().subscribe({
+      next: (users) => {
+        this.systemUsers.set(users);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.errorCarga.set('Error al cargar los usuarios. Intente de nuevo.');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  /*loadUsers(): void {
+    this.loading.set(true);
+    this.errorCarga.set('');
+
     forkJoin([
       this.adminService.getDoctors(),
       this.adminService.getSchedulers(),
@@ -119,6 +135,7 @@ export class AdminUsersComponent implements OnInit {
       },
     });
   }
+*/
 
   navigateToCreate(): void {
     this.router.navigate(['/admin/usuarios/crear']);
@@ -134,6 +151,8 @@ export class AdminUsersComponent implements OnInit {
   }
 
   // ── Private ───────────────────────────────────────────────────────────────
+  /*
+
   private mapSchedulesToDoctor(schedules: dtoSchedule[]): Partial<Doctor> {
     if (!schedules?.length) return {};
     const dayMap: Record<string, number> = {
@@ -161,4 +180,5 @@ export class AdminUsersComponent implements OnInit {
       workdays: workdays.sort((a, b) => a - b),
     };
   }
+     */
 }

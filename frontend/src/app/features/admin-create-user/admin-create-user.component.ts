@@ -376,6 +376,31 @@ export class AdminCreateUserComponent {
 
     if (!this.validateAll()) return;
 
+    if (this.hasSchedulerRole && !this.hasDoctorRole) {
+      this.adminService
+        .createScheduler({
+          documentId: this.userForm.documentId,
+          password: this.userForm.password,
+          firstName: this.userForm.firstName.trim(),
+          lastName: this.userForm.lastName.trim(),
+        })
+        .subscribe({
+          next: () => {
+            this.router.navigate(['/admin/usuarios']);
+          },
+          error: (err) => {
+            console.error('Error al crear agendador:', err);
+          },
+        });
+
+      return;
+    }
+
+    console.warn(
+      'La creación de médicos desde este formulario aún requiere alinear los datos con el backend.',
+    );
+
+    /*
     const newUser: any = {
       id: `user-${Date.now()}`,
       documentId: this.userForm.documentId,
@@ -401,6 +426,7 @@ export class AdminCreateUserComponent {
     this.adminService.createSystemUserMock(newUser);
     console.log('[MOCK] Usuario creado:', newUser);
     this.router.navigate(['/admin/usuarios']);
+    */
   }
 
   navigateBack(): void {
