@@ -1,13 +1,13 @@
-package co.edu.unicauca.piedrazul.backend.report.csv;
+package co.edu.unicauca.piedrazul.backend.report.domain;
 
 import co.edu.unicauca.piedrazul.backend.report.dtos.AppointmentReportRow;
 import co.edu.unicauca.piedrazul.backend.report.dtos.DailyReportDto;
 import co.edu.unicauca.piedrazul.backend.report.dtos.ReportColumn;
+import co.edu.unicauca.piedrazul.backend.report.util.ReportRowMapper;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Component;
-import org.w3c.dom.stylesheets.LinkStyle;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -16,7 +16,7 @@ import java.util.List;
 @Component
 public class ExcelExporter {
 
-    public byte[] export(DailyReportDto report, List<ReportColumn> columnas) {
+    public final byte[] export(DailyReportDto report, List<ReportColumn> columnas) {
             try (XSSFWorkbook workbook = new XSSFWorkbook();
                  ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
@@ -50,7 +50,7 @@ public class ExcelExporter {
                 int rowNum = 2;
                 for (AppointmentReportRow row : report.rows()) {
                     Row fila = sheet.createRow(rowNum++);
-                    List<Object> valores = extraerValores(row, report, columnas);
+                    List<Object> valores = ReportRowMapper.extraerValores(row, report, columnas);
                     for (int i = 0; i < valores.size(); i++) {
                         Cell cell = fila.createCell(i);
                         cell.setCellValue(valores.get(i) != null ? valores.get(i).toString() : "");
@@ -71,20 +71,6 @@ public class ExcelExporter {
             }
     }
 
-    private List<Object> extraerValores(AppointmentReportRow row,
-                                        DailyReportDto report,
-                                        List<ReportColumn> columnas) {
-        return columnas.stream().map(col -> switch (col) {
-            case FECHA_CITA          -> (Object) row.date().toString();
-            case HORA_CITA           -> row.startTime().toString();
-            case NOMBRE_PACIENTE     -> row.patientFullName();
-            case DOCUMENTO_IDENTIDAD -> row.document();
-            case TELEFONO_PACIENTE   -> row.phoneNumber();
-            case NOMBRE_MEDICO       -> report.doctorFullName();
-            case ESPECIALIDAD        -> row.specialty();
-            case ESTADO_CITA         -> row.state();
-        }).toList();
-    }
 
     private CellStyle crearEstiloEncabezado(Workbook wb) {
         CellStyle style = wb.createCellStyle();

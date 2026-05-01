@@ -8,10 +8,15 @@ import java.util.UUID;
 
 public record AppointmentSummary(
         UUID idAppointment,
-        UUID idDoctor,
         UUID idPatient,
+        String patientFullName,
+        String document,
+        String phoneNumber,
+        UUID idDoctor,
+        String doctorName,
         LocalDate date,
         LocalTime startTime,
-        AppointmentState state
+        String specialty,
+        String state
 ) {
 }

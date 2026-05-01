@@ -1,8 +1,9 @@
-package co.edu.unicauca.piedrazul.backend.report.csv;
+package co.edu.unicauca.piedrazul.backend.report.domain;
 
 import co.edu.unicauca.piedrazul.backend.report.dtos.AppointmentReportRow;
 import co.edu.unicauca.piedrazul.backend.report.dtos.DailyReportDto;
 import co.edu.unicauca.piedrazul.backend.report.dtos.ReportColumn;
+import co.edu.unicauca.piedrazul.backend.report.util.ReportRowMapper;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.springframework.stereotype.Component;
@@ -17,7 +18,7 @@ import java.util.List;
 public class CsvExporter {
 
 
-    public byte[] export(DailyReportDto report, List<ReportColumn> columns) {
+    public final byte[] export(DailyReportDto report, List<ReportColumn> columns) {
 
         try (ByteArrayOutputStream out = new ByteArrayOutputStream();
              OutputStreamWriter writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
@@ -41,7 +42,7 @@ public class CsvExporter {
 
 
             for (AppointmentReportRow row : report.rows()) {
-                printer.printRecord(extraerValores(row, report, columns));
+                printer.printRecord(ReportRowMapper.extraerValores(row, report, columns));
             }
 
             writer.flush();
@@ -52,21 +53,7 @@ public class CsvExporter {
         }
     }
 
-    private List<Object> extraerValores(AppointmentReportRow row,
-                                        DailyReportDto report,
-                                        List<ReportColumn> columns) {
-        return columns.stream().map(col -> switch (col) {
-            case FECHA_CITA          -> row.date();
-            case HORA_CITA           -> row.startTime();
-            case NOMBRE_PACIENTE     -> row.patientFullName();
-            case DOCUMENTO_IDENTIDAD -> row.document();
-            case TELEFONO_PACIENTE   -> row.phoneNumber();
-            case NOMBRE_MEDICO       -> report.doctorFullName();
-            case ESPECIALIDAD        -> row.specialty();
-            case ESTADO_CITA         -> row.state();
-        }).map(Object.class::cast).toList();
 
-    }
 
 }
 

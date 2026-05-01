@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.report.integration;
 
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientData;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -17,5 +18,10 @@ public class PatientDataClient {
         return patientModuleApi.findById(idPatient)
                 .map(p -> p.firstName() + " " + p.lastName())
                 .orElse("Paciente no encontrado");
+    }
+
+    // Una sola llamada que trae ambos campos para no hacer dos roundtrips por paciente
+    public PatientData getPatientData(UUID idPatient) {
+        return patientModuleApi.findById(idPatient).orElse(null);
     }
 }

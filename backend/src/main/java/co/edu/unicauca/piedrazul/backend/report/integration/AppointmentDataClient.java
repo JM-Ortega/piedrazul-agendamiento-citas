@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.report.integration;
 
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentSummary;
+import co.edu.unicauca.piedrazul.backend.report.dtos.AppointmentStateFilter;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -16,7 +17,7 @@ public class AppointmentDataClient {
         this.appointmentExternalService = appointmentExternalService;
     }
 
-    public List<AppointmentSummary> getAppointmentForDoctorsToday(UUID doctorId) {
-        return appointmentExternalService.findByDoctorAndDate(doctorId, LocalDate.now());
+    public List<AppointmentSummary> getAppointmentForDoctorsToday(UUID doctorId, AppointmentStateFilter state) {
+        return appointmentExternalService.findByDoctorAndDate(doctorId, LocalDate.now(), state.name());
     }
 }

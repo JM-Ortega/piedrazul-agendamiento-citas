@@ -8,6 +8,10 @@ public record AppointmentReportRow(
         UUID idAppointment,
         UUID idPatient,
         String patientFullName,
+        String document,
+        String phoneNumber,
         LocalDate date,
-        LocalTime startTime
+        LocalTime startTime,
+        String specialty,
+        String state
 ){}

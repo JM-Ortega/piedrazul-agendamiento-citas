@@ -20,16 +20,26 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
     }
 
     @Override
-    public List<AppointmentSummary> findByDoctorAndDate(UUID idDoctor, LocalDate date){
-        return appointmentRepository.findByDoctorIdAndDate(idDoctor, date).stream()
-                .filter(a -> a.getAppointmentState() == AppointmentState.AGENDADA)
+    public List<AppointmentSummary> findByDoctorAndDate(UUID idDoctor, LocalDate date, String state){
+        return appointmentRepository.findByDoctorIdAndDateAndState(idDoctor, date, state).stream()
                 .map(a -> new AppointmentSummary(
                         a.getIdAppointment(),
-                        a.getIdDoctor(),
                         a.getIdPatient(),
+                        a.getPatientName(),
+                        // CORREGIDO: patientInfo es null cuando se reconstruye desde la BD
+                        // (el mapper lo reconstruye con null intencionalmente porque PatientInfo
+                        // no se persiste en la entidad). Se usan cadenas vacías como valores
+                        // seguros; si en el futuro se necesitan, se deberá persistir esos campos
+                        // en AppointmentEntity o consultar el módulo de paciente.
+                        "",   // document — no persistido en AppointmentEntity
+                        "",   // phoneNumber — no persistido en AppointmentEntity
+                        a.getIdDoctor(),
+                        a.getDoctorName(),
                         a.getDate(),
                         a.getStartTime().getTime(),
-                        a.getAppointmentState()
+                        a.getSpecialty().name(),
+                        a.getAppointmentState().name()
                 )).toList();
     }
+
 }

@@ -12,9 +12,7 @@ public record DailyReportDto(
         LocalDate date,
         List<AppointmentReportRow> rows
 ) {
-
     public int total(){
         return rows.size();
     }
-
 }
