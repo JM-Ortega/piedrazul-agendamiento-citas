@@ -98,6 +98,7 @@ export class SchedulerDashboardComponent implements OnInit {
   viewMode = signal<'all' | 'today'>('all');
   filterDate = signal('');
   filterDoctor = signal('');
+  filterStatus = signal('');
   searched = signal(false);
 
   // ── Export signals ────────────────────────────────────────────────────────
@@ -153,6 +154,10 @@ export class SchedulerDashboardComponent implements OnInit {
       filtered = filtered.filter((a) => a.doctorName === this.filterDoctor());
     if (this.filterDate())
       filtered = filtered.filter((a) => a.date === this.filterDate());
+    if (this.filterStatus())
+      filtered = filtered.filter(
+        (a) => a.appointmentState === this.filterStatus(),
+      );
     return [...filtered].sort((a, b) =>
       a.date === b.date
         ? a.startTime > b.startTime
@@ -200,6 +205,9 @@ export class SchedulerDashboardComponent implements OnInit {
         };
     }
   });
+  clearStatusFilter(): void {
+    this.filterStatus.set('');
+  }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
