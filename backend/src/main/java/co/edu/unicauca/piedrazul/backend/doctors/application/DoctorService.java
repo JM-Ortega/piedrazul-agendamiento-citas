@@ -34,6 +34,7 @@ public class DoctorService {
         Doctor doctor = new Doctor();
         doctor.setFirstName(request.firstName());
         doctor.setLastName(request.lastName());
+        doctor.setDocumentType(request.documentType());
         doctor.setIdentification(request.identification());
         doctor.setPhone(request.phone());
         doctor.setSpecialty(request.specialty());
