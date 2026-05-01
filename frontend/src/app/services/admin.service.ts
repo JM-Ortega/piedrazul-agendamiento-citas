@@ -5,10 +5,14 @@ import { environment } from '../../environments/environment';
 import { dtoSchedule } from '../models/dtos/schedule.dto';
 import { Doctor } from '../models/interfaces/doctor.model';
 import { SystemUser } from '../models/interfaces/system-user.model';
+
 @Injectable({ providedIn: 'root' })
 export class AdminService {
   private http = inject(HttpClient);
   private apiUrl = environment.apiUrl;
+
+  // ── Mock in-memory store (temporal hasta que exista el backend) ───────────
+  private mockUsers: SystemUser[] = [];
 
   // ── Doctors ──────────────────────────────────────────────────────────────
 
@@ -94,10 +98,23 @@ export class AdminService {
       { startTime, endTime, workday },
     );
   }
+
   deleteSchedule(doctorId: string, workday: string): Observable<void> {
     return this.http.delete<void>(
       `${this.apiUrl}/doctor/schedules/${doctorId}/${workday}`,
     );
+  }
+
+  // ── System Users (mock hasta disponibilidad del backend) ─────────────────
+
+  /**
+   * Persiste el nuevo usuario en el store en memoria.
+   * TODO: Reemplazar por llamada HTTP cuando el endpoint esté disponible:
+   *   return this.http.post<SystemUser>(`${this.apiUrl}/admin/users`, user);
+   */
+  createSystemUserMock(user: SystemUser): void {
+    this.mockUsers.push(user);
+    console.log('[AdminService] Usuario añadido al store mock:', user);
   }
 
   getSchedulers(): Observable<SystemUser[]> {
@@ -123,6 +140,9 @@ export class AdminService {
         documentId: '3045678902',
         roles: ['scheduler'],
       },
+      ...this.mockUsers.filter(
+        (u) => u.roles.includes('scheduler') && !u.roles.includes('doctor'),
+      ),
     ]);
   }
 
@@ -154,6 +174,9 @@ export class AdminService {
           interval: 20,
         },
       },
+      ...this.mockUsers.filter(
+        (u) => u.roles.includes('doctor') && u.roles.includes('scheduler'),
+      ),
     ]);
   }
 }
