@@ -1,7 +1,9 @@
 <div
   class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
 >
-  <div class="bg-white rounded-xl max-w-4xl w-full shadow-2xl">
+  <div
+    class="bg-white rounded-xl max-w-4xl w-full shadow-2xl max-h-[90vh] flex flex-col"
+  >
     <!-- Header -->
     <div
       [class]="
@@ -21,7 +23,7 @@
       </button>
     </div>
 
-    <div class="px-8 py-6">
+    <div class="px-8 py-6 overflow-y-auto flex-1">
       <!-- Aviso: siempre exporta hoy + filtros activos que sí aplican -->
       <div
         class="mb-6 flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-5 py-4"
