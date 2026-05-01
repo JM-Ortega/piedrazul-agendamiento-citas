@@ -15,7 +15,7 @@ import java.util.List;
 @Component
 public class PdfExporter {
 
-    // Colores — misma paleta verde que el Excel
+    // Colores personalizados para el diseño del PDF
     private static final Color COLOR_HEADER_BG  = new Color(0, 153, 76);   // verde oscuro
     private static final Color COLOR_TITLE_BG   = new Color(198, 239, 206); // verde claro
     private static final Color COLOR_ROW_ALT    = new Color(242, 242, 242); // gris claro filas pares
@@ -23,14 +23,14 @@ public class PdfExporter {
     private static final Color COLOR_WHITE      = Color.WHITE;
     private static final Color COLOR_TEXT_DARK  = new Color(30, 30, 30);
 
-    public byte[] export(DailyReportDto report, List<ReportColumn> columnas) {
+    public final byte[] export(DailyReportDto report, List<ReportColumn> columnas) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
             Document doc = new Document(PageSize.A4.rotate(), 30, 30, 40, 30);
             PdfWriter.getInstance(doc, out);
             doc.open();
 
-            // ── Título principal ──────────────────────────────────────────
+            //Título principal
             Font fuenteTitulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, COLOR_TEXT_DARK);
             Font fuenteSubtitulo = FontFactory.getFont(FontFactory.HELVETICA, 10, COLOR_TEXT_DARK);
 
@@ -49,7 +49,7 @@ public class PdfExporter {
             subtitulo.setSpacingAfter(14);
             doc.add(subtitulo);
 
-            // ── Tabla ─────────────────────────────────────────────────────
+            //Tabla
             PdfPTable tabla = new PdfPTable(columnas.size());
             tabla.setWidthPercentage(100);
             tabla.setSpacingBefore(4);
@@ -93,7 +93,7 @@ public class PdfExporter {
 
             doc.add(tabla);
 
-            // ── Pie de página con total ───────────────────────────────────
+            //Pie de página con total
             Font fuentePie = FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8,
                     new Color(120, 120, 120));
             Paragraph pie = new Paragraph("Generado automáticamente  •  Total de registros: "

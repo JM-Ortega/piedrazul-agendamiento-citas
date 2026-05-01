@@ -14,12 +14,6 @@ public class PatientDataClient {
         this.patientModuleApi = patientModuleApi;
     }
 
-    public String getPatientFullName(UUID idPatient) {
-        return patientModuleApi.findById(idPatient)
-                .map(p -> p.firstName() + " " + p.lastName())
-                .orElse("Paciente no encontrado");
-    }
-
     // Una sola llamada que trae ambos campos para no hacer dos roundtrips por paciente
     public PatientData getPatientData(UUID idPatient) {
         return patientModuleApi.findById(idPatient).orElse(null);
