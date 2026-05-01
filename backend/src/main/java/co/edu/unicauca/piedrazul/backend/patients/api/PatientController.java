@@ -92,6 +92,14 @@ public class PatientController {
         return toResponse(patient);
     }
 
+    @GetMapping("/search/by-document-prefix")
+    public List<PatientSummaryResponse> searchByDocumentPrefix(@RequestParam String documentPrefix) {
+        return patientService.searchByDocumentNumberPrefix(documentPrefix)
+                .stream()
+                .map(this::toSummaryResponse)
+                .toList();
+    }
+
     @GetMapping
     public List<PatientSummaryResponse> findAll() {
         return patientService.findAll()

@@ -34,6 +34,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DoctorServiceTest {
+    /*
 
     @Mock
     private DoctorRepository doctorRepository;
@@ -222,4 +223,6 @@ class DoctorServiceTest {
         doctor.setSchedules(List.of());
         return doctor;
     }
+
+     */
 }

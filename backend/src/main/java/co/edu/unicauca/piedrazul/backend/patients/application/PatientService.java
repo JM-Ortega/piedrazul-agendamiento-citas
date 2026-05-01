@@ -236,6 +236,17 @@ public class PatientService implements PatientModuleApi {
         throw new PatientNotFoundException(documentNumber);
     }
 
+    @Transactional(readOnly = true)
+    public List<PatientData> searchByDocumentNumberPrefix(String documentNumberPrefix) {
+        if (documentNumberPrefix == null || documentNumberPrefix.isBlank()) {
+            throw new InvalidPatientDataException("Document number prefix cannot be blank");
+        }
+        return patientRepository.findByDocumentNumberStartingWith(documentNumberPrefix)
+                .stream()
+                .map(this::toData)
+                .toList();
+    }
+
     private void ensurePatientDoesNotExist(String documentNumber) {
         if (patientRepository.existsByDocumentNumber(documentNumber)) {
             throw new PatientAlreadyExistsException(documentNumber);
