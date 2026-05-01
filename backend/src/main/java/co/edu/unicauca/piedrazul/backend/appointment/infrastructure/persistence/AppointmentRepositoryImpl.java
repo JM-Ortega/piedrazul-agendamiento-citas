@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import jakarta.transaction.Transactional;
@@ -47,6 +48,15 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     @Override
     public List<Appointment> findByDoctorIdAndDate(UUID idDoctor, LocalDate date) {
         return jpaRepository.findByIdDoctorAndDate(idDoctor, date).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<Appointment> findByDoctorIdAndDateAndState(UUID idDoctor, LocalDate date, String state) {
+        return jpaRepository
+                .findByIdDoctorAndDateAndAppointmentState(idDoctor, date, AppointmentState.valueOf(state))
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 
     @Override
