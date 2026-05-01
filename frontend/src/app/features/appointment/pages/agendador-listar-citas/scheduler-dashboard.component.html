@@ -54,8 +54,7 @@
                   [class]="
                     viewMode() === 'all' ? 'text-white' : 'text-gray-600'
                   "
-                >
-                </lucide-angular>
+                ></lucide-angular>
               </div>
               <div>
                 <h3
@@ -85,9 +84,8 @@
                 'text-3xl font-bold ' +
                 (viewMode() === 'all' ? 'text-blue-700' : 'text-gray-600')
               "
+              >{{ allActiveCount() }}</span
             >
-              {{ allActiveCount() }}
-            </span>
             <span class="text-gray-500 text-sm">citas activas</span>
           </div>
         </button>
@@ -116,8 +114,7 @@
                   [class]="
                     viewMode() === 'today' ? 'text-white' : 'text-gray-600'
                   "
-                >
-                </lucide-angular>
+                ></lucide-angular>
               </div>
               <div>
                 <h3
@@ -149,9 +146,8 @@
                 'text-3xl font-bold ' +
                 (viewMode() === 'today' ? 'text-amber-700' : 'text-gray-600')
               "
+              >{{ todayCount() }}</span
             >
-              {{ todayCount() }}
-            </span>
             <span class="text-gray-500 text-sm">citas activas</span>
           </div>
         </button>
@@ -167,7 +163,7 @@
       <p class="text-gray-600 mb-5 text-base">
         Los filtros se aplican automáticamente junto con la vista seleccionada
       </p>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
         <div>
           <label class="block text-gray-700 mb-2 text-lg"
             >Médico / Terapista</label
@@ -196,9 +192,26 @@
             class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-3 text-lg outline-none transition-colors"
           />
         </div>
+        <div>
+          <label class="block text-gray-700 mb-2 text-lg"
+            >Estado de la Cita</label
+          >
+          <select
+            [value]="filterStatus()"
+            (change)="filterStatus.set($any($event.target).value)"
+            class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-3 text-lg outline-none transition-colors"
+          >
+            <option value="">Todos los estados</option>
+            <option value="AGENDADA">Agendada</option>
+            <option value="ATENDIDA">Atendida</option>
+            <option value="CANCELADA">Cancelada</option>
+            <option value="NO_ASISTIO">No asistió</option>
+            <option value="REPROGRAMADA">Reprogramada</option>
+          </select>
+        </div>
       </div>
 
-      @if (filterDoctor() || filterDate()) {
+      @if (filterDoctor() || filterDate() || filterStatus()) {
         <div class="mt-4 flex flex-wrap gap-2 items-center">
           <span class="text-sm text-gray-600">Filtros activos:</span>
           @if (filterDoctor()) {
@@ -227,11 +240,24 @@
               </button>
             </span>
           }
+          @if (filterStatus()) {
+            <span
+              class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm"
+            >
+              {{ statusLabel(filterStatus()) }}
+              <button
+                (click)="clearStatusFilter()"
+                class="hover:bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center ml-1"
+              >
+                ×
+              </button>
+            </span>
+          }
         </div>
       }
     </div>
 
-    <!-- ── Exportar ────────────────────────────────────────────────────────── -->
+    <!-- Exportar — igual al componente doctor -->
     @if (results().length > 0) {
       <div
         class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200"
@@ -249,13 +275,17 @@
             </div>
             <div>
               <h3 class="text-green-800 text-xl font-bold">
-                Exportar Resultados
+                Exportar Reporte de Hoy
               </h3>
-              <p class="text-green-600 text-base">
-                {{ results().length }} cita{{
-                  results().length !== 1 ? "s" : ""
-                }}
-                lista{{ results().length !== 1 ? "s" : "" }} para exportar
+              <!-- Mismo aviso que el componente doctor: siempre exporta hoy -->
+              <p class="text-green-600 text-sm flex items-center gap-1 mt-0.5">
+                <lucide-angular [img]="Calendar" [size]="14"></lucide-angular>
+                Solo se exportan las citas del día de hoy ({{
+                  formatDate(today)
+                }})
+              </p>
+              <p class="text-green-700 text-base font-medium mt-1">
+                Filtros de médico y estado aplicados al reporte
               </p>
             </div>
           </div>
@@ -457,222 +487,16 @@
         }
       </div>
     }
-
-    <!-- ── Modal de Exportación ───────────────────────────────────────────── -->
-    @if (showExportModal()) {
-      <div
-        class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
-      >
-        <div class="bg-white rounded-xl max-w-4xl w-full shadow-2xl">
-          <!-- Modal header -->
-          <div
-            [class]="
-              colors().header +
-              ' text-white px-8 py-5 rounded-t-xl flex items-center justify-between'
-            "
-          >
-            <div class="flex items-center gap-3">
-              <lucide-angular [img]="Download" [size]="28"></lucide-angular>
-              <h2 class="text-2xl font-bold">Exportar Reporte de Citas</h2>
-            </div>
-            <button
-              (click)="showExportModal.set(false)"
-              class="text-white hover:bg-white/20 rounded-lg w-9 h-9 flex items-center justify-center text-xl transition-colors"
-            >
-              ×
-            </button>
-          </div>
-
-          <div class="px-8 py-6">
-            <!-- Selección de formato -->
-            <div class="mb-6">
-              <h3 class="text-gray-700 text-lg font-semibold mb-3">
-                Formato del archivo
-              </h3>
-              <div class="grid grid-cols-3 gap-3">
-                <button
-                  (click)="exportFormat.set('excel')"
-                  [class]="
-                    'p-4 rounded-lg border transition-all ' +
-                    (exportFormat() === 'excel'
-                      ? 'border-green-600 bg-green-50 shadow-md'
-                      : 'border-gray-300 hover:border-green-400 bg-white')
-                  "
-                >
-                  <div class="flex flex-col items-center gap-2">
-                    <lucide-angular
-                      [img]="FileSpreadsheet"
-                      [size]="32"
-                      [class]="
-                        exportFormat() === 'excel'
-                          ? 'text-green-600'
-                          : 'text-gray-500'
-                      "
-                    >
-                    </lucide-angular>
-                    <span
-                      [class]="
-                        'text-base font-semibold ' +
-                        (exportFormat() === 'excel'
-                          ? 'text-green-700'
-                          : 'text-gray-700')
-                      "
-                    >
-                      Excel
-                    </span>
-                  </div>
-                </button>
-
-                <button
-                  (click)="exportFormat.set('pdf')"
-                  [class]="
-                    'p-4 rounded-lg border transition-all ' +
-                    (exportFormat() === 'pdf'
-                      ? 'border-red-600 bg-red-50 shadow-md'
-                      : 'border-gray-300 hover:border-red-400 bg-white')
-                  "
-                >
-                  <div class="flex flex-col items-center gap-2">
-                    <lucide-angular
-                      [img]="FileText"
-                      [size]="32"
-                      [class]="
-                        exportFormat() === 'pdf'
-                          ? 'text-red-600'
-                          : 'text-gray-500'
-                      "
-                    >
-                    </lucide-angular>
-                    <span
-                      [class]="
-                        'text-base font-semibold ' +
-                        (exportFormat() === 'pdf'
-                          ? 'text-red-700'
-                          : 'text-gray-700')
-                      "
-                    >
-                      PDF
-                    </span>
-                  </div>
-                </button>
-
-                <button
-                  (click)="exportFormat.set('csv')"
-                  [class]="
-                    'p-4 rounded-lg border transition-all ' +
-                    (exportFormat() === 'csv'
-                      ? 'border-orange-600 bg-orange-50 shadow-md'
-                      : 'border-gray-300 hover:border-orange-400 bg-white')
-                  "
-                >
-                  <div class="flex flex-col items-center gap-2">
-                    <lucide-angular
-                      [img]="FileText"
-                      [size]="32"
-                      [class]="
-                        exportFormat() === 'csv'
-                          ? 'text-orange-600'
-                          : 'text-gray-500'
-                      "
-                    >
-                    </lucide-angular>
-                    <span
-                      [class]="
-                        'text-base font-semibold ' +
-                        (exportFormat() === 'csv'
-                          ? 'text-orange-700'
-                          : 'text-gray-700')
-                      "
-                    >
-                      CSV
-                    </span>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            <!-- Selección de columnas -->
-            <div class="mb-6">
-              <h3 class="text-gray-700 text-lg font-semibold mb-3">
-                Datos a incluir en el reporte
-              </h3>
-              <div class="grid grid-cols-2 gap-2.5">
-                @for (col of columnDefs; track col.key) {
-                  <label
-                    [class]="
-                      'flex items-center gap-2.5 px-3.5 py-3 rounded-lg border cursor-pointer transition-all ' +
-                      (isColumnChecked(col.key)
-                        ? colors().border + ' ' + colors().bg
-                        : 'border-gray-300 hover:border-gray-400 bg-white')
-                    "
-                  >
-                    <input
-                      type="checkbox"
-                      [checked]="isColumnChecked(col.key)"
-                      (change)="toggleColumn(col.key)"
-                      class="w-5 h-5 cursor-pointer"
-                      [style.accent-color]="accentColor()"
-                    />
-                    <lucide-angular
-                      [img]="col.icon"
-                      [size]="18"
-                      [class]="
-                        isColumnChecked(col.key)
-                          ? colors().icon
-                          : 'text-gray-400'
-                      "
-                    >
-                    </lucide-angular>
-                    <span class="text-sm text-gray-700">{{ col.label }}</span>
-                  </label>
-                }
-              </div>
-            </div>
-
-            <!-- Advertencia si no hay columnas -->
-            @if (!hasSelectedColumns()) {
-              <div
-                class="mb-4 bg-amber-50 border border-amber-300 text-amber-800 px-4 py-3 rounded-lg text-sm"
-              >
-                Debe seleccionar al menos un dato para exportar
-              </div>
-            }
-
-            <!-- Botones de acción -->
-            <div class="flex gap-3 pt-4 border-t border-gray-200">
-              <button
-                (click)="showExportModal.set(false)"
-                [disabled]="exportingInProgress()"
-                class="flex-1 px-6 py-3.5 border border-gray-300 text-gray-700 rounded-lg text-base font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Cancelar
-              </button>
-              <button
-                (click)="handleExport()"
-                [disabled]="!hasSelectedColumns() || exportingInProgress()"
-                [class]="
-                  'flex-1 px-6 py-3.5 rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2 ' +
-                  (hasSelectedColumns() && !exportingInProgress()
-                    ? colors().button + ' text-white'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed')
-                "
-              >
-                @if (exportingInProgress()) {
-                  <span
-                    class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"
-                  ></span>
-                  Obteniendo datos...
-                } @else {
-                  <lucide-angular [img]="Download" [size]="20"></lucide-angular>
-                  Exportar {{ results().length }} Cita{{
-                    results().length !== 1 ? "s" : ""
-                  }}
-                }
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    }
   </div>
 </div>
+
+<!-- Modal de Exportación -->
+@if (showExportModal()) {
+  <app-export-modal
+    [idDoctor]="selectedDoctor()?.id ?? null"
+    [filterStatus]="filterStatus()"
+    [doctorName]="selectedDoctor()?.name ?? null"
+    [todayFormatted]="formatDate(today)"
+    (closed)="showExportModal.set(false)"
+  />
+}

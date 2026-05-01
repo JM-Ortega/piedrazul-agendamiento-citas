@@ -245,7 +245,7 @@
                   </div>
 
                   <div class="flex flex-1 flex-wrap gap-3 items-end">
-                    <div class="flex-1 min-w-[130px]">
+                    <div class="flex-1 min-w-32.5">
                       <label class="block text-gray-600 text-sm mb-1"
                         >Hora Inicio</label
                       >
@@ -277,7 +277,7 @@
                         }
                       </select>
                     </div>
-                    <div class="flex-1 min-w-[130px]">
+                    <div class="flex-1 min-w-32.5">
                       <label class="block text-gray-600 text-sm mb-1"
                         >Hora Fin</label
                       >
@@ -320,11 +320,11 @@
                   </div>
                 </div>
                 @if (errors().horariosDia[day]) {
-                  <p class="text-red-500 text-xs mt-2 sm:ml-[52px]">
+                  <p class="text-red-500 text-xs mt-2 sm:ml-13">
                     ⚠️ {{ errors().horariosDia[day] }}
                   </p>
                 } @else if (!hasDayOverride(day)) {
-                  <p class="text-xs text-gray-400 mt-2 sm:ml-[52px]">
+                  <p class="text-xs text-gray-400 mt-2 sm:ml-13">
                     Usando horario por defecto: {{ editForm()!.startTime }} –
                     {{ editForm()!.endTime }}
                   </p>

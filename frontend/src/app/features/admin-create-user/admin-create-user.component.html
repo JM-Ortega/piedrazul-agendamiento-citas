@@ -1,0 +1,456 @@
+<div class="min-h-screen bg-blue-50 py-8 px-4">
+  <div class="max-w-4xl mx-auto space-y-6">
+    <!-- Header -->
+    <div
+      class="bg-linear-to-r from-blue-700 to-blue-500 text-white rounded-2xl p-7 shadow-lg"
+    >
+      <button
+        (click)="navigateBack()"
+        class="flex items-center gap-2 text-white hover:text-blue-100 mb-4 text-base"
+      >
+        <lucide-icon [name]="ArrowLeft" [size]="20"></lucide-icon>
+        Volver a Gestión de Usuarios
+      </button>
+      <div class="flex items-center gap-3">
+        <lucide-icon [name]="UserPlus" [size]="34"></lucide-icon>
+        <div>
+          <h1 class="text-3xl font-bold">Crear Nuevo Usuario</h1>
+          <p class="text-blue-100 text-lg mt-2">
+            Registre un nuevo médico y/o agendador en el sistema
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Form Card -->
+    <div class="bg-white rounded-2xl shadow-md p-8">
+      <!-- ── Roles ── -->
+      <div class="mb-8">
+        <h3 class="text-gray-700 text-xl font-semibold mb-1">
+          Roles del Usuario
+        </h3>
+        <p class="text-gray-500 text-base mb-4">
+          Seleccione uno o ambos roles (un usuario puede ser médico y agendador
+          simultáneamente)
+        </p>
+
+        <div class="grid grid-cols-2 gap-4">
+          <!-- Doctor -->
+          <button
+            type="button"
+            (click)="toggleRole('doctor')"
+            [class]="
+              'p-6 rounded-xl border-2 transition-all ' +
+              (hasDoctorRole
+                ? 'border-blue-600 bg-blue-50 shadow-lg ring-2 ring-blue-200'
+                : 'border-gray-300 hover:border-blue-400 bg-white')
+            "
+          >
+            <div class="flex flex-col items-center gap-3">
+              <div class="relative">
+                <lucide-icon
+                  [name]="Stethoscope"
+                  [size]="40"
+                  [class]="hasDoctorRole ? 'text-blue-600' : 'text-gray-500'"
+                >
+                </lucide-icon>
+                <div
+                  *ngIf="hasDoctorRole"
+                  class="absolute -top-2 -right-2 bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
+                >
+                  ✓
+                </div>
+              </div>
+              <span
+                [class]="
+                  'text-lg font-semibold ' +
+                  (hasDoctorRole ? 'text-blue-700' : 'text-gray-700')
+                "
+              >
+                Médico / Terapista
+              </span>
+            </div>
+          </button>
+
+          <!-- Agendador -->
+          <button
+            type="button"
+            (click)="toggleRole('scheduler')"
+            [class]="
+              'p-6 rounded-xl border-2 transition-all ' +
+              (hasSchedulerRole
+                ? 'border-green-600 bg-green-50 shadow-lg ring-2 ring-green-200'
+                : 'border-gray-300 hover:border-green-400 bg-white')
+            "
+          >
+            <div class="flex flex-col items-center gap-3">
+              <div class="relative">
+                <lucide-icon
+                  [name]="Calendar"
+                  [size]="40"
+                  [class]="
+                    hasSchedulerRole ? 'text-green-600' : 'text-gray-500'
+                  "
+                >
+                </lucide-icon>
+                <div
+                  *ngIf="hasSchedulerRole"
+                  class="absolute -top-2 -right-2 bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
+                >
+                  ✓
+                </div>
+              </div>
+              <span
+                [class]="
+                  'text-lg font-semibold ' +
+                  (hasSchedulerRole ? 'text-green-700' : 'text-gray-700')
+                "
+              >
+                Agendador
+              </span>
+            </div>
+          </button>
+        </div>
+
+        <!-- Error roles -->
+        <p
+          *ngIf="hasError('roles')"
+          class="mt-2 text-sm text-red-600 flex items-center gap-1"
+        >
+          <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+          {{ errors.roles }}
+        </p>
+      </div>
+
+      <!-- ── Información Básica ── -->
+      <div class="space-y-6">
+        <h3
+          class="text-gray-700 text-xl font-semibold border-b-2 border-blue-100 pb-3"
+        >
+          Información Básica
+        </h3>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <!-- Documento -->
+          <div>
+            <label class="block text-gray-700 text-base font-medium mb-2">
+              Documento de Identidad *
+              <span class="text-sm text-gray-500">(solo dígitos)</span>
+            </label>
+            <div class="relative">
+              <lucide-icon
+                [name]="CreditCard"
+                [size]="20"
+                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              >
+              </lucide-icon>
+              <input
+                type="text"
+                inputmode="numeric"
+                [(ngModel)]="userForm.documentId"
+                name="documentId"
+                (keydown)="onDocumentKeydown($event)"
+                (input)="onDocumentInput()"
+                (blur)="validateField('documentId')"
+                [class]="inputClass('documentId', 'pl-12 pr-4')"
+                placeholder="1234567890"
+                maxlength="15"
+                autocomplete="off"
+              />
+            </div>
+            <p
+              *ngIf="hasError('documentId')"
+              class="mt-1 text-sm text-red-600 flex items-center gap-1"
+            >
+              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+              {{ errors.documentId }}
+            </p>
+          </div>
+
+          <!-- Contraseña -->
+          <div>
+            <label class="block text-gray-700 text-base font-medium mb-2"
+              >Contraseña *</label
+            >
+            <div class="relative">
+              <lucide-icon
+                [name]="Lock"
+                [size]="20"
+                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              >
+              </lucide-icon>
+              <input
+                [type]="showPassword ? 'text' : 'password'"
+                [(ngModel)]="userForm.password"
+                name="password"
+                (blur)="validateField('password')"
+                [class]="inputClass('password', 'pl-12 pr-12')"
+                placeholder="Mín. 8 car., 1 mayúscula, 1 número"
+                autocomplete="new-password"
+              />
+              <button
+                type="button"
+                (click)="showPassword = !showPassword"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <lucide-icon
+                  [name]="showPassword ? EyeOff : Eye"
+                  [size]="20"
+                ></lucide-icon>
+              </button>
+            </div>
+            <p
+              *ngIf="hasError('password')"
+              class="mt-1 text-sm text-red-600 flex items-center gap-1"
+            >
+              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+              {{ errors.password }}
+            </p>
+          </div>
+
+          <!-- Nombre -->
+          <div>
+            <label class="block text-gray-700 text-base font-medium mb-2"
+              >Nombre *</label
+            >
+            <div class="relative">
+              <lucide-icon
+                [name]="User"
+                [size]="20"
+                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              >
+              </lucide-icon>
+              <input
+                type="text"
+                [(ngModel)]="userForm.firstName"
+                name="firstName"
+                (keydown)="onNameKeydown($event)"
+                (input)="onNameInput('firstName')"
+                (blur)="validateField('firstName')"
+                [class]="inputClass('firstName', 'pl-12 pr-4')"
+                placeholder="Juan"
+                autocomplete="off"
+              />
+            </div>
+            <p
+              *ngIf="hasError('firstName')"
+              class="mt-1 text-sm text-red-600 flex items-center gap-1"
+            >
+              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+              {{ errors.firstName }}
+            </p>
+          </div>
+
+          <!-- Apellido -->
+          <div>
+            <label class="block text-gray-700 text-base font-medium mb-2"
+              >Apellido *</label
+            >
+            <div class="relative">
+              <lucide-icon
+                [name]="User"
+                [size]="20"
+                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              >
+              </lucide-icon>
+              <input
+                type="text"
+                [(ngModel)]="userForm.lastName"
+                name="lastName"
+                (keydown)="onNameKeydown($event)"
+                (input)="onNameInput('lastName')"
+                (blur)="validateField('lastName')"
+                [class]="inputClass('lastName', 'pl-12 pr-4')"
+                placeholder="Pérez"
+                autocomplete="off"
+              />
+            </div>
+            <p
+              *ngIf="hasError('lastName')"
+              class="mt-1 text-sm text-red-600 flex items-center gap-1"
+            >
+              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+              {{ errors.lastName }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Información del Médico ── -->
+      <div
+        *ngIf="hasDoctorRole"
+        class="space-y-6 mt-8 pt-8 border-t-2 border-blue-100"
+      >
+        <h3 class="text-blue-700 text-xl font-semibold flex items-center gap-2">
+          <lucide-icon [name]="Stethoscope" [size]="24"></lucide-icon>
+          Información del Médico
+        </h3>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <!-- Especialidad -->
+          <div>
+            <label class="block text-gray-700 text-base font-medium mb-2"
+              >Especialidad *</label
+            >
+            <div class="relative">
+              <lucide-icon
+                [name]="Building2"
+                [size]="20"
+                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              >
+              </lucide-icon>
+              <select
+                [(ngModel)]="userForm.specialty"
+                name="specialty"
+                (change)="validateField('specialty')"
+                [class]="inputClass('specialty', 'pl-12 pr-4')"
+              >
+                <option value="">Seleccione...</option>
+                <option *ngFor="let s of specialties" [value]="s">
+                  {{ s }}
+                </option>
+              </select>
+            </div>
+            <p
+              *ngIf="hasError('specialty')"
+              class="mt-1 text-sm text-red-600 flex items-center gap-1"
+            >
+              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+              {{ errors.specialty }}
+            </p>
+          </div>
+
+          <!-- Intervalo -->
+          <div>
+            <label class="block text-gray-700 text-base font-medium mb-2">
+              Intervalo entre citas (min)
+              <span class="text-sm text-gray-500 font-normal ml-1"
+                >máx. {{ maxInterval }} min</span
+              >
+            </label>
+            <input
+              type="number"
+              [(ngModel)]="userForm.interval"
+              name="interval"
+              (keydown)="onIntervalKeydown($event)"
+              (input)="onIntervalInput()"
+              (blur)="validateField('interval')"
+              [class]="inputClass('interval', 'px-4')"
+              [min]="10"
+              [max]="maxInterval"
+              step="5"
+            />
+            <p
+              *ngIf="hasError('interval')"
+              class="mt-1 text-sm text-red-600 flex items-center gap-1"
+            >
+              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+              {{ errors.interval }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Horario -->
+        <div class="grid grid-cols-2 gap-5">
+          <div>
+            <label class="block text-gray-700 text-base font-medium mb-2"
+              >Hora de Inicio</label
+            >
+            <input
+              type="time"
+              [(ngModel)]="userForm.startTime"
+              name="startTime"
+              (change)="onStartTimeChange()"
+              [class]="inputClass('startTime', 'px-4')"
+            />
+            <p
+              *ngIf="hasError('startTime')"
+              class="mt-1 text-sm text-red-600 flex items-center gap-1"
+            >
+              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+              {{ errors.startTime }}
+            </p>
+          </div>
+          <div>
+            <label class="block text-gray-700 text-base font-medium mb-2">
+              Hora de Fin
+              <span class="text-sm text-gray-500 font-normal ml-1"
+                >máx. 14:00 (2:00 p.m.)</span
+              >
+            </label>
+            <input
+              type="time"
+              [(ngModel)]="userForm.endTime"
+              name="endTime"
+              max="14:00"
+              (change)="onEndTimeChange()"
+              [class]="inputClass('endTime', 'px-4')"
+            />
+            <p
+              *ngIf="hasError('endTime')"
+              class="mt-1 text-sm text-red-600 flex items-center gap-1"
+            >
+              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+              {{ errors.endTime }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Días de atención -->
+        <div>
+          <label class="block text-gray-700 text-base font-medium mb-1"
+            >Días de Atención</label
+          >
+          <p class="text-gray-400 text-sm mb-3 flex items-center gap-1">
+            <lucide-icon [name]="Info" [size]="14"></lucide-icon>
+            Disponible de lunes a viernes
+          </p>
+          <div class="flex flex-wrap gap-3">
+            <button
+              *ngFor="let day of daysOfWeek"
+              type="button"
+              (click)="toggleWorkDay(day.value)"
+              [class]="
+                'px-5 py-3 rounded-xl border-2 transition-all text-base font-medium ' +
+                (isWorkDaySelected(day.value)
+                  ? 'border-blue-600 bg-blue-50 text-blue-700'
+                  : 'border-gray-300 bg-white text-gray-600 hover:border-blue-400')
+              "
+            >
+              {{ day.label }}
+            </button>
+          </div>
+          <p
+            *ngIf="hasError('workDays')"
+            class="mt-2 text-sm text-red-600 flex items-center gap-1"
+          >
+            <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+            {{ errors.workDays }}
+          </p>
+        </div>
+      </div>
+
+      <!-- ── Botones ── -->
+      <div class="flex gap-4 pt-8 border-t-2 border-gray-100 mt-8">
+        <button
+          type="button"
+          (click)="navigateBack()"
+          class="flex-1 px-6 py-4 border-2 border-gray-300 text-gray-700 rounded-xl text-lg font-semibold hover:bg-gray-50 transition-colors"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          (click)="handleCreateUser()"
+          class="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-lg font-semibold transition-colors flex items-center justify-center gap-2"
+        >
+          <lucide-icon [name]="UserPlus" [size]="24"></lucide-icon>
+          Crear Usuario
+          <span *ngIf="selectedRoles.length > 1" class="text-sm opacity-90">
+            ({{ getRolesDisplayText() }})
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

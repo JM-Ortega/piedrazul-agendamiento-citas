@@ -13,5 +13,6 @@ public interface ScheduleAutonomousAppointmentUseCase {
                                    UUID idDoctor,
                                    Specialty specialty,
                                    LocalDate date,
-                                   AppointmentTime startTime);
+                                   AppointmentTime startTime,
+                                   String performedBy);
 }
