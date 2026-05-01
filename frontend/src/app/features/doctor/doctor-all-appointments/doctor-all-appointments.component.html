@@ -99,14 +99,17 @@
           </div>
           <div>
             <h3 class="text-green-800 text-xl font-bold">
-              Exportar Resultados
+              Exportar Reporte de Hoy
             </h3>
-            <p class="text-green-600 text-base">
-              {{ filteredAppointments().length }}
-              cita{{ filteredAppointments().length !== 1 ? "s" : "" }} lista{{
-                filteredAppointments().length !== 1 ? "s" : ""
-              }}
-              para exportar
+            <!-- Aviso de que la exportación siempre es del día actual -->
+            <p class="text-green-600 text-sm flex items-center gap-1 mt-0.5">
+              <lucide-angular [img]="Calendar" [size]="14"></lucide-angular>
+              Solo se exportan las citas del día de hoy ({{
+                formatDate(today)
+              }})
+            </p>
+            <p class="text-green-700 text-base font-medium mt-1">
+              Filtros activos aplicados al reporte
             </p>
           </div>
         </div>
@@ -256,6 +259,35 @@
       </div>
 
       <div class="px-8 py-6">
+        <!-- Aviso de fecha fija: siempre hoy -->
+        <div
+          class="mb-6 flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-5 py-4"
+        >
+          <lucide-angular
+            [img]="Calendar"
+            [size]="22"
+            class="text-blue-600 mt-0.5 shrink-0"
+          ></lucide-angular>
+          <div>
+            <p class="text-blue-800 font-semibold text-base">
+              Exportación del día de hoy
+            </p>
+            <p class="text-blue-600 text-sm mt-0.5">
+              El reporte incluirá únicamente las citas del
+              <strong>{{ formatDate(today) }}</strong
+              >. El filtro de rango de fechas global no afecta esta exportación.
+            </p>
+            @if (filterStatus() !== "all") {
+              <p class="text-blue-600 text-sm mt-1">
+                Se aplicará el filtro de estado activo:
+                <span class="font-semibold">{{
+                  statusLabel(filterStatus())
+                }}</span>
+              </p>
+            }
+          </div>
+        </div>
+
         <!-- Format Selection -->
         <div class="mb-6">
           <h3 class="text-gray-700 text-lg font-semibold mb-3">
@@ -361,12 +393,21 @@
           </div>
         </div>
 
-        <!-- Warning -->
+        <!-- Warning: sin columnas -->
         @if (!hasSelectedColumns()) {
           <div
             class="mb-4 bg-amber-50 border border-amber-300 text-amber-800 px-4 py-3 rounded-lg text-sm"
           >
             Debe seleccionar al menos un dato para exportar
+          </div>
+        }
+
+        <!-- Error del backend -->
+        @if (exportError()) {
+          <div
+            class="mb-4 bg-red-50 border border-red-300 text-red-800 px-4 py-3 rounded-lg text-sm flex items-center gap-2"
+          >
+            <span class="font-semibold">Error:</span> {{ exportError() }}
           </div>
         }
 
@@ -393,12 +434,10 @@
               <span
                 class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"
               ></span>
-              Obteniendo datos...
+              Generando reporte...
             } @else {
               <lucide-angular [img]="Download" [size]="20"></lucide-angular>
-              Exportar {{ filteredAppointments().length }} Cita{{
-                filteredAppointments().length !== 1 ? "s" : ""
-              }}
+              Exportar citas de hoy
             }
           </button>
         </div>

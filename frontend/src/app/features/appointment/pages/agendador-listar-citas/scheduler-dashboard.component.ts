@@ -1,8 +1,5 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { saveAs } from 'file-saver';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import {
   Calendar,
   CheckCircle,
@@ -20,15 +17,15 @@ import {
   User,
   UserCircle,
 } from 'lucide-angular';
-import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
-import * as XLSX from 'xlsx';
 import { AppointmentsPatient } from '../../../../models/dtos/appointments.dto';
 import { dtoDoctor } from '../../../../models/dtos/doctor.dto';
-import { Patient } from '../../../../models/interfaces/patient.model';
-import { SchedulerService } from '../../../../services/scheduler.service';
+import {
+  AppointmentExportRequest,
+  ExportColumnBackend,
+  ExportFormatBackend,
+  SchedulerService,
+} from '../../../../services/scheduler.service';
 
-// ── Tipos explícitos para evitar errores de inferencia en templates ──────────
 type ExportColumnKey =
   | 'date'
   | 'time'
@@ -47,6 +44,36 @@ interface ColumnDef {
   icon: any;
 }
 
+/** Mapa frontend-key → columna backend */
+const COLUMN_MAP: Record<ExportColumnKey, ExportColumnBackend> = {
+  date: 'FECHA_CITA',
+  time: 'HORA_CITA',
+  patient: 'NOMBRE_PACIENTE',
+  documentId: 'DOCUMENTO_IDENTIDAD',
+  phone: 'TELEFONO_PACIENTE',
+  doctor: 'NOMBRE_MEDICO',
+  specialty: 'ESPECIALIDAD',
+  status: 'ESTADO_CITA',
+};
+
+const FORMAT_MAP: Record<'excel' | 'pdf' | 'csv', ExportFormatBackend> = {
+  excel: 'EXCEL',
+  pdf: 'PDF',
+  csv: 'CSV',
+};
+
+const MIME_MAP: Record<'excel' | 'pdf' | 'csv', string> = {
+  excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pdf: 'application/pdf',
+  csv: 'text/csv;charset=utf-8;',
+};
+
+const EXT_MAP: Record<'excel' | 'pdf' | 'csv', string> = {
+  excel: 'xlsx',
+  pdf: 'pdf',
+  csv: 'csv',
+};
+
 @Component({
   selector: 'app-scheduler-dashboard',
   templateUrl: './scheduler-dashboard.component.html',
@@ -56,7 +83,7 @@ interface ColumnDef {
 export class SchedulerDashboardComponent implements OnInit {
   private schedulerService = inject(SchedulerService);
 
-  // ── Lucide icons ──────────────────────────────────────────────────────────
+  // ── Icons ─────────────────────────────────────────────────────────────────
   readonly Calendar = Calendar;
   readonly CheckCircle = CheckCircle;
   readonly Clock = Clock;
@@ -105,6 +132,7 @@ export class SchedulerDashboardComponent implements OnInit {
   showExportModal = signal(false);
   exportFormat = signal<'excel' | 'pdf' | 'csv'>('excel');
   exportingInProgress = signal(false);
+  exportError = signal<string | null>(null);
   exportColumns = signal<ExportColumns>({
     date: true,
     time: true,
@@ -116,7 +144,6 @@ export class SchedulerDashboardComponent implements OnInit {
     status: true,
   });
 
-  // ── Column definitions (tipo explícito, sin typeof this) ─────────────────
   readonly columnDefs: ColumnDef[] = [
     { key: 'date', label: 'Fecha de la Cita', icon: Calendar },
     { key: 'time', label: 'Hora de la Cita', icon: Clock },
@@ -177,6 +204,13 @@ export class SchedulerDashboardComponent implements OnInit {
     Object.values(this.exportColumns()).some((v) => v),
   );
 
+  /** Columnas backend actualmente seleccionadas */
+  private selectedBackendColumns = computed<ExportColumnBackend[]>(() =>
+    (Object.entries(this.exportColumns()) as [ExportColumnKey, boolean][])
+      .filter(([, v]) => v)
+      .map(([k]) => COLUMN_MAP[k]),
+  );
+
   colors = computed(() => {
     switch (this.exportFormat()) {
       case 'excel':
@@ -205,9 +239,6 @@ export class SchedulerDashboardComponent implements OnInit {
         };
     }
   });
-  clearStatusFilter(): void {
-    this.filterStatus.set('');
-  }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
@@ -220,7 +251,7 @@ export class SchedulerDashboardComponent implements OnInit {
     });
   }
 
-  // ── View / filter methods ─────────────────────────────────────────────────
+  // ── View / filter ─────────────────────────────────────────────────────────
   setViewMode(mode: 'all' | 'today'): void {
     this.viewMode.set(mode);
   }
@@ -229,6 +260,9 @@ export class SchedulerDashboardComponent implements OnInit {
   }
   clearDateFilter(): void {
     this.filterDate.set('');
+  }
+  clearStatusFilter(): void {
+    this.filterStatus.set('');
   }
 
   search(): void {
@@ -244,6 +278,7 @@ export class SchedulerDashboardComponent implements OnInit {
     else if (doctorId)
       request$ = this.schedulerService.getAppointmentsByDoctor(doctorId);
     else request$ = this.schedulerService.getAllAppointments();
+
     request$.subscribe((data) => {
       this.appointments.set(data);
       this.searched.set(true);
@@ -278,8 +313,8 @@ export class SchedulerDashboardComponent implements OnInit {
   }
 
   // ── Export helpers ────────────────────────────────────────────────────────
-  toggleColumn(column: ExportColumnKey): void {
-    this.exportColumns.update((cols) => ({ ...cols, [column]: !cols[column] }));
+  toggleColumn(key: ExportColumnKey): void {
+    this.exportColumns.update((cols) => ({ ...cols, [key]: !cols[key] }));
   }
 
   isColumnChecked(key: ExportColumnKey): boolean {
@@ -294,115 +329,52 @@ export class SchedulerDashboardComponent implements OnInit {
         : '#ea580c';
   }
 
-  // Resuelve los teléfonos en paralelo via getByDocument antes de exportar
-  private resolvePhones() {
-    const apts = this.results();
-    const requests = apts.map((apt) =>
-      apt.documentNumber
-        ? this.schedulerService
-            .getByDocument(apt.documentNumber)
-            .pipe(catchError(() => of(null)))
-        : of(null),
-    );
-    return forkJoin(requests as any);
-  }
+  /**
+   * Construye el payload para el backend.
+   * - idDoctor → el doctor filtrado actualmente, o null si es "todos"
+   * - state    → el estado filtrado actualmente, o null si es "todos"
+   * - columns  → solo las columnas seleccionadas en el modal
+   */
+  private buildPayload(): AppointmentExportRequest {
+    const doctor = this.selectedDoctor();
+    const status = this.filterStatus();
 
-  private buildExportRows(
-    patients: (Patient | null)[],
-  ): Record<string, string>[] {
-    const cols = this.exportColumns();
-    return this.results().map((apt, i) => {
-      const row: Record<string, string> = {};
-      if (cols.date) row['Fecha'] = this.formatDate(apt.date);
-      if (cols.time) row['Hora'] = apt.startTime;
-      if (cols.patient)
-        row['Paciente'] = `${apt.patientFirstName} ${apt.patientLastName}`;
-      if (cols.documentId) row['Documento'] = apt.documentNumber ?? '';
-      if (cols.phone) row['Teléfono'] = patients[i]?.phone ?? '';
-      if (cols.doctor) row['Médico'] = apt.doctorName ?? '';
-      if (cols.specialty) row['Especialidad'] = apt.specialty ?? '';
-      if (cols.status) row['Estado'] = this.statusLabel(apt.appointmentState);
-      return row;
-    });
+    return {
+      idDoctor: doctor?.id ?? null,
+      format: FORMAT_MAP[this.exportFormat()],
+      columns: this.selectedBackendColumns(),
+      state: status || null,
+    };
   }
 
   handleExport(): void {
     if (!this.hasSelectedColumns()) return;
+
     this.exportingInProgress.set(true);
+    this.exportError.set(null);
 
-    // Si el teléfono no está en las columnas seleccionadas, exporta directamente
-    if (!this.exportColumns().phone) {
-      const data = this.buildExportRows(this.results().map(() => null));
-      this.generateFile(data);
-      this.exportingInProgress.set(false);
-      this.showExportModal.set(false);
-      return;
-    }
+    const payload = this.buildPayload();
+    const fmt = this.exportFormat();
 
-    this.resolvePhones().subscribe({
-      next: (patients) => {
-        const data = this.buildExportRows(patients as (Patient | null)[]);
-        this.generateFile(data);
+    this.schedulerService.exportAppointments(payload).subscribe({
+      next: (blob) => {
+        const typedBlob = new Blob([blob], { type: MIME_MAP[fmt] });
+        const url = URL.createObjectURL(typedBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Citas_${this.today}.${EXT_MAP[fmt]}`;
+        link.click();
+        URL.revokeObjectURL(url);
+
         this.exportingInProgress.set(false);
         this.showExportModal.set(false);
       },
       error: () => {
+        this.exportError.set(
+          'Ocurrió un error al generar el reporte. Intente nuevamente.',
+        );
         this.exportingInProgress.set(false);
-        this.showExportModal.set(false);
       },
     });
-  }
-
-  private generateFile(data: Record<string, string>[]): void {
-    if (this.exportFormat() === 'excel') this.exportToExcel(data);
-    else if (this.exportFormat() === 'pdf') this.exportToPDF(data);
-    else this.exportToCSV(data);
-  }
-
-  private exportToExcel(data: Record<string, string>[]): void {
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Citas');
-    XLSX.writeFile(wb, `Citas_${this.today}.xlsx`);
-  }
-
-  private exportToPDF(data: Record<string, string>[]): void {
-    const doc = new jsPDF();
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.text('Reporte de Citas - Piedrazul Salud', 14, 15);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text(`Generado: ${this.formatDate(this.today)}`, 14, 22);
-    autoTable(doc, {
-      head: [Object.keys(data[0] ?? {})],
-      body: data.map((row) => Object.values(row)),
-      startY: 28,
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: [37, 99, 235], textColor: 255 },
-    });
-    doc.save(`Citas_${this.today}.pdf`);
-  }
-
-  private exportToCSV(data: Record<string, string>[]): void {
-    if (data.length === 0) return;
-    const headers = Object.keys(data[0]);
-    const csvContent = [
-      headers.join(','),
-      ...data.map((row) =>
-        headers
-          .map((header) => {
-            const value = String(row[header] || '');
-            return value.includes(',') ||
-              value.includes('\n') ||
-              value.includes('"')
-              ? `"${value.replace(/"/g, '""')}"`
-              : value;
-          })
-          .join(','),
-      ),
-    ].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    saveAs(blob, `Citas_${this.today}.csv`);
   }
 }
