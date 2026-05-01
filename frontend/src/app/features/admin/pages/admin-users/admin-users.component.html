@@ -1,0 +1,227 @@
+<div class="min-h-screen bg-blue-50 py-8 px-4">
+  <div class="max-w-7xl mx-auto space-y-6">
+    <!-- Header -->
+    <div
+      class="bg-gradient-to-r from-blue-700 to-blue-500 text-white rounded-2xl p-7 shadow-lg"
+    >
+      <div
+        class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+      >
+        <div>
+          <h1 class="text-3xl font-bold flex items-center gap-3">
+            <lucide-angular [img]="Users" [size]="34"></lucide-angular>
+            Gestión de Usuarios
+          </h1>
+          <p class="text-blue-100 text-lg mt-2">
+            Administre médicos y agendadores del sistema
+          </p>
+        </div>
+        <button
+          (click)="navigateToCreate()"
+          class="flex items-center gap-2 bg-white text-blue-700 hover:bg-blue-50 px-6 py-3 rounded-xl text-lg font-semibold transition-colors shrink-0"
+        >
+          <lucide-angular [img]="UserPlus" [size]="24"></lucide-angular>
+          Crear Usuario
+        </button>
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div
+        class="bg-gradient-to-br from-blue-600 to-blue-500 text-white rounded-xl shadow-lg p-6"
+      >
+        <div class="flex items-center gap-3 mb-2">
+          <lucide-angular [img]="Stethoscope" [size]="28"></lucide-angular>
+          <p class="text-blue-100 text-base">Médicos</p>
+        </div>
+        <p class="text-4xl font-bold">{{ doctors().length }}</p>
+      </div>
+      <div
+        class="bg-gradient-to-br from-green-600 to-green-500 text-white rounded-xl shadow-lg p-6"
+      >
+        <div class="flex items-center gap-3 mb-2">
+          <lucide-angular [img]="Calendar" [size]="28"></lucide-angular>
+          <p class="text-green-100 text-base">Agendadores</p>
+        </div>
+        <p class="text-4xl font-bold">{{ schedulers().length }}</p>
+      </div>
+      <div
+        class="bg-gradient-to-br from-purple-600 to-purple-500 text-white rounded-xl shadow-lg p-6"
+      >
+        <div class="flex items-center gap-3 mb-2">
+          <lucide-angular [img]="Users" [size]="28"></lucide-angular>
+          <p class="text-purple-100 text-base">Ambos Roles</p>
+        </div>
+        <p class="text-4xl font-bold">{{ both().length }}</p>
+      </div>
+    </div>
+
+    <!-- Error de carga -->
+    @if (errorCarga()) {
+      <div
+        class="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-4 text-base"
+      >
+        ⚠️ {{ errorCarga() }}
+      </div>
+    }
+
+    <!-- Users List -->
+    <div class="bg-white rounded-2xl shadow-md p-7">
+      <h2
+        class="text-blue-800 text-2xl font-semibold mb-6 flex items-center gap-2"
+      >
+        <lucide-angular [img]="Users" [size]="26"></lucide-angular>
+        Todos los Usuarios ({{ systemUsers().length }})
+      </h2>
+
+      @if (loading()) {
+        <div class="text-center text-gray-400 text-lg py-10">
+          Cargando usuarios...
+        </div>
+      }
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        @for (user of systemUsers(); track user.id) {
+          <!-- Card -->
+          <div
+            class="border-2 rounded-xl p-5 hover:shadow-lg transition-shadow"
+            [class.border-purple-100]="hasBothRoles(user)"
+            [class.bg-purple-50]="hasBothRoles(user)"
+            [class.border-blue-100]="
+              !hasBothRoles(user) && user.roles.includes('doctor')
+            "
+            [class.bg-blue-50]="
+              !hasBothRoles(user) && user.roles.includes('doctor')
+            "
+            [class.border-green-100]="
+              !hasBothRoles(user) && !user.roles.includes('doctor')
+            "
+            [class.bg-green-50]="
+              !hasBothRoles(user) && !user.roles.includes('doctor')
+            "
+          >
+            <div class="flex items-start justify-between mb-3">
+              <div class="flex items-center gap-3 flex-1">
+                <!-- Avatar -->
+                <div
+                  class="rounded-full p-3 shrink-0"
+                  [class.bg-purple-600]="hasBothRoles(user)"
+                  [class.bg-blue-600]="
+                    !hasBothRoles(user) && user.roles.includes('doctor')
+                  "
+                  [class.bg-green-600]="
+                    !hasBothRoles(user) && !user.roles.includes('doctor')
+                  "
+                >
+                  @if (hasBothRoles(user)) {
+                    <lucide-angular
+                      [img]="Users"
+                      class="text-white"
+                      [size]="24"
+                    ></lucide-angular>
+                  } @else if (user.roles.includes("doctor")) {
+                    <lucide-angular
+                      [img]="Stethoscope"
+                      class="text-white"
+                      [size]="24"
+                    ></lucide-angular>
+                  } @else {
+                    <lucide-angular
+                      [img]="Calendar"
+                      class="text-white"
+                      [size]="24"
+                    ></lucide-angular>
+                  }
+                </div>
+
+                <div class="flex-1">
+                  <!-- Nombre -->
+                  <h3
+                    class="text-lg font-bold"
+                    [class.text-purple-900]="hasBothRoles(user)"
+                    [class.text-blue-900]="
+                      !hasBothRoles(user) && user.roles.includes('doctor')
+                    "
+                    [class.text-green-900]="
+                      !hasBothRoles(user) && !user.roles.includes('doctor')
+                    "
+                  >
+                    {{ user.firstName }} {{ user.lastName }}
+                  </h3>
+
+                  <!-- Badges de roles -->
+                  <div class="flex flex-wrap gap-1 mt-1">
+                    @for (role of user.roles; track role) {
+                      <span
+                        class="text-xs px-2 py-1 rounded-full font-medium"
+                        [class.bg-blue-100]="role === 'doctor'"
+                        [class.text-blue-700]="role === 'doctor'"
+                        [class.bg-green-100]="role !== 'doctor'"
+                        [class.text-green-700]="role !== 'doctor'"
+                      >
+                        {{ roleLabel(role) }}
+                      </span>
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Detalles -->
+            <div class="space-y-2 text-sm text-gray-700 ml-14">
+              <div class="flex items-center gap-2">
+                <lucide-angular
+                  [img]="CreditCard"
+                  [size]="16"
+                  [class.text-purple-600]="hasBothRoles(user)"
+                  [class.text-blue-600]="
+                    !hasBothRoles(user) && user.roles.includes('doctor')
+                  "
+                  [class.text-green-600]="
+                    !hasBothRoles(user) && !user.roles.includes('doctor')
+                  "
+                ></lucide-angular>
+                <span class="font-medium">Doc:</span>
+                <span>{{ user.documentId }}</span>
+              </div>
+
+              @if (user.roles.includes("doctor") && user.doctorData) {
+                <div class="flex items-center gap-2">
+                  <lucide-angular
+                    [img]="Stethoscope"
+                    [size]="16"
+                    class="text-blue-600"
+                  ></lucide-angular>
+                  <span class="font-medium">Especialidad:</span>
+                  <span>{{ user.doctorData.specialty }}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <lucide-angular
+                    [img]="Clock"
+                    [size]="16"
+                    class="text-blue-600"
+                  ></lucide-angular>
+                  <span class="font-medium">Horario:</span>
+                  <span>
+                    {{ user.doctorData.startTime }} -
+                    {{ user.doctorData.endTime }} ({{
+                      user.doctorData.interval
+                    }}
+                    min)
+                  </span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (systemUsers().length === 0 && !loading()) {
+          <div class="col-span-2 text-center py-12 text-gray-500">
+            No hay usuarios registrados
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</div>

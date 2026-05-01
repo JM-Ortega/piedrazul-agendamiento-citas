@@ -7,9 +7,8 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientData;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientResponse;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -34,7 +33,7 @@ public class DoctorController {
      * @return Sin contenido
      */
     @PostMapping
-    public ResponseEntity<?> createDoctor(@RequestBody CreateDoctorRequest request) {
+    public ResponseEntity<?> createDoctor(@Valid @RequestBody CreateDoctorRequest request) {
         doctorService.createDoctor(request);
         return ResponseEntity.noContent().build();
     }
