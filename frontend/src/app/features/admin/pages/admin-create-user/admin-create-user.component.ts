@@ -26,6 +26,7 @@ type Role = 'doctor' | 'scheduler';
 
 interface UserForm {
   documentId: string;
+  documentType: string;
   password: string;
   firstName: string;
   lastName: string;
@@ -43,6 +44,7 @@ interface UserForm {
 
 interface FormErrors {
   documentId?: string;
+  documentType?: string;
   password?: string;
   firstName?: string;
   lastName?: string;
@@ -103,6 +105,7 @@ export class AdminCreateUserComponent {
 
   userForm: UserForm = {
     documentId: '',
+    documentType: '',
     password: '',
     firstName: '',
     lastName: '',
@@ -118,7 +121,12 @@ export class AdminCreateUserComponent {
   };
 
   specialties: string[] = ['FISIOTERAPIA', 'TERAPIA_NEURAL', 'QUIROPRAXIA'];
-
+  documentTypes: string[] = [
+    'CEDULA',
+    'TARJETA_IDENTIDAD',
+    'REGISTRO_NACIMIENTO',
+    'PASAPORTE',
+  ]; // ← agregar, ajusta según los valores que espere tu backend
   daysOfWeek = [
     { value: 1, label: 'Lunes' },
     { value: 2, label: 'Martes' },
@@ -367,6 +375,11 @@ export class AdminCreateUserComponent {
           }
         }
         break;
+      case 'documentType':
+        if (this.hasDoctorRole && !this.userForm.documentType) {
+          this.errors.documentType = 'El tipo de documento es obligatorio.';
+        }
+        break;
 
       case 'phone':
         if (this.hasDoctorRole) {
@@ -461,6 +474,7 @@ export class AdminCreateUserComponent {
   private validateAll(): boolean {
     const fields: (keyof FormErrors)[] = [
       'documentId',
+      'documentType',
       'password',
       'firstName',
       'lastName',
@@ -535,6 +549,7 @@ export class AdminCreateUserComponent {
           firstName: this.userForm.firstName.trim(),
           lastName: this.userForm.lastName.trim(),
           identification: this.userForm.documentId,
+          documentType: this.userForm.documentType,
           phone: this.userForm.phone,
           specialty: [this.userForm.specialty],
           laborStart: this.userForm.laborStart,

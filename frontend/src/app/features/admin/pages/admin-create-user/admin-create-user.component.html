@@ -325,6 +325,28 @@
               {{ errors.specialty }}
             </p>
           </div>
+          <div>
+            <label class="block text-gray-700 text-base font-medium mb-2">
+              Tipo de Documento *
+            </label>
+            <div class="relative">
+              <lucide-icon
+                [name]="CreditCard"
+                [size]="20"
+                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              ></lucide-icon>
+              <select
+                [(ngModel)]="userForm.documentType"
+                name="documentType"
+                [class]="inputClass('documentType', 'pl-12 pr-4')"
+              >
+                <option value="">Seleccione...</option>
+                <option *ngFor="let dt of documentTypes" [value]="dt">
+                  {{ dt }}
+                </option>
+              </select>
+            </div>
+          </div>
 
           <!-- Teléfono -->
           <div>
