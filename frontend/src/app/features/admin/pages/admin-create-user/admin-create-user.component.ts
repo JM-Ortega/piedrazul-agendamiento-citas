@@ -120,13 +120,6 @@ export class AdminCreateUserComponent {
     endTime: '14:00',
   };
 
-  specialties: string[] = ['FISIOTERAPIA', 'TERAPIA_NEURAL', 'QUIROPRAXIA'];
-  documentTypes: string[] = [
-    'CEDULA',
-    'TARJETA_IDENTIDAD',
-    'REGISTRO_NACIMIENTO',
-    'PASAPORTE',
-  ]; // ← agregar, ajusta según los valores que espere tu backend
   daysOfWeek = [
     { value: 1, label: 'Lunes' },
     { value: 2, label: 'Martes' },
@@ -134,7 +127,18 @@ export class AdminCreateUserComponent {
     { value: 4, label: 'Jueves' },
     { value: 5, label: 'Viernes' },
   ];
+  documentTypes: { value: string; label: string }[] = [
+    { value: 'CEDULA', label: 'Cédula de Ciudadanía' },
+    { value: 'TARJETA_IDENTIDAD', label: 'Tarjeta de Identidad' },
+    { value: 'REGISTRO_NACIMIENTO', label: 'Registro de Nacimiento' },
+    { value: 'PASAPORTE', label: 'Pasaporte' },
+  ];
 
+  specialties: { value: string; label: string }[] = [
+    { value: 'FISIOTERAPIA', label: 'Fisioterapia' },
+    { value: 'TERAPIA_NEURAL', label: 'Terapia Neural' },
+    { value: 'QUIROPRAXIA', label: 'Quiropraxia' },
+  ];
   constructor(
     private router: Router,
     private adminService: AdminService,
@@ -297,14 +301,9 @@ export class AdminCreateUserComponent {
   // ── Roles ─────────────────────────────────────────────────────────────────
 
   toggleRole(role: Role): void {
-    if (this.selectedRoles.includes(role)) {
-      this.selectedRoles = this.selectedRoles.filter((r) => r !== role);
-    } else {
-      this.selectedRoles = [...this.selectedRoles, role];
-    }
+    this.selectedRoles = [role];
     if (this.submitted) this.validateField('roles');
   }
-
   getRoleLabel(role: Role): string {
     return role === 'doctor' ? 'Médico' : 'Agendador';
   }

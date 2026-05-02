@@ -82,7 +82,17 @@ export class SchedulerDashboardComponent implements OnInit {
     'noviembre',
     'diciembre',
   ];
+  // ── Filter Helpers ──────────────────────────────────────────────────────────
+  private readonly specialtyLabels: Record<string, string> = {
+    FISIOTERAPIA: 'Fisioterapia',
+    TERAPIA_NEURAL: 'Terapia Neural',
+    QUIROPRAXIA: 'Quiropraxia',
+  };
 
+  specialtyLabel(specialty: string): string {
+    const clean = specialty.replace(/^\[|\]$/g, '').trim();
+    return this.specialtyLabels[clean] ?? clean;
+  }
   // ── Data signals ──────────────────────────────────────────────────────────
   doctors = signal<dtoDoctor[]>([]);
   private appointments = signal<AppointmentsPatient[]>([]);
