@@ -20,12 +20,10 @@ import {
   Tag,
   UserCircle,
 } from 'lucide-angular';
-import {
-  AppointmentExportRequest,
-  ExportColumnBackend,
-  ExportFormatBackend,
-  SchedulerService,
-} from '../../../services/scheduler.service';
+import { AppointmentExportRequest } from '../../../models/dtos/AppointmentExportRequest.dto';
+import { ExportColumnBackend } from '../../../models/types/ExportColumnBackend.type';
+import { ExportFormatBackend } from '../../../models/types/ExportFormatBackend.type';
+import { SchedulerService } from '../../../services/scheduler.service';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 export type ExportColumnKey =

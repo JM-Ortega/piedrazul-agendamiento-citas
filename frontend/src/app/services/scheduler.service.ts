@@ -2,34 +2,11 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { AppointmentExportRequest } from '../models/dtos/AppointmentExportRequest.dto';
 import { AppointmentsPatient } from '../models/dtos/appointments.dto';
 import { dtoDoctor } from '../models/dtos/doctor.dto';
 import { Patient } from '../models/interfaces/patient.model';
-export type ExportColumnKey =
-  | 'date'
-  | 'time'
-  | 'patient'
-  | 'documentId'
-  | 'phone'
-  | 'status';
 
-export type ExportFormatBackend = 'EXCEL' | 'PDF' | 'CSV';
-export type ExportColumnBackend =
-  | 'FECHA_CITA'
-  | 'HORA_CITA'
-  | 'NOMBRE_PACIENTE'
-  | 'DOCUMENTO_IDENTIDAD'
-  | 'TELEFONO_PACIENTE'
-  | 'NOMBRE_MEDICO'
-  | 'ESPECIALIDAD'
-  | 'ESTADO_CITA';
-
-export interface AppointmentExportRequest {
-  idDoctor?: string | null;
-  format: ExportFormatBackend;
-  columns: ExportColumnBackend[];
-  state?: string | null;
-}
 @Injectable({ providedIn: 'root' })
 export class SchedulerService {
   private http = inject(HttpClient);
