@@ -1,9 +1,14 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Doctor } from '../models/doctor.model';
-import { dtoSchedule } from '../models/DTOs/dtoSchedule.model';
 import { environment } from '../../environments/environment';
+import { CreateSchedulerRequest } from '../models/dtos/CreateDtos/create-scheduler-request.dto';
+import { CreateDoctorRequestDto } from '../models/dtos/CreateDtos/CreateDoctorRequest.dto';
+import { dtoSchedule } from '../models/dtos/schedule.dto';
+import { Doctor } from '../models/interfaces/doctor.model';
+import { SystemUser } from '../models/interfaces/system-user.model';
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Injectable({ providedIn: 'root' })
 export class AdminService {
@@ -14,6 +19,15 @@ export class AdminService {
 
   getDoctors(): Observable<Doctor[]> {
     return this.http.get<Doctor[]>(`${this.apiUrl}/doctor/doctors/detailed`);
+  }
+
+  /**
+   * Crea un nuevo doctor en el backend.
+   * El servidor responde 204 No Content en caso de éxito.
+   * @param payload Datos del doctor según CreateDoctorRequest del backend
+   */
+  createDoctor(payload: CreateDoctorRequestDto): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/doctor/doctors`, payload);
   }
 
   updateAppointmentInterval(
@@ -93,5 +107,21 @@ export class AdminService {
       `${this.apiUrl}/doctor/schedules/${doctorId}/${workday}`,
       { startTime, endTime, workday },
     );
+  }
+
+  deleteSchedule(doctorId: string, workday: string): Observable<void> {
+    return this.http.delete<void>(
+      `${this.apiUrl}/doctor/schedules/${doctorId}/${workday}`,
+    );
+  }
+
+  // ── System Users ──────────────────────────────────────────────────────────
+
+  getSystemUsers(): Observable<SystemUser[]> {
+    return this.http.get<SystemUser[]>(`${this.apiUrl}/admin/system-users`);
+  }
+
+  createScheduler(request: CreateSchedulerRequest): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/admin/schedulers`, request);
   }
 }

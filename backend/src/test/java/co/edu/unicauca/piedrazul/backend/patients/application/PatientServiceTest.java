@@ -28,6 +28,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PatientServiceTest {
 
+
     @Mock
     private PatientRepository patientRepository;
 
@@ -357,4 +358,6 @@ class PatientServiceTest {
                 userId
         );
     }
+
+
 }

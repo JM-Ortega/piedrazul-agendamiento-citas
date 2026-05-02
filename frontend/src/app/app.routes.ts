@@ -1,14 +1,19 @@
 import { Routes } from '@angular/router';
 import { AuthGuard } from './guards/auth.guard';
 
-import { AccesoComponent } from './pages/acceso/acceso.component';
-import { AdminConfigComponent } from './pages/admin/admin-config.component';
-import { SchedulerDashboardComponent } from './pages/agendador/scheduler-dashboard.component';
-import { HomeComponent } from './pages/home/home.component';
-import { NewAppointmentSchedulerComponent } from './pages/nueva-cita/new-appointment-scheduler.component';
-import { PatientNewAppointmentComponent } from './pages/paciente-agendar/patient-new-appointment.component';
-import { PatientDashboardComponent } from './pages/paciente/patient-dashboard.component';
-import { RegistroComponent } from './pages/registro/registro.component';
+import { AccesoComponent } from './design-system/pages/acceso/acceso.component';
+import { HomeComponent } from './design-system/pages/home/home.component';
+import { AdminConfigComponent } from './features/admin/admin-config.component';
+import { AdminCreateUserComponent } from './features/admin/pages/admin-create-user/admin-create-user.component';
+import { AdminUsersComponent } from './features/admin/pages/admin-users/admin-users.component';
+import { NewAppointmentSchedulerComponent } from './features/appointment/pages/agendador-agendar/new-appointment-scheduler.component';
+import { SchedulerDashboardComponent } from './features/appointment/pages/agendador-listar-citas/scheduler-dashboard.component';
+import { PatientNewAppointmentComponent } from './features/appointment/pages/paciente-agendar/patient-new-appointment.component';
+import { PatientDashboardComponent } from './features/appointment/pages/paciente-listar-citas/patient-dashboard.component';
+import { DoctorAllAppointmentsComponent } from './features/doctor/doctor-all-appointments/doctor-all-appointments.component';
+import { DoctorDashboardComponent } from './features/doctor/doctor-dashboard/doctor-dashboard.component';
+import { RegistroComponent } from './features/registro/registro.component';
+import { NewAppointmentDoctorComponent  } from './features/appointment/pages/doctor-agendar/new-appointment-doctor.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -31,6 +36,36 @@ export const routes: Routes = [
     component: AdminConfigComponent,
     canActivate: [AuthGuard],
     data: { role: 'ADMIN' },
+  },
+  {
+    path: 'admin/usuarios',
+    component: AdminUsersComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'ADMIN' },
+  },
+  {
+    path: 'admin/usuarios/crear',
+    component: AdminCreateUserComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'ADMIN' },
+  },
+  {
+    path: 'medico',
+    component: DoctorDashboardComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'DOCTOR' },
+  },
+  {
+    path: 'medico/citas',
+    component: DoctorAllAppointmentsComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'DOCTOR' },
+  },
+  {
+    path: 'medico/nueva-cita',
+    component: NewAppointmentDoctorComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'DOCTOR' },
   },
   {
     path: 'paciente/agendar',

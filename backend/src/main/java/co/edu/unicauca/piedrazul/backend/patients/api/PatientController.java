@@ -4,6 +4,7 @@ import co.edu.unicauca.piedrazul.backend.patients.api.dto.*;
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientService;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +23,7 @@ public class PatientController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public PatientResponse create(@Valid @RequestBody CreatePatientRequest request) {
         PatientData patient = patientService.createPatient(
                 request.getDocumentType(),
@@ -71,6 +73,7 @@ public class PatientController {
     }
 
     @GetMapping("/me")
+    @PreAuthorize("hasRole('PATIENT')")
     public PatientResponse findMe(@AuthenticationPrincipal Jwt jwt) {
         UUID keycloakId = UUID.fromString(jwt.getSubject());
         PatientData patient = patientService.findByUserId(keycloakId)
@@ -79,6 +82,7 @@ public class PatientController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR')")
     public PatientResponse findById(@PathVariable UUID id) {
         PatientData patient = patientService.findById(id)
                 .orElseThrow(() -> new PatientNotFoundException(id));
@@ -86,13 +90,24 @@ public class PatientController {
     }
 
     @GetMapping("/document/{documentNumber}")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public PatientResponse findByDocument(@PathVariable String documentNumber) {
         PatientData patient = patientService.findByDocumentNumber(documentNumber)
                 .orElseThrow(() -> new PatientNotFoundException(documentNumber));
         return toResponse(patient);
     }
 
+    @GetMapping("/search/by-document-prefix")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
+    public List<PatientSummaryResponse> searchByDocumentPrefix(@RequestParam String documentPrefix) {
+        return patientService.searchByDocumentNumberPrefix(documentPrefix)
+                .stream()
+                .map(this::toSummaryResponse)
+                .toList();
+    }
+
     @GetMapping
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR')")
     public List<PatientSummaryResponse> findAll() {
         return patientService.findAll()
                 .stream()
@@ -101,6 +116,7 @@ public class PatientController {
     }
 
     @GetMapping("/{id}/exists")
+    @PreAuthorize("hasRole('SCHEDULER')")
     public boolean existsById(@PathVariable UUID id) {
         return patientService.existsById(id);
     }

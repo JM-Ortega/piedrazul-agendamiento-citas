@@ -1,0 +1,850 @@
+<div class="min-h-screen bg-blue-50 py-8 px-4">
+  <div class="max-w-2xl mx-auto">
+    <div class="mb-6">
+      <button
+        (click)="goBack()"
+        class="flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-4 transition-colors"
+      >
+        <lucide-angular [img]="ArrowLeft" [size]="18" />
+        <span class="text-sm font-medium">Volver</span>
+      </button>
+      <h1 class="text-blue-800 text-3xl font-bold">Crear cuenta</h1>
+      <p class="text-gray-500 text-lg mt-1">
+        Regístrate para agendar tus citas médicas
+      </p>
+    </div>
+
+    <div class="flex gap-2 mb-6">
+      @for (
+        label of [
+          "1. Verificar documento",
+          "2. Completar registro",
+          "3. Verificar código",
+        ];
+        track $index
+      ) {
+        <div
+          class="flex-1 text-center py-2 rounded-xl text-sm font-medium transition-all"
+          [ngClass]="{
+            'bg-blue-600 text-white shadow': step() === $index + 1,
+            'bg-green-100 text-green-700': step() > $index + 1,
+            'bg-white text-gray-400 border border-gray-200':
+              step() < $index + 1,
+          }"
+        >
+          {{ label }}
+        </div>
+      }
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-xl p-8">
+      @if (step() === 1) {
+        <div class="space-y-5">
+          <h2 class="text-blue-800 text-2xl font-bold mb-4">
+            Verificar documento
+          </h2>
+
+          <div>
+            <label class="block text-gray-700 mb-2 font-medium">
+              Número de documento
+            </label>
+            <div class="flex gap-3">
+              <input
+                type="text"
+                [ngModel]="documentNumber()"
+                (ngModelChange)="onDocumentChange($event)"
+                (input)="handleDocInput($event)"
+                (keyup.enter)="searchPatient()"
+                placeholder="Ingresa tu número de documento"
+                class="flex-1 border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors"
+              />
+              <button
+                (click)="searchPatient()"
+                [disabled]="isLoading()"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl flex items-center gap-2 disabled:opacity-50 transition-colors"
+              >
+                <lucide-angular [img]="Search" [size]="18" />
+                Buscar
+              </button>
+            </div>
+            @if (docInputWarning()) {
+              <p class="text-red-500 text-sm mt-1">{{ docInputWarning() }}</p>
+            }
+            @if (errors()["documentNumber"]) {
+              <p class="text-red-500 text-sm mt-1">
+                {{ errors()["documentNumber"] }}
+              </p>
+            }
+          </div>
+
+          @if (patientStatus() === "found" && foundPatient(); as p) {
+            <div class="bg-green-50 border-2 border-green-300 rounded-xl p-5">
+              <div class="flex items-center gap-3 mb-3">
+                <lucide-angular
+                  [img]="CheckCircle"
+                  [size]="24"
+                  class="text-green-500"
+                />
+                <h3 class="text-green-800 text-lg font-semibold">
+                  Encontramos tus datos
+                </h3>
+              </div>
+              <p class="text-green-700 text-sm mb-4">
+                Confirma que estos son tus datos. Luego validaremos un código
+                para crear o vincular tu acceso.
+              </p>
+              <div class="grid grid-cols-2 gap-3 text-gray-700">
+                <div>
+                  <p class="text-gray-500 text-xs">Nombre</p>
+                  <p class="font-semibold">
+                    {{ p.firstName }} {{ p.lastName }}
+                  </p>
+                </div>
+                <div>
+                  <p class="text-gray-500 text-xs">Documento</p>
+                  <p class="font-semibold">{{ p.maskedDocument }}</p>
+                </div>
+                <div>
+                  <p class="text-gray-500 text-xs">Tipo de documento</p>
+                  <p class="font-semibold">{{ p.documentType }}</p>
+                </div>
+              </div>
+            </div>
+          }
+
+          @if (patientStatus() === "existing-user") {
+            <div class="bg-blue-50 border-2 border-blue-300 rounded-xl p-5">
+              <div class="flex items-center gap-3 mb-3">
+                <lucide-angular
+                  [img]="CheckCircle"
+                  [size]="24"
+                  class="text-blue-500"
+                />
+                <h3 class="text-blue-800 text-lg font-semibold">
+                  Ya existe una cuenta con este documento
+                </h3>
+              </div>
+              <p class="text-blue-700 text-sm">
+                Este documento ya tiene una cuenta del sistema. Completa tus
+                datos como paciente y validaremos un código. No necesitas crear
+                una nueva contraseña.
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Tipo de documento <span class="text-red-500">*</span>
+                </label>
+                <select
+                  [ngModel]="getFormField('documentType')"
+                  (ngModelChange)="setFormField('documentType', $event)"
+                  class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">Seleccione...</option>
+                  <option value="REGISTRO_NACIMIENTO">
+                    Registro de Nacimiento
+                  </option>
+                  <option value="TARJETA_IDENTIDAD">
+                    Tarjeta de Identidad
+                  </option>
+                  <option value="CEDULA">Cédula</option>
+                  <option value="PASAPORTE">Pasaporte</option>
+                </select>
+                @if (errors()["documentType"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["documentType"] }}
+                  </p>
+                }
+              </div>
+
+              <div>
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Nombres <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  [ngModel]="getFormField('firstName')"
+                  (ngModelChange)="setFormField('firstName', $event)"
+                  (input)="handleNameInput($event, 'firstName')"
+                  placeholder="Nombres del paciente"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['firstName']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
+                @if (firstNameLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ firstNameLimitMsg() }}</p>
+                } @else if (errors()["firstName"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["firstName"] }}
+                  </p>
+                }
+              </div>
+
+              <div>
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Apellidos <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  [ngModel]="getFormField('lastName')"
+                  (ngModelChange)="setFormField('lastName', $event)"
+                  (input)="handleNameInput($event, 'lastName')"
+                  placeholder="Apellidos del paciente"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['lastName']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
+                @if (lastNameLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ lastNameLimitMsg() }}</p>
+                } @else if (errors()["lastName"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["lastName"] }}
+                  </p>
+                }
+              </div>
+
+              <div>
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Celular <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  [ngModel]="getFormField('phone')"
+                  (ngModelChange)="setFormField('phone', $event)"
+                  (input)="handlePhoneInput($event)"
+                  placeholder="Ej: 3001234567"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['phone']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
+                @if (phoneLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ phoneLimitMsg() }}</p>
+                } @else if (errors()["phone"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["phone"] }}
+                  </p>
+                }
+              </div>
+
+              <div>
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Género <span class="text-red-500">*</span>
+                </label>
+                <select
+                  [ngModel]="getFormField('gender')"
+                  (ngModelChange)="setFormField('gender', $event)"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['gender']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                >
+                  <option value="">Seleccione...</option>
+                  <option value="MASCULINO">Masculino</option>
+                  <option value="FEMENINO">Femenino</option>
+                  <option value="OTRO">Otro</option>
+                </select>
+                @if (errors()["gender"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["gender"] }}
+                  </p>
+                }
+              </div>
+
+              <div>
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Fecha de nacimiento <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  [ngModel]="getFormField('birthDate')"
+                  (ngModelChange)="setFormField('birthDate', $event)"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['birthDate']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
+                @if (errors()["birthDate"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["birthDate"] }}
+                  </p>
+                }
+              </div>
+
+              <div class="sm:col-span-2">
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Correo electrónico
+                  <span class="text-gray-400 text-xs">(opcional)</span>
+                </label>
+                <input
+                  type="email"
+                  [ngModel]="getFormField('email')"
+                  (ngModelChange)="setFormField('email', $event)"
+                  (input)="handleEmailInput($event)"
+                  placeholder="tucorreo@ejemplo.com"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['email']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
+                @if (emailLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ emailLimitMsg() }}</p>
+                } @else if (errors()["email"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["email"] }}
+                  </p>
+                }
+              </div>
+
+              <div class="sm:col-span-2">
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Celular de acudiente
+                  @if (isMinorPatient()) {
+                    <span class="text-red-500">*</span>
+                  } @else {
+                    <span class="text-gray-400 text-xs">
+                      (requerido para menores de edad)
+                    </span>
+                  }
+                </label>
+                <input
+                  type="tel"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  [ngModel]="getFormField('guardianPhone')"
+                  (ngModelChange)="setFormField('guardianPhone', $event)"
+                  (input)="handleGuardianPhoneInput($event)"
+                  placeholder="Ej: 3009876543"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['guardianPhone']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
+                @if (guardianPhoneLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ guardianPhoneLimitMsg() }}</p>
+                } @else if (errors()["guardianPhone"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["guardianPhone"] }}
+                  </p>
+                }
+              </div>
+            </div>
+          }
+
+          @if (patientStatus() === "already-linked" && foundPatient(); as p) {
+            <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-5">
+              <h3 class="text-amber-800 text-lg font-semibold mb-3">
+                Ya existe una cuenta asociada
+              </h3>
+              <p class="text-amber-700 text-sm mb-4">
+                Este paciente ya tiene una cuenta creada. Inicia sesión o
+                recupera tu acceso si lo necesitas.
+              </p>
+              <div class="grid grid-cols-2 gap-3 text-gray-700">
+                <div>
+                  <p class="text-gray-500 text-xs">Nombre</p>
+                  <p class="font-semibold">
+                    {{ p.firstName }} {{ p.lastName }}
+                  </p>
+                </div>
+                <div>
+                  <p class="text-gray-500 text-xs">Documento</p>
+                  <p class="font-semibold">{{ p.maskedDocument }}</p>
+                </div>
+                <div>
+                  <p class="text-gray-500 text-xs">Tipo de documento</p>
+                  <p class="font-semibold">{{ p.documentType }}</p>
+                </div>
+              </div>
+            </div>
+          }
+
+          @if (patientStatus() === "not-found") {
+            <div
+              class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-yellow-800 text-sm"
+            >
+              No encontramos tu documento en el sistema. Completa tus datos para
+              registrarte.
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Tipo de documento <span class="text-red-500">*</span>
+                </label>
+                <select
+                  [ngModel]="getFormField('documentType')"
+                  (ngModelChange)="setFormField('documentType', $event)"
+                  class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">Seleccione...</option>
+                  <option value="REGISTRO_NACIMIENTO">
+                    Registro de Nacimiento
+                  </option>
+                  <option value="TARJETA_IDENTIDAD">
+                    Tarjeta de Identidad
+                  </option>
+                  <option value="CEDULA">Cédula</option>
+                  <option value="PASAPORTE">Pasaporte</option>
+                </select>
+                @if (errors()["documentType"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["documentType"] }}
+                  </p>
+                }
+              </div>
+
+              <div>
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Nombres <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  [ngModel]="getFormField('firstName')"
+                  (ngModelChange)="setFormField('firstName', $event)"
+                  (input)="handleNameInput($event, 'firstName')"
+                  placeholder="Nombres del paciente"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['firstName']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
+                @if (firstNameLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ firstNameLimitMsg() }}</p>
+                } @else if (errors()["firstName"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["firstName"] }}
+                  </p>
+                }
+              </div>
+
+              <div>
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Apellidos <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  [ngModel]="getFormField('lastName')"
+                  (ngModelChange)="setFormField('lastName', $event)"
+                  (input)="handleNameInput($event, 'lastName')"
+                  placeholder="Apellidos del paciente"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['lastName']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
+                @if (lastNameLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ lastNameLimitMsg() }}</p>
+                } @else if (errors()["lastName"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["lastName"] }}
+                  </p>
+                }
+              </div>
+
+              <div>
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Celular <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  [ngModel]="getFormField('phone')"
+                  (ngModelChange)="setFormField('phone', $event)"
+                  (input)="handlePhoneInput($event)"
+                  placeholder="Ej: 3001234567"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['phone']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
+                @if (phoneLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ phoneLimitMsg() }}</p>
+                } @else if (errors()["phone"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["phone"] }}
+                  </p>
+                }
+              </div>
+
+              <div>
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Género <span class="text-red-500">*</span>
+                </label>
+                <select
+                  [ngModel]="getFormField('gender')"
+                  (ngModelChange)="setFormField('gender', $event)"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['gender']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                >
+                  <option value="">Seleccione...</option>
+                  <option value="MASCULINO">Masculino</option>
+                  <option value="FEMENINO">Femenino</option>
+                  <option value="OTRO">Otro</option>
+                </select>
+                @if (errors()["gender"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["gender"] }}
+                  </p>
+                }
+              </div>
+
+              <div>
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Fecha de nacimiento <span class="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  [ngModel]="getFormField('birthDate')"
+                  (ngModelChange)="setFormField('birthDate', $event)"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['birthDate']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
+                @if (errors()["birthDate"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["birthDate"] }}
+                  </p>
+                }
+              </div>
+
+              <div class="sm:col-span-2">
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Correo electrónico
+                  <span class="text-gray-400 text-xs">(opcional)</span>
+                </label>
+                <input
+                  type="email"
+                  [ngModel]="getFormField('email')"
+                  (ngModelChange)="setFormField('email', $event)"
+                  (input)="handleEmailInput($event)"
+                  placeholder="tucorreo@ejemplo.com"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['email']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
+                @if (emailLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ emailLimitMsg() }}</p>
+                } @else if (errors()["email"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["email"] }}
+                  </p>
+                }
+              </div>
+
+              <div class="sm:col-span-2">
+                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                  Celular de acudiente
+                  @if (isMinorPatient()) {
+                    <span class="text-red-500">*</span>
+                  } @else {
+                    <span class="text-gray-400 text-xs">
+                      (requerido para menores de edad)
+                    </span>
+                  }
+                </label>
+                <input
+                  type="tel"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  [ngModel]="getFormField('guardianPhone')"
+                  (ngModelChange)="setFormField('guardianPhone', $event)"
+                  (input)="handleGuardianPhoneInput($event)"
+                  placeholder="Ej: 3009876543"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['guardianPhone']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
+                @if (guardianPhoneLimitMsg()) {
+                  <p class="text-red-500 text-sm mt-1">{{ guardianPhoneLimitMsg() }}</p>
+                } @else if (errors()["guardianPhone"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["guardianPhone"] }}
+                  </p>
+                }
+              </div>
+            </div>
+          }
+
+          @if (errorMessage()) {
+            <div
+              class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"
+            >
+              {{ errorMessage() }}
+            </div>
+          }
+
+          <div class="flex justify-end mt-4">
+            <button
+              (click)="goToStep2()"
+              class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-semibold transition-colors"
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (step() === 2) {
+        <div class="space-y-5">
+          <div>
+            <h2 class="text-blue-800 text-2xl font-bold">
+              @if (requiresPassword()) {
+                Crear tu cuenta
+              } @else {
+                Confirmar acceso
+              }
+            </h2>
+
+            @if (displayName()) {
+              <p class="text-gray-500 mt-1">
+                Hola, <strong>{{ displayName() }}</strong
+                >.
+                @if (requiresPassword()) {
+                  Tu usuario será tu número de documento. Define tu contraseña
+                  para completar el registro.
+                } @else if (isExistingPatient()) {
+                  Validaremos tu identidad con un código para vincular tu acceso
+                  como paciente.
+                } @else if (isExistingSystemUser()) {
+                  Ya tienes una cuenta del sistema. Validaremos tu identidad con
+                  un código para habilitar tu acceso como paciente sin cambiar
+                  tu contraseña actual.
+                }
+              </p>
+            } @else {
+              <p class="text-gray-500 mt-1">
+                @if (requiresPassword()) {
+                  Define tu contraseña para completar el registro.
+                } @else {
+                  Validaremos tu identidad con un código para completar el
+                  proceso.
+                }
+              </p>
+            }
+          </div>
+
+          @if (requiresPassword()) {
+            <div>
+              <label class="block text-gray-700 mb-1 text-sm font-medium">
+                Contraseña <span class="text-red-500">*</span>
+              </label>
+              <div class="relative">
+                <input
+                  [type]="showPassword() ? 'text' : 'password'"
+                  [ngModel]="password()"
+                  (ngModelChange)="password.set($event)"
+                  placeholder="Mínimo 8 caracteres"
+                  class="w-full border-2 rounded-xl px-4 py-3 pr-12 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['password']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
+                <button
+                  type="button"
+                  (click)="showPassword.set(!showPassword())"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <lucide-angular
+                    [img]="showPassword() ? EyeOff : Eye"
+                    [size]="18"
+                  />
+                </button>
+              </div>
+              @if (errors()["password"]) {
+                <p class="text-red-500 text-sm mt-1">
+                  {{ errors()["password"] }}
+                </p>
+              }
+            </div>
+
+            <div>
+              <label class="block text-gray-700 mb-1 text-sm font-medium">
+                Confirmar contraseña <span class="text-red-500">*</span>
+              </label>
+              <div class="relative">
+                <input
+                  [type]="showConfirmPassword() ? 'text' : 'password'"
+                  [ngModel]="confirmPassword()"
+                  (ngModelChange)="confirmPassword.set($event)"
+                  placeholder="Repite tu contraseña"
+                  class="w-full border-2 rounded-xl px-4 py-3 pr-12 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['confirmPassword']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
+                <button
+                  type="button"
+                  (click)="showConfirmPassword.set(!showConfirmPassword())"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <lucide-angular
+                    [img]="showConfirmPassword() ? EyeOff : Eye"
+                    [size]="18"
+                  />
+                </button>
+              </div>
+              @if (errors()["confirmPassword"]) {
+                <p class="text-red-500 text-sm mt-1">
+                  {{ errors()["confirmPassword"] }}
+                </p>
+              }
+            </div>
+          } @else {
+            <div
+              class="bg-blue-50 border border-blue-200 text-blue-700 rounded-xl px-4 py-3 text-sm"
+            >
+              Te enviaremos un código de verificación para completar el proceso.
+            </div>
+          }
+
+          @if (errorMessage()) {
+            <div
+              class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"
+            >
+              {{ errorMessage() }}
+            </div>
+          }
+
+          <div class="flex gap-4 mt-4">
+            <button
+              (click)="goBack()"
+              class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Atrás
+            </button>
+            <button
+              (click)="submit()"
+              [disabled]="isLoading()"
+              class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+            >
+              @if (isLoading()) {
+                <span>Procesando...</span>
+              } @else {
+                <lucide-angular [img]="UserPlus" [size]="18" />
+                <span>Continuar</span>
+              }
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (step() === 3) {
+        <div class="space-y-5">
+          <div>
+            <h2 class="text-blue-800 text-2xl font-bold">Verificar código</h2>
+            <p class="text-gray-500 mt-1">
+              Ingresa el código de verificación para completar la creación de tu
+              cuenta.
+            </p>
+          </div>
+
+          @if (successMessage()) {
+            <div
+              class="bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm"
+            >
+              {{ successMessage() }}
+            </div>
+          }
+
+          <div>
+            <label class="block text-gray-700 mb-1 text-sm font-medium">
+              Código de verificación <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              maxlength="6"
+              [ngModel]="verificationCode()"
+              (ngModelChange)="verificationCode.set($event)"
+              placeholder="Ej. 123456"
+              class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+              [ngClass]="
+                errors()['verificationCode']
+                  ? 'border-red-400 bg-red-50'
+                  : 'border-blue-200 focus:border-blue-500'
+              "
+            />
+            @if (errors()["verificationCode"]) {
+              <p class="text-red-500 text-sm mt-1">
+                {{ errors()["verificationCode"] }}
+              </p>
+            }
+          </div>
+
+          @if (errorMessage()) {
+            <div
+              class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"
+            >
+              {{ errorMessage() }}
+            </div>
+          }
+
+          <div class="flex gap-4 mt-4">
+            <button
+              (click)="goBack()"
+              class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Atrás
+            </button>
+
+            <button
+              (click)="confirmCode()"
+              [disabled]="isLoading()"
+              class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+            >
+              @if (isLoading()) {
+                <span>Verificando...</span>
+              } @else {
+                <lucide-angular [img]="KeyRound" [size]="18" />
+                <span>Confirmar código</span>
+              }
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>

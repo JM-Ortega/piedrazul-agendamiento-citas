@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +29,7 @@ public class AppointmentController {
     private final GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase;
     private final CitaDtoMapper citaDtoMapper;
     private final ListMyAppointmentsUseCase listMyAppointmentsUseCase;
+    private final UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase;
 
     public AppointmentController(
             GetAvailableSlotsUseCase getAvailableSlotsUseCase,
@@ -36,7 +38,8 @@ public class AppointmentController {
             ListAppointmentsUseCase listAppointmentsUseCase,
             GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase,
             CitaDtoMapper citaDtoMapper,
-            ListMyAppointmentsUseCase listMyAppointmentsUseCase) {
+            ListMyAppointmentsUseCase listMyAppointmentsUseCase,
+            UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase) {
         this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
         this.scheduleManualAppointmentUseCase = scheduleManualAppointmentUseCase;
         this.scheduleAutonomousAppointmentUseCase = scheduleAutonomousAppointmentUseCase;
@@ -44,9 +47,11 @@ public class AppointmentController {
         this.getSpecialtiesWithDoctorUseCase = getSpecialtiesWithDoctorUseCase;
         this.citaDtoMapper = citaDtoMapper;
         this.listMyAppointmentsUseCase = listMyAppointmentsUseCase;
+        this.updateAppointmentStatusUseCase = updateAppointmentStatusUseCase;
     }
 
     // Franjas disponibles según el médico y la fecha
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     @GetMapping("/available-slots")
     public ResponseEntity<List<AppointmentTime>> getAvailableSlots(
             @RequestParam UUID doctorId,
@@ -60,6 +65,7 @@ public class AppointmentController {
 
     // Un unico método para listar por idDoctor, idPatient, fecha o combinaciones
     @GetMapping
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<List<AppointmentResponse>> list(
             @RequestParam(required = false) UUID idDoctor,
             @RequestParam(required = false) UUID idPatient,
@@ -70,6 +76,7 @@ public class AppointmentController {
     }
 
     @GetMapping("/me")
+    @PreAuthorize("hasRole('PATIENT')")
     public ResponseEntity<List<AppointmentResponse>> listMyAppointments(
             @AuthenticationPrincipal Jwt jwt) {
 
@@ -85,10 +92,13 @@ public class AppointmentController {
 
     // Crear cita
     @PostMapping
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<Void> scheduleAppointment(
-            @RequestBody @Valid AppointmentRequest request) {
+            @RequestBody @Valid AppointmentRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
 
         request.validate();
+        String performedBy = resolvePerformedBy(jwt);
 
         switch (request.getSchedulingOrigin()) {
 
@@ -106,7 +116,8 @@ public class AppointmentController {
                     request.getDoctorId(),
                     request.getSpecialty(),
                     request.getDate(),
-                    new AppointmentTime(request.getStartTime())
+                    new AppointmentTime(request.getStartTime()),
+                    performedBy
             );
 
             // Paciente agenda por la web, ya tiene cuenta en el sistema
@@ -115,7 +126,8 @@ public class AppointmentController {
                     request.getDoctorId(),
                     request.getSpecialty(),
                     request.getDate(),
-                    new AppointmentTime(request.getStartTime())
+                    new AppointmentTime(request.getStartTime()),
+                    performedBy
             );
         }
 
@@ -124,7 +136,25 @@ public class AppointmentController {
 
     // Listar un médico por defecto para cada especialidad
     @GetMapping("/specialties-with-doctor")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<List<DoctorResponse>> getSpecialtiesWithDoctor() {
         return ResponseEntity.ok(getSpecialtiesWithDoctorUseCase.getSpecialtiesWithDoctor());
+    }
+
+    // Actualizar el estado de una cita a atendida
+    @PutMapping("/{appointmentId}/mark-as-attended")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<Void> markAppointmentAsAttended(@PathVariable UUID appointmentId) {
+        updateAppointmentStatusUseCase.markAsAttended(appointmentId);
+        return ResponseEntity.ok().build();
+    }
+
+    private String resolvePerformedBy(Jwt jwt) {
+        String preferredUsername = jwt.getClaimAsString("preferred_username");
+        if (preferredUsername != null && !preferredUsername.isBlank()) {
+            return preferredUsername;
+        }
+
+        return jwt.getSubject();
     }
 }

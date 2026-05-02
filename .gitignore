@@ -373,6 +373,18 @@ terraform.rc
 
 
 
+# keycloakify build
 infra/keycloak/themes/keycloakify-starter/node_modules/
 infra/keycloak/themes/keycloakify-starter/dist/
-infra/keycloak/themes/dist/
+
+# ignorar todo el dist de keycloak
+infra/keycloak/themes/dist/*
+
+# reabrir carpeta dist
+!infra/keycloak/themes/dist/
+
+# reabrir subcarpetas
+!infra/keycloak/themes/dist/**/
+
+# permitir jars dentro de dist
+!infra/keycloak/themes/dist/**/*.jar

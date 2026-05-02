@@ -1,16 +1,25 @@
 package co.edu.unicauca.piedrazul.backend.patients.api.dto;
 
+import co.edu.unicauca.piedrazul.backend.config.security.sanitization.Sanitize;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 public class ConfirmLinkUserAccountRequest {
 
     @NotBlank
+    @Size(max = 12)
+    @Pattern(regexp = "^[A-Za-z0-9._-]{5,30}$")
+    @Sanitize
     private String documentNumber;
 
     @NotBlank
+    @Pattern(regexp = "^[A-Za-z0-9]{4,12}$")
+    @Sanitize
     private String code;
 
     @NotBlank
+    @Size(min = 8, max = 100)
     private String password;
 
     public String getDocumentNumber() {

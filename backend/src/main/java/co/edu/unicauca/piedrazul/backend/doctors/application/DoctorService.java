@@ -34,7 +34,9 @@ public class DoctorService {
         Doctor doctor = new Doctor();
         doctor.setFirstName(request.firstName());
         doctor.setLastName(request.lastName());
+        doctor.setDocumentType(request.documentType());
         doctor.setIdentification(request.identification());
+        doctor.setPhone(request.phone());
         doctor.setSpecialty(request.specialty());
         doctor.setLaborStart(request.laborStart());
         doctor.setLaborEnd(request.laborEnd());
@@ -177,7 +179,7 @@ public class DoctorService {
 
     // Habilitar medico
     @Transactional
-    public DoctorResponse enableDoctor(UUID idDoctor, LocalDate newStart, LocalDate newEnd) {
+    public void enableDoctor(UUID idDoctor, LocalDate newStart, LocalDate newEnd) {
         validateLaborDateRange(newStart, newEnd);
 
         Doctor doctor = doctorRepository.findById(idDoctor)
@@ -195,12 +197,11 @@ public class DoctorService {
 
         // 4. Guardamos y retornamos el DTO actualizado
         Doctor savedDoctor = doctorRepository.save(doctor);
-        return DoctorResponse.fromEntity(savedDoctor);
     }
 
     //Deshabilitar medico
     @Transactional
-    public DoctorResponse disableDoctor(UUID idDoctor, boolean force) {
+    public void disableDoctor(UUID idDoctor, boolean force) {
         // 1. Buscar al doctor
         Doctor doctor = doctorRepository.findById(idDoctor)
                 .orElseThrow(() -> new EntityNotFoundException("Doctor no encontrado"));
@@ -233,8 +234,6 @@ public class DoctorService {
 
         // 6. Persistir cambios
         Doctor updatedDoctor = doctorRepository.save(doctor);
-
-        return DoctorResponse.fromEntity(updatedDoctor);
     }
 
     public List<Doctor> findAllDoctors() {
@@ -243,7 +242,11 @@ public class DoctorService {
 
     public Doctor getDoctorById(UUID idDoctor) {
         return doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new RuntimeException("Doctor not found"));
+                .orElseThrow(() -> new RuntimeException("Doctor no encontrado"));
+    }
+
+    public Doctor findByUserId(UUID keycloakId) {
+        return doctorRepository.findByIdUser(keycloakId);
     }
 
     public List<Doctor> getDoctorBySpeciality(Specialty specialty) {
