@@ -196,7 +196,7 @@ public class DoctorService {
         syncUserStatus(doctor);
 
         // 4. Guardamos y retornamos el DTO actualizado
-        Doctor savedDoctor = doctorRepository.save(doctor);
+        doctorRepository.save(doctor);
     }
 
     //Deshabilitar medico
@@ -233,7 +233,7 @@ public class DoctorService {
         syncUserStatus(doctor);
 
         // 6. Persistir cambios
-        Doctor updatedDoctor = doctorRepository.save(doctor);
+        doctorRepository.save(doctor);
     }
 
     public List<Doctor> findAllDoctors() {
