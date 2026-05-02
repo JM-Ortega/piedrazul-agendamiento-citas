@@ -116,22 +116,33 @@
                 </div>
               </div>
 
-              <!-- Lado derecho: botones historia clinica y reagendar -->
+              <!-- Lado derecho: botones según estado -->
               <div class="flex flex-col gap-3 lg:items-end">
-                <button
-                  (click)="scheduleNewAppointment(apt.documentNumber)"
-                  class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white
-                         px-5 py-2.5 rounded-lg transition-colors text-base"
-                >
-                  <lucide-angular [img]="Plus" [size]="18"></lucide-angular>
-                  Nueva Cita
-                </button>
-                <button
-                  class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg transition-colors text-base"
-                >
-                  <lucide-angular [img]="FileText" [size]="18"></lucide-angular>
-                  Ver Historia Clínica
-                </button>
+
+                <!-- Botón "Atender": solo cuando la cita está AGENDADA (Confirmada) -->
+                @if (apt.appointmentState === 'AGENDADA') {
+                  <button
+                    (click)="openAttendModal(apt.idAppointment)"
+                    class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white
+                           px-5 py-2.5 rounded-lg transition-colors text-base"
+                  >
+                    <lucide-angular [img]="Check" [size]="18"></lucide-angular>
+                    Atender
+                  </button>
+                }
+
+                <!-- Botón "Nueva cita": solo cuando la cita ya fue ATENDIDA -->
+                @if (apt.appointmentState === 'ATENDIDA') {
+                  <button
+                    (click)="scheduleNewAppointment(apt.documentNumber)"
+                    class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white
+                           px-5 py-2.5 rounded-lg transition-colors text-base"
+                  >
+                    <lucide-angular [img]="Calendar" [size]="18"></lucide-angular>
+                    Nueva cita
+                  </button>
+                }
+
               </div>
             </div>
           </div>
@@ -140,3 +151,53 @@
     }
   </div>
 </div>
+
+<!-- Modal de confirmación: ¿Marcar cita como atendida? -->
+@if (showConfirmModal()) {
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+  >
+    <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border-2 border-blue-100">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="bg-emerald-100 rounded-full p-3">
+          <lucide-angular [img]="FileText" [size]="28" class="text-emerald-600"></lucide-angular>
+        </div>
+        <h3 class="text-blue-900 text-xl font-semibold">Confirmar atención</h3>
+      </div>
+
+      <p class="text-gray-600 text-base mb-8">
+        ¿Desea marcar esta cita como <strong class="text-emerald-700">Atendida</strong>?
+        Esta acción actualizará el estado de la cita.
+      </p>
+
+      <div class="flex gap-3 justify-end">
+        <!-- Botón No -->
+        <button
+          (click)="closeModal()"
+          [disabled]="isMarkingAttended()"
+          class="px-6 py-2.5 rounded-lg border-2 border-gray-300 text-gray-700
+                 hover:bg-gray-50 transition-colors text-base disabled:opacity-50"
+        >
+          No, cancelar
+        </button>
+
+        <!-- Botón Sí -->
+        <button
+          (click)="confirmMarkAsAttended()"
+          [disabled]="isMarkingAttended()"
+          class="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-emerald-600
+                 hover:bg-emerald-700 text-white transition-colors text-base
+                 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          @if (isMarkingAttended()) {
+            <span class="inline-block w-4 h-4 border-2 border-white border-t-transparent
+                         rounded-full animate-spin"></span>
+            Guardando...
+          } @else {
+            Sí, marcar como atendida
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}

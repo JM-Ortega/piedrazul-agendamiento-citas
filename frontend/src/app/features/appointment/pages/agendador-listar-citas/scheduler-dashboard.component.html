@@ -176,7 +176,7 @@
             <option value="">Todos los médicos</option>
             @for (doc of doctors(); track doc.id) {
               <option [value]="doc.name">
-                {{ doc.name }} — {{ doc.specialty }}
+                {{ doc.name }} — {{ specialtyLabel(doc.specialty) }}
               </option>
             }
           </select>
@@ -257,50 +257,75 @@
       }
     </div>
 
-    <!-- Exportar — igual al componente doctor -->
-    @if (results().length > 0) {
-      <div
-        class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200"
-      >
+    <!-- ── Exportar ── -->
+    @if (searched()) {
+      @if (hasTodayAppointments()) {
         <div
-          class="flex flex-col sm:flex-row items-center justify-between gap-4"
+          class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200"
         >
-          <div class="flex items-center gap-3">
-            <div class="bg-green-500 rounded-full p-3">
-              <lucide-angular
-                [img]="Download"
-                [size]="28"
-                class="text-white"
-              ></lucide-angular>
+          <div
+            class="flex flex-col sm:flex-row items-center justify-between gap-4"
+          >
+            <div class="flex items-center gap-3">
+              <div class="bg-green-500 rounded-full p-3">
+                <lucide-angular
+                  [img]="Download"
+                  [size]="28"
+                  class="text-white"
+                ></lucide-angular>
+              </div>
+              <div>
+                <h3 class="text-green-800 text-xl font-bold">
+                  Exportar Reporte de Hoy
+                </h3>
+                <p
+                  class="text-green-600 text-sm flex items-center gap-1 mt-0.5"
+                >
+                  <lucide-angular [img]="Calendar" [size]="14"></lucide-angular>
+                  Solo se exportan las citas del día de hoy ({{
+                    formatDate(today)
+                  }})
+                </p>
+                <p class="text-green-700 text-base font-medium mt-1">
+                  Filtros de médico y estado aplicados al reporte
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 class="text-green-800 text-xl font-bold">
-                Exportar Reporte de Hoy
-              </h3>
-              <!-- Mismo aviso que el componente doctor: siempre exporta hoy -->
-              <p class="text-green-600 text-sm flex items-center gap-1 mt-0.5">
-                <lucide-angular [img]="Calendar" [size]="14"></lucide-angular>
-                Solo se exportan las citas del día de hoy ({{
-                  formatDate(today)
-                }})
-              </p>
-              <p class="text-green-700 text-base font-medium mt-1">
-                Filtros de médico y estado aplicados al reporte
-              </p>
+            <div class="flex flex-col items-end gap-2">
+              <button
+                (click)="filterDoctor() ? showExportModal.set(true) : null"
+                [disabled]="!filterDoctor()"
+                [class]="
+                  'flex items-center gap-3 px-8 py-4 rounded-xl text-lg font-semibold transition-colors shadow-lg ' +
+                  (filterDoctor()
+                    ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed')
+                "
+              >
+                <lucide-angular
+                  [img]="FileSpreadsheet"
+                  [size]="24"
+                ></lucide-angular>
+                Exportar Citas
+              </button>
+              @if (!filterDoctor()) {
+                <p class="text-red-500 text-sm">
+                  Debe seleccionar un médico antes de exportar.
+                </p>
+              }
             </div>
           </div>
-          <button
-            (click)="showExportModal.set(true)"
-            class="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-colors shadow-lg"
-          >
-            <lucide-angular
-              [img]="FileSpreadsheet"
-              [size]="24"
-            ></lucide-angular>
-            Exportar Citas
-          </button>
         </div>
-      </div>
+      } @else {
+        <div
+          class="bg-gray-50 border-2 border-gray-200 rounded-2xl p-5 text-center"
+        >
+          <p class="text-gray-500 text-base">
+            No hay citas programadas para hoy, por lo que no es posible exportar
+            un reporte.
+          </p>
+        </div>
+      }
     }
 
     <!-- Resultados -->
@@ -469,7 +494,9 @@
                       <p class="text-gray-700 text-base">
                         {{ apt.doctorName }}
                       </p>
-                      <p class="text-gray-400 text-sm">{{ apt.specialty }}</p>
+                      <p class="text-gray-400 text-sm">
+                        {{ specialtyLabel(apt.specialty) }}
+                      </p>
                     </td>
                     <td class="px-4 py-4">
                       <span

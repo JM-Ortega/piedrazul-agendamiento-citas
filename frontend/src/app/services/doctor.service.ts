@@ -48,9 +48,17 @@ export class DoctorService {
   getTodayAppointmentsByDoctor(
     doctorId: string,
   ): Observable<AppointmentsPatient[]> {
-    const today = new Date().toISOString().split('T')[0];
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     return this.http.get<AppointmentsPatient[]>(`${this.apiUrl}/appointments`, {
       params: { idDoctor: doctorId, date: today },
     });
+  }
+
+  updateAppointmentState(appointmentId: string, state: string,): Observable<void> {
+    return this.http.patch<void>(
+      `${this.apiUrl}/appointments/${appointmentId}/mark-as-attended`,
+      { appointmentState: state },
+    );
   }
 }

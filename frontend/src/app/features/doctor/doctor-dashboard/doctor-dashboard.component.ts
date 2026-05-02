@@ -7,6 +7,7 @@ import {
   LucideAngularModule,
   Plus,
   User,
+  Check,
 } from 'lucide-angular';
 import { AppointmentsPatient } from '../../../models/dtos/appointments.dto';
 import { Doctor } from '../../../models/interfaces/doctor.model';
@@ -27,12 +28,20 @@ export class DoctorDashboardComponent implements OnInit {
   readonly FileText = FileText;
   readonly User = User;
   readonly Plus = Plus;
+  readonly Check = Check;
 
   today = (() => {
     const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   })();
   currentDoctor = signal<Doctor | null>(null);
+
+  showConfirmModal = signal(false);
+  selectedAppointmentId = signal<string | null>(null);
+  isMarkingAttended = signal(false);
 
   formattedSpecialty = computed(() => {
     const spec = this.currentDoctor()?.specialty ?? '';
@@ -69,13 +78,48 @@ export class DoctorDashboardComponent implements OnInit {
     this.doctorService.getMe().subscribe({
       next: (doctor) => {
         this.currentDoctor.set(doctor);
-        this.doctorService.getTodayAppointmentsByDoctor(doctor.id).subscribe({
-          next: (data) => this.appointments.set(data),
-          error: () => this.appointments.set([]),
-        });
+        this.loadAppointments(doctor.id);
       },
       error: () => this.router.navigate(['/']),
     });
+  }
+
+  private loadAppointments(doctorId: string): void {
+    this.doctorService.getTodayAppointmentsByDoctor(doctorId).subscribe({
+      next: (data) => this.appointments.set(data),
+      error: () => this.appointments.set([]),
+    });
+  }
+
+  /** Abre el modal de confirmación para marcar como atendida */
+  openAttendModal(appointmentId: string): void {
+    this.selectedAppointmentId.set(appointmentId);
+    this.showConfirmModal.set(true);
+  }
+
+  /** El usuario confirmó: llama al endpoint y refresca */
+  confirmMarkAsAttended(): void {
+    const id = this.selectedAppointmentId();
+    if (id === null) return;
+
+    this.isMarkingAttended.set(true);
+
+    this.doctorService.updateAppointmentState(id, 'ATENDIDA').subscribe({
+      next: () => {
+        this.closeModal();
+        const doctorId = this.currentDoctor()?.id;
+        if (doctorId) this.loadAppointments(doctorId);
+      },
+      error: () => {
+        this.isMarkingAttended.set(false);
+      },
+    });
+  }
+
+  closeModal(): void {
+    this.showConfirmModal.set(false);
+    this.selectedAppointmentId.set(null);
+    this.isMarkingAttended.set(false);
   }
 
   scheduleNewAppointment(documentNumber: string): void {

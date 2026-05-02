@@ -3,11 +3,12 @@ package co.edu.unicauca.piedrazul.backend.doctors.api;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.AvailableIntervalsResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.ScheduleResponse;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import co.edu.unicauca.piedrazul.backend.doctors.application.ScheduleService;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalTime;
@@ -16,6 +17,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/doctor/schedules")
+@PreAuthorize("hasRole('ADMIN')")
 public class SheduleController {
     private final ScheduleService scheduleService;
     private final DoctorService doctorService;
@@ -32,6 +34,7 @@ public class SheduleController {
      * @return El horario creado
      */
     @PostMapping("/{doctorId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<?> createSchedule(
             @PathVariable UUID doctorId,
             @RequestBody CreateScheduleRequest request
@@ -98,6 +101,7 @@ public class SheduleController {
      * @return Lista de horarios del doctor
      */
     @GetMapping("/{doctorId}")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<?> getSchedulesByDoctor(@PathVariable UUID doctorId) {
         var doctor = doctorService.getDoctorById(doctorId);
         List<Schedule> schedules = scheduleService.getSchedulesByDoctor(doctor);
@@ -114,6 +118,7 @@ public class SheduleController {
      * @return Lista de horarios disponibles
      */
     @GetMapping("/{doctorId}/available-intervals/{workday}")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<?> getAvailableIntervals(
             @PathVariable UUID doctorId,
             @PathVariable Workday workday
