@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -47,6 +48,7 @@ public class AppointmentController {
     }
 
     // Franjas disponibles según el médico y la fecha
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     @GetMapping("/available-slots")
     public ResponseEntity<List<AppointmentTime>> getAvailableSlots(
             @RequestParam UUID doctorId,
@@ -60,6 +62,7 @@ public class AppointmentController {
 
     // Un unico método para listar por idDoctor, idPatient, fecha o combinaciones
     @GetMapping
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<List<AppointmentResponse>> list(
             @RequestParam(required = false) UUID idDoctor,
             @RequestParam(required = false) UUID idPatient,
@@ -70,6 +73,7 @@ public class AppointmentController {
     }
 
     @GetMapping("/me")
+    @PreAuthorize("hasRole('PATIENT')")
     public ResponseEntity<List<AppointmentResponse>> listMyAppointments(
             @AuthenticationPrincipal Jwt jwt) {
 
@@ -85,6 +89,7 @@ public class AppointmentController {
 
     // Crear cita
     @PostMapping
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<Void> scheduleAppointment(
             @RequestBody @Valid AppointmentRequest request,
             @AuthenticationPrincipal Jwt jwt) {
@@ -128,6 +133,7 @@ public class AppointmentController {
 
     // Listar un médico por defecto para cada especialidad
     @GetMapping("/specialties-with-doctor")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<List<DoctorResponse>> getSpecialtiesWithDoctor() {
         return ResponseEntity.ok(getSpecialtiesWithDoctorUseCase.getSpecialtiesWithDoctor());
     }
