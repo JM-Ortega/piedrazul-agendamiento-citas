@@ -28,6 +28,7 @@ public class AppointmentController {
     private final GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase;
     private final CitaDtoMapper citaDtoMapper;
     private final ListMyAppointmentsUseCase listMyAppointmentsUseCase;
+    private final UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase;
 
     public AppointmentController(
             GetAvailableSlotsUseCase getAvailableSlotsUseCase,
@@ -36,7 +37,8 @@ public class AppointmentController {
             ListAppointmentsUseCase listAppointmentsUseCase,
             GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase,
             CitaDtoMapper citaDtoMapper,
-            ListMyAppointmentsUseCase listMyAppointmentsUseCase) {
+            ListMyAppointmentsUseCase listMyAppointmentsUseCase,
+            UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase) {
         this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
         this.scheduleManualAppointmentUseCase = scheduleManualAppointmentUseCase;
         this.scheduleAutonomousAppointmentUseCase = scheduleAutonomousAppointmentUseCase;
@@ -44,6 +46,7 @@ public class AppointmentController {
         this.getSpecialtiesWithDoctorUseCase = getSpecialtiesWithDoctorUseCase;
         this.citaDtoMapper = citaDtoMapper;
         this.listMyAppointmentsUseCase = listMyAppointmentsUseCase;
+        this.updateAppointmentStatusUseCase = updateAppointmentStatusUseCase;
     }
 
     // Franjas disponibles según el médico y la fecha
@@ -130,6 +133,13 @@ public class AppointmentController {
     @GetMapping("/specialties-with-doctor")
     public ResponseEntity<List<DoctorResponse>> getSpecialtiesWithDoctor() {
         return ResponseEntity.ok(getSpecialtiesWithDoctorUseCase.getSpecialtiesWithDoctor());
+    }
+
+    // Actualizar el estado de una cita a atendida
+    @PutMapping("/{appointmentId}/mark-as-attended")
+    public ResponseEntity<Void> markAppointmentAsAttended(@PathVariable UUID appointmentId) {
+        updateAppointmentStatusUseCase.markAsAttended(appointmentId);
+        return ResponseEntity.ok().build();
     }
 
     private String resolvePerformedBy(Jwt jwt) {

@@ -78,4 +78,11 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     public List<Appointment> findAll(){
         return jpaRepository.findAll().stream().map(mapper::toDomain).toList();
     }
+
+    @Override
+    public Appointment findById(UUID appointmentId) {
+        return jpaRepository.findById(appointmentId)
+                .map(mapper::toDomain)
+                .orElseThrow(() -> new IllegalArgumentException("Cita con ID: " + appointmentId + "no encontrada"));
+    }
 }
