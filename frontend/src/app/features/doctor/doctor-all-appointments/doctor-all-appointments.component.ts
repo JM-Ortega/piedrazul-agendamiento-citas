@@ -68,7 +68,13 @@ export class DoctorAllAppointmentsComponent {
   readonly Phone = Phone;
 
   // ── State ─────────────────────────────────────────────────────────────────
-  today = new Date().toISOString().split('T')[0];
+  today = (() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  })();
   currentDoctor = signal<Doctor | null>(null);
   private allAppointments = signal<AppointmentsPatient[]>([]);
   private loaded = signal(false);
@@ -105,6 +111,12 @@ export class DoctorAllAppointmentsComponent {
   ];
 
   // ── Computed ──────────────────────────────────────────────────────────────
+  hasTodayAppointments = computed(() =>
+    this.allAppointments().some(
+      (a) => a.date === this.today && a.appointmentState !== 'CANCELADA',
+    ),
+  );
+  hasAnyAppointments = computed(() => this.allAppointments().length > 0);
   filteredAppointments = computed(() => {
     let result = this.allAppointments();
 

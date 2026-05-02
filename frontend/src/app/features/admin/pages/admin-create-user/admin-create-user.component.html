@@ -43,8 +43,7 @@
           Roles del Usuario
         </h3>
         <p class="text-gray-500 text-base mb-4">
-          Seleccione uno o ambos roles (un usuario puede ser médico y agendador
-          simultáneamente)
+          Seleccione un rol para el usuario.Al menos un rol es requerido.
         </p>
 
         <div class="grid grid-cols-2 gap-4">
@@ -312,8 +311,8 @@
                 [class]="inputClass('specialty', 'pl-12 pr-4')"
               >
                 <option value="">Seleccione...</option>
-                <option *ngFor="let s of specialties" [value]="s">
-                  {{ s }}
+                <option *ngFor="let s of specialties" [value]="s.value">
+                  {{ s.label }}
                 </option>
               </select>
             </div>
@@ -324,6 +323,28 @@
               <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
               {{ errors.specialty }}
             </p>
+          </div>
+          <div>
+            <label class="block text-gray-700 text-base font-medium mb-2">
+              Tipo de Documento *
+            </label>
+            <div class="relative">
+              <lucide-icon
+                [name]="CreditCard"
+                [size]="20"
+                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              ></lucide-icon>
+              <select
+                [(ngModel)]="userForm.documentType"
+                name="documentType"
+                [class]="inputClass('documentType', 'pl-12 pr-4')"
+              >
+                <option value="">Seleccione...</option>
+                <option *ngFor="let dt of documentTypes" [value]="dt.value">
+                  {{ dt.label }}
+                </option>
+              </select>
+            </div>
           </div>
 
           <!-- Teléfono -->
@@ -587,12 +608,6 @@
             class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"
           ></span>
           {{ isSubmitting ? "Guardando..." : "Crear Usuario" }}
-          <span
-            *ngIf="!isSubmitting && selectedRoles.length > 1"
-            class="text-sm opacity-90"
-          >
-            ({{ getRolesDisplayText() }})
-          </span>
         </button>
       </div>
     </div>

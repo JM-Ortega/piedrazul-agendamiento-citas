@@ -4,6 +4,7 @@ export interface CreateDoctorRequestDto {
   firstName: string;
   lastName: string;
   identification: string;
+  documentType: string;
   phone: string;
   specialty: string[];
   laborStart: string; // ISO date: "YYYY-MM-DD"

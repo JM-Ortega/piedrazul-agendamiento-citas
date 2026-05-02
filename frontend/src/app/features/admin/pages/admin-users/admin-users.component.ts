@@ -22,6 +22,17 @@ export class AdminUsersComponent implements OnInit {
   private adminService = inject(AdminService);
   private router = inject(Router);
 
+  private readonly specialtyLabels: Record<string, string> = {
+    FISIOTERAPIA: 'Fisioterapia',
+    TERAPIA_NEURAL: 'Terapia Neural',
+    QUIROPRAXIA: 'Quiropraxia',
+  };
+
+  specialtyLabel(specialty: string): string {
+    const clean = specialty.replace(/^\[|\]$/g, '').trim();
+    return this.specialtyLabels[clean] ?? clean;
+  }
+
   readonly Users = Users;
   readonly UserPlus = UserPlus;
   readonly Stethoscope = Stethoscope;
@@ -73,66 +84,6 @@ export class AdminUsersComponent implements OnInit {
     });
   }
 
-  /*loadUsers(): void {
-    this.loading.set(true);
-    this.errorCarga.set('');
-
-    forkJoin([
-      this.adminService.getDoctors(),
-      this.adminService.getSchedulers(),
-      this.adminService.getBothRoleUsers(),
-    ]).subscribe({
-      next: ([doctors, schedulers, bothUsers]) => {
-        forkJoin(
-          doctors.map((d) => this.adminService.getSchedulesByDoctor(d.id)),
-        ).subscribe({
-          next: (allSchedules) => {
-            const doctorUsers: SystemUser[] = doctors.map((d, i) => {
-              const mapped = this.mapSchedulesToDoctor(allSchedules[i]);
-              return {
-                id: d.id,
-                firstName: d.name, // ← era d.firstName
-                lastName: '', // ← no existe en el modelo
-                documentId: '', // ← no existe en el modelo
-                roles: ['doctor'],
-                doctorData: {
-                  specialty: d.specialty,
-                  startTime: (mapped.startTime ?? d.startTime) || '',
-                  endTime: (mapped.endTime ?? d.endTime) || '',
-                  interval: d.appointmentInterval,
-                },
-              };
-            });
-            this.systemUsers.set([...doctorUsers, ...schedulers, ...bothUsers]);
-            this.loading.set(false);
-          },
-          error: () => {
-            const doctorUsers: SystemUser[] = doctors.map((d) => ({
-              id: d.id,
-              firstName: d.name, // ← era d.firstName
-              lastName: '', // ← no existe en el modelo
-              documentId: '', // ← no existe en el modelo
-              roles: ['doctor'],
-              doctorData: {
-                specialty: d.specialty,
-                startTime: d.startTime || '',
-                endTime: d.endTime || '',
-                interval: d.appointmentInterval,
-              },
-            }));
-            this.systemUsers.set([...doctorUsers, ...schedulers, ...bothUsers]);
-            this.loading.set(false);
-          },
-        });
-      },
-      error: () => {
-        this.errorCarga.set('Error al cargar los usuarios. Intente de nuevo.');
-        this.loading.set(false);
-      },
-    });
-  }
-*/
-
   navigateToCreate(): void {
     this.router.navigate(['/admin/usuarios/crear']);
   }
@@ -145,36 +96,4 @@ export class AdminUsersComponent implements OnInit {
   roleLabel(role: string): string {
     return role === 'doctor' ? 'Médico' : 'Agendador';
   }
-
-  // ── Private ───────────────────────────────────────────────────────────────
-  /*
-
-  private mapSchedulesToDoctor(schedules: dtoSchedule[]): Partial<Doctor> {
-    if (!schedules?.length) return {};
-    const dayMap: Record<string, number> = {
-      LUNES: 1,
-      MARTES: 2,
-      MIERCOLES: 3,
-      JUEVES: 4,
-      VIERNES: 5,
-    };
-    const daySchedules: { [day: number]: DaySchedule } = {};
-    const workdays: number[] = [];
-    schedules.forEach((s) => {
-      const day = dayMap[s.workday];
-      if (!day) return;
-      daySchedules[day] = {
-        startTime: s.startTime.substring(0, 5),
-        endTime: s.endTime.substring(0, 5),
-      };
-      workdays.push(day);
-    });
-    return {
-      startTime: schedules[0].startTime.substring(0, 5),
-      endTime: schedules[0].endTime.substring(0, 5),
-      daySchedules,
-      workdays: workdays.sort((a, b) => a - b),
-    };
-  }
-     */
 }

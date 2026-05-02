@@ -26,6 +26,7 @@ type Role = 'doctor' | 'scheduler';
 
 interface UserForm {
   documentId: string;
+  documentType: string;
   password: string;
   firstName: string;
   lastName: string;
@@ -43,6 +44,7 @@ interface UserForm {
 
 interface FormErrors {
   documentId?: string;
+  documentType?: string;
   password?: string;
   firstName?: string;
   lastName?: string;
@@ -103,6 +105,7 @@ export class AdminCreateUserComponent {
 
   userForm: UserForm = {
     documentId: '',
+    documentType: '',
     password: '',
     firstName: '',
     lastName: '',
@@ -117,8 +120,6 @@ export class AdminCreateUserComponent {
     endTime: '14:00',
   };
 
-  specialties: string[] = ['FISIOTERAPIA', 'TERAPIA_NEURAL', 'QUIROPRAXIA'];
-
   daysOfWeek = [
     { value: 1, label: 'Lunes' },
     { value: 2, label: 'Martes' },
@@ -126,7 +127,18 @@ export class AdminCreateUserComponent {
     { value: 4, label: 'Jueves' },
     { value: 5, label: 'Viernes' },
   ];
+  documentTypes: { value: string; label: string }[] = [
+    { value: 'CEDULA', label: 'Cédula de Ciudadanía' },
+    { value: 'TARJETA_IDENTIDAD', label: 'Tarjeta de Identidad' },
+    { value: 'REGISTRO_NACIMIENTO', label: 'Registro de Nacimiento' },
+    { value: 'PASAPORTE', label: 'Pasaporte' },
+  ];
 
+  specialties: { value: string; label: string }[] = [
+    { value: 'FISIOTERAPIA', label: 'Fisioterapia' },
+    { value: 'TERAPIA_NEURAL', label: 'Terapia Neural' },
+    { value: 'QUIROPRAXIA', label: 'Quiropraxia' },
+  ];
   constructor(
     private router: Router,
     private adminService: AdminService,
@@ -289,14 +301,9 @@ export class AdminCreateUserComponent {
   // ── Roles ─────────────────────────────────────────────────────────────────
 
   toggleRole(role: Role): void {
-    if (this.selectedRoles.includes(role)) {
-      this.selectedRoles = this.selectedRoles.filter((r) => r !== role);
-    } else {
-      this.selectedRoles = [...this.selectedRoles, role];
-    }
+    this.selectedRoles = [role];
     if (this.submitted) this.validateField('roles');
   }
-
   getRoleLabel(role: Role): string {
     return role === 'doctor' ? 'Médico' : 'Agendador';
   }
@@ -365,6 +372,11 @@ export class AdminCreateUserComponent {
           ) {
             this.errors.email = 'Ingrese un correo electrónico válido.';
           }
+        }
+        break;
+      case 'documentType':
+        if (this.hasDoctorRole && !this.userForm.documentType) {
+          this.errors.documentType = 'El tipo de documento es obligatorio.';
         }
         break;
 
@@ -461,6 +473,7 @@ export class AdminCreateUserComponent {
   private validateAll(): boolean {
     const fields: (keyof FormErrors)[] = [
       'documentId',
+      'documentType',
       'password',
       'firstName',
       'lastName',
@@ -535,6 +548,7 @@ export class AdminCreateUserComponent {
           firstName: this.userForm.firstName.trim(),
           lastName: this.userForm.lastName.trim(),
           identification: this.userForm.documentId,
+          documentType: this.userForm.documentType,
           phone: this.userForm.phone,
           specialty: [this.userForm.specialty],
           laborStart: this.userForm.laborStart,

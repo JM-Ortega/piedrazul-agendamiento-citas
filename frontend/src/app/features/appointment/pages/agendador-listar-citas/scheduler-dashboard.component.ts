@@ -66,7 +66,13 @@ export class SchedulerDashboardComponent implements OnInit {
   readonly UserCircle = UserCircle;
 
   // ── Date helpers ──────────────────────────────────────────────────────────
-  today = new Date().toISOString().split('T')[0];
+  today = (() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  })();
   dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   monthNames = [
     'enero',
@@ -82,7 +88,17 @@ export class SchedulerDashboardComponent implements OnInit {
     'noviembre',
     'diciembre',
   ];
+  // ── Filter Helpers ──────────────────────────────────────────────────────────
+  private readonly specialtyLabels: Record<string, string> = {
+    FISIOTERAPIA: 'Fisioterapia',
+    TERAPIA_NEURAL: 'Terapia Neural',
+    QUIROPRAXIA: 'Quiropraxia',
+  };
 
+  specialtyLabel(specialty: string): string {
+    const clean = specialty.replace(/^\[|\]$/g, '').trim();
+    return this.specialtyLabels[clean] ?? clean;
+  }
   // ── Data signals ──────────────────────────────────────────────────────────
   doctors = signal<dtoDoctor[]>([]);
   private appointments = signal<AppointmentsPatient[]>([]);
@@ -109,6 +125,15 @@ export class SchedulerDashboardComponent implements OnInit {
   ];
 
   // ── Computed ──────────────────────────────────────────────────────────────
+  hasTodayAppointments = computed(() => {
+    const doctorFilter = this.filterDoctor();
+    return this.appointments().some(
+      (a) =>
+        a.date === this.today &&
+        a.appointmentState !== 'CANCELADA' &&
+        (doctorFilter ? a.doctorName === doctorFilter : true),
+    );
+  });
   selectedDoctor = computed(() =>
     this.doctors().find((d) => d.name === this.filterDoctor()),
   );
