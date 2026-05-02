@@ -114,10 +114,6 @@ class SanitizeDeserializerTest {
       public NestedValue getNested() {
         return nested;
       }
-
-      public void setNested(NestedValue nested) {
-        this.nested = nested;
-      }
     }
 
     private static class CollectionWrapper {
@@ -125,10 +121,6 @@ class SanitizeDeserializerTest {
 
       public List<NestedValue> getValues() {
         return values;
-      }
-
-      public void setValues(List<NestedValue> values) {
-        this.values = values;
       }
     }
 
@@ -138,10 +130,6 @@ class SanitizeDeserializerTest {
 
       public String getDocumentNumber() {
         return documentNumber;
-      }
-
-      public void setDocumentNumber(String documentNumber) {
-        this.documentNumber = documentNumber;
       }
     }
 }
