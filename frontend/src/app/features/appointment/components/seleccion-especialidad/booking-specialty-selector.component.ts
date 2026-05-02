@@ -2,6 +2,7 @@ import { Component, inject, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, UserSearch } from 'lucide-angular';
 import { BookingStateService } from '../../booking-state.service';
+import { SpecialtyPipe } from './specialtyPipe';
 
 /**
  * Permite al usuario elegir una especialidad y,
@@ -10,7 +11,7 @@ import { BookingStateService } from '../../booking-state.service';
 @Component({
   selector: 'app-booking-specialty-selector',
   standalone: true,
-  imports: [FormsModule, LucideAngularModule],
+  imports: [FormsModule, LucideAngularModule, SpecialtyPipe],
   templateUrl: './booking-specialty-selector.component.html',
 })
 export class BookingSpecialtySelectorComponent {
