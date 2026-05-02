@@ -12,7 +12,7 @@
     >
       <option value="">Seleccione una especialidad...</option>
       @for (s of state.uniqueSpecialties(); track s) {
-        <option [value]="s">{{ s }}</option>
+        <option [value]="s">{{ s | specialty }}</option>
       }
     </select>
   </div>
