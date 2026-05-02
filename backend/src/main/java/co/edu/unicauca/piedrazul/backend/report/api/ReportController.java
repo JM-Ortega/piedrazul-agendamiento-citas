@@ -1,20 +1,22 @@
 package co.edu.unicauca.piedrazul.backend.report.api;
 
 import co.edu.unicauca.piedrazul.backend.report.application.ReportService;
-import co.edu.unicauca.piedrazul.backend.report.dtos.ExportFormat;
 import co.edu.unicauca.piedrazul.backend.report.dtos.ExportRequestDto;
-import co.edu.unicauca.piedrazul.backend.report.exception.NoAppointmentsTodayException;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/reports")
+@PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR')")
 public class ReportController {
 
     private final ReportService reportService;
@@ -46,10 +48,5 @@ public class ReportController {
         headers.setContentLength(archivo.length);
 
         return ResponseEntity.ok().headers(headers).body(archivo);
-    }
-
-    @ExceptionHandler(NoAppointmentsTodayException.class)
-    public ResponseEntity<Void> handleNoAppointments() {
-        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }
