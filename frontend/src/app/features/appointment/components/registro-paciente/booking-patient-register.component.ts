@@ -3,6 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, ArrowLeft } from 'lucide-angular';
 import { BookingStateService } from '../../booking-state.service';
 import { Patient } from '../../../../models/interfaces/patient.model';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { Calendar } from 'lucide-angular';
 
 /**
  * Capturar y validar los datos de un paciente que no fue encontrado en el sistema para
@@ -11,12 +13,13 @@ import { Patient } from '../../../../models/interfaces/patient.model';
 @Component({
   selector: 'app-booking-patient-register',
   standalone: true,
-  imports: [FormsModule, LucideAngularModule],
+  imports: [FormsModule, LucideAngularModule, MatDatepickerModule],
   templateUrl: './booking-patient-register.component.html',
 })
 export class BookingPatientRegisterComponent {
   readonly ArrowLeft = ArrowLeft;
   protected state = inject(BookingStateService);
+  Calendar = Calendar;
 
   advance = output<void>();
   goBack = output<void>();
@@ -41,6 +44,7 @@ export class BookingPatientRegisterComponent {
   emailLimitMsg = signal('');
   guardianPhoneLimitMsg = signal('');
 
+  readonly maxBirthDate = new Date();
   readonly NAME_MAX = 30;
   readonly EMAIL_MAX = 100;
   readonly PHONE_MAX = 15;
