@@ -9,13 +9,9 @@ import {
   UserPlus,
   Users,
 } from 'lucide-angular';
-import { forkJoin } from 'rxjs';
-import { dtoSchedule } from '../../models/dtos/schedule.dto';
-import { DaySchedule } from '../../models/interfaces/daySchedule.model';
-import { Doctor } from '../../models/interfaces/doctor.model';
 
-import { SystemUser } from '../../models/interfaces/system-user.model';
-import { AdminService } from '../../services/admin.service';
+import { SystemUser } from '../../../../models/interfaces/system-user.model';
+import { AdminService } from '../../../../services/admin.service';
 @Component({
   selector: 'app-admin-users',
   templateUrl: './admin-users.component.html',

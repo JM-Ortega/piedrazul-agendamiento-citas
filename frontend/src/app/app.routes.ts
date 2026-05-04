@@ -3,9 +3,9 @@ import { AuthGuard } from './guards/auth.guard';
 
 import { AccesoComponent } from './design-system/pages/acceso/acceso.component';
 import { HomeComponent } from './design-system/pages/home/home.component';
-import { AdminCreateUserComponent } from './features/admin-create-user/admin-create-user.component';
-import { AdminUsersComponent } from './features/admin-users/admin-users.component';
 import { AdminConfigComponent } from './features/admin/admin-config.component';
+import { AdminCreateUserComponent } from './features/admin/pages/admin-create-user/admin-create-user.component';
+import { AdminUsersComponent } from './features/admin/pages/admin-users/admin-users.component';
 import { NewAppointmentSchedulerComponent } from './features/appointment/pages/agendador-agendar/new-appointment-scheduler.component';
 import { SchedulerDashboardComponent } from './features/appointment/pages/agendador-listar-citas/scheduler-dashboard.component';
 import { PatientNewAppointmentComponent } from './features/appointment/pages/paciente-agendar/patient-new-appointment.component';

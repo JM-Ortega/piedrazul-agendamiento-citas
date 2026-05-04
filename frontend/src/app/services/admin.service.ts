@@ -2,10 +2,15 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { CreateSchedulerRequest } from '../models/dtos/create-scheduler-request.dto';
+import { CreateDoctorRequestDto } from '../models/dtos/CreateDoctorRequest.dto';
 import { dtoSchedule } from '../models/dtos/schedule.dto';
 import { Doctor } from '../models/interfaces/doctor.model';
 import { SystemUser } from '../models/interfaces/system-user.model';
-import { CreateSchedulerRequest } from '../models/dtos/create-scheduler-request.dto';
+
+// ── DTOs para creación de doctor ─────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Injectable({ providedIn: 'root' })
 export class AdminService {
@@ -19,6 +24,15 @@ export class AdminService {
 
   getDoctors(): Observable<Doctor[]> {
     return this.http.get<Doctor[]>(`${this.apiUrl}/doctor/doctors/detailed`);
+  }
+
+  /**
+   * Crea un nuevo doctor en el backend.
+   * El servidor responde 204 No Content en caso de éxito.
+   * @param payload Datos del doctor según CreateDoctorRequest del backend
+   */
+  createDoctor(payload: CreateDoctorRequestDto): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/doctor/doctors`, payload);
   }
 
   updateAppointmentInterval(

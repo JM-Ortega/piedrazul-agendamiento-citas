@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   Building2,
   Calendar,
+  CalendarRange,
   CircleAlert,
   CreditCard,
   Eye,
@@ -13,11 +14,13 @@ import {
   Info,
   Lock,
   LucideAngularModule,
+  Mail,
+  Phone,
   Stethoscope,
   User,
   UserPlus,
 } from 'lucide-angular';
-import { AdminService } from '../../services/admin.service';
+import { AdminService } from '../../../../services/admin.service';
 
 type Role = 'doctor' | 'scheduler';
 
@@ -26,7 +29,12 @@ interface UserForm {
   password: string;
   firstName: string;
   lastName: string;
+  // Doctor-specific
+  email: string;
+  phone: string;
   specialty: string;
+  laborStart: string; // ISO date: "YYYY-MM-DD"
+  laborEnd: string; // ISO date: "YYYY-MM-DD"
   interval: number;
   workDays: number[];
   startTime: string;
@@ -39,12 +47,26 @@ interface FormErrors {
   firstName?: string;
   lastName?: string;
   roles?: string;
+  // Doctor-specific
+  email?: string;
+  phone?: string;
   specialty?: string;
+  laborStart?: string;
+  laborEnd?: string;
   startTime?: string;
   endTime?: string;
   interval?: string;
   workDays?: string;
 }
+
+// Map JS day index (0=Sun … 6=Sat) → backend workday string
+const DAY_VALUE_TO_WORKDAY: Record<number, string> = {
+  1: 'LUNES',
+  2: 'MARTES',
+  3: 'MIERCOLES',
+  4: 'JUEVES',
+  5: 'VIERNES',
+};
 
 @Component({
   selector: 'app-admin-create-user',
@@ -57,6 +79,7 @@ export class AdminCreateUserComponent {
   readonly UserPlus = UserPlus;
   readonly Stethoscope = Stethoscope;
   readonly Calendar = Calendar;
+  readonly CalendarRange = CalendarRange;
   readonly CreditCard = CreditCard;
   readonly Lock = Lock;
   readonly Eye = Eye;
@@ -65,34 +88,36 @@ export class AdminCreateUserComponent {
   readonly Building2 = Building2;
   readonly CircleAlert = CircleAlert;
   readonly Info = Info;
+  readonly Mail = Mail;
+  readonly Phone = Phone;
 
   showPassword = false;
   selectedRoles: Role[] = ['doctor'];
   errors: FormErrors = {};
   submitted = false;
 
+  /** Feedback visible al usuario tras submit */
+  submitSuccess = false;
+  submitError: string | null = null;
+  isSubmitting = false;
+
   userForm: UserForm = {
     documentId: '',
     password: '',
     firstName: '',
     lastName: '',
+    email: '',
+    phone: '',
     specialty: '',
+    laborStart: '',
+    laborEnd: '',
     interval: 20,
     workDays: [1, 2, 3, 4, 5],
     startTime: '08:00',
     endTime: '14:00',
   };
 
-  specialties: string[] = [
-    'Medicina General',
-    'Cardiología',
-    'Fisioterapia',
-    'Neurología',
-    'Pediatría',
-    'Psicología',
-    'Dermatología',
-    'Oftalmología',
-  ];
+  specialties: string[] = ['FISIOTERAPIA', 'TERAPIA_NEURAL', 'QUIROPRAXIA'];
 
   daysOfWeek = [
     { value: 1, label: 'Lunes' },
@@ -191,6 +216,28 @@ export class AdminCreateUserComponent {
     if (this.submitted) this.validateField('interval');
   }
 
+  onPhoneKeydown(event: KeyboardEvent): void {
+    const allowedKeys = [
+      'Backspace',
+      'Delete',
+      'ArrowLeft',
+      'ArrowRight',
+      'Tab',
+      'Enter',
+    ];
+    if (allowedKeys.includes(event.key)) return;
+    if (!/^\d$/.test(event.key)) event.preventDefault();
+  }
+
+  onPhoneInput(): void {
+    this.userForm.phone = this.userForm.phone.replace(/\D/g, '').slice(0, 15);
+    if (this.submitted) this.validateField('phone');
+  }
+
+  onEmailInput(): void {
+    if (this.submitted) this.validateField('email');
+  }
+
   // ── Lógica de tiempo ─────────────────────────────────────────────────────
 
   private timeToMinutes(time: string): number {
@@ -200,17 +247,28 @@ export class AdminCreateUserComponent {
   }
 
   onStartTimeChange(): void {
-    // ✅ Siempre valida, sin importar si se hizo submit
     this.validateField('startTime');
     if (this.submitted) this.validateField('interval');
   }
 
   onEndTimeChange(): void {
-    // ✅ Siempre valida, sin importar si se hizo submit
     this.validateField('endTime');
-    // Revalida startTime por si el error cruzado ya no aplica
     this.validateField('startTime');
     if (this.submitted) this.validateField('interval');
+  }
+
+  onLaborStartChange(): void {
+    if (this.submitted) {
+      this.validateField('laborStart');
+      this.validateField('laborEnd');
+    }
+  }
+
+  onLaborEndChange(): void {
+    if (this.submitted) {
+      this.validateField('laborEnd');
+      this.validateField('laborStart');
+    }
   }
 
   // ── Días de atención ─────────────────────────────────────────────────────
@@ -296,10 +354,63 @@ export class AdminCreateUserComponent {
         }
         break;
 
+      // ── Doctor fields ────────────────────────────────────────────────────
+
+      case 'email':
+        if (this.hasDoctorRole) {
+          if (!this.userForm.email.trim()) {
+            this.errors.email = 'El correo electrónico es obligatorio.';
+          } else if (
+            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.userForm.email.trim())
+          ) {
+            this.errors.email = 'Ingrese un correo electrónico válido.';
+          }
+        }
+        break;
+
+      case 'phone':
+        if (this.hasDoctorRole) {
+          if (!this.userForm.phone.trim()) {
+            this.errors.phone = 'El teléfono es obligatorio.';
+          } else if (!/^\d{7,15}$/.test(this.userForm.phone)) {
+            this.errors.phone = 'Debe contener entre 7 y 15 dígitos numéricos.';
+          }
+        }
+        break;
+
       case 'specialty':
         if (this.hasDoctorRole && !this.userForm.specialty) {
           this.errors.specialty =
             'La especialidad es obligatoria para médicos.';
+        }
+        break;
+
+      case 'laborStart':
+        if (this.hasDoctorRole) {
+          if (!this.userForm.laborStart) {
+            this.errors.laborStart =
+              'La fecha de inicio laboral es obligatoria.';
+          } else if (
+            this.userForm.laborEnd &&
+            this.userForm.laborStart >= this.userForm.laborEnd
+          ) {
+            this.errors.laborStart =
+              'La fecha de inicio debe ser anterior a la fecha de fin.';
+          }
+        }
+        break;
+
+      case 'laborEnd':
+        if (this.hasDoctorRole) {
+          if (!this.userForm.laborEnd) {
+            this.errors.laborEnd = 'La fecha de fin laboral es obligatoria.';
+          } else if (
+            this.userForm.laborStart &&
+            this.userForm.laborStart >= this.userForm.laborEnd
+          ) {
+            this.errors.laborEnd =
+              'La fecha de fin debe ser posterior a la fecha de inicio.';
+          }
         }
         break;
 
@@ -309,8 +420,6 @@ export class AdminCreateUserComponent {
         if (this.userForm.endTime && start >= end) {
           this.errors.startTime =
             'La hora de inicio no puede ser igual o posterior a la hora de fin.';
-        } else {
-          this.errors.startTime = undefined;
         }
         break;
       }
@@ -324,8 +433,6 @@ export class AdminCreateUserComponent {
         } else if (this.userForm.startTime && start >= end) {
           this.errors.endTime =
             'La hora de fin debe ser posterior a la hora de inicio.';
-        } else {
-          this.errors.endTime = undefined;
         }
         break;
       }
@@ -361,7 +468,17 @@ export class AdminCreateUserComponent {
     ];
 
     if (this.hasDoctorRole) {
-      fields.push('specialty', 'startTime', 'endTime', 'interval', 'workDays');
+      fields.push(
+        'email',
+        'phone',
+        'specialty',
+        'laborStart',
+        'laborEnd',
+        'startTime',
+        'endTime',
+        'interval',
+        'workDays',
+      );
     }
 
     fields.forEach((f) => this.validateField(f));
@@ -373,9 +490,14 @@ export class AdminCreateUserComponent {
 
   handleCreateUser(): void {
     this.submitted = true;
+    this.submitSuccess = false;
+    this.submitError = null;
 
     if (!this.validateAll()) return;
 
+    this.isSubmitting = true;
+
+    // ── Caso: solo Agendador ──────────────────────────────────────────────
     if (this.hasSchedulerRole && !this.hasDoctorRole) {
       this.adminService
         .createScheduler({
@@ -386,47 +508,56 @@ export class AdminCreateUserComponent {
         })
         .subscribe({
           next: () => {
+            this.isSubmitting = false;
             this.router.navigate(['/admin/usuarios']);
           },
           error: (err) => {
+            this.isSubmitting = false;
+            this.submitError =
+              err?.error?.message ??
+              'Ocurrió un error al crear el agendador. Inténtalo de nuevo.';
             console.error('Error al crear agendador:', err);
           },
         });
-
       return;
     }
 
-    console.warn(
-      'La creación de médicos desde este formulario aún requiere alinear los datos con el backend.',
-    );
-
-    /*
-    const newUser: any = {
-      id: `user-${Date.now()}`,
-      documentId: this.userForm.documentId,
-      password: this.userForm.password,
-      firstName: this.userForm.firstName.trim(),
-      lastName: this.userForm.lastName.trim(),
-      roles: this.selectedRoles,
-    };
-
+    // ── Caso: Doctor (con o sin rol Agendador simultáneo) ─────────────────
     if (this.hasDoctorRole) {
-      newUser.doctorData = {
-        specialty: this.userForm.specialty,
-        interval: this.userForm.interval,
-        workDays: this.userForm.workDays,
+      const schedules = this.userForm.workDays.map((day) => ({
+        workday: DAY_VALUE_TO_WORKDAY[day],
         startTime: this.userForm.startTime,
         endTime: this.userForm.endTime,
-        windowWeeks: 4,
-        photo: '',
-        enabled: true,
-      };
-    }
+      }));
 
-    this.adminService.createSystemUserMock(newUser);
-    console.log('[MOCK] Usuario creado:', newUser);
-    this.router.navigate(['/admin/usuarios']);
-    */
+      this.adminService
+        .createDoctor({
+          firstName: this.userForm.firstName.trim(),
+          lastName: this.userForm.lastName.trim(),
+          identification: this.userForm.documentId,
+          phone: this.userForm.phone,
+          specialty: [this.userForm.specialty],
+          laborStart: this.userForm.laborStart,
+          laborEnd: this.userForm.laborEnd,
+          appointmentInterval: this.userForm.interval,
+          schedules,
+          email: this.userForm.email.trim(),
+          password: this.userForm.password,
+        })
+        .subscribe({
+          next: () => {
+            this.isSubmitting = false;
+            this.router.navigate(['/admin/usuarios']);
+          },
+          error: (err) => {
+            this.isSubmitting = false;
+            this.submitError =
+              err?.error?.message ??
+              'Ocurrió un error al crear el médico. Inténtalo de nuevo.';
+            console.error('Error al crear médico:', err);
+          },
+        });
+    }
   }
 
   navigateBack(): void {

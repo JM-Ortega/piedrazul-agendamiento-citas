@@ -17,10 +17,10 @@ import {
   User,
   UserCircle,
 } from 'lucide-angular';
+import { ExportModalComponent } from '../../../../design-system/organisms/export-modal/export-modal.component';
 import { AppointmentsPatient } from '../../../../models/dtos/appointments.dto';
 import { dtoDoctor } from '../../../../models/dtos/doctor.dto';
 import { SchedulerService } from '../../../../services/scheduler.service';
-import { ExportModalComponent } from '../../../export-modal/export-modal.component';
 
 type ExportColumnKey =
   | 'date'

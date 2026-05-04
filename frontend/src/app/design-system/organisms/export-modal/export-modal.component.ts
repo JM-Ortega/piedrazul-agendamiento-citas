@@ -25,7 +25,7 @@ import {
   ExportColumnBackend,
   ExportFormatBackend,
   SchedulerService,
-} from '../../services/scheduler.service';
+} from '../../../services/scheduler.service';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 export type ExportColumnKey =
