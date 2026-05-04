@@ -56,7 +56,7 @@ export class DoctorService {
   }
 
   updateAppointmentState(appointmentId: string, state: string,): Observable<void> {
-    return this.http.patch<void>(
+    return this.http.put<void>(
       `${this.apiUrl}/appointments/${appointmentId}/mark-as-attended`,
       { appointmentState: state },
     );
