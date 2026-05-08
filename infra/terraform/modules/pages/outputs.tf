@@ -1,11 +1,11 @@
 output "pages_hostname" {
   description = "Hostname pages.dev del proyecto"
-  value       = "${cloudflare_pages_project.main.subdomain}.pages.dev"
+  value       = cloudflare_pages_project.main.subdomain
 }
 
 output "pages_url" {
   description = "URL del proyecto en Cloudflare Pages"
-  value       = "https://${cloudflare_pages_project.main.subdomain}.pages.dev"
+  value       = "https://${cloudflare_pages_project.main.subdomain}"
 }
 
 output "project_name" {
