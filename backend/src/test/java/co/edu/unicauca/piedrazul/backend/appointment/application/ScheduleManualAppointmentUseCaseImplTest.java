@@ -2,15 +2,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientAlreadyScheduledInSpecialtyException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientScheduleTimeConflictException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientSnapshot;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
@@ -31,13 +23,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ScheduleManualAppointmentUseCaseImplTest {
@@ -64,6 +51,9 @@ class ScheduleManualAppointmentUseCaseImplTest {
                 appointmentService,
                 patientConsultPort
         );
+
+        lenient().when(appointmentRepository.save(any(Appointment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     // ─────────────────────────────────────────────

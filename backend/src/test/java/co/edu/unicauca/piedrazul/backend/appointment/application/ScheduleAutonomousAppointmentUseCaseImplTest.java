@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -60,6 +61,9 @@ class ScheduleAutonomousAppointmentUseCaseImplTest {
                 doctorConfigConsultPort,
                 appointmentService
         );
+
+        lenient().when(appointmentRepository.save(any(Appointment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     // ─────────────────────────────────────────────
@@ -76,90 +80,129 @@ class ScheduleAutonomousAppointmentUseCaseImplTest {
         Appointment expected = buildAppointment(idDoctor, idPatient, startTime, date);
 
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
+
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date))
                 .thenReturn(List.of());
+
         when(appointmentRepository.findByPatientId(idPatient))
                 .thenReturn(List.of());
+
         when(appointmentRepository.findByPatientIdAndDate(idPatient, date))
                 .thenReturn(List.of());
+
         stubPatientName(idPatient, patientInfo);
+
         when(appointmentService.scheduleAutonomous(
-                any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
+                any(), any(), any(), any(), any(),
+                any(), any(), any(), anyInt(), anyList()
         )).thenReturn(expected);
 
         Appointment result = useCase.scheduleAutonomous(
-                idPatient, idDoctor, Specialty.FISIOTERAPIA, date, startTime
+                idPatient,
+                idDoctor,
+                Specialty.FISIOTERAPIA,
+                date,
+                startTime
         );
 
         assertThat(result).isEqualTo(expected);
+
         verify(appointmentRepository).save(expected);
     }
 
     // ─────────────────────────────────────────────
-    // Validación: paciente ya tiene cita AGENDADA en la misma especialidad
+    // Validación: paciente ya tiene cita AGENDADA
+    // en la misma especialidad
     // ─────────────────────────────────────────────
 
     @Test
     void scheduleAutonomousShouldThrowWhenPatientAlreadyHasScheduledAppointmentInSameSpecialty() {
         UUID idDoctor  = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
+
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
         LocalDate date = LocalDate.now().plusDays(1);
 
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
+
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date))
                 .thenReturn(List.of());
 
-        // Ya tiene una cita AGENDADA en la misma especialidad
         Appointment citaExistente = buildAppointmentWithState(
-                idDoctor, idPatient, startTime, date,
-                Specialty.FISIOTERAPIA, AppointmentState.AGENDADA
+                idDoctor,
+                idPatient,
+                startTime,
+                date,
+                Specialty.FISIOTERAPIA,
+                AppointmentState.AGENDADA
         );
+
         when(appointmentRepository.findByPatientId(idPatient))
                 .thenReturn(List.of(citaExistente));
 
         assertThatThrownBy(() ->
                 useCase.scheduleAutonomous(
-                        idPatient, idDoctor, Specialty.FISIOTERAPIA, date, startTime
+                        idPatient,
+                        idDoctor,
+                        Specialty.FISIOTERAPIA,
+                        date,
+                        startTime
                 )
         )
                 .isInstanceOf(PatientAlreadyScheduledInSpecialtyException.class)
                 .hasMessageContaining("ya tiene una cita AGENDADA para la especialidad");
 
         verify(appointmentRepository, never()).save(any(Appointment.class));
+
         verify(appointmentService, never()).scheduleAutonomous(
-                any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
+                any(), any(), any(), any(), any(),
+                any(), any(), any(), anyInt(), anyList()
         );
     }
 
     @Test
     void scheduleAutonomousShouldNotThrowWhenPatientHasCancelledAppointmentInSameSpecialty() {
-        // CANCELADA no bloquea — debe poder agendar de nuevo
         UUID idDoctor  = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
+
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
         LocalDate date = LocalDate.now().plusDays(1);
+
         PatientInfo patientInfo = buildPatientInfo();
 
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
+
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date))
                 .thenReturn(List.of());
 
         Appointment cancelada = buildAppointmentWithState(
-                idDoctor, idPatient, startTime, date,
-                Specialty.FISIOTERAPIA, AppointmentState.CANCELADA
+                idDoctor,
+                idPatient,
+                startTime,
+                date,
+                Specialty.FISIOTERAPIA,
+                AppointmentState.CANCELADA
         );
+
         when(appointmentRepository.findByPatientId(idPatient))
                 .thenReturn(List.of(cancelada));
+
         when(appointmentRepository.findByPatientIdAndDate(idPatient, date))
                 .thenReturn(List.of());
+
         stubPatientName(idPatient, patientInfo);
+
         when(appointmentService.scheduleAutonomous(
-                any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
+                any(), any(), any(), any(), any(),
+                any(), any(), any(), anyInt(), anyList()
         )).thenReturn(buildAppointment(idDoctor, idPatient, startTime, date));
 
         useCase.scheduleAutonomous(
-                idPatient, idDoctor, Specialty.FISIOTERAPIA, date, startTime
+                idPatient,
+                idDoctor,
+                Specialty.FISIOTERAPIA,
+                date,
+                startTime
         );
 
         verify(appointmentRepository).save(any(Appointment.class));
@@ -169,71 +212,99 @@ class ScheduleAutonomousAppointmentUseCaseImplTest {
     void scheduleAutonomousShouldNotThrowWhenPatientHasScheduledAppointmentInDifferentSpecialty() {
         UUID idDoctor  = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
+
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
         LocalDate date = LocalDate.now().plusDays(1);
+
         PatientInfo patientInfo = buildPatientInfo();
 
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
+
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date))
                 .thenReturn(List.of());
 
-        // AGENDADA pero en otra especialidad — no debe bloquear
         Appointment otraEspecialidad = buildAppointmentWithState(
-                idDoctor, idPatient, startTime, date,
-                Specialty.QUIROPRAXIA, AppointmentState.AGENDADA
+                idDoctor,
+                idPatient,
+                startTime,
+                date,
+                Specialty.QUIROPRAXIA,
+                AppointmentState.AGENDADA
         );
+
         when(appointmentRepository.findByPatientId(idPatient))
                 .thenReturn(List.of(otraEspecialidad));
+
         when(appointmentRepository.findByPatientIdAndDate(idPatient, date))
                 .thenReturn(List.of());
+
         stubPatientName(idPatient, patientInfo);
+
         when(appointmentService.scheduleAutonomous(
-                any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
+                any(), any(), any(), any(), any(),
+                any(), any(), any(), anyInt(), anyList()
         )).thenReturn(buildAppointment(idDoctor, idPatient, startTime, date));
 
         useCase.scheduleAutonomous(
-                idPatient, idDoctor, Specialty.FISIOTERAPIA, date, startTime
+                idPatient,
+                idDoctor,
+                Specialty.FISIOTERAPIA,
+                date,
+                startTime
         );
 
         verify(appointmentRepository).save(any(Appointment.class));
     }
 
     // ─────────────────────────────────────────────
-    // Validación: conflicto de horario para el paciente
+    // Validación: conflicto de horario
     // ─────────────────────────────────────────────
 
     @Test
     void scheduleAutonomousShouldThrowWhenPatientHasActiveAppointmentAtSameTime() {
         UUID idDoctor  = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
+
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
         LocalDate date = LocalDate.now().plusDays(1);
 
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
+
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date))
                 .thenReturn(List.of());
+
         when(appointmentRepository.findByPatientId(idPatient))
                 .thenReturn(List.of());
 
-        // Cita activa a la misma hora ese día
         Appointment conflicto = buildAppointmentWithState(
-                idDoctor, idPatient, startTime, date,
-                Specialty.QUIROPRAXIA, AppointmentState.AGENDADA
+                idDoctor,
+                idPatient,
+                startTime,
+                date,
+                Specialty.QUIROPRAXIA,
+                AppointmentState.AGENDADA
         );
+
         when(appointmentRepository.findByPatientIdAndDate(idPatient, date))
                 .thenReturn(List.of(conflicto));
 
         assertThatThrownBy(() ->
                 useCase.scheduleAutonomous(
-                        idPatient, idDoctor, Specialty.FISIOTERAPIA, date, startTime
+                        idPatient,
+                        idDoctor,
+                        Specialty.FISIOTERAPIA,
+                        date,
+                        startTime
                 )
         )
                 .isInstanceOf(PatientScheduleTimeConflictException.class)
                 .hasMessageContaining("ya tiene una cita activa");
 
         verify(appointmentRepository, never()).save(any(Appointment.class));
+
         verify(appointmentService, never()).scheduleAutonomous(
-                any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
+                any(), any(), any(), any(), any(),
+                any(), any(), any(), anyInt(), anyList()
         );
     }
 
@@ -241,100 +312,162 @@ class ScheduleAutonomousAppointmentUseCaseImplTest {
     void scheduleAutonomousShouldNotThrowWhenPatientHasCancelledAppointmentAtSameTime() {
         UUID idDoctor  = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
+
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
         LocalDate date = LocalDate.now().plusDays(1);
+
         PatientInfo patientInfo = buildPatientInfo();
 
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
+
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date))
                 .thenReturn(List.of());
+
         when(appointmentRepository.findByPatientId(idPatient))
                 .thenReturn(List.of());
 
-        // CANCELADA a la misma hora — no debe generar conflicto
         Appointment cancelada = buildAppointmentWithState(
-                idDoctor, idPatient, startTime, date,
-                Specialty.QUIROPRAXIA, AppointmentState.CANCELADA
+                idDoctor,
+                idPatient,
+                startTime,
+                date,
+                Specialty.QUIROPRAXIA,
+                AppointmentState.CANCELADA
         );
+
         when(appointmentRepository.findByPatientIdAndDate(idPatient, date))
                 .thenReturn(List.of(cancelada));
+
         stubPatientName(idPatient, patientInfo);
+
         when(appointmentService.scheduleAutonomous(
-                any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
+                any(), any(), any(), any(), any(),
+                any(), any(), any(), anyInt(), anyList()
         )).thenReturn(buildAppointment(idDoctor, idPatient, startTime, date));
 
         useCase.scheduleAutonomous(
-                idPatient, idDoctor, Specialty.FISIOTERAPIA, date, startTime
+                idPatient,
+                idDoctor,
+                Specialty.FISIOTERAPIA,
+                date,
+                startTime
         );
 
         verify(appointmentRepository).save(any(Appointment.class));
     }
 
     // ─────────────────────────────────────────────
-    // Verificación de la orquestación completa
+    // Verificación de orquestación
     // ─────────────────────────────────────────────
 
     @Test
     void scheduleAutonomousShouldCallCollaboratorsInCorrectOrder() {
         UUID idDoctor  = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
+
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
         LocalDate date = LocalDate.now().plusDays(1);
+
         PatientInfo patientInfo = buildPatientInfo();
-        Appointment expected = buildAppointment(idDoctor, idPatient, startTime, date);
+
+        Appointment expected = buildAppointment(
+                idDoctor,
+                idPatient,
+                startTime,
+                date
+        );
 
         stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
+
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date))
                 .thenReturn(List.of());
+
         when(appointmentRepository.findByPatientId(idPatient))
                 .thenReturn(List.of());
+
         when(appointmentRepository.findByPatientIdAndDate(idPatient, date))
                 .thenReturn(List.of());
+
         stubPatientName(idPatient, patientInfo);
+
         when(appointmentService.scheduleAutonomous(
-                any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
+                any(), any(), any(), any(), any(),
+                any(), any(), any(), anyInt(), anyList()
         )).thenReturn(expected);
 
         useCase.scheduleAutonomous(
-                idPatient, idDoctor, Specialty.FISIOTERAPIA, date, startTime
+                idPatient,
+                idDoctor,
+                Specialty.FISIOTERAPIA,
+                date,
+                startTime
         );
 
-        verify(doctorConfigConsultPort, times(1)).getDoctorName(idDoctor);
-        verify(doctorConfigConsultPort, times(1)).getIntervalMinutesByDoctor(idDoctor);
-        verify(appointmentRepository, times(1)).findByDoctorIdAndDate(idDoctor, date);
-        verify(appointmentRepository, times(1)).findByPatientId(idPatient);
-        verify(appointmentRepository, times(1)).findByPatientIdAndDate(idPatient, date);
+        verify(doctorConfigConsultPort, times(1))
+                .getDoctorName(idDoctor);
+
+        verify(doctorConfigConsultPort, times(1))
+                .getIntervalMinutesByDoctor(idDoctor);
+
+        verify(appointmentRepository, times(1))
+                .findByDoctorIdAndDate(idDoctor, date);
+
+        verify(appointmentRepository, times(1))
+                .findByPatientId(idPatient);
+
+        verify(appointmentRepository, times(1))
+                .findByPatientIdAndDate(idPatient, date);
+
         verify(appointmentService, times(1)).scheduleAutonomous(
-                any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
+                any(), any(), any(), any(), any(),
+                any(), any(), any(), anyInt(), anyList()
         );
-        verify(appointmentRepository, times(1)).save(expected);
+
+        verify(appointmentRepository, times(1))
+                .save(expected);
     }
 
     // ─────────────────────────────────────────────
-    // Fixtures y helpers
+    // Helpers
     // ─────────────────────────────────────────────
 
     private void stubDoctorConfig(UUID idDoctor, int interval, String name) {
-        when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor)).thenReturn(interval);
-        when(doctorConfigConsultPort.getDoctorName(idDoctor)).thenReturn(name);
+        when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor))
+                .thenReturn(interval);
+
+        when(doctorConfigConsultPort.getDoctorName(idDoctor))
+                .thenReturn(name);
     }
 
-    // En autónomo el nombre viene de patientConsultPort.findById() — se llama dos veces
     private void stubPatientName(UUID idPatient, PatientInfo patientInfo) {
-        when(patientConsultPort.findById(idPatient)).thenReturn(patientInfo);
+        when(patientConsultPort.findById(idPatient))
+                .thenReturn(patientInfo);
     }
 
-    private Appointment buildAppointment(UUID idDoctor, UUID idPatient,
-                                         AppointmentTime startTime, LocalDate date) {
+    private Appointment buildAppointment(
+            UUID idDoctor,
+            UUID idPatient,
+            AppointmentTime startTime,
+            LocalDate date
+    ) {
         return buildAppointmentWithState(
-                idDoctor, idPatient, startTime, date,
-                Specialty.FISIOTERAPIA, AppointmentState.AGENDADA
+                idDoctor,
+                idPatient,
+                startTime,
+                date,
+                Specialty.FISIOTERAPIA,
+                AppointmentState.AGENDADA
         );
     }
 
-    private Appointment buildAppointmentWithState(UUID idDoctor, UUID idPatient,
-                                                  AppointmentTime startTime, LocalDate date,
-                                                  Specialty specialty, AppointmentState state) {
+    private Appointment buildAppointmentWithState(
+            UUID idDoctor,
+            UUID idPatient,
+            AppointmentTime startTime,
+            LocalDate date,
+            Specialty specialty,
+            AppointmentState state
+    ) {
         return Appointment.reconstruct(
                 UUID.randomUUID(),
                 idDoctor,
