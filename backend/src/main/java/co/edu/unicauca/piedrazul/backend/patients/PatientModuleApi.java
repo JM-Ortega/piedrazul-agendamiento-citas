@@ -15,6 +15,8 @@ public interface PatientModuleApi {
 
     Optional<PatientData> findByDocumentNumber(String documentNumber);
 
+    Optional<PatientData> findByUserId(UUID userId);
+
     boolean existsById(UUID id);
 
     List<PatientData> findAll();

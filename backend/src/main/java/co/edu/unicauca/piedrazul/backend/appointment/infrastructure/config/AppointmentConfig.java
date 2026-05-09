@@ -1,11 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.config;
 
-import co.edu.unicauca.piedrazul.backend.appointment.aplication.*;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAvailableSlotsUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetSpecialtiesWithDoctorUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ListAppointmentsUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ScheduleAutonomousAppointmentUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ScheduleManualAppointmentUseCase;
+import co.edu.unicauca.piedrazul.backend.appointment.application.*;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
@@ -15,6 +11,8 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeServ
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
+import co.edu.unicauca.piedrazul.backend.appointment.application.ListMyAppointmentsUseCaseImpl;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -43,9 +41,8 @@ public class AppointmentConfig {
     }
 
     @Bean
-    public AppointmentService appointmentService(BusySlotService busySlotService,
-                                                 SlotTimeService slotTimeService) {
-        return new AppointmentService(busySlotService, slotTimeService);
+    public AppointmentService appointmentService(BusySlotService busySlotService) {
+        return new AppointmentService(busySlotService);
     }
 
     // --- CASOS DE USO (PUERTOS DE ENTRADA) ---
@@ -61,12 +58,14 @@ public class AppointmentConfig {
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService,
-            PatientConsultPort patientConsultPort) {
+            PatientConsultPort patientConsultPort,
+            ApplicationEventPublisher eventPublisher) {
         return new ScheduleManualAppointmentUseCaseImpl(
                 appointmentRepository,
                 doctorConfigConsultPort,
                 appointmentService,
-                patientConsultPort
+                patientConsultPort,
+                eventPublisher
         );
     }
 
@@ -75,12 +74,14 @@ public class AppointmentConfig {
             AppointmentRepository appointmentRepository,
             PatientConsultPort patientConsultPort,
             DoctorConfigConsultPort doctorConfigConsultPort,
-            AppointmentService appointmentService) {
+            AppointmentService appointmentService,
+            ApplicationEventPublisher eventPublisher) {
         return new ScheduleAutonomousAppointmentUseCaseImpl(
                 appointmentRepository,
                 patientConsultPort,
                 doctorConfigConsultPort,
-                appointmentService
+                appointmentService,
+                eventPublisher
         );
     }
 
@@ -88,21 +89,39 @@ public class AppointmentConfig {
     public GetAvailableSlotsUseCase getAvailableSlotsUseCase(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
-            AppointmentService appointmentService) {
+            SlotTimeService slotTimeService) {
         return new GetAvailableSlotsUseCaseImpl(
                 appointmentRepository,
                 doctorConfigConsultPort,
-                appointmentService
+                slotTimeService
         );
     }
 
     @Bean
     public GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase(
             AppointmentRepository appointmentRepository,
-            DoctorConfigConsultPort doctorConfigConsultPort) {
+            DoctorConfigConsultPort doctorConfigConsultPort,
+            SlotTimeService slotTimeService) {
         return new GetSpecialtiesWithDoctorUseCaseImpl(
                 appointmentRepository,
-                doctorConfigConsultPort
+                doctorConfigConsultPort,
+                slotTimeService
         );
+    }
+
+    @Bean
+    public ListMyAppointmentsUseCase listMyAppointmentsUseCase(
+            AppointmentRepository appointmentRepository,
+            PatientConsultPort patientConsultPort) {
+        return new ListMyAppointmentsUseCaseImpl(
+                appointmentRepository,
+                patientConsultPort
+        );
+    }
+
+    @Bean
+    public UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase(
+            AppointmentRepository appointmentRepository) {
+        return new UpdateAppointmentStatusUseCaseImpl(appointmentRepository);
     }
 }

@@ -9,7 +9,7 @@ import java.util.UUID;
 public interface AppointmentRepository {
 
     // Metodos que solo hablan en terminos del dominio
-    void save(Appointment appointment);
+    Appointment save(Appointment appointment);
 
 
     List<Appointment> findByDoctorId(UUID idDoctor);
@@ -20,6 +20,8 @@ public interface AppointmentRepository {
 
     List<Appointment> findByDoctorIdAndDate(UUID idDoctor, LocalDate date);
 
+    List<Appointment> findByDoctorIdAndDateAndState(UUID idDoctor, LocalDate date, String state);
+
     List<Appointment> findByPatientIdAndDate(UUID idPatient, LocalDate date);
 
     List<Appointment> findByDoctorIdAndPatientId(UUID idDoctor, UUID idPatient);
@@ -27,5 +29,7 @@ public interface AppointmentRepository {
     List<Appointment> findByDoctorIdAndPatientIdAndDate(UUID idDoctor, UUID idPatient, LocalDate date);
 
     List<Appointment> findAll();
+
+    Appointment findById(UUID appointmentId);
 
 }

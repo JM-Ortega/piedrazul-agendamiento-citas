@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence;
 
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -17,10 +18,13 @@ public interface AppointmentJpaRepository extends JpaRepository<AppointmentEntit
 
     List<AppointmentEntity> findByIdDoctorAndDate(UUID idDoctor, LocalDate date);
 
+    List<AppointmentEntity> findByIdDoctorAndDateAndAppointmentState(UUID idDoctor, LocalDate date, AppointmentState appointmentState);
+
     List<AppointmentEntity> findByIdPatientAndDate(UUID idPatient, LocalDate date);
 
     List<AppointmentEntity> findByIdDoctorAndIdPatient(UUID idDoctor, UUID idPatient);
 
     List<AppointmentEntity> findByIdDoctorAndIdPatientAndDate(UUID idDoctor, UUID idPatient, LocalDate date);
+
 
 }

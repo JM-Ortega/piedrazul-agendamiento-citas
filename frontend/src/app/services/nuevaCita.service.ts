@@ -1,20 +1,27 @@
 import { HttpClient } from '@angular/common/http';
-import { inject, Injectable, signal } from '@angular/core';
-import { Observable, of, tap, throwError } from 'rxjs';
-import { Patient } from '../models/patient.model';
-import { NewAppointment } from '../models/DTOs/newAppointment';
-import { SpecialtyDoctor } from '../models/DTOs/specialty-doctor';
+import { inject, Injectable } from '@angular/core';
+import { Observable } from 'rxjs';
+import { Patient } from '../models/interfaces/patient.model';
+import { NewAppointment } from '../models/dtos/newAppointment.dto';
+import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
 import { map } from 'rxjs/operators';
+import { PatientSuggestion } from '../models/dtos/patient-suggestion.dto';
+import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class NuevaCitaService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8080/api';
+  private apiUrl = environment.apiUrl;
 
   getPatientByDocument(documentId: string): Observable<Patient | null> {
     return this.http.get<Patient>(
       `${this.apiUrl}/patients/document/${documentId}`,
     );
+  }
+
+  getPatientSuggestionsByDocument(documentPrefix: string): Observable<PatientSuggestion[]> {
+    return this.http.get<PatientSuggestion[]>(
+      `${this.apiUrl}/patients/search/by-document-prefix`, { params: { documentPrefix } },);
   }
 
   getSpecialtiesWithDoctor(): Observable<SpecialtyDoctor[]> {
@@ -34,12 +41,9 @@ export class NuevaCitaService {
   }
 
   getAvailableSlots(doctorId: string, date: string): Observable<string[]> {
-    return this.http.get<{ time: string }[]>(
-      `${this.apiUrl}/appointments/available-slots`,
-      { params: { doctorId, date } },
-    ).pipe(
-      map(slots => slots.map(s => s.time))
-    );
+    return this.http.get< { time: string }[] >
+    (`${this.apiUrl}/appointments/available-slots`, { params: { doctorId, date } })
+      .pipe(map((slots) => slots.map((s) => s.time)));
   }
 
   addAppointment(data: NewAppointment): Observable<void> {

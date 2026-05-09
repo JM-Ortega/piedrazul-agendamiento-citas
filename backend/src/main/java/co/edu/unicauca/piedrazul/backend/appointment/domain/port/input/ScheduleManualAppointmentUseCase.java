@@ -20,6 +20,7 @@ public interface ScheduleManualAppointmentUseCase {
             UUID idDoctor,
             Specialty specialty,
             LocalDate date,
-            AppointmentTime startTime
+            AppointmentTime startTime,
+            String performedBy
     );
 }

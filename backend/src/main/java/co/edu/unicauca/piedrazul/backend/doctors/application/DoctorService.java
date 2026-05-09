@@ -4,13 +4,12 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequ
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
-
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -35,7 +34,9 @@ public class DoctorService {
         Doctor doctor = new Doctor();
         doctor.setFirstName(request.firstName());
         doctor.setLastName(request.lastName());
+        doctor.setDocumentType(request.documentType());
         doctor.setIdentification(request.identification());
+        doctor.setPhone(request.phone());
         doctor.setSpecialty(request.specialty());
         doctor.setLaborStart(request.laborStart());
         doctor.setLaborEnd(request.laborEnd());
@@ -54,7 +55,13 @@ public class DoctorService {
         doctor.setSchedules(schedules);
 
         // 2. Crear el usuario
-        doctor.setIdUser(userModuleApi.createDoctorUser(request.identification()));
+        doctor.setIdUser(userModuleApi.getOrCreateDoctorUser(
+                request.identification(),
+                request.firstName(),
+                request.lastName(),
+                request.email(),
+                request.password()
+        ));
 
         // 3. Deshabilitar el usuario si el doctor no está activo
         if (!doctor.isStatus())
@@ -172,7 +179,7 @@ public class DoctorService {
 
     // Habilitar medico
     @Transactional
-    public DoctorResponse enableDoctor(UUID idDoctor, LocalDate newStart, LocalDate newEnd) {
+    public void enableDoctor(UUID idDoctor, LocalDate newStart, LocalDate newEnd) {
         validateLaborDateRange(newStart, newEnd);
 
         Doctor doctor = doctorRepository.findById(idDoctor)
@@ -189,13 +196,12 @@ public class DoctorService {
         syncUserStatus(doctor);
 
         // 4. Guardamos y retornamos el DTO actualizado
-        Doctor savedDoctor = doctorRepository.save(doctor);
-        return DoctorResponse.fromEntity(savedDoctor);
+        doctorRepository.save(doctor);
     }
 
     //Deshabilitar medico
     @Transactional
-    public DoctorResponse disableDoctor(UUID idDoctor, boolean force) {
+    public void disableDoctor(UUID idDoctor, boolean force) {
         // 1. Buscar al doctor
         Doctor doctor = doctorRepository.findById(idDoctor)
                 .orElseThrow(() -> new EntityNotFoundException("Doctor no encontrado"));
@@ -227,9 +233,7 @@ public class DoctorService {
         syncUserStatus(doctor);
 
         // 6. Persistir cambios
-        Doctor updatedDoctor = doctorRepository.save(doctor);
-
-        return DoctorResponse.fromEntity(updatedDoctor);
+        doctorRepository.save(doctor);
     }
 
     public List<Doctor> findAllDoctors() {
@@ -238,7 +242,11 @@ public class DoctorService {
 
     public Doctor getDoctorById(UUID idDoctor) {
         return doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new RuntimeException("Doctor not found"));
+                .orElseThrow(() -> new RuntimeException("Doctor no encontrado"));
+    }
+
+    public Doctor findByUserId(UUID keycloakId) {
+        return doctorRepository.findByIdUser(keycloakId);
     }
 
     public List<Doctor> getDoctorBySpeciality(Specialty specialty) {

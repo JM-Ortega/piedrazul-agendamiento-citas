@@ -24,7 +24,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,14 +33,11 @@ class AppointmentServiceTest {
     @Mock
     private BusySlotService busySlotService;
 
-    @Mock
-    private SlotTimeService slotTimeService;
-
     private AppointmentService appointmentService;
 
     @BeforeEach
     void setUp() {
-        appointmentService = new AppointmentService(busySlotService, slotTimeService);
+                appointmentService = new AppointmentService(busySlotService);
     }
 
     // ─────────────────────────────────────────────
@@ -134,9 +130,6 @@ class AppointmentServiceTest {
                 UUID.randomUUID(), "Carlos Gomez", Specialty.FISIOTERAPIA,
                 LocalDate.now().plusDays(1), startTime, 30, List.of()
         )).isInstanceOf(SlotNotAvailableException.class);
-
-        // slotTimeService no debe invocarse en este flujo
-        verify(slotTimeService, never()).calculateAvailable(anyList(), anyList(), anyInt());
     }
 
     // ─────────────────────────────────────────────
@@ -211,8 +204,6 @@ class AppointmentServiceTest {
                 UUID.randomUUID(), "Carlos Gomez", Specialty.FISIOTERAPIA,
                 LocalDate.now().plusDays(1), startTime, 30, List.of()
         )).isInstanceOf(SlotNotAvailableException.class);
-
-        verify(slotTimeService, never()).calculateAvailable(anyList(), anyList(), anyInt());
     }
 
     // ─────────────────────────────────────────────
@@ -240,84 +231,6 @@ class AppointmentServiceTest {
 
         assertThat(manual.getSchedulingOrigin()).isEqualTo(SchedulingOrigin.MANUAL);
         assertThat(autonomo.getSchedulingOrigin()).isEqualTo(SchedulingOrigin.AUTONOMO);
-    }
-
-    // ─────────────────────────────────────────────
-    // getAvailableSlots — delegación a SlotTimeService
-    // ─────────────────────────────────────────────
-
-    @Test
-    void getAvailableSlotsShouldReturnSlotsFromSlotTimeService() {
-        List<AppointmentTime> doctorSlots = List.of(
-                new AppointmentTime(LocalTime.of(7, 0)),
-                new AppointmentTime(LocalTime.of(7, 30)),
-                new AppointmentTime(LocalTime.of(8, 0))
-        );
-        List<AppointmentTime> expectedAvailable = List.of(
-                new AppointmentTime(LocalTime.of(7, 0)),
-                new AppointmentTime(LocalTime.of(8, 0))
-        );
-        List<Appointment> existingAppointments = List.of();
-
-        when(slotTimeService.calculateAvailable(doctorSlots, existingAppointments, 30))
-                .thenReturn(expectedAvailable);
-
-        List<AppointmentTime> result = appointmentService.getAvailableSlots(
-                doctorSlots, existingAppointments, 30
-        );
-
-        assertThat(result).isEqualTo(expectedAvailable);
-    }
-
-    @Test
-    void getAvailableSlotsShouldDelegateToSlotTimeServiceWithCorrectArguments() {
-        List<AppointmentTime> doctorSlots = List.of(
-                new AppointmentTime(LocalTime.of(9, 0))
-        );
-        List<Appointment> existingAppointments = List.of();
-
-        when(slotTimeService.calculateAvailable(doctorSlots, existingAppointments, 45))
-                .thenReturn(List.of());
-
-        appointmentService.getAvailableSlots(doctorSlots, existingAppointments, 45);
-
-        verify(slotTimeService).calculateAvailable(doctorSlots, existingAppointments, 45);
-    }
-
-    @Test
-    void getAvailableSlotsShouldReturnEmptyWhenAllSlotsAreOccupied() {
-        List<AppointmentTime> doctorSlots = List.of(
-                new AppointmentTime(LocalTime.of(9, 0)),
-                new AppointmentTime(LocalTime.of(9, 30))
-        );
-        List<Appointment> existingAppointments = List.of();
-
-        when(slotTimeService.calculateAvailable(doctorSlots, existingAppointments, 30))
-                .thenReturn(List.of());
-
-        List<AppointmentTime> result = appointmentService.getAvailableSlots(
-                doctorSlots, existingAppointments, 30
-        );
-
-        assertThat(result).isEmpty();
-    }
-
-    @Test
-    void getAvailableSlotsShouldReturnAllSlotsWhenNoneAreOccupied() {
-        List<AppointmentTime> doctorSlots = List.of(
-                new AppointmentTime(LocalTime.of(7, 0)),
-                new AppointmentTime(LocalTime.of(7, 30))
-        );
-        List<Appointment> existingAppointments = List.of();
-
-        when(slotTimeService.calculateAvailable(doctorSlots, existingAppointments, 30))
-                .thenReturn(doctorSlots);
-
-        List<AppointmentTime> result = appointmentService.getAvailableSlots(
-                doctorSlots, existingAppointments, 30
-        );
-
-        assertThat(result).containsExactlyInAnyOrderElementsOf(doctorSlots);
     }
 
     // ─────────────────────────────────────────────

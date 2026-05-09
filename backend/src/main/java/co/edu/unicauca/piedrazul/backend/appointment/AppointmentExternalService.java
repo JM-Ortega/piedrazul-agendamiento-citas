@@ -1,9 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.appointment;
 
-import co.edu.unicauca.piedrazul.backend.doctors.DoctorPublicInfo;
-
+import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 public interface AppointmentExternalService {
-	List<DoctorPublicInfo> getSpecialtiesWithDoctor();
+    List<AppointmentSummary> findByDoctorAndDate(UUID idDoctor, LocalDate date, String state);
 }

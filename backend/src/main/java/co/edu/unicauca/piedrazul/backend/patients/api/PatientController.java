@@ -4,6 +4,9 @@ import co.edu.unicauca.piedrazul.backend.patients.api.dto.*;
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientService;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,6 +23,7 @@ public class PatientController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public PatientResponse create(@Valid @RequestBody CreatePatientRequest request) {
         PatientData patient = patientService.createPatient(
                 request.getDocumentType(),
@@ -32,7 +36,6 @@ public class PatientController {
                 request.getBirthDate(),
                 request.getGuardianPhone()
         );
-
         return toResponse(patient);
     }
 
@@ -40,6 +43,7 @@ public class PatientController {
     public PatientResponse createWithUser(@Valid @RequestBody CreatePatientWithUserRequest request) {
         PatientData patient = patientService.createPatientWithUser(
                 request.getUsername(),
+                request.getPassword(),
                 request.getDocumentType(),
                 request.getDocumentNumber(),
                 request.getFirstName(),
@@ -50,37 +54,60 @@ public class PatientController {
                 request.getBirthDate(),
                 request.getGuardianPhone()
         );
-
         return toResponse(patient);
     }
 
-    @PostMapping("/link-user-account")
-    public PatientResponse linkUserAccount(@Valid @RequestBody LinkUserAccountRequest request) {
-        PatientData patient = patientService.linkUserToExistingPatient(
-                request.getDocumentNumber(),
-                request.getUsername()
-        );
+    @PostMapping("/link-user-account/request-code")
+    public void requestLinkUserAccountCode(@Valid @RequestBody RequestLinkUserAccountCodeRequest request) {
+        patientService.requestLinkUserAccountCode(request.getDocumentNumber());
+    }
 
+    @PostMapping("/link-user-account/confirm")
+    public PatientResponse confirmLinkUserAccount(@Valid @RequestBody ConfirmLinkUserAccountRequest request) {
+        PatientData patient = patientService.confirmLinkUserAccount(
+                request.getDocumentNumber(),
+                request.getCode(),
+                request.getPassword()
+        );
+        return toResponse(patient);
+    }
+
+    @GetMapping("/me")
+    @PreAuthorize("hasRole('PATIENT')")
+    public PatientResponse findMe(@AuthenticationPrincipal Jwt jwt) {
+        UUID keycloakId = UUID.fromString(jwt.getSubject());
+        PatientData patient = patientService.findByUserId(keycloakId)
+                .orElseThrow(() -> new PatientNotFoundException(keycloakId));
         return toResponse(patient);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR')")
     public PatientResponse findById(@PathVariable UUID id) {
         PatientData patient = patientService.findById(id)
                 .orElseThrow(() -> new PatientNotFoundException(id));
-
         return toResponse(patient);
     }
 
     @GetMapping("/document/{documentNumber}")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public PatientResponse findByDocument(@PathVariable String documentNumber) {
         PatientData patient = patientService.findByDocumentNumber(documentNumber)
                 .orElseThrow(() -> new PatientNotFoundException(documentNumber));
-
         return toResponse(patient);
     }
 
+    @GetMapping("/search/by-document-prefix")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
+    public List<PatientSummaryResponse> searchByDocumentPrefix(@RequestParam String documentPrefix) {
+        return patientService.searchByDocumentNumberPrefix(documentPrefix)
+                .stream()
+                .map(this::toSummaryResponse)
+                .toList();
+    }
+
     @GetMapping
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR')")
     public List<PatientSummaryResponse> findAll() {
         return patientService.findAll()
                 .stream()
@@ -89,8 +116,14 @@ public class PatientController {
     }
 
     @GetMapping("/{id}/exists")
+    @PreAuthorize("hasRole('SCHEDULER')")
     public boolean existsById(@PathVariable UUID id) {
         return patientService.existsById(id);
+    }
+
+    @GetMapping("/document/{documentNumber}/public")
+    public PatientPublicResponse findPublicByDocument(@PathVariable String documentNumber) {
+        return patientService.findPublicByDocumentNumber(documentNumber);
     }
 
     private PatientResponse toResponse(PatientData patient) {

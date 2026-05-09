@@ -3,18 +3,26 @@ spring:
     name: backend
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:piedrazul}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:app_db}?currentSchema=${DB_SCHEMA:piedrazul}
     username: ${DB_USER:piedrazul}
     password: ${DB_PASSWORD:piedrazul}
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: ${JPA_DDL_AUTO:update}
     show-sql: ${JPA_SHOW_SQL:true}
     properties:
       hibernate:
         format_sql: ${JPA_FORMAT_SQL:true}
+        default_schema: ${DB_SCHEMA:piedrazul}
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KC_ISSUER_URI:http://localhost:8180/realms/piedrazul}
+
   web:
     error:
       include-stacktrace: never
@@ -22,3 +30,33 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+
+  seed:
+    identity:
+      enabled: ${IDENTITY_SEED_ENABLED:false}
+
+      admin:
+        username: ${IDENTITY_SEED_ADMIN_USERNAME:}
+        first-name: ${IDENTITY_SEED_ADMIN_FIRST_NAME:}
+        last-name: ${IDENTITY_SEED_ADMIN_LAST_NAME:}
+        email: ${IDENTITY_SEED_ADMIN_EMAIL:}
+        password: ${IDENTITY_SEED_ADMIN_PASSWORD:}
+
+keycloak:
+  server-url: ${KC_SERVER_URL:http://localhost:8180}
+  realm: ${KC_REALM:piedrazul}
+  client-id: ${KC_BACKEND_CLIENT_ID:piedrazul-backend}
+  client-secret: ${KC_BACKEND_CLIENT_SECRET:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: always

@@ -1,32 +1,28 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
-import co.edu.unicauca.piedrazul.backend.doctors.DoctorPublicInfo;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.DoctorAdminUserData;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 import java.time.DayOfWeek;
 
-// Lombok
-@RequiredArgsConstructor
-
-//Servicio para peticiones externas
-@Service
+// Servicio para peticiones externas
 public class DoctorExternalServiceImpl implements DoctorExternalService {
     private final DoctorRepository doctorRepository;
     private final ScheduleService scheduleService;
+
+    public DoctorExternalServiceImpl(DoctorRepository doctorRepository, ScheduleService scheduleService) {
+        this.doctorRepository = doctorRepository;
+        this.scheduleService = scheduleService;
+    }
 
     @Override
     public boolean existDoctor(UUID idDoctor) {
@@ -56,10 +52,10 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     }
 
     @Override
-    public List<DoctorPublicInfo> getActiveDoctors (){
+    public List<DoctorResponse> getActiveDoctors (){
         return doctorRepository.findByStatusTrue()
                 .stream()
-                .map(this::toPublicInfo)
+                .map(DoctorResponse::fromEntity)
                 .toList();
     }
 
@@ -73,42 +69,23 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
 
     @Override
     @Transactional
-    public List<DoctorPublicInfo> getDoctorInfoByIds(List<UUID> doctorIds) {
+    public List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds) {
         if (doctorIds == null || doctorIds.isEmpty()) {
             return List.of();
         }
 
         return doctorRepository.findByIdDoctorIn(doctorIds).stream()
-                .map(this::toPublicInfo)
+                .map(DoctorResponse::fromEntity)
                 .toList();
     }
 
-    private DoctorPublicInfo toPublicInfo(Doctor doctor) {
-        return new DoctorPublicInfo(
-                doctor.getSpecialty().toString(),
-                doctor.getIdDoctor(),
-                doctor.getFirstName() + " " + doctor.getLastName(),
-                doctor.getLaborEnd(),
-                Optional.ofNullable(doctor.getSchedules())
-                        .orElse(List.of())
-                        .stream()
-                        .map(Schedule::getWorkday)
-                        .filter(Objects::nonNull)
-                        .map(DoctorExternalServiceImpl::toWorkdayNumber)
-                        .distinct()
-                        .sorted(Comparator.naturalOrder())
-                        .toList()
-        );
-    }
-
-    private static int toWorkdayNumber(Workday workday) {
-        return switch (workday) {
-            case LUNES -> 1;
-            case MARTES -> 2;
-            case MIERCOLES -> 3;
-            case JUEVES -> 4;
-            case VIERNES -> 5;
-        };
+    @Override
+    @Transactional
+    public List<DoctorAdminUserData> getAdminUserData() {
+        return doctorRepository.findAll()
+                .stream()
+                .map(DoctorAdminUserData::fromEntity)
+                .toList();
     }
 
     private static Workday toWorkday(DayOfWeek dayOfWeek) {

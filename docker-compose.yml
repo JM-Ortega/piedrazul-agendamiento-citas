@@ -2,6 +2,4 @@ name: ${PROJECT_NAME}
 
 include:
   - ./infra/compose/db.yml
-
-volumes:
-  pgdata:
+  - ./infra/compose/keycloak.yml
