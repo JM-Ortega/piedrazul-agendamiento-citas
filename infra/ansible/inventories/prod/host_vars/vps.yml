@@ -2,5 +2,6 @@
 kc_hostname: auth.piedrazul.narvaezlab.dev
 api_public_domain: api.piedrazul.narvaezlab.dev
 acme_email: jortegan@unicauca.edu.co
+frontend_public_domain: piedrazul.narvaezlab.dev
 
-cors_allowed_origins: "https://{{ api_public_domain }}"
+cors_allowed_origins: "https://{{ frontend_public_domain }}"
