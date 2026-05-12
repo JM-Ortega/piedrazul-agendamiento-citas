@@ -54,6 +54,8 @@ on:
         required: true
       CLOUDFLARE_DNS_API_TOKEN:
         required: true
+      IDENTITY_SEED_ADMIN_PASSWORD:
+        required: true
 
 concurrency:
   group: deploy-${{ inputs.github_environment }}
@@ -331,6 +333,13 @@ jobs:
           KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
           CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
 
+          IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
+          IDENTITY_SEED_ADMIN_USERNAME: ${{ vars.IDENTITY_SEED_ADMIN_USERNAME }}
+          IDENTITY_SEED_ADMIN_FIRST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_FIRST_NAME }}
+          IDENTITY_SEED_ADMIN_LAST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_LAST_NAME }}
+          IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
+          IDENTITY_SEED_ADMIN_PASSWORD: ${{ secrets.IDENTITY_SEED_ADMIN_PASSWORD }}
+
   # Desplegar aplicación
   app_deploy:
     name: Desplegar aplicación
@@ -398,6 +407,13 @@ jobs:
           KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
           KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
           CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
+
+          IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
+          IDENTITY_SEED_ADMIN_USERNAME: ${{ vars.IDENTITY_SEED_ADMIN_USERNAME }}
+          IDENTITY_SEED_ADMIN_FIRST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_FIRST_NAME }}
+          IDENTITY_SEED_ADMIN_LAST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_LAST_NAME }}
+          IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
+          IDENTITY_SEED_ADMIN_PASSWORD: ${{ secrets.IDENTITY_SEED_ADMIN_PASSWORD }}
 
   # Health check
   health_check:
