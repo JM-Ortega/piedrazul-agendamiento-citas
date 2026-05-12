@@ -8,7 +8,7 @@ import {
 } from '@angular/router';
 import { AuthGuardData, createAuthGuard } from 'keycloak-angular';
 
-const isAccessAllowed = async ( 
+const isAccessAllowed = async (
   route: ActivatedRouteSnapshot,
   state: RouterStateSnapshot,
   authData: AuthGuardData,
