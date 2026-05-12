@@ -12,7 +12,7 @@ include:
 
 services:
   keycloak:
-    command: [ "start", "--import-realm" ]
+    command: ["start", "--import-realm"]
     environment:
       KC_HOSTNAME: ${KC_HOSTNAME}
       KC_HOSTNAME_STRICT: "true"
@@ -30,10 +30,10 @@ services:
 
   backend:
     expose:
-      - "8080"
+      - "${SERVER_PORT}"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.backend.rule=Host(`${API_PUBLIC_DOMAIN}`)"
       - "traefik.http.routers.backend.entrypoints=websecure"
       - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.backend.loadbalancer.server.port=8080"
+      - "traefik.http.services.backend.loadbalancer.server.port=${SERVER_PORT}"

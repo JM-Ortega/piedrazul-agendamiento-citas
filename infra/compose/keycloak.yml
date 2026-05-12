@@ -15,8 +15,8 @@ services:
       KC_DB_PASSWORD: ${KC_DB_PASSWORD}
       KC_HTTP_ENABLED: "true"
       KC_HTTP_PORT: ${KC_PORT}
-      KC_HEALTH_ENABLED: "true"
-      KC_METRICS_ENABLED: "true"
+      KC_HEALTH_ENABLED: ${KC_HEALTH_ENABLED}
+      KC_METRICS_ENABLED: ${KC_METRICS_ENABLED}
     volumes:
       - ../keycloak/realm:/opt/keycloak/data/import
       - ../keycloak/themes/keycloak-theme/keycloak-theme-for-kc-all-other-versions.jar:/opt/keycloak/providers/keycloak-theme.jar
@@ -28,14 +28,13 @@ services:
         limits:
           memory: 1g
     healthcheck:
-      test:
-        [
+      test: [
           "CMD-SHELL",
           "{ printf 'HEAD /health/ready HTTP/1.0\r
 
-            \r
+          \r
 
-            ' >&0; grep 'HTTP/1.0 200'; } 0<>/dev/tcp/localhost/9000",
+          ' >&0; grep 'HTTP/1.0 200'; } 0<>/dev/tcp/localhost/9000",
         ]
       interval: 10s
       timeout: 5s
