@@ -33,7 +33,7 @@ variable "build_command" {
 variable "output_dir" {
   description = "Directorio de salida del build"
   type        = string
-  default     = "dist/frontend"
+  default     = "dist/frontend/browser"
 }
 
 variable "root_dir" {

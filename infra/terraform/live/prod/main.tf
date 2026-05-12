@@ -41,5 +41,5 @@ module "dns" {
   project         = var.project
   base_domain     = var.base_domain
   pages_hostname  = module.pages.pages_hostname
-  proxied_backend = false
+  proxied_backend = true
 }
