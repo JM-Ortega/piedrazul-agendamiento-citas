@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Doctor } from '../../../models/interfaces/doctor.model';
+import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 
 export interface FormErrors {
   horarioGlobal: string;

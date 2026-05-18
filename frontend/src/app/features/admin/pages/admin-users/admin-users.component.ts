@@ -10,8 +10,8 @@ import {
   Users,
 } from 'lucide-angular';
 
-import { SystemUser } from '../../../../models/interfaces/system-user.model';
-import { AdminService } from '../../../../services/admin.service';
+import { SystemUser } from '../../models/interfaces/system-user.model';
+import { AdminService } from '../../service/admin.service';
 @Component({
   selector: 'app-admin-users',
   templateUrl: './admin-users.component.html',
