@@ -1,1 +1,0 @@
-export type BookingContext = 'patient' | 'scheduler' | 'doctor';

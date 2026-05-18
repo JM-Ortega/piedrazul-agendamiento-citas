@@ -1,9 +1,0 @@
-export type ExportColumnBackend =
-  | 'FECHA_CITA'
-  | 'HORA_CITA'
-  | 'NOMBRE_PACIENTE'
-  | 'DOCUMENTO_IDENTIDAD'
-  | 'TELEFONO_PACIENTE'
-  | 'NOMBRE_MEDICO'
-  | 'ESPECIALIDAD'
-  | 'ESTADO_CITA';
