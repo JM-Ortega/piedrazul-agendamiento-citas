@@ -1,19 +1,19 @@
 import { Routes } from '@angular/router';
-import { AuthGuard } from './guards/auth.guard';
+import { AuthGuard } from './core/guards/auth.guard';
 
 import { AccesoComponent } from './design-system/pages/acceso/acceso.component';
 import { HomeComponent } from './design-system/pages/home/home.component';
-import { AdminConfigComponent } from './features/admin/admin-config.component';
+import { AdminConfigComponent } from './features/admin/components/admin-orquestador/admin-config.component';
 import { AdminCreateUserComponent } from './features/admin/pages/admin-create-user/admin-create-user.component';
 import { AdminUsersComponent } from './features/admin/pages/admin-users/admin-users.component';
 import { NewAppointmentSchedulerComponent } from './features/appointment/pages/agendador-agendar/new-appointment-scheduler.component';
-import { SchedulerDashboardComponent } from './features/appointment/pages/agendador-listar-citas/scheduler-dashboard.component';
+import { NewAppointmentDoctorComponent } from './features/appointment/pages/doctor-agendar/new-appointment-doctor.component';
 import { PatientNewAppointmentComponent } from './features/appointment/pages/paciente-agendar/patient-new-appointment.component';
-import { PatientDashboardComponent } from './features/appointment/pages/paciente-listar-citas/patient-dashboard.component';
 import { DoctorAllAppointmentsComponent } from './features/doctor/doctor-all-appointments/doctor-all-appointments.component';
 import { DoctorDashboardComponent } from './features/doctor/doctor-dashboard/doctor-dashboard.component';
+import { PatientDashboardComponent } from './features/patient-dashboard/patient-dashboard.component';
 import { RegistroComponent } from './features/registro/registro.component';
-import { NewAppointmentDoctorComponent  } from './features/appointment/pages/doctor-agendar/new-appointment-doctor.component';
+import { SchedulerDashboardComponent } from './features/scheduler-dashboard/scheduler-dashboard.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
