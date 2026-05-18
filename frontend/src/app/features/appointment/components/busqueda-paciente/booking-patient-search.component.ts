@@ -1,11 +1,18 @@
-import { Component, inject, output, signal, OnDestroy } from '@angular/core';
+import { Component, inject, OnDestroy, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, CheckCircle, Search } from 'lucide-angular';
-import { Subject, switchMap, debounceTime, distinctUntilChanged, of, takeUntil } from 'rxjs';
-import { BookingStateService } from '../../booking-state.service';
-import { NuevaCitaService } from '../../../../services/nuevaCita.service';
-import { Patient } from '../../../../models/interfaces/patient.model';
-import { PatientSuggestion } from '../../../../models/dtos/patient-suggestion.dto';
+import { CheckCircle, LucideAngularModule, Search } from 'lucide-angular';
+import {
+  debounceTime,
+  distinctUntilChanged,
+  of,
+  Subject,
+  switchMap,
+  takeUntil,
+} from 'rxjs';
+import { Patient } from '../../../../shared/models/interfaces/patient.model';
+import { PatientSuggestion } from '../../models/dtos/patient-suggestion.dto';
+import { BookingStateService } from '../../services/booking-state.service';
+import { NuevaCitaService } from '../../services/nuevaCita.service';
 
 const MIN_CHARS = 3;
 const MAX_DOC_LENGTH = 12;
@@ -40,7 +47,8 @@ export class BookingPatientSearchComponent implements OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
   constructor() {
-    this.searchInput$.pipe(
+    this.searchInput$
+      .pipe(
         debounceTime(300),
         distinctUntilChanged(),
         switchMap((query) => {
@@ -59,7 +67,8 @@ export class BookingPatientSearchComponent implements OnDestroy {
           return this.citaService.getPatientSuggestionsByDocument(trimmed);
         }),
         takeUntil(this.destroy$),
-      ).subscribe({
+      )
+      .subscribe({
         next: (suggestions) => {
           this.state.searchLoading.set(false);
           this.state.searchSuggestions.set(suggestions);
@@ -77,12 +86,14 @@ export class BookingPatientSearchComponent implements OnDestroy {
   }
 
   handleDocInput(event: Event): void {
-    const el    = event.target as HTMLInputElement;
-    const raw   = el.value;
+    const el = event.target as HTMLInputElement;
+    const raw = el.value;
     const clean = raw.replace(/[^a-zA-Z0-9]/g, '');
     if (clean !== raw) {
       el.value = clean;
-      this.flashWarning('Solo se permiten letras y números, sin caracteres especiales');
+      this.flashWarning(
+        'Solo se permiten letras y números, sin caracteres especiales',
+      );
     }
     if (clean.length > MAX_DOC_LENGTH) {
       el.value = clean.slice(0, MAX_DOC_LENGTH);
@@ -98,24 +109,25 @@ export class BookingPatientSearchComponent implements OnDestroy {
   }
 
   onQueryChange(value: string): void {
- 
     const clean = value.replace(/[^a-zA-Z0-9]/g, '').slice(0, MAX_DOC_LENGTH);
     this.state.searchQuery.set(clean);
     this.state.searchError.set('');
     this.clearResult();
- 
+
     if (clean.trim().length < MIN_CHARS) {
       this.state.searchSuggestions.set([]);
       this.showSuggestions.set(false);
     }
- 
+
     this.searchInput$.next(clean);
   }
 
   onSearchExact(): void {
     const query = this.state.searchQuery().trim();
     if (query.length < MIN_DOC_LENGTH) {
-      this.state.searchError.set(`El documento debe tener al menos ${MIN_DOC_LENGTH} caracteres alfanuméricos.`);
+      this.state.searchError.set(
+        `El documento debe tener al menos ${MIN_DOC_LENGTH} caracteres alfanuméricos.`,
+      );
       return;
     }
     this.showSuggestions.set(false);
@@ -162,7 +174,9 @@ export class BookingPatientSearchComponent implements OnDestroy {
         if (err.status === 404) {
           this.handleNotFound(documentNumber);
         } else if (err.status === 0) {
-          this.state.searchError.set('No se pudo conectar con el servidor. Intente más tarde.');
+          this.state.searchError.set(
+            'No se pudo conectar con el servidor. Intente más tarde.',
+          );
         } else {
           this.state.searchError.set('Error al buscar el paciente.');
         }

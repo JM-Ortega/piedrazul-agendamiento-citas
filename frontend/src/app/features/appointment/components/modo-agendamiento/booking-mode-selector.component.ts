@@ -1,8 +1,8 @@
-import { Component, inject, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, inject, output } from '@angular/core';
 import { LucideAngularModule, Stethoscope, UserSearch } from 'lucide-angular';
-import { BookingStateService } from '../../booking-state.service';
-import { BookingMode } from '../../../../models/types/bookingMode.type';
+import { BookingMode } from '../../models/types/bookingMode.type';
+import { BookingStateService } from '../../services/booking-state.service';
 
 /**
  * Mostrar las dos tarjetas de selección de modo
@@ -15,9 +15,8 @@ import { BookingMode } from '../../../../models/types/bookingMode.type';
   templateUrl: './booking-mode-selector.component.html',
 })
 export class BookingModeSelectorComponent {
-
   readonly Stethoscope = Stethoscope;
-  readonly UserSearch  = UserSearch;
+  readonly UserSearch = UserSearch;
 
   protected state = inject(BookingStateService);
 
