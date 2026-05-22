@@ -107,8 +107,7 @@ export class RegistroComponent {
 
   readonly NAME_MAX = 30;
   readonly EMAIL_MAX = 100;
-  readonly PHONE_MAX = 15;
-  readonly PHONE_MIN = 7;
+  readonly PHONE_MAX = 10;
 
   firstNameLimitMsg = signal('');
   lastNameLimitMsg = signal('');
@@ -583,11 +582,11 @@ export class RegistroComponent {
     if (!trimmed) {
       return required ? `Ingresa el ${label.toLowerCase()}` : '';
     }
-    if (trimmed.length < this.PHONE_MIN) {
-      return `El número debe tener al menos ${this.PHONE_MIN} dígitos`;
+    if (trimmed.length < this.PHONE_MAX) {
+      return `El número debe tener al menos ${this.PHONE_MAX} dígitos`;
     }
-    if (!/^[0-9]{7,15}$/.test(trimmed)) {
-      return `Ingresa un número válido (entre ${this.PHONE_MIN} y ${this.PHONE_MAX} dígitos)`;
+    if (!/^[0-9]{10}$/.test(trimmed)) {
+      return `Ingresa un número válido de ${this.PHONE_MAX} dígitos`;
     }
     return '';
   }
