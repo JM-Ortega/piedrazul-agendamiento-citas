@@ -135,7 +135,11 @@ export class DoctorDashboardComponent implements OnInit {
 
     this.isMarkingAttended.set(true);
 
-    this.doctorService.updateAppointmentState(id, outcome).subscribe({
+    const request$ = outcome === 'ATENDIDA'
+      ? this.doctorService.updateAppointmentAsAttended(id, outcome)
+      : this.doctorService.updateAppointmentAsUnassisted(id, outcome);
+
+    request$.subscribe({
       next: () => {
         this.closeModal();
         const doctorId = this.currentDoctor()?.id;
