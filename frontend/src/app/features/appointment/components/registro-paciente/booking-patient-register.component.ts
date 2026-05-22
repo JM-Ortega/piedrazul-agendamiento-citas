@@ -46,8 +46,7 @@ export class BookingPatientRegisterComponent {
   readonly maxBirthDate = new Date();
   readonly NAME_MAX = 30;
   readonly EMAIL_MAX = 100;
-  readonly PHONE_MAX = 15;
-  readonly PHONE_MIN = 7;
+  readonly PHONE_MAX = 10;
 
   private readonly VALID_NAME_REGEX = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s\-]+$/;
   private readonly VALID_EMAIL_REGEX =
@@ -239,17 +238,10 @@ export class BookingPatientRegisterComponent {
       this.phoneErrorMsg.set('Este campo es obligatorio');
       return false;
     }
-    if (trimmed.length < this.PHONE_MIN) {
+    if (!/^[0-9]{10}$/.test(trimmed)) {
       this.phoneError.set(true);
       this.phoneErrorMsg.set(
-        `El número debe tener al menos ${this.PHONE_MIN} dígitos`,
-      );
-      return false;
-    }
-    if (!/^[0-9]{7,15}$/.test(trimmed)) {
-      this.phoneError.set(true);
-      this.phoneErrorMsg.set(
-        `Ingrese un número válido (entre ${this.PHONE_MIN} y ${this.PHONE_MAX} dígitos)`,
+        'Ingrese un número válido de exactamente 10 dígitos',
       );
       return false;
     }
@@ -344,10 +336,10 @@ export class BookingPatientRegisterComponent {
 
   private validateGuardianPhone(f: Omit<Patient, 'id'>): boolean {
     if (f.guardianPhone) {
-      if (!/^[0-9]{7,15}$/.test(f.guardianPhone)) {
+      if (!/^[0-9]{10}$/.test(f.guardianPhone)) {
         this.guardianPhoneError.set(true);
         this.guardianPhoneErrorMsg.set(
-          `Ingrese un número válido (entre ${this.PHONE_MIN} y ${this.PHONE_MAX} dígitos)`,
+          `Ingrese un número válido de ${this.PHONE_MAX} dígitos`,
         );
         return false;
       }
