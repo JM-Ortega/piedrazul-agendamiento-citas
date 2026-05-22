@@ -9,6 +9,7 @@ import { LucideAngularModule, UserSearch } from 'lucide-angular';
 import { BookingStateService } from '../../services/booking-state.service';
 import { CalendarService } from '../../services/calendar.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
+import {SpecialtyPipe} from "../seleccion-especialidad/specialtyPipe";
 
 /**
  * Permite al usuario elegir una fecha y hora
@@ -28,6 +29,7 @@ import { NuevaCitaService } from '../../services/nuevaCita.service';
     MatInputModule,
     MatFormFieldModule,
     MatNativeDateModule,
+    SpecialtyPipe,
   ],
   templateUrl: './booking-schedule-selector.component.html',
 })
