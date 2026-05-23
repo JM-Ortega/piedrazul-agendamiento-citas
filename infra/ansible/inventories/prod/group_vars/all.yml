@@ -53,6 +53,7 @@ log_level_sql_bind: WARN
 kc_realm: piedrazul
 kc_port: 8180
 kc_backend_client_id: piedrazul-backend
+kc_automation_client_id: piedrazul-keycloak-automation
 kc_bootstrap_admin_user: kc-bootstrap
 kc_admin_user: kc-admin
 kc_health_enabled: true

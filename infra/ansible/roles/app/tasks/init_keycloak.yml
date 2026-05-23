@@ -1,108 +1,306 @@
 ---
-# Fase de identidad: crea admin permanente, aplica KC_BACKEND_CLIENT_SECRET,
-# elimina bootstrap temporal. Corre UNA SOLA VEZ por marker en disco.
-# Requiere que setup.yml haya establecido app_kc_backend_secret como set_fact.
+# Fase de identidad de Keycloak.
+#
+# Bootstrap (marker): corre UNA SOLA VEZ en el primer deploy.
+#   - Crea automation client en master realm
+#   - Fija KC_AUTOMATION_CLIENT_SECRET
+#   - Asigna manage-clients + view-clients de piedrazul-realm al service account
+#   - Crea kc-admin humano
+#   - Asigna rol admin a kc-admin
+#   - Elimina bootstrap admin temporal
+#   - Crea marker
+#
+# Sync del secret (siempre): corre en cada converge.
+#   - Usa automation client (client credentials) para autenticarse
+#   - Lee secret actual de piedrazul-backend en Keycloak
+#   - Actualiza solo si difiere del esperado
 
+# ─────────────────────────────────────────────
+# Sección 1 — Verificar marker
+# ─────────────────────────────────────────────
 - name: Verificar si Keycloak ya fue inicializado
   ansible.builtin.stat:
     path: "{{ app_dir }}/.keycloak_initialized"
   register: app_kc_initialized
 
-- name: Inicializar identidad Keycloak
+# ─────────────────────────────────────────────
+# Sección 2 — Esperar Keycloak healthy (siempre)
+# ─────────────────────────────────────────────
+- name: Esperar que Keycloak esté healthy
+  ansible.builtin.command:
+    cmd: >
+      docker inspect keycloak
+      --format="{{ '{{' }}.State.Health.Status{{ '}}' }}"
+  register: app_kc_health
+  until: app_kc_health.stdout == "healthy"
+  retries: 30
+  delay: 10
+  changed_when: false
+
+# ─────────────────────────────────────────────
+# Sección 3 — Bootstrap inicial (solo primer deploy)
+# ─────────────────────────────────────────────
+- name: Bootstrap inicial de Keycloak
   when: not app_kc_initialized.stat.exists
   block:
-    # Readiness
-    - name: Esperar que Keycloak esté disponible (puerto management 9000)
-      ansible.builtin.command:
-        cmd: >
-          docker inspect keycloak --format="{{ '{{' }}.State.Health.Status{{
-          '}}' }}"
-      register: app_kc_health
-      until: app_kc_health.stdout == "healthy"
-      retries: 30
-      delay: 10
-      changed_when: false
-
-    # Esperar import del realm
-    # El healthcheck responde 200 cuando KC arranca, pero --import-realm
-    # puede completarse después. Este paso espera hasta que el realm exista.
-    - name: Esperar que el realm piedrazul esté importado
-      community.general.keycloak_realm:
-        auth_keycloak_url: "http://127.0.0.1:{{ kc_port }}"
-        auth_realm: master
-        auth_client_id: admin-cli
-        auth_username: "{{ kc_bootstrap_admin_user }}"
-        auth_password: "{{ lookup('env', 'KC_BOOTSTRAP_ADMIN_PASSWORD') }}"
-        realm: "{{ kc_realm }}"
-        state: present
+    # ── 3.1 Esperar import del realm piedrazul ──
+    - name: Esperar que el realm {{ kc_realm }} esté importado
+      community.docker.docker_container_exec:
+        container: keycloak
+        argv:
+          - /opt/keycloak/bin/kcadm.sh
+          - get
+          - "realms/{{ kc_realm }}"
+          - --no-config
+          - --server
+          - "http://localhost:{{ kc_port }}"
+          - --realm
+          - master
+          - --user
+          - "{{ kc_bootstrap_admin_user }}"
+        env:
+          KC_CLI_PASSWORD: "{{ lookup('env', 'KC_BOOTSTRAP_ADMIN_PASSWORD') | string }}"
       register: app_realm_check
-      until: app_realm_check is not failed
+      until: app_realm_check.rc == 0
       retries: 12
       delay: 5
+      changed_when: false
       no_log: true
 
-    # Admin permanente en master realm
+    # ── 3.2 Crear automation client en master realm ──
+    - name: Crear automation client en master realm
+      community.docker.docker_container_exec:
+        container: keycloak
+        argv:
+          - /bin/bash
+          - -c
+          - |
+            set -euo pipefail
+
+            KCADM="/opt/keycloak/bin/kcadm.sh"
+            SERVER="http://localhost:{{ kc_port }}"
+            BOOTSTRAP="{{ kc_bootstrap_admin_user }}"
+            CLIENT_ID="{{ kc_automation_client_id }}"
+
+            EXISTING=$($KCADM get clients \
+              --no-config --server "$SERVER" --realm master --user "$BOOTSTRAP" \
+              -r master \
+              -q clientId="$CLIENT_ID" \
+              --fields id --format csv --noquotes)
+
+            if [ -n "$EXISTING" ]; then
+              echo "AUTOMATION_CLIENT_EXISTS"
+              exit 0
+            fi
+
+            $KCADM create clients \
+              --no-config --server "$SERVER" --realm master --user "$BOOTSTRAP" \
+              -r master \
+              -s clientId="$CLIENT_ID" \
+              -s name="Piedrazul Keycloak Automation" \
+              -s description="Service account para automatización Ansible" \
+              -s enabled=true \
+              -s clientAuthenticatorType=client-secret \
+              -s serviceAccountsEnabled=true \
+              -s standardFlowEnabled=false \
+              -s directAccessGrantsEnabled=false \
+              -s publicClient=false
+
+            echo "AUTOMATION_CLIENT_CREATED"
+        env:
+          KC_CLI_PASSWORD: "{{ lookup('env', 'KC_BOOTSTRAP_ADMIN_PASSWORD') | string }}"
+      register: app_kc_create_automation
+      changed_when: "'AUTOMATION_CLIENT_CREATED' in app_kc_create_automation.stdout"
+      no_log: true
+
+    # ── 3.3 Fijar secret del automation client ──
+    - name: Fijar KC_AUTOMATION_CLIENT_SECRET al automation client
+      community.docker.docker_container_exec:
+        container: keycloak
+        argv:
+          - /bin/bash
+          - -c
+          - |
+            set -euo pipefail
+
+            KCADM="/opt/keycloak/bin/kcadm.sh"
+            SERVER="http://localhost:{{ kc_port }}"
+            BOOTSTRAP="{{ kc_bootstrap_admin_user }}"
+            CLIENT_ID="{{ kc_automation_client_id }}"
+
+            CLIENT_UUID=$($KCADM get clients \
+              --no-config --server "$SERVER" --realm master --user "$BOOTSTRAP" \
+              -r master \
+              -q clientId="$CLIENT_ID" \
+              --fields id --format csv --noquotes)
+
+            if [ -z "$CLIENT_UUID" ]; then
+              echo "ERROR: automation client no encontrado" >&2
+              exit 1
+            fi
+
+            $KCADM update "clients/$CLIENT_UUID" \
+              --no-config --server "$SERVER" --realm master --user "$BOOTSTRAP" \
+              -r master \
+              -s secret="$KC_AUTOMATION_SECRET"
+
+            echo "AUTOMATION_SECRET_SET"
+        env:
+          KC_CLI_PASSWORD: "{{ lookup('env', 'KC_BOOTSTRAP_ADMIN_PASSWORD') | string }}"
+          KC_AUTOMATION_SECRET: "{{ app_kc_automation_secret | string }}"
+      register: app_kc_set_automation_secret
+      changed_when: "'AUTOMATION_SECRET_SET' in app_kc_set_automation_secret.stdout"
+      no_log: true
+
+    # ── 3.4 Asignar manage-clients + view-clients al service account ──
+    - name: Asignar manage-clients y view-clients al service account del automation client
+      community.docker.docker_container_exec:
+        container: keycloak
+        argv:
+          - /opt/keycloak/bin/kcadm.sh
+          - add-roles
+          - --no-config
+          - --server
+          - "http://localhost:{{ kc_port }}"
+          - --realm
+          - master
+          - --user
+          - "{{ kc_bootstrap_admin_user }}"
+          - -r
+          - master
+          - --uusername
+          - "service-account-{{ kc_automation_client_id }}"
+          - --cclientid
+          - "{{ kc_realm }}-realm"
+          - --rolename
+          - manage-clients
+          - --rolename
+          - view-clients
+        env:
+          KC_CLI_PASSWORD: "{{ lookup('env', 'KC_BOOTSTRAP_ADMIN_PASSWORD') | string }}"
+      changed_when: true
+      no_log: true
+
+    # ── 3.5 Crear usuario admin permanente ──
     - name: Crear usuario admin permanente en master realm
-      community.general.keycloak_user:
-        auth_keycloak_url: "http://127.0.0.1:{{ kc_port }}"
-        auth_realm: master
-        auth_client_id: admin-cli
-        auth_username: "{{ kc_bootstrap_admin_user }}"
-        auth_password: "{{ lookup('env', 'KC_BOOTSTRAP_ADMIN_PASSWORD') }}"
-        realm: master
-        username: "{{ kc_admin_user }}"
-        enabled: true
-        email_verified: true
-        credentials:
-          - type: password
-            value: "{{ lookup('env', 'KC_ADMIN_PASSWORD') }}"
-            temporary: false
-        state: present
-      register: app_kc_permanent_user
+      community.docker.docker_container_exec:
+        container: keycloak
+        argv:
+          - /opt/keycloak/bin/kcadm.sh
+          - create
+          - users
+          - --no-config
+          - --server
+          - "http://localhost:{{ kc_port }}"
+          - --realm
+          - master
+          - --user
+          - "{{ kc_bootstrap_admin_user }}"
+          - -r
+          - master
+          - -s
+          - "username={{ kc_admin_user }}"
+          - -s
+          - enabled=true
+          - -s
+          - emailVerified=true
+        env:
+          KC_CLI_PASSWORD: "{{ lookup('env', 'KC_BOOTSTRAP_ADMIN_PASSWORD') | string }}"
+      register: app_kc_create_admin
+      failed_when: >
+        app_kc_create_admin.rc != 0 and
+        'already exists' not in (app_kc_create_admin.stderr | default(''))
+      changed_when: app_kc_create_admin.rc == 0
       no_log: true
 
+    # ── 3.6 Establecer password del admin permanente ──
+    - name: Establecer password del admin permanente
+      community.docker.docker_container_exec:
+        container: keycloak
+        argv:
+          - /bin/bash
+          - -c
+          - |
+            set -euo pipefail
+
+            KCADM="/opt/keycloak/bin/kcadm.sh"
+            SERVER="http://localhost:{{ kc_port }}"
+            BOOTSTRAP="{{ kc_bootstrap_admin_user }}"
+
+            $KCADM set-password \
+              --no-config --server "$SERVER" --realm master --user "$BOOTSTRAP" \
+              -r master \
+              --username "{{ kc_admin_user }}" \
+              --new-password "$KC_NEW_ADMIN_PASSWORD"
+        env:
+          KC_CLI_PASSWORD: "{{ lookup('env', 'KC_BOOTSTRAP_ADMIN_PASSWORD') | string }}"
+          KC_NEW_ADMIN_PASSWORD: "{{ lookup('env', 'KC_ADMIN_PASSWORD') | string }}"
+      changed_when: true
+      no_log: true
+
+    # ── 3.7 Asignar rol admin al usuario permanente ──
     - name: Asignar rol admin al usuario permanente
-      community.general.keycloak_user_rolemapping:
-        auth_keycloak_url: "http://127.0.0.1:{{ kc_port }}"
-        auth_realm: master
-        auth_client_id: admin-cli
-        auth_username: "{{ kc_bootstrap_admin_user }}"
-        auth_password: "{{ lookup('env', 'KC_BOOTSTRAP_ADMIN_PASSWORD') }}"
-        realm: master
-        uid: "{{ app_kc_permanent_user.end_state.id }}"
-        roles:
-          - name: admin
-        state: present
+      community.docker.docker_container_exec:
+        container: keycloak
+        argv:
+          - /opt/keycloak/bin/kcadm.sh
+          - add-roles
+          - --no-config
+          - --server
+          - "http://localhost:{{ kc_port }}"
+          - --realm
+          - master
+          - --user
+          - "{{ kc_bootstrap_admin_user }}"
+          - -r
+          - master
+          - --uusername
+          - "{{ kc_admin_user }}"
+          - --rolename
+          - admin
+        env:
+          KC_CLI_PASSWORD: "{{ lookup('env', 'KC_BOOTSTRAP_ADMIN_PASSWORD') | string }}"
+      changed_when: true
       no_log: true
 
-    # Client secret en realm piedrazul
-    - name: Aplicar KC_BACKEND_CLIENT_SECRET al client piedrazul-backend
-      community.general.keycloak_client:
-        auth_keycloak_url: "http://127.0.0.1:{{ kc_port }}"
-        auth_realm: master
-        auth_client_id: admin-cli
-        auth_username: "{{ kc_admin_user }}"
-        auth_password: "{{ lookup('env', 'KC_ADMIN_PASSWORD') }}"
-        realm: "{{ kc_realm }}"
-        client_id: "{{ kc_backend_client_id }}"
-        secret: "{{ app_kc_backend_secret }}"
-        state: present
-      no_log: true
-
-    # Eliminar usuario bootstrap temporal
+    # ── 3.8 Eliminar usuario bootstrap temporal ──
     - name: Eliminar usuario bootstrap temporal
-      community.general.keycloak_user:
-        auth_keycloak_url: "http://127.0.0.1:{{ kc_port }}"
-        auth_realm: master
-        auth_client_id: admin-cli
-        auth_username: "{{ kc_admin_user }}"
-        auth_password: "{{ lookup('env', 'KC_ADMIN_PASSWORD') }}"
-        realm: master
-        username: "{{ kc_bootstrap_admin_user }}"
-        state: absent
+      community.docker.docker_container_exec:
+        container: keycloak
+        argv:
+          - /bin/bash
+          - -c
+          - |
+            set -euo pipefail
+
+            KCADM="/opt/keycloak/bin/kcadm.sh"
+            SERVER="http://localhost:{{ kc_port }}"
+            ADMIN="{{ kc_admin_user }}"
+            BOOTSTRAP="{{ kc_bootstrap_admin_user }}"
+
+            BOOTSTRAP_UUID=$($KCADM get users \
+              --no-config --server "$SERVER" --realm master --user "$ADMIN" \
+              -r master \
+              -q username="$BOOTSTRAP" \
+              --fields id --format csv --noquotes)
+
+            if [ -z "$BOOTSTRAP_UUID" ]; then
+              echo "Bootstrap user not found, skipping"
+              exit 0
+            fi
+
+            $KCADM delete "users/$BOOTSTRAP_UUID" \
+              --no-config --server "$SERVER" --realm master --user "$ADMIN" \
+              -r master
+
+            echo "BOOTSTRAP_DELETED"
+        env:
+          KC_CLI_PASSWORD: "{{ lookup('env', 'KC_ADMIN_PASSWORD') | string }}"
+      register: app_kc_delete_bootstrap
+      changed_when: "'BOOTSTRAP_DELETED' in app_kc_delete_bootstrap.stdout"
       no_log: true
 
-    # Marker de inicialización
+    # ── 3.9 Crear marker ──
     - name: Crear marker .keycloak_initialized
       ansible.builtin.file:
         path: "{{ app_dir }}/.keycloak_initialized"
@@ -110,3 +308,69 @@
         owner: ansible
         group: ansible
         mode: "0444"
+
+# ─────────────────────────────────────────────
+# Sección 4 — Sync del secret (siempre)
+# ─────────────────────────────────────────────
+- name: Sincronizar KC_BACKEND_CLIENT_SECRET con Keycloak
+  community.docker.docker_container_exec:
+    container: keycloak
+    argv:
+      - /bin/bash
+      - -c
+      - |
+        set -euo pipefail
+
+        KCADM="/opt/keycloak/bin/kcadm.sh"
+        SERVER="http://localhost:{{ kc_port }}"
+        REALM="{{ kc_realm }}"
+        AUTOMATION_CLIENT="{{ kc_automation_client_id }}"
+        CLIENT_ID="{{ kc_backend_client_id }}"
+        DESIRED="$KC_DESIRED_BACKEND_CLIENT_SECRET"
+
+        # Obtener UUID del backend client
+        CLIENT_UUID=$($KCADM get clients \
+          --no-config \
+          --server "$SERVER" \
+          --realm master \
+          --client "$AUTOMATION_CLIENT" \
+          --secret "$KC_AUTOMATION_CLIENT_SECRET" \
+          -r "$REALM" \
+          -q clientId="$CLIENT_ID" \
+          --fields id --format csv --noquotes)
+
+        if [ -z "$CLIENT_UUID" ]; then
+          echo "ERROR: client $CLIENT_ID no encontrado en realm $REALM" >&2
+          exit 1
+        fi
+
+        # Leer secret actual
+        CURRENT=$($KCADM get "clients/$CLIENT_UUID/client-secret" \
+          --no-config \
+          --server "$SERVER" \
+          --realm master \
+          --client "$AUTOMATION_CLIENT" \
+          --secret "$KC_AUTOMATION_CLIENT_SECRET" \
+          -r "$REALM" \
+          --fields value --format csv --noquotes)
+
+        # Comparar y actualizar solo si difiere
+        if [ "$CURRENT" = "$DESIRED" ]; then
+          echo "SECRET_UNCHANGED"
+        else
+          $KCADM update "clients/$CLIENT_UUID" \
+            --no-config \
+            --server "$SERVER" \
+            --realm master \
+            --client "$AUTOMATION_CLIENT" \
+            --secret "$KC_AUTOMATION_CLIENT_SECRET" \
+            -r "$REALM" \
+            -s secret="$DESIRED"
+          echo "SECRET_UPDATED"
+        fi
+    env:
+      KC_AUTOMATION_CLIENT_SECRET: "{{ app_kc_automation_secret | string }}"
+      KC_DESIRED_BACKEND_CLIENT_SECRET: "{{ app_kc_backend_secret | string }}"
+  register: app_kc_secret_sync
+  changed_when: "'SECRET_UPDATED' in app_kc_secret_sync.stdout"
+  no_log: true
