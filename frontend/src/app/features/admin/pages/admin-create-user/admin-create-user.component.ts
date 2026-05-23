@@ -20,7 +20,7 @@ import {
   User,
   UserPlus,
 } from 'lucide-angular';
-import { AdminService } from '../../../../services/admin.service';
+import { AdminService } from '../../service/admin.service';
 
 type Role = 'doctor' | 'scheduler';
 

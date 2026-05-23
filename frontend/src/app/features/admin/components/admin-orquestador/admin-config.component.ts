@@ -1,16 +1,16 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { LucideAngularModule, Pencil, Settings } from 'lucide-angular';
 import { forkJoin } from 'rxjs';
-import { dtoSchedule } from '../../models/dtos/schedule.dto';
-import { DaySchedule } from '../../models/interfaces/daySchedule.model';
-import { Doctor } from '../../models/interfaces/doctor.model';
-import { AdminService } from '../../services/admin.service';
-import { DoctorCardComponent } from './components/doctor-card/doctor-card.component';
+import { dtoSchedule } from '../../../../shared/models/dtos/schedule.dto';
+import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
+import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
+import { AdminService } from '../../service/admin.service';
+import { DoctorCardComponent } from '../doctor-card/doctor-card.component';
 import {
   DoctorEditFormComponent,
   DoctorSaveEvent,
-} from './components/doctor-edit-form/doctor-edit-form.component';
-import { AdminModalsComponent } from './components/modals/admin-modals.component';
+} from '../doctor-edit-form/doctor-edit-form.component';
+import { AdminModalsComponent } from '../modals/admin-modals.component';
 
 @Component({
   selector: 'app-admin-config',
@@ -129,7 +129,6 @@ export class AdminConfigComponent implements OnInit {
     if (originalDoctor.laborEnd !== form.laborEnd)
       calls.push(this.adminService.updateLaborEnd(form.id, form.laborEnd));
 
-   
     removedWorkdays.forEach((day) => {
       const workday = this.DAY_TO_WORKDAY[day];
       if (workday)

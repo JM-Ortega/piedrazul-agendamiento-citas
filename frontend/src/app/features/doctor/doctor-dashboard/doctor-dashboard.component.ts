@@ -2,16 +2,19 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   Calendar,
+  Check,
   Clock,
   FileText,
   LucideAngularModule,
   Plus,
   User,
-  Check,
+  UserX,
+  ChevronDown,
+  ClipboardList,
 } from 'lucide-angular';
-import { AppointmentsPatient } from '../../../models/dtos/appointments.dto';
-import { Doctor } from '../../../models/interfaces/doctor.model';
-import { DoctorService } from '../../../services/doctor.service';
+import { DoctorService } from '../../../core/services/doctor.service';
+import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
+import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 
 @Component({
   selector: 'app-doctor-dashboard',
@@ -29,6 +32,9 @@ export class DoctorDashboardComponent implements OnInit {
   readonly User = User;
   readonly Plus = Plus;
   readonly Check = Check;
+  readonly ChevronDown = ChevronDown;
+  readonly ClipboardList = ClipboardList;
+  readonly UserX = UserX;
 
   today = (() => {
     const d = new Date();
@@ -37,11 +43,17 @@ export class DoctorDashboardComponent implements OnInit {
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   })();
+
   currentDoctor = signal<Doctor | null>(null);
+  private appointments = signal<AppointmentsPatient[]>([]);
 
   showConfirmModal = signal(false);
   selectedAppointmentId = signal<string | null>(null);
+  selectedOutcome = signal<'ATENDIDA' | 'NO_ASISTIO' | null>(null);
   isMarkingAttended = signal(false);
+
+  openCardDropdownId = signal<string | null>(null);
+  showOutcomeDropdown = signal(false);
 
   formattedSpecialty = computed(() => {
     const spec = this.currentDoctor()?.specialty ?? '';
@@ -51,7 +63,6 @@ export class DoctorDashboardComponent implements OnInit {
       .toLowerCase()
       .replace(/^\w/, (c) => c.toUpperCase());
   });
-  private appointments = signal<AppointmentsPatient[]>([]);
 
   todaysAppointments = computed(() =>
     [...this.appointments()]
@@ -91,20 +102,44 @@ export class DoctorDashboardComponent implements OnInit {
     });
   }
 
-  /** Abre el modal de confirmación para marcar como atendida */
-  openAttendModal(appointmentId: string): void {
+  toggleCardDropdown(appointmentId: string): void {
+    this.openCardDropdownId.update((current) =>
+      current === appointmentId ? null : appointmentId,
+    );
+  }
+
+  selectCardOutcome(
+    appointmentId: string,
+    outcome: 'ATENDIDA' | 'NO_ASISTIO',
+  ): void {
+    this.openCardDropdownId.set(null);
+    this.selectedOutcome.set(outcome);
     this.selectedAppointmentId.set(appointmentId);
+    this.showOutcomeDropdown.set(false);
     this.showConfirmModal.set(true);
   }
 
-  /** El usuario confirmó: llama al endpoint y refresca */
+  toggleOutcomeDropdown(): void {
+    this.showOutcomeDropdown.update((v) => !v);
+  }
+
+  selectOutcome(value: 'ATENDIDA' | 'NO_ASISTIO'): void {
+    this.selectedOutcome.set(value);
+    this.showOutcomeDropdown.set(false);
+  }
+
   confirmMarkAsAttended(): void {
     const id = this.selectedAppointmentId();
-    if (id === null) return;
+    const outcome = this.selectedOutcome();
+    if (!id || !outcome) return;
 
     this.isMarkingAttended.set(true);
 
-    this.doctorService.updateAppointmentState(id, 'ATENDIDA').subscribe({
+    const request$ = outcome === 'ATENDIDA'
+      ? this.doctorService.updateAppointmentAsAttended(id, outcome)
+      : this.doctorService.updateAppointmentAsUnassisted(id, outcome);
+
+    request$.subscribe({
       next: () => {
         this.closeModal();
         const doctorId = this.currentDoctor()?.id;
@@ -119,6 +154,9 @@ export class DoctorDashboardComponent implements OnInit {
   closeModal(): void {
     this.showConfirmModal.set(false);
     this.selectedAppointmentId.set(null);
+    this.selectedOutcome.set(null);
+    this.showOutcomeDropdown.set(false);
+    this.openCardDropdownId.set(null);
     this.isMarkingAttended.set(false);
   }
 

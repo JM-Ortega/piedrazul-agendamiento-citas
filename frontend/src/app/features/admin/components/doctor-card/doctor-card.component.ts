@@ -8,7 +8,7 @@ import {
   Power,
   PowerOff,
 } from 'lucide-angular';
-import { Doctor } from '../../../../models/interfaces/doctor.model';
+import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 
 @Component({
   selector: 'app-doctor-card',

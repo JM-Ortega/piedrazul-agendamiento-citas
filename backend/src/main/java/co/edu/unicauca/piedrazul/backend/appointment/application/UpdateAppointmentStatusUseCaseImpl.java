@@ -25,4 +25,16 @@ public class UpdateAppointmentStatusUseCaseImpl implements UpdateAppointmentStat
         // Guardar la cita actualizada
         appointmentRepository.save(appointment);
     }
+
+    @Override
+    public void markAsUnassisted(UUID appointmentId) {
+        // Obtener la cita por ID
+        Appointment appointment = appointmentRepository.findById(appointmentId);
+
+        // Actualizar el estado a NO ASISTIDA
+        appointment.setAppointmentState(AppointmentState.NO_ASISTIO);
+
+        // Guardar la cita actualizada
+        appointmentRepository.save(appointment);
+    }
 }

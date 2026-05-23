@@ -1,11 +1,18 @@
+import { CommonModule } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { CalendarDays, ChevronRight, Clock, LucideAngularModule, PlusCircle, User } from 'lucide-angular';
-import { CommonModule } from '@angular/common';
-import { AppService } from '../../../../services/app.service';
-import { PatientAppointmentService } from '../../../../services/PatientApointment.service';
-import { Appointment } from '../../../../models/interfaces/appointment.model';
-import { AppointmentsPatient } from '../../../../models/dtos/appointments.dto';
+import {
+  CalendarDays,
+  ChevronRight,
+  Clock,
+  LucideAngularModule,
+  PlusCircle,
+  User,
+} from 'lucide-angular';
+import { AppService } from '../../core/services/app.service';
+import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
+import { PatientAppointmentService } from '../appointment/services/PatientApointment.service';
+import { Appointment } from './models/interfaces/appointment.model';
 
 @Component({
   selector: 'app-patient-dashboard',

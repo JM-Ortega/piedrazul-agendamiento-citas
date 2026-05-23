@@ -5,9 +5,10 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRe
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.*;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
-import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -174,8 +175,8 @@ class DoctorServiceTest {
         );
 
         assertThatThrownBy(() -> doctorService.createDoctor(request))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("fecha de finalización es obligatoria");
+                .isInstanceOf(DoctorValidationException.class)
+                .hasMessageContaining("La fecha de finalización es obligatoria");
 
         verify(doctorRepository, never()).save(any(Doctor.class));
         verify(userModuleApi, never()).getOrCreateDoctorUser(any(), any(), any(), any(), any());
@@ -374,7 +375,7 @@ class DoctorServiceTest {
         when(doctorRepository.findById(doctorId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> doctorService.updateDoctorLaborStart(doctorId, LocalDate.now()))
-                .isInstanceOf(EntityNotFoundException.class)
+                .isInstanceOf(DoctorNotFoundException.class)
                 .hasMessageContaining("Doctor no encontrado");
     }
 
