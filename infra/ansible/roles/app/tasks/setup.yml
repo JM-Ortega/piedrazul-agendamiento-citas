@@ -1,6 +1,5 @@
 # Crea directorios, copia compose files y assets, genera .env
 # y levanta solo la infraestructura base (sin backend).
-# Idempotente: si .env ya existe, preserva KC_BACKEND_CLIENT_SECRET existente.
 
 - name: Crear directorio de la aplicación
   ansible.builtin.file:
@@ -10,37 +9,22 @@
     group: ansible
     mode: "0750"
 
-# KC_BACKEND_CLIENT_SECRET
-- name: Leer .env existente
-  ansible.builtin.slurp:
-    src: "{{ app_dir }}/.env"
-  register: app_env_file
-  failed_when: false
-  no_log: true
-
-- name: Extraer KC_BACKEND_CLIENT_SECRET del .env existente
+# KC secrets desde el entorno
+- name: Tomar KC secrets desde el entorno
   ansible.builtin.set_fact:
-    app_kc_backend_secret: >-
-      {{ (app_env_file.content | b64decode).split('\n')
-         | select('match', '^KC_BACKEND_CLIENT_SECRET=')
-         | map('regex_replace', '^KC_BACKEND_CLIENT_SECRET=', '')
-         | first | default('') }}
-  no_log: true
-  when: app_env_file.content is defined
-
-- name: Generar KC_BACKEND_CLIENT_SECRET nuevo
-  ansible.builtin.command:
-    cmd: "openssl rand -hex 32"
-  register: app_new_secret
-  changed_when: false
-  when: app_kc_backend_secret | default('') == ""
+    app_kc_backend_secret: "{{ lookup('env', 'KC_BACKEND_CLIENT_SECRET') | trim | string }}"
+    app_kc_automation_secret: "{{ lookup('env', 'KC_AUTOMATION_CLIENT_SECRET') | trim | string }}"
   no_log: true
 
-- name: Establecer kc_backend_secret como fact
-  ansible.builtin.set_fact:
-    app_kc_backend_secret: "{{ app_new_secret.stdout }}"
+- name: Verificar que los KC secrets están definidos
+  ansible.builtin.assert:
+    that:
+      - app_kc_backend_secret | length > 0
+      - app_kc_automation_secret | length > 0
+    fail_msg: >-
+      KC_BACKEND_CLIENT_SECRET o KC_AUTOMATION_CLIENT_SECRET no están definidos.
+      Ambos deben existir como GitHub Secrets e inyectarse al workflow de Ansible.
   no_log: true
-  when: app_kc_backend_secret | default('') == ""
 
 # Compose files
 - name: Copiar archivos compose al servidor

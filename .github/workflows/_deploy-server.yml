@@ -56,6 +56,10 @@ on:
         required: true
       IDENTITY_SEED_ADMIN_PASSWORD:
         required: true
+      KC_BACKEND_CLIENT_SECRET:
+        required: true
+      KC_AUTOMATION_CLIENT_SECRET:
+        required: true
 
 concurrency:
   group: deploy-${{ inputs.github_environment }}
@@ -332,6 +336,8 @@ jobs:
           KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
           KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
           CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
+          KC_BACKEND_CLIENT_SECRET: ${{ secrets.KC_BACKEND_CLIENT_SECRET }}
+          KC_AUTOMATION_CLIENT_SECRET: ${{ secrets.KC_AUTOMATION_CLIENT_SECRET }}
 
           IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
           IDENTITY_SEED_ADMIN_USERNAME: ${{ vars.IDENTITY_SEED_ADMIN_USERNAME }}
