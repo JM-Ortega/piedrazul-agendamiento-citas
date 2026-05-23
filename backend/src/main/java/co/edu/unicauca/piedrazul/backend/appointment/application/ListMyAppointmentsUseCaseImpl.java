@@ -8,6 +8,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientC
 
 import java.util.List;
 import java.util.UUID;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentPatientNotFoundException;
 
 public class ListMyAppointmentsUseCaseImpl implements ListMyAppointmentsUseCase {
 
@@ -25,7 +26,7 @@ public class ListMyAppointmentsUseCaseImpl implements ListMyAppointmentsUseCase 
     @Override
     public List<Appointment> execute(UUID userId) {
         PatientSnapshot patient = patientConsultPort.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Paciente no encontrado para el userId: " + userId));
+                .orElseThrow(() -> new AppointmentPatientNotFoundException("Paciente no encontrado para el userId: " + userId));
 
         return appointmentRepository.findByPatientId(patient.idPatient());
     }
