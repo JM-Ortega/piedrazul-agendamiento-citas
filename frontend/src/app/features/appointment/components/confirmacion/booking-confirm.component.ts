@@ -9,6 +9,7 @@ import { NewAppointment } from '../../models/dtos/newAppointment.dto';
 import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
+import {SpecialtyPipe} from "../seleccion-especialidad/specialtyPipe";
 
 /**
  * Mostrar el resumen completo de la cita a confirmar
@@ -17,7 +18,7 @@ import { NuevaCitaService } from '../../services/nuevaCita.service';
 @Component({
   selector: 'app-booking-confirm',
   standalone: true,
-  imports: [LucideAngularModule],
+  imports: [LucideAngularModule, SpecialtyPipe],
   templateUrl: './booking-confirm.component.html',
 })
 export class BookingConfirmComponent {

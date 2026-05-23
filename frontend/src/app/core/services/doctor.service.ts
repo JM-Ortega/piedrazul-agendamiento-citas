@@ -55,12 +55,22 @@ export class DoctorService {
     });
   }
 
-  updateAppointmentState(
+  updateAppointmentAsAttended(
     appointmentId: string,
     state: string,
   ): Observable<void> {
     return this.http.put<void>(
       `${this.apiUrl}/appointments/${appointmentId}/mark-as-attended`,
+      { appointmentState: state },
+    );
+  }
+
+  updateAppointmentAsUnassisted(
+    appointmentId: string,
+    state: string,
+  ): Observable<void> {
+    return this.http.put<void>(
+      `${this.apiUrl}/appointments/${appointmentId}/mark-as-unassisted`,
       { appointmentState: state },
     );
   }

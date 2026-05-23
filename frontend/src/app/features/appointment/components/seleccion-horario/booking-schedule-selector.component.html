@@ -4,7 +4,7 @@
   @if (state.effectiveDoctor(); as doctor) {
     <div class="flex items-center gap-2 text-sm text-gray-500">
       <lucide-angular [img]="UserSearch" [size]="16"></lucide-angular>
-      <span>{{ doctor.name }} · {{ state.selectedSpecialty() }}</span>
+      <span>{{ doctor.name }} · {{ state.selectedSpecialty() | specialty }}</span>
     </div>
   }
 
@@ -49,7 +49,7 @@
               'border-gray-200 hover:border-blue-400 text-blue-800': state.selectedTime() !== slot
             }"
           >
-            {{ slot }}
+            {{ slot.slice(0, 5) }}
           </button>
         }
       </div>

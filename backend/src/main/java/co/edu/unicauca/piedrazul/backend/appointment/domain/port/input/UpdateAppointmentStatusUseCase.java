@@ -4,4 +4,5 @@ import java.util.UUID;
 
 public interface UpdateAppointmentStatusUseCase {
     void markAsAttended(UUID appointmentId);
+    void markAsUnassisted(UUID appointmentId);
 }

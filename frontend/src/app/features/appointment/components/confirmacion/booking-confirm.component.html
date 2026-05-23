@@ -28,10 +28,10 @@
         <lucide-angular [img]="Stethoscope" [size]="18"></lucide-angular>
         Cita
       </h3>
-      <p><strong>Especialidad:</strong> {{ state.selectedSpecialty() }}</p>
+      <p><strong>Especialidad:</strong> {{ state.selectedSpecialty() | specialty }}</p>
       <p><strong>Médico:</strong> {{ state.confirmDoctorName() }}</p>
       <p><strong>Fecha:</strong> {{ state.confirmDate() }}</p>
-      <p><strong>Hora:</strong> {{ state.selectedTime() }}</p>
+      <p><strong>Hora:</strong> {{ state.selectedTime().slice(0, 5) }}</p>
     </div>
 
   </div>
