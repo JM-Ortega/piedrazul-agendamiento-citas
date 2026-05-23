@@ -2,16 +2,16 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   Calendar,
+  Check,
   Clock,
   FileText,
   LucideAngularModule,
   Plus,
   User,
-  Check,
 } from 'lucide-angular';
-import { AppointmentsPatient } from '../../../models/dtos/appointments.dto';
-import { Doctor } from '../../../models/interfaces/doctor.model';
-import { DoctorService } from '../../../services/doctor.service';
+import { DoctorService } from '../../../core/services/doctor.service';
+import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
+import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 
 @Component({
   selector: 'app-doctor-dashboard',

@@ -1,7 +1,7 @@
 import { Component, inject, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, UserSearch } from 'lucide-angular';
-import { BookingStateService } from '../../booking-state.service';
+import { BookingStateService } from '../../services/booking-state.service';
 import { SpecialtyPipe } from './specialtyPipe';
 
 /**
@@ -15,7 +15,6 @@ import { SpecialtyPipe } from './specialtyPipe';
   templateUrl: './booking-specialty-selector.component.html',
 })
 export class BookingSpecialtySelectorComponent {
-
   readonly UserSearch = UserSearch;
 
   protected state = inject(BookingStateService);
@@ -32,7 +31,9 @@ export class BookingSpecialtySelectorComponent {
     if (!specialty) return;
 
     if (this.state.bookingMode() === 'specialty') {
-      const match = this.state.specialtiesWithDoctor().find(s => s.specialty === specialty);
+      const match = this.state
+        .specialtiesWithDoctor()
+        .find((s) => s.specialty === specialty);
       this.state.assignedDoctor.set(match ?? null);
     } else {
       this.state.doctorsBySpecialty.set([]);
@@ -44,7 +45,7 @@ export class BookingSpecialtySelectorComponent {
 
   onDoctorChange(doctorId: string): void {
     this.state.selectedDoctorId.set(doctorId);
-    const doc = this.state.doctorsBySpecialty().find(d => d.id === doctorId);
+    const doc = this.state.doctorsBySpecialty().find((d) => d.id === doctorId);
     this.state.selectedDoctorName.set(doc?.name ?? '');
   }
 

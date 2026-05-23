@@ -14,11 +14,11 @@ import {
   Phone,
   UserCircle,
 } from 'lucide-angular';
+import { DoctorService } from '../../../core/services/doctor.service';
+import { SchedulerService } from '../../../core/services/scheduler.service';
 import { ExportModalComponent } from '../../../design-system/organisms/export-modal/export-modal.component';
-import { AppointmentsPatient } from '../../../models/dtos/appointments.dto';
-import { Doctor } from '../../../models/interfaces/doctor.model';
-import { DoctorService } from '../../../services/doctor.service';
-import { SchedulerService } from '../../../services/scheduler.service';
+import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
+import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 type ExportColumnKey =
   | 'date'
   | 'time'

@@ -15,8 +15,8 @@ import {
   LucideAngularModule,
   Save,
 } from 'lucide-angular';
-import { DaySchedule } from '../../../../models/interfaces/daySchedule.model';
-import { Doctor } from '../../../../models/interfaces/doctor.model';
+import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
+import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import {
   DoctorFormValidationService,
   FormErrors,

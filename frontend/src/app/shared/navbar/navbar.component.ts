@@ -25,7 +25,7 @@ import {
   Users,
   X,
 } from 'lucide-angular';
-import { AppService } from '../../../services/app.service';
+import { AppService } from '../../core/services/app.service';
 
 @Component({
   selector: 'app-navbar',

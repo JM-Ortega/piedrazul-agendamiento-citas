@@ -1,11 +1,11 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { environment } from '../../environments/environment';
-import { CreateSchedulerRequest } from '../models/dtos/CreateDtos/create-scheduler-request.dto';
-import { CreateDoctorRequestDto } from '../models/dtos/CreateDtos/CreateDoctorRequest.dto';
-import { dtoSchedule } from '../models/dtos/schedule.dto';
-import { Doctor } from '../models/interfaces/doctor.model';
+import { environment } from '../../../../environments/environment';
+import { dtoSchedule } from '../../../shared/models/dtos/schedule.dto';
+import { Doctor } from '../../../shared/models/interfaces/doctor.model';
+import { CreateSchedulerRequest } from '../models/dtos/create-scheduler-request.dto';
+import { CreateDoctorRequestDto } from '../models/dtos/CreateDoctorRequest.dto';
 import { SystemUser } from '../models/interfaces/system-user.model';
 
 // ─────────────────────────────────────────────────────────────────────────────

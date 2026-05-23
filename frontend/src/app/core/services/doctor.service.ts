@@ -1,11 +1,11 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
-import { environment } from '../../environments/environment';
-import { AppointmentsPatient } from '../models/dtos/appointments.dto';
-import { dtoDoctor } from '../models/dtos/doctor.dto';
-import { dtoSchedule } from '../models/dtos/schedule.dto';
-import { Doctor } from '../models/interfaces/doctor.model';
+import { environment } from '../../../environments/environment';
+import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
+import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
+import { dtoSchedule } from '../../shared/models/dtos/schedule.dto';
+import { Doctor } from '../../shared/models/interfaces/doctor.model';
 
 @Injectable({ providedIn: 'root' })
 export class DoctorService {
@@ -55,7 +55,10 @@ export class DoctorService {
     });
   }
 
-  updateAppointmentState(appointmentId: string, state: string,): Observable<void> {
+  updateAppointmentState(
+    appointmentId: string,
+    state: string,
+  ): Observable<void> {
     return this.http.put<void>(
       `${this.apiUrl}/appointments/${appointmentId}/mark-as-attended`,
       { appointmentState: state },

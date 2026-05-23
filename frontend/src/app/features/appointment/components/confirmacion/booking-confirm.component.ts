@@ -1,9 +1,14 @@
 import { Component, inject, output } from '@angular/core';
-import { LucideAngularModule, CheckCircle, Stethoscope, UserSearch } from 'lucide-angular';
-import { BookingStateService } from '../../booking-state.service';
-import { NuevaCitaService } from '../../../../services/nuevaCita.service';
-import { NewAppointment } from '../../../../models/dtos/newAppointment.dto';
-import { AppointmentConfirmedEvent } from '../../../../models/interfaces/appointmentConfirmedEvent.model';
+import {
+  CheckCircle,
+  LucideAngularModule,
+  Stethoscope,
+  UserSearch,
+} from 'lucide-angular';
+import { NewAppointment } from '../../models/dtos/newAppointment.dto';
+import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
+import { BookingStateService } from '../../services/booking-state.service';
+import { NuevaCitaService } from '../../services/nuevaCita.service';
 
 /**
  * Mostrar el resumen completo de la cita a confirmar
@@ -16,12 +21,11 @@ import { AppointmentConfirmedEvent } from '../../../../models/interfaces/appoint
   templateUrl: './booking-confirm.component.html',
 })
 export class BookingConfirmComponent {
-
   readonly CheckCircle = CheckCircle;
   readonly Stethoscope = Stethoscope;
-  readonly UserSearch  = UserSearch;
+  readonly UserSearch = UserSearch;
 
-  protected state     = inject(BookingStateService);
+  protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
 
   confirmed = output<AppointmentConfirmedEvent>();
@@ -30,7 +34,8 @@ export class BookingConfirmComponent {
 
   confirm(): void {
     const date = this.state.selectedDate();
-    if (!date || !this.state.selectedTime() || !this.state.effectiveDoctorId()) return;
+    if (!date || !this.state.selectedTime() || !this.state.effectiveDoctorId())
+      return;
 
     this.state.isLoading.set(true);
     this.state.errorMessage.set('');
@@ -47,19 +52,23 @@ export class BookingConfirmComponent {
         this.state.isLoading.set(false);
 
         if (err.status === 0) {
-          this.state.errorMessage.set('No se pudo conectar con el servidor. Intente más tarde.');
+          this.state.errorMessage.set(
+            'No se pudo conectar con el servidor. Intente más tarde.',
+          );
           return;
         }
 
         const errorCode = err.error?.errorCode;
-        const detail    = err.error?.detail;
+        const detail = err.error?.detail;
         switch (errorCode) {
           case 'PATIENT_TIME_CONFLICT':
           case 'PATIENT_SPECIALTY_CONFLICT':
             this.state.errorMessage.set(detail);
             break;
           default:
-            this.state.errorMessage.set(detail || 'Error inesperado al registrar la cita.');
+            this.state.errorMessage.set(
+              detail || 'Error inesperado al registrar la cita.',
+            );
         }
       },
     });
@@ -72,17 +81,17 @@ export class BookingConfirmComponent {
 
   private buildPayload(date: Date): NewAppointment {
     const base = {
-      doctorId:       this.state.effectiveDoctorId(),
-      specialty:      this.state.selectedSpecialty(),
-      date:           this.state.formatLocalDate(date),
-      startTime:      this.state.selectedTime(),
-      documentType:   this.state.confirmDocumentType(),
+      doctorId: this.state.effectiveDoctorId(),
+      specialty: this.state.selectedSpecialty(),
+      date: this.state.formatLocalDate(date),
+      startTime: this.state.selectedTime(),
+      documentType: this.state.confirmDocumentType(),
       documentNumber: this.state.confirmDocument(),
-      firstName:      this.state.confirmFirstName(),
-      lastName:       this.state.confirmLastName(),
-      phone:          this.state.confirmPhone(),
-      gender:         this.state.confirmGender(),
-      birthDate:      this.state.confirmBirthDate(),
+      firstName: this.state.confirmFirstName(),
+      lastName: this.state.confirmLastName(),
+      phone: this.state.confirmPhone(),
+      gender: this.state.confirmGender(),
+      birthDate: this.state.confirmBirthDate(),
     };
 
     if (this.state.isSchedulerContext() || this.state.isDoctorContext()) {
@@ -92,15 +101,17 @@ export class BookingConfirmComponent {
         schedulingOrigin: 'MANUAL',
         ...(this.state.patientId()
           ? { patientId: this.state.patientId()! }
-          : { email: f.email || undefined, guardianPhone: f.guardianPhone || undefined }
-        ),
+          : {
+              email: f.email || undefined,
+              guardianPhone: f.guardianPhone || undefined,
+            }),
       };
     }
 
     return {
       ...base,
-      patientId:        this.state.patientSnapshot()?.id,
-      email:            this.state.patientSnapshot()?.email,
+      patientId: this.state.patientSnapshot()?.id,
+      email: this.state.patientSnapshot()?.email,
       schedulingOrigin: 'AUTONOMO',
     };
   }

@@ -1,8 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
-import { Observable, of } from 'rxjs';
-import { AppointmentsPatient } from '../models/dtos/appointments.dto';
-import { environment } from '../../environments/environment';
+import { Observable } from 'rxjs';
+import { environment } from '../../../../environments/environment';
+import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 
 @Injectable({ providedIn: 'root' })
 export class PatientAppointmentService {
