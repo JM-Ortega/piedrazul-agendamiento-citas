@@ -3,6 +3,8 @@ package co.edu.unicauca.piedrazul.backend.doctors.application;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleConflictException;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleValidationException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,7 +24,6 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ScheduleServiceTest {
 
-
     @Mock
     private ScheduleRepository scheduleRepository;
 
@@ -38,7 +39,7 @@ class ScheduleServiceTest {
         Schedule schedule = new Schedule(null, LocalTime.of(8, 0), LocalTime.of(10, 0), Workday.LUNES);
 
         assertThatThrownBy(() -> scheduleService.addSchedule(null, schedule))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(DoctorScheduleValidationException.class)
                 .hasMessageContaining("Doctor must be provided");
 
         verify(scheduleRepository, never()).save(any(Schedule.class));
@@ -53,7 +54,7 @@ class ScheduleServiceTest {
         when(scheduleRepository.findByDoctor(doctor)).thenReturn(List.of(existing));
 
         assertThatThrownBy(() -> scheduleService.addSchedule(doctor, incoming))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(DoctorScheduleConflictException.class)
                 .hasMessageContaining("already exists");
 
         verify(scheduleRepository, never()).save(any(Schedule.class));
@@ -100,8 +101,8 @@ class ScheduleServiceTest {
         when(scheduleRepository.findByDoctor(doctor)).thenReturn(List.of(monday));
 
         assertThatThrownBy(() -> scheduleService.getAvailableIntervalsByWorkday(doctor, Workday.LUNES))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Invalid schedule range");
+                .isInstanceOf(DoctorScheduleValidationException.class)
+                .hasMessageContaining("Rango de horario inválido para el LUNES");
     }
 
     @Test
@@ -113,21 +114,19 @@ class ScheduleServiceTest {
         when(scheduleRepository.findByDoctor(doctor)).thenReturn(List.of(first, second));
 
         assertThatThrownBy(() -> scheduleService.getAvailableIntervalsByWorkday(doctor, Workday.MIERCOLES))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("more than one schedule");
+                .isInstanceOf(DoctorScheduleConflictException.class)
+                .hasMessageContaining("El doctor tiene más de un horario para el MIERCOLES");
     }
 
     @Test
     void getAvailableIntervalsByWorkdayShouldThrowWhenAppointmentIntervalIsNotPositive() {
         Doctor doctor = createDoctorFixture(0);
-        Schedule monday = new Schedule(doctor, LocalTime.of(8, 0), LocalTime.of(10, 0), Workday.LUNES);
-
-        lenient().when(scheduleRepository.findByDoctor(doctor))
-                .thenReturn(List.of(monday));
 
         assertThatThrownBy(() -> scheduleService.getAvailableIntervalsByWorkday(doctor, Workday.LUNES))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("must be greater than 0");
+                .isInstanceOf(DoctorScheduleValidationException.class)
+                .hasMessageContaining("El intervalo entre citas médicas debe ser mayor que 0");
+
+        verify(scheduleRepository, never()).findByDoctor(any(Doctor.class));
     }
 
     private Doctor createDoctorFixture(int appointmentInterval) {
@@ -136,6 +135,4 @@ class ScheduleServiceTest {
         doctor.setAppointmentInterval(appointmentInterval);
         return doctor;
     }
-
-
 }
