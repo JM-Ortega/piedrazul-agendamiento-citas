@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.doctors.api;
 
 import co.edu.unicauca.piedrazul.backend.shared.BaseExceptionHandler;
 import co.edu.unicauca.piedrazul.backend.shared.BusinessException;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorBusinessException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -72,6 +73,23 @@ public class DoctorGlobalExceptionHandler extends BaseExceptionHandler {
         );
     }
 
+    @ExceptionHandler(DoctorBusinessException.class)
+    public ProblemDetail handleBusinessException(
+            DoctorBusinessException ex,
+            HttpServletRequest request
+    ) {
+        log.warn("Error de negocio en doctors [{}]: {}", ex.getClass().getSimpleName(), ex.getMessage());
+
+        return buildProblem(
+                ex.getStatus(),
+                ex.getStatus().getReasonPhrase(),
+                ex.getMessage(),
+                ex.getModule(),
+                ex.getErrorCode(),
+                request
+        );
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ProblemDetail handleRuntime(
             RuntimeException ex,
@@ -85,22 +103,14 @@ public class DoctorGlobalExceptionHandler extends BaseExceptionHandler {
             throw accessDeniedException;
         }
 
-        String errorCode = (ex instanceof BusinessException be) ? be.getErrorCode() : "INTERNAL_ERROR";
-        HttpStatus status = (ex instanceof BusinessException be) ? be.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
-        String module = (ex instanceof BusinessException be) ? be.getModule() : "doctors";
-
-        if (status.is5xxServerError()) {
-            log.error("Error no controlado en doctors", ex);
-        } else {
-            log.warn("Error de negocio en doctors [{}]: {}", ex.getClass().getSimpleName(), ex.getMessage());
-        }
+        log.error("Error no controlado en doctors", ex);
 
         return buildProblem(
-                status,
-                status.getReasonPhrase(),
-                ex.getMessage(),
-                module,
-                errorCode,
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
+                "Unexpected error in doctors module",
+                "doctors",
+                "INTERNAL_ERROR",
                 request
         );
     }
