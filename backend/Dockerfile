@@ -10,7 +10,8 @@ COPY mvnw pom.xml ./
 
 # Asegurar permisos de ejecución del wrapper (necesario en Linux)
 # y descargar dependencias con cache de Maven entre builds
-RUN --mount=type=cache,target=/root/.m2 \
+# Cache separado por arquitectura — evita conflictos en builds multi-arch
+RUN --mount=type=cache,target=/root/.m2,id=maven-$TARGETARCH \
     chmod +x mvnw && \
     ./mvnw -q -B dependency:go-offline
 
@@ -19,7 +20,7 @@ COPY src/ src/
 
 # TODO: cambiar a -DskipTests cuando los tests estén estables
 # Por ahora se salta compilación y ejecución de tests (-Dmaven.test.skip=true)
-RUN --mount=type=cache,target=/root/.m2 \
+RUN --mount=type=cache,target=/root/.m2,id=maven-$TARGETARCH \
     ./mvnw -q -B package -Dmaven.test.skip=true
 
 # ── Runtime stage ──────────────────────────────────────────
