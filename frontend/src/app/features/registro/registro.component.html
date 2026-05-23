@@ -613,14 +613,16 @@
             </div>
           }
 
-          <div class="flex justify-end mt-4">
-            <button
-              (click)="goToStep2()"
-              class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-semibold transition-colors"
-            >
-              Continuar
-            </button>
-          </div>
+          @if (patientStatus() !== 'idle' && patientStatus() !== 'already-linked') {
+            <div class="flex justify-end mt-4">
+              <button
+                (click)="goToStep2()"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-semibold transition-colors"
+              >
+                Continuar
+              </button>
+            </div>
+          }
         </div>
       }
 

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 import java.util.UUID;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentPatientNotFoundException;
 
 @Component
 public class PatientConsultPortImpl implements PatientConsultPort {
@@ -26,7 +27,7 @@ public class PatientConsultPortImpl implements PatientConsultPort {
     public PatientInfo findById(UUID idPatient) {
         return patientModuleApi.findById(idPatient)
                 .map(PatientInfoMapper::toPatientInfo)
-                .orElseThrow(() -> new RuntimeException("Patient not found: " + idPatient));
+                .orElseThrow(() -> new AppointmentPatientNotFoundException("Patient not found: " + idPatient));
     }
 
     @Override

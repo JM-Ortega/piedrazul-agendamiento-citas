@@ -1,10 +1,9 @@
 import { Component, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, ArrowLeft } from 'lucide-angular';
-import { BookingStateService } from '../../booking-state.service';
-import { Patient } from '../../../../models/interfaces/patient.model';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { Calendar } from 'lucide-angular';
+import { ArrowLeft, Calendar, LucideAngularModule } from 'lucide-angular';
+import { Patient } from '../../../../shared/models/interfaces/patient.model';
+import { BookingStateService } from '../../services/booking-state.service';
 
 /**
  * Capturar y validar los datos de un paciente que no fue encontrado en el sistema para
@@ -47,32 +46,42 @@ export class BookingPatientRegisterComponent {
   readonly maxBirthDate = new Date();
   readonly NAME_MAX = 30;
   readonly EMAIL_MAX = 100;
-  readonly PHONE_MAX = 15;
-  readonly PHONE_MIN = 7;
+  readonly PHONE_MAX = 10;
 
   private readonly VALID_NAME_REGEX = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s\-]+$/;
-  private readonly VALID_EMAIL_REGEX = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+  private readonly VALID_EMAIL_REGEX =
+    /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
   private readonly INVALID_EMAIL_CHARS = /['"<>()[\]\\,;:{}|^~`!#$%&*=?/]/;
 
   private timers: Record<string, ReturnType<typeof setTimeout>> = {};
 
-  getPatientField<K extends keyof Omit<Patient, 'id'>>(key: K): Omit<Patient, 'id'>[K] {
+  getPatientField<K extends keyof Omit<Patient, 'id'>>(
+    key: K,
+  ): Omit<Patient, 'id'>[K] {
     return this.state.patientForm()[key];
   }
 
-  setPatientField<K extends keyof Omit<Patient, 'id'>>(key: K, value: Omit<Patient, 'id'>[K]): void {
+  setPatientField<K extends keyof Omit<Patient, 'id'>>(
+    key: K,
+    value: Omit<Patient, 'id'>[K],
+  ): void {
     this.state.patientForm.update((f) => ({ ...f, [key]: value }));
   }
 
   handleNameInput(event: Event, field: 'firstName' | 'lastName'): void {
-    const el    = event.target as HTMLInputElement;
+    const el = event.target as HTMLInputElement;
     const value = el.value;
-    const limitMsg = field === 'firstName' ? this.firstNameLimitMsg : this.lastNameLimitMsg;
+    const limitMsg =
+      field === 'firstName' ? this.firstNameLimitMsg : this.lastNameLimitMsg;
 
     if (value.length > this.NAME_MAX) {
       el.value = value.slice(0, this.NAME_MAX);
       this.setPatientField(field, el.value as any);
-      this.flash(limitMsg, `Solo se permiten máximo ${this.NAME_MAX} caracteres`, field);
+      this.flash(
+        limitMsg,
+        `Solo se permiten máximo ${this.NAME_MAX} caracteres`,
+        field,
+      );
     } else {
       this.setPatientField(field, value as any);
       limitMsg.set('');
@@ -80,13 +89,17 @@ export class BookingPatientRegisterComponent {
   }
 
   handlePhoneInput(event: Event): void {
-    const el     = event.target as HTMLInputElement;
+    const el = event.target as HTMLInputElement;
     const digits = el.value.replace(/\D/g, '');
 
     if (digits.length > this.PHONE_MAX) {
       el.value = digits.slice(0, this.PHONE_MAX);
       this.setPatientField('phone', el.value as any);
-      this.flash(this.phoneLimitMsg, `Solo se permiten máximo ${this.PHONE_MAX} dígitos`, 'phone');
+      this.flash(
+        this.phoneLimitMsg,
+        `Solo se permiten máximo ${this.PHONE_MAX} dígitos`,
+        'phone',
+      );
     } else {
       el.value = digits;
       this.setPatientField('phone', digits as any);
@@ -95,13 +108,17 @@ export class BookingPatientRegisterComponent {
   }
 
   handleEmailInput(event: Event): void {
-    const el    = event.target as HTMLInputElement;
+    const el = event.target as HTMLInputElement;
     const value = el.value;
 
     if (value.length > this.EMAIL_MAX) {
       el.value = value.slice(0, this.EMAIL_MAX);
       this.setPatientField('email', el.value as any);
-      this.flash(this.emailLimitMsg, `Solo se permiten máximo ${this.EMAIL_MAX} caracteres`, 'email');
+      this.flash(
+        this.emailLimitMsg,
+        `Solo se permiten máximo ${this.EMAIL_MAX} caracteres`,
+        'email',
+      );
     } else {
       this.setPatientField('email', value as any);
       this.emailLimitMsg.set('');
@@ -109,13 +126,17 @@ export class BookingPatientRegisterComponent {
   }
 
   handleGuardianPhoneInput(event: Event): void {
-    const el     = event.target as HTMLInputElement;
+    const el = event.target as HTMLInputElement;
     const digits = el.value.replace(/\D/g, '');
 
     if (digits.length > this.PHONE_MAX) {
       el.value = digits.slice(0, this.PHONE_MAX);
       this.setPatientField('guardianPhone', el.value as any);
-      this.flash(this.guardianPhoneLimitMsg, `Solo se permiten máximo ${this.PHONE_MAX} dígitos`, 'gphone');
+      this.flash(
+        this.guardianPhoneLimitMsg,
+        `Solo se permiten máximo ${this.PHONE_MAX} dígitos`,
+        'gphone',
+      );
     } else {
       el.value = digits;
       this.setPatientField('guardianPhone', digits as any);
@@ -123,7 +144,11 @@ export class BookingPatientRegisterComponent {
     }
   }
 
-  private flash(sig: ReturnType<typeof signal<string>>, text: string, key: string): void {
+  private flash(
+    sig: ReturnType<typeof signal<string>>,
+    text: string,
+    key: string,
+  ): void {
     sig.set(text);
     if (this.timers[key]) clearTimeout(this.timers[key]);
     this.timers[key] = setTimeout(() => sig.set(''), 3000);
@@ -151,7 +176,16 @@ export class BookingPatientRegisterComponent {
     const emailOk = this.validateEmailField(f.email);
     const gPhoneOk = this.validateGuardianPhone(f);
 
-    return docTypeOk && genderOk && fnOk && lnOk && phoneOk && birthOk && emailOk && gPhoneOk;
+    return (
+      docTypeOk &&
+      genderOk &&
+      fnOk &&
+      lnOk &&
+      phoneOk &&
+      birthOk &&
+      emailOk &&
+      gPhoneOk
+    );
   }
 
   private validateDocType(value: string | undefined): boolean {
@@ -166,10 +200,15 @@ export class BookingPatientRegisterComponent {
     return ok;
   }
 
-  private validateNameField(field: 'firstName' | 'lastName', value: string | undefined): boolean {
-    const errorSig = field === 'firstName' ? this.firstNameError    : this.lastNameError;
-    const msgSig   = field === 'firstName' ? this.firstNameErrorMsg : this.lastNameErrorMsg;
-    const trimmed  = value?.trim() ?? '';
+  private validateNameField(
+    field: 'firstName' | 'lastName',
+    value: string | undefined,
+  ): boolean {
+    const errorSig =
+      field === 'firstName' ? this.firstNameError : this.lastNameError;
+    const msgSig =
+      field === 'firstName' ? this.firstNameErrorMsg : this.lastNameErrorMsg;
+    const trimmed = value?.trim() ?? '';
 
     if (!trimmed) {
       errorSig.set(true);
@@ -199,14 +238,11 @@ export class BookingPatientRegisterComponent {
       this.phoneErrorMsg.set('Este campo es obligatorio');
       return false;
     }
-    if (trimmed.length < this.PHONE_MIN) {
+    if (!/^[0-9]{10}$/.test(trimmed)) {
       this.phoneError.set(true);
-      this.phoneErrorMsg.set(`El número debe tener al menos ${this.PHONE_MIN} dígitos`);
-      return false;
-    }
-    if (!/^[0-9]{7,15}$/.test(trimmed)) {
-      this.phoneError.set(true);
-      this.phoneErrorMsg.set(`Ingrese un número válido (entre ${this.PHONE_MIN} y ${this.PHONE_MAX} dígitos)`);
+      this.phoneErrorMsg.set(
+        'Ingrese un número válido de exactamente 10 dígitos',
+      );
       return false;
     }
     this.phoneError.set(false);
@@ -214,19 +250,26 @@ export class BookingPatientRegisterComponent {
     return true;
   }
 
-  private validateBirthDate(value: string | undefined, documentType: string | undefined): boolean {
+  private validateBirthDate(
+    value: string | undefined,
+    documentType: string | undefined,
+  ): boolean {
     if (!value) {
       this.birthDateError.set(true);
       this.birthDateErrorMsg.set('Ingrese una fecha de nacimiento válida');
       return false;
     }
 
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const input = new Date(value); input.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const input = new Date(value);
+    input.setHours(0, 0, 0, 0);
 
     if (input >= today) {
       this.birthDateError.set(true);
-      this.birthDateErrorMsg.set('La fecha de nacimiento debe ser anterior a hoy');
+      this.birthDateErrorMsg.set(
+        'La fecha de nacimiento debe ser anterior a hoy',
+      );
       return false;
     }
 
@@ -236,7 +279,7 @@ export class BookingPatientRegisterComponent {
         this.birthDateError.set(true);
         this.birthDateErrorMsg.set(
           'La fecha ingresada indica que el paciente es menor de edad. ' +
-          'Para Cédula el paciente debe tener 18 años o más.'
+            'Para Cédula el paciente debe tener 18 años o más.',
         );
         return false;
       }
@@ -264,19 +307,25 @@ export class BookingPatientRegisterComponent {
 
     if (value.length > this.EMAIL_MAX) {
       this.emailError.set(true);
-      this.emailErrorMsg.set(`El correo no puede superar los ${this.EMAIL_MAX} caracteres`);
+      this.emailErrorMsg.set(
+        `El correo no puede superar los ${this.EMAIL_MAX} caracteres`,
+      );
       return false;
     }
 
     if (this.INVALID_EMAIL_CHARS.test(value)) {
       this.emailError.set(true);
-      this.emailErrorMsg.set("No se permiten caracteres especiales como ', \", <, >, (, ), [, ], etc.");
+      this.emailErrorMsg.set(
+        'No se permiten caracteres especiales como \', ", <, >, (, ), [, ], etc.',
+      );
       return false;
     }
 
     if (!this.VALID_EMAIL_REGEX.test(value)) {
       this.emailError.set(true);
-      this.emailErrorMsg.set('La estructura del correo no es válida. Ejemplo: nombre@dominio.com');
+      this.emailErrorMsg.set(
+        'La estructura del correo no es válida. Ejemplo: nombre@dominio.com',
+      );
       return false;
     }
 
@@ -287,9 +336,11 @@ export class BookingPatientRegisterComponent {
 
   private validateGuardianPhone(f: Omit<Patient, 'id'>): boolean {
     if (f.guardianPhone) {
-      if (!/^[0-9]{7,15}$/.test(f.guardianPhone)) {
+      if (!/^[0-9]{10}$/.test(f.guardianPhone)) {
         this.guardianPhoneError.set(true);
-        this.guardianPhoneErrorMsg.set(`Ingrese un número válido (entre ${this.PHONE_MIN} y ${this.PHONE_MAX} dígitos)`);
+        this.guardianPhoneErrorMsg.set(
+          `Ingrese un número válido de ${this.PHONE_MAX} dígitos`,
+        );
         return false;
       }
       this.guardianPhoneError.set(false);
@@ -301,7 +352,9 @@ export class BookingPatientRegisterComponent {
 
     if (age < 18 && !f.guardianPhone) {
       this.guardianPhoneError.set(true);
-      this.guardianPhoneErrorMsg.set('El celular del acudiente es obligatorio para menores de 18 años');
+      this.guardianPhoneErrorMsg.set(
+        'El celular del acudiente es obligatorio para menores de 18 años',
+      );
       return false;
     }
 

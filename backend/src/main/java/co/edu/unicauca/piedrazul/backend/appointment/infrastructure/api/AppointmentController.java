@@ -149,6 +149,14 @@ public class AppointmentController {
         return ResponseEntity.ok().build();
     }
 
+    // Actualizar el estado de una cita a no asistida
+    @PutMapping("/{appointmentId}/mark-as-unassisted")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<Void> markAppointmentAsUnassisted(@PathVariable UUID appointmentId) {
+        updateAppointmentStatusUseCase.markAsUnassisted(appointmentId);
+        return ResponseEntity.ok().build();
+    }
+
     private String resolvePerformedBy(Jwt jwt) {
         String preferredUsername = jwt.getClaimAsString("preferred_username");
         if (preferredUsername != null && !preferredUsername.isBlank()) {

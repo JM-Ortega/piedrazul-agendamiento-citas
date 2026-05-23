@@ -1,11 +1,11 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { environment } from '../../environments/environment';
-import { AppointmentExportRequest } from '../models/dtos/AppointmentExportRequest.dto';
-import { AppointmentsPatient } from '../models/dtos/appointments.dto';
-import { dtoDoctor } from '../models/dtos/doctor.dto';
-import { Patient } from '../models/interfaces/patient.model';
+import { environment } from '../../../environments/environment';
+import { AppointmentExportRequest } from '../../shared/models/dtos/AppointmentExportRequest.dto';
+import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
+import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
+import { Patient } from '../../shared/models/interfaces/patient.model';
 
 @Injectable({ providedIn: 'root' })
 export class SchedulerService {

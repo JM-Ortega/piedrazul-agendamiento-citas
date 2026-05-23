@@ -1,8 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { environment } from '../../environments/environment';
-import { Patient } from '../models/interfaces/patient.model';
+import { environment } from '../../../environments/environment';
+import { Patient } from '../../shared/models/interfaces/patient.model';
 
 export interface PatientPublicResponse {
   documentType: string | null;

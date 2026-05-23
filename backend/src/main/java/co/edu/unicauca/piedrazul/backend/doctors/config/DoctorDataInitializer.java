@@ -84,6 +84,21 @@ public class DoctorDataInitializer implements ApplicationRunner {
                 "Doctor123!"
         ));
 
+        doctorService.createDoctor(new CreateDoctorRequest(
+                "Valentina",
+                "Gómez",
+                DocumentType.CEDULA,
+                "1029384756",
+                "3158472931",
+                List.of(Specialty.MEDICINA_GENERAL),
+                LocalDate.of(2026, 1, 15),
+                LocalDate.of(2026, 12, 31),
+                20,
+                Collections.emptyList(),
+                "valentina.gomez@piedrazul.dev",
+                "Doctor123!"
+        ));
+
         System.out.println("✔ Médicos de prueba insertados");
     }
 }

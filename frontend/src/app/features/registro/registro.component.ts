@@ -1,22 +1,22 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+import Keycloak from 'keycloak-js';
 import {
-  LucideAngularModule,
-  Search,
-  CheckCircle,
   ArrowLeft,
+  CheckCircle,
   Eye,
   EyeOff,
-  UserPlus,
   KeyRound,
+  LucideAngularModule,
+  Search,
+  UserPlus,
 } from 'lucide-angular';
 import {
   PatientPublicResponse,
   PatientService,
-} from '../../services/patient.service';
-import Keycloak from 'keycloak-js';
+} from '../../core/services/patient.service';
 
 type RegistroStep = 1 | 2 | 3;
 type PatientStatus =
@@ -81,16 +81,20 @@ export class RegistroComponent {
   private readonly INVALID_DOC_CHARS = /[^a-zA-Z0-9]/g;
 
   handleDocInput(event: Event): void {
-    const el    = event.target as HTMLInputElement;
-    const raw   = el.value;
+    const el = event.target as HTMLInputElement;
+    const raw = el.value;
     const clean = raw.replace(this.INVALID_DOC_CHARS, '');
     if (clean !== raw) {
       el.value = clean;
-      this.flashDocWarning('Solo se permiten letras y números, sin caracteres especiales');
+      this.flashDocWarning(
+        'Solo se permiten letras y números, sin caracteres especiales',
+      );
     }
     if (clean.length > this.DOC_MAX) {
       el.value = clean.slice(0, this.DOC_MAX);
-      this.flashDocWarning(`Solo se permiten máximo ${this.DOC_MAX} caracteres`);
+      this.flashDocWarning(
+        `Solo se permiten máximo ${this.DOC_MAX} caracteres`,
+      );
     }
     this.onDocumentChange(el.value);
   }
@@ -103,17 +107,17 @@ export class RegistroComponent {
 
   readonly NAME_MAX = 30;
   readonly EMAIL_MAX = 100;
-  readonly PHONE_MAX = 15;
-  readonly PHONE_MIN = 7;
+  readonly PHONE_MAX = 10;
 
   firstNameLimitMsg = signal('');
-  lastNameLimitMsg  = signal('');
-  phoneLimitMsg     = signal('');
-  emailLimitMsg     = signal('');
+  lastNameLimitMsg = signal('');
+  phoneLimitMsg = signal('');
+  emailLimitMsg = signal('');
   guardianPhoneLimitMsg = signal('');
 
-  private readonly VALID_NAME_REGEX  = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s\-]+$/;
-  private readonly VALID_EMAIL_REGEX = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+  private readonly VALID_NAME_REGEX = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s\-]+$/;
+  private readonly VALID_EMAIL_REGEX =
+    /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
   private readonly INVALID_EMAIL_CHARS = /['"<>()[\]\\,;:{}|^~`!#$%&*=?/]/;
 
   private timers: Record<string, ReturnType<typeof setTimeout>> = {};
@@ -162,7 +166,8 @@ export class RegistroComponent {
 
     if (!/^[a-zA-Z0-9]{1,12}$/.test(doc)) {
       this.errors.set({
-        documentNumber: 'Ingresa un documento válido (máximo 12 caracteres alfanuméricos, sin caracteres especiales)',
+        documentNumber:
+          'Ingresa un documento válido (máximo 12 caracteres alfanuméricos, sin caracteres especiales)',
       });
       return;
     }
@@ -335,14 +340,19 @@ export class RegistroComponent {
   }
 
   handleNameInput(event: Event, field: 'firstName' | 'lastName'): void {
-    const el        = event.target as HTMLInputElement;
-    const value     = el.value;
-    const limitMsg  = field === 'firstName' ? this.firstNameLimitMsg : this.lastNameLimitMsg;
+    const el = event.target as HTMLInputElement;
+    const value = el.value;
+    const limitMsg =
+      field === 'firstName' ? this.firstNameLimitMsg : this.lastNameLimitMsg;
 
     if (value.length > this.NAME_MAX) {
       el.value = value.slice(0, this.NAME_MAX);
       this.updateFormField(field, el.value);
-      this.flash(limitMsg, `Solo se permiten máximo ${this.NAME_MAX} caracteres`, field);
+      this.flash(
+        limitMsg,
+        `Solo se permiten máximo ${this.NAME_MAX} caracteres`,
+        field,
+      );
     } else {
       this.updateFormField(field, value);
       limitMsg.set('');
@@ -350,13 +360,17 @@ export class RegistroComponent {
   }
 
   handlePhoneInput(event: Event): void {
-    const el     = event.target as HTMLInputElement;
+    const el = event.target as HTMLInputElement;
     const digits = el.value.replace(/\D/g, '');
 
     if (digits.length > this.PHONE_MAX) {
       el.value = digits.slice(0, this.PHONE_MAX);
       this.updateFormField('phone', el.value);
-      this.flash(this.phoneLimitMsg, `Solo se permiten máximo ${this.PHONE_MAX} dígitos`, 'phone');
+      this.flash(
+        this.phoneLimitMsg,
+        `Solo se permiten máximo ${this.PHONE_MAX} dígitos`,
+        'phone',
+      );
     } else {
       el.value = digits;
       this.updateFormField('phone', digits);
@@ -365,13 +379,17 @@ export class RegistroComponent {
   }
 
   handleEmailInput(event: Event): void {
-    const el    = event.target as HTMLInputElement;
+    const el = event.target as HTMLInputElement;
     const value = el.value;
 
     if (value.length > this.EMAIL_MAX) {
       el.value = value.slice(0, this.EMAIL_MAX);
       this.updateFormField('email', el.value);
-      this.flash(this.emailLimitMsg, `Solo se permiten máximo ${this.EMAIL_MAX} caracteres`, 'email');
+      this.flash(
+        this.emailLimitMsg,
+        `Solo se permiten máximo ${this.EMAIL_MAX} caracteres`,
+        'email',
+      );
     } else {
       this.updateFormField('email', value);
       this.emailLimitMsg.set('');
@@ -379,13 +397,17 @@ export class RegistroComponent {
   }
 
   handleGuardianPhoneInput(event: Event): void {
-    const el     = event.target as HTMLInputElement;
+    const el = event.target as HTMLInputElement;
     const digits = el.value.replace(/\D/g, '');
 
     if (digits.length > this.PHONE_MAX) {
       el.value = digits.slice(0, this.PHONE_MAX);
       this.updateFormField('guardianPhone', el.value);
-      this.flash(this.guardianPhoneLimitMsg, `Solo se permiten máximo ${this.PHONE_MAX} dígitos`, 'gphone');
+      this.flash(
+        this.guardianPhoneLimitMsg,
+        `Solo se permiten máximo ${this.PHONE_MAX} dígitos`,
+        'gphone',
+      );
     } else {
       el.value = digits;
       this.updateFormField('guardianPhone', digits);
@@ -405,7 +427,11 @@ export class RegistroComponent {
     this.form.update((f) => ({ ...f, [key]: value }));
   }
 
-  private flash(sig: ReturnType<typeof signal<string>>, text: string, key: string): void {
+  private flash(
+    sig: ReturnType<typeof signal<string>>,
+    text: string,
+    key: string,
+  ): void {
     sig.set(text);
     if (this.timers[key]) clearTimeout(this.timers[key]);
     this.timers[key] = setTimeout(() => sig.set(''), 3000);
@@ -489,7 +515,10 @@ export class RegistroComponent {
       const emailErr = this.validateEmail(f.email);
       if (emailErr) newErrors['email'] = emailErr;
 
-      const gPhoneErr = this.validateGuardianPhone(f.guardianPhone, f.birthDate);
+      const gPhoneErr = this.validateGuardianPhone(
+        f.guardianPhone,
+        f.birthDate,
+      );
       if (gPhoneErr) newErrors['guardianPhone'] = gPhoneErr;
     }
 
@@ -543,28 +572,37 @@ export class RegistroComponent {
     return '';
   }
 
-  private validatePhone(value: string | undefined, label: string, required = true): string {
+  private validatePhone(
+    value: string | undefined,
+    label: string,
+    required = true,
+  ): string {
     const trimmed = value?.trim() ?? '';
 
     if (!trimmed) {
       return required ? `Ingresa el ${label.toLowerCase()}` : '';
     }
-    if (trimmed.length < this.PHONE_MIN) {
-      return `El número debe tener al menos ${this.PHONE_MIN} dígitos`;
+    if (trimmed.length < this.PHONE_MAX) {
+      return `El número debe tener al menos ${this.PHONE_MAX} dígitos`;
     }
-    if (!/^[0-9]{7,15}$/.test(trimmed)) {
-      return `Ingresa un número válido (entre ${this.PHONE_MIN} y ${this.PHONE_MAX} dígitos)`;
+    if (!/^[0-9]{10}$/.test(trimmed)) {
+      return `Ingresa un número válido de ${this.PHONE_MAX} dígitos`;
     }
     return '';
   }
 
-  private validateBirthDate(value: string | undefined, documentType: string | undefined): string {
+  private validateBirthDate(
+    value: string | undefined,
+    documentType: string | undefined,
+  ): string {
     if (!value) {
       return 'Ingresa una fecha de nacimiento válida';
     }
 
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const input = new Date(value); input.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const input = new Date(value);
+    input.setHours(0, 0, 0, 0);
 
     if (input >= today) {
       return 'La fecha de nacimiento debe ser anterior a hoy';
@@ -590,7 +628,7 @@ export class RegistroComponent {
       return `El correo no puede superar los ${this.EMAIL_MAX} caracteres`;
     }
     if (this.INVALID_EMAIL_CHARS.test(value)) {
-      return "No se permiten caracteres especiales como ', \", <, >, (, ), [, ], etc.";
+      return 'No se permiten caracteres especiales como \', ", <, >, (, ), [, ], etc.';
     }
     if (!this.VALID_EMAIL_REGEX.test(value)) {
       return 'La estructura del correo no es válida. Ejemplo: nombre@dominio.com';
@@ -605,7 +643,11 @@ export class RegistroComponent {
     const trimmed = guardianPhone?.trim() ?? '';
 
     if (trimmed) {
-      const formatErr = this.validatePhone(trimmed, 'celular del acudiente', false);
+      const formatErr = this.validatePhone(
+        trimmed,
+        'celular del acudiente',
+        false,
+      );
       if (formatErr) return formatErr;
     }
 

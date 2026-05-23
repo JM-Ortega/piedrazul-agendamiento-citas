@@ -1,12 +1,12 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Patient } from '../models/interfaces/patient.model';
-import { NewAppointment } from '../models/dtos/newAppointment.dto';
-import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
 import { map } from 'rxjs/operators';
+import { environment } from '../../../../environments/environment';
+import { Patient } from '../../../shared/models/interfaces/patient.model';
+import { NewAppointment } from '../models/dtos/newAppointment.dto';
 import { PatientSuggestion } from '../models/dtos/patient-suggestion.dto';
-import { environment } from '../../environments/environment';
+import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
 
 @Injectable({ providedIn: 'root' })
 export class NuevaCitaService {
@@ -19,9 +19,13 @@ export class NuevaCitaService {
     );
   }
 
-  getPatientSuggestionsByDocument(documentPrefix: string): Observable<PatientSuggestion[]> {
+  getPatientSuggestionsByDocument(
+    documentPrefix: string,
+  ): Observable<PatientSuggestion[]> {
     return this.http.get<PatientSuggestion[]>(
-      `${this.apiUrl}/patients/search/by-document-prefix`, { params: { documentPrefix } },);
+      `${this.apiUrl}/patients/search/by-document-prefix`,
+      { params: { documentPrefix } },
+    );
   }
 
   getSpecialtiesWithDoctor(): Observable<SpecialtyDoctor[]> {
@@ -41,8 +45,10 @@ export class NuevaCitaService {
   }
 
   getAvailableSlots(doctorId: string, date: string): Observable<string[]> {
-    return this.http.get< { time: string }[] >
-    (`${this.apiUrl}/appointments/available-slots`, { params: { doctorId, date } })
+    return this.http
+      .get<
+        { time: string }[]
+      >(`${this.apiUrl}/appointments/available-slots`, { params: { doctorId, date } })
       .pipe(map((slots) => slots.map((s) => s.time)));
   }
 
