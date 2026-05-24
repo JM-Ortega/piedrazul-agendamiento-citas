@@ -7,6 +7,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.Appo
 import jakarta.transaction.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -72,6 +73,11 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     @Override
     public List<Appointment> findByDoctorIdAndPatientIdAndDate(UUID idDoctor, UUID idPatient, LocalDate date) {
         return jpaRepository.findByIdDoctorAndIdPatientAndDate(idDoctor, idPatient, date).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public boolean existsByPatientIdAndStates(UUID idPatient, Collection<AppointmentState> states) {
+        return jpaRepository.existsByIdPatientAndAppointmentStateIn(idPatient, states);
     }
 
     @Override
