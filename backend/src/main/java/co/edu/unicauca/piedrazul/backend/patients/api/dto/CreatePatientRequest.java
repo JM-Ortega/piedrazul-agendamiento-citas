@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.patients.api.dto;
 
-import co.edu.unicauca.piedrazul.backend.jackson.normalization.NormalizeName;
+import co.edu.unicauca.piedrazul.backend.jackson.NormalizeName;
 import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
 import co.edu.unicauca.piedrazul.backend.jackson.validation.ValidDocument;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
