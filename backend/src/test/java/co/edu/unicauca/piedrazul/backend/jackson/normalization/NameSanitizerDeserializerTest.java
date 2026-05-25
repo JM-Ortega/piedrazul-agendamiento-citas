@@ -2,7 +2,6 @@ package co.edu.unicauca.piedrazul.backend.jackson.normalization;
 
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
-import co.edu.unicauca.piedrazul.backend.jackson.NormalizeName;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.CreatePatientWithUserRequest;
