@@ -15,6 +15,7 @@
     <app-appointment-booking
       context="patient"
       [patientData]="patientSnapshot()"
+      [isNewPatient]="isNewPatient()"
       (appointmentConfirmed)="onAppointmentConfirmed($event)"
       (goBack)="goBack()"
     ></app-appointment-booking>

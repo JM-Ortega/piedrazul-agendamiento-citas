@@ -3,6 +3,17 @@
     {{ state.bookingMode() === 'specialty' ? 'Seleccionar Especialidad' : 'Seleccionar Especialidad y Médico' }}
   </h2>
 
+  <!-- Aviso para paciente nuevo -->
+  @if (state.isNewPatient() && !state.isDoctorContext()) {
+    <div class="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 text-amber-800 text-sm flex items-start gap-2">
+      <span class="mt-0.5">⚠️</span>
+      <span>
+        Para pacientes nuevos se recomienda agendar primero con
+        <strong>Medicina General</strong>. Solo podrá seleccionar esta especialidad.
+      </span>
+    </div>
+  }
+
   <div>
     <label class="block text-gray-700 mb-1">Especialidad *</label>
     <select
@@ -11,7 +22,7 @@
       class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
     >
       <option value="">Seleccione una especialidad...</option>
-      @for (s of state.uniqueSpecialties(); track s) {
+      @for (s of filteredSpecialties(); track s) {
         <option [value]="s">{{ s | specialty }}</option>
       }
     </select>

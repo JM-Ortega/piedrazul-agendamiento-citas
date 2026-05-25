@@ -1,4 +1,4 @@
-import { Component, inject, output } from '@angular/core';
+import { Component, inject, output, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, UserSearch } from 'lucide-angular';
 import { BookingStateService } from '../../services/booking-state.service';
@@ -21,6 +21,17 @@ export class BookingSpecialtySelectorComponent {
 
   advance = output<void>();
   back = output<void>();
+
+  readonly filteredSpecialties = computed(() => {
+    const specialties = this.state.uniqueSpecialties();
+    if (
+      this.state.isNewPatient() &&
+      !this.state.isDoctorContext()
+    ) {
+      return specialties.filter(s => s === 'MEDICINA_GENERAL');
+    }
+    return specialties;
+  });
 
   onSpecialtyChange(specialty: string): void {
     this.state.selectedSpecialty.set(specialty);
