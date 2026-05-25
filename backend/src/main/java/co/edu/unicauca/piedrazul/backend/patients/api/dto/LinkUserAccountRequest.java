@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.patients.api.dto;
 
-import co.edu.unicauca.piedrazul.backend.config.security.sanitization.Sanitize;
+import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
