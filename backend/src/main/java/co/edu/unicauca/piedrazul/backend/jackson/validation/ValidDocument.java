@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.config.security.validation;
+package co.edu.unicauca.piedrazul.backend.jackson.validation;
 
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;

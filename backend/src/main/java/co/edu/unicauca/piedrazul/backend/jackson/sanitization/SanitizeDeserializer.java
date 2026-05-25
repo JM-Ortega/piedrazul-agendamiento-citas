@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.config.security.sanitization;
+package co.edu.unicauca.piedrazul.backend.jackson.sanitization;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
