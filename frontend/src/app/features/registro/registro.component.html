@@ -675,7 +675,7 @@
                   [type]="showPassword() ? 'text' : 'password'"
                   [ngModel]="password()"
                   (ngModelChange)="password.set($event)"
-                  placeholder="Mínimo 8 caracteres"
+                  placeholder="Mínimo 6 letras y números"
                   class="w-full border-2 rounded-xl px-4 py-3 pr-12 focus:outline-none transition-colors"
                   [ngClass]="
                     errors()['password']
