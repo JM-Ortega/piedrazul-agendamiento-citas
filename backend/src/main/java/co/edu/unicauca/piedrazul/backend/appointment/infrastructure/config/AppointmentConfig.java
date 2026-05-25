@@ -120,6 +120,13 @@ public class AppointmentConfig {
     }
 
     @Bean
+    public IsNewPatientUseCase isNewPatientUseCase(
+            AppointmentRepository appointmentRepository,
+            PatientConsultPort patientConsultPort) {
+        return new IsNewPatientUseCaseImpl(appointmentRepository, patientConsultPort);
+    }
+
+    @Bean
     public UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase(
             AppointmentRepository appointmentRepository) {
         return new UpdateAppointmentStatusUseCaseImpl(appointmentRepository);

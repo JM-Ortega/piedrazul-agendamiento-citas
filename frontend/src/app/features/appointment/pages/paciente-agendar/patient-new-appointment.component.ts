@@ -20,6 +20,7 @@ export class PatientNewAppointmentComponent implements OnInit {
   private appointmentService = inject(PatientAppointmentService);
   private router = inject(Router);
   private currentPatient = signal<Patient | null>(null);
+  protected isNewPatient = signal<boolean>(false);
 
   /**
    * Snapshot que se pasa al componente atómico.
@@ -41,12 +42,19 @@ export class PatientNewAppointmentComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    // Carga datos del paciente desde el backend usando el keycloakId del token
     this.patientService.getMe().subscribe({
-      next: (patient) => this.currentPatient.set(patient),
+      next: (patient) => {
+        this.currentPatient.set(patient);
+
+        if (patient?.id) {
+          this.appointmentService.hasAppointments(patient.id).subscribe({
+            next: (isNew) => this.isNewPatient.set(isNew),
+            error: () => this.isNewPatient.set(false),
+          });
+        }
+      },
       error: () => {
-        // Si no existe el paciente en la DB aún, no bloqueamos el flujo
-        // El backend lo creará con los datos mínimos del token
+        this.isNewPatient.set(false);
       },
     });
   }

@@ -24,4 +24,8 @@ export class PatientAppointmentService {
       `${this.apiUrl}/appointments/me`,
     );
   }
+
+  hasAppointments(patientId: string): Observable<boolean> {
+    return this.http.get<boolean>(`${this.apiUrl}/appointments/${patientId}/is-new-patient`);
+  }
 }
