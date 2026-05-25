@@ -341,22 +341,28 @@ export class RegistroComponent {
 
   handleNameInput(event: Event, field: 'firstName' | 'lastName'): void {
     const el = event.target as HTMLInputElement;
-    const value = el.value;
     const limitMsg =
       field === 'firstName' ? this.firstNameLimitMsg : this.lastNameLimitMsg;
-
+    let value = el.value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    value = value.replace(/[^a-zA-ZñÑ\s]/g, '');
+    value = value.replace(/^\s+/, '');
+    value = value.replace(/\s{2,}/g, ' ');
+    value = value.replace(/(\S+)/g, (word) =>
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    );
     if (value.length > this.NAME_MAX) {
-      el.value = value.slice(0, this.NAME_MAX);
-      this.updateFormField(field, el.value);
+      value = value.slice(0, this.NAME_MAX);
       this.flash(
         limitMsg,
         `Solo se permiten máximo ${this.NAME_MAX} caracteres`,
         field,
       );
     } else {
-      this.updateFormField(field, value);
       limitMsg.set('');
     }
+
+    el.value = value;
+    this.setFormField(field, value as any);
   }
 
   handlePhoneInput(event: Event): void {
