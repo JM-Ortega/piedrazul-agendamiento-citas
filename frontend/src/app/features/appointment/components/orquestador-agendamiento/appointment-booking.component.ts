@@ -101,19 +101,19 @@ export class AppointmentBookingComponent implements OnInit {
               this.applyDoctorsPreselection(doctors, doctor.id, doctor.name);
               this.state.foundPatient.set(patient);
               this.state.patientId.set(patient?.id ?? null);
-              this.state.step.set(this.state.scheduleStep());
+              this.state.step.set(this.state.specialtyStep());
             },
             error: () => {
-              this.state.step.set(this.state.scheduleStep());
+              this.state.step.set(this.state.specialtyStep());
             },
           });
         } else {
           doctors$.subscribe({
             next: (docs) => {
               this.applyDoctorsPreselection(docs, doctor.id, doctor.name);
-              this.state.step.set(this.state.scheduleStep());
+              this.state.step.set(this.state.specialtyStep());
             },
-            error: () => this.state.step.set(this.state.scheduleStep()),
+            error: () => this.state.step.set(this.state.specialtyStep()),
           });
         }
       },
