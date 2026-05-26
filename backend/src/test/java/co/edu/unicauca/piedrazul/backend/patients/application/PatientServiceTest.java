@@ -2,7 +2,7 @@ package co.edu.unicauca.piedrazul.backend.patients.application;
 
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientData;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
 import co.edu.unicauca.piedrazul.backend.patients.exception.InvalidPatientDataException;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyExistsException;
