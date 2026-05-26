@@ -83,7 +83,7 @@ export class BookingScheduleSelectorComponent {
       .getAvailableSlots(this.state.effectiveDoctorId(), dateStr)
       .subscribe({
         next: (slots) => {
-          if (this.state.isSchedulerContext()) {
+          if (this.state.isSchedulerContext() || this.state.isDoctorContext()) {
             const today = this.state.formatLocalDate(new Date());
             if (dateStr === today) {
               const cutoff = new Date(Date.now() + 10 * 60 * 1000);
