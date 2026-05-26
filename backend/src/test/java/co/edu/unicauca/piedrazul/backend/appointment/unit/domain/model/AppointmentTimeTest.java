@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment.domain.model;
+package co.edu.unicauca.piedrazul.backend.appointment.unit.domain.model;
 
 import org.junit.jupiter.api.Test;
 

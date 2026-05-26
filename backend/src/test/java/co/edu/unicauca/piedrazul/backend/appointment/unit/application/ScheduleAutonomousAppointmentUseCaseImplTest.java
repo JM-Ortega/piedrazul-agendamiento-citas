@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment.application;
+package co.edu.unicauca.piedrazul.backend.appointment.unit.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientAlreadyScheduledInSpecialtyException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientScheduleTimeConflictException;

@@ -153,7 +153,19 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Base de datos H2 (BD en memoria para pruebas rápidas) -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
 
+        <!-- Seguridad en tests (para simular JWT) -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
 
         <!-- Export-CSV -->
         <dependency>

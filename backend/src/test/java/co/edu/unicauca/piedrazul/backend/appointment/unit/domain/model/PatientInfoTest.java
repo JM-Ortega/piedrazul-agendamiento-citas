@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment.domain.model;
+package co.edu.unicauca.piedrazul.backend.appointment.unit.domain.model;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.GuardianRequiredException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InconsistentPatientInfoException;
