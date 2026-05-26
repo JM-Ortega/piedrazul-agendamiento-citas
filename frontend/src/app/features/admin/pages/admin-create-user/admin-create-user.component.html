@@ -470,37 +470,6 @@
           </div>
         </div>
 
-        <!-- Fila 4: Intervalo entre citas -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div>
-            <label class="block text-gray-700 text-base font-medium mb-2">
-              Intervalo entre citas (min)
-              <span class="text-sm text-gray-500 font-normal ml-1"
-                >máx. {{ maxInterval }} min</span
-              >
-            </label>
-            <input
-              type="number"
-              [(ngModel)]="userForm.interval"
-              name="interval"
-              (keydown)="onIntervalKeydown($event)"
-              (input)="onIntervalInput()"
-              (blur)="validateField('interval')"
-              [class]="inputClass('interval', 'px-4')"
-              [min]="10"
-              [max]="maxInterval"
-              step="5"
-            />
-            <p
-              *ngIf="hasError('interval')"
-              class="mt-1 text-sm text-red-600 flex items-center gap-1"
-            >
-              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-              {{ errors.interval }}
-            </p>
-          </div>
-        </div>
-
         <!-- Fila 5: Horario de atención -->
         <div class="grid grid-cols-2 gap-5">
           <div>
@@ -546,7 +515,36 @@
             </p>
           </div>
         </div>
-
+        <!-- Fila 4: Intervalo entre citas -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-gray-700 text-base font-medium mb-2">
+              Intervalo entre citas (min)
+              <span class="text-sm text-gray-500 font-normal ml-1"
+                >máx. {{ maxInterval }} min</span
+              >
+            </label>
+            <input
+              type="number"
+              [(ngModel)]="userForm.interval"
+              name="interval"
+              (keydown)="onIntervalKeydown($event)"
+              (input)="onIntervalInput()"
+              (blur)="validateField('interval')"
+              [class]="inputClass('interval', 'px-4')"
+              [min]="10"
+              [max]="maxInterval"
+              step="5"
+            />
+            <p
+              *ngIf="hasError('interval')"
+              class="mt-1 text-sm text-red-600 flex items-center gap-1"
+            >
+              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+              {{ errors.interval }}
+            </p>
+          </div>
+        </div>
         <!-- Fila 6: Días de atención -->
         <div>
           <label class="block text-gray-700 text-base font-medium mb-1"
