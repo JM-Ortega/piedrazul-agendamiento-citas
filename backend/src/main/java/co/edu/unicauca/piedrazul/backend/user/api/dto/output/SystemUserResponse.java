@@ -1,7 +1,5 @@
 package co.edu.unicauca.piedrazul.backend.user.api.dto.output;
 
-import co.edu.unicauca.piedrazul.backend.admin.api.dto.DoctorUserDataResponse;
-
 import java.util.List;
 import java.util.UUID;
 
