@@ -91,4 +91,12 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
                 .map(mapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Cita con ID: " + appointmentId + "no encontrada"));
     }
+  
+    public List<Appointment> findAllByDate(LocalDate date) { return jpaRepository.findByDate(date)
+            .stream()
+            .map(mapper::toDomain)
+            .toList();
+    }
+
+
 }

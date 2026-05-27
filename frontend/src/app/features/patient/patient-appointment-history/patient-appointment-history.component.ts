@@ -1,6 +1,5 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import {
   CalendarDays,
   ChevronRight,
@@ -9,18 +8,19 @@ import {
   PlusCircle,
   User,
 } from 'lucide-angular';
-import { AppService } from '../../core/services/app.service';
-import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
-import { PatientAppointmentService } from '../appointment/services/PatientApointment.service';
-import { Appointment } from './models/interfaces/appointment.model';
+import { AppService } from '../../../core/services/app.service';
+import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
+import { PatientAppointmentService } from '../../appointment/services/PatientApointment.service';
+import { Appointment } from '../models/interfaces/appointment.model';
+import {FormatoPipe} from "../../../shared/pipes/formatoPipe";
 
 @Component({
-  selector: 'app-patient-dashboard',
-  templateUrl: './patient-dashboard.component.html',
+  selector: 'app-patient-appointment-history',
+  templateUrl: './patient-appointment-history.component.html',
   standalone: true,
-  imports: [CommonModule, RouterLink, LucideAngularModule],
+  imports: [CommonModule, LucideAngularModule, FormatoPipe],
 })
-export class PatientDashboardComponent implements OnInit {
+export class PatientAppointmentHistoryComponent implements OnInit {
   protected appService = inject(AppService);
   private appointmentService = inject(PatientAppointmentService);
 
@@ -63,14 +63,14 @@ export class PatientDashboardComponent implements OnInit {
     AGENDADA: 'bg-green-100 text-green-700',
     ATENDIDA: 'bg-blue-100 text-blue-700',
     CANCELADA: 'bg-red-100 text-red-700',
-    NO_ASISTIO: 'bg-gray-100 text-gray-600',
+    NO_ASISTIO: 'bg-orange-100 text-orange-700',
     REPROGRAMADA: 'bg-yellow-100 text-yellow-700',
   };
 
   readonly upcomingAppointments = computed<AppointmentsPatient[]>(() => {
-    const today = new Date().toISOString().slice(0, 10);
     return this.appointmentService
       .appointments()
+      .filter((a) => a.appointmentState !== 'AGENDADA')
       .sort((a, b) => (a.date + a.startTime > b.date + b.startTime ? 1 : -1));
   });
 

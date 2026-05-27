@@ -11,9 +11,10 @@ import { NewAppointmentDoctorComponent } from './features/appointment/pages/doct
 import { PatientNewAppointmentComponent } from './features/appointment/pages/paciente-agendar/patient-new-appointment.component';
 import { DoctorAllAppointmentsComponent } from './features/doctor/doctor-all-appointments/doctor-all-appointments.component';
 import { DoctorDashboardComponent } from './features/doctor/doctor-dashboard/doctor-dashboard.component';
-import { PatientDashboardComponent } from './features/patient-dashboard/patient-dashboard.component';
+import { PatientDashboardComponent } from './features/patient/patient-dashboard/patient-dashboard.component';
 import { RegistroComponent } from './features/registro/registro.component';
 import { SchedulerDashboardComponent } from './features/scheduler-dashboard/scheduler-dashboard.component';
+import { PatientAppointmentHistoryComponent } from './features/patient/patient-appointment-history/patient-appointment-history.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -76,6 +77,12 @@ export const routes: Routes = [
   {
     path: 'paciente',
     component: PatientDashboardComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'PATIENT' },
+  },
+  {
+    path: 'paciente/historial-citas',
+    component: PatientAppointmentHistoryComponent,
     canActivate: [AuthGuard],
     data: { role: 'PATIENT' },
   },
