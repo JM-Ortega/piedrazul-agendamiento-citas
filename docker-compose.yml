@@ -10,6 +10,9 @@ include:
 
 services:
   postgres:
+    build:
+      context: ./infra/postgres
+      dockerfile: Dockerfile
     ports:
       - "${DB_PORT}:5432"
 
