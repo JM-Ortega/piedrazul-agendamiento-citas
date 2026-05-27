@@ -148,7 +148,7 @@
                         ></lucide-angular>
                         <span class="font-medium">Especialidad:</span>
                         <span class="truncate">{{
-                          specialtyLabel(user.doctorData.specialty)
+                          user.doctorData.specialty | formato
                         }}</span>
                       </div>
                       <div class="flex items-center gap-2">
@@ -230,7 +230,7 @@
                         ></lucide-angular>
                         <span class="font-medium">Especialidad:</span>
                         <span class="truncate">{{
-                          specialtyLabel(user.doctorData.specialty)
+                          user.doctorData.specialty | formato
                         }}</span>
                       </div>
                       <div class="flex items-center gap-2">

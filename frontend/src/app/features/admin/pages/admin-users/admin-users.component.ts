@@ -9,6 +9,7 @@ import {
   UserPlus,
   Users,
 } from 'lucide-angular';
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
 import { SystemUser } from '../../models/interfaces/system-user.model';
 import { AdminService } from '../../service/admin.service';
@@ -16,22 +17,11 @@ import { AdminService } from '../../service/admin.service';
   selector: 'app-admin-users',
   templateUrl: './admin-users.component.html',
   standalone: true,
-  imports: [LucideAngularModule],
+  imports: [LucideAngularModule, FormatoPipe],
 })
 export class AdminUsersComponent implements OnInit {
   private adminService = inject(AdminService);
   private router = inject(Router);
-
-  private readonly specialtyLabels: Record<string, string> = {
-    FISIOTERAPIA: 'Fisioterapia',
-    TERAPIA_NEURAL: 'Terapia Neural',
-    QUIROPRAXIA: 'Quiropraxia',
-  };
-
-  specialtyLabel(specialty: string): string {
-    const clean = specialty.replace(/^\[|\]$/g, '').trim();
-    return this.specialtyLabels[clean] ?? clean;
-  }
 
   readonly Users = Users;
   readonly UserPlus = UserPlus;

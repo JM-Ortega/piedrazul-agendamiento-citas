@@ -21,7 +21,7 @@ import { SchedulerService } from '../../core/services/scheduler.service';
 import { ExportModalComponent } from '../../design-system/organisms/export-modal/export-modal.component';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
-
+import { FormatoPipe } from '../../shared/pipes/formatoPipe';
 type ExportColumnKey =
   | 'date'
   | 'time'
@@ -44,7 +44,7 @@ interface ColumnDef {
   selector: 'app-scheduler-dashboard',
   templateUrl: './scheduler-dashboard.component.html',
   standalone: true,
-  imports: [RouterLink, LucideAngularModule, ExportModalComponent],
+  imports: [RouterLink, LucideAngularModule, ExportModalComponent, FormatoPipe],
 })
 export class SchedulerDashboardComponent implements OnInit {
   private schedulerService = inject(SchedulerService);
@@ -88,17 +88,7 @@ export class SchedulerDashboardComponent implements OnInit {
     'noviembre',
     'diciembre',
   ];
-  // ── Filter Helpers ──────────────────────────────────────────────────────────
-  private readonly specialtyLabels: Record<string, string> = {
-    FISIOTERAPIA: 'Fisioterapia',
-    TERAPIA_NEURAL: 'Terapia Neural',
-    QUIROPRAXIA: 'Quiropraxia',
-  };
 
-  specialtyLabel(specialty: string): string {
-    const clean = specialty.replace(/^\[|\]$/g, '').trim();
-    return this.specialtyLabels[clean] ?? clean;
-  }
   // ── Data signals ──────────────────────────────────────────────────────────
   doctors = signal<dtoDoctor[]>([]);
   private appointments = signal<AppointmentsPatient[]>([]);

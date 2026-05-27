@@ -176,7 +176,7 @@
             <option value="">Todos los médicos</option>
             @for (doc of doctors(); track doc.id) {
               <option [value]="doc.name">
-                {{ doc.name }} — {{ specialtyLabel(doc.specialty) }}
+                {{ doc.name }} — {{ doc.specialty | formato }}
               </option>
             }
           </select>
@@ -495,7 +495,7 @@
                         {{ apt.doctorName }}
                       </p>
                       <p class="text-gray-400 text-sm">
-                        {{ specialtyLabel(apt.specialty) }}
+                        {{ apt.specialty | formato }}
                       </p>
                     </td>
                     <td class="px-4 py-4">
