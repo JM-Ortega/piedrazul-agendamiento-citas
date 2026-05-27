@@ -1,6 +1,6 @@
 ---
 # Rollout de nueva imagen. No toca Keycloak ni secretos.
-# Requiere image_tag disponible como variable (inyectada por el workflow).
+# Requiere image_tag o postgres_image_tag disponible como variable (inyectada por el workflow).
 
 # Validar que .env existe y tiene claves críticas
 - name: Verificar que .env existe
@@ -10,7 +10,7 @@
 
 - name: Fallar si .env no existe
   ansible.builtin.fail:
-    msg: ".env no existe en {{ app_dir }} — corre host_config primero"
+    msg: ".env no existe en {{ app_dir }} — corre converge primero"
   when: not app_env_stat.stat.exists
 
 - name: Leer .env para validación
@@ -25,20 +25,79 @@
       - >-
         (app_env_file.content | b64decode).split('\n') | select('match',
         '^KC_BACKEND_CLIENT_SECRET=.+') | list | length > 0
-    fail_msg: "KC_BACKEND_CLIENT_SECRET está vacío en .env — corre host_config primero"
+    fail_msg: "KC_BACKEND_CLIENT_SECRET está vacío en .env — corre converge primero"
   no_log: true
 
-# Actualizar image.env con el nuevo tag
+# Resolver tags
+- name: Verificar image.env actual
+  ansible.builtin.stat:
+    path: "{{ app_dir }}/image.env"
+  register: image_env_stat
+
+- name: Leer image.env actual
+  ansible.builtin.slurp:
+    src: "{{ app_dir }}/image.env"
+  register: image_env_current
+  when: image_env_stat.stat.exists
+
+- name: Extraer IMAGE_TAG actual
+  ansible.builtin.set_fact:
+    current_image_tag: >-
+      {{
+        (image_env_current.content | b64decode | regex_search('(?m)^IMAGE_TAG=(.+)$', '\\1') | first)
+        if image_env_stat.stat.exists and
+           ((image_env_current.content | b64decode | regex_search('(?m)^IMAGE_TAG=(.+)$', '\\1')) is not none)
+        else ''
+      }}
+
+- name: Extraer POSTGRES_IMAGE_TAG actual
+  ansible.builtin.set_fact:
+    current_postgres_image_tag: >-
+      {{
+        (image_env_current.content | b64decode | regex_search('(?m)^POSTGRES_IMAGE_TAG=(.+)$', '\\1') | first)
+        if image_env_stat.stat.exists and
+           ((image_env_current.content | b64decode | regex_search('(?m)^POSTGRES_IMAGE_TAG=(.+)$', '\\1')) is not none)
+        else ''
+      }}
+
+- name: Resolver tags finales
+  ansible.builtin.set_fact:
+    final_image_tag: >-
+      {{
+        image_tag
+        if (image_tag | default('') | length > 0)
+        else current_image_tag
+      }}
+    final_postgres_image_tag: >-
+      {{
+        postgres_image_tag
+        if (postgres_image_tag | default('') | length > 0)
+        else current_postgres_image_tag
+      }}
+
+- name: Validar que IMAGE_TAG está disponible
+  ansible.builtin.fail:
+    msg: "No hay IMAGE_TAG actual en el servidor y image_tag vino vacío — corre con run_build=true o pasa image_tag"
+  when: final_image_tag | length == 0
+
+- name: Validar que POSTGRES_IMAGE_TAG está disponible
+  ansible.builtin.fail:
+    msg: "No hay POSTGRES_IMAGE_TAG actual en el servidor y postgres_image_tag vino vacío — corre con run_build_postgres=true"
+  when: final_postgres_image_tag | length == 0
+
+# Actualizar image.env
 - name: Actualizar image.env
   ansible.builtin.copy:
-    content: "IMAGE_TAG={{ image_tag }}\n"
     dest: "{{ app_dir }}/image.env"
     owner: ansible
     group: ansible
     mode: "0640"
+    content: |
+      IMAGE_TAG={{ final_image_tag }}
+      POSTGRES_IMAGE_TAG={{ final_postgres_image_tag }}
 
-# Desplegar nueva imagen
-- name: Desplegar nueva imagen
+# Desplegar stack con tags resueltos
+- name: Desplegar nueva imagen backend
   community.docker.docker_compose_v2:
     project_src: "{{ app_dir }}/compose"
     project_name: "{{ compose_project_name }}"
