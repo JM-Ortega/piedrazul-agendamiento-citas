@@ -122,10 +122,11 @@ public class SheduleController {
         List<LocalTime> availableIntervals = scheduleService.getAvailableIntervalsByWorkday(doctor, workday);
 
         AvailableIntervalsResponse response = new AvailableIntervalsResponse(
-            workday.toString(),
-            availableIntervals
+                workday.toString(),
+                availableIntervals
         );
 
         return ResponseEntity.ok(response);
     }
+
 }
