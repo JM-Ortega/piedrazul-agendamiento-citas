@@ -156,7 +156,7 @@ jobs:
             RESPONSE=$(curl -sf \
               -H "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" \
               -H "Content-Type: application/vnd.api+json" \
-              "https://app.terraform.io/api/v2/workspaces/${{ inputs.workspace_id }}/runs?page[size]=1")
+              "https://app.terraform.io/api/v2/workspaces/${{ inputs.workspace_id }}/runs?page%5Bsize%5D=1")
 
             STATUS=$(echo "$RESPONSE" | jq -r '.data[0].attributes.status // "none"')
 
