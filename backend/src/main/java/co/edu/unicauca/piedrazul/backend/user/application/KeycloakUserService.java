@@ -146,8 +146,22 @@ public class KeycloakUserService implements UserModuleApi {
     }
 
     @Override
+    public List<UserSummary> findDoctors() {
+        return keycloakClient.findUsersByRole(Role.DOCTOR)
+                .stream()
+                .map(this::toUserSummary)
+                .toList();
+    }
+
+    // BORRAR
+    @Override
     public boolean hasSchedulerRole(UUID userId) {
         return keycloakClient.userHasRole(userId, Role.SCHEDULER);
+    }
+
+    @Override
+    public List<String> getUserRoles (UUID userId) {
+        return keycloakClient.getUserRoles(userId);
     }
 
     @Override

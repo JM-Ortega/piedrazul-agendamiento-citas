@@ -9,6 +9,7 @@ import jakarta.ws.rs.core.Response;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.admin.client.resource.RealmResource;
+import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -172,6 +173,18 @@ public class KeycloakUserClient {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    public List<String> getUserRoles(UUID keycloakId) {
+        return keycloak.realm(props.getRealm())
+                .users()
+                .get(keycloakId.toString())
+                .roles()
+                .realmLevel()
+                .listAll()
+                .stream()
+                .map(RoleRepresentation::getName)
+                .toList();
     }
 
     public boolean userHasRole(UUID keycloakId, Role role) {

@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.admin.api.dto;
+package co.edu.unicauca.piedrazul.backend.user.api.dto.output;
 
 import java.util.List;
 import java.util.UUID;
@@ -8,6 +8,5 @@ public record SystemUserResponse(
         String firstName,
         String lastName,
         String documentId,
-        List<String> roles,
-        DoctorUserDataResponse doctorData
+        List<String> roles
 ) {}

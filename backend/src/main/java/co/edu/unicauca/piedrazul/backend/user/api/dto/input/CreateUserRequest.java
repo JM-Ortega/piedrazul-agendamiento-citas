@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.user.api.dto;
+package co.edu.unicauca.piedrazul.backend.user.api.dto.input;
 
 import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
 import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
