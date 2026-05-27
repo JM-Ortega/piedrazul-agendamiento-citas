@@ -1,7 +1,7 @@
 ---
-kc_hostname: "auth.piedrazul.{{ base_domain }}"
-api_public_domain: "api.piedrazul.{{ base_domain }}"
-frontend_public_domain: "piedrazul.{{ base_domain }}"
+kc_hostname: "auth.{{ base_domain }}"
+api_public_domain: "api.{{ base_domain }}"
+frontend_public_domain: "{{ base_domain }}"
 acme_email: jortegan@unicauca.edu.co
 
 cors_allowed_origins: "https://{{ frontend_public_domain }}"

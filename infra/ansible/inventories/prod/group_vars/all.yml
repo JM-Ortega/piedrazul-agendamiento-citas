@@ -11,7 +11,7 @@ ghcr_namespace: jm-ortega/piedrazul-agendamiento-citas
 backend_image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/backend"
 
 # Dominio base
-base_domain: narvaezlab.dev
+base_domain: piedrazul.org
 
 # Spring / backend
 spring_profiles_active: prod
