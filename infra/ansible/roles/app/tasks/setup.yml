@@ -72,9 +72,14 @@
   ansible.builtin.set_fact:
     current_image_tag: >-
       {{
-        (image_env_current.content | b64decode | regex_search('(?m)^IMAGE_TAG=(.+)$', '\\1') | first)
-        if image_env_stat.stat.exists and
-           ((image_env_current.content | b64decode | regex_search('(?m)^IMAGE_TAG=(.+)$', '\\1')) is not none)
+        (
+          image_env_current.content
+          | b64decode
+          | regex_findall('(?m)^IMAGE_TAG=(.+)$')
+          | first
+          | default('')
+        )
+        if image_env_stat.stat.exists
         else ''
       }}
 
@@ -82,9 +87,14 @@
   ansible.builtin.set_fact:
     current_postgres_image_tag: >-
       {{
-        (image_env_current.content | b64decode | regex_search('(?m)^POSTGRES_IMAGE_TAG=(.+)$', '\\1') | first)
-        if image_env_stat.stat.exists and
-           ((image_env_current.content | b64decode | regex_search('(?m)^POSTGRES_IMAGE_TAG=(.+)$', '\\1')) is not none)
+        (
+          image_env_current.content
+          | b64decode
+          | regex_findall('(?m)^POSTGRES_IMAGE_TAG=(.+)$')
+          | first
+          | default('')
+        )
+        if image_env_stat.stat.exists
         else ''
       }}
 
