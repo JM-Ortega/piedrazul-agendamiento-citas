@@ -24,6 +24,10 @@ on:
         description: "Construir nueva imagen del backend"
         type: boolean
         default: true
+      run_build_postgres:
+        description: "Construir nueva imagen de postgres"
+        type: boolean
+        default: false
       run_app_deploy:
         description: "Desplegar aplicación"
         type: boolean
@@ -38,11 +42,10 @@ on:
         default: false
 
 concurrency:
-  group: deploy-hetzner-main
+  group: piedrazul-production-hetzner
   cancel-in-progress: false
 
 jobs:
-  # Detectar qué cambió (solo en push)
   classify:
     name: Detectar cambios
     runs-on: ubuntu-latest
@@ -53,6 +56,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       ansible: ${{ steps.filter.outputs.ansible }}
       app: ${{ steps.filter.outputs.app }}
+      postgres: ${{ steps.filter.outputs.postgres }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -70,13 +74,13 @@ jobs:
               - "!backend/target/**"
             ansible:
               - "infra/ansible/**"
+            postgres:
+              - "infra/postgres/**"
             app:
               - "infra/compose/**"
               - "infra/keycloak/realm/**"
               - "infra/keycloak/themes/dist/**"
-              - "infra/postgres/**"
 
-  # Normalizar inputs según evento
   resolve:
     name: Resolver parámetros
     runs-on: ubuntu-latest
@@ -86,6 +90,7 @@ jobs:
       (needs.classify.result == 'success' || needs.classify.result == 'skipped')
     outputs:
       run_build: ${{ steps.params.outputs.run_build }}
+      run_build_postgres: ${{ steps.params.outputs.run_build_postgres }}
       run_host_config: ${{ steps.params.outputs.run_host_config }}
       run_app_deploy: ${{ steps.params.outputs.run_app_deploy }}
       image_tag: ${{ steps.params.outputs.image_tag }}
@@ -100,15 +105,18 @@ jobs:
             BACKEND="${{ needs.classify.outputs.backend }}"
             ANSIBLE="${{ needs.classify.outputs.ansible }}"
             APP="${{ needs.classify.outputs.app }}"
+            POSTGRES="${{ needs.classify.outputs.postgres }}"
 
-            # run_build: solo si cambió backend
             echo "run_build=${BACKEND}" >> $GITHUB_OUTPUT
+            echo "run_build_postgres=${POSTGRES}" >> $GITHUB_OUTPUT
 
-            # run_host_config: solo si cambió ansible
-            echo "run_host_config=${ANSIBLE}" >> $GITHUB_OUTPUT
+            if [ "$ANSIBLE" = "true" ] || [ "$APP" = "true" ]; then
+              echo "run_host_config=true" >> $GITHUB_OUTPUT
+            else
+              echo "run_host_config=false" >> $GITHUB_OUTPUT
+            fi
 
-            # run_app_deploy: si cambió backend O app
-            if [ "$BACKEND" = "true" ] || [ "$APP" = "true" ]; then
+            if [ "$BACKEND" = "true" ] || [ "$APP" = "true" ] || [ "$POSTGRES" = "true" ]; then
               echo "run_app_deploy=true" >> $GITHUB_OUTPUT
             else
               echo "run_app_deploy=false" >> $GITHUB_OUTPUT
@@ -118,15 +126,14 @@ jobs:
             echo "force_init_keycloak=false" >> $GITHUB_OUTPUT
 
           else
-            # workflow_dispatch — usar inputs directamente
             echo "run_build=${{ inputs.run_build }}" >> $GITHUB_OUTPUT
+            echo "run_build_postgres=${{ inputs.run_build_postgres }}" >> $GITHUB_OUTPUT
             echo "run_host_config=${{ inputs.run_host_config }}" >> $GITHUB_OUTPUT
             echo "run_app_deploy=${{ inputs.run_app_deploy }}" >> $GITHUB_OUTPUT
             echo "image_tag=${{ inputs.image_tag }}" >> $GITHUB_OUTPUT
             echo "force_init_keycloak=${{ inputs.force_init_keycloak }}" >> $GITHUB_OUTPUT
           fi
 
-  # Llamar al reusable
   deploy:
     name: Deploy Hetzner
     needs: resolve
@@ -140,6 +147,7 @@ jobs:
       ansible_host: vps
       github_environment: production-hetzner
       run_build: ${{ needs.resolve.outputs.run_build == 'true' }}
+      run_build_postgres: ${{ needs.resolve.outputs.run_build_postgres == 'true' }}
       run_host_config: ${{ needs.resolve.outputs.run_host_config == 'true' }}
       run_app_deploy: ${{ needs.resolve.outputs.run_app_deploy == 'true' }}
       image_tag: ${{ needs.resolve.outputs.image_tag }}
