@@ -7,11 +7,12 @@ import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
 import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
 import { PatientAppointmentService } from '../../services/PatientApointment.service';
+import {ArrowLeft, LucideAngularModule,} from 'lucide-angular';
 
 @Component({
   selector: 'app-patient-new-appointment',
   standalone: true,
-  imports: [CommonModule, AppointmentBookingComponent],
+  imports: [CommonModule, LucideAngularModule, AppointmentBookingComponent],
   templateUrl: './patient-new-appointment.component.html',
 })
 export class PatientNewAppointmentComponent implements OnInit {
@@ -21,6 +22,8 @@ export class PatientNewAppointmentComponent implements OnInit {
   private router = inject(Router);
   private currentPatient = signal<Patient | null>(null);
   protected isNewPatient = signal<boolean>(false);
+
+  readonly ArrowLeft = ArrowLeft;
 
   /**
    * Snapshot que se pasa al componente atómico.
