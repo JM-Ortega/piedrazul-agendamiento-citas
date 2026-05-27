@@ -8,7 +8,7 @@ export const environment = {
   },
   contact: {
     whatsapp: '573173803813',
-    whatsappDisplay: '317 380 3813',
+    whatsappDisplay: '317 300 3813',
     phone: '6013891234',
     phoneDisplay: '601 389 1234',
   },
