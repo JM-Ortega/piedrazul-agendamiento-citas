@@ -332,6 +332,9 @@ crash.*.log
 *.tfvars
 *.tfvars.json
 
+# Archivo permitido para variables no sensibles
+!infra/terraform/live/prod/piedrazul.auto.tfvars
+
 # Ignore override files as they are usually used to override resources locally and so
 # are not checked in
 override.tf
