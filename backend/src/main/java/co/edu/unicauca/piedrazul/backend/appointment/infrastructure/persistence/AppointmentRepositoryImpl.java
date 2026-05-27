@@ -28,11 +28,6 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
         return mapper.toDomain(jpaRepository.save(mapper.toEntity(appointment)));
     }
 
-    //metodo para el modulo de historia clinica
-    @Override
-    public Optional<Appointment> findById(UUID idAppointment) {
-        return jpaRepository.findById(idAppointment).map(mapper::toDomain);
-    }
 
     @Override
     public List<Appointment> findByDoctorId(UUID idDoctor) {

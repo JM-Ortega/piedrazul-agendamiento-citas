@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
+import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalData;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentSummary;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
@@ -40,6 +41,21 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
                         a.getSpecialty().name(),
                         a.getAppointmentState().name()
                 )).toList();
+    }
+
+    @Override
+    public AppointmentExternalData getAppointmentData(UUID idAppointment) {
+
+        Appointment appointment = appointmentRepository.findById(idAppointment);
+
+        return new AppointmentExternalData(
+                appointment.getIdAppointment(),
+                appointment.getIdDoctor(),
+                appointment.getDoctorName(),
+                appointment.getIdPatient(),
+                appointment.getAppointmentState().name(),
+                appointment.getDate()
+        );
     }
 
 }
