@@ -4,7 +4,7 @@
 project = "piedrazul"
 
 # Dominio principal del proyecto
-base_domain = "narvaezlab.dev"
+base_domain = "piedrazul.org"
 
 # -- Cloudflare
 
@@ -12,7 +12,7 @@ base_domain = "narvaezlab.dev"
 cloudflare_account_id = "3962a117c8b14a746eec13702d330b42"
 
 # Zona DNS del dominio base
-cloudflare_zone_id = "9ada5928f8c2bb1b7db80324f97966a3"
+cloudflare_zone_id = "a6b67fc21dcdfb3c00c9020f6cd92891"
 
 # -- GitHub
 
