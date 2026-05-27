@@ -3,6 +3,7 @@ package co.edu.unicauca.piedrazul.backend.doctors.application;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorDoesNotWorkException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
 import jakarta.transaction.Transactional;
 
@@ -38,7 +39,7 @@ public class ScheduleService {
     @Transactional
     public Schedule updateScheduleByWorkday(Doctor doctor, Workday workday, Schedule newScheduleData) {
         if (doctor == null || doctor.getIdDoctor() == null) {
-            throw new RuntimeException("Doctor must be provided");
+            throw new RuntimeException("El doctor debe ser proporcionado");
         }
 
         List<Schedule> schedules = scheduleRepository.findByDoctor(doctor);
@@ -46,7 +47,7 @@ public class ScheduleService {
         Schedule existingSchedule = schedules.stream()
                 .filter(s -> s.getWorkday().equals(workday))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Schedule not found for this day"));
+                .orElseThrow(() -> new RuntimeException("No se encontró horario para este día."));
 
         // Actualizamos los datos
         existingSchedule.setStartTime(newScheduleData.getStartTime());
@@ -58,7 +59,7 @@ public class ScheduleService {
     @Transactional
     public void deleteScheduleByWorkday(Doctor doctor, Workday workday) {
         if (doctor == null || doctor.getIdDoctor() == null) {
-            throw new IllegalArgumentException("Doctor must be provided");
+            throw new IllegalArgumentException("El doctor debe ser proporcionado");
         }
 
         scheduleRepository.deleteByDoctorAndWorkday(doctor, workday);
@@ -66,19 +67,19 @@ public class ScheduleService {
 
     public List<Schedule> getSchedulesByDoctor(Doctor doctor) {
         if (doctor == null || doctor.getIdDoctor() == null) {
-            throw new RuntimeException("Doctor must be provided");
+            throw new RuntimeException("El doctor debe ser proporcionado");
         }
         return scheduleRepository.findByDoctor(doctor);
     }
 
     public List<LocalTime> getAvailableIntervalsByWorkday(Doctor doctor, Workday workday) {
         if (doctor == null || doctor.getIdDoctor() == null) {
-            throw new RuntimeException("Doctor must be provided");
+            throw new RuntimeException("El doctor debe ser proporcionado");
         }
 
         int appointmentInterval = doctor.getAppointmentInterval();
         if (appointmentInterval <= 0) {
-            throw new RuntimeException("Doctor appointment interval must be greater than 0");
+            throw new RuntimeException("El intervalo entre citas médicas debe ser mayor que 0");
         }
 
         List<Schedule> schedules = scheduleRepository.findByDoctor(doctor).stream()
@@ -86,10 +87,10 @@ public class ScheduleService {
                 .toList();
 
         if (schedules.isEmpty()) {
-            throw new RuntimeException("Doctor does not work on " + workday);
+            throw new DoctorDoesNotWorkException("El doctor no trabaja los " + workday);
         }
         if (schedules.size() > 1) {
-            throw new RuntimeException("Doctor has more than one schedule for " + workday);
+            throw new RuntimeException("El doctor tiene más de un horario para el dia " + workday);
         }
 
         Schedule workdaySchedule = schedules.getFirst();
@@ -97,7 +98,7 @@ public class ScheduleService {
         LocalTime startTime = workdaySchedule.getStartTime();
         LocalTime endTime = workdaySchedule.getEndTime();
         if (!startTime.isBefore(endTime)) {
-            throw new RuntimeException("Invalid schedule range for " + workday);
+            throw new RuntimeException("Rango de tiempo invalido para el dia " + workday);
         }
 
         List<LocalTime> availableIntervals = new ArrayList<>();
