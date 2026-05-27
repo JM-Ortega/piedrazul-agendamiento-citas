@@ -110,6 +110,8 @@ export class SchedulerDashboardComponent implements OnInit {
   exportFormat = signal<ExportFormat>('excel');
   isExporting = signal(false);
   exportError = signal<string | null>(null);
+  showAvailabilityWarning = signal(false);
+  isCheckingAvailability = signal(false);
 
   // ── Computed ──────────────────────────────────────────────────────────────
   selectedDoctor = computed(() =>
@@ -238,6 +240,33 @@ export class SchedulerDashboardComponent implements OnInit {
     this.exportError.set(null);
     this.exportFormat.set('excel');
     this.showExportModal.set(true);
+  }
+
+  handleExportClick(): void {
+    const date = this.filterDate();
+    if (!date) return;
+
+    this.isCheckingAvailability.set(true);
+
+    this.schedulerService.checkSchedulerAvailability(date).subscribe({
+      next: (hasAvailability) => {
+        this.isCheckingAvailability.set(false);
+        if (hasAvailability) {
+          this.showAvailabilityWarning.set(true);
+        } else {
+          this.openExportModal();
+        }
+      },
+      error: () => {
+        this.isCheckingAvailability.set(false);
+        this.openExportModal();
+      },
+    });
+  }
+
+  confirmExportDespiteAvailability(): void {
+    this.showAvailabilityWarning.set(false);
+    this.openExportModal();
   }
 
   closeExportModal(): void {

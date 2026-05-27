@@ -45,9 +45,10 @@ export class SchedulerService {
       responseType: 'blob',
     });
   }
-  checkSchedulerAvailability(): Observable<boolean> {
+  checkSchedulerAvailability(date: string): Observable<boolean> {
     return this.http.get<boolean>(
       `${this.apiUrl}/reports/scheduler/availability`,
+      { params: { date } },
     );
   }
   getAppointmentsByDateAndDoctor(

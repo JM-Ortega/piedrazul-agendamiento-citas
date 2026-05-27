@@ -287,20 +287,27 @@
           </div>
           <div class="flex flex-col items-end gap-2">
             <button
-              (click)="filterDate() ? openExportModal() : null"
-              [disabled]="!filterDate()"
+              (click)="filterDate() ? handleExportClick() : null"
+              [disabled]="!filterDate() || isCheckingAvailability()"
               [class]="
                 'flex items-center gap-3 px-8 py-4 rounded-xl text-lg font-semibold transition-colors shadow-lg ' +
-                (filterDate()
+                (filterDate() && !isCheckingAvailability()
                   ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed')
               "
             >
-              <lucide-angular
-                [img]="FileSpreadsheet"
-                [size]="24"
-              ></lucide-angular>
-              Exportar Citas
+              @if (isCheckingAvailability()) {
+                <span
+                  class="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"
+                ></span>
+                Verificando...
+              } @else {
+                <lucide-angular
+                  [img]="FileSpreadsheet"
+                  [size]="24"
+                ></lucide-angular>
+                Exportar Citas
+              }
             </button>
             @if (!filterDate()) {
               <p
@@ -503,7 +510,70 @@
     }
   </div>
 </div>
+<!-- ── Modal advertencia disponibilidad ── -->
+@if (showAvailabilityWarning()) {
+  <div
+    class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+  >
+    <div class="bg-white rounded-xl max-w-md w-full shadow-2xl">
+      <!-- Header -->
+      <div
+        class="bg-amber-500 text-white px-8 py-5 rounded-t-xl flex items-center justify-between"
+      >
+        <div class="flex items-center gap-3">
+          <lucide-angular [img]="Calendar" [size]="28"></lucide-angular>
+          <h2 class="text-2xl font-bold">Franjas disponibles</h2>
+        </div>
+        <button
+          (click)="showAvailabilityWarning.set(false)"
+          class="text-white hover:bg-white/20 rounded-lg w-9 h-9 flex items-center justify-center text-xl transition-colors"
+        >
+          ×
+        </button>
+      </div>
 
+      <div class="px-8 py-6">
+        <!-- Aviso -->
+        <div
+          class="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-xl px-5 py-4 mb-6"
+        >
+          <lucide-angular
+            [img]="Calendar"
+            [size]="22"
+            class="text-amber-600 mt-0.5 shrink-0"
+          ></lucide-angular>
+          <div>
+            <p class="text-amber-800 font-semibold text-base">
+              Aún hay franjas horarias disponibles
+            </p>
+            <p class="text-amber-700 text-sm mt-1">
+              Para el <strong>{{ formatDate(filterDate()) }}</strong> todavía
+              existen horarios disponibles para agendar citas. ¿Está seguro de
+              que desea exportar el reporte en este momento?
+            </p>
+          </div>
+        </div>
+
+        <!-- Botones -->
+        <div class="flex gap-3">
+          <button
+            (click)="showAvailabilityWarning.set(false)"
+            class="flex-1 px-6 py-3.5 border border-gray-300 text-gray-700 rounded-lg text-base font-semibold hover:bg-gray-50 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            (click)="confirmExportDespiteAvailability()"
+            class="flex-1 px-6 py-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2"
+          >
+            <lucide-angular [img]="Download" [size]="20"></lucide-angular>
+            Sí, continuar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
 <!-- ── Modal de Exportación ── -->
 @if (showExportModal()) {
   <div
