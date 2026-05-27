@@ -4,9 +4,10 @@
     <div class="mb-6">
       <button
         (click)="goBack()"
-        class="flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-4 transition-colors cursor-pointer"
+        class="flex items-center gap-2 text-blue-600 text-lg hover:text-blue-800 mb-4 transition-colors cursor-pointer"
       >
-        ← Volver al inicio
+        <lucide-angular [img]="ArrowLeft" [size]="20"></lucide-angular>
+         Volver al inicio
       </button>
       <h1 class="text-blue-800 text-3xl font-bold">Nueva Cita</h1>
       <p class="text-gray-500 text-lg mt-1">Agende una cita médica</p>
