@@ -63,7 +63,7 @@ export class PatientAppointmentHistoryComponent implements OnInit {
     AGENDADA: 'bg-green-100 text-green-700',
     ATENDIDA: 'bg-blue-100 text-blue-700',
     CANCELADA: 'bg-red-100 text-red-700',
-    NO_ASISTIO: 'bg-gray-100 text-gray-600',
+    NO_ASISTIO: 'bg-orange-100 text-orange-700',
     REPROGRAMADA: 'bg-yellow-100 text-yellow-700',
   };
 
