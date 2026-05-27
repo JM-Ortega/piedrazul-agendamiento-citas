@@ -46,15 +46,6 @@
     directory_mode: "0750"
     mode: "0640"
 
-- name: Copiar directorio postgres
-  ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../../postgres/"
-    dest: "{{ app_dir }}/postgres/"
-    owner: ansible
-    group: ansible
-    directory_mode: "0755"
-    mode: "0755"
-
 # .env
 - name: Generar .env desde template
   ansible.builtin.template:
