@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.clinicalHistory.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
-import co.edu.unicauca.piedrazul.backend.appointment.dto.AppointmentExternalData;
+import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalData;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.ClinicalHistoryExternalService;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.input.ClinicalHistoryRequest;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.output.ClinicalHistoryResponse;
@@ -9,7 +9,7 @@ import co.edu.unicauca.piedrazul.backend.clinicalHistory.domain.ClinicalHistory;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.infrastructure.persistence.ClinicalHistoryRepository;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -39,36 +39,21 @@ public class ClinicalHistoryExternalServiceImpl implements ClinicalHistoryExtern
             throw new IllegalStateException("Solo se puede generar una historia clínica de una cita atendida");
         }
 
-        LocalDateTime attendedAt = LocalDateTime.of(
-                appointmentData.date(),
-                appointmentData.startTime()
-        );
+
 
         ClinicalHistory clinicalHistory = new ClinicalHistory(
                 request.idAppointment(),
                 appointmentData.idDoctor(),
                 appointmentData.idPatient(),
-                attendedAt,
+                appointmentData.date(),
                 request.description()
         );
 
         ClinicalHistory saved = repository.save(clinicalHistory);
 
-        return toResponse(saved, appointmentData);
+        return toResponse(saved, appointmentData.doctorName());
     }
 
-    @Override
-    public ClinicalHistoryResponse getByAppointment(UUID idAppointment) {
-
-        ClinicalHistory clinicalHistory = repository.findByIdAppointment(idAppointment)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "No existe historia clínica para esta cita"));
-
-        AppointmentExternalData appointmentData = appointmentExternalService
-                .getAppointmentData(idAppointment);
-
-        return toResponse(clinicalHistory, appointmentData);
-    }
 
     @Override
     public List<ClinicalHistoryResponse> getHistoryByPatient(UUID idPatient) {
@@ -77,20 +62,16 @@ public class ClinicalHistoryExternalServiceImpl implements ClinicalHistoryExtern
                 .map(ch -> {
                     AppointmentExternalData appointmentData = appointmentExternalService
                             .getAppointmentData(ch.getIdAppointment());
-                    return toResponse(ch, appointmentData);
+                    return toResponse(ch, appointmentData.doctorName());
                 })
                 .toList();
     }
 
     private ClinicalHistoryResponse toResponse(ClinicalHistory ch,
-                                               AppointmentExternalData appointmentData) {
+                                               String doctorName) {
         return new ClinicalHistoryResponse(
-                ch.getIdClinicalHistory(),
-                ch.getIdAppointment(),
-                ch.getIdDoctor(),
-                appointmentData.doctorName(),
-                ch.getIdPatient(),
                 ch.getAttendedAt(),
+                doctorName,
                 ch.getDescription()
         );
     }

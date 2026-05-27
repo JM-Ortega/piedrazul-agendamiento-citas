@@ -9,9 +9,6 @@ import java.util.UUID;
 
 public interface ClinicalHistoryRepository extends JpaRepository<ClinicalHistory, UUID> {
 
-    //Para consultar la HC de una cita especifica
-    Optional<ClinicalHistory> findByIdAppointment(UUID idAppointment);
-
     //Para consultar el HC completo de un paciente
     List<ClinicalHistory> findByIdPatient(UUID idPatient);
 

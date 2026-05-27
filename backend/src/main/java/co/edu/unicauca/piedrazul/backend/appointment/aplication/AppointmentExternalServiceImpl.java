@@ -3,7 +3,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.aplication;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
-import co.edu.unicauca.piedrazul.backend.appointment.dto.AppointmentExternalData;
+import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalData;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -11,7 +11,7 @@ import java.util.UUID;
 @Service
 public class AppointmentExternalServiceImpl implements AppointmentExternalService {
 
-    private AppointmentRepository appointmentRepository;
+    private final AppointmentRepository appointmentRepository;
 
     public AppointmentExternalServiceImpl(AppointmentRepository appointmentRepository) {
         this.appointmentRepository = appointmentRepository;
@@ -29,8 +29,7 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
                 appointment.getDoctorName(),
                 appointment.getIdPatient(),
                 appointment.getAppointmentState().name(),
-                appointment.getDate(),
-                appointment.getStartTime().getTime() // ← aquí tengo una duda
+                appointment.getDate()
         );
     }
 

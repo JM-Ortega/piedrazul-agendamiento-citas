@@ -2,7 +2,7 @@ package co.edu.unicauca.piedrazul.backend.clinicalHistory.domain;
 
 import jakarta.persistence.*;
 import lombok.Getter;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Getter
@@ -25,7 +25,7 @@ public class ClinicalHistory {
     private UUID idPatient;
 
     @Column(name = "attended_at", nullable = false, updatable = false)
-    private LocalDateTime attendedAt;
+    private LocalDate attendedAt;
 
     @Column(name = "description", nullable = false, updatable = false, length = 500)
     private String description;
@@ -33,7 +33,7 @@ public class ClinicalHistory {
     protected ClinicalHistory() {}
 
     public ClinicalHistory(UUID idAppointment, UUID idDoctor, UUID idPatient,
-                           LocalDateTime attendedAt, String description) {
+                           LocalDate attendedAt, String description) {
         this.idAppointment = idAppointment;
         this.idDoctor = idDoctor;
         this.idPatient = idPatient;

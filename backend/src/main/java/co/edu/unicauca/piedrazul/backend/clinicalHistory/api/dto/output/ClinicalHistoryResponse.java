@@ -1,14 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.output;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
+import java.time.LocalDate;
 
 public record ClinicalHistoryResponse(
-        UUID idClinicalHistory,
-        UUID idAppointment,
-        UUID idDoctor,
+        LocalDate attendedAt,
         String doctorName,
-        UUID idPatient,
-        LocalDateTime attendedAt,
         String description
 ) {}

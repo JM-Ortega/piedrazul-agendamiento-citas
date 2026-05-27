@@ -15,8 +15,6 @@ public interface ClinicalHistoryExternalService {
 
     ClinicalHistoryResponse registerClinicalHistory(ClinicalHistoryRequest request);
 
-    ClinicalHistoryResponse getByAppointment(UUID idAppointment);
-
     List<ClinicalHistoryResponse> getHistoryByPatient(UUID idPatient);
 
 
