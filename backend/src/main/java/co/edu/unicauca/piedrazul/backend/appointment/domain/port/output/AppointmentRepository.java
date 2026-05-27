@@ -11,7 +11,6 @@ public interface AppointmentRepository {
     // Metodos que solo hablan en terminos del dominio
     Appointment save(Appointment appointment);
 
-
     List<Appointment> findByDoctorId(UUID idDoctor);
 
     List<Appointment> findByPatientId(UUID idPatient);
