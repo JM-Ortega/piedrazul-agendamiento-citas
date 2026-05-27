@@ -4,16 +4,16 @@ on:
   push:
     branches:
       - main
+      - feat/repo-structure-cicd
     paths:
       - "infra/terraform/live/prod/**"
       - "infra/terraform/modules/hetzner/**"
-      - "infra/terraform/modules/dns/**"
-      - "infra/terraform/modules/pages/**"
+      - "infra/terraform/modules/cloudflare/**"
       - ".github/workflows/terraform-hetzner-*.yml"
   workflow_dispatch:
 
 concurrency:
-  group: terraform-hetzner-main
+  group: piedrazul-production-hetzner
   cancel-in-progress: false
 
 env:
