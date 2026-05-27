@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.patients.application;
 
+import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -245,6 +247,10 @@ public class PatientService implements PatientModuleApi {
                 .stream()
                 .map(this::toData)
                 .toList();
+    }
+
+    public List<DocumentType> getAllDocumentTypes(){
+        return Arrays.asList(DocumentType.values());
     }
 
     private void ensurePatientDoesNotExist(String documentNumber) {

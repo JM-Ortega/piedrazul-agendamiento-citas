@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.patients.api;
 
+import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.ConfirmLinkUserAccountRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.CreatePatientRequest;
@@ -131,6 +132,11 @@ public class PatientController {
     @GetMapping("/document/{documentNumber}/public")
     public PatientPublicResponse findPublicByDocument(@PathVariable String documentNumber) {
         return patientService.findPublicByDocumentNumber(documentNumber);
+    }
+
+    @GetMapping("/document-types")
+    public List<DocumentType> findAllDocumentTypes() {
+        return patientService.getAllDocumentTypes();
     }
 
     private PatientResponse toResponse(PatientData patient) {

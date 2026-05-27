@@ -41,5 +41,4 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
                         a.getAppointmentState().name()
                 )).toList();
     }
-
 }
