@@ -18,33 +18,37 @@ import {
   UserCircle,
 } from 'lucide-angular';
 import { SchedulerService } from '../../core/services/scheduler.service';
-import { ExportModalComponent } from '../../design-system/organisms/export-modal/export-modal.component';
+import { AppointmentExportRequest } from '../../shared/models/dtos/AppointmentExportRequest.dto';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
+import { ExportFormatBackend } from '../../shared/models/types/ExportFormatBackend.type';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
-type ExportColumnKey =
-  | 'date'
-  | 'time'
-  | 'patient'
-  | 'documentId'
-  | 'phone'
-  | 'doctor'
-  | 'specialty'
-  | 'status';
 
-type ExportColumns = Record<ExportColumnKey, boolean>;
+type ExportFormat = 'excel' | 'pdf' | 'csv';
 
-interface ColumnDef {
-  key: ExportColumnKey;
-  label: string;
-  icon: any;
-}
+const FORMAT_MAP: Record<ExportFormat, ExportFormatBackend> = {
+  excel: 'EXCEL',
+  pdf: 'PDF',
+  csv: 'CSV',
+};
+
+const MIME_MAP: Record<ExportFormat, string> = {
+  excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pdf: 'application/pdf',
+  csv: 'text/csv;charset=utf-8;',
+};
+
+const EXT_MAP: Record<ExportFormat, string> = {
+  excel: 'xlsx',
+  pdf: 'pdf',
+  csv: 'csv',
+};
 
 @Component({
   selector: 'app-scheduler-dashboard',
   templateUrl: './scheduler-dashboard.component.html',
   standalone: true,
-  imports: [RouterLink, LucideAngularModule, ExportModalComponent, FormatoPipe],
+  imports: [RouterLink, LucideAngularModule, FormatoPipe],
 })
 export class SchedulerDashboardComponent implements OnInit {
   private schedulerService = inject(SchedulerService);
@@ -73,6 +77,7 @@ export class SchedulerDashboardComponent implements OnInit {
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   })();
+
   dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   monthNames = [
     'enero',
@@ -102,28 +107,11 @@ export class SchedulerDashboardComponent implements OnInit {
 
   // ── Export signals ────────────────────────────────────────────────────────
   showExportModal = signal(false);
-
-  readonly columnDefs: ColumnDef[] = [
-    { key: 'date', label: 'Fecha de la Cita', icon: Calendar },
-    { key: 'time', label: 'Hora de la Cita', icon: Clock },
-    { key: 'patient', label: 'Nombre del Paciente', icon: UserCircle },
-    { key: 'documentId', label: 'Documento de Identidad', icon: CreditCard },
-    { key: 'phone', label: 'Teléfono del Paciente', icon: Phone },
-    { key: 'doctor', label: 'Nombre del Médico', icon: Stethoscope },
-    { key: 'specialty', label: 'Especialidad', icon: Tag },
-    { key: 'status', label: 'Estado de la Cita', icon: CheckCircle },
-  ];
+  exportFormat = signal<ExportFormat>('excel');
+  isExporting = signal(false);
+  exportError = signal<string | null>(null);
 
   // ── Computed ──────────────────────────────────────────────────────────────
-  hasTodayAppointments = computed(() => {
-    const doctorFilter = this.filterDoctor();
-    return this.appointments().some(
-      (a) =>
-        a.date === this.today &&
-        a.appointmentState !== 'CANCELADA' &&
-        (doctorFilter ? a.doctorName === doctorFilter : true),
-    );
-  });
   selectedDoctor = computed(() =>
     this.doctors().find((d) => d.name === this.filterDoctor()),
   );
@@ -168,6 +156,35 @@ export class SchedulerDashboardComponent implements OnInit {
     this.results().filter((a) => a.appointmentState !== 'CANCELADA'),
   );
 
+  exportColors = computed(() => {
+    switch (this.exportFormat()) {
+      case 'excel':
+        return {
+          header: 'bg-green-700',
+          border: 'border-green-600',
+          bg: 'bg-green-50',
+          icon: 'text-green-600',
+          button: 'bg-green-600 hover:bg-green-700',
+        };
+      case 'pdf':
+        return {
+          header: 'bg-red-700',
+          border: 'border-red-600',
+          bg: 'bg-red-50',
+          icon: 'text-red-600',
+          button: 'bg-red-600 hover:bg-red-700',
+        };
+      default:
+        return {
+          header: 'bg-orange-700',
+          border: 'border-orange-600',
+          bg: 'bg-orange-50',
+          icon: 'text-orange-600',
+          button: 'bg-orange-600 hover:bg-orange-700',
+        };
+    }
+  });
+
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.schedulerService
@@ -183,12 +200,15 @@ export class SchedulerDashboardComponent implements OnInit {
   setViewMode(mode: 'all' | 'today'): void {
     this.viewMode.set(mode);
   }
+
   clearDoctorFilter(): void {
     this.filterDoctor.set('');
   }
+
   clearDateFilter(): void {
     this.filterDate.set('');
   }
+
   clearStatusFilter(): void {
     this.filterStatus.set('');
   }
@@ -213,6 +233,53 @@ export class SchedulerDashboardComponent implements OnInit {
     });
   }
 
+  // ── Export ────────────────────────────────────────────────────────────────
+  openExportModal(): void {
+    this.exportError.set(null);
+    this.exportFormat.set('excel');
+    this.showExportModal.set(true);
+  }
+
+  closeExportModal(): void {
+    this.showExportModal.set(false);
+    this.exportError.set(null);
+  }
+
+  handleExport(): void {
+    const date = this.filterDate();
+    if (!date) return;
+
+    this.isExporting.set(true);
+    this.exportError.set(null);
+
+    const fmt = this.exportFormat();
+    const payload: AppointmentExportRequest = {
+      date,
+      format: FORMAT_MAP[fmt],
+    };
+
+    this.schedulerService.exportScheduler(payload).subscribe({
+      next: (blob) => {
+        const typedBlob = new Blob([blob], { type: MIME_MAP[fmt] });
+        const url = URL.createObjectURL(typedBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `agenda-${date}.${EXT_MAP[fmt]}`;
+        link.click();
+        URL.revokeObjectURL(url);
+        this.isExporting.set(false);
+        this.closeExportModal();
+      },
+      error: () => {
+        this.exportError.set(
+          'Ocurrió un error al generar el reporte. Intente nuevamente.',
+        );
+        this.isExporting.set(false);
+      },
+    });
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
   formatDate(dateStr: string): string {
     const d = new Date(dateStr + 'T12:00:00');
     return `${this.dayNames[d.getDay()]} ${d.getDate()} de ${this.monthNames[d.getMonth()]} de ${d.getFullYear()}`;
