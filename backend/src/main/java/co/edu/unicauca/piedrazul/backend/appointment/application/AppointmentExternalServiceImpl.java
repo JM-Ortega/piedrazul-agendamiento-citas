@@ -76,7 +76,7 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
                     return true;
                 }
             } catch (RuntimeException e) {
-                // El doctor no trabaja este día. Ignoramos el error y el "for" pasa al siguiente doctor.
+                // El doctor no trabaja este día. Ignoramos el error y el for pasa al siguiente doctor.
             }
         }
         return false;
