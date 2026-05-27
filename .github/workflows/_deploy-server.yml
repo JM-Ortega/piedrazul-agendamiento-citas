@@ -355,8 +355,14 @@ jobs:
   host_config:
     name: Configurar servidor
     runs-on: ubuntu-latest
-    needs: [infra, inventory, readiness]
-    if: inputs.run_host_config == true
+    needs: [infra, inventory, readiness, postgres_build]
+    if: |
+      always() &&
+      inputs.run_host_config == true &&
+      needs.infra.result == 'success' &&
+      needs.inventory.result == 'success' &&
+      needs.readiness.result == 'success' &&
+      (needs.postgres_build.result == 'success' || needs.postgres_build.result == 'skipped')
     timeout-minutes: 30
     environment: ${{ inputs.github_environment }}
     env:
@@ -402,9 +408,11 @@ jobs:
           ansible-playbook \
             -i infra/ansible/inventories/prod \
             -i hosts.runtime.yml \
+            -e "postgres_image_tag=${POSTGRES_IMAGE_TAG}" \
             infra/ansible/playbooks/converge.yml
         env:
           ANSIBLE_HOST_KEY_CHECKING: "False"
+          POSTGRES_IMAGE_TAG: ${{ needs.postgres_build.outputs.image_tag }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
           KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
