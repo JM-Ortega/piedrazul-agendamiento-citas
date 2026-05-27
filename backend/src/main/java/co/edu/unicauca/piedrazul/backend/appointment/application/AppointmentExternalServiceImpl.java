@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentSummary;
+import co.edu.unicauca.piedrazul.backend.appointment.SchedulerAppointmentSummary;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
@@ -41,6 +42,25 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
                         a.getSpecialty().name(),
                         a.getAppointmentState().name()
                 )).toList();
+    }
+
+
+    @Override
+    public List<SchedulerAppointmentSummary> findAllByDate(LocalDate date) {
+
+        return appointmentRepository.findAllByDate(date)
+                .stream()
+                .map(a -> new SchedulerAppointmentSummary(
+                        a.getDoctorName(),
+                        a.getPatientName(),
+                        a.getStartTime().getTime()
+                ))
+                .toList();
+    }
+
+    @Override
+    public boolean hasAvailableSlots(LocalDate date){
+        return true;
     }
 
 }

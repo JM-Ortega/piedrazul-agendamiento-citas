@@ -30,4 +30,6 @@ public interface AppointmentRepository {
 
     List<Appointment> findAll();
 
+    List<Appointment> findAllByDate(LocalDate date);
+
 }
