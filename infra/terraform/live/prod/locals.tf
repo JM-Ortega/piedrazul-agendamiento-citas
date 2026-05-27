@@ -5,5 +5,5 @@ locals {
   pages_name    = var.project
 
   # Dominios derivados a partir de base_domain
-  frontend_domain = "${var.project}.${var.base_domain}"
+  frontend_domain = var.base_domain
 }
