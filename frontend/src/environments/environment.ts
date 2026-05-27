@@ -1,8 +1,8 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://api.piedrazul.narvaezlab.dev/api',
+  apiUrl: 'https://api.piedrazul.org/api',
   keycloak: {
-    url: 'https://auth.piedrazul.narvaezlab.dev',
+    url: 'https://auth.piedrazul.org',
     realm: 'piedrazul',
     clientId: 'piedrazul-frontend',
   },

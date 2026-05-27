@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.patients.api.dto;
+package co.edu.unicauca.piedrazul.backend.patients.api.dto.input;
 
 import co.edu.unicauca.piedrazul.backend.jackson.normalization.NormalizeName;
 import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
@@ -67,7 +67,7 @@ public class CreatePatientWithUserRequest {
     private String guardianPhone;
 
     @NotBlank
-    @Size(min = 8, max = 100)
+    @Size(min = 6, max = 100)
     private String password;
 
     public String getUsername() {

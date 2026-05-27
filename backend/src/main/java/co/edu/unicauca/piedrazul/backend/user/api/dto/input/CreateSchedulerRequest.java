@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.admin.api.dto;
+package co.edu.unicauca.piedrazul.backend.user.api.dto.input;
 
 public record CreateSchedulerRequest(
         String documentId,

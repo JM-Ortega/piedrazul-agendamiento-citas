@@ -1,8 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.port.output;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientRegistrationData;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientSnapshot;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.PatientRegistrationData;
 
 import java.util.Optional;
 import java.util.UUID;

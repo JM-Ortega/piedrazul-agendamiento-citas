@@ -4,7 +4,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequ
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.CreatePatientWithUserRequest;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.CreatePatientWithUserRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;

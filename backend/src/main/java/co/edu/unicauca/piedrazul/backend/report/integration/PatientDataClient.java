@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.report.integration;
 
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientData;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;

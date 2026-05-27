@@ -1,6 +1,14 @@
 package co.edu.unicauca.piedrazul.backend.patients.api;
 
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.*;
+import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.ConfirmLinkUserAccountRequest;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.CreatePatientRequest;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.CreatePatientWithUserRequest;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.RequestLinkUserAccountCodeRequest;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientPublicResponse;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientResponse;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientSummaryResponse;
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientService;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import jakarta.validation.Valid;
@@ -124,6 +132,11 @@ public class PatientController {
     @GetMapping("/document/{documentNumber}/public")
     public PatientPublicResponse findPublicByDocument(@PathVariable String documentNumber) {
         return patientService.findPublicByDocumentNumber(documentNumber);
+    }
+
+    @GetMapping("/document-types")
+    public List<DocumentType> findAllDocumentTypes() {
+        return patientService.getAllDocumentTypes();
     }
 
     private PatientResponse toResponse(PatientData patient) {

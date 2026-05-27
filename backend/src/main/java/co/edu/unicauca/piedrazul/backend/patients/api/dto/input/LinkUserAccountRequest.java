@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.patients.api.dto;
+package co.edu.unicauca.piedrazul.backend.patients.api.dto.input;
 
 import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
 import jakarta.validation.constraints.Email;
@@ -38,7 +38,7 @@ public class LinkUserAccountRequest {
     private String email;
 
     @NotBlank
-    @Size(min = 8, max = 100)
+    @Size(min = 6, max = 100)
     private String password;
 
     public LinkUserAccountRequest() {}
