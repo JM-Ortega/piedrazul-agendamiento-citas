@@ -20,7 +20,7 @@ module "server" {
 }
 
 module "pages" {
-  source = "../../modules/pages"
+  source = "../../modules/cloudflare/pages"
 
   account_id        = var.cloudflare_account_id
   project_name      = local.pages_name
@@ -34,7 +34,7 @@ module "pages" {
 }
 
 module "dns" {
-  source = "../../modules/dns"
+  source = "../../modules/cloudflare/dns"
 
   zone_id         = var.cloudflare_zone_id
   server_ip       = module.server.ipv4_address

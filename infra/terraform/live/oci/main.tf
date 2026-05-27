@@ -39,7 +39,7 @@ module "server" {
 # ── DNS — apunta los subdominios al servidor OCI ──────────────────────────────
 
 module "dns" {
-  source = "../../modules/dns"
+  source = "../../modules/cloudflare/dns"
 
   zone_id        = var.cloudflare_zone_id
   project        = "${var.project}-oci"
@@ -51,7 +51,7 @@ module "dns" {
 # ── Pages — frontend en Cloudflare ───────────────────────────────────────────
 
 module "pages" {
-  source = "../../modules/pages"
+  source = "../../modules/cloudflare/pages"
 
   account_id    = var.cloudflare_account_id
   project_name  = "${var.project}-oci"
