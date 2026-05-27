@@ -1,45 +1,92 @@
 import { Routes } from '@angular/router';
-import { AuthGuard } from './guards/auth.guard';
+import { AuthGuard } from './core/guards/auth.guard';
 
-import { AccesoComponent } from './pages/acceso/acceso.component';
-import { AdminConfigComponent } from './pages/admin/admin-config.component';
-import { SchedulerDashboardComponent } from './pages/agendador/scheduler-dashboard.component';
-import { HomeComponent } from './pages/home/home.component';
-import { NewAppointmentSchedulerComponent } from './pages/nueva-cita/new-appointment-scheduler.component';
-import { PatientNewAppointmentComponent } from './pages/paciente-agendar/patient-new-appointment.component';
-import { PatientDashboardComponent } from './pages/paciente/patient-dashboard.component';
+import { AccesoComponent } from './design-system/pages/acceso/acceso.component';
+import { HomeComponent } from './design-system/pages/home/home.component';
+import { AdminConfigComponent } from './features/admin/components/admin-orquestador/admin-config.component';
+import { AdminCreateUserComponent } from './features/admin/pages/admin-create-user/admin-create-user.component';
+import { AdminUsersComponent } from './features/admin/pages/admin-users/admin-users.component';
+import { NewAppointmentSchedulerComponent } from './features/appointment/pages/agendador-agendar/new-appointment-scheduler.component';
+import { NewAppointmentDoctorComponent } from './features/appointment/pages/doctor-agendar/new-appointment-doctor.component';
+import { PatientNewAppointmentComponent } from './features/appointment/pages/paciente-agendar/patient-new-appointment.component';
+import { DoctorAllAppointmentsComponent } from './features/doctor/doctor-all-appointments/doctor-all-appointments.component';
+import { DoctorDashboardComponent } from './features/doctor/doctor-dashboard/doctor-dashboard.component';
+import { PatientDashboardComponent } from './features/patient/patient-dashboard/patient-dashboard.component';
+import { RegistroComponent } from './features/registro/registro.component';
+import { SchedulerDashboardComponent } from './features/scheduler-dashboard/scheduler-dashboard.component';
+import { PatientAppointmentHistoryComponent } from './features/patient/patient-appointment-history/patient-appointment-history.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
   { path: 'acceso', component: AccesoComponent },
+
   {
     path: 'agendador',
     component: SchedulerDashboardComponent,
     canActivate: [AuthGuard],
-    data: { role: 'scheduler' },
+    data: { role: 'SCHEDULER' },
   },
   {
     path: 'agendador/nueva',
     component: NewAppointmentSchedulerComponent,
     canActivate: [AuthGuard],
-    data: { role: 'scheduler' },
+    data: { role: 'SCHEDULER' },
   },
   {
     path: 'admin',
     component: AdminConfigComponent,
     canActivate: [AuthGuard],
-    data: { role: 'admin' },
-  },
-  { path: 'paciente/agendar', 
-    component: PatientNewAppointmentComponent ,
-    canActivate: [AuthGuard],
-    data: { role: 'patient' },
+    data: { role: 'ADMIN' },
   },
   {
-    path: 'paciente', 
-    component:  PatientDashboardComponent,
+    path: 'admin/usuarios',
+    component: AdminUsersComponent,
     canActivate: [AuthGuard],
-    data: { role: 'patient' },
+    data: { role: 'ADMIN' },
   },
+  {
+    path: 'admin/usuarios/crear',
+    component: AdminCreateUserComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'ADMIN' },
+  },
+  {
+    path: 'medico',
+    component: DoctorDashboardComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'DOCTOR' },
+  },
+  {
+    path: 'medico/citas',
+    component: DoctorAllAppointmentsComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'DOCTOR' },
+  },
+  {
+    path: 'medico/nueva-cita',
+    component: NewAppointmentDoctorComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'DOCTOR' },
+  },
+  {
+    path: 'paciente/agendar',
+    component: PatientNewAppointmentComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'PATIENT' },
+  },
+  {
+    path: 'paciente',
+    component: PatientDashboardComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'PATIENT' },
+  },
+  {
+    path: 'paciente/historial-citas',
+    component: PatientAppointmentHistoryComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'PATIENT' },
+  },
+  { path: 'registro', component: RegistroComponent },
+
   { path: '**', redirectTo: '' },
 ];

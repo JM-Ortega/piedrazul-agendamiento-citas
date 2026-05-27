@@ -1,8 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.port.output;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -10,9 +12,7 @@ import java.util.UUID;
 public interface AppointmentRepository {
 
     // Metodos que solo hablan en terminos del dominio
-    void save(Appointment appointment);
-
-    Optional<Appointment> findById(UUID id);
+    Appointment save(Appointment appointment);
 
     //metodo para el modulo de historia clinica
     List<Appointment> findByDoctorId(UUID idDoctor);
@@ -23,14 +23,18 @@ public interface AppointmentRepository {
 
     List<Appointment> findByDoctorIdAndDate(UUID idDoctor, LocalDate date);
 
+    List<Appointment> findByDoctorIdAndDateAndState(UUID idDoctor, LocalDate date, String state);
+
     List<Appointment> findByPatientIdAndDate(UUID idPatient, LocalDate date);
 
     List<Appointment> findByDoctorIdAndPatientId(UUID idDoctor, UUID idPatient);
 
     List<Appointment> findByDoctorIdAndPatientIdAndDate(UUID idDoctor, UUID idPatient, LocalDate date);
 
+    boolean existsByPatientIdAndStates(UUID idPatient, Collection<AppointmentState> states);
+
     List<Appointment> findAll();
 
-
+    Appointment findById(UUID appointmentId);
 
 }

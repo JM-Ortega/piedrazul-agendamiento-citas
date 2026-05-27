@@ -341,5 +341,16 @@ dist/
 # logs
 *.log
 
+# ignorar todo el dist de keycloak
+infra/keycloak/themes/dist/*
+
+# reabrir carpeta dist
+!infra/keycloak/themes/dist/
+
+# reabrir subcarpetas
+!infra/keycloak/themes/dist/**/
+
+# permitir jars en cualquier nivel dentro de dist
+!infra/keycloak/themes/dist/**/*.jar
 
 # Edit at https://www.toptal.com/developers/gitignore?templates=java,node,angular,jetbrains,visualstudiocode

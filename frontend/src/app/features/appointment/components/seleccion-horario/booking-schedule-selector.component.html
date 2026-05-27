@@ -1,0 +1,81 @@
+<div class="space-y-6">
+  <h2 class="text-blue-800 text-2xl mb-2">Seleccionar Horario</h2>
+
+  @if (state.effectiveDoctor(); as doctor) {
+    <div class="flex items-center gap-2 text-sm text-gray-500">
+      <lucide-angular [img]="UserSearch" [size]="16"></lucide-angular>
+      <span>{{ doctor.name }} · {{ state.selectedSpecialty() | formato }}</span>
+    </div>
+  }
+
+  <div>
+    <label class="block text-gray-700 mb-2 font-medium">Fecha *</label>
+    <mat-form-field appearance="outline" class="w-full">
+      <input
+        matInput
+        [matDatepicker]="picker"
+        [matDatepickerFilter]="dateFilter()"
+        [min]="minDate()"
+        [max]="maxDate()"
+        [value]="state.selectedDate()"
+        (dateChange)="onDateSelected($event.value)"
+        placeholder="mm/dd/aaaa"
+        readonly
+      />
+      <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker #picker></mat-datepicker>
+    </mat-form-field>
+    <p class="text-xs text-gray-400 -mt-4">
+      Solo se muestran días hábiles del médico, excluyendo fines de semana y festivos colombianos.
+    </p>
+  </div>
+
+  @if (state.selectedDate()) {
+    <div class="bg-blue-50 rounded-xl px-4 py-3 text-blue-800 font-medium">
+      📅 {{ state.confirmDate() }}
+    </div>
+  }
+
+  @if (state.availableSlots().length > 0) {
+    <div>
+      <label class="block text-gray-700 mb-2 font-medium">Hora *</label>
+      <div class="grid grid-cols-4 sm:grid-cols-5 gap-2">
+        @for (slot of state.availableSlots(); track slot) {
+          <button
+            (click)="state.selectedTime.set(slot)"
+            class="py-3 rounded-xl border-2 text-base font-semibold transition-colors"
+            [ngClass]="{
+              'border-blue-500 bg-blue-600 text-white':              state.selectedTime() === slot,
+              'border-gray-200 hover:border-blue-400 text-blue-800': state.selectedTime() !== slot
+            }"
+          >
+            {{ slot.slice(0, 5) }}
+          </button>
+        }
+      </div>
+    </div>
+  }
+
+  @if (state.selectedDate() && noSlotsAvailable) {
+    <div class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm">
+      ⚠️ {{ errorMessageSlots }}
+    </div>
+  }
+
+  <div class="flex gap-4 mt-2">
+    <button
+      (click)="goBack()"
+      class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+    >
+      ← Atrás
+    </button>
+    <button
+      [disabled]="!state.canGoToConfirmStep()"
+      (click)="goToConfirm()"
+      class="flex-1 bg-blue-600 text-white py-3 rounded-xl disabled:opacity-50
+             hover:bg-blue-700 transition-colors"
+    >
+      Revisar Cita →
+    </button>
+  </div>
+</div>

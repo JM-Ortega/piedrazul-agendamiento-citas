@@ -1,12 +1,15 @@
 package co.edu.unicauca.piedrazul.backend.doctors.api;
 
-import co.edu.unicauca.piedrazul.backend.shared.BusinessException;
 import co.edu.unicauca.piedrazul.backend.shared.BaseExceptionHandler;
+import co.edu.unicauca.piedrazul.backend.shared.BusinessException;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorBusinessException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -70,27 +73,44 @@ public class DoctorGlobalExceptionHandler extends BaseExceptionHandler {
         );
     }
 
+    @ExceptionHandler(DoctorBusinessException.class)
+    public ProblemDetail handleBusinessException(
+            DoctorBusinessException ex,
+            HttpServletRequest request
+    ) {
+        log.warn("Error de negocio en doctors [{}]: {}", ex.getClass().getSimpleName(), ex.getMessage());
+
+        return buildProblem(
+                ex.getStatus(),
+                ex.getStatus().getReasonPhrase(),
+                ex.getMessage(),
+                ex.getModule(),
+                ex.getErrorCode(),
+                request
+        );
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ProblemDetail handleRuntime(
             RuntimeException ex,
             HttpServletRequest request
     ) {
-        String errorCode = (ex instanceof BusinessException be) ? be.getErrorCode() : "INTERNAL_ERROR";
-        HttpStatus status = (ex instanceof BusinessException be) ? be.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
-        String module = (ex instanceof BusinessException be) ? be.getModule() : "doctors";
-
-        if (status.is5xxServerError()) {
-            log.error("Error no controlado en doctors", ex);
-        } else {
-            log.warn("Error de negocio en doctors [{}]: {}", ex.getClass().getSimpleName(), ex.getMessage());
+        if (ex instanceof AuthorizationDeniedException authorizationDeniedException) {
+            throw authorizationDeniedException;
         }
 
+        if (ex instanceof AccessDeniedException accessDeniedException) {
+            throw accessDeniedException;
+        }
+
+        log.error("Error no controlado en doctors", ex);
+
         return buildProblem(
-                status,
-                status.getReasonPhrase(),
-                ex.getMessage(),
-                module,
-                errorCode,
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
+                "Unexpected error in doctors module",
+                "doctors",
+                "INTERNAL_ERROR",
                 request
         );
     }

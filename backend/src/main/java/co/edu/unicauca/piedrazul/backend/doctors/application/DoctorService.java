@@ -4,13 +4,13 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequ
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
-import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
-
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -35,7 +35,9 @@ public class DoctorService {
         Doctor doctor = new Doctor();
         doctor.setFirstName(request.firstName());
         doctor.setLastName(request.lastName());
+        doctor.setDocumentType(request.documentType());
         doctor.setIdentification(request.identification());
+        doctor.setPhone(request.phone());
         doctor.setSpecialty(request.specialty());
         doctor.setLaborStart(request.laborStart());
         doctor.setLaborEnd(request.laborEnd());
@@ -54,7 +56,13 @@ public class DoctorService {
         doctor.setSchedules(schedules);
 
         // 2. Crear el usuario
-        doctor.setIdUser(userModuleApi.createDoctorUser(request.identification()));
+        doctor.setIdUser(userModuleApi.getOrCreateDoctorUser(
+                request.identification(),
+                request.firstName(),
+                request.lastName(),
+                request.email(),
+                request.password()
+        ));
 
         // 3. Deshabilitar el usuario si el doctor no está activo
         if (!doctor.isStatus())
@@ -69,7 +77,7 @@ public class DoctorService {
 
     private boolean calculateActiveStatus(LocalDate start, LocalDate end) {
         if (start == null) {
-            throw new IllegalArgumentException("La fecha de inicio es obligatoria");
+            throw new DoctorValidationException("La fecha de inicio es obligatoria");
         }
 
         LocalDate today = LocalDate.now();
@@ -84,7 +92,7 @@ public class DoctorService {
     //Metodo para validar si el medico esta activo o no usarlo cada vez que ingrese el medico
     public void updateDoctorStatus(UUID idDoctor) {
         Doctor doctor = doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new RuntimeException("Doctor not found"));
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
         boolean isActive = calculateActiveStatus(doctor.getLaborStart(), doctor.getLaborEnd());
 
@@ -101,11 +109,11 @@ public class DoctorService {
     @Transactional
     public void updateDoctorLaborStart(UUID idDoctor, LocalDate newLaborStart) {
         if (newLaborStart == null) {
-            throw new IllegalArgumentException("La fecha de inicio es obligatoria");
+            throw new DoctorValidationException("La fecha de inicio es obligatoria");
         }
 
         Doctor doctor = doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new EntityNotFoundException("Doctor no encontrado"));
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
         if (doctor.getLaborEnd() != null && newLaborStart.isAfter(doctor.getLaborEnd())) {
             throw new DateConflictException("La fecha de inicio no puede ser posterior a la fecha de finalización");
@@ -122,11 +130,11 @@ public class DoctorService {
     @Transactional
     public void updateDoctorLaborEnd(UUID idDoctor, LocalDate newLaborEnd) {
         if (newLaborEnd == null) {
-            throw new IllegalArgumentException("La fecha de finalización es obligatoria");
+            throw new DoctorValidationException("La fecha de finalización es obligatoria");
         }
 
         Doctor doctor = doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new EntityNotFoundException("Doctor no encontrado"));
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
         if (doctor.getLaborStart() == null) {
             throw new DateConflictException("No se puede actualizar la fecha de finalización porque el médico no tiene fecha de inicio registrada");
@@ -147,11 +155,11 @@ public class DoctorService {
     @Transactional
     public void updateDoctorAppointmentInterval(UUID idDoctor, int newAppointmentInterval) {
         if (newAppointmentInterval <= 0) {
-            throw new IllegalArgumentException("El intervalo de atención debe ser mayor a 0");
+            throw new DoctorValidationException("El intervalo de atención debe ser mayor a 0");
         }
 
         Doctor doctor = doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new EntityNotFoundException("Doctor no encontrado"));
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
         // Evita intervalos imposibles para todos los horarios existentes.
         List<Schedule> schedules = doctor.getSchedules() == null ? List.of() : doctor.getSchedules();
@@ -172,11 +180,11 @@ public class DoctorService {
 
     // Habilitar medico
     @Transactional
-    public DoctorResponse enableDoctor(UUID idDoctor, LocalDate newStart, LocalDate newEnd) {
+    public void enableDoctor(UUID idDoctor, LocalDate newStart, LocalDate newEnd) {
         validateLaborDateRange(newStart, newEnd);
 
         Doctor doctor = doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new EntityNotFoundException("Doctor no encontrado"));
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
         // 1. Actualizamos el periodo laboral
         doctor.setLaborStart(newStart);
@@ -189,16 +197,15 @@ public class DoctorService {
         syncUserStatus(doctor);
 
         // 4. Guardamos y retornamos el DTO actualizado
-        Doctor savedDoctor = doctorRepository.save(doctor);
-        return DoctorResponse.fromEntity(savedDoctor);
+        doctorRepository.save(doctor);
     }
 
     //Deshabilitar medico
     @Transactional
-    public DoctorResponse disableDoctor(UUID idDoctor, boolean force) {
+    public void disableDoctor(UUID idDoctor, boolean force) {
         // 1. Buscar al doctor
         Doctor doctor = doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new EntityNotFoundException("Doctor no encontrado"));
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
         LocalDate today = LocalDate.now();
 
@@ -227,9 +234,7 @@ public class DoctorService {
         syncUserStatus(doctor);
 
         // 6. Persistir cambios
-        Doctor updatedDoctor = doctorRepository.save(doctor);
-
-        return DoctorResponse.fromEntity(updatedDoctor);
+        doctorRepository.save(doctor);
     }
 
     public List<Doctor> findAllDoctors() {
@@ -238,7 +243,15 @@ public class DoctorService {
 
     public Doctor getDoctorById(UUID idDoctor) {
         return doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new RuntimeException("Doctor not found"));
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
+    }
+
+    public Doctor findByUserId(UUID keycloakId) {
+        Doctor doctor = doctorRepository.findByIdUser(keycloakId);
+        if (doctor == null) {
+            throw new DoctorNotFoundException("Doctor no encontrado para el usuario autenticado");
+        }
+        return doctor;
     }
 
     public List<Doctor> getDoctorBySpeciality(Specialty specialty) {
@@ -259,10 +272,10 @@ public class DoctorService {
 
     private void validateLaborDateRange(LocalDate laborStart, LocalDate laborEnd) {
         if (laborStart == null) {
-            throw new IllegalArgumentException("La fecha de inicio es obligatoria");
+            throw new DoctorValidationException("La fecha de inicio es obligatoria");
         }
         if (laborEnd == null) {
-            throw new IllegalArgumentException("La fecha de finalización es obligatoria");
+            throw new DoctorValidationException("La fecha de finalización es obligatoria");
         }
         if (laborEnd.isBefore(laborStart)) {
             throw new DateConflictException("La fecha de finalización no puede ser anterior a la fecha de inicio");

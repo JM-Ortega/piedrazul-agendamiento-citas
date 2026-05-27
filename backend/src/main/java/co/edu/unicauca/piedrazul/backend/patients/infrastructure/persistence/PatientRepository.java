@@ -15,4 +15,6 @@ public interface PatientRepository extends JpaRepository<Patient, UUID> {
     boolean existsByDocumentNumberAndUserIdIsNotNull(String documentNumber);
 
     Optional<Patient> findByUserId(UUID userId);
+
+    java.util.List<Patient> findByDocumentNumberStartingWith(String documentNumberPrefix);
 }

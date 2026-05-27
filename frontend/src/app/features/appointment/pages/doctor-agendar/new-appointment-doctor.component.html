@@ -1,0 +1,33 @@
+<div class="min-h-screen bg-blue-50 py-8 px-4">
+  <div class="max-w-3xl mx-auto">
+
+    <div class="mb-6">
+      <button
+        (click)="goToDashboard()"
+        class="flex items-center gap-2 text-blue-600 text-lg hover:text-blue-800 mb-4 transition-colors cursor-pointer"
+      >
+      <lucide-angular [img]="ArrowLeft" [size]="20"></lucide-angular>
+       Volver al inicio
+      </button>
+
+      <h1 class="text-blue-800 text-3xl font-bold">Nueva Cita</h1>
+
+      @if (patientDocument()) {
+        <p class="text-gray-500 text-lg mt-1">
+          Agendando cita para el paciente con documento
+          <span class="font-semibold text-blue-700">{{ patientDocument() }}</span>
+        </p>
+      } @else {
+        <p class="text-gray-500 text-lg mt-1">Registre una cita para un paciente</p>
+      }
+    </div>
+
+    <app-appointment-booking
+      context="doctor"
+      [documentNumber]="patientDocument()"
+      (appointmentConfirmed)="onAppointmentConfirmed($event)"
+      (goBack)="goToDashboard()"
+    ></app-appointment-booking>
+
+  </div>
+</div>
