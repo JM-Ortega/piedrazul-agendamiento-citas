@@ -56,15 +56,62 @@
     mode: "0640"
   no_log: true
 
-# image.env — solo si no existe (deploy.yml lo actualiza con el tag real)
-- name: Copiar image.env al servidor
+# Resolver tags para image.env
+- name: Verificar image.env actual
+  ansible.builtin.stat:
+    path: "{{ app_dir }}/image.env"
+  register: image_env_stat
+
+- name: Leer image.env actual
+  ansible.builtin.slurp:
+    src: "{{ app_dir }}/image.env"
+  register: image_env_current
+  when: image_env_stat.stat.exists
+
+- name: Extraer IMAGE_TAG actual
+  ansible.builtin.set_fact:
+    current_image_tag: >-
+      {{
+        (image_env_current.content | b64decode | regex_search('(?m)^IMAGE_TAG=(.+)$', '\\1') | first)
+        if image_env_stat.stat.exists and
+           ((image_env_current.content | b64decode | regex_search('(?m)^IMAGE_TAG=(.+)$', '\\1')) is not none)
+        else ''
+      }}
+
+- name: Extraer POSTGRES_IMAGE_TAG actual
+  ansible.builtin.set_fact:
+    current_postgres_image_tag: >-
+      {{
+        (image_env_current.content | b64decode | regex_search('(?m)^POSTGRES_IMAGE_TAG=(.+)$', '\\1') | first)
+        if image_env_stat.stat.exists and
+           ((image_env_current.content | b64decode | regex_search('(?m)^POSTGRES_IMAGE_TAG=(.+)$', '\\1')) is not none)
+        else ''
+      }}
+
+- name: Resolver POSTGRES_IMAGE_TAG final
+  ansible.builtin.set_fact:
+    final_postgres_image_tag: >-
+      {{
+        postgres_image_tag
+        if (postgres_image_tag | default('') | length > 0)
+        else current_postgres_image_tag
+      }}
+
+- name: Validar que POSTGRES_IMAGE_TAG está disponible
+  ansible.builtin.fail:
+    msg: "No hay POSTGRES_IMAGE_TAG actual y postgres_image_tag vino vacío — corre con run_build_postgres=true"
+  when: final_postgres_image_tag | length == 0
+
+# Generar image.env con tags resueltos
+- name: Generar image.env con tags resueltos
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../../image.env"
     dest: "{{ app_dir }}/image.env"
     owner: ansible
     group: ansible
     mode: "0640"
-    force: false
+    content: |
+      IMAGE_TAG={{ current_image_tag | default('none', true) }}
+      POSTGRES_IMAGE_TAG={{ final_postgres_image_tag }}
 
 # Levantar solo infraestructura base (sin backend)
 - name: Levantar servicios de infraestructura
