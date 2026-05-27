@@ -3,14 +3,12 @@ package co.edu.unicauca.piedrazul.backend.doctors.application;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.*;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
-import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,7 +29,6 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class DoctorServiceTest {
-
 
     @Mock
     private DoctorRepository doctorRepository;
@@ -56,7 +53,9 @@ class DoctorServiceTest {
         CreateDoctorRequest request = new CreateDoctorRequest(
                 "Laura",
                 "Perez",
+                DocumentType.CEDULA,
                 "123456",
+                "3001234567",
                 List.of(Specialty.QUIROPRAXIA),
                 tomorrow,
                 endDate,
@@ -112,7 +111,9 @@ class DoctorServiceTest {
         CreateDoctorRequest request = new CreateDoctorRequest(
                 "Laura",
                 "Perez",
+                DocumentType.CEDULA,
                 "123456",
+                "3001234567",
                 List.of(Specialty.FISIOTERAPIA),
                 today,
                 endDate,
@@ -161,7 +162,9 @@ class DoctorServiceTest {
         CreateDoctorRequest request = new CreateDoctorRequest(
                 "Laura",
                 "Perez",
+                DocumentType.CEDULA,
                 "123456",
+                "3001234567",
                 List.of(Specialty.FISIOTERAPIA),
                 LocalDate.now(),
                 null,
@@ -172,8 +175,8 @@ class DoctorServiceTest {
         );
 
         assertThatThrownBy(() -> doctorService.createDoctor(request))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("fecha de finalización es obligatoria");
+                .isInstanceOf(DoctorValidationException.class)
+                .hasMessageContaining("La fecha de finalización es obligatoria");
 
         verify(doctorRepository, never()).save(any(Doctor.class));
         verify(userModuleApi, never()).getOrCreateDoctorUser(any(), any(), any(), any(), any());
@@ -184,7 +187,9 @@ class DoctorServiceTest {
         CreateDoctorRequest request = new CreateDoctorRequest(
                 "Laura",
                 "Perez",
+                DocumentType.CEDULA,
                 "123456",
+                "3001234567",
                 List.of(Specialty.FISIOTERAPIA),
                 LocalDate.now(),
                 LocalDate.now().minusDays(1),
@@ -370,7 +375,7 @@ class DoctorServiceTest {
         when(doctorRepository.findById(doctorId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> doctorService.updateDoctorLaborStart(doctorId, LocalDate.now()))
-                .isInstanceOf(EntityNotFoundException.class)
+                .isInstanceOf(DoctorNotFoundException.class)
                 .hasMessageContaining("Doctor no encontrado");
     }
 
@@ -422,7 +427,7 @@ class DoctorServiceTest {
     }
 
     @Test
-    void enableDoctorShouldUpdateDatesActivateUserAndReturnResponse() {
+    void enableDoctorShouldUpdateDatesActivateUserAndPersistDoctor() {
         UUID doctorId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
 
@@ -437,9 +442,8 @@ class DoctorServiceTest {
         when(doctorRepository.findById(doctorId)).thenReturn(Optional.of(doctor));
         when(doctorRepository.save(any(Doctor.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        DoctorResponse response = doctorService.enableDoctor(doctorId, newStart, newEnd);
+        doctorService.enableDoctor(doctorId, newStart, newEnd);
 
-        assertThat(response.id()).isEqualTo(doctorId);
         assertThat(doctor.getLaborStart()).isEqualTo(newStart);
         assertThat(doctor.getLaborEnd()).isEqualTo(newEnd);
         assertThat(doctor.isStatus()).isTrue();
@@ -452,7 +456,9 @@ class DoctorServiceTest {
         Doctor doctor = new Doctor();
         doctor.setFirstName("Ana");
         doctor.setLastName("Lopez");
+        doctor.setDocumentType(DocumentType.CEDULA);
         doctor.setIdentification("987654");
+        doctor.setPhone("3007654321");
         doctor.setSpecialty(List.of(Specialty.FISIOTERAPIA));
         doctor.setStatus(true);
         doctor.setLaborStart(LocalDate.now().minusDays(30));
@@ -461,6 +467,4 @@ class DoctorServiceTest {
         doctor.setSchedules(List.of());
         return doctor;
     }
-
-
 }

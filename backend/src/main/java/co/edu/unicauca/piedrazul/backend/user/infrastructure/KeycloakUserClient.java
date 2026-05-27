@@ -9,6 +9,7 @@ import jakarta.ws.rs.core.Response;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.admin.client.resource.RealmResource;
+import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -116,6 +117,13 @@ public class KeycloakUserClient {
         return UUID.fromString(keycloakId);
     }
 
+    public List<UserRepresentation> findUsersByRole(Role role) {
+        return keycloak.realm(props.getRealm())
+                .roles()
+                .get(role.name())
+                .getUserMembers();
+    }
+
     public Optional<UUID> findUserIdByUsername(String username) {
         if (username == null || username.isBlank()) {
             return Optional.empty();
@@ -132,7 +140,7 @@ public class KeycloakUserClient {
     }
 
     public void assignRoleIfMissing(UUID keycloakId, Role role) {
-        if (!hasRealmRole(keycloakId, role)) {
+        if (!userHasRole(keycloakId, role)) {
             assignRealmRole(keycloakId.toString(), role);
         }
     }
@@ -167,7 +175,19 @@ public class KeycloakUserClient {
         }
     }
 
-    private boolean hasRealmRole(UUID keycloakId, Role role) {
+    public List<String> getUserRoles(UUID keycloakId) {
+        return keycloak.realm(props.getRealm())
+                .users()
+                .get(keycloakId.toString())
+                .roles()
+                .realmLevel()
+                .listAll()
+                .stream()
+                .map(RoleRepresentation::getName)
+                .toList();
+    }
+
+    public boolean userHasRole(UUID keycloakId, Role role) {
         List<RoleRepresentation> assignedRoles = keycloak.realm(props.getRealm())
                 .users()
                 .get(keycloakId.toString())

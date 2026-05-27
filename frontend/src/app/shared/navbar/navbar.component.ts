@@ -8,6 +8,9 @@ import {
 import {
   AlertCircle,
   Calendar,
+  CalendarDays,
+  Check,
+  ChevronDown,
   ClipboardList,
   Home,
   Hospital,
@@ -18,10 +21,11 @@ import {
   Settings,
   Stethoscope,
   User,
+  UserCog,
   Users,
   X,
 } from 'lucide-angular';
-import { AppService } from '../../services/app.service';
+import { AppService } from '../../core/services/app.service';
 
 @Component({
   selector: 'app-navbar',
@@ -46,10 +50,30 @@ export class NavbarComponent implements OnInit {
   readonly Menu = Menu;
   readonly X = X;
   readonly AlertCircle = AlertCircle;
+  readonly CalendarDays = CalendarDays;
+  readonly ChevronDown = ChevronDown;
+  readonly UserCog = UserCog;
+  readonly Check = Check;
   readonly exactMatch = { exact: true };
 
   menuOpen = signal(false);
   showLogoutModal = signal(false);
+  showRoleDropdown = signal(false);
+
+  // Icono y color por rol para el dropdown
+  readonly roleConfig: Record<
+    string,
+    { icon: any; color: string; label: string }
+  > = {
+    ADMIN: { icon: Settings, color: 'text-purple-600', label: 'Administrador' },
+    SCHEDULER: {
+      icon: ClipboardList,
+      color: 'text-green-600',
+      label: 'Agendador',
+    },
+    DOCTOR: { icon: Stethoscope, color: 'text-blue-600', label: 'Médico' },
+    PATIENT: { icon: User, color: 'text-orange-600', label: 'Paciente' },
+  };
 
   ngOnInit(): void {
     history.pushState(null, '', location.href);
@@ -66,9 +90,20 @@ export class NavbarComponent implements OnInit {
     });
   }
 
+  toggleRoleDropdown(): void {
+    this.showRoleDropdown.update((v) => !v);
+  }
+
+  selectRole(role: string): void {
+    this.appService.switchRole(role);
+    this.showRoleDropdown.set(false);
+    this.menuOpen.set(false);
+  }
+
   openLogoutModal(): void {
     this.showLogoutModal.set(true);
     this.menuOpen.set(false);
+    this.showRoleDropdown.set(false);
   }
 
   cancelLogout(): void {

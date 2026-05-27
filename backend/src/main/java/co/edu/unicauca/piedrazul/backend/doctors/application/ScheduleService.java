@@ -3,6 +3,9 @@ package co.edu.unicauca.piedrazul.backend.doctors.application;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleConflictException;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleNotFoundException;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleValidationException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorDoesNotWorkException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
 import jakarta.transaction.Transactional;
@@ -22,13 +25,13 @@ public class ScheduleService {
     @Transactional
     public Schedule addSchedule(Doctor doctor, Schedule schedule) {
         if (doctor == null || doctor.getIdDoctor() == null) {
-            throw new RuntimeException("Doctor must be provided");
+            throw new DoctorScheduleValidationException("Doctor must be provided");
         }
 
         boolean alreadyExistsForWorkday = scheduleRepository.findByDoctor(doctor).stream()
                 .anyMatch(existing -> existing.getWorkday().equals(schedule.getWorkday()));
         if (alreadyExistsForWorkday) {
-            throw new RuntimeException("A schedule for " + schedule.getWorkday() + " already exists");
+            throw new DoctorScheduleConflictException("A schedule for " + schedule.getWorkday() + " already exists");
         }
 
         schedule.setDoctor(doctor);
@@ -79,7 +82,7 @@ public class ScheduleService {
 
         int appointmentInterval = doctor.getAppointmentInterval();
         if (appointmentInterval <= 0) {
-            throw new RuntimeException("El intervalo entre citas médicas debe ser mayor que 0");
+            throw new DoctorScheduleValidationException("El intervalo entre citas médicas debe ser mayor que 0");
         }
 
         List<Schedule> schedules = scheduleRepository.findByDoctor(doctor).stream()
@@ -98,7 +101,7 @@ public class ScheduleService {
         LocalTime startTime = workdaySchedule.getStartTime();
         LocalTime endTime = workdaySchedule.getEndTime();
         if (!startTime.isBefore(endTime)) {
-            throw new RuntimeException("Rango de tiempo invalido para el dia " + workday);
+            throw new DoctorScheduleValidationException("Rango de horario inválido para el " + workday);
         }
 
         List<LocalTime> availableIntervals = new ArrayList<>();

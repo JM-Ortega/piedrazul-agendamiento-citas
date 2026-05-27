@@ -1,8 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.port.output;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,8 +29,12 @@ public interface AppointmentRepository {
 
     List<Appointment> findByDoctorIdAndPatientIdAndDate(UUID idDoctor, UUID idPatient, LocalDate date);
 
+    boolean existsByPatientIdAndStates(UUID idPatient, Collection<AppointmentState> states);
+
     List<Appointment> findAll();
 
+    Appointment findById(UUID appointmentId);
+  
     List<Appointment> findAllByDate(LocalDate date);
 
 }

@@ -7,6 +7,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.Appo
 import jakarta.transaction.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -75,11 +76,22 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     }
 
     @Override
+    public boolean existsByPatientIdAndStates(UUID idPatient, Collection<AppointmentState> states) {
+        return jpaRepository.existsByIdPatientAndAppointmentStateIn(idPatient, states);
+    }
+
+    @Override
     public List<Appointment> findAll(){
         return jpaRepository.findAll().stream().map(mapper::toDomain).toList();
     }
 
     @Override
+    public Appointment findById(UUID appointmentId) {
+        return jpaRepository.findById(appointmentId)
+                .map(mapper::toDomain)
+                .orElseThrow(() -> new IllegalArgumentException("Cita con ID: " + appointmentId + "no encontrada"));
+    }
+  
     public List<Appointment> findAllByDate(LocalDate date) { return jpaRepository.findByDate(date)
             .stream()
             .map(mapper::toDomain)

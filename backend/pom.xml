@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.4</version>
+        <version>4.0.6</version>
         <relativePath/>
     </parent>
 
@@ -105,6 +105,13 @@
             <artifactId>jmolecules-layered-architecture</artifactId>
         </dependency>
 
+        <!-- HTML sanitization -->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.18.3</version>
+        </dependency>
+
         <!-- Dev -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -159,7 +166,7 @@
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
-            <version>5.2.5</version>
+            <version>5.4.1</version>
         </dependency>
 
         <!-- Export-PDF -->

@@ -2,15 +2,14 @@ package co.edu.unicauca.piedrazul.backend.doctors.api;
 
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorDetailedResponse;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorShortResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorShortResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
-import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientData;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientResponse;
-import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -34,7 +33,8 @@ public class DoctorController {
      * @return Sin contenido
      */
     @PostMapping
-    public ResponseEntity<?> createDoctor(@RequestBody CreateDoctorRequest request) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> createDoctor(@Valid @RequestBody CreateDoctorRequest request) {
         doctorService.createDoctor(request);
         return ResponseEntity.noContent().build();
     }
@@ -45,6 +45,7 @@ public class DoctorController {
      * @return
      */
     @GetMapping("/me")
+    @PreAuthorize("hasRole('DOCTOR')")
     public DoctorDetailedResponse findMe(@AuthenticationPrincipal Jwt jwt) {
         UUID keycloakId = UUID.fromString(jwt.getSubject());
         Doctor doctor = doctorService.findByUserId(keycloakId);
@@ -56,6 +57,7 @@ public class DoctorController {
      * @return Lista de todos los doctores
      */
     @GetMapping
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<?> getAllDoctors() {
         List<Doctor> doctors = doctorService.findAllDoctors();
         List<DoctorShortResponse> responses = doctors.stream()
@@ -69,6 +71,7 @@ public class DoctorController {
      * @return Lista de todos los doctores
      */
     @GetMapping("/detailed")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getAllDoctorsDetailed() {
         List<Doctor> doctors = doctorService.findAllDoctors();
         List<DoctorDetailedResponse> responses = doctors.stream()
@@ -83,6 +86,7 @@ public class DoctorController {
      * @return Los datos del doctor
      */
     @GetMapping("/{doctorId}")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<?> getDoctorById(@PathVariable UUID doctorId) {
         Doctor doctor = doctorService.getDoctorById(doctorId);
         return ResponseEntity.ok(DoctorShortResponse.fromEntity(doctor));
@@ -93,6 +97,7 @@ public class DoctorController {
      * @return Lista de especialidades
      */
     @GetMapping("/specialty")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<?> getSpecialties() {
         List<Specialty> specialties = doctorService.getSpecialties();
         return ResponseEntity.ok(specialties);
@@ -104,6 +109,7 @@ public class DoctorController {
      * @return Lista de doctores con esa especialidad
      */
     @GetMapping("/specialty/{specialty}")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<?> getDoctorsBySpecialty(@PathVariable Specialty specialty) {
         List<Doctor> doctors = doctorService.getDoctorBySpeciality(specialty);
         List<DoctorResponse> responses = doctors.stream()
@@ -120,6 +126,7 @@ public class DoctorController {
      * @return Sin contenido
      */
     @PutMapping("/{doctorId}/enable")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> enableDoctor(
             @PathVariable UUID doctorId,
             @RequestParam LocalDate laborStart,
@@ -136,6 +143,7 @@ public class DoctorController {
      * @return Sin contenido
      */
     @PutMapping("/{doctorId}/labor-start")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateDoctorLaborStart(
             @PathVariable UUID doctorId,
             @RequestParam LocalDate laborStart
@@ -151,6 +159,7 @@ public class DoctorController {
      * @return Sin contenido
      */
     @PutMapping("/{doctorId}/labor-end")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateDoctorLaborEnd(
             @PathVariable UUID doctorId,
             @RequestParam LocalDate laborEnd
@@ -166,6 +175,7 @@ public class DoctorController {
      * @return Sin contenido
      */
     @PutMapping("/{doctorId}/appointment-interval")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateDoctorAppointmentInterval(
             @PathVariable UUID doctorId,
             @RequestParam int appointmentInterval
@@ -181,6 +191,7 @@ public class DoctorController {
      * @return Sin contenido
      */
     @PutMapping("/{doctorId}/disable")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> disableDoctor(
             @PathVariable UUID doctorId,
             @RequestParam(defaultValue = "false") boolean force
@@ -196,6 +207,7 @@ public class DoctorController {
      * @return Sin contenido
      */
     @PutMapping("/{doctorId}/sync-status")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateDoctorStatus(@PathVariable UUID doctorId) {
         doctorService.updateDoctorStatus(doctorId);
         return ResponseEntity.noContent().build();

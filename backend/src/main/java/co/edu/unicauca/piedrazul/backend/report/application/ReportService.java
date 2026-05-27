@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.report.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentSummary;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import co.edu.unicauca.piedrazul.backend.appointment.SchedulerAppointmentSummary;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientData;
 import co.edu.unicauca.piedrazul.backend.report.domain.CsvExporter;

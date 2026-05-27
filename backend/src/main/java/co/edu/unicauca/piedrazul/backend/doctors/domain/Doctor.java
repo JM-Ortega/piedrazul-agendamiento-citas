@@ -35,6 +35,10 @@ public class Doctor {
     @Column(name = "identification", nullable = false, length = 100)
     private String identification;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "document_type", nullable = false, length = 40)
+    private DocumentType documentType;
+
     @Column(name = "phone", nullable = false, length = 20)
     private String phone;
 
@@ -64,12 +68,14 @@ public class Doctor {
 
     //Al momento de registrar/crearle una cuenta al doctor se le deben llenar todos estos campos,
     // el registro de doctores deberia hacerlo solo el administrador
-    public Doctor(UUID idUser, String firstName, String lastName, String identification, String phone, List<Specialty> specialty, boolean status, LocalDate laborStart,
+    public Doctor(UUID idUser, String firstName, String lastName, String identification, DocumentType documentType,
+                  String phone, List<Specialty> specialty, boolean status, LocalDate laborStart,
                   LocalDate laborEnd, int appointmentInterval, List<Schedule> schedules) {
         this.idUser = idUser;
         this.firstName = firstName;
         this.lastName = lastName;
         this.identification = identification;
+        this.documentType = documentType;
         this.phone = phone;
         this.specialty = specialty;
         this.status = status;

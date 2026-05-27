@@ -185,4 +185,8 @@ public class Appointment {
     public UUID getIdDoctor() {
         return idDoctor;
     }
+
+    public void setAppointmentState(AppointmentState appointmentState) {
+        this.appointmentState = appointmentState;
+    }
 }
