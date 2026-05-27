@@ -1,8 +1,8 @@
-import { Component, inject, output } from '@angular/core';
+import { Component, inject, output, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, UserSearch } from 'lucide-angular';
 import { BookingStateService } from '../../services/booking-state.service';
-import { SpecialtyPipe } from './specialtyPipe';
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
 /**
  * Permite al usuario elegir una especialidad y,
@@ -11,7 +11,7 @@ import { SpecialtyPipe } from './specialtyPipe';
 @Component({
   selector: 'app-booking-specialty-selector',
   standalone: true,
-  imports: [FormsModule, LucideAngularModule, SpecialtyPipe],
+  imports: [FormsModule, LucideAngularModule, FormatoPipe],
   templateUrl: './booking-specialty-selector.component.html',
 })
 export class BookingSpecialtySelectorComponent {
@@ -21,6 +21,17 @@ export class BookingSpecialtySelectorComponent {
 
   advance = output<void>();
   back = output<void>();
+
+  readonly filteredSpecialties = computed(() => {
+    const specialties = this.state.uniqueSpecialties();
+    if (
+      this.state.isNewPatient() &&
+      !this.state.isDoctorContext()
+    ) {
+      return specialties.filter(s => s === 'MEDICINA_GENERAL');
+    }
+    return specialties;
+  });
 
   onSpecialtyChange(specialty: string): void {
     this.state.selectedSpecialty.set(specialty);

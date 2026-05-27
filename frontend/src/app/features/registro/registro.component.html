@@ -48,7 +48,7 @@
             <label class="block text-gray-700 mb-2 font-medium">
               Número de documento
             </label>
-            <div class="flex gap-3">
+            <div class="flex flex-col sm:flex-row gap-3">
               <input
                 type="text"
                 [ngModel]="documentNumber()"
@@ -212,7 +212,7 @@
 
               <div>
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
-                  Celular <span class="text-red-500">*</span>
+                  Teléfono <span class="text-red-500">*</span>
                 </label>
                 <input
                   type="tel"
@@ -289,7 +289,7 @@
               <div class="sm:col-span-2">
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
                   Correo electrónico
-                  <span class="text-gray-400 text-xs">(opcional)</span>
+                  <span class="text-gray-400 text-sm">(opcional)</span>
                 </label>
                 <input
                   type="email"
@@ -315,11 +315,11 @@
 
               <div class="sm:col-span-2">
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
-                  Celular de acudiente
+                  Teléfono de familiar
                   @if (isMinorPatient()) {
                     <span class="text-red-500">*</span>
                   } @else {
-                    <span class="text-gray-400 text-xs">
+                    <span class="text-gray-400 text-sm">
                       (requerido para menores de edad)
                     </span>
                   }
@@ -467,7 +467,7 @@
 
               <div>
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
-                  Celular <span class="text-red-500">*</span>
+                  Teléfono <span class="text-red-500">*</span>
                 </label>
                 <input
                   type="tel"
@@ -544,7 +544,7 @@
               <div class="sm:col-span-2">
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
                   Correo electrónico
-                  <span class="text-gray-400 text-xs">(opcional)</span>
+                  <span class="text-gray-400 text-sm">(opcional)</span>
                 </label>
                 <input
                   type="email"
@@ -570,11 +570,11 @@
 
               <div class="sm:col-span-2">
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
-                  Celular de acudiente
+                  Teléfono de familiar
                   @if (isMinorPatient()) {
                     <span class="text-red-500">*</span>
                   } @else {
-                    <span class="text-gray-400 text-xs">
+                    <span class="text-gray-400 text-sm">
                       (requerido para menores de edad)
                     </span>
                   }
@@ -675,7 +675,7 @@
                   [type]="showPassword() ? 'text' : 'password'"
                   [ngModel]="password()"
                   (ngModelChange)="password.set($event)"
-                  placeholder="Mínimo 8 caracteres"
+                  placeholder="Mínimo 6 letras y números"
                   class="w-full border-2 rounded-xl px-4 py-3 pr-12 focus:outline-none transition-colors"
                   [ngClass]="
                     errors()['password']

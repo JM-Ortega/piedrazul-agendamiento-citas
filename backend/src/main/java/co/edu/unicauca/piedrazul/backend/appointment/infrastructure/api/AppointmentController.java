@@ -29,6 +29,7 @@ public class AppointmentController {
     private final GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase;
     private final CitaDtoMapper citaDtoMapper;
     private final ListMyAppointmentsUseCase listMyAppointmentsUseCase;
+    private final IsNewPatientUseCase isNewPatientUseCase;
     private final UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase;
 
     public AppointmentController(
@@ -39,6 +40,7 @@ public class AppointmentController {
             GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase,
             CitaDtoMapper citaDtoMapper,
             ListMyAppointmentsUseCase listMyAppointmentsUseCase,
+            IsNewPatientUseCase isNewPatientUseCase,
             UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase) {
         this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
         this.scheduleManualAppointmentUseCase = scheduleManualAppointmentUseCase;
@@ -47,6 +49,7 @@ public class AppointmentController {
         this.getSpecialtiesWithDoctorUseCase = getSpecialtiesWithDoctorUseCase;
         this.citaDtoMapper = citaDtoMapper;
         this.listMyAppointmentsUseCase = listMyAppointmentsUseCase;
+        this.isNewPatientUseCase = isNewPatientUseCase;
         this.updateAppointmentStatusUseCase = updateAppointmentStatusUseCase;
     }
 
@@ -88,6 +91,13 @@ public class AppointmentController {
                         .map(citaDtoMapper::toResponse)
                         .toList()
         );
+    }
+
+    // Sirve para saber si un paciente es nuevo
+    @GetMapping({"/{patientId}/is-new-patient"})
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
+    public ResponseEntity<Boolean> isNewPatient(@PathVariable UUID patientId) {
+        return ResponseEntity.ok(isNewPatientUseCase.isNewPatient(patientId));
     }
 
     // Crear cita

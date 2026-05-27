@@ -71,6 +71,10 @@ export class RegistroComponent {
   password = signal('');
   confirmPassword = signal('');
   verificationCode = signal('');
+  
+  private readonly PASSWORD_MIN = 6;
+  private readonly PASSWORD_MAX = 100;
+  private readonly PASSWORD_ALPHANUMERIC = /^(?=.*[a-zA-Z])(?=.*[0-9]).+$/;
 
   errors = signal<Record<string, string>>({});
 
@@ -341,22 +345,28 @@ export class RegistroComponent {
 
   handleNameInput(event: Event, field: 'firstName' | 'lastName'): void {
     const el = event.target as HTMLInputElement;
-    const value = el.value;
     const limitMsg =
       field === 'firstName' ? this.firstNameLimitMsg : this.lastNameLimitMsg;
-
+    let value = el.value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    value = value.replace(/[^a-zA-ZñÑ\s]/g, '');
+    value = value.replace(/^\s+/, '');
+    value = value.replace(/\s{2,}/g, ' ');
+    value = value.replace(/(\S+)/g, (word) =>
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    );
     if (value.length > this.NAME_MAX) {
-      el.value = value.slice(0, this.NAME_MAX);
-      this.updateFormField(field, el.value);
+      value = value.slice(0, this.NAME_MAX);
       this.flash(
         limitMsg,
         `Solo se permiten máximo ${this.NAME_MAX} caracteres`,
         field,
       );
     } else {
-      this.updateFormField(field, value);
       limitMsg.set('');
     }
+
+    el.value = value;
+    this.setFormField(field, value as any);
   }
 
   handlePhoneInput(event: Event): void {
@@ -528,12 +538,13 @@ export class RegistroComponent {
 
   private validateStep2(): boolean {
     const newErrors: Record<string, string> = {};
-
-    // solo validar contraseña si se va a crear usuario nuevo
     if (this.requiresPassword()) {
-      if (this.password().length < 8) {
-        newErrors['password'] =
-          'La contraseña debe tener al menos 8 caracteres';
+      if (this.password().length < this.PASSWORD_MIN) {
+        newErrors['password'] = `La contraseña debe tener al menos ${this.PASSWORD_MIN} caracteres`;
+      } else if (this.password().length > this.PASSWORD_MAX) {
+        newErrors['password'] = `La contraseña no puede superar los ${this.PASSWORD_MAX} caracteres`;
+      } else if (!this.PASSWORD_ALPHANUMERIC.test(this.password())) {
+        newErrors['password'] = 'La contraseña debe contener letras y números';
       }
 
       if (this.password() !== this.confirmPassword()) {

@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input;
 
-import co.edu.unicauca.piedrazul.backend.config.security.sanitization.Sanitize;
-import co.edu.unicauca.piedrazul.backend.config.security.validation.ValidDocument;
+import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
+import co.edu.unicauca.piedrazul.backend.jackson.validation.ValidDocument;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;

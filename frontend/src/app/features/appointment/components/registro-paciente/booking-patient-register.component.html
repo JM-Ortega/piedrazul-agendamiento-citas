@@ -14,7 +14,7 @@
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
     <div>
-      <label class="block text-gray-700 mb-1">
+      <label class="block text-gray-700 mb-1 text-sm font-medium">
         Tipo de Documento <span class="text-red-500">*</span>
       </label>
       <select
@@ -34,7 +34,7 @@
     </div>
 
     <div>
-      <label class="block text-gray-700 mb-1">
+      <label class="block text-gray-700 mb-1 text-sm font-medium">
         Nombres <span class="text-red-500">*</span>
       </label>
       <input
@@ -53,7 +53,7 @@
     </div>
 
     <div>
-      <label class="block text-gray-700 mb-1">
+      <label class="block text-gray-700 mb-1 text-sm font-medium">
         Apellidos <span class="text-red-500">*</span>
       </label>
       <input
@@ -72,8 +72,8 @@
     </div>
 
     <div>
-      <label class="block text-gray-700 mb-1">
-        Celular <span class="text-red-500">*</span>
+      <label class="block text-gray-700 mb-1 text-sm font-medium">
+        Teléfono <span class="text-red-500">*</span>
       </label>
       <input
         type="tel"
@@ -91,7 +91,7 @@
     </div>
 
     <div>
-      <label class="block text-gray-700 mb-1">
+      <label class="block text-gray-700 mb-1 text-sm font-medium">
         Género <span class="text-red-500">*</span>
       </label>
       <select
@@ -110,7 +110,7 @@
     </div>
 
     <div>
-      <label class="block text-gray-700 mb-1">
+      <label class="block text-gray-700 mb-1 text-sm font-medium">
         Fecha de Nacimiento <span class="text-red-500">*</span>
       </label>
 
@@ -144,8 +144,11 @@
       }
     </div>
 
-    <div>
-      <label class="block text-gray-700 mb-1">Correo Electrónico</label>
+    <div class="sm:col-span-2">
+      <label class="block text-gray-700 mb-1 text-sm font-medium">
+        Correo Electrónico
+        <span class="text-gray-400 text-sm">(opcional)</span>
+      </label>
       <input
         type="email"
         [ngModel]="getPatientField('email')"
@@ -161,10 +164,10 @@
       }
     </div>
 
-    <div>
-      <label class="block text-gray-700 mb-1">
-        Celular de acudiente
-        <span class="text-gray-400 text-xs ml-1">(requerido si es menor de 18 años)</span>
+    <div class="sm:col-span-2">
+      <label class="block text-gray-700 mb-1 text-sm font-medium">
+        Teléfono de familiar
+        <span class="text-gray-400 text-sm">(requerido si es menor de 18 años)</span>
       </label>
       <input
         type="tel"

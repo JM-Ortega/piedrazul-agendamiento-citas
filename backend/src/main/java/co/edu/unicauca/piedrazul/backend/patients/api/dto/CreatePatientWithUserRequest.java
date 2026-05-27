@@ -1,7 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.patients.api.dto;
 
-import co.edu.unicauca.piedrazul.backend.config.security.sanitization.Sanitize;
-import co.edu.unicauca.piedrazul.backend.config.security.validation.ValidDocument;
+import co.edu.unicauca.piedrazul.backend.jackson.normalization.NormalizeName;
+import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
+import co.edu.unicauca.piedrazul.backend.jackson.validation.ValidDocument;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
 import jakarta.validation.constraints.Email;
@@ -33,16 +34,19 @@ public class CreatePatientWithUserRequest {
     @Size(min = 2, max = 60)
     @Pattern(regexp = "^[\\p{L} '-]{2,60}$")
     @Sanitize
+    @NormalizeName
     private String firstName;
 
     @NotBlank
     @Size(min = 2, max = 60)
     @Pattern(regexp = "^[\\p{L} '-]{2,60}$")
     @Sanitize
+    @NormalizeName
     private String lastName;
 
+    // Número Colombiano
+    @Pattern(regexp = "^[0-9]{10}$")
     @NotBlank
-    @Pattern(regexp = "^[0-9]{7,15}$")
     @Sanitize
     private String phone;
 
@@ -57,7 +61,8 @@ public class CreatePatientWithUserRequest {
     @NotNull
     private LocalDate birthDate;
 
-    @Pattern(regexp = "^[0-9]{7,15}$")
+    // Número Colombiano
+    @Pattern(regexp = "^[0-9]{10}$")
     @Sanitize
     private String guardianPhone;
 
