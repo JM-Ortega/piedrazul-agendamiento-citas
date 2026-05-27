@@ -333,8 +333,16 @@
           (click)="menuOpen.set(false)"
           class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
         >
-          <lucide-angular [img]="User" [size]="20"></lucide-angular>
-          Mi Portal
+          <lucide-angular [img]="CalendarDays" [size]="20"></lucide-angular>
+          Citas pendientes
+        </a>
+        <a
+          routerLink="/paciente/historial-citas"
+          (click)="menuOpen.set(false)"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+        >
+          <lucide-angular [img]="ClipboardList" [size]="20"></lucide-angular>
+          Historial de Citas
         </a>
       }
 
