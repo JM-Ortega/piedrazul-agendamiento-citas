@@ -14,6 +14,7 @@ import jakarta.transaction.Transactional;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -260,6 +261,10 @@ public class DoctorService {
 
     public List<Specialty> getSpecialties (){
         return doctorRepository.findAllDistinctSpecialtiesByActiveDoctors();
+    }
+
+    public List<Specialty> getAllSpecialties (){
+        return Arrays.asList(Specialty.values());
     }
 
     private void syncUserStatus(Doctor doctor) {
