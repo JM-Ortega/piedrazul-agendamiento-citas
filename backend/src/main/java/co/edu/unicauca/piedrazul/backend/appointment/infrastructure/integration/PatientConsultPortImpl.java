@@ -7,7 +7,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.Pati
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.PatientInfoMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.PatientRegistrationMapper;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientData;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
