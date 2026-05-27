@@ -473,16 +473,18 @@
         <!-- Fila 5: Horario de atención -->
         <div class="grid grid-cols-2 gap-5">
           <div>
-            <label class="block text-gray-700 text-base font-medium mb-2"
-              >Hora de Inicio</label
-            >
-            <input
-              type="time"
+            <label class="block text-gray-700 text-base font-medium mb-2">
+              Hora de Inicio
+            </label>
+            <select
               [(ngModel)]="userForm.startTime"
               name="startTime"
               (change)="onStartTimeChange()"
               [class]="inputClass('startTime', 'px-4')"
-            />
+            >
+              <option value="" disabled>-- Seleccionar --</option>
+              <option *ngFor="let t of timeOptions" [value]="t">{{ t }}</option>
+            </select>
             <p
               *ngIf="hasError('startTime')"
               class="mt-1 text-sm text-red-600 flex items-center gap-1"
@@ -495,17 +497,18 @@
             <label class="block text-gray-700 text-base font-medium mb-2">
               Hora de Fin
               <span class="text-sm text-gray-500 font-normal ml-1"
-                >máx. 14:00 (2:00 p.m.)</span
+                >máx. 12:00 pm</span
               >
             </label>
-            <input
-              type="time"
+            <select
               [(ngModel)]="userForm.endTime"
               name="endTime"
-              max="14:00"
               (change)="onEndTimeChange()"
               [class]="inputClass('endTime', 'px-4')"
-            />
+            >
+              <option value="" disabled>-- Seleccionar --</option>
+              <option *ngFor="let t of timeOptions" [value]="t">{{ t }}</option>
+            </select>
             <p
               *ngIf="hasError('endTime')"
               class="mt-1 text-sm text-red-600 flex items-center gap-1"

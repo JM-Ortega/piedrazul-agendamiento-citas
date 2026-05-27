@@ -116,8 +116,8 @@ export class AdminCreateUserComponent {
     laborEnd: '',
     interval: 20,
     workDays: [1, 2, 3, 4, 5],
-    startTime: '08:00',
-    endTime: '14:00',
+    startTime: '07:00',
+    endTime: '12:00',
   };
 
   daysOfWeek = [
@@ -138,7 +138,20 @@ export class AdminCreateUserComponent {
     { value: 'FISIOTERAPIA', label: 'Fisioterapia' },
     { value: 'TERAPIA_NEURAL', label: 'Terapia Neural' },
     { value: 'QUIROPRAXIA', label: 'Quiropraxia' },
+    { value: 'MEDICINA_GENERAL', label: 'Medicina General' },
   ];
+  readonly timeOptions: string[] = (() => {
+    const opts: string[] = [];
+    for (let h = 7; h <= 12; h++) {
+      for (let m = 0; m < 60; m += 5) {
+        if (h === 12 && m > 0) break;
+        opts.push(
+          `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
+        );
+      }
+    }
+    return opts;
+  })();
   constructor(
     private router: Router,
     private adminService: AdminService,
@@ -439,10 +452,7 @@ export class AdminCreateUserComponent {
       case 'endTime': {
         const end = this.timeToMinutes(this.userForm.endTime);
         const start = this.timeToMinutes(this.userForm.startTime);
-        if (end > this.timeToMinutes('14:00')) {
-          this.errors.endTime =
-            'El horario no puede extenderse más allá de las 14:00.';
-        } else if (this.userForm.startTime && start >= end) {
+        if (this.userForm.startTime && start >= end) {
           this.errors.endTime =
             'La hora de fin debe ser posterior a la hora de inicio.';
         }
