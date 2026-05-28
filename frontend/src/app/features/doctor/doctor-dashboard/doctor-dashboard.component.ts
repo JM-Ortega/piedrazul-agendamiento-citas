@@ -144,6 +144,10 @@ export class DoctorDashboardComponent implements OnInit {
         this.closeModal();
         const doctorId = this.currentDoctor()?.id;
         if (doctorId) this.loadAppointments(doctorId);
+
+        if (outcome === 'ATENDIDA') {
+          this.router.navigate(['/doctor/historial-citas', id]);
+        }
       },
       error: () => {
         this.isMarkingAttended.set(false);
