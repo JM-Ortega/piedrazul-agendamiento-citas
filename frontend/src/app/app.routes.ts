@@ -14,7 +14,7 @@ import { DoctorDashboardComponent } from './features/doctor/doctor-dashboard/doc
 import { PatientDashboardComponent } from './features/patient/patient-dashboard/patient-dashboard.component';
 import { RegistroComponent } from './features/registro/registro.component';
 import { SchedulerDashboardComponent } from './features/scheduler-dashboard/scheduler-dashboard.component';
-import { PatientAppointmentHistoryComponent } from './features/patient/patient-appointment-history/patient-appointment-history.component';
+import { DoctorMedicalHistoryComponent } from './features/doctor/doctor-medical-history/doctor-medical-history.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -81,10 +81,10 @@ export const routes: Routes = [
     data: { role: 'PATIENT' },
   },
   {
-    path: 'paciente/historial-citas',
-    component: PatientAppointmentHistoryComponent,
+    path: 'doctor/historial-citas/:idAppointment',
+    component: DoctorMedicalHistoryComponent,
     canActivate: [AuthGuard],
-    data: { role: 'PATIENT' },
+    data: { role: 'DOCTOR' },
   },
   { path: 'registro', component: RegistroComponent },
 
