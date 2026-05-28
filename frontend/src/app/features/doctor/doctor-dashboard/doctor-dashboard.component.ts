@@ -146,7 +146,7 @@ export class DoctorDashboardComponent implements OnInit {
         if (doctorId) this.loadAppointments(doctorId);
 
         if (outcome === 'ATENDIDA') {
-          this.router.navigate(['/doctor/historial-citas', id]);
+          this.router.navigate(['medico/control-medico/', id]);
         }
       },
       error: () => {
