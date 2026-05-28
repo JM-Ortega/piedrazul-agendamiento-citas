@@ -1,16 +1,20 @@
 import { HttpClient } from '@angular/common/http';
-import { inject, Injectable } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
 import { dtoSchedule } from '../../shared/models/dtos/schedule.dto';
 import { Doctor } from '../../shared/models/interfaces/doctor.model';
+import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
+import { Patient } from '../../shared/models/interfaces/patient.model';
 
 @Injectable({ providedIn: 'root' })
 export class DoctorService {
   private http = inject(HttpClient);
   private apiUrl = environment.apiUrl;
+
+  medicalRecords = signal<MedicalRecord[]>([]);
 
   getMe(): Observable<Doctor> {
     return this.http.get<any>(`${this.apiUrl}/doctor/doctors/me`).pipe(
@@ -73,5 +77,21 @@ export class DoctorService {
       `${this.apiUrl}/appointments/${appointmentId}/mark-as-unassisted`,
       { appointmentState: state },
     );
+  }
+
+  loadMedicalRecordsByPatient(patientId: string): void {
+    this.http.get<MedicalRecord[]>(`${this.apiUrl}/clinical-history/patient/${patientId}`)
+      .subscribe((records) => this.medicalRecords.set(records));
+  }
+
+  addMedicalRecord(idAppointment: string, description: string): Observable<MedicalRecord> {
+    return this.http.post<MedicalRecord>(`${this.apiUrl}/clinical-history`, {
+      idAppointment,
+      description,
+    });
+  }
+
+  getPatientByAppointment(appointmentId: string): Observable<Patient> {
+    return this.http.get<Patient>(`${this.apiUrl}/patients/${appointmentId}/patient-attended`);
   }
 }

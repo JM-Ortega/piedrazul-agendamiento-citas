@@ -6,11 +6,11 @@
         <lucide-angular
           [img]="User"
           [size]="40"
-          class="text-blue-600"
+          class="text-[#4e92d9]"
         ></lucide-angular>
       </div>
       <div>
-        <h1 class="text-blue-800 text-3xl">
+        <h1 class="text-[#215c98] text-3xl">
           Bienvenido, {{ currentDoctor()?.name }}
         </h1>
         <p class="text-gray-600 text-xl mt-1">
@@ -22,7 +22,7 @@
       <lucide-angular
         [img]="Calendar"
         [size]="20"
-        class="text-blue-600"
+        class="text-[#4e92d9]"
       ></lucide-angular>
       <span class="capitalize">{{ formatDate(today) }}</span>
     </div>
@@ -30,7 +30,7 @@
 
   <!-- Resumen del Día -->
   <div
-    class="bg-linear-to-r from-blue-600 to-blue-500 text-white rounded-2xl shadow-lg p-6 mb-8"
+    class="bg-linear-to-r from-[#215c98] to-[#4e92d9] text-white rounded-2xl shadow-lg p-6 mb-8"
   >
     <h2 class="text-2xl mb-4">Resumen del Día</h2>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -51,7 +51,7 @@
 
   <!-- Lista de Citas -->
   <div class="bg-white rounded-2xl shadow-lg border-2 border-blue-100 p-8">
-    <h2 class="text-blue-800 text-2xl mb-6">Citas de Hoy</h2>
+    <h2 class="text-[#163c63] text-2xl mb-6">Citas de Hoy</h2>
 
     @if (todaysAppointments().length === 0) {
       <div class="text-center py-12">
@@ -85,7 +85,7 @@
 
                     <!-- Hora -->
                     <div
-                      class="bg-blue-500 text-white rounded-xl px-4 py-3 text-center min-w-20"
+                      class="bg-[#4e92d9] text-white rounded-xl px-4 py-3 text-center min-w-20"
                     >
                       <div class="flex items-center gap-1 justify-center">
                         <lucide-angular
@@ -106,7 +106,7 @@
                       <lucide-angular
                         [img]="User"
                         [size]="16"
-                        class="text-blue-600"
+                        class="text-[#163c63]"
                       ></lucide-angular>
                       <span class="text-base"
                         >Doc: {{ apt.documentNumber }}</span
@@ -143,21 +143,13 @@
                     </button>
 
                     @if (openCardDropdownId() === apt.idAppointment) {
-                      <div
-                        class="absolute right-0 mt-2 w-44 bg-white border-2 border-blue-100 rounded-xl shadow-xl z-10 overflow-hidden"
-                      >
-                        <button
-                          (click)="
-                            selectCardOutcome(apt.idAppointment, 'ATENDIDA')
-                          "
-                          class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-emerald-50 text-emerald-700 transition-colors"
-                        >
-                          <lucide-angular
-                            [img]="Check"
-                            [size]="16"
-                          ></lucide-angular>
-                          Atendida
+                      <div class="absolute right-0 mt-2 w-44 bg-white border-2 border-blue-100 rounded-xl shadow-xl z-10 overflow-hidden">
+                        <button (click)="selectCardOutcome(apt.idAppointment, 'ATENDIDA')"
+                          class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-emerald-50 text-emerald-700 transition-colors">
+                          <lucide-angular [img]="Check" [size]="16"></lucide-angular>
+                          Atender
                         </button>
+
                         <div class="border-t border-gray-100"></div>
                         <button
                           (click)="
@@ -224,10 +216,9 @@
           class="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-4 mb-6 text-sm text-gray-700"
         >
           <p>¿Deseas marcar esta cita como <strong>Atendida</strong>?</p>
-          <p class="mt-2">
-            Se actualizará el estado de la cita y podrás agendar una nueva cita
-            para este paciente si lo deseas.
-          </p>
+          <p class="mt-2">- Se actualizará el estado de la cita</p>
+          <p>- Deberás llenar la historia clínica</p>
+          <p>- Podrás agendar una nueva cita para este paciente si lo deseas</p>
         </div>
       } @else if (selectedOutcome() === "NO_ASISTIO") {
         <div

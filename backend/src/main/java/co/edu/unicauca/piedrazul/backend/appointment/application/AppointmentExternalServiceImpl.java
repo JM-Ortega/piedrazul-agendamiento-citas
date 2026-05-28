@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
+import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalData;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentSummary;
 import co.edu.unicauca.piedrazul.backend.appointment.SchedulerAppointmentSummary;
@@ -30,6 +31,20 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
     }
 
     @Override
+    public AppointmentExternalData getAppointmentData(UUID idAppointment) {
+
+        Appointment appointment = appointmentRepository.findById(idAppointment);
+        return new AppointmentExternalData(
+                appointment.getIdAppointment(),
+                appointment.getIdDoctor(),
+                appointment.getDoctorName(),
+                appointment.getIdPatient(),
+                appointment.getAppointmentState().name(),
+                appointment.getDate()
+        );
+    }
+
+    @Override
     public List<AppointmentSummary> findByDoctorAndDate(UUID idDoctor, LocalDate date, String state){
 
         List<Appointment> appointments = (state != null)
@@ -52,6 +67,10 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
                 )).toList();
     }
 
+    @Override
+    public UUID getPattientIdByAppointmentId(UUID appointmentId){
+        return appointmentRepository.getPattientIdByAppointmentId(appointmentId);
+    }
 
     @Override
     public List<SchedulerAppointmentSummary> findAllByDate(LocalDate date) {

@@ -1,0 +1,110 @@
+<div class="min-h-screen bg-blue-50 py-8 px-4">
+  <div class="max-w-3xl mx-auto">
+    <div class="mb-6">
+      <button routerLink="/medico" 
+        class="flex items-center gap-2 text-[#215c98] text-lg hover:text-[#4e92d9] mb-4 transition-colors cursor-pointer">
+        <lucide-angular [img]="ArrowLeft" [size]="20"></lucide-angular>
+        volver al inicio
+      </button>
+      <div class="flex items-center gap-3">
+        <lucide-angular [img]="ClipboardPen" [size]="40" class="text-[#163c63]"></lucide-angular>
+        <h3 class="text-2xl font-bold text-[#163c63]"> Historia Clínica</h3>
+      </div>
+    </div>
+
+    @if (!patient()) {
+      <div class="bg-red-50 border border-red-300 text-red-700 px-6 py-4 rounded-xl">
+        Paciente no encontrado.
+      </div>
+    }
+
+    @if (patient()) {
+      <div class="space-y-6">
+        <!-- Info paciente -->
+        <div class="bg-white rounded-2xl shadow-md p-6">
+          <div class="flex items-center justify-between flex-wrap gap-3">
+            <h1 class="text-gray-700 text-xl">
+              <strong class="text-[#163c63]">Paciente:</strong> 
+              {{ patient()!.firstName }} {{ patient()!.lastName }}
+            </h1>
+
+            <button
+              (click)="toggleInfo()"
+              class="flex items-center gap-1.5 text-sm font-medium text-[#215c98] border border-[#215c98]/30 
+                    rounded-lg px-3 py-1.5 hover:bg-[#215c98]/8 hover:border-[#215c98]/60 
+                    transition-all duration-200 select-none cursor-pointer"
+            >
+              <span>{{ mostrarInfo() ? 'Ocultar' : 'Ver más información' }}</span>
+              <svg
+                class="w-3.5 h-3.5 transition-transform duration-200"
+                [class.rotate-180]="mostrarInfo()"
+                viewBox="0 0 20 20" fill="currentColor"
+              >
+                <path fill-rule="evenodd"
+                  d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                  clip-rule="evenodd"/>
+              </svg>
+            </button>
+          </div>
+
+          @if (mostrarInfo()) {
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 pt-4 border-t border-[#215c98]/15">
+              <p><strong class="text-[#163c63]">Tipo de documento: </strong>{{ patient()!.documentType | formato }}</p>
+              <p><strong class="text-[#163c63]">Documento: </strong>{{ patient()!.documentNumber }}</p>
+              <p><strong class="text-[#163c63]">Género: </strong>{{ patient()!.gender | formato }}</p>
+              <p><strong class="text-[#163c63]">Teléfono: </strong>{{ patient()!.phone }}</p>
+              <p><strong class="text-[#163c63]">Correo electrónico: </strong>{{ patient()!.email || 'No registra' }}</p>
+              <p><strong class="text-[#163c63]">Teléfono del acudiente: </strong>{{ patient()!.guardianPhone || 'No registra' }}</p>
+            </div>
+          }
+        </div>
+
+        <!-- Nueva observación -->
+        <div class="bg-white rounded-2xl shadow-md p-6">
+          <h5 class="flex items-center gap-2 text-lg font-semibold text-[#163c63] mb-4"> 
+            <lucide-angular [img]="ClipboardPlus" [size]="30" class="text-[#163c63]"></lucide-angular> 
+            Agregar Observación
+          </h5>
+          <textarea
+            [value]="newObservation()"
+            (input)="newObservation.set($any($event.target).value)"
+            rows="3"
+            placeholder="Escriba las observaciones de la consulta..."
+            class="w-full border-2 border-[#d9e9f8] focus:border-[#a7c9ec] rounded-xl px-4 py-3 outline-none transition-colors mb-3 resize-none"
+          ></textarea>
+          <button
+            (click)="addRecord()"
+            [disabled]="!newObservation().trim()"
+            class="flex items-center gap-2 bg-[#215c98] hover:bg-[#163c63] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl transition-colors"
+          >
+            <lucide-angular [img]="Save" [size]="30" class="text-white"></lucide-angular> 
+            Guardar
+          </button>
+        </div>
+
+        <!-- Historial -->
+        <div >
+          <h5 class="flex items-center gap-2 text-lg font-semibold text-[#163c63] mb-4">
+            <lucide-angular [img]="FolderOpen" [size]="30" class="text-[#163c63]"></lucide-angular> 
+            Historial de Consultas
+          </h5>
+          @if (records().length === 0) {
+            <div class="bg-blue-50 border border-blue-200 text-[#215c98] px-4 py-3 rounded-xl">
+              Sin registros clínicos.
+            </div>
+          }
+          @for (r of records(); track r.attendedAt) {
+            <div class="bg-white rounded-2xl shadow-md p-6 mb-3">
+              <div class="flex justify-between items-center mb-3">
+                <span class="flex items-center gap-2 text-gray-700 text-2lg">
+                  <lucide-angular [img]="Calendar" [size]="25" class="text-[#163c63]"></lucide-angular>
+                   {{ r.attendedAt }}</span>
+              </div>
+              <p class="text-gray-700">{{ r.description }}</p>
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </div>
+</div>
