@@ -49,11 +49,12 @@
 
           @if (mostrarInfo()) {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 pt-4 border-t border-[#215c98]/15">
-              <p><strong class="text-[#163c63]">Tipo de documento:</strong> {{ patient()!.documentType | formato }}</p>
-              <p><strong class="text-[#163c63]">Documento:</strong> {{ patient()!.documentNumber }}</p>
-              <p><strong class="text-[#163c63]">Género:</strong> {{ patient()!.gender | formato }}</p>
-              <p><strong class="text-[#163c63]">Teléfono:</strong> {{ patient()!.phone }}</p>
-              <p><strong class="text-[#163c63]">Correo electrónico:</strong> {{ patient()!.email }}</p>
+              <p><strong class="text-[#163c63]">Tipo de documento: </strong>{{ patient()!.documentType | formato }}</p>
+              <p><strong class="text-[#163c63]">Documento: </strong>{{ patient()!.documentNumber }}</p>
+              <p><strong class="text-[#163c63]">Género: </strong>{{ patient()!.gender | formato }}</p>
+              <p><strong class="text-[#163c63]">Teléfono: </strong>{{ patient()!.phone }}</p>
+              <p><strong class="text-[#163c63]">Correo electrónico: </strong>{{ patient()!.email || 'No registra' }}</p>
+              <p><strong class="text-[#163c63]">Teléfono del acudiente: </strong>{{ patient()!.guardianPhone || 'No registra' }}</p>
             </div>
           }
         </div>
