@@ -28,7 +28,7 @@ module "pages" {
   github_repo       = var.github_repo
   production_branch = "main"
   build_command     = "npm run build"
-  output_dir        = "dist/frontend"
+  output_dir        = "dist/frontend/browser"
   root_dir          = "frontend"
   custom_domain     = local.frontend_domain
 }
