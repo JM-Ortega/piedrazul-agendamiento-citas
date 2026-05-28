@@ -39,7 +39,7 @@ public record PatientSchedulingContext(
                 Objects.requireNonNull(phone, "El teléfono es obligatorio"),
                 Objects.requireNonNull(gender, "El género es obligatorio"),
                 Objects.requireNonNull(birthDate, "La fecha de nacimiento es obligatoria"),
-                Objects.requireNonNull(email, "El correo es obligatorio"),
+                email,
                 guardianPhone
         );
     }
