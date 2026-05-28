@@ -36,4 +36,6 @@ public interface AppointmentRepository {
 
     Appointment findById(UUID appointmentId);
 
+    UUID getPattientIdByAppointmentId(UUID appointmentId);
+
 }
