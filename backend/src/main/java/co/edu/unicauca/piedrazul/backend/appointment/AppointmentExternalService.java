@@ -8,7 +8,14 @@ public interface AppointmentExternalService {
 
     AppointmentExternalData getAppointmentData(UUID idAppointment);
 
+    UUID getPattientIdByAppointmentId(UUID appointmentId);
+    
+    //Para el reporte de los medicos
     List<AppointmentSummary> findByDoctorAndDate(UUID idDoctor, LocalDate date, String state);
 
-    UUID getPattientIdByAppointmentId(UUID appointmentId);
+    //Para el reporte de los agendadores
+    List<SchedulerAppointmentSummary> findAllByDate(LocalDate date);
+
+    boolean hasAvailableSlots(LocalDate date);
+
 }

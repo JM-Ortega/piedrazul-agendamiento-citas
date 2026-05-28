@@ -36,6 +36,8 @@ public interface AppointmentRepository {
     List<Appointment> findAll();
 
     Appointment findById(UUID appointmentId);
+  
+    List<Appointment> findAllByDate(LocalDate date);
 
     UUID getPattientIdByAppointmentId(UUID appointmentId);
 

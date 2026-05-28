@@ -1,7 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto;
-
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
+package co.edu.unicauca.piedrazul.backend.appointment.domain.model;
 
 import java.time.LocalDate;
 

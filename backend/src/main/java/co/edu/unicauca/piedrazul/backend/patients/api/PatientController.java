@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.patients.api;
 
+import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.ConfirmLinkUserAccountRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.CreatePatientRequest;
@@ -141,6 +142,12 @@ public class PatientController {
         PatientData patient = patientService.findById(patientId)
                 .orElseThrow(() -> new PatientNotFoundException(patientId));
         return toResponse(patient);
+    }
+
+    @GetMapping("/document-types")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'SCHEDULER', 'PATIENT', 'ADMIN')")
+    public List<DocumentType> findAllDocumentTypes() {
+        return patientService.getAllDocumentTypes();
     }
 
     private PatientResponse toResponse(PatientData patient) {

@@ -104,6 +104,17 @@ public class DoctorController {
     }
 
     /**
+     * Obtiene todas las especialidades de los medicos
+     * @return Lista de especialidades
+     */
+    @GetMapping("/all-specialties")
+    @PreAuthorize("hasAnyRole('ADMIN')")
+    public ResponseEntity<?> getAllSpecialties() {
+        List<Specialty> specialties = doctorService.getAllSpecialties();
+        return ResponseEntity.ok(specialties);
+    }
+
+    /**
      * Obtener doctores por especialidad
      * @param specialty Especialidad a buscar
      * @return Lista de doctores con esa especialidad

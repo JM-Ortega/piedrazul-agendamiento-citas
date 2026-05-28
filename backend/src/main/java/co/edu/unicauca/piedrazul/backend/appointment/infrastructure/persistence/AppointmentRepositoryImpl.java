@@ -95,4 +95,13 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     public UUID getPattientIdByAppointmentId(UUID appointmentId){
         return jpaRepository.findById(appointmentId).get().getIdPatient();
     }
+  
+    @Override
+    public List<Appointment> findAllByDate(LocalDate date) { return jpaRepository.findByDate(date)
+            .stream()
+            .map(mapper::toDomain)
+            .toList();
+    }
+
+
 }

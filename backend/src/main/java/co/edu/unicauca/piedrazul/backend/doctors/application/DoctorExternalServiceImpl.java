@@ -36,8 +36,6 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
 
     @Override
     public List<LocalTime> getSlotsByDoctor(UUID idDoctor, LocalDate date) {
-
-
         return scheduleService.getAvailableIntervalsByWorkday(doctorRepository.findByIdDoctor(idDoctor), toWorkday(date.getDayOfWeek()));
     }
 
