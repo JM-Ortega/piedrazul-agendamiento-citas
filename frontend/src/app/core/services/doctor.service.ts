@@ -78,7 +78,7 @@ export class DoctorService {
       { appointmentState: state },
     );
   }
-}
+
   loadMedicalRecordsByPatient(patientId: string): void {
     this.http.get<MedicalRecord[]>(`${this.apiUrl}/clinical-history/patient/${patientId}`)
       .subscribe((records) => this.medicalRecords.set(records));
@@ -90,5 +90,4 @@ export class DoctorService {
       description,
     });
   }
-
 }
