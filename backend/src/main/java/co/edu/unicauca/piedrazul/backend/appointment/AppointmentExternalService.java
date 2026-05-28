@@ -9,4 +9,6 @@ public interface AppointmentExternalService {
     AppointmentExternalData getAppointmentData(UUID idAppointment);
 
     List<AppointmentSummary> findByDoctorAndDate(UUID idDoctor, LocalDate date, String state);
+
+    UUID getPattientIdByAppointmentId(UUID appointmentId);
 }

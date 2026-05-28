@@ -24,4 +24,5 @@ public class AppointmentDataClient {
         String stateName = state != null ? state.name() : null;
         return appointmentExternalService.findByDoctorAndDate(doctorId, LocalDate.now(), stateName);
     }
+
 }

@@ -90,4 +90,9 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
                 .map(mapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Cita con ID: " + appointmentId + "no encontrada"));
     }
+
+    @Override
+    public UUID getPattientIdByAppointmentId(UUID appointmentId){
+        return jpaRepository.findById(appointmentId).get().getIdPatient();
+    }
 }

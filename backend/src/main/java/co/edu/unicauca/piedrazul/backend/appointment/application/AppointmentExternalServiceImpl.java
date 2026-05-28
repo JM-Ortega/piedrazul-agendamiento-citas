@@ -44,18 +44,7 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
     }
 
     @Override
-    public AppointmentExternalData getAppointmentData(UUID idAppointment) {
-
-        Appointment appointment = appointmentRepository.findById(idAppointment);
-
-        return new AppointmentExternalData(
-                appointment.getIdAppointment(),
-                appointment.getIdDoctor(),
-                appointment.getDoctorName(),
-                appointment.getIdPatient(),
-                appointment.getAppointmentState().name(),
-                appointment.getDate()
-        );
+    public UUID getPattientIdByAppointmentId(UUID appointmentId){
+        return appointmentRepository.getPattientIdByAppointmentId(appointmentId);
     }
-
 }

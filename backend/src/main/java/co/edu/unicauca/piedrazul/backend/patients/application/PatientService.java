@@ -1,10 +1,12 @@
 package co.edu.unicauca.piedrazul.backend.patients.application;
 
+import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientPublicResponse;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientResponse;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
 import co.edu.unicauca.piedrazul.backend.patients.exception.InvalidPatientDataException;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyExistsException;
@@ -30,15 +32,18 @@ public class PatientService implements PatientModuleApi {
     private final PatientRepository patientRepository;
     private final UserModuleApi userModuleApi;
     private final VerificationModuleApi verificationModuleApi;
+    private final AppointmentExternalService appointmentExternalService;
 
     public PatientService(
             PatientRepository patientRepository,
             UserModuleApi userModuleApi,
-            VerificationModuleApi verificationModuleApi
+            VerificationModuleApi verificationModuleApi,
+            AppointmentExternalService appointmentExternalService
     ) {
         this.patientRepository = patientRepository;
         this.userModuleApi = userModuleApi;
         this.verificationModuleApi = verificationModuleApi;
+        this.appointmentExternalService = appointmentExternalService;
     }
 
     @Override
@@ -245,6 +250,10 @@ public class PatientService implements PatientModuleApi {
                 .stream()
                 .map(this::toData)
                 .toList();
+    }
+
+    public UUID getPatientIdByAppointmentId(UUID appointmentId){
+        return appointmentExternalService.getPattientIdByAppointmentId(appointmentId);
     }
 
     private void ensurePatientDoesNotExist(String documentNumber) {

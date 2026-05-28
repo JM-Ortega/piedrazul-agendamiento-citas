@@ -6,7 +6,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
 import java.time.LocalDate;
 
 public record PatientRegistrationData(
-  DocumentType documentType,
+        DocumentType documentType,
         String documentNumber,
         String firstName,
         String lastName,
