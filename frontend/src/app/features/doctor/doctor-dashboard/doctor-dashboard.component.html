@@ -140,8 +140,9 @@
                         <button (click)="selectCardOutcome(apt.idAppointment, 'ATENDIDA')"
                           class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-emerald-50 text-emerald-700 transition-colors">
                           <lucide-angular [img]="Check" [size]="16"></lucide-angular>
-                          Atendida
+                          Atender
                         </button>
+
                         <div class="border-t border-gray-100"></div>
                         <button (click)="selectCardOutcome(apt.idAppointment, 'NO_ASISTIO')"
                           class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-red-50 text-red-600 transition-colors">
@@ -190,7 +191,9 @@
       @if (selectedOutcome() === 'ATENDIDA') {
         <div class="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-4 mb-6 text-sm text-gray-700">
           <p>¿Deseas marcar esta cita como <strong>Atendida</strong>?</p>
-          <p class="mt-2">Se actualizará el estado de la cita y podrás agendar una nueva cita para este paciente si lo deseas.</p>
+          <p class="mt-2">- Se actualizará el estado de la cita</p>
+          <p>- Deberás llenar la historia clínica</p>
+          <p>- Podrás agendar una nueva cita para este paciente si lo deseas</p>
         </div>
       } @else if (selectedOutcome() === 'NO_ASISTIO') {
         <div class="bg-red-50 border border-red-200 rounded-xl px-4 py-4 mb-6 text-sm text-gray-700">
