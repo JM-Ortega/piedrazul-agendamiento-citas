@@ -38,17 +38,25 @@ export class AdminUsersComponent implements OnInit {
   // ── Computed ──────────────────────────────────────────────────────────────
   doctors = computed(() =>
     this.systemUsers().filter(
-      (u) => u.roles.includes('doctor') && !u.roles.includes('scheduler'),
+      (u) =>
+        u.roles.map((r) => r.toLowerCase()).includes('doctor') &&
+        !u.roles.map((r) => r.toLowerCase()).includes('scheduler'),
     ),
   );
+
   schedulers = computed(() =>
     this.systemUsers().filter(
-      (u) => u.roles.includes('scheduler') && !u.roles.includes('doctor'),
+      (u) =>
+        u.roles.map((r) => r.toLowerCase()).includes('scheduler') &&
+        !u.roles.map((r) => r.toLowerCase()).includes('doctor'),
     ),
   );
+
   both = computed(() =>
     this.systemUsers().filter(
-      (u) => u.roles.includes('doctor') && u.roles.includes('scheduler'),
+      (u) =>
+        u.roles.map((r) => r.toLowerCase()).includes('doctor') &&
+        u.roles.map((r) => r.toLowerCase()).includes('scheduler'),
     ),
   );
 
