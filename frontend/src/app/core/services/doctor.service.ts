@@ -90,4 +90,8 @@ export class DoctorService {
       description,
     });
   }
+
+  getPatientByAppointment(appointmentId: string): Observable<Patient> {
+    return this.http.get<Patient>(`${this.apiUrl}/patients/${appointmentId}/patient-attended`);
+  }
 }
