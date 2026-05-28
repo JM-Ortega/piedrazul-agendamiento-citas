@@ -96,10 +96,10 @@ public class DoctorController {
      * Obtiene las especialidades de los medicos activos
      * @return Lista de especialidades
      */
-    @GetMapping("/specialty")
+    @GetMapping("/patients/{patientId}/specialties")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<?> getSpecialties() {
-        List<Specialty> specialties = doctorService.getSpecialties();
+    public ResponseEntity<?> getSpecialties(@PathVariable UUID patientId) {
+        List<Specialty> specialties = doctorService.getSpecialties(patientId);
         return ResponseEntity.ok(specialties);
     }
 
