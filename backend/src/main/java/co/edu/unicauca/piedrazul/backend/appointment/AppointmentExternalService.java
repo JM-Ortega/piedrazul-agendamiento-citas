@@ -6,4 +6,6 @@ import java.util.UUID;
 
 public interface AppointmentExternalService {
     List<AppointmentSummary> findByDoctorAndDate(UUID idDoctor, LocalDate date, String state);
+
+    UUID getPattientIdByAppointmentId(UUID appointmentId);
 }

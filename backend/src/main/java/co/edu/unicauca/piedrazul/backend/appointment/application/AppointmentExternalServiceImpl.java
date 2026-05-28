@@ -42,4 +42,8 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
                 )).toList();
     }
 
+    @Override
+    public UUID getPattientIdByAppointmentId(UUID appointmentId){
+        return appointmentRepository.getPattientIdByAppointmentId(appointmentId);
+    }
 }
