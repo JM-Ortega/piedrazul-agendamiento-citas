@@ -27,7 +27,7 @@ public class PatientConsultPortImpl implements PatientConsultPort {
     public PatientInfo findById(UUID idPatient) {
         return patientModuleApi.findById(idPatient)
                 .map(PatientInfoMapper::toPatientInfo)
-                .orElseThrow(() -> new AppointmentPatientNotFoundException("Patient not found: " + idPatient));
+                .orElseThrow(() -> new AppointmentPatientNotFoundException("Paciente con id " + idPatient + " no encontrado"));
     }
 
     @Override
