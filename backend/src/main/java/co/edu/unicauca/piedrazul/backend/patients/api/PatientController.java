@@ -11,6 +11,7 @@ import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientSummaryR
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientService;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -131,6 +132,15 @@ public class PatientController {
     @GetMapping("/document/{documentNumber}/public")
     public PatientPublicResponse findPublicByDocument(@PathVariable String documentNumber) {
         return patientService.findPublicByDocumentNumber(documentNumber);
+    }
+
+    @GetMapping("/{appointmentId}/patient-attended")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public PatientResponse getPatientByAppointment(@PathVariable UUID appointmentId) {
+        UUID patientId = patientService.getPatientIdByAppointmentId(appointmentId);
+        PatientData patient = patientService.findById(patientId)
+                .orElseThrow(() -> new PatientNotFoundException(patientId));
+        return toResponse(patient);
     }
 
     private PatientResponse toResponse(PatientData patient) {
