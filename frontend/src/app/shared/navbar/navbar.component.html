@@ -58,8 +58,8 @@
           [class]="
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
             (rla8.isActive
-              ? 'bg-white text-blue-700'
-              : 'text-white hover:bg-blue-600')
+              ? 'bg-white text-[#215c98]'
+              : 'text-white hover:bg-[#4e92d9]')
           "
         >
           <lucide-angular [img]="Stethoscope" [size]="20"></lucide-angular>
@@ -73,8 +73,8 @@
           [class]="
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
             (rla9.isActive
-              ? 'bg-white text-blue-700'
-              : 'text-white hover:bg-blue-600')
+              ? 'bg-white text-[#215c98]'
+              : 'text-white hover:bg-[#4e92d9]')
           "
         >
           <lucide-angular [img]="CalendarDays" [size]="20"></lucide-angular>
@@ -256,7 +256,7 @@
 
     <!-- Mobile Menu Button -->
     <button
-      class="md:hidden p-2 rounded-lg hover:bg-blue-600"
+      class="md:hidden p-2 rounded-lg hover:bg-[#4e92d9]"
       (click)="menuOpen.set(!menuOpen())"
     >
       @if (menuOpen()) {
