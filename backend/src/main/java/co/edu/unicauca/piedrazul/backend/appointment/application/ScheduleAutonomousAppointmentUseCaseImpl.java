@@ -37,7 +37,11 @@ public class ScheduleAutonomousAppointmentUseCaseImpl implements ScheduleAutonom
                                                 appointmentRepository,
                                                 doctorConfigConsultPort,
                                                 appointmentService,
-                                                eventPublisher
+                                                eventPublisher,
+                                                new IsNewPatientUseCaseImpl(
+                                                        appointmentRepository,
+                                                        patientConsultPort
+                                                )
                                 ),
                                 new AutonomousPatientResolutionStrategy(patientConsultPort)
                 );
