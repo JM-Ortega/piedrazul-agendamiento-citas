@@ -3,24 +3,25 @@ import { Router } from '@angular/router';
 import {
   Calendar,
   Check,
+  ChevronDown,
+  ClipboardList,
   Clock,
   FileText,
   LucideAngularModule,
   Plus,
   User,
   UserX,
-  ChevronDown,
-  ClipboardList,
 } from 'lucide-angular';
 import { DoctorService } from '../../../core/services/doctor.service';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
+import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
 @Component({
   selector: 'app-doctor-dashboard',
   templateUrl: './doctor-dashboard.component.html',
   standalone: true,
-  imports: [LucideAngularModule],
+  imports: [LucideAngularModule, FormatoPipe],
 })
 export class DoctorDashboardComponent implements OnInit {
   private doctorService = inject(DoctorService);
@@ -54,15 +55,6 @@ export class DoctorDashboardComponent implements OnInit {
 
   openCardDropdownId = signal<string | null>(null);
   showOutcomeDropdown = signal(false);
-
-  formattedSpecialty = computed(() => {
-    const spec = this.currentDoctor()?.specialty ?? '';
-    return spec
-      .replace(/[\[\]"]/g, '')
-      .replace(/_/g, ' ')
-      .toLowerCase()
-      .replace(/^\w/, (c) => c.toUpperCase());
-  });
 
   todaysAppointments = computed(() =>
     [...this.appointments()]
@@ -135,9 +127,10 @@ export class DoctorDashboardComponent implements OnInit {
 
     this.isMarkingAttended.set(true);
 
-    const request$ = outcome === 'ATENDIDA'
-      ? this.doctorService.updateAppointmentAsAttended(id, outcome)
-      : this.doctorService.updateAppointmentAsUnassisted(id, outcome);
+    const request$ =
+      outcome === 'ATENDIDA'
+        ? this.doctorService.updateAppointmentAsAttended(id, outcome)
+        : this.doctorService.updateAppointmentAsUnassisted(id, outcome);
 
     request$.subscribe({
       next: () => {

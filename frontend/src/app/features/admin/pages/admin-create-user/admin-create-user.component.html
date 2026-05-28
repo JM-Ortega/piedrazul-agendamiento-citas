@@ -2,11 +2,11 @@
   <div class="max-w-4xl mx-auto space-y-6">
     <!-- Header -->
     <div
-      class="bg-linear-to-r from-blue-700 to-blue-500 text-white rounded-2xl p-7 shadow-lg"
+      class="bg-linear-to-r from-[#163c63] to-[#215c98] text-white rounded-2xl p-7 shadow-lg"
     >
       <button
         (click)="navigateBack()"
-        class="flex items-center gap-2 text-white hover:text-blue-100 mb-4 text-base"
+        class="flex items-center gap-2 text-white hover:text-[#a7c9ec] mb-4 text-base"
       >
         <lucide-icon [name]="ArrowLeft" [size]="20"></lucide-icon>
         Volver a Gestión de Usuarios
@@ -15,7 +15,7 @@
         <lucide-icon [name]="UserPlus" [size]="34"></lucide-icon>
         <div>
           <h1 class="text-3xl font-bold">Crear Nuevo Usuario</h1>
-          <p class="text-blue-100 text-lg mt-2">
+          <p class="text-[#a7c9ec] text-lg mt-2">
             Registre un nuevo médico y/o agendador en el sistema
           </p>
         </div>
@@ -43,9 +43,8 @@
           Roles del Usuario
         </h3>
         <p class="text-gray-500 text-base mb-4">
-          Seleccione un rol para el usuario.Al menos un rol es requerido.
+          Seleccione un rol para el usuario. Al menos un rol es requerido.
         </p>
-
         <div class="grid grid-cols-2 gap-4">
           <!-- Doctor -->
           <button
@@ -54,8 +53,8 @@
             [class]="
               'p-6 rounded-xl border-2 transition-all ' +
               (hasDoctorRole
-                ? 'border-blue-600 bg-blue-50 shadow-lg ring-2 ring-blue-200'
-                : 'border-gray-300 hover:border-blue-400 bg-white')
+                ? 'border-[#215c98] bg-[#d9e9f8] shadow-lg ring-2 ring-[#a7c9ec]'
+                : 'border-gray-300 hover:border-[#4e92d9] bg-white')
             "
           >
             <div class="flex flex-col items-center gap-3">
@@ -63,11 +62,11 @@
                 <lucide-icon
                   [name]="Stethoscope"
                   [size]="40"
-                  [class]="hasDoctorRole ? 'text-blue-600' : 'text-gray-500'"
+                  [class]="hasDoctorRole ? 'text-[#215c98]' : 'text-gray-500'"
                 ></lucide-icon>
                 <div
                   *ngIf="hasDoctorRole"
-                  class="absolute -top-2 -right-2 bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
+                  class="absolute -top-2 -right-2 bg-[#215c98] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
                 >
                   ✓
                 </div>
@@ -75,7 +74,7 @@
               <span
                 [class]="
                   'text-lg font-semibold ' +
-                  (hasDoctorRole ? 'text-blue-700' : 'text-gray-700')
+                  (hasDoctorRole ? 'text-[#215c98]' : 'text-gray-700')
                 "
               >
                 Médico / Terapista
@@ -121,7 +120,6 @@
             </div>
           </button>
         </div>
-
         <p
           *ngIf="hasError('roles')"
           class="mt-2 text-sm text-red-600 flex items-center gap-1"
@@ -134,11 +132,10 @@
       <!-- ── Información Básica ── -->
       <div class="space-y-6">
         <h3
-          class="text-gray-700 text-xl font-semibold border-b-2 border-blue-100 pb-3"
+          class="text-gray-700 text-xl font-semibold border-b-2 border-[#d9e9f8] pb-3"
         >
           Información Básica
         </h3>
-
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <!-- Documento -->
           <div>
@@ -284,16 +281,17 @@
       <!-- ── Información del Médico ── -->
       <div
         *ngIf="hasDoctorRole"
-        class="space-y-6 mt-8 pt-8 border-t-2 border-blue-100"
+        class="space-y-6 mt-8 pt-8 border-t-2 border-[#a7c9ec]"
       >
-        <h3 class="text-blue-700 text-xl font-semibold flex items-center gap-2">
+        <h3
+          class="text-[#215c98] text-xl font-semibold flex items-center gap-2"
+        >
           <lucide-icon [name]="Stethoscope" [size]="24"></lucide-icon>
           Información del Médico
         </h3>
 
-        <!-- Fila 1: Especialidad + Teléfono -->
+        <!-- Fila 1: Especialidad + Tipo doc + Teléfono -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <!-- Especialidad -->
           <div>
             <label class="block text-gray-700 text-base font-medium mb-2"
               >Especialidad *</label
@@ -325,9 +323,9 @@
             </p>
           </div>
           <div>
-            <label class="block text-gray-700 text-base font-medium mb-2">
-              Tipo de Documento *
-            </label>
+            <label class="block text-gray-700 text-base font-medium mb-2"
+              >Tipo de Documento *</label
+            >
             <div class="relative">
               <lucide-icon
                 [name]="CreditCard"
@@ -346,8 +344,6 @@
               </select>
             </div>
           </div>
-
-          <!-- Teléfono -->
           <div>
             <label class="block text-gray-700 text-base font-medium mb-2">
               Teléfono *
@@ -383,7 +379,7 @@
           </div>
         </div>
 
-        <!-- Fila 2: Correo electrónico -->
+        <!-- Fila 2: Correo -->
         <div>
           <label class="block text-gray-700 text-base font-medium mb-2"
             >Correo Electrónico *</label
@@ -470,7 +466,56 @@
           </div>
         </div>
 
-        <!-- Fila 4: Intervalo entre citas -->
+        <!-- Fila 5: Horario -->
+        <div class="grid grid-cols-2 gap-5">
+          <div>
+            <label class="block text-gray-700 text-base font-medium mb-2"
+              >Hora de Inicio</label
+            >
+            <select
+              [(ngModel)]="userForm.startTime"
+              name="startTime"
+              (change)="onStartTimeChange()"
+              [class]="inputClass('startTime', 'px-4')"
+            >
+              <option value="" disabled>-- Seleccionar --</option>
+              <option *ngFor="let t of timeOptions" [value]="t">{{ t }}</option>
+            </select>
+            <p
+              *ngIf="hasError('startTime')"
+              class="mt-1 text-sm text-red-600 flex items-center gap-1"
+            >
+              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+              {{ errors.startTime }}
+            </p>
+          </div>
+          <div>
+            <label class="block text-gray-700 text-base font-medium mb-2">
+              Hora de Fin
+              <span class="text-sm text-gray-500 font-normal ml-1"
+                >máx. 12:00 pm</span
+              >
+            </label>
+            <select
+              [(ngModel)]="userForm.endTime"
+              name="endTime"
+              (change)="onEndTimeChange()"
+              [class]="inputClass('endTime', 'px-4')"
+            >
+              <option value="" disabled>-- Seleccionar --</option>
+              <option *ngFor="let t of timeOptions" [value]="t">{{ t }}</option>
+            </select>
+            <p
+              *ngIf="hasError('endTime')"
+              class="mt-1 text-sm text-red-600 flex items-center gap-1"
+            >
+              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+              {{ errors.endTime }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Fila 4: Intervalo -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div>
             <label class="block text-gray-700 text-base font-medium mb-2">
@@ -501,53 +546,7 @@
           </div>
         </div>
 
-        <!-- Fila 5: Horario de atención -->
-        <div class="grid grid-cols-2 gap-5">
-          <div>
-            <label class="block text-gray-700 text-base font-medium mb-2"
-              >Hora de Inicio</label
-            >
-            <input
-              type="time"
-              [(ngModel)]="userForm.startTime"
-              name="startTime"
-              (change)="onStartTimeChange()"
-              [class]="inputClass('startTime', 'px-4')"
-            />
-            <p
-              *ngIf="hasError('startTime')"
-              class="mt-1 text-sm text-red-600 flex items-center gap-1"
-            >
-              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-              {{ errors.startTime }}
-            </p>
-          </div>
-          <div>
-            <label class="block text-gray-700 text-base font-medium mb-2">
-              Hora de Fin
-              <span class="text-sm text-gray-500 font-normal ml-1"
-                >máx. 14:00 (2:00 p.m.)</span
-              >
-            </label>
-            <input
-              type="time"
-              [(ngModel)]="userForm.endTime"
-              name="endTime"
-              max="14:00"
-              (change)="onEndTimeChange()"
-              [class]="inputClass('endTime', 'px-4')"
-            />
-            <p
-              *ngIf="hasError('endTime')"
-              class="mt-1 text-sm text-red-600 flex items-center gap-1"
-            >
-              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-              {{ errors.endTime }}
-            </p>
-          </div>
-        </div>
-
-        <!-- Fila 6: Días de atención -->
+        <!-- Fila 6: Días -->
         <div>
           <label class="block text-gray-700 text-base font-medium mb-1"
             >Días de Atención</label
@@ -564,8 +563,8 @@
               [class]="
                 'px-5 py-3 rounded-xl border-2 transition-all text-base font-medium ' +
                 (isWorkDaySelected(day.value)
-                  ? 'border-blue-600 bg-blue-50 text-blue-700'
-                  : 'border-gray-300 bg-white text-gray-600 hover:border-blue-400')
+                  ? 'border-[#215c98] bg-[#d9e9f8] text-[#215c98]'
+                  : 'border-gray-300 bg-white text-gray-600 hover:border-[#4e92d9]')
               "
             >
               {{ day.label }}
@@ -596,7 +595,7 @@
           type="button"
           (click)="handleCreateUser()"
           [disabled]="isSubmitting"
-          class="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-lg font-semibold transition-colors flex items-center justify-center gap-2"
+          class="flex-1 px-6 py-4 bg-[#215c98] hover:bg-[#163c63] disabled:bg-[#a7c9ec] text-white rounded-xl text-lg font-semibold transition-colors flex items-center justify-center gap-2"
         >
           <lucide-icon
             *ngIf="!isSubmitting"

@@ -57,7 +57,7 @@ export class DoctorEditFormComponent implements OnInit {
 
   readonly timeOptions: string[] = (() => {
     const opts: string[] = [];
-    for (let h = 5; h <= 12; h++) {
+    for (let h = 7; h <= 12; h++) {
       for (let m = 0; m < 60; m += 5) {
         if (h === 12 && m > 0) break;
         opts.push(

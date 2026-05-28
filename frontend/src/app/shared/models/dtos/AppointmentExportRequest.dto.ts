@@ -3,6 +3,7 @@ import { ExportFormatBackend } from '../types/ExportFormatBackend.type';
 export interface AppointmentExportRequest {
   idDoctor?: string | null;
   format: ExportFormatBackend;
-  columns: ExportColumnBackend[];
+  columns?: ExportColumnBackend[];
   state?: string | null;
+  date?: string | null;
 }
