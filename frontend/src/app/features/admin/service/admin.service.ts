@@ -118,10 +118,10 @@ export class AdminService {
   // ── System Users ──────────────────────────────────────────────────────────
 
   getSystemUsers(): Observable<SystemUser[]> {
-    return this.http.get<SystemUser[]>(`${this.apiUrl}/admin/system-users`);
+    return this.http.get<SystemUser[]>(`${this.apiUrl}/user/system-users`);
   }
 
   createScheduler(request: CreateSchedulerRequest): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/admin/schedulers`, request);
+    return this.http.post<void>(`${this.apiUrl}/user/schedulers`, request);
   }
 }
