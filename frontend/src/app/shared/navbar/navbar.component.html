@@ -27,7 +27,7 @@
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
             (rla4.isActive
               ? 'bg-white text-blue-700'
-              : 'text-white hover:bg-blue-600')
+              : 'text-white hover:bg-[#4e92d9]')
           "
         >
           <lucide-angular [img]="ClipboardList" [size]="20"></lucide-angular>
@@ -152,7 +152,7 @@
             <div class="relative">
               <button
                 (click)="toggleRoleDropdown()"
-                class="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 px-3 py-2 rounded-lg transition-colors"
+                class="flex items-center gap-2 bg-[#215c98] hover:bg-[#4e92d9] px-3 py-2 rounded-lg transition-colors"
               >
                 <div class="bg-[#4e92d9] rounded-full p-1">
                   <lucide-angular [img]="User" [size]="16"></lucide-angular>
@@ -274,7 +274,7 @@
         <a
           routerLink="/agendador"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#a7c9ec] text-white"
         >
           <lucide-angular [img]="ClipboardList" [size]="20"></lucide-angular>
           Ver Citas
