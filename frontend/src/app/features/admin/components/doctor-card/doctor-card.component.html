@@ -5,7 +5,7 @@
   <div class="flex items-center gap-4">
     <div
       class="text-white rounded-full w-12 h-12 flex items-center justify-center text-lg font-bold shrink-0"
-      [class]="doctor().status === false ? 'bg-gray-400' : 'bg-blue-600'"
+      [class]="doctor().status === false ? 'bg-gray-400' : 'bg-[#215c98]'"
     >
       {{ doctor().name.split(" ").slice(-2)[0][0]
       }}{{ doctor().name.split(" ").slice(-2)[1][0] }}
@@ -20,7 +20,7 @@
           >
         }
       </p>
-      <p class="text-gray-500 text-base">
+      <p class="text-gray-600 text-base">
         {{ doctor().specialty | formato }}
       </p>
     </div>
@@ -36,7 +36,7 @@
   @if (!isEditing()) {
     <button
       (click)="edit.emit(doctor())"
-      class="flex items-center gap-2 px-5 py-2.5 rounded-xl transition-colors text-base bg-blue-100 hover:bg-blue-200 text-blue-700 cursor-pointer"
+      class="flex items-center gap-2 px-5 py-2.5 rounded-xl transition-colors text-base bg-[#d9e9f8] hover:bg-[#a7c9ec] text-[#215c98] cursor-pointer"
     >
       <lucide-angular [img]="Pencil" [size]="18"></lucide-angular>
       Editar
@@ -52,7 +52,7 @@
         <lucide-angular
           [img]="Clock"
           [size]="14"
-          class="text-blue-500"
+          class="text-[#163c63]"
         ></lucide-angular>
         {{ doctor().startTime }} – {{ doctor().endTime }}
       </span>
@@ -60,7 +60,7 @@
         <lucide-angular
           [img]="Clock"
           [size]="14"
-          class="text-blue-500"
+          class="text-[#163c63]"
         ></lucide-angular>
         Intervalo: {{ doctor().appointmentInterval }} min
       </span>
