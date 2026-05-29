@@ -145,6 +145,13 @@ public class KeycloakUserClient {
         }
     }
 
+    public void revokeRoleIfPresent(UUID keycloakId, Role role) {
+
+        if (userHasRole(keycloakId, role)) {
+            revokeRealmRole(keycloakId.toString(), role);
+        }
+    }
+
     public void activateUser(UUID keycloakId) {
         UserRepresentation user = new UserRepresentation();
         user.setEnabled(true);
@@ -211,5 +218,20 @@ public class KeycloakUserClient {
                 .roles()
                 .realmLevel()
                 .add(List.of(realmRole));
+    }
+
+    private void revokeRealmRole(String keycloakId, Role role) {
+
+        RealmResource realm = keycloak.realm(props.getRealm());
+
+        RoleRepresentation realmRole = realm.roles()
+                .get(role.name())
+                .toRepresentation();
+
+        realm.users()
+                .get(keycloakId)
+                .roles()
+                .realmLevel()
+                .remove(List.of(realmRole));
     }
 }

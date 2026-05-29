@@ -35,7 +35,7 @@ public class ExcelExporter {
                                 + "  |  Fecha: " + report.date()
                 );
                 tituloCell.setCellStyle(titleStyle);
-                sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, columnas.size() - 1));
+                mergeIfNeeded(sheet, 0, 0, 0, columnas.size() - 1);
 
                 // Fila de cabeceras
                 Row cabecera = sheet.createRow(1);
@@ -84,13 +84,14 @@ public class ExcelExporter {
             if (hasAvailableSlots) {
                 CellStyle warningStyle = crearEstiloAdvertencia(workbook);
                 Row warningRow = sheet.createRow(startRow++);
+                warningRow.setHeightInPoints(40);
                 Cell warningCell = warningRow.createCell(0);
                 warningCell.setCellValue(
                         "⚠ ADVERTENCIA: Aún existen horarios disponibles para esta fecha. " +
                                 "Este documento puede estar sujeto a desactualizaciones."
                 );
                 warningCell.setCellStyle(warningStyle);
-                sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, schedules.size() - 1));
+                mergeIfNeeded(sheet, 0, 0, 0, schedules.size() - 1);
                 startRow++; // fila en blanco separadora
             }
 
@@ -99,6 +100,7 @@ public class ExcelExporter {
             int totalCitas = schedules.stream().mapToInt(s -> s.patientNames().size()).sum();
 
             Row titulo = sheet.createRow(startRow++);
+            titulo.setHeightInPoints(30);
             Cell tituloCell = titulo.createCell(0);
             tituloCell.setCellValue(
                     "Agenda de Citas por Médico" +
@@ -107,8 +109,7 @@ public class ExcelExporter {
                             "  |  Total citas: " + totalCitas
             );
             tituloCell.setCellStyle(titleStyle);
-            sheet.addMergedRegion(new CellRangeAddress(
-                    startRow - 1, startRow - 1, 0, schedules.size() - 1));
+            mergeIfNeeded(sheet, startRow - 1, startRow - 1, 0, schedules.size() - 1);
 
             startRow++; // fila en blanco entre título y encabezados de médicos
 
@@ -152,6 +153,13 @@ public class ExcelExporter {
         }
     }
 
+    // Método helper para agregar al final de la clase
+    private void mergeIfNeeded(Sheet sheet, int firstRow, int lastRow, int firstCol, int lastCol) {
+        if (firstCol < lastCol || firstRow < lastRow) {
+            sheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, firstCol, lastCol));
+        }
+    }
+
 
     private CellStyle crearEstiloEncabezado(Workbook wb) {
         CellStyle style = wb.createCellStyle();
@@ -174,6 +182,7 @@ public class ExcelExporter {
         style.setFont(font);
         style.setFillForegroundColor(IndexedColors.LIGHT_GREEN.getIndex());
         style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setWrapText(true);
         return style;
     }
 
@@ -193,8 +202,8 @@ public class ExcelExporter {
         style.setFont(font);
         style.setFillForegroundColor(IndexedColors.LIGHT_YELLOW.getIndex());
         style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setWrapText(true);
         return style;
     }
-
 
 }

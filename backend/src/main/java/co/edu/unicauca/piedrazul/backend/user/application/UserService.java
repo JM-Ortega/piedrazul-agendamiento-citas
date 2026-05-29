@@ -5,11 +5,14 @@ import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSchedulerRequest;
+import co.edu.unicauca.piedrazul.backend.user.exception.DoctorRoleRequiredException;
 import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsException;
+import co.edu.unicauca.piedrazul.backend.user.exception.UserNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 @Service
@@ -69,5 +72,27 @@ public class UserService {
         }
 
         return result;
+    }
+
+    public void giveDoctorScheduleRole(String username){
+        UUID userId = keycloakUserService.findUserIdByUsername(username)
+                .orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
+
+        if(keycloakUserService.hasDoctrRole(userId)){
+            keycloakUserService.ensureSchedulerRole(userId);
+        }else{
+            throw new DoctorRoleRequiredException("Solo se puede añadir el rol de Agendador a un usuario de tipo Doctor");
+        }
+    }
+
+    public void revokeDoctorSchedulerRole(String username){
+        UUID userId = keycloakUserService.findUserIdByUsername(username)
+                .orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
+
+        if(keycloakUserService.hasDoctrRole(userId)){
+            keycloakUserService.revokeSchedulerRole(userId);
+        }else{
+            throw new DoctorRoleRequiredException("Solo se puede revocar el rol de Agendador a un usuario de tipo Doctor");
+        }
     }
 }

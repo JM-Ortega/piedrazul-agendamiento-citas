@@ -105,6 +105,51 @@ public class DoctorController {
     }
 
     /**
+     * Agregar especialidades de un doctor específico
+     * @param specialties Especialidades a agregar para el doctor
+     * @param doctorId Id del doctor
+     * @return Sin contenido
+     */
+    @PostMapping("/{doctorId}/specialties")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> addSpecialties(
+            @PathVariable UUID doctorId,
+            @RequestBody List<Specialty> specialties) {
+
+        doctorService.addSpecialities(doctorId, specialties);
+
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Eliminar especialidades de un doctor específico
+     * @param specialties Especialidades a agregar para el doctor
+     * @param doctorId Id del doctors
+     * @return Sin contenido
+     */
+    @DeleteMapping("/{doctorId}/specialties")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> removeSpecialties(
+            @PathVariable UUID doctorId,
+            @RequestBody List<Specialty> specialties) {
+
+        doctorService.removeSpecialities(doctorId, specialties);
+
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Obtiene todas las especialidades de los medicos
+     * @return Lista de especialidades
+     */
+    @GetMapping("/all-specialties")
+    @PreAuthorize("hasAnyRole('ADMIN')")
+    public ResponseEntity<?> getAllSpecialties() {
+        List<Specialty> specialties = doctorService.getAllSpecialties();
+        return ResponseEntity.ok(specialties);
+    }
+
+    /**
      * Obtener doctores por especialidad
      * @param specialty Especialidad a buscar
      * @return Lista de doctores con esa especialidad

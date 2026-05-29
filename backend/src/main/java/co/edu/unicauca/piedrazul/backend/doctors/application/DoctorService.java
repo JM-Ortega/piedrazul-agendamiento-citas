@@ -242,6 +242,24 @@ public class DoctorService {
         doctorRepository.save(doctor);
     }
 
+    @Transactional
+    public void addSpecialities(UUID doctorId, List<Specialty> specialties) {
+
+        Doctor doctor = doctorRepository.findById(doctorId)
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
+
+        doctor.getSpecialty().addAll(specialties);
+    }
+
+    @Transactional
+    public void removeSpecialities(UUID doctorId, List<Specialty> specialties) {
+
+        Doctor doctor = doctorRepository.findById(doctorId)
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
+
+        doctor.getSpecialty().removeAll(specialties);
+    }
+
     public List<Doctor> findAllDoctors() {
         return doctorRepository.findAll();
     }
@@ -273,6 +291,10 @@ public class DoctorService {
             return activeSpecialities;
         }
         return Collections.emptyList();
+    }
+
+    public List<Specialty> getAllSpecialties (){
+        return Arrays.asList(Specialty.values());
     }
 
     private void syncUserStatus(Doctor doctor) {

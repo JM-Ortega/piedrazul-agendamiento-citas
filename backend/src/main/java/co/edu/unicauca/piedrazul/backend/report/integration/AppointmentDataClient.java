@@ -28,7 +28,6 @@ public class AppointmentDataClient {
         return appointmentExternalService.findAllByDate(date);
     }
 
-
     public boolean hasAvailableSlots(LocalDate date){
         return appointmentExternalService.hasAvailableSlots(date);
     }

@@ -9,6 +9,7 @@ import jakarta.transaction.Transactional;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public class AppointmentRepositoryImpl implements AppointmentRepository {
@@ -16,12 +17,10 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     private final AppointmentJpaRepository jpaRepository;
     private final AppointmentMapper mapper;
 
-
     public AppointmentRepositoryImpl(AppointmentJpaRepository jpaRepository, AppointmentMapper mapper) {
         this.jpaRepository = jpaRepository;
         this.mapper = mapper;
     }
-
 
     @Transactional
     @Override
@@ -91,7 +90,13 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
                 .map(mapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Cita con ID: " + appointmentId + "no encontrada"));
     }
+
+    @Override
+    public UUID getPattientIdByAppointmentId(UUID appointmentId){
+        return jpaRepository.findById(appointmentId).get().getIdPatient();
+    }
   
+    @Override
     public List<Appointment> findAllByDate(LocalDate date) { return jpaRepository.findByDate(date)
             .stream()
             .map(mapper::toDomain)

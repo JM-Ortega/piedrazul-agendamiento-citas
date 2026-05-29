@@ -40,6 +40,17 @@ export class SchedulerService {
       },
     );
   }
+  exportScheduler(payload: AppointmentExportRequest): Observable<Blob> {
+    return this.http.post(`${this.apiUrl}/reports/scheduler/export`, payload, {
+      responseType: 'blob',
+    });
+  }
+  checkSchedulerAvailability(date: string): Observable<boolean> {
+    return this.http.get<boolean>(
+      `${this.apiUrl}/reports/scheduler/availability`,
+      { params: { date } },
+    );
+  }
   getAppointmentsByDateAndDoctor(
     date: string,
     doctorId: string,
