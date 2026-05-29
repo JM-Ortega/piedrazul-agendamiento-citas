@@ -172,15 +172,8 @@ public class AppointmentController {
 
     @DeleteMapping("/{appointmentId}")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT')")
-    public ResponseEntity<Void> cancelAppointment(
-            @PathVariable UUID appointmentId,
-            @AuthenticationPrincipal Jwt jwt) {
-
-        UUID requesterId = UUID.fromString(jwt.getSubject());
-        boolean isScheduler = jwt.getClaimAsStringList("roles") != null
-                && jwt.getClaimAsStringList("roles").contains("ROLE_SCHEDULER");
-
-        cancelAppointmentUseCase.cancel(appointmentId, requesterId, isScheduler);
+    public ResponseEntity<Void> cancelAppointment(@PathVariable UUID appointmentId) {
+        cancelAppointmentUseCase.cancel(appointmentId);
         return ResponseEntity.noContent().build(); // 204
     }
 

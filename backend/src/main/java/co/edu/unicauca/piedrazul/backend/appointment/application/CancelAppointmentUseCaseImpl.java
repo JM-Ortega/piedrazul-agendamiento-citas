@@ -17,14 +17,9 @@ public class CancelAppointmentUseCaseImpl implements CancelAppointmentUseCase {
     }
 
     @Override
-    public void cancel(UUID  appointmentId, UUID requesterId, boolean isScheduler) {
+    public void cancel(UUID  appointmentId) {
 
         Appointment appointment = appointmentRepository.findById(appointmentId);
-
-        //un paciente solo puede cancelar su propia cita
-        if(!isScheduler && !appointment.getIdPatient().equals(requesterId)) {
-            throw new CancelAppointmentNotAllowedException("No tiene permiso para cancelar esta cita");
-        }
 
         // No se pueden cancelar citas pasadas (ya manejamos que sean ATENDIDA o NO_ASISTIO)
         //pero por doble seguridad
