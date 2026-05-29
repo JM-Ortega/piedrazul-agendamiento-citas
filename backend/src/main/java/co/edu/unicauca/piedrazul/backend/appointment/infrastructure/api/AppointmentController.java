@@ -31,6 +31,7 @@ public class AppointmentController {
     private final ListMyAppointmentsUseCase listMyAppointmentsUseCase;
     private final IsNewPatientUseCase isNewPatientUseCase;
     private final UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase;
+    private final CancelAppointmentUseCase cancelAppointmentUseCase;
 
     public AppointmentController(
             GetAvailableSlotsUseCase getAvailableSlotsUseCase,
@@ -41,7 +42,8 @@ public class AppointmentController {
             CitaDtoMapper citaDtoMapper,
             ListMyAppointmentsUseCase listMyAppointmentsUseCase,
             IsNewPatientUseCase isNewPatientUseCase,
-            UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase) {
+            UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase,
+            CancelAppointmentUseCase cancelAppointmentUseCase) {
         this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
         this.scheduleManualAppointmentUseCase = scheduleManualAppointmentUseCase;
         this.scheduleAutonomousAppointmentUseCase = scheduleAutonomousAppointmentUseCase;
@@ -51,6 +53,7 @@ public class AppointmentController {
         this.listMyAppointmentsUseCase = listMyAppointmentsUseCase;
         this.isNewPatientUseCase = isNewPatientUseCase;
         this.updateAppointmentStatusUseCase = updateAppointmentStatusUseCase;
+        this.cancelAppointmentUseCase = cancelAppointmentUseCase;
     }
 
     // Franjas disponibles según el médico y la fecha
@@ -165,6 +168,20 @@ public class AppointmentController {
     public ResponseEntity<Void> markAppointmentAsUnassisted(@PathVariable UUID appointmentId) {
         updateAppointmentStatusUseCase.markAsUnassisted(appointmentId);
         return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{appointmentId}")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT')")
+    public ResponseEntity<Void> cancelAppointment(
+            @PathVariable UUID appointmentId,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        UUID requesterId = UUID.fromString(jwt.getSubject());
+        boolean isScheduler = jwt.getClaimAsStringList("roles") != null
+                && jwt.getClaimAsStringList("roles").contains("ROLE_SCHEDULER");
+
+        cancelAppointmentUseCase.cancel(appointmentId, requesterId, isScheduler);
+        return ResponseEntity.noContent().build(); // 204
     }
 
     private String resolvePerformedBy(Jwt jwt) {
