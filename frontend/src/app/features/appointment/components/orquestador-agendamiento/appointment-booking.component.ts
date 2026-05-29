@@ -266,7 +266,15 @@ export class AppointmentBookingComponent implements OnInit {
   }
 
   private loadSpecialties(): void {
-    this.citaService.getSpecialties().subscribe({
+    const patientId = this.resolvePatientIdForSpecialties();
+
+    if (!patientId) {
+      this.state.noSpecialtyAvailable.set(true);
+      this.state.errorMessageSpecialty.set('No se pudo determinar el paciente para cargar las especialidades.');
+      return;
+    }
+
+    this.citaService.getSpecialties(patientId).subscribe({
       next: (specs) => {
         if (!specs || specs.length === 0) {
           this.state.noSpecialtyAvailable.set(true);
@@ -370,5 +378,12 @@ export class AppointmentBookingComponent implements OnInit {
         this.state.selectedDoctorName.set(doctor.name);
       },
     });
+  }
+
+  private resolvePatientIdForSpecialties(): string {
+    if (this.state.isSchedulerContext()) {
+      return this.state.patientId() ?? '';
+    }
+    return this.state.patientSnapshot()?.id ?? '';
   }
 }
