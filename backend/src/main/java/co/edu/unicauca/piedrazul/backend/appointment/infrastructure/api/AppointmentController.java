@@ -170,7 +170,8 @@ public class AppointmentController {
         return ResponseEntity.ok().build();
     }
 
-    @DeleteMapping("/{appointmentId}")
+    //Cancelar una cita
+    @DeleteMapping("/cancel/{appointmentId}")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT')")
     public ResponseEntity<Void> cancelAppointment(@PathVariable UUID appointmentId) {
         cancelAppointmentUseCase.cancel(appointmentId);
