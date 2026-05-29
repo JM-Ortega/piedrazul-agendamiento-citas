@@ -289,38 +289,60 @@
           <!-- Especialidad + Tipo doc + Teléfono -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <!-- Especialidad -->
-            <div>
-              <label class="block text-gray-700 text-base font-medium mb-2"
-                >Especialidad *</label
-              >
-              <div class="relative">
-                <lucide-icon
-                  [name]="Building2"
-                  [size]="20"
-                  class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                ></lucide-icon>
-                <select
-                  [(ngModel)]="userForm.specialty"
-                  name="specialty"
-                  (change)="validateField('specialty')"
-                  [class]="inputClass('specialty', 'pl-12 pr-4')"
+            <!-- Especialidad -->
+            <div class="sm:col-span-2">
+              <label class="block text-gray-700 text-base font-medium mb-1">
+                Especialidades *
+                <span class="text-sm text-gray-500 font-normal ml-1"
+                  >(puede seleccionar varias)</span
                 >
-                  <option value="">
-                    {{ loadingSpecialties ? "Cargando..." : "Seleccione..." }}
-                  </option>
-                  @for (s of specialties; track s) {
-                    <option [value]="s">{{ s | formato }}</option>
-                  }
-                </select>
+              </label>
+              <div class="grid grid-cols-2 gap-3 mt-2">
+                @for (sp of specialtyOptions; track sp.name) {
+                  <button
+                    type="button"
+                    (click)="toggleSpecialty(sp.name)"
+                    [class]="
+                      'flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-base font-medium ' +
+                      (isSpecialtySelected(sp.name)
+                        ? 'border-[#215c98] bg-[#d9e9f8] text-[#215c98] shadow-md'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-[#4e92d9]')
+                    "
+                  >
+                    <lucide-icon
+                      [name]="sp.icon"
+                      [size]="22"
+                      [class]="
+                        isSpecialtySelected(sp.name)
+                          ? 'text-[#215c98] shrink-0'
+                          : sp.colorClass + ' shrink-0'
+                      "
+                    ></lucide-icon>
+                    <span class="flex-1 text-left">{{
+                      sp.name | formato
+                    }}</span>
+                    @if (isSpecialtySelected(sp.name)) {
+                      <div
+                        class="bg-[#215c98] text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shrink-0"
+                      >
+                        ✓
+                      </div>
+                    }
+                  </button>
+                }
               </div>
+              @if (loadingSpecialties) {
+                <p class="mt-2 text-sm text-gray-400">
+                  Cargando especialidades...
+                </p>
+              }
               @if (hasError("specialty")) {
-                <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
                   <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
                   {{ errors.specialty }}
                 </p>
               }
             </div>
-
             <!-- Tipo de Documento -->
             <div>
               <label class="block text-gray-700 text-base font-medium mb-2"

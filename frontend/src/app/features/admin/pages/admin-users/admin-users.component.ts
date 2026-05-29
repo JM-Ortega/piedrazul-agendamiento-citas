@@ -92,6 +92,6 @@ export class AdminUsersComponent implements OnInit {
   }
 
   roleLabel(role: string): string {
-    return role === 'doctor' ? 'Médico' : 'Agendador';
+    return role.toUpperCase() === 'DOCTOR' ? 'Médico' : 'Agendador';
   }
 }

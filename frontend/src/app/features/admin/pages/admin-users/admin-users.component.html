@@ -116,10 +116,18 @@
                           @for (role of user.roles; track role) {
                             <span
                               class="text-xs px-2 py-1 rounded-full font-medium"
-                              [class.bg-[#d9e9f8]]="role === 'doctor'"
-                              [class.text-[#215c98]]="role === 'doctor'"
-                              [class.bg-green-100]="role !== 'doctor'"
-                              [class.text-green-700]="role !== 'doctor'"
+                              [class.bg-[#d9e9f8]]="
+                                role.toUpperCase() === 'DOCTOR'
+                              "
+                              [class.text-[#215c98]]="
+                                role.toUpperCase() === 'DOCTOR'
+                              "
+                              [class.bg-green-100]="
+                                role.toUpperCase() !== 'DOCTOR'
+                              "
+                              [class.text-green-700]="
+                                role.toUpperCase() !== 'DOCTOR'
+                              "
                             >
                               {{ roleLabel(role) }}
                             </span>

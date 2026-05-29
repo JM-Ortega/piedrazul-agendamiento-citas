@@ -3,7 +3,9 @@ import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
+  Activity,
   ArrowLeft,
+  Bone,
   Building2,
   Calendar,
   CalendarRange,
@@ -11,6 +13,7 @@ import {
   CreditCard,
   Eye,
   EyeOff,
+  Heart,
   Info,
   Lock,
   LucideAngularModule,
@@ -19,6 +22,7 @@ import {
   Stethoscope,
   User,
   UserPlus,
+  Zap,
 } from 'lucide-angular';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { AdminService } from '../../service/admin.service';
@@ -33,7 +37,7 @@ interface UserForm {
   lastName: string;
   email: string;
   phone: string;
-  specialty: string;
+  specialty: string[];
   laborStart: string;
   laborEnd: string;
   interval: number;
@@ -90,6 +94,10 @@ export class AdminCreateUserComponent implements OnInit {
   readonly Info = Info;
   readonly Mail = Mail;
   readonly Phone = Phone;
+  readonly Heart = Heart;
+  readonly Bone = Bone;
+  readonly Activity = Activity;
+  readonly Zap = Zap;
 
   showPassword = false;
   selectedRoles: Role[] = ['doctor'];
@@ -101,6 +109,7 @@ export class AdminCreateUserComponent implements OnInit {
   isSubmitting = false;
 
   // ── Datos dinámicos del backend ───────────────────────────────────────────
+  specialtyOptions: { name: string; icon: any; colorClass: string }[] = [];
   specialties: string[] = [];
   documentTypes: string[] = [];
   loadingSpecialties = false;
@@ -114,7 +123,7 @@ export class AdminCreateUserComponent implements OnInit {
     lastName: '',
     email: '',
     phone: '',
-    specialty: '',
+    specialty: [],
     laborStart: '',
     laborEnd: '',
     interval: 20,
@@ -156,11 +165,25 @@ export class AdminCreateUserComponent implements OnInit {
     this.loadDocumentTypes();
   }
 
+  private getSpecialtyIcon(name: string): { icon: any; colorClass: string } {
+    const map: Record<string, { icon: any; colorClass: string }> = {
+      MEDICINA_GENERAL: { icon: Heart, colorClass: 'text-red-700' },
+      QUIROPRAXIA: { icon: Bone, colorClass: 'text-orange-700' },
+      FISIOTERAPIA: { icon: Activity, colorClass: 'text-green-700' },
+      TERAPIA_NEURAL: { icon: Zap, colorClass: 'text-purple-700' },
+    };
+    // fallback si llega una especialidad no mapeada
+    return map[name] ?? { icon: Building2, colorClass: 'text-gray-400' };
+  }
+
   private loadSpecialties(): void {
     this.loadingSpecialties = true;
     this.adminService.getAllSpecialties().subscribe({
       next: (data) => {
-        this.specialties = data;
+        this.specialtyOptions = data.map((name) => ({
+          name,
+          ...this.getSpecialtyIcon(name),
+        }));
         this.loadingSpecialties = false;
       },
       error: () => {
@@ -352,29 +375,7 @@ export class AdminCreateUserComponent implements OnInit {
     }
     if (this.submitted) this.validateField('laborEnd');
   }
-  onDateKeydown(event: KeyboardEvent): void {
-    const input = event.target as HTMLInputElement;
-    const value = input.value;
-    const cursorPos = input.selectionStart ?? 0;
-    const allowedKeys = [
-      'Backspace',
-      'Delete',
-      'ArrowLeft',
-      'ArrowRight',
-      'Tab',
-      'Enter',
-    ];
-    if (allowedKeys.includes(event.key)) return;
 
-    // Bloquear si el cursor está en la parte del año (posición 0-3)
-    // y el año ya tiene 4 dígitos
-    if (cursorPos <= 3) {
-      const yearPart = value.split('-')[0] ?? '';
-      if (yearPart.length >= 4) {
-        event.preventDefault();
-      }
-    }
-  }
   // ── Días de atención ─────────────────────────────────────────────────────
 
   toggleWorkDay(day: number): void {
@@ -389,7 +390,20 @@ export class AdminCreateUserComponent implements OnInit {
   isWorkDaySelected(day: number): boolean {
     return this.userForm.workDays.includes(day);
   }
+  toggleSpecialty(specialty: string): void {
+    if (this.userForm.specialty.includes(specialty)) {
+      this.userForm.specialty = this.userForm.specialty.filter(
+        (s) => s !== specialty,
+      );
+    } else {
+      this.userForm.specialty = [...this.userForm.specialty, specialty];
+    }
+    if (this.submitted) this.validateField('specialty');
+  }
 
+  isSpecialtySelected(specialty: string): boolean {
+    return this.userForm.specialty.includes(specialty);
+  }
   // ── Roles ─────────────────────────────────────────────────────────────────
 
   toggleRole(role: Role): void {
@@ -479,9 +493,8 @@ export class AdminCreateUserComponent implements OnInit {
         break;
 
       case 'specialty':
-        if (this.hasDoctorRole && !this.userForm.specialty) {
-          this.errors.specialty =
-            'La especialidad es obligatoria para médicos.';
+        if (this.hasDoctorRole && this.userForm.specialty.length === 0) {
+          this.errors.specialty = 'Debe seleccionar al menos una especialidad.';
         }
         break;
 
@@ -637,7 +650,7 @@ export class AdminCreateUserComponent implements OnInit {
           identification: this.userForm.documentId,
           documentType: this.userForm.documentType,
           phone: this.userForm.phone,
-          specialty: [this.userForm.specialty],
+          specialty: this.userForm.specialty,
           laborStart: this.userForm.laborStart,
           laborEnd: this.userForm.laborEnd,
           appointmentInterval: this.userForm.interval,

@@ -137,4 +137,16 @@ export class AdminService {
   getAllDocumentTypes(): Observable<string[]> {
     return this.http.get<string[]>(`${this.apiUrl}/patients/document-types`);
   }
+  giveDoctorSchedulerRole(username: string): Observable<void> {
+    return this.http.post<void>(
+      `${this.apiUrl}/user/${username}/give-doctor-scheduler`,
+      null,
+    );
+  }
+
+  revokeDoctorSchedulerRole(username: string): Observable<void> {
+    return this.http.delete<void>(
+      `${this.apiUrl}/user/${username}/revoke-doctor-scheduler`,
+    );
+  }
 }
