@@ -41,7 +41,7 @@
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
             (rla5.isActive
               ? 'bg-white text-blue-700'
-              : 'text-white hover:bg-blue-600')
+              : 'text-white hover:bg-[#4e92d9]')
           "
         >
           <lucide-angular [img]="Calendar" [size]="20"></lucide-angular>
@@ -119,11 +119,12 @@
           routerLink="/paciente"
           #rla7="routerLinkActive"
           routerLinkActive
+          [routerLinkActiveOptions]="exactMatch"
           [class]="
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
             (rla7.isActive
-              ? 'bg-white text-blue-700'
-              : 'text-white hover:bg-blue-600')
+              ? 'bg-white text-[#215c98]'
+              : 'bg-[#215c98] text-white hover:bg-[#4e92d9]')
           "
         >
           <lucide-angular [img]="CalendarDays" [size]="20"></lucide-angular>
@@ -131,13 +132,14 @@
         </a>
         <a
           routerLink="/paciente/historial-citas"
-          #rla7="routerLinkActive"
+          #rla1="routerLinkActive"
           routerLinkActive
+          [routerLinkActiveOptions]="exactMatch"
           [class]="
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
-            (rla7.isActive
-              ? 'bg-white text-blue-700'
-              : 'text-white hover:bg-blue-600')
+            (rla1.isActive
+              ? 'bg-white text-[#215c98]'
+              : 'bg-[#215c98] text-white hover:bg-[#4e92d9]')
           "
         >
           <lucide-angular [img]="ClipboardList" [size]="20"></lucide-angular>
