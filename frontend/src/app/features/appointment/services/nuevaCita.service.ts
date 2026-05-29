@@ -30,15 +30,15 @@ export class NuevaCitaService {
 
   getSpecialtiesWithDoctor(patientId: string | null): Observable<SpecialtyDoctor[]> {
     const url = patientId
-      ? `${this.apiUrl}/appointments/specialties-with-doctor/${patientId}`
+      ? `${this.apiUrl}/appointments/specialties-with-doctor?patientId=${patientId}`
       : `${this.apiUrl}/appointments/specialties-with-doctor`;
     return this.http.get<SpecialtyDoctor[]>(url);
   }
 
   getSpecialties(patientId: string | null): Observable<string[]> {
     const url = patientId
-    ? `${this.apiUrl}/doctor/doctors/patients/specialties/${patientId}`
-    : `${this.apiUrl}/doctor/doctors/patients/specialties`;
+      ? `${this.apiUrl}/doctor/doctors/patients/specialties?patientId=${patientId}`
+      : `${this.apiUrl}/doctor/doctors/patients/specialties`;
     return this.http.get<string[]>(url);
   }
 
