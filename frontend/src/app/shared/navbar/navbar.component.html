@@ -26,7 +26,7 @@
           [class]="
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
             (rla4.isActive
-              ? 'bg-white text-blue-700'
+              ? 'bg-white text-[#215c98]'
               : 'text-white hover:bg-[#4e92d9]')
           "
         >
@@ -40,7 +40,7 @@
           [class]="
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
             (rla5.isActive
-              ? 'bg-white text-blue-700'
+              ? 'bg-white text-[#215c98]'
               : 'text-white hover:bg-[#4e92d9]')
           "
         >
@@ -91,8 +91,8 @@
           [class]="
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
             (rla6.isActive
-              ? 'bg-white text-blue-700'
-              : 'text-white hover:bg-blue-600')
+              ? 'bg-white text-[#215c98]'
+              : 'text-white hover:bg-[#4e92d9]')
           "
         >
           <lucide-angular [img]="Settings" [size]="20"></lucide-angular>
@@ -105,8 +105,8 @@
           [class]="
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
             (rla10.isActive
-              ? 'bg-white text-blue-700'
-              : 'text-white hover:bg-blue-600')
+              ? 'bg-white text-[#215c98]'
+              : 'text-white hover:bg-[#4e92d9]')
           "
         >
           <lucide-angular [img]="Users" [size]="20"></lucide-angular>
@@ -276,7 +276,7 @@
         <a
           routerLink="/agendador"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#a7c9ec] text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <lucide-angular [img]="ClipboardList" [size]="20"></lucide-angular>
           Ver Citas
@@ -284,7 +284,7 @@
         <a
           routerLink="/agendador/nueva"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <lucide-angular [img]="Calendar" [size]="20"></lucide-angular>
           Nueva Cita
@@ -314,7 +314,7 @@
         <a
           routerLink="/admin"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <lucide-angular [img]="Settings" [size]="20"></lucide-angular>
           Configuración
@@ -322,7 +322,7 @@
         <a
           routerLink="/admin/usuarios"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <lucide-angular [img]="Users" [size]="20"></lucide-angular>
           Usuarios
@@ -333,7 +333,7 @@
         <a
           routerLink="/paciente"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <lucide-angular [img]="CalendarDays" [size]="20"></lucide-angular>
           Citas pendientes
@@ -341,7 +341,7 @@
         <a
           routerLink="/paciente/historial-citas"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <lucide-angular [img]="ClipboardList" [size]="20"></lucide-angular>
           Historial de Citas
@@ -362,7 +362,7 @@
                 'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ' +
                 (appService.currentRole() === role
                   ? 'bg-white/20 text-white'
-                  : 'text-blue-200 hover:bg-blue-600')
+                  : 'text-blue-200 hover:bg-[#4e92d9]')
               "
             >
               <lucide-angular
@@ -386,7 +386,7 @@
         <a
           routerLink="/acceso"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <lucide-angular [img]="Users" [size]="20"></lucide-angular>
           Otros usuarios
