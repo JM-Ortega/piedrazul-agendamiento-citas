@@ -100,33 +100,46 @@
               class="flex flex-col md:flex-row md:items-center justify-between bg-blue-50 border border-blue-100 rounded-xl p-5 gap-4"
             >
               <div class="flex items-start md:items-center gap-4">
-                <div
-                  class="bg-blue-600 text-white rounded-xl p-3 text-center min-w-15 shrink-0"
-                >
-                  <p class="text-2xl font-bold leading-none">
-                    {{ apt.date.split("-")[2] }}
-                  </p>
-                  <p class="text-xs uppercase">{{ getMonthShort(apt.date) }}</p>
+                
+                <div class="flex flex-col gap- 1 items-center">
+                  <div
+                    class="bg-blue-600 text-white rounded-xl p-3 text-center min-w-15 shrink-0"
+                  >
+                    <p class="text-2xl font-bold leading-none">
+                      {{ apt.date.split("-")[2] }}
+                    </p>
+                    <p class="text-xs uppercase">{{ getMonthShort(apt.date) }}</p>
+                  </div>
+                  <div class="flex items-center gap-2 text-gray-600">
+                    <lucide-angular [img]="Clock" [size]="16"></lucide-angular>
+                    <span class="text-base">{{ apt.startTime.slice(0,5) }}</span>
+                  </div>
                 </div>
 
                 <div>
                   <p class="text-blue-800 text-xl font-semibold">
                     Dr. {{ apt.doctorName }}
                   </p>
-                  <p class="text-gray-500 text-base">{{ apt.specialty | formato }}</p>
-                  <div class="flex items-center gap-2 mt-1 text-gray-600">
-                    <lucide-angular [img]="Clock" [size]="16"></lucide-angular>
-                    <span class="text-base">{{ apt.startTime.slice(0,5) }}</span>
-                  </div>
+                  <p class="text-gray-500 text-base mb-2">{{ apt.specialty | formato }}</p>
+                  <span
+                    class="px-4 py-2 rounded-lg text-base font-medium whitespace-nowrap"
+                    [ngClass]="statusClasses[apt.appointmentState]"
+                  >
+                    {{ statusLabels[apt.appointmentState] }}
+                  </span>
                 </div>
               </div>
 
-              <span
-                class="px-4 py-2 rounded-lg text-base font-medium whitespace-nowrap"
-                [ngClass]="statusClasses[apt.appointmentState]"
-              >
-                {{ statusLabels[apt.appointmentState] }}
-              </span>
+              <div>
+                <button class="bg-red-100 text-red-600 hover:text-red-800 
+                  text-sm font-semibold transition-colors 
+                  rounded-lg px-4 py-2 text-base hover:bg-red-200
+                  border border-red-300"
+                  (click)="cancelAppointment(apt.idAppointment)">
+                  <lucide-angular [img]="X" [size]="16" class="inline-block"></lucide-angular>
+                  Cancelar
+                </button>
+              </div>
             </div>
           }
         </div>
