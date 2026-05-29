@@ -189,7 +189,7 @@
                 name="password"
                 (blur)="validateField('password')"
                 [class]="inputClass('password', 'pl-12 pr-12')"
-                placeholder="Mín. 8 car., 1 mayúscula, 1 número"
+                placeholder="Mín. 6 caracteres"
                 autocomplete="new-password"
               />
               <button
@@ -431,6 +431,8 @@
                 type="date"
                 [(ngModel)]="userForm.laborStart"
                 name="laborStart"
+                maxlength="10"
+                (input)="onLaborStartInput($event)"
                 (change)="onLaborStartChange()"
                 (blur)="validateField('laborStart')"
                 [class]="inputClass('laborStart', 'px-4')"
@@ -451,6 +453,8 @@
                 type="date"
                 [(ngModel)]="userForm.laborEnd"
                 name="laborEnd"
+                maxlength="10"
+                (input)="onLaborEndInput($event)"
                 (change)="onLaborEndChange()"
                 (blur)="validateField('laborEnd')"
                 [class]="inputClass('laborEnd', 'px-4')"

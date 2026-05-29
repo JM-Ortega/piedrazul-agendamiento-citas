@@ -343,12 +343,8 @@ export class AdminCreateUserComponent {
       case 'password':
         if (!this.userForm.password) {
           this.errors.password = 'La contraseña es obligatoria.';
-        } else if (this.userForm.password.length < 8) {
-          this.errors.password = 'Mínimo 8 caracteres.';
-        } else if (!/(?=.*[A-Z])/.test(this.userForm.password)) {
-          this.errors.password = 'Debe incluir al menos una letra mayúscula.';
-        } else if (!/(?=.*\d)/.test(this.userForm.password)) {
-          this.errors.password = 'Debe incluir al menos un número.';
+        } else if (this.userForm.password.length < 6) {
+          this.errors.password = 'Mínimo 6 caracteres.';
         }
         break;
 
@@ -477,7 +473,31 @@ export class AdminCreateUserComponent {
         break;
     }
   }
+  onLaborStartInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value;
+    if (value) {
+      const parts = value.split('-');
+      if (parts[0].length > 4) {
+        parts[0] = parts[0].slice(0, 4);
+        input.value = parts.join('-');
+        this.userForm.laborStart = input.value;
+      }
+    }
+  }
 
+  onLaborEndInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value;
+    if (value) {
+      const parts = value.split('-');
+      if (parts[0].length > 4) {
+        parts[0] = parts[0].slice(0, 4);
+        input.value = parts.join('-');
+        this.userForm.laborEnd = input.value;
+      }
+    }
+  }
   // ── Validación completa del formulario ───────────────────────────────────
 
   private validateAll(): boolean {
