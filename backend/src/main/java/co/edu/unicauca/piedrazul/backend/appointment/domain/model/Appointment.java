@@ -151,6 +151,15 @@ public class Appointment {
         this.appointmentState = AppointmentState.NO_ASISTIO;
     }
 
+    public void cancel() {
+        if (this.appointmentState != AppointmentState.AGENDADA) {
+            throw new IllegalStateException(
+                    "Solo las citas AGENDADAS pueden cancelarse. Estado actual: " + this.appointmentState
+            );
+        }
+        this.appointmentState = AppointmentState.CANCELADA;
+    }
+
     public UUID getIdAppointment() {
         return idAppointment;
     }

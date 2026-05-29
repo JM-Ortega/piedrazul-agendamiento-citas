@@ -14,6 +14,8 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.Appo
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.application.ListMyAppointmentsUseCaseImpl;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.CancelAppointmentUseCase;
+import co.edu.unicauca.piedrazul.backend.appointment.application.CancelAppointmentUseCaseImpl;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -148,5 +150,11 @@ public class AppointmentConfig {
     public UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase(
             AppointmentRepository appointmentRepository) {
         return new UpdateAppointmentStatusUseCaseImpl(appointmentRepository);
+    }
+
+    @Bean
+    public CancelAppointmentUseCase cancelAppointmentUseCase(
+            AppointmentRepository appointmentRepository) {
+        return new CancelAppointmentUseCaseImpl(appointmentRepository);
     }
 }
