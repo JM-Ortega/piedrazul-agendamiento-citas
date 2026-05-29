@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
@@ -20,6 +20,7 @@ import {
   User,
   UserPlus,
 } from 'lucide-angular';
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { AdminService } from '../../service/admin.service';
 
 type Role = 'doctor' | 'scheduler';
@@ -30,12 +31,11 @@ interface UserForm {
   password: string;
   firstName: string;
   lastName: string;
-  // Doctor-specific
   email: string;
   phone: string;
   specialty: string;
-  laborStart: string; // ISO date: "YYYY-MM-DD"
-  laborEnd: string; // ISO date: "YYYY-MM-DD"
+  laborStart: string;
+  laborEnd: string;
   interval: number;
   workDays: number[];
   startTime: string;
@@ -49,7 +49,6 @@ interface FormErrors {
   firstName?: string;
   lastName?: string;
   roles?: string;
-  // Doctor-specific
   email?: string;
   phone?: string;
   specialty?: string;
@@ -61,7 +60,6 @@ interface FormErrors {
   workDays?: string;
 }
 
-// Map JS day index (0=Sun … 6=Sat) → backend workday string
 const DAY_VALUE_TO_WORKDAY: Record<number, string> = {
   1: 'LUNES',
   2: 'MARTES',
@@ -73,10 +71,10 @@ const DAY_VALUE_TO_WORKDAY: Record<number, string> = {
 @Component({
   selector: 'app-admin-create-user',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, FormatoPipe],
   templateUrl: './admin-create-user.component.html',
 })
-export class AdminCreateUserComponent {
+export class AdminCreateUserComponent implements OnInit {
   readonly ArrowLeft = ArrowLeft;
   readonly UserPlus = UserPlus;
   readonly Stethoscope = Stethoscope;
@@ -98,10 +96,15 @@ export class AdminCreateUserComponent {
   errors: FormErrors = {};
   submitted = false;
 
-  /** Feedback visible al usuario tras submit */
   submitSuccess = false;
   submitError: string | null = null;
   isSubmitting = false;
+
+  // ── Datos dinámicos del backend ───────────────────────────────────────────
+  specialties: string[] = [];
+  documentTypes: string[] = [];
+  loadingSpecialties = false;
+  loadingDocumentTypes = false;
 
   userForm: UserForm = {
     documentId: '',
@@ -127,19 +130,7 @@ export class AdminCreateUserComponent {
     { value: 4, label: 'Jueves' },
     { value: 5, label: 'Viernes' },
   ];
-  documentTypes: { value: string; label: string }[] = [
-    { value: 'CEDULA', label: 'Cédula de Ciudadanía' },
-    { value: 'TARJETA_IDENTIDAD', label: 'Tarjeta de Identidad' },
-    { value: 'REGISTRO_NACIMIENTO', label: 'Registro de Nacimiento' },
-    { value: 'PASAPORTE', label: 'Pasaporte' },
-  ];
 
-  specialties: { value: string; label: string }[] = [
-    { value: 'FISIOTERAPIA', label: 'Fisioterapia' },
-    { value: 'TERAPIA_NEURAL', label: 'Terapia Neural' },
-    { value: 'QUIROPRAXIA', label: 'Quiropraxia' },
-    { value: 'MEDICINA_GENERAL', label: 'Medicina General' },
-  ];
   readonly timeOptions: string[] = (() => {
     const opts: string[] = [];
     for (let h = 7; h <= 12; h++) {
@@ -152,10 +143,44 @@ export class AdminCreateUserComponent {
     }
     return opts;
   })();
+
   constructor(
     private router: Router,
     private adminService: AdminService,
   ) {}
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+  ngOnInit(): void {
+    this.loadSpecialties();
+    this.loadDocumentTypes();
+  }
+
+  private loadSpecialties(): void {
+    this.loadingSpecialties = true;
+    this.adminService.getAllSpecialties().subscribe({
+      next: (data) => {
+        this.specialties = data;
+        this.loadingSpecialties = false;
+      },
+      error: () => {
+        this.loadingSpecialties = false;
+      },
+    });
+  }
+
+  private loadDocumentTypes(): void {
+    this.loadingDocumentTypes = true;
+    this.adminService.getAllDocumentTypes().subscribe({
+      next: (data) => {
+        this.documentTypes = data;
+        this.loadingDocumentTypes = false;
+      },
+      error: () => {
+        this.loadingDocumentTypes = false;
+      },
+    });
+  }
 
   // ── Getters ──────────────────────────────────────────────────────────────
 
@@ -296,6 +321,60 @@ export class AdminCreateUserComponent {
     }
   }
 
+  onLaborStartInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value;
+    if (value) {
+      const [year, month, day] = value.split('-');
+      if (year && year.length > 4) {
+        const fixed = `${year.slice(0, 4)}-${month ?? ''}-${day ?? ''}`;
+        input.value = fixed;
+        this.userForm.laborStart = fixed;
+      } else {
+        this.userForm.laborStart = value;
+      }
+    }
+    if (this.submitted) this.validateField('laborStart');
+  }
+
+  onLaborEndInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value;
+    if (value) {
+      const [year, month, day] = value.split('-');
+      if (year && year.length > 4) {
+        const fixed = `${year.slice(0, 4)}-${month ?? ''}-${day ?? ''}`;
+        input.value = fixed;
+        this.userForm.laborEnd = fixed;
+      } else {
+        this.userForm.laborEnd = value;
+      }
+    }
+    if (this.submitted) this.validateField('laborEnd');
+  }
+  onDateKeydown(event: KeyboardEvent): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value;
+    const cursorPos = input.selectionStart ?? 0;
+    const allowedKeys = [
+      'Backspace',
+      'Delete',
+      'ArrowLeft',
+      'ArrowRight',
+      'Tab',
+      'Enter',
+    ];
+    if (allowedKeys.includes(event.key)) return;
+
+    // Bloquear si el cursor está en la parte del año (posición 0-3)
+    // y el año ya tiene 4 dígitos
+    if (cursorPos <= 3) {
+      const yearPart = value.split('-')[0] ?? '';
+      if (yearPart.length >= 4) {
+        event.preventDefault();
+      }
+    }
+  }
   // ── Días de atención ─────────────────────────────────────────────────────
 
   toggleWorkDay(day: number): void {
@@ -317,6 +396,7 @@ export class AdminCreateUserComponent {
     this.selectedRoles = [role];
     if (this.submitted) this.validateField('roles');
   }
+
   getRoleLabel(role: Role): string {
     return role === 'doctor' ? 'Médico' : 'Agendador';
   }
@@ -370,8 +450,6 @@ export class AdminCreateUserComponent {
         }
         break;
 
-      // ── Doctor fields ────────────────────────────────────────────────────
-
       case 'email':
         if (this.hasDoctorRole) {
           if (!this.userForm.email.trim()) {
@@ -383,6 +461,7 @@ export class AdminCreateUserComponent {
           }
         }
         break;
+
       case 'documentType':
         if (this.hasDoctorRole && !this.userForm.documentType) {
           this.errors.documentType = 'El tipo de documento es obligatorio.';
@@ -412,6 +491,10 @@ export class AdminCreateUserComponent {
             this.errors.laborStart =
               'La fecha de inicio laboral es obligatoria.';
           } else if (
+            parseInt(this.userForm.laborStart.split('-')[0], 10) > 9999
+          ) {
+            this.errors.laborStart = 'El año no puede tener más de 4 dígitos.';
+          } else if (
             this.userForm.laborEnd &&
             this.userForm.laborStart >= this.userForm.laborEnd
           ) {
@@ -425,6 +508,10 @@ export class AdminCreateUserComponent {
         if (this.hasDoctorRole) {
           if (!this.userForm.laborEnd) {
             this.errors.laborEnd = 'La fecha de fin laboral es obligatoria.';
+          } else if (
+            parseInt(this.userForm.laborEnd.split('-')[0], 10) > 9999
+          ) {
+            this.errors.laborEnd = 'El año no puede tener más de 4 dígitos.';
           } else if (
             this.userForm.laborStart &&
             this.userForm.laborStart >= this.userForm.laborEnd
@@ -473,32 +560,8 @@ export class AdminCreateUserComponent {
         break;
     }
   }
-  onLaborStartInput(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const value = input.value;
-    if (value) {
-      const parts = value.split('-');
-      if (parts[0].length > 4) {
-        parts[0] = parts[0].slice(0, 4);
-        input.value = parts.join('-');
-        this.userForm.laborStart = input.value;
-      }
-    }
-  }
 
-  onLaborEndInput(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const value = input.value;
-    if (value) {
-      const parts = value.split('-');
-      if (parts[0].length > 4) {
-        parts[0] = parts[0].slice(0, 4);
-        input.value = parts.join('-');
-        this.userForm.laborEnd = input.value;
-      }
-    }
-  }
-  // ── Validación completa del formulario ───────────────────────────────────
+  // ── Validación completa ───────────────────────────────────────────────────
 
   private validateAll(): boolean {
     const fields: (keyof FormErrors)[] = [
@@ -509,7 +572,6 @@ export class AdminCreateUserComponent {
       'lastName',
       'roles',
     ];
-
     if (this.hasDoctorRole) {
       fields.push(
         'email',
@@ -523,9 +585,7 @@ export class AdminCreateUserComponent {
         'workDays',
       );
     }
-
     fields.forEach((f) => this.validateField(f));
-
     return Object.values(this.errors).every((e) => !e);
   }
 
@@ -540,7 +600,6 @@ export class AdminCreateUserComponent {
 
     this.isSubmitting = true;
 
-    // ── Caso: solo Agendador ──────────────────────────────────────────────
     if (this.hasSchedulerRole && !this.hasDoctorRole) {
       this.adminService
         .createScheduler({
@@ -559,13 +618,11 @@ export class AdminCreateUserComponent {
             this.submitError =
               err?.error?.message ??
               'Ocurrió un error al crear el agendador. Inténtalo de nuevo.';
-            console.error('Error al crear agendador:', err);
           },
         });
       return;
     }
 
-    // ── Caso: Doctor (con o sin rol Agendador simultáneo) ─────────────────
     if (this.hasDoctorRole) {
       const schedules = this.userForm.workDays.map((day) => ({
         workday: DAY_VALUE_TO_WORKDAY[day],
@@ -598,7 +655,6 @@ export class AdminCreateUserComponent {
             this.submitError =
               err?.error?.message ??
               'Ocurrió un error al crear el médico. Inténtalo de nuevo.';
-            console.error('Error al crear médico:', err);
           },
         });
     }
@@ -607,8 +663,6 @@ export class AdminCreateUserComponent {
   navigateBack(): void {
     this.router.navigate(['/admin/usuarios']);
   }
-
-  // ── Helpers para el template ──────────────────────────────────────────────
 
   hasError(field: keyof FormErrors): boolean {
     return !!this.errors[field];

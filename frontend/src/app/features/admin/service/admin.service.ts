@@ -124,4 +124,17 @@ export class AdminService {
   createScheduler(request: CreateSchedulerRequest): Observable<void> {
     return this.http.post<void>(`${this.apiUrl}/user/schedulers`, request);
   }
+  // ── Specialties ───────────────────────────────────────────────────────────
+
+  getAllSpecialties(): Observable<string[]> {
+    return this.http.get<string[]>(
+      `${this.apiUrl}/doctor/doctors/all-specialties`,
+    );
+  }
+
+  // ── Document Types ────────────────────────────────────────────────────────
+
+  getAllDocumentTypes(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.apiUrl}/patients/document-types`);
+  }
 }
