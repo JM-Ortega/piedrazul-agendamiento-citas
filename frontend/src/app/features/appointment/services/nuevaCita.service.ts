@@ -37,8 +37,8 @@ export class NuevaCitaService {
 
   getSpecialties(patientId: string | null): Observable<string[]> {
     const url = patientId
-    ? `${this.apiUrl}/doctor/doctors/patients/specialities/${patientId}`
-    : `${this.apiUrl}/doctor/doctors/specialities`;
+    ? `${this.apiUrl}/doctor/doctors/patients/specialties/${patientId}`
+    : `${this.apiUrl}/doctor/doctors/patients/specialties`;
     return this.http.get<string[]>(url);
   }
 
