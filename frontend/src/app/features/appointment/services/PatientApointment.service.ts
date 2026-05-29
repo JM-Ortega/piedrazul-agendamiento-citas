@@ -28,4 +28,8 @@ export class PatientAppointmentService {
   hasAppointments(patientId: string): Observable<boolean> {
     return this.http.get<boolean>(`${this.apiUrl}/appointments/${patientId}/is-new-patient`);
   }
+
+  cancelAppointment(appointmentId: string): Observable<void> {
+    return this.http.put<void>(`${this.apiUrl}/appointments/${appointmentId}`, {});
+  }
 }
