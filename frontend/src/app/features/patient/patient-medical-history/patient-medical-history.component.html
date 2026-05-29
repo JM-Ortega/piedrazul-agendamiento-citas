@@ -1,7 +1,52 @@
-<div >
-    <h5 class="flex items-center gap-2 text-lg font-semibold text-[#163c63] mb-4">
-    <lucide-angular [img]="FolderOpen" [size]="30" class="text-[#163c63]"></lucide-angular> 
-    Historial de Consultas
-    </h5>
-    
+<div class="min-h-screen bg-blue-50 py-8 px-6">
+  <div class="max-w-3xl mx-auto">
+
+    <!-- Header: volver + título -->
+    <div class="mb-6">
+      <button routerLink="/paciente"
+        class="flex items-center gap-2 text-[#215c98] text-lg hover:text-[#4e92d9] mb-4 transition-colors cursor-pointer">
+        <lucide-angular [img]="ArrowLeft" [size]="20"></lucide-angular>
+        volver al inicio
+      </button>
+      <div class="flex items-center gap-3">
+        <lucide-angular [img]="FolderOpen" [size]="40" class="text-[#163c63]"></lucide-angular>
+        <h3 class="text-2xl font-bold text-[#163c63]">Mi Historia Clínica</h3>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-md p-6">
+        <!-- Historial -->
+        <h5 class="flex items-center gap-2 text-lg font-semibold text-[#163c63] mb-4">
+        <lucide-angular [img]="ClipboardList" [size]="30" class="text-[#163c63]"></lucide-angular>
+        Historial Clínico
+        </h5>
+
+        @if (records().length === 0) {
+        <div class="bg-blue-50 border border-blue-200 text-[#215c98] px-4 py-3 rounded-xl">
+            Sin registros.
+        </div>
+        }
+        @if (error()) {
+        <div class="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-xl">
+            ⚠️ {{ error() }}
+        </div>
+        }
+
+        @for (r of records(); track r.attendedAt) {
+        <div class="bg-white rounded-2xl shadow-md p-6 mb-3">
+            <div class="flex flex-col gap-2 mb-1">
+            <span class="flex items-center gap-2 text-gray-700 text-sm">
+                <lucide-angular [img]="Calendar" [size]="22" class="text-[#163c63]"></lucide-angular>
+                <strong class="text-[#163c63]">Fecha:</strong>{{ r.attendedAt }}
+            </span>
+            <span class="flex items-center gap-2 text-gray-700 text-sm mt-2">
+                <strong class="text-[#163c63]">Médico:</strong>{{ r.doctorName }}
+            </span>
+            </div>
+            <p class="text-gray-700">{{ r.description }}</p>
+        </div>
+        }
+    </div>
+
+  </div>
 </div>
