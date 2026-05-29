@@ -4,7 +4,7 @@ module "firewall" {
 
   name        = local.firewall_name
   ssh_sources = ["0.0.0.0/0", "::/0"]
-  web_sources = ["0.0.0.0/0", "::/0"]
+  web_sources = local.cloudflare_proxy_ips
 }
 
 module "server" {
