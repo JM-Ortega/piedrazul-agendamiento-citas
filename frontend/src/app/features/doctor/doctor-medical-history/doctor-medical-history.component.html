@@ -105,10 +105,14 @@
           }
           @for (r of records(); track r.attendedAt) {
             <div class="bg-white rounded-2xl shadow-md p-6 mb-3">
-              <div class="flex justify-between items-center mb-3">
-                <span class="flex items-center gap-2 text-gray-700 text-2lg">
-                  <lucide-angular [img]="Calendar" [size]="25" class="text-[#163c63]"></lucide-angular>
-                   {{ r.attendedAt }}</span>
+              <div class="flex flex-col gap-2 mb-1">
+                <span class="flex items-center gap-2 text-gray-700 text-sm">
+                  <lucide-angular [img]="Calendar" [size]="22" class="text-[#163c63]"></lucide-angular>
+                  <strong class="text-[#163c63]">Fecha:</strong>{{ r.attendedAt }}
+                </span>
+                <span class="flex items-center gap-2 text-gray-700 text-sm mt-2">
+                  <strong class="text-[#163c63]">Médico:</strong>{{ r.doctorName }}
+                </span>
               </div>
               <p class="text-gray-700">{{ r.description }}</p>
             </div>
