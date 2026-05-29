@@ -9,10 +9,10 @@ import {
   PlusCircle,
   User,
 } from 'lucide-angular';
-import { AppService } from '../../core/services/app.service';
-import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
-import { PatientAppointmentService } from '../appointment/services/PatientApointment.service';
-import { Appointment } from './models/interfaces/appointment.model';
+import { AppService } from '../../../core/services/app.service';
+import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
+import { PatientAppointmentService } from '../../appointment/services/PatientApointment.service';
+import { Appointment } from '../models/interfaces/appointment.model';
 
 @Component({
   selector: 'app-patient-dashboard',
@@ -68,9 +68,9 @@ export class PatientDashboardComponent implements OnInit {
   };
 
   readonly upcomingAppointments = computed<AppointmentsPatient[]>(() => {
-    const today = new Date().toISOString().slice(0, 10);
     return this.appointmentService
       .appointments()
+      .filter((a) => a.appointmentState === 'AGENDADA')
       .sort((a, b) => (a.date + a.startTime > b.date + b.startTime ? 1 : -1));
   });
 
