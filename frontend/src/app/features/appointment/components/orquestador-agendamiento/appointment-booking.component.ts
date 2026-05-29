@@ -236,7 +236,9 @@ export class AppointmentBookingComponent implements OnInit {
   }
 
   private loadSpecialtiesWithDoctor(): void {
-    this.citaService.getSpecialtiesWithDoctor().subscribe({
+    const patientId = this.resolvePatientIdForSpecialties() || null;
+
+    this.citaService.getSpecialtiesWithDoctor(patientId).subscribe({
       next: (data) => {
         const filtered = this.state.isNewPatient()
           ? data.filter((s) => s.specialty === 'MEDICINA_GENERAL')
@@ -269,11 +271,12 @@ export class AppointmentBookingComponent implements OnInit {
     const patientId = this.resolvePatientIdForSpecialties();
 
     if (!patientId) {
-      this.state.noSpecialtyAvailable.set(true);
-      this.state.errorMessageSpecialty.set('No se pudo determinar el paciente para cargar las especialidades.');
-      return;
+      this.traerEspecialidades(null);
     }
+    this.traerEspecialidades(patientId)
+  }
 
+  private traerEspecialidades(patientId: string | null): void {
     this.citaService.getSpecialties(patientId).subscribe({
       next: (specs) => {
         if (!specs || specs.length === 0) {
