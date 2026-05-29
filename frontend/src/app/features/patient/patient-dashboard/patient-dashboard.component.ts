@@ -1,14 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import {
-  CalendarDays,
-  ChevronRight,
-  Clock,
-  LucideAngularModule,
-  PlusCircle,
-  User,
-} from 'lucide-angular';
+import { CalendarDays, ChevronRight, Clock, LucideAngularModule, PlusCircle,
+        User, X, AlertCircle, Check,
+      } from 'lucide-angular';
 import { AppService } from '../../../core/services/app.service';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { PatientAppointmentService } from '../../appointment/services/PatientApointment.service';
@@ -30,9 +25,14 @@ export class PatientDashboardComponent implements OnInit {
   readonly CalendarDays = CalendarDays;
   readonly ChevronRight = ChevronRight;
   readonly Clock = Clock;
+  readonly X = X;
+  readonly AlertCircle = AlertCircle;
+  readonly Check = Check;
 
   isLoading = signal(false);
   errorMessage = signal('');
+  readonly toastMessage = signal('');
+  readonly toastType = signal<'success' | 'error' | null>(null);
 
   readonly monthNames = [
     'enero',
@@ -95,5 +95,31 @@ export class PatientDashboardComponent implements OnInit {
   getMonthShort(dateStr: string): string {
     const month = parseInt(dateStr.split('-')[1]) - 1;
     return this.monthNames[month].slice(0, 3);
+  }
+
+  cancelAppointment(appointmentId: string): void {
+    this.appointmentService.cancelAppointment(appointmentId).subscribe({
+      next: () => {
+        this.showToast('La cita fue cancelada exitosamente', 'success');
+        this.appointmentService.appointments.set(
+          this.appointmentService.appointments().map((a) =>
+            a.idAppointment === appointmentId
+              ? { ...a, appointmentState: 'CANCELADA' }
+              : a,
+          ),
+        );
+      },
+      error: () => {
+        this.showToast('Ocurrió un error al cancelar la cita', 'error');
+      },
+    });
+  }
+
+  private showToast(message: string, type: 'success' | 'error'): void {
+    this.toastMessage.set(message);
+    this.toastType.set(type);
+    setTimeout(() => {
+      this.toastMessage.set(''); 
+      this.toastType.set(null);}, 3000);
   }
 }
