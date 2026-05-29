@@ -755,3 +755,29 @@
     </div>
   </div>
 }
+@if (toastMessage()) {
+  <div class="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-2xl border
+      px-6 py-4 min-w-[320px] transition-all duration-300 animate-in slide-in-from-top-5"
+    [class.border-green-200]="toastType() === 'success'"
+    [class.border-red-200]="toastType() === 'error'">
+    <div class="flex items-center gap-3">
+      <div class="rounded-full p-2"
+        [class.bg-green-100]="toastType() === 'success'"
+        [class.bg-red-100]="toastType() === 'error'">
+        @if (toastType() === 'success') {
+          <lucide-angular [img]="Check" [size]="20" class="text-green-600"></lucide-angular>
+        } @else {
+          <lucide-angular [img]="AlertCircle" [size]="20" class="text-red-600"></lucide-angular>
+        }
+      </div>
+      <div>
+        <p class="font-semibold"
+          [class.text-green-700]="toastType() === 'success'"
+          [class.text-red-700]="toastType() === 'error'">
+          {{ toastType() === 'success' ? 'Éxito' : 'Error' }}
+        </p>
+        <p class="text-sm text-gray-600">{{ toastMessage() }}</p>
+      </div>
+    </div>
+  </div>
+}
