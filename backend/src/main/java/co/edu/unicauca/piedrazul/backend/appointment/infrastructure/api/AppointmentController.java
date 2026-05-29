@@ -147,8 +147,8 @@ public class AppointmentController {
     // Listar un médico por defecto para cada especialidad
     @GetMapping("/specialties-with-doctor")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<List<DoctorResponse>> getSpecialtiesWithDoctor() {
-        return ResponseEntity.ok(getSpecialtiesWithDoctorUseCase.getSpecialtiesWithDoctor());
+    public ResponseEntity<List<DoctorResponse>> getSpecialtiesWithDoctor(@RequestParam(required = false) UUID patientId) {
+        return ResponseEntity.ok(getSpecialtiesWithDoctorUseCase.getSpecialtiesWithDoctor(patientId));
     }
 
     // Actualizar el estado de una cita a atendida

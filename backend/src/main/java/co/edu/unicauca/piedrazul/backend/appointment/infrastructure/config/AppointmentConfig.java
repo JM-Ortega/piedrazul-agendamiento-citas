@@ -117,11 +117,13 @@ public class AppointmentConfig {
     public GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
-            SlotTimeService slotTimeService) {
+            SlotTimeService slotTimeService,
+            IsNewPatientUseCase isNewPatientUseCase) {
         return new GetSpecialtiesWithDoctorUseCaseImpl(
                 appointmentRepository,
                 doctorConfigConsultPort,
-                slotTimeService
+                slotTimeService,
+                isNewPatientUseCase
         );
     }
 
