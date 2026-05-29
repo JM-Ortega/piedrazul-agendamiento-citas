@@ -39,7 +39,11 @@ public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppoi
                                                 appointmentRepository,
                                                 doctorConfigConsultPort,
                                                 appointmentService,
-                                                eventPublisher
+                                                                eventPublisher,
+                                                                new IsNewPatientUseCaseImpl(
+                                                                        appointmentRepository,
+                                                                        patientConsultPort
+                                                                )
                                 ),
                                 new ManualPatientResolutionStrategy(patientConsultPort)
                 );

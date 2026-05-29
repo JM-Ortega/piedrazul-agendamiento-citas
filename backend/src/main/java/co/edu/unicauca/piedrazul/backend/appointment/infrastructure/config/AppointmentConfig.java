@@ -52,12 +52,14 @@ public class AppointmentConfig {
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            IsNewPatientUseCase isNewPatientUseCase) {
         return new AppointmentSchedulingService(
                 appointmentRepository,
                 doctorConfigConsultPort,
                 appointmentService,
-                eventPublisher
+                eventPublisher,
+                isNewPatientUseCase
         );
     }
 
@@ -115,11 +117,13 @@ public class AppointmentConfig {
     public GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
-            SlotTimeService slotTimeService) {
+            SlotTimeService slotTimeService,
+            IsNewPatientUseCase isNewPatientUseCase) {
         return new GetSpecialtiesWithDoctorUseCaseImpl(
                 appointmentRepository,
                 doctorConfigConsultPort,
-                slotTimeService
+                slotTimeService,
+                isNewPatientUseCase
         );
     }
 

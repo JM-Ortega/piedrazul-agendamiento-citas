@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
+import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
@@ -15,16 +16,19 @@ import jakarta.transaction.Transactional;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
 public class DoctorService {
     private final DoctorRepository doctorRepository;
     private final UserModuleApi userModuleApi;
+    private final AppointmentExternalService appointmentExternalService;
 
-    public DoctorService(DoctorRepository doctorRepository, UserModuleApi userModuleApi) {
+    public DoctorService(DoctorRepository doctorRepository, UserModuleApi userModuleApi, AppointmentExternalService appointmentExternalService) {
         this.doctorRepository = doctorRepository;
         this.userModuleApi = userModuleApi;
+        this.appointmentExternalService = appointmentExternalService;
     }
 
     // Crear un nuevo doctor
@@ -277,8 +281,16 @@ public class DoctorService {
         return doctorRepository.findBySpecialtyContaining(specialty);
     }
 
-    public List<Specialty> getSpecialties (){
-        return doctorRepository.findAllDistinctSpecialtiesByActiveDoctors();
+    public List<Specialty> getSpecialties (UUID idPatient){
+        List<Specialty> activeSpecialities = doctorRepository.findAllDistinctSpecialtiesByActiveDoctors();
+        if (appointmentExternalService.isNewPatient(idPatient)){
+            if(activeSpecialities.contains(Specialty.MEDICINA_GENERAL)){
+                return List.of(Specialty.MEDICINA_GENERAL);
+            }
+        }else {
+            return activeSpecialities;
+        }
+        return Collections.emptyList();
     }
 
     public List<Specialty> getAllSpecialties (){

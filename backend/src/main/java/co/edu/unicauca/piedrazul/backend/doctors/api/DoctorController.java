@@ -93,13 +93,14 @@ public class DoctorController {
     }
 
     /**
-     * Obtiene las especialidades de los medicos activos
+     * Obtiene las especialidades disponibles para un paciente
+     * @param patientId Id del paciente (opcional)
      * @return Lista de especialidades
      */
-    @GetMapping("/specialty")
+    @GetMapping("/patients/specialties")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<?> getSpecialties() {
-        List<Specialty> specialties = doctorService.getSpecialties();
+    public ResponseEntity<List<Specialty>> getSpecialties(@RequestParam(required = false) UUID patientId) {
+        List<Specialty> specialties = doctorService.getSpecialties(patientId);
         return ResponseEntity.ok(specialties);
     }
 
