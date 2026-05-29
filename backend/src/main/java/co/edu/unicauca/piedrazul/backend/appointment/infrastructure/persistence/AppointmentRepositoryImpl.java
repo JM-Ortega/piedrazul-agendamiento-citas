@@ -103,5 +103,12 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
             .toList();
     }
 
+    @Override
+    public List<Appointment> findScheduledAppointmentsBefore(LocalDate date) {
+        return jpaRepository.findByAppointmentStateAndDateBefore(AppointmentState.AGENDADA, date)
+                .stream().map(mapper::toDomain)
+                .toList();
+    }
+
 
 }

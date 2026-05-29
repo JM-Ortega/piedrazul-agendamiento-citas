@@ -39,6 +39,8 @@ public interface AppointmentRepository {
   
     List<Appointment> findAllByDate(LocalDate date);
 
+    List<Appointment> findScheduledAppointmentsBefore(LocalDate date);
+
     UUID getPattientIdByAppointmentId(UUID appointmentId);
 
 }
