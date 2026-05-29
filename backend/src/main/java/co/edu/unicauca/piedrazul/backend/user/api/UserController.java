@@ -46,7 +46,7 @@ public class UserController {
 
     /**
      * Asigna el rol scheduler a un doctor.
-     * @param username Nombre de doctor al que se le asignará el rol
+     * @param username Identificación del doctor al que se le asignará el rol
      * @return Respuesta HTTP 204 si la operación fue exitosa
      */
     @PostMapping("/{username}/give-doctor-scheduler")
@@ -58,7 +58,7 @@ public class UserController {
 
     /**
      * Revoca el rol scheduler de un doctor.
-     * @param username Nombre de doctor al que se le removerá el rol
+     * @param username Identificación de doctor al que se le removerá el rol
      * @return Respuesta HTTP 204 si la operación fue exitosa
      */
     @DeleteMapping("/{username}/revoke-doctor-scheduler")
