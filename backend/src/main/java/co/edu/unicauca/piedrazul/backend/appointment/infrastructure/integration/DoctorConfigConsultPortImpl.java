@@ -44,6 +44,11 @@ public class DoctorConfigConsultPortImpl implements DoctorConfigConsultPort {
     }
 
     @Override
+    public List<UUID> getActiveGeneralDoctorIds(){
+        return doctorExternalService.getActiveGeneralDoctorIds();
+    }
+
+    @Override
     public List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds) {
         return doctorExternalService.getDoctorInfoByIds(doctorIds);
     }
