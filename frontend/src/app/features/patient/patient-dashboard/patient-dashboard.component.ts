@@ -13,12 +13,13 @@ import { AppService } from '../../../core/services/app.service';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { PatientAppointmentService } from '../../appointment/services/PatientApointment.service';
 import { Appointment } from '../models/interfaces/appointment.model';
+import {FormatoPipe} from "../../../shared/pipes/formatoPipe";
 
 @Component({
   selector: 'app-patient-dashboard',
   templateUrl: './patient-dashboard.component.html',
   standalone: true,
-  imports: [CommonModule, RouterLink, LucideAngularModule],
+  imports: [CommonModule, RouterLink, LucideAngularModule, FormatoPipe],
 })
 export class PatientDashboardComponent implements OnInit {
   protected appService = inject(AppService);

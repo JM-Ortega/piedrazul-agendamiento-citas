@@ -113,7 +113,7 @@
                   <p class="text-blue-800 text-xl font-semibold">
                     Dr. {{ apt.doctorName }}
                   </p>
-                  <p class="text-gray-500 text-base">{{ apt.specialty }}</p>
+                  <p class="text-gray-500 text-base">{{ apt.specialty | formato }}</p>
                   <div class="flex items-center gap-2 mt-1 text-gray-600">
                     <lucide-angular [img]="Clock" [size]="16"></lucide-angular>
                     <span class="text-base">{{ apt.startTime }}</span>

@@ -12,12 +12,13 @@ import { AppService } from '../../../core/services/app.service';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { PatientAppointmentService } from '../../appointment/services/PatientApointment.service';
 import { Appointment } from '../models/interfaces/appointment.model';
+import {FormatoPipe} from "../../../shared/pipes/formatoPipe";
 
 @Component({
   selector: 'app-patient-appointment-history',
   templateUrl: './patient-appointment-history.component.html',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [CommonModule, LucideAngularModule, FormatoPipe],
 })
 export class PatientAppointmentHistoryComponent implements OnInit {
   protected appService = inject(AppService);
