@@ -1,6 +1,5 @@
 package co.edu.unicauca.piedrazul.backend.patients.application;
 
-import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
@@ -34,18 +33,15 @@ public class PatientService implements PatientModuleApi {
     private final PatientRepository patientRepository;
     private final UserModuleApi userModuleApi;
     private final VerificationModuleApi verificationModuleApi;
-    private final AppointmentExternalService appointmentExternalService;
 
     public PatientService(
             PatientRepository patientRepository,
             UserModuleApi userModuleApi,
-            VerificationModuleApi verificationModuleApi,
-            AppointmentExternalService appointmentExternalService
+            VerificationModuleApi verificationModuleApi
     ) {
         this.patientRepository = patientRepository;
         this.userModuleApi = userModuleApi;
         this.verificationModuleApi = verificationModuleApi;
-        this.appointmentExternalService = appointmentExternalService;
     }
 
     @Override
@@ -254,10 +250,6 @@ public class PatientService implements PatientModuleApi {
                 .toList();
     }
 
-    public UUID getPatientIdByAppointmentId(UUID appointmentId){
-        return appointmentExternalService.getPattientIdByAppointmentId(appointmentId);
-    }
-    
     public List<DocumentType> getAllDocumentTypes(){
         return Arrays.asList(DocumentType.values());
     }
