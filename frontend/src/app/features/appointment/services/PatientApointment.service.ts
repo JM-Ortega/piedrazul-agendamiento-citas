@@ -30,6 +30,6 @@ export class PatientAppointmentService {
   }
 
   cancelAppointment(appointmentId: string): Observable<void> {
-    return this.http.put<void>(`${this.apiUrl}/appointments/${appointmentId}`, {});
+    return this.http.put<void>(`${this.apiUrl}/appointments/cancel/${appointmentId}`, {});
   }
 }
