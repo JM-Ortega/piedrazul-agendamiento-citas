@@ -1,7 +1,6 @@
 module "firewall" {
   source = "../../modules/hetzner/firewall"
 
-
   name        = local.firewall_name
   ssh_sources = ["0.0.0.0/0", "::/0"]
   web_sources = local.cloudflare_proxy_ips
@@ -42,4 +41,10 @@ module "dns" {
   base_domain     = var.base_domain
   pages_hostname  = module.pages.pages_hostname
   proxied_backend = true
+}
+
+module "zone_settings" {
+  source = "../../modules/cloudflare/zone_settings"
+
+  zone_id = var.cloudflare_zone_id
 }

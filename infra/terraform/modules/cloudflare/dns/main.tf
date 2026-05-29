@@ -27,15 +27,3 @@ resource "cloudflare_dns_record" "auth" {
   proxied = var.proxied_backend
   comment = "Autenticación"
 }
-
-resource "cloudflare_zone_setting" "ssl" {
-  zone_id    = var.zone_id
-  setting_id = "ssl"
-  value      = "strict"
-}
-
-resource "cloudflare_zone_setting" "always_https" {
-  zone_id    = var.zone_id
-  setting_id = "always_use_https"
-  value      = "on"
-}
