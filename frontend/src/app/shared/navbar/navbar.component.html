@@ -128,6 +128,19 @@
         >
           <lucide-angular [img]="User" [size]="20"></lucide-angular>
           Mi Portal
+        <a
+          routerLink="/paciente/historial-citas"
+          #rla7="routerLinkActive"
+          routerLinkActive
+          [class]="
+            'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
+            (rla7.isActive
+              ? 'bg-white text-blue-700'
+              : 'text-white hover:bg-blue-600')
+          "
+        >
+          <lucide-angular [img]="ClipboardList" [size]="20"></lucide-angular>
+          Historial de Citas
         </a>
       }
 
