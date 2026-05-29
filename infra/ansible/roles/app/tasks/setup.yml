@@ -46,6 +46,15 @@
     directory_mode: "0750"
     mode: "0640"
 
+- name: Copiar directorio traefik
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../traefik/"
+    dest: "{{ app_dir }}/traefik/"
+    owner: ansible
+    group: ansible
+    directory_mode: "0750"
+    mode: "0640"
+
 # .env
 - name: Generar .env desde template
   ansible.builtin.template:
