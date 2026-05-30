@@ -137,8 +137,12 @@
           Información Básica
         </h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <!-- Documento -->
           <div>
-            <label class="block text-gray-700 text-base font-medium mb-2">
+            <label
+              for="documentId"
+              class="block text-gray-700 text-base font-medium mb-2"
+            >
               Documento de Identidad *
               <span class="text-sm text-gray-500">(solo dígitos)</span>
             </label>
@@ -149,6 +153,7 @@
                 class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
               ></lucide-icon>
               <input
+                id="documentId"
                 type="text"
                 inputmode="numeric"
                 [(ngModel)]="userForm.documentId"
@@ -170,10 +175,14 @@
             }
           </div>
 
+          <!-- Contraseña -->
           <div>
-            <label class="block text-gray-700 text-base font-medium mb-2"
-              >Contraseña *</label
+            <label
+              for="password"
+              class="block text-gray-700 text-base font-medium mb-2"
             >
+              Contraseña *
+            </label>
             <div class="relative">
               <lucide-icon
                 [name]="Lock"
@@ -181,6 +190,7 @@
                 class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
               ></lucide-icon>
               <input
+                id="password"
                 [type]="showPassword ? 'text' : 'password'"
                 [(ngModel)]="userForm.password"
                 name="password"
@@ -208,10 +218,14 @@
             }
           </div>
 
+          <!-- Nombre -->
           <div>
-            <label class="block text-gray-700 text-base font-medium mb-2"
-              >Nombre *</label
+            <label
+              for="firstName"
+              class="block text-gray-700 text-base font-medium mb-2"
             >
+              Nombre *
+            </label>
             <div class="relative">
               <lucide-icon
                 [name]="User"
@@ -219,6 +233,7 @@
                 class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
               ></lucide-icon>
               <input
+                id="firstName"
                 type="text"
                 [(ngModel)]="userForm.firstName"
                 name="firstName"
@@ -238,10 +253,14 @@
             }
           </div>
 
+          <!-- Apellido -->
           <div>
-            <label class="block text-gray-700 text-base font-medium mb-2"
-              >Apellido *</label
+            <label
+              for="lastName"
+              class="block text-gray-700 text-base font-medium mb-2"
             >
+              Apellido *
+            </label>
             <div class="relative">
               <lucide-icon
                 [name]="User"
@@ -249,6 +268,7 @@
                 class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
               ></lucide-icon>
               <input
+                id="lastName"
                 type="text"
                 [(ngModel)]="userForm.lastName"
                 name="lastName"
@@ -281,13 +301,14 @@
           </h3>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <!-- Especialidades -->
             <div class="sm:col-span-2">
-              <label class="block text-gray-700 text-base font-medium mb-1">
+              <p class="block text-gray-700 text-base font-medium mb-1">
                 Especialidades *
                 <span class="text-sm text-gray-500 font-normal ml-1"
                   >(puede seleccionar varias)</span
                 >
-              </label>
+              </p>
               <div class="grid grid-cols-2 gap-3 mt-2">
                 @for (sp of specialtyOptions; track sp.name) {
                   <button
@@ -335,10 +356,14 @@
               }
             </div>
 
+            <!-- Tipo de Documento -->
             <div>
-              <label class="block text-gray-700 text-base font-medium mb-2"
-                >Tipo de Documento *</label
+              <label
+                for="documentType"
+                class="block text-gray-700 text-base font-medium mb-2"
               >
+                Tipo de Documento *
+              </label>
               <div class="relative">
                 <lucide-icon
                   [name]="CreditCard"
@@ -346,6 +371,7 @@
                   class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
                 ></lucide-icon>
                 <select
+                  id="documentType"
                   [(ngModel)]="userForm.documentType"
                   name="documentType"
                   (change)="validateField('documentType')"
@@ -367,8 +393,12 @@
               }
             </div>
 
+            <!-- Teléfono -->
             <div>
-              <label class="block text-gray-700 text-base font-medium mb-2">
+              <label
+                for="phone"
+                class="block text-gray-700 text-base font-medium mb-2"
+              >
                 Teléfono *
                 <span class="text-sm text-gray-500">(solo dígitos)</span>
               </label>
@@ -379,6 +409,7 @@
                   class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
                 ></lucide-icon>
                 <input
+                  id="phone"
                   type="text"
                   inputmode="numeric"
                   [(ngModel)]="userForm.phone"
@@ -401,10 +432,14 @@
             </div>
           </div>
 
+          <!-- Correo -->
           <div>
-            <label class="block text-gray-700 text-base font-medium mb-2"
-              >Correo Electrónico *</label
+            <label
+              for="email"
+              class="block text-gray-700 text-base font-medium mb-2"
             >
+              Correo Electrónico *
+            </label>
             <div class="relative">
               <lucide-icon
                 [name]="Mail"
@@ -412,6 +447,7 @@
                 class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
               ></lucide-icon>
               <input
+                id="email"
                 type="email"
                 [(ngModel)]="userForm.email"
                 name="email"
@@ -430,23 +466,28 @@
             }
           </div>
 
+          <!-- Período Laboral -->
           <div>
-            <label
+            <p
               class="text-gray-700 text-base font-medium mb-1 flex items-center gap-2"
             >
               <lucide-icon [name]="CalendarRange" [size]="18"></lucide-icon>
               Período Laboral *
-            </label>
+            </p>
             <p class="text-gray-400 text-sm mb-3 flex items-center gap-1">
               <lucide-icon [name]="Info" [size]="14"></lucide-icon>
               Rango de fechas en que el médico estará activo en el sistema
             </p>
             <div class="grid grid-cols-2 gap-5">
               <div>
-                <label class="block text-gray-600 text-sm font-medium mb-2"
-                  >Fecha de Inicio</label
+                <label
+                  for="laborStart"
+                  class="block text-gray-600 text-sm font-medium mb-2"
                 >
+                  Fecha de Inicio
+                </label>
                 <input
+                  id="laborStart"
                   type="date"
                   [value]="userForm.laborStart"
                   name="laborStart"
@@ -462,10 +503,14 @@
                 }
               </div>
               <div>
-                <label class="block text-gray-600 text-sm font-medium mb-2"
-                  >Fecha de Fin</label
+                <label
+                  for="laborEnd"
+                  class="block text-gray-600 text-sm font-medium mb-2"
                 >
+                  Fecha de Fin
+                </label>
                 <input
+                  id="laborEnd"
                   type="date"
                   [value]="userForm.laborEnd"
                   name="laborEnd"
@@ -483,12 +528,17 @@
             </div>
           </div>
 
+          <!-- Horario -->
           <div class="grid grid-cols-2 gap-5">
             <div>
-              <label class="block text-gray-700 text-base font-medium mb-2"
-                >Hora de Inicio</label
+              <label
+                for="startTime"
+                class="block text-gray-700 text-base font-medium mb-2"
               >
+                Hora de Inicio
+              </label>
               <select
+                id="startTime"
                 [(ngModel)]="userForm.startTime"
                 name="startTime"
                 (change)="onStartTimeChange()"
@@ -507,13 +557,17 @@
               }
             </div>
             <div>
-              <label class="block text-gray-700 text-base font-medium mb-2">
+              <label
+                for="endTime"
+                class="block text-gray-700 text-base font-medium mb-2"
+              >
                 Hora de Fin
                 <span class="text-sm text-gray-500 font-normal ml-1"
                   >máx. 12:00 pm</span
                 >
               </label>
               <select
+                id="endTime"
                 [(ngModel)]="userForm.endTime"
                 name="endTime"
                 (change)="onEndTimeChange()"
@@ -533,15 +587,20 @@
             </div>
           </div>
 
+          <!-- Intervalo -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <label class="block text-gray-700 text-base font-medium mb-2">
+              <label
+                for="interval"
+                class="block text-gray-700 text-base font-medium mb-2"
+              >
                 Intervalo entre citas (min)
                 <span class="text-sm text-gray-500 font-normal ml-1"
                   >máx. {{ maxInterval }} min</span
                 >
               </label>
               <input
+                id="interval"
                 type="number"
                 [(ngModel)]="userForm.interval"
                 name="interval"
@@ -562,10 +621,11 @@
             </div>
           </div>
 
+          <!-- Días de Atención -->
           <div>
-            <label class="block text-gray-700 text-base font-medium mb-1"
-              >Días de Atención</label
-            >
+            <p class="block text-gray-700 text-base font-medium mb-1">
+              Días de Atención
+            </p>
             <p class="text-gray-400 text-sm mb-3 flex items-center gap-1">
               <lucide-icon [name]="Info" [size]="14"></lucide-icon>
               Disponible de lunes a viernes
@@ -626,16 +686,23 @@
     </div>
   </div>
 </div>
-<!-- ── Modal de Confirmación ── -->
+
 <!-- ── Modal de Confirmación ── -->
 @if (showConfirmModal) {
   <div
     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Confirmar creación de usuario"
+    tabindex="0"
     (click)="closeConfirmModal()"
+    (keydown.escape)="closeConfirmModal()"
   >
     <div
-      class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl"
+      class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl"
       (click)="$event.stopPropagation()"
+      (keydown)="$event.stopPropagation()"
+      tabindex="0"
     >
       <!-- Header -->
       <div
@@ -653,13 +720,13 @@
         <button
           (click)="closeConfirmModal()"
           class="text-white hover:text-[#a7c9ec] transition-colors"
+          aria-label="Cerrar modal"
         >
           <lucide-icon [name]="CircleAlert" [size]="20"></lucide-icon>
         </button>
       </div>
 
       <!-- Body -->
-      <<!-- Body -->
       <div class="px-6 py-5">
         <!-- Resumen principal -->
         <div class="bg-[#f8fbff] border border-[#d9e9f8] rounded-xl p-5 mb-5">
@@ -668,21 +735,14 @@
               <h3 class="text-xl font-bold text-gray-900">
                 {{ userForm.firstName }} {{ userForm.lastName }}
               </h3>
-
               <div class="mt-2 flex flex-wrap gap-4 text-sm text-gray-600">
-                <span>
-                  <strong>Documento:</strong>
-                  {{ userForm.documentId }}
-                </span>
-
-                <span>
-                  <strong>Correo:</strong>
-                  {{ userForm.email }}
-                </span>
+                <span
+                  ><strong>Documento:</strong> {{ userForm.documentId }}</span
+                >
+                <span><strong>Correo:</strong> {{ userForm.email }}</span>
               </div>
             </div>
-
-            <div class="flex flex-wrap gap-2 justify-end">
+            <div class="flex flex-wrap gap-2 justify-end shrink-0">
               @if (hasDoctorRole) {
                 <span
                   class="flex items-center gap-2 px-3 py-1.5 bg-[#eaf2fb] text-[#215c98] border border-[#b8d4ee] rounded-full text-sm font-semibold"
@@ -691,7 +751,6 @@
                   Médico
                 </span>
               }
-
               @if (hasSchedulerRole) {
                 <span
                   class="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-full text-sm font-semibold"
@@ -704,23 +763,20 @@
           </div>
         </div>
 
+        <!-- Información médica -->
         @if (hasDoctorRole) {
-          <!-- Información médica -->
           <div class="border border-gray-200 rounded-xl overflow-hidden">
             <!-- Métricas -->
             <div class="grid grid-cols-2">
               <div class="p-4 border-r border-gray-200">
                 <p class="text-xs text-gray-500 mb-1">Intervalo entre citas</p>
-
                 <p class="text-2xl font-bold text-[#163c63]">
                   {{ userForm.interval }}
-                  <span class="text-sm font-medium text-gray-500"> min </span>
+                  <span class="text-sm font-medium text-gray-500">min</span>
                 </p>
               </div>
-
               <div class="p-4">
                 <p class="text-xs text-gray-500 mb-1">Horario de atención</p>
-
                 <p class="text-2xl font-bold text-[#163c63]">
                   {{ userForm.startTime }}
                   <span class="text-gray-400">–</span>
@@ -734,7 +790,6 @@
               <p class="text-sm font-semibold text-gray-700 mb-3">
                 Especialidades
               </p>
-
               <div class="flex flex-wrap gap-2">
                 @for (sp of userForm.specialty; track sp) {
                   <span
@@ -746,12 +801,11 @@
               </div>
             </div>
 
-            <!-- Periodo -->
+            <!-- Período laboral -->
             <div class="border-t border-gray-100 p-4">
               <p class="text-sm font-semibold text-gray-700 mb-2">
                 Período laboral
               </p>
-
               <p class="text-gray-800 font-medium">
                 {{ userForm.laborStart }}
                 <span class="text-gray-400 mx-1">→</span>
@@ -764,7 +818,6 @@
               <p class="text-sm font-semibold text-gray-700 mb-3">
                 Días de atención
               </p>
-
               <div class="flex flex-wrap gap-2">
                 @for (day of userForm.workDays; track day) {
                   <span
@@ -778,6 +831,7 @@
           </div>
         }
       </div>
+
       <!-- Footer -->
       <div class="grid grid-cols-2 gap-3 px-6 py-4 border-t border-gray-100">
         <button

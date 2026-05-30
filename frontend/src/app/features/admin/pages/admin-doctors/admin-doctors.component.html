@@ -62,7 +62,7 @@
         <div class="space-y-4">
           @for (doctor of doctors(); track doctor.doctorId) {
             <div
-              class="border-2 border-[#a7c9ec] rounded-xl p-6 bg-[#d9e9f8]/30 edit-container"
+              class="border-2 border-[#a7c9ec] rounded-xl p-6 bg-[#d9e9f8]/30 edit-container hover:shadow-lg transition-shadow relative"
             >
               <!-- ── MODO EDICIÓN ── -->
               @if (isEditing(doctor.doctorId)) {
@@ -106,10 +106,9 @@
 
                   <!-- Toggle Agendador -->
                   <div>
-                    <label
-                      class="block text-gray-700 text-lg font-semibold mb-3"
-                      >Rol Adicional</label
-                    >
+                    <p class="block text-gray-700 text-lg font-semibold mb-3">
+                      Rol Adicional
+                    </p>
                     <button
                       (click)="editingHasScheduler.set(!editingHasScheduler())"
                       [class]="
@@ -179,10 +178,9 @@
 
                   <!-- Especialidades -->
                   <div>
-                    <label
-                      class="block text-gray-700 text-lg font-semibold mb-3"
-                      >Especialidades</label
-                    >
+                    <p class="block text-gray-700 text-lg font-semibold mb-3">
+                      Especialidades
+                    </p>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       @for (
                         specialty of specialtiesList;
@@ -291,13 +289,31 @@
                     </div>
                   </div>
 
-                  <button
-                    (click)="handleEdit(doctor)"
-                    class="px-5 py-3 bg-[#215c98] hover:bg-[#163c63] text-white rounded-lg transition-colors flex items-center gap-2 font-semibold shrink-0"
-                  >
-                    <lucide-angular [img]="Edit3" [size]="18"></lucide-angular>
-                    Editar
-                  </button>
+                  <div class="relative shrink-0 edit-container">
+                    <button
+                      (click)="handleEdit(doctor)"
+                      (mouseenter)="hoveredDoctorId.set(doctor.doctorId)"
+                      (mouseleave)="hoveredDoctorId.set(null)"
+                      class="px-5 py-3 bg-[#215c98] hover:bg-[#163c63] text-white rounded-lg transition-colors flex items-center gap-2 font-semibold"
+                    >
+                      <lucide-angular
+                        [img]="Edit3"
+                        [size]="18"
+                      ></lucide-angular>
+                      Editar
+                    </button>
+
+                    @if (hoveredDoctorId() === doctor.doctorId) {
+                      <div
+                        class="absolute right-0 top-full mt-1 whitespace-nowrap bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg animate-fade-in pointer-events-none z-10"
+                      >
+                        Editar roles y especialidades
+                        <div
+                          class="absolute -top-1 right-4 w-2 h-2 bg-gray-900 rotate-45"
+                        ></div>
+                      </div>
+                    }
+                  </div>
                 </div>
               }
             </div>

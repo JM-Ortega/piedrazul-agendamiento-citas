@@ -58,24 +58,24 @@ export class AdminUsersComponent implements OnInit {
     this.systemUsers().filter(
       (u) =>
         u.roles.map((r) => r.toLowerCase()).includes('doctor') &&
-        !u.roles.map((r) => r.toLowerCase()).includes('scheduler'),
-    ),
+        !u.roles.map((r) => r.toLowerCase()).includes('scheduler')
+    )
   );
 
   schedulers = computed(() =>
     this.systemUsers().filter(
       (u) =>
         u.roles.map((r) => r.toLowerCase()).includes('scheduler') &&
-        !u.roles.map((r) => r.toLowerCase()).includes('doctor'),
-    ),
+        !u.roles.map((r) => r.toLowerCase()).includes('doctor')
+    )
   );
 
   both = computed(() =>
     this.systemUsers().filter(
       (u) =>
         u.roles.map((r) => r.toLowerCase()).includes('doctor') &&
-        u.roles.map((r) => r.toLowerCase()).includes('scheduler'),
-    ),
+        u.roles.map((r) => r.toLowerCase()).includes('scheduler')
+    )
   );
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ export class AdminUsersComponent implements OnInit {
                 : [...u.roles, 'SCHEDULER']
             ) as ('doctor' | 'scheduler')[];
             return { ...u, roles: updatedRoles };
-          }),
+          })
         );
         this.appService.refreshRoles();
       },

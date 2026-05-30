@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
@@ -17,6 +17,7 @@ import {
   Info,
   Lock,
   LucideAngularModule,
+  LucideIconData,
   Mail,
   Phone,
   Stethoscope,
@@ -28,6 +29,12 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { AdminService } from '../../service/admin.service';
 
 type Role = 'doctor' | 'scheduler';
+
+interface SpecialtyOption {
+  name: string;
+  icon: LucideIconData;
+  colorClass: string;
+}
 
 interface UserForm {
   documentId: string;
@@ -108,11 +115,9 @@ export class AdminCreateUserComponent implements OnInit {
   submitError: string | null = null;
   isSubmitting = false;
 
-  // ── Modal de confirmación ─────────────────────────────────────────────────
   showConfirmModal = false;
 
-  // ── Datos dinámicos del backend ───────────────────────────────────────────
-  specialtyOptions: { name: string; icon: any; colorClass: string }[] = [];
+  specialtyOptions: SpecialtyOption[] = [];
   specialties: string[] = [];
   documentTypes: string[] = [];
   loadingSpecialties = false;
@@ -156,19 +161,19 @@ export class AdminCreateUserComponent implements OnInit {
     return opts;
   })();
 
-  constructor(
-    private router: Router,
-    private adminService: AdminService
-  ) {}
+  private router = inject(Router);
+  private adminService = inject(AdminService);
 
-  // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.loadSpecialties();
     this.loadDocumentTypes();
   }
 
-  private getSpecialtyIcon(name: string): { icon: any; colorClass: string } {
-    const map: Record<string, { icon: any; colorClass: string }> = {
+  private getSpecialtyIcon(name: string): {
+    icon: LucideIconData;
+    colorClass: string;
+  } {
+    const map: Record<string, { icon: LucideIconData; colorClass: string }> = {
       MEDICINA_GENERAL: { icon: Heart, colorClass: 'text-red-700' },
       QUIROPRAXIA: { icon: Bone, colorClass: 'text-orange-700' },
       FISIOTERAPIA: { icon: Activity, colorClass: 'text-green-700' },
@@ -206,7 +211,6 @@ export class AdminCreateUserComponent implements OnInit {
     });
   }
 
-  // ── Getters ───────────────────────────────────────────────────────────────
   get hasDoctorRole(): boolean {
     return this.selectedRoles.includes('doctor');
   }
@@ -226,7 +230,6 @@ export class AdminCreateUserComponent implements OnInit {
     return Math.max(this.shiftDurationMinutes, 10);
   }
 
-  // ── Sanitización de inputs ────────────────────────────────────────────────
   onDocumentKeydown(event: KeyboardEvent): void {
     const allowedKeys = [
       'Backspace',
@@ -310,7 +313,6 @@ export class AdminCreateUserComponent implements OnInit {
     if (this.submitted) this.validateField('email');
   }
 
-  // ── Lógica de tiempo ──────────────────────────────────────────────────────
   private timeToMinutes(time: string): number {
     if (!time) return 0;
     const [h, m] = time.split(':').map(Number);
@@ -326,20 +328,6 @@ export class AdminCreateUserComponent implements OnInit {
     this.validateField('endTime');
     this.validateField('startTime');
     if (this.submitted) this.validateField('interval');
-  }
-
-  onLaborStartChange(): void {
-    if (this.submitted) {
-      this.validateField('laborStart');
-      this.validateField('laborEnd');
-    }
-  }
-
-  onLaborEndChange(): void {
-    if (this.submitted) {
-      this.validateField('laborEnd');
-      this.validateField('laborStart');
-    }
   }
 
   onLaborStartInput(event: Event): void {
@@ -374,7 +362,6 @@ export class AdminCreateUserComponent implements OnInit {
     if (this.submitted) this.validateField('laborEnd');
   }
 
-  // ── Días de atención ──────────────────────────────────────────────────────
   toggleWorkDay(day: number): void {
     if (this.userForm.workDays.includes(day)) {
       this.userForm.workDays = this.userForm.workDays.filter((d) => d !== day);
@@ -403,25 +390,15 @@ export class AdminCreateUserComponent implements OnInit {
     return this.userForm.specialty.includes(specialty);
   }
 
-  // ── Roles ─────────────────────────────────────────────────────────────────
   toggleRole(role: Role): void {
     this.selectedRoles = [role];
     if (this.submitted) this.validateField('roles');
-  }
-
-  getRoleLabel(role: Role): string {
-    return role === 'doctor' ? 'Médico' : 'Agendador';
-  }
-
-  getRolesDisplayText(): string {
-    return this.selectedRoles.map((r) => this.getRoleLabel(r)).join(' + ');
   }
 
   getDayLabel(value: number): string {
     return this.daysOfWeek.find((d) => d.value === value)?.label ?? '';
   }
 
-  // ── Modal de confirmación ─────────────────────────────────────────────────
   openConfirmModal(): void {
     this.submitted = true;
     this.submitSuccess = false;
@@ -498,7 +475,6 @@ export class AdminCreateUserComponent implements OnInit {
     }
   }
 
-  // ── Validación por campo ──────────────────────────────────────────────────
   validateField(field: keyof FormErrors): void {
     this.errors[field] = undefined;
 
@@ -652,7 +628,6 @@ export class AdminCreateUserComponent implements OnInit {
     }
   }
 
-  // ── Validación completa ───────────────────────────────────────────────────
   private validateAll(): boolean {
     const fields: (keyof FormErrors)[] = [
       'documentId',

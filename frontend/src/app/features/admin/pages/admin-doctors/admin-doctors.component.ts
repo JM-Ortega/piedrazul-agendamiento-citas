@@ -57,6 +57,7 @@ export class AdminDoctorsComponent implements OnInit {
   editingSpecialties = signal<string[]>([]);
   editingHasScheduler = signal(false);
   savingDoctorId = signal<string | null>(null);
+  hoveredDoctorId = signal<string | null>(null);
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
