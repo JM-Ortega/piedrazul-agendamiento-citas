@@ -1,12 +1,12 @@
 package co.edu.unicauca.piedrazul.backend.patients.application;
 
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientUserRequest;
 import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientPublicResponse;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientResponse;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
 import co.edu.unicauca.piedrazul.backend.patients.exception.InvalidPatientDataException;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyExistsException;
@@ -14,7 +14,11 @@ import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyLinked
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.mappers.PatientApiMapper;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientRepository;
+import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
+import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
 import co.edu.unicauca.piedrazul.backend.verification.VerificationModuleApi;
 import co.edu.unicauca.piedrazul.backend.verification.api.VerificationPurpose;
 import org.springframework.stereotype.Service;
@@ -32,15 +36,18 @@ public class PatientService implements PatientModuleApi {
 
     private final PatientRepository patientRepository;
     private final UserModuleApi userModuleApi;
+    private final UserProvisioningApi userProvisioningApi;
     private final VerificationModuleApi verificationModuleApi;
 
     public PatientService(
             PatientRepository patientRepository,
             UserModuleApi userModuleApi,
+            UserProvisioningApi userProvisioningApi,
             VerificationModuleApi verificationModuleApi
     ) {
         this.patientRepository = patientRepository;
         this.userModuleApi = userModuleApi;
+        this.userProvisioningApi = userProvisioningApi;
         this.verificationModuleApi = verificationModuleApi;
     }
 
@@ -75,54 +82,23 @@ public class PatientService implements PatientModuleApi {
         return toData(patientRepository.save(patient));
     }
 
-    public PatientData createPatientWithUser(
-            String username,
-            String password,
-            PatientDocumentType documentType,
-            String documentNumber,
-            String firstName,
-            String lastName,
-            String phone,
-            String email,
-            PatientGender gender,
-            LocalDate birthDate,
-            String guardianPhone
-    ) {
-        validateUsername(username);
-        validateDocumentNumber(documentNumber);
-        validateUsernameMatchesDocumentNumber(username, documentNumber);
-        ensurePatientDoesNotExist(documentNumber);
-
-        UUID userId = userModuleApi.findUserIdByUsername(username)
-                .orElseGet(() -> {
-                    validatePassword(password);
-                    return userModuleApi.getOrCreatePatientUser(
-                            username,
-                            firstName,
-                            lastName,
-                            email,
-                            password
-                    );
-                });
-
-        if (userModuleApi.findUserIdByUsername(username).isPresent()) {
-            userModuleApi.ensurePatientRole(userId);
-        }
-
+    @Override
+    public void createPatientWithUser(UUID userId, String firstName, String lastName, String identificacion,
+                                      String email, CreatePatientUserRequest request) {
         Patient patient = buildPatient(
-                documentType,
-                documentNumber,
+                request.documentType(),
+                identificacion,
                 firstName,
                 lastName,
-                phone,
+                request.phone(),
                 email,
-                gender,
-                birthDate,
-                guardianPhone,
+                request.gender(),
+                request.birthDate(),
+                request.guardianPhone(),
                 userId
         );
 
-        return toData(patientRepository.save(patient));
+        patientRepository.save(patient);
     }
 
     public void requestLinkUserAccountCode(String documentNumber) {
@@ -156,24 +132,19 @@ public class PatientService implements PatientModuleApi {
                 code
         );
 
-        Optional<UUID> existingUserId = userModuleApi.findUserIdByUsername(documentNumber);
+        validatePassword(password);
 
-        UUID userId = existingUserId.orElseGet(() -> {
-            validatePassword(password);
-            return userModuleApi.getOrCreatePatientUser(
-                    documentNumber,
-                    patient.getFirstName(),
-                    patient.getLastName(),
-                    patient.getEmail(),
-                    password
-            );
-        });
+        /*
+        Lo comento porque la funcion create user automaticamente linkea a el paciente con su usuario
 
-        if (existingUserId.isPresent()) {
-            userModuleApi.ensurePatientRole(userId);
-        }
+        UserSummary user = userModuleApi.createUser(new CreateSystemUserPayload(new CreateSystemUserRequest(documentNumber, patient.getFirstName(),
+                patient.getLastName(), patient.getEmail(), password),null,null, List.of(Role.PATIENT)));
 
-        patient.linkUser(userId);
+        patient.linkUser(user.id());
+         */
+
+        userProvisioningApi.createUser(new CreateSystemUserPayload(new CreateSystemUserRequest(documentNumber, patient.getFirstName(),
+            patient.getLastName(), patient.getEmail(), password),null,null, List.of(Role.PATIENT)));
 
         return toData(patientRepository.save(patient));
     }
@@ -226,7 +197,7 @@ public class PatientService implements PatientModuleApi {
                 patientRepository.findByDocumentNumber(documentNumber);
 
         boolean hasSystemUser =
-                userModuleApi.findUserIdByUsername(documentNumber).isPresent();
+                userModuleApi.findUserByUsername(documentNumber).isPresent();
 
         if (patientOpt.isPresent()) {
             return PatientPublicResponse.from(patientOpt.get(), hasSystemUser);

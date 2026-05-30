@@ -1,7 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.patients.domain;
 
 import co.edu.unicauca.piedrazul.backend.patients.exception.InvalidPatientDataException;
-import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyLinkedUserException;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
@@ -144,6 +143,7 @@ public class Patient {
         return userId != null;
     }
 
+    /*
     public void linkUser(UUID userId) {
         if (userId == null) {
             throw new InvalidPatientDataException("userId cannot be null");
@@ -155,4 +155,5 @@ public class Patient {
 
         this.userId = userId;
     }
+     */
 }

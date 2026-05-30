@@ -4,8 +4,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.ConfirmLinkUserAccountRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.CreatePatientRequest;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.CreatePatientWithUserRequest;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.RequestLinkUserAccountCodeRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientPublicResponse;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientResponse;
@@ -13,7 +12,6 @@ import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientSummaryR
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientService;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import jakarta.validation.Valid;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -38,24 +36,6 @@ public class PatientController {
     @PreAuthorize("hasRole('ADMIN')")
     public PatientResponse create(@Valid @RequestBody CreatePatientRequest request) {
         PatientData patient = patientService.createPatient(
-                request.getDocumentType(),
-                request.getDocumentNumber(),
-                request.getFirstName(),
-                request.getLastName(),
-                request.getPhone(),
-                request.getEmail(),
-                request.getGender(),
-                request.getBirthDate(),
-                request.getGuardianPhone()
-        );
-        return toResponse(patient);
-    }
-
-    @PostMapping("/with-user")
-    public PatientResponse createWithUser(@Valid @RequestBody CreatePatientWithUserRequest request) {
-        PatientData patient = patientService.createPatientWithUser(
-                request.getUsername(),
-                request.getPassword(),
                 request.getDocumentType(),
                 request.getDocumentNumber(),
                 request.getFirstName(),

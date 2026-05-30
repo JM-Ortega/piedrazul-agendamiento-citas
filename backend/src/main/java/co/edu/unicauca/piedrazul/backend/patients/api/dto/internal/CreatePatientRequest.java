@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.patients.api.dto.input;
+package co.edu.unicauca.piedrazul.backend.patients.api.dto.internal;
 
 import co.edu.unicauca.piedrazul.backend.jackson.normalization.NormalizeName;
 import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
@@ -14,13 +14,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
 @ValidDocument
-public class CreatePatientWithUserRequest {
-
-    @NotBlank
-    @Size(min = 4, max = 50)
-    @Pattern(regexp = "^[A-Za-z0-9._-]{4,50}$")
-    @Sanitize
-    private String username;
+public class CreatePatientRequest {
 
     @NotNull
     private PatientDocumentType documentType;
@@ -66,14 +60,6 @@ public class CreatePatientWithUserRequest {
     @Sanitize
     private String guardianPhone;
 
-    @NotBlank
-    @Size(min = 6, max = 100)
-    private String password;
-
-    public String getUsername() {
-        return username;
-    }
-
     public PatientDocumentType getDocumentType() {
         return documentType;
     }
@@ -108,9 +94,5 @@ public class CreatePatientWithUserRequest {
 
     public String getGuardianPhone() {
         return guardianPhone;
-    }
-
-    public String getPassword() {
-        return password;
     }
 }

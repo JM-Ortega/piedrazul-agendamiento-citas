@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.patients;
 
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientUserRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 
 import java.time.LocalDate;
@@ -32,4 +33,7 @@ public interface PatientModuleApi {
             LocalDate birthDate,
             String guardianPhone
     );
+
+    void createPatientWithUser(UUID userId, String firstName, String lastName, String identificacion,
+                               String email, CreatePatientUserRequest request);
 }
