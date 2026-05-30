@@ -1,23 +1,26 @@
 package co.edu.unicauca.piedrazul.backend.user.api;
 
-import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSchedulerRequest;
+import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
+import co.edu.unicauca.piedrazul.backend.user.application.CreateAccountUseCase;
 import co.edu.unicauca.piedrazul.backend.user.application.UserService;
+import co.edu.unicauca.piedrazul.backend.user.exception.InvalidPatientRoleAssignmentException;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/user")
-@PreAuthorize("hasRole('ADMIN')")
 public class UserController {
+    private final CreateAccountUseCase createAccountUseCase;
     private final UserService userService;
 
-    public UserController(UserService userService) {
+    public UserController(CreateAccountUseCase createAccountUseCase, UserService userService) {
+        this.createAccountUseCase = createAccountUseCase;
         this.userService = userService;
     }
 
@@ -33,14 +36,37 @@ public class UserController {
     }
 
     /**
-     * Crea un nuevo usuario con rol de scheduler.
-     * @param request Datos necesarios para crear el scheduler
+     * Crea un nuevo usuario del sistema.
+     * @param request Datos del usuario a crear
      * @return Respuesta HTTP 204 si la operación fue exitosa
      */
-    @PostMapping("/schedulers")
+    @PostMapping("/users")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> createScheduler(@Valid @RequestBody CreateSchedulerRequest request) {
-        userService.createScheduler(request);
+    public ResponseEntity<Void> createUser(
+            @Valid @RequestBody CreateSystemUserPayload request
+    ) {
+        createAccountUseCase.execute(request);
+
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Endpoind público para crear un nuevo paciente en el sistema.
+     * @param request Datos del usuario a crear
+     * @return Respuesta HTTP 204 si la operación fue exitosa
+     */
+    @PostMapping("/patient-user")
+    public ResponseEntity<Void> createPatientUser(
+            @Valid @RequestBody CreateSystemUserPayload request
+    ) {
+        if (request.roles().size()>2 || !request.roles().contains(Role.PATIENT)){
+            throw new InvalidPatientRoleAssignmentException(
+                    "Un paciente solo puede tener asignado el rol PATIENT y ningún otro privilegio adicional."
+            );
+        }
+
+        createAccountUseCase.execute(request);
+
         return ResponseEntity.noContent().build();
     }
 
