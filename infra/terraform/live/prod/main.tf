@@ -48,3 +48,10 @@ module "zone_settings" {
 
   zone_id = var.cloudflare_zone_id
 }
+
+module "origin_security" {
+  source = "../../modules/cloudflare/origin_security"
+
+  zone_id = var.cloudflare_zone_id
+  enabled = true
+}
