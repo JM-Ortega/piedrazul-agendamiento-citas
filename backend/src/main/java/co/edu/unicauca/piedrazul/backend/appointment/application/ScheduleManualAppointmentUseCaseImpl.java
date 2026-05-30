@@ -1,40 +1,52 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
-import co.edu.unicauca.piedrazul.backend.shared.events.AppointmentCreatedEvent;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientAlreadyScheduledInSpecialtyException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientScheduleTimeConflictException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
+import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.ManualPatientResolutionStrategy;
+import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.PatientSchedulingContext;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ScheduleManualAppointmentUseCase;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.PatientRegistrationData;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppointmentUseCase {
-    private final AppointmentRepository appointmentRepository;
-    private final DoctorConfigConsultPort doctorConfigConsultPort;
-    private final AppointmentService appointmentService;
-    private final PatientConsultPort patientConsultPort;
-    private final ApplicationEventPublisher eventPublisher;
+        private final AppointmentSchedulingService appointmentSchedulingService;
+        private final ManualPatientResolutionStrategy manualPatientResolutionStrategy;
 
     public ScheduleManualAppointmentUseCaseImpl(
-            AppointmentRepository appointmentRepository,
-            DoctorConfigConsultPort doctorConfigConsultPort,
-            AppointmentService appointmentService,
-            PatientConsultPort patientConsultPort,
-            ApplicationEventPublisher eventPublisher) {
-        this.appointmentRepository   = appointmentRepository;
-        this.doctorConfigConsultPort = doctorConfigConsultPort;
-        this.appointmentService      = appointmentService;
-        this.patientConsultPort = patientConsultPort;
-        this.eventPublisher = eventPublisher;
+                        AppointmentSchedulingService appointmentSchedulingService,
+                        ManualPatientResolutionStrategy manualPatientResolutionStrategy) {
+                this.appointmentSchedulingService = appointmentSchedulingService;
+                this.manualPatientResolutionStrategy = manualPatientResolutionStrategy;
+    }
+
+    public ScheduleManualAppointmentUseCaseImpl(
+                        AppointmentRepository appointmentRepository,
+                        DoctorConfigConsultPort doctorConfigConsultPort,
+                        AppointmentService appointmentService,
+                        PatientConsultPort patientConsultPort,
+                        ApplicationEventPublisher eventPublisher) {
+                this(
+                                new AppointmentSchedulingService(
+                                                appointmentRepository,
+                                                doctorConfigConsultPort,
+                                                appointmentService,
+                                                                eventPublisher,
+                                                                new IsNewPatientUseCaseImpl(
+                                                                        appointmentRepository,
+                                                                        patientConsultPort
+                                                                )
+                                ),
+                                new ManualPatientResolutionStrategy(patientConsultPort)
+                );
     }
 
     public ScheduleManualAppointmentUseCaseImpl(
@@ -68,83 +80,25 @@ public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppoi
             LocalDate date,
             AppointmentTime startTime,
             String performedBy) {
-
-        // 1. Obtiene la configuración del médico a través del puerto de salida
-        int intervalMinutes = doctorConfigConsultPort
-                .getIntervalMinutesByDoctor(idDoctor);
-        String doctorName = doctorConfigConsultPort.getDoctorName(idDoctor);
-
-        // 2. Obtiene las citas existentes del médico ese día a través del puerto de salida
-        List<Appointment> existingAppointments = appointmentRepository
-                .findByDoctorIdAndDate(idDoctor, date);
-
-        // 3. Buscar paciente por documento
-        Optional<PatientSnapshot> existingPatient =
-                patientConsultPort.findByDocumentNumber(documentNumber);
-
-        UUID idPatient = null;
-        PatientInfo finalPatientInfo;
-
-        if (existingPatient.isPresent()) {
-            // ya existe
-            idPatient = existingPatient.get().idPatient();
-            finalPatientInfo = existingPatient.get().patientInfo();
-        } else {
-            // No existe → ahora sí se construye y valida el PatientInfo
-            PatientInfo patientInfo = PatientInfo.of(
-                    documentType,
-                    documentNumber,
-                    firstName,
-                    lastName,
-                    phone,
-                    gender,
-                    birthDate,
-                    email,
-                    guardianPhone
-            );
-
-            finalPatientInfo = patientInfo;
-
-            idPatient = patientConsultPort.createPatient(
-                    new PatientRegistrationData(
-                            documentType,
-                            documentNumber,
-                            firstName,
-                            lastName,
-                            phone,
-                            email,
-                            gender,
-                            birthDate,
-                            guardianPhone
-                    )
-            );
-        }
-
-        validateUniqueScheduledAppointmentBySpecialty(idPatient, specialty);
-        validateNoTimeConflictForPatient(idPatient, date, startTime);
-
-        // 4. Delega la lógica de negocio al servicio de dominio
-        Appointment appointment = appointmentService.scheduleManual(
-                doctorName,
-                idPatient,
-                finalPatientInfo,
+        return appointmentSchedulingService.scheduleManual(
+                PatientSchedulingContext.manual(
+                        documentType,
+                        documentNumber,
+                        firstName,
+                        lastName,
+                        phone,
+                        gender,
+                        birthDate,
+                        email,
+                        guardianPhone
+                ),
                 idDoctor,
-                finalPatientInfo.getFirstName() + " " + finalPatientInfo.getLastName(),
                 specialty,
                 date,
                 startTime,
-                intervalMinutes,
-                existingAppointments
+                performedBy,
+                manualPatientResolutionStrategy
         );
-
-        Appointment saved = appointmentRepository.save(appointment);
-
-        eventPublisher.publishEvent(new AppointmentCreatedEvent(
-                saved.getIdAppointment().toString(),
-                performedBy
-        ));
-
-        return saved;
     }
 
     public Appointment scheduleManual(
@@ -177,32 +131,6 @@ public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppoi
                 startTime,
                 "system"
         );
-    }
-
-    private void validateUniqueScheduledAppointmentBySpecialty(UUID idPatient, Specialty specialty) {
-        boolean hasScheduledInSameSpecialty = appointmentRepository.findByPatientId(idPatient)
-                .stream()
-                .anyMatch(appointment -> appointment.getSpecialty() == specialty
-                        && appointment.getAppointmentState() == AppointmentState.AGENDADA);
-
-        if (hasScheduledInSameSpecialty) {
-            throw new PatientAlreadyScheduledInSpecialtyException(
-                    "El paciente ya tiene una cita AGENDADA para la especialidad " + specialty
-            );
-        }
-    }
-
-    private void validateNoTimeConflictForPatient(UUID idPatient, LocalDate date, AppointmentTime startTime) {
-        boolean hasTimeConflict = appointmentRepository.findByPatientIdAndDate(idPatient, date)
-                .stream()
-                .anyMatch(appointment -> appointment.getStartTime().equals(startTime)
-                        && appointment.getAppointmentState().isActive());
-
-        if (hasTimeConflict) {
-            throw new PatientScheduleTimeConflictException(
-                    "El paciente ya tiene una cita activa para la fecha " + date + " a las " + startTime.getTime()
-            );
-        }
     }
 
 }

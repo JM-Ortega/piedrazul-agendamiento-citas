@@ -142,6 +142,15 @@ public class Appointment {
         return appointment;
     }
 
+    public void markAsNoShow() {
+        if (this.appointmentState != AppointmentState.AGENDADA) {
+            throw new IllegalStateException(
+                    "Solo las citas AGENDADAS pueden marcarse como NO_ASISTIO"
+            );
+        }
+        this.appointmentState = AppointmentState.NO_ASISTIO;
+    }
+
     public UUID getIdAppointment() {
         return idAppointment;
     }

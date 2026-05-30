@@ -8,6 +8,7 @@ import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsExcepti
 import jakarta.ws.rs.core.Response;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
+import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -118,6 +119,13 @@ public class KeycloakUserClient {
         }
     }
 
+    public void revokeRoleIfPresent(UUID keycloakId, Role role) {
+
+        if (userHasRole(keycloakId, role)) {
+            revokeRealmRole(keycloakId.toString(), role);
+        }
+    }
+
     public void activateUser(UUID keycloakId) {
         UserRepresentation user = new UserRepresentation();
         user.setEnabled(true);
@@ -150,6 +158,18 @@ public class KeycloakUserClient {
         }
     }
 
+    public List<String> getUserRoles(UUID keycloakId) {
+        return keycloak.realm(props.getRealm())
+                .users()
+                .get(keycloakId.toString())
+                .roles()
+                .realmLevel()
+                .listAll()
+                .stream()
+                .map(RoleRepresentation::getName)
+                .toList();
+    }
+
     public boolean userHasRole(UUID keycloakId, Role role) {
         List<RoleRepresentation> assignedRoles = keycloak.realm(props.getRealm())
                 .users()
@@ -174,5 +194,20 @@ public class KeycloakUserClient {
                 .roles()
                 .realmLevel()
                 .add(List.of(realmRole));
+    }
+
+    private void revokeRealmRole(String keycloakId, Role role) {
+
+        RealmResource realm = keycloak.realm(props.getRealm());
+
+        RoleRepresentation realmRole = realm.roles()
+                .get(role.name())
+                .toRepresentation();
+
+        realm.users()
+                .get(keycloakId)
+                .roles()
+                .realmLevel()
+                .remove(List.of(realmRole));
     }
 }

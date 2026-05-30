@@ -1,15 +1,12 @@
 package co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input;
 
-import co.edu.unicauca.piedrazul.backend.config.security.sanitization.Sanitize;
-import co.edu.unicauca.piedrazul.backend.config.security.validation.ValidDocument;
+import co.edu.unicauca.piedrazul.backend.jackson.normalization.NormalizeName;
+import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
+import co.edu.unicauca.piedrazul.backend.jackson.validation.ValidDocument;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -18,26 +15,33 @@ import java.util.List;
 public record CreateDoctorRequest(
         @Size(min = 2, max = 60)
         @Pattern(regexp = "^[\\p{L} '-]{2,60}$")
-        @NotBlank @Sanitize
+        @NotBlank
+        @Sanitize
+        @NormalizeName
         String firstName,
 
         @Size(min = 2, max = 60)
         @Pattern(regexp = "^[\\p{L} '-]{2,60}$")
-        @NotBlank @Sanitize
+        @NotBlank
+        @Sanitize
+        @NormalizeName
         String lastName,
 
         @NotNull
         DocumentType documentType,
 
         @Size(max = 20)
-        @NotBlank @Sanitize
+        @NotBlank
+        @Sanitize
         String identification,
 
-        @Pattern(regexp = "^[0-9]{7,15}$")
-        @NotBlank @Sanitize
+        // Número Colombiano
+        @Pattern(regexp = "^[0-9]{10}$")
+        @NotBlank
+        @Sanitize
         String phone,
 
-        @NotNull
+        @NotEmpty
         List<Specialty> specialty,
 
         @NotNull
@@ -46,7 +50,11 @@ public record CreateDoctorRequest(
         LocalDate laborEnd,
 
         @Positive
+        @Min(5)
+        @Max(240)
         int appointmentInterval,
+
+        @Valid
         List<CreateScheduleRequest> schedules,
 
         @Email
@@ -54,7 +62,7 @@ public record CreateDoctorRequest(
         @Sanitize
         String email,
 
-        @Size(min = 8, max = 100)
+        @Size(min = 6, max = 100)
         @NotBlank
         String password
 ) {}

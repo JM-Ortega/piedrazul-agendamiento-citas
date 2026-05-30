@@ -11,10 +11,10 @@
       <p><strong>Nombre:</strong> {{ state.confirmFirstName() }} {{ state.confirmLastName() }}</p>
 
       @if (state.isSchedulerContext()) {
-        <p><strong>Tipo de Documento:</strong> {{ state.confirmDocumentType() }}</p>
+        <p><strong>Tipo de Documento:</strong> {{ state.confirmDocumentType() | formato }}</p>
         <p><strong>Documento:</strong> {{ state.confirmDocument() }}</p>
         <p><strong>Celular:</strong> {{ state.confirmPhone() }}</p>
-        <p><strong>Género:</strong> {{ state.confirmGender() }}</p>
+        <p><strong>Género:</strong> {{ state.confirmGender() | formato }}</p>
         <p><strong>Fecha de Nacimiento:</strong> {{ state.confirmBirthDate() }}</p>
       } @else {
         @if (state.confirmDocument()) {
@@ -28,7 +28,7 @@
         <lucide-angular [img]="Stethoscope" [size]="18"></lucide-angular>
         Cita
       </h3>
-      <p><strong>Especialidad:</strong> {{ state.selectedSpecialty() | specialty }}</p>
+      <p><strong>Especialidad:</strong> {{ state.selectedSpecialty() | formato }}</p>
       <p><strong>Médico:</strong> {{ state.confirmDoctorName() }}</p>
       <p><strong>Fecha:</strong> {{ state.confirmDate() }}</p>
       <p><strong>Hora:</strong> {{ state.selectedTime().slice(0, 5) }}</p>

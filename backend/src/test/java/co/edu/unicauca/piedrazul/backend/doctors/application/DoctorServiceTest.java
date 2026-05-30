@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
+import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
@@ -36,11 +37,14 @@ class DoctorServiceTest {
     @Mock
     private UserModuleApi userModuleApi;
 
+    @Mock
+    private AppointmentExternalService appointmentExternalService;
+
     private DoctorService doctorService;
 
     @BeforeEach
     void setUp() {
-        doctorService = new DoctorService(doctorRepository, userModuleApi);
+        doctorService = new DoctorService(doctorRepository, userModuleApi, appointmentExternalService);
     }
 
     @Test

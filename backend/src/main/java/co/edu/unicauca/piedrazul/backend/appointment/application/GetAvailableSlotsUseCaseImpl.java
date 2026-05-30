@@ -15,15 +15,15 @@ import java.util.UUID;
 public class GetAvailableSlotsUseCaseImpl implements GetAvailableSlotsUseCase {
     private final AppointmentRepository appointmentRepository;
     private final DoctorConfigConsultPort doctorConfigConsultPort;
-        private final SlotTimeService slotTimeService;
+    private final SlotTimeService slotTimeService;
 
     public GetAvailableSlotsUseCaseImpl(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
-                        SlotTimeService slotTimeService) {
+            SlotTimeService slotTimeService) {
         this.appointmentRepository   = appointmentRepository;
         this.doctorConfigConsultPort = doctorConfigConsultPort;
-                this.slotTimeService = slotTimeService;
+        this.slotTimeService = slotTimeService;
     }
 
     // Obtener franjas disponibles para mostrarle al frontend antes de agendar

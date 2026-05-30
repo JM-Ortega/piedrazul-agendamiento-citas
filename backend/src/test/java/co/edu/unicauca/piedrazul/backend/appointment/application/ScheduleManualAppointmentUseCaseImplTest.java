@@ -1,13 +1,14 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientAlreadyScheduledInSpecialtyException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.FirstAppointmentMustBeGeneralMedicineException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientScheduleTimeConflictException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientRegistrationData;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.PatientRegistrationData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,6 +55,9 @@ class ScheduleManualAppointmentUseCaseImplTest {
 
         lenient().when(appointmentRepository.save(any(Appointment.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+
+        lenient().when(appointmentRepository.existsByPatientIdAndStates(any(UUID.class), anySet()))
+                .thenReturn(true);
     }
 
     // ─────────────────────────────────────────────
@@ -76,6 +80,8 @@ class ScheduleManualAppointmentUseCaseImplTest {
         // Se crea el paciente y se obtiene su nuevo id
         when(patientConsultPort.createPatient(any(PatientRegistrationData.class)))
                 .thenReturn(idPatient);
+        when(appointmentRepository.existsByPatientIdAndStates(eq(idPatient), anySet()))
+                .thenReturn(false);
         when(appointmentRepository.findByPatientId(idPatient)).thenReturn(List.of());
         when(appointmentRepository.findByPatientIdAndDate(idPatient, date)).thenReturn(List.of());
         when(appointmentService.scheduleManual(
@@ -93,7 +99,7 @@ class ScheduleManualAppointmentUseCaseImplTest {
                 "carlos@correo.com",
                 null,                // guardianPhone
                 idDoctor,
-                Specialty.FISIOTERAPIA,
+                Specialty.MEDICINA_GENERAL,
                 date,
                 startTime
         );
@@ -119,6 +125,8 @@ class ScheduleManualAppointmentUseCaseImplTest {
                 .thenReturn(Optional.empty());
         when(patientConsultPort.createPatient(any(PatientRegistrationData.class)))
                 .thenReturn(idPatient);
+        when(appointmentRepository.existsByPatientIdAndStates(eq(idPatient), anySet()))
+                .thenReturn(false);
         when(appointmentRepository.findByPatientId(idPatient)).thenReturn(List.of());
         when(appointmentRepository.findByPatientIdAndDate(idPatient, date)).thenReturn(List.of());
         when(appointmentService.scheduleManual(
@@ -136,7 +144,7 @@ class ScheduleManualAppointmentUseCaseImplTest {
                 "carlos@correo.com",
                 null,                // guardianPhone
                 idDoctor,
-                Specialty.FISIOTERAPIA,
+                Specialty.MEDICINA_GENERAL,
                 date,
                 startTime
         );
@@ -152,6 +160,46 @@ class ScheduleManualAppointmentUseCaseImplTest {
         assertThat(sent.firstName()).isEqualTo(patientInfo.getFirstName());
         assertThat(sent.lastName()).isEqualTo(patientInfo.getLastName());
         assertThat(sent.phone()).isEqualTo(patientInfo.getPhone());
+
+    }
+
+    @Test
+    void scheduleManualShouldThrowWhenNewPatientFirstAppointmentIsNotGeneralMedicine() {
+        UUID idDoctor = UUID.randomUUID();
+        UUID idPatient = UUID.randomUUID();
+        AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
+        LocalDate date = LocalDate.now().plusDays(1);
+
+        stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
+        when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
+        when(patientConsultPort.findByDocumentNumber("12345678")).thenReturn(Optional.empty());
+        when(patientConsultPort.createPatient(any(PatientRegistrationData.class))).thenReturn(idPatient);
+        when(appointmentRepository.existsByPatientIdAndStates(eq(idPatient), anySet())).thenReturn(false);
+
+        assertThatThrownBy(() ->
+                useCase.scheduleManual(
+                        DocumentType.CEDULA,
+                        "12345678",
+                        "Carlos",
+                        "Gomez",
+                        "3001234567",
+                        Gender.MASCULINO,
+                        LocalDate.of(1990, 6, 15),
+                        "carlos@correo.com",
+                        null,
+                        idDoctor,
+                        Specialty.FISIOTERAPIA,
+                        date,
+                        startTime
+                )
+        )
+                .isInstanceOf(FirstAppointmentMustBeGeneralMedicineException.class)
+                .hasMessageContaining("primera cita");
+
+        verify(appointmentRepository, never()).save(any(Appointment.class));
+        verify(appointmentService, never()).scheduleManual(
+                any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyList()
+        );
     }
 
     // ─────────────────────────────────────────────
