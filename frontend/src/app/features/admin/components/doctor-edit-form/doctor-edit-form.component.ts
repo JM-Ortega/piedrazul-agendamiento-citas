@@ -229,4 +229,29 @@ export class DoctorEditFormComponent implements OnInit {
       removedWorkdays, // ← añadir
     });
   }
+  onLaborStartInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value;
+    if (value) {
+      const parts = value.split('-');
+      if (parts[0].length > 4) {
+        parts[0] = parts[0].slice(0, 4);
+        input.value = parts.join('-');
+        this.updateField('laborStart', input.value);
+      }
+    }
+  }
+
+  onLaborEndInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value;
+    if (value) {
+      const parts = value.split('-');
+      if (parts[0].length > 4) {
+        parts[0] = parts[0].slice(0, 4);
+        input.value = parts.join('-');
+        this.updateField('laborEnd', input.value);
+      }
+    }
+  }
 }

@@ -128,4 +128,11 @@ export class AppService {
   logout(): void {
     this.keycloak.logout({ redirectUri: window.location.origin });
   }
+  async refreshRoles(): Promise<void> {
+    try {
+      await this.keycloak.updateToken(-1);
+    } catch {
+      // silencioso
+    }
+  }
 }

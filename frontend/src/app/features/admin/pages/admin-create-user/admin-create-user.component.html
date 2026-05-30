@@ -6,7 +6,7 @@
     >
       <button
         (click)="navigateBack()"
-        class="flex items-center gap-2 text-white hover:text-[#a7c9ec] mb-4 text-base"
+        class="flex items-center gap-2 text-white hover:text-[#a7c9ec] mb-4 text-lg cursor-pointer"
       >
         <lucide-icon [name]="ArrowLeft" [size]="20"></lucide-icon>
         Volver a Gestión de Usuarios
@@ -23,17 +23,18 @@
     </div>
 
     <!-- Error global de submit -->
-    <div
-      *ngIf="submitError"
-      class="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-5 py-4 flex items-start gap-3"
-    >
-      <lucide-icon
-        [name]="CircleAlert"
-        [size]="20"
-        class="shrink-0 mt-0.5"
-      ></lucide-icon>
-      <p class="text-base">{{ submitError }}</p>
-    </div>
+    @if (submitError) {
+      <div
+        class="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-5 py-4 flex items-start gap-3"
+      >
+        <lucide-icon
+          [name]="CircleAlert"
+          [size]="20"
+          class="shrink-0 mt-0.5"
+        ></lucide-icon>
+        <p class="text-base">{{ submitError }}</p>
+      </div>
+    }
 
     <!-- Main Form Card -->
     <div class="bg-white rounded-2xl shadow-md p-8">
@@ -64,12 +65,13 @@
                   [size]="40"
                   [class]="hasDoctorRole ? 'text-[#215c98]' : 'text-gray-500'"
                 ></lucide-icon>
-                <div
-                  *ngIf="hasDoctorRole"
-                  class="absolute -top-2 -right-2 bg-[#215c98] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
-                >
-                  ✓
-                </div>
+                @if (hasDoctorRole) {
+                  <div
+                    class="absolute -top-2 -right-2 bg-[#215c98] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
+                  >
+                    ✓
+                  </div>
+                }
               </div>
               <span
                 [class]="
@@ -102,12 +104,13 @@
                     hasSchedulerRole ? 'text-green-600' : 'text-gray-500'
                   "
                 ></lucide-icon>
-                <div
-                  *ngIf="hasSchedulerRole"
-                  class="absolute -top-2 -right-2 bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
-                >
-                  ✓
-                </div>
+                @if (hasSchedulerRole) {
+                  <div
+                    class="absolute -top-2 -right-2 bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
+                  >
+                    ✓
+                  </div>
+                }
               </div>
               <span
                 [class]="
@@ -120,13 +123,12 @@
             </div>
           </button>
         </div>
-        <p
-          *ngIf="hasError('roles')"
-          class="mt-2 text-sm text-red-600 flex items-center gap-1"
-        >
-          <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-          {{ errors.roles }}
-        </p>
+        @if (hasError("roles")) {
+          <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
+            <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+            {{ errors.roles }}
+          </p>
+        }
       </div>
 
       <!-- ── Información Básica ── -->
@@ -163,13 +165,12 @@
                 autocomplete="off"
               />
             </div>
-            <p
-              *ngIf="hasError('documentId')"
-              class="mt-1 text-sm text-red-600 flex items-center gap-1"
-            >
-              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-              {{ errors.documentId }}
-            </p>
+            @if (hasError("documentId")) {
+              <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+                {{ errors.documentId }}
+              </p>
+            }
           </div>
 
           <!-- Contraseña -->
@@ -189,7 +190,7 @@
                 name="password"
                 (blur)="validateField('password')"
                 [class]="inputClass('password', 'pl-12 pr-12')"
-                placeholder="Mín. 8 car., 1 mayúscula, 1 número"
+                placeholder="Mín. 6 caracteres"
                 autocomplete="new-password"
               />
               <button
@@ -203,13 +204,12 @@
                 ></lucide-icon>
               </button>
             </div>
-            <p
-              *ngIf="hasError('password')"
-              class="mt-1 text-sm text-red-600 flex items-center gap-1"
-            >
-              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-              {{ errors.password }}
-            </p>
+            @if (hasError("password")) {
+              <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+                {{ errors.password }}
+              </p>
+            }
           </div>
 
           <!-- Nombre -->
@@ -235,13 +235,12 @@
                 autocomplete="off"
               />
             </div>
-            <p
-              *ngIf="hasError('firstName')"
-              class="mt-1 text-sm text-red-600 flex items-center gap-1"
-            >
-              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-              {{ errors.firstName }}
-            </p>
+            @if (hasError("firstName")) {
+              <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+                {{ errors.firstName }}
+              </p>
+            }
           </div>
 
           <!-- Apellido -->
@@ -267,319 +266,350 @@
                 autocomplete="off"
               />
             </div>
-            <p
-              *ngIf="hasError('lastName')"
-              class="mt-1 text-sm text-red-600 flex items-center gap-1"
-            >
-              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-              {{ errors.lastName }}
-            </p>
+            @if (hasError("lastName")) {
+              <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+                {{ errors.lastName }}
+              </p>
+            }
           </div>
         </div>
       </div>
 
       <!-- ── Información del Médico ── -->
-      <div
-        *ngIf="hasDoctorRole"
-        class="space-y-6 mt-8 pt-8 border-t-2 border-[#a7c9ec]"
-      >
-        <h3
-          class="text-[#215c98] text-xl font-semibold flex items-center gap-2"
-        >
-          <lucide-icon [name]="Stethoscope" [size]="24"></lucide-icon>
-          Información del Médico
-        </h3>
+      @if (hasDoctorRole) {
+        <div class="space-y-6 mt-8 pt-8 border-t-2 border-[#a7c9ec]">
+          <h3
+            class="text-[#215c98] text-xl font-semibold flex items-center gap-2"
+          >
+            <lucide-icon [name]="Stethoscope" [size]="24"></lucide-icon>
+            Información del Médico
+          </h3>
 
-        <!-- Fila 1: Especialidad + Tipo doc + Teléfono -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <!-- Especialidad + Tipo doc + Teléfono -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <!-- Especialidad -->
+            <!-- Especialidad -->
+            <div class="sm:col-span-2">
+              <label class="block text-gray-700 text-base font-medium mb-1">
+                Especialidades *
+                <span class="text-sm text-gray-500 font-normal ml-1"
+                  >(puede seleccionar varias)</span
+                >
+              </label>
+              <div class="grid grid-cols-2 gap-3 mt-2">
+                @for (sp of specialtyOptions; track sp.name) {
+                  <button
+                    type="button"
+                    (click)="toggleSpecialty(sp.name)"
+                    [class]="
+                      'flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-base font-medium ' +
+                      (isSpecialtySelected(sp.name)
+                        ? 'border-[#215c98] bg-[#d9e9f8] text-[#215c98] shadow-md'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-[#4e92d9]')
+                    "
+                  >
+                    <lucide-icon
+                      [name]="sp.icon"
+                      [size]="22"
+                      [class]="
+                        isSpecialtySelected(sp.name)
+                          ? 'text-[#215c98] shrink-0'
+                          : sp.colorClass + ' shrink-0'
+                      "
+                    ></lucide-icon>
+                    <span class="flex-1 text-left">{{
+                      sp.name | formato
+                    }}</span>
+                    @if (isSpecialtySelected(sp.name)) {
+                      <div
+                        class="bg-[#215c98] text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shrink-0"
+                      >
+                        ✓
+                      </div>
+                    }
+                  </button>
+                }
+              </div>
+              @if (loadingSpecialties) {
+                <p class="mt-2 text-sm text-gray-400">
+                  Cargando especialidades...
+                </p>
+              }
+              @if (hasError("specialty")) {
+                <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
+                  <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+                  {{ errors.specialty }}
+                </p>
+              }
+            </div>
+            <!-- Tipo de Documento -->
+            <div>
+              <label class="block text-gray-700 text-base font-medium mb-2"
+                >Tipo de Documento *</label
+              >
+              <div class="relative">
+                <lucide-icon
+                  [name]="CreditCard"
+                  [size]="20"
+                  class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                ></lucide-icon>
+                <select
+                  [(ngModel)]="userForm.documentType"
+                  name="documentType"
+                  (change)="validateField('documentType')"
+                  [class]="inputClass('documentType', 'pl-12 pr-4')"
+                >
+                  <option value="">
+                    {{ loadingDocumentTypes ? "Cargando..." : "Seleccione..." }}
+                  </option>
+                  @for (dt of documentTypes; track dt) {
+                    <option [value]="dt">{{ dt | formato }}</option>
+                  }
+                </select>
+              </div>
+              @if (hasError("documentType")) {
+                <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+                  {{ errors.documentType }}
+                </p>
+              }
+            </div>
+
+            <!-- Teléfono -->
+            <div>
+              <label class="block text-gray-700 text-base font-medium mb-2">
+                Teléfono *
+                <span class="text-sm text-gray-500">(solo dígitos)</span>
+              </label>
+              <div class="relative">
+                <lucide-icon
+                  [name]="Phone"
+                  [size]="20"
+                  class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                ></lucide-icon>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  [(ngModel)]="userForm.phone"
+                  name="phone"
+                  (keydown)="onPhoneKeydown($event)"
+                  (input)="onPhoneInput()"
+                  (blur)="validateField('phone')"
+                  [class]="inputClass('phone', 'pl-12 pr-4')"
+                  placeholder="3001234567"
+                  maxlength="15"
+                  autocomplete="off"
+                />
+              </div>
+              @if (hasError("phone")) {
+                <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+                  {{ errors.phone }}
+                </p>
+              }
+            </div>
+          </div>
+
+          <!-- Correo -->
           <div>
             <label class="block text-gray-700 text-base font-medium mb-2"
-              >Especialidad *</label
+              >Correo Electrónico *</label
             >
             <div class="relative">
               <lucide-icon
-                [name]="Building2"
-                [size]="20"
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              ></lucide-icon>
-              <select
-                [(ngModel)]="userForm.specialty"
-                name="specialty"
-                (change)="validateField('specialty')"
-                [class]="inputClass('specialty', 'pl-12 pr-4')"
-              >
-                <option value="">Seleccione...</option>
-                <option *ngFor="let s of specialties" [value]="s.value">
-                  {{ s.label }}
-                </option>
-              </select>
-            </div>
-            <p
-              *ngIf="hasError('specialty')"
-              class="mt-1 text-sm text-red-600 flex items-center gap-1"
-            >
-              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-              {{ errors.specialty }}
-            </p>
-          </div>
-          <div>
-            <label class="block text-gray-700 text-base font-medium mb-2"
-              >Tipo de Documento *</label
-            >
-            <div class="relative">
-              <lucide-icon
-                [name]="CreditCard"
-                [size]="20"
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              ></lucide-icon>
-              <select
-                [(ngModel)]="userForm.documentType"
-                name="documentType"
-                [class]="inputClass('documentType', 'pl-12 pr-4')"
-              >
-                <option value="">Seleccione...</option>
-                <option *ngFor="let dt of documentTypes" [value]="dt.value">
-                  {{ dt.label }}
-                </option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label class="block text-gray-700 text-base font-medium mb-2">
-              Teléfono *
-              <span class="text-sm text-gray-500">(solo dígitos)</span>
-            </label>
-            <div class="relative">
-              <lucide-icon
-                [name]="Phone"
+                [name]="Mail"
                 [size]="20"
                 class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
               ></lucide-icon>
               <input
-                type="text"
-                inputmode="numeric"
-                [(ngModel)]="userForm.phone"
-                name="phone"
-                (keydown)="onPhoneKeydown($event)"
-                (input)="onPhoneInput()"
-                (blur)="validateField('phone')"
-                [class]="inputClass('phone', 'pl-12 pr-4')"
-                placeholder="3001234567"
-                maxlength="15"
+                type="email"
+                [(ngModel)]="userForm.email"
+                name="email"
+                (input)="onEmailInput()"
+                (blur)="validateField('email')"
+                [class]="inputClass('email', 'pl-12 pr-4')"
+                placeholder="doctor@ejemplo.com"
                 autocomplete="off"
               />
             </div>
-            <p
-              *ngIf="hasError('phone')"
-              class="mt-1 text-sm text-red-600 flex items-center gap-1"
+            @if (hasError("email")) {
+              <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+                {{ errors.email }}
+              </p>
+            }
+          </div>
+
+          <!-- Período Laboral -->
+          <div>
+            <label
+              class="text-gray-700 text-base font-medium mb-1 flex items-center gap-2"
             >
-              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-              {{ errors.phone }}
+              <lucide-icon [name]="CalendarRange" [size]="18"></lucide-icon>
+              Período Laboral *
+            </label>
+            <p class="text-gray-400 text-sm mb-3 flex items-center gap-1">
+              <lucide-icon [name]="Info" [size]="14"></lucide-icon>
+              Rango de fechas en que el médico estará activo en el sistema
             </p>
+            <div class="grid grid-cols-2 gap-5">
+              <div>
+                <label class="block text-gray-600 text-sm font-medium mb-2"
+                  >Fecha de Inicio</label
+                >
+                <input
+                  type="date"
+                  [value]="userForm.laborStart"
+                  name="laborStart"
+                  (input)="onLaborStartInput($event)"
+                  (blur)="validateField('laborStart')"
+                  [class]="inputClass('laborStart', 'px-4')"
+                />
+                @if (hasError("laborStart")) {
+                  <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+                    {{ errors.laborStart }}
+                  </p>
+                }
+              </div>
+              <div>
+                <label class="block text-gray-600 text-sm font-medium mb-2"
+                  >Fecha de Fin</label
+                >
+                <input
+                  type="date"
+                  [value]="userForm.laborEnd"
+                  name="laborEnd"
+                  (input)="onLaborEndInput($event)"
+                  (blur)="validateField('laborEnd')"
+                  [class]="inputClass('laborEnd', 'px-4')"
+                />
+                @if (hasError("laborEnd")) {
+                  <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                    <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+                    {{ errors.laborEnd }}
+                  </p>
+                }
+              </div>
+            </div>
           </div>
-        </div>
 
-        <!-- Fila 2: Correo -->
-        <div>
-          <label class="block text-gray-700 text-base font-medium mb-2"
-            >Correo Electrónico *</label
-          >
-          <div class="relative">
-            <lucide-icon
-              [name]="Mail"
-              [size]="20"
-              class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-            ></lucide-icon>
-            <input
-              type="email"
-              [(ngModel)]="userForm.email"
-              name="email"
-              (input)="onEmailInput()"
-              (blur)="validateField('email')"
-              [class]="inputClass('email', 'pl-12 pr-4')"
-              placeholder="doctor@ejemplo.com"
-              autocomplete="off"
-            />
-          </div>
-          <p
-            *ngIf="hasError('email')"
-            class="mt-1 text-sm text-red-600 flex items-center gap-1"
-          >
-            <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-            {{ errors.email }}
-          </p>
-        </div>
-
-        <!-- Fila 3: Período laboral -->
-        <div>
-          <label
-            class="text-gray-700 text-base font-medium mb-1 flex items-center gap-2"
-          >
-            <lucide-icon [name]="CalendarRange" [size]="18"></lucide-icon>
-            Período Laboral *
-          </label>
-          <p class="text-gray-400 text-sm mb-3 flex items-center gap-1">
-            <lucide-icon [name]="Info" [size]="14"></lucide-icon>
-            Rango de fechas en que el médico estará activo en el sistema
-          </p>
+          <!-- Horario -->
           <div class="grid grid-cols-2 gap-5">
             <div>
-              <label class="block text-gray-600 text-sm font-medium mb-2"
-                >Fecha de Inicio</label
+              <label class="block text-gray-700 text-base font-medium mb-2"
+                >Hora de Inicio</label
               >
-              <input
-                type="date"
-                [(ngModel)]="userForm.laborStart"
-                name="laborStart"
-                (change)="onLaborStartChange()"
-                (blur)="validateField('laborStart')"
-                [class]="inputClass('laborStart', 'px-4')"
-              />
-              <p
-                *ngIf="hasError('laborStart')"
-                class="mt-1 text-sm text-red-600 flex items-center gap-1"
+              <select
+                [(ngModel)]="userForm.startTime"
+                name="startTime"
+                (change)="onStartTimeChange()"
+                [class]="inputClass('startTime', 'px-4')"
               >
-                <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-                {{ errors.laborStart }}
-              </p>
+                <option value="" disabled>-- Seleccionar --</option>
+                @for (t of timeOptions; track t) {
+                  <option [value]="t">{{ t }}</option>
+                }
+              </select>
+              @if (hasError("startTime")) {
+                <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+                  {{ errors.startTime }}
+                </p>
+              }
             </div>
             <div>
-              <label class="block text-gray-600 text-sm font-medium mb-2"
-                >Fecha de Fin</label
+              <label class="block text-gray-700 text-base font-medium mb-2">
+                Hora de Fin
+                <span class="text-sm text-gray-500 font-normal ml-1"
+                  >máx. 12:00 pm</span
+                >
+              </label>
+              <select
+                [(ngModel)]="userForm.endTime"
+                name="endTime"
+                (change)="onEndTimeChange()"
+                [class]="inputClass('endTime', 'px-4')"
               >
-              <input
-                type="date"
-                [(ngModel)]="userForm.laborEnd"
-                name="laborEnd"
-                (change)="onLaborEndChange()"
-                (blur)="validateField('laborEnd')"
-                [class]="inputClass('laborEnd', 'px-4')"
-              />
-              <p
-                *ngIf="hasError('laborEnd')"
-                class="mt-1 text-sm text-red-600 flex items-center gap-1"
-              >
-                <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-                {{ errors.laborEnd }}
-              </p>
+                <option value="" disabled>-- Seleccionar --</option>
+                @for (t of timeOptions; track t) {
+                  <option [value]="t">{{ t }}</option>
+                }
+              </select>
+              @if (hasError("endTime")) {
+                <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+                  {{ errors.endTime }}
+                </p>
+              }
             </div>
           </div>
-        </div>
 
-        <!-- Fila 5: Horario -->
-        <div class="grid grid-cols-2 gap-5">
-          <div>
-            <label class="block text-gray-700 text-base font-medium mb-2"
-              >Hora de Inicio</label
-            >
-            <select
-              [(ngModel)]="userForm.startTime"
-              name="startTime"
-              (change)="onStartTimeChange()"
-              [class]="inputClass('startTime', 'px-4')"
-            >
-              <option value="" disabled>-- Seleccionar --</option>
-              <option *ngFor="let t of timeOptions" [value]="t">{{ t }}</option>
-            </select>
-            <p
-              *ngIf="hasError('startTime')"
-              class="mt-1 text-sm text-red-600 flex items-center gap-1"
-            >
-              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-              {{ errors.startTime }}
-            </p>
+          <!-- Intervalo -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div>
+              <label class="block text-gray-700 text-base font-medium mb-2">
+                Intervalo entre citas (min)
+                <span class="text-sm text-gray-500 font-normal ml-1"
+                  >máx. {{ maxInterval }} min</span
+                >
+              </label>
+              <input
+                type="number"
+                [(ngModel)]="userForm.interval"
+                name="interval"
+                (keydown)="onIntervalKeydown($event)"
+                (input)="onIntervalInput()"
+                (blur)="validateField('interval')"
+                [class]="inputClass('interval', 'px-4')"
+                [min]="10"
+                [max]="maxInterval"
+                step="5"
+              />
+              @if (hasError("interval")) {
+                <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+                  {{ errors.interval }}
+                </p>
+              }
+            </div>
           </div>
-          <div>
-            <label class="block text-gray-700 text-base font-medium mb-2">
-              Hora de Fin
-              <span class="text-sm text-gray-500 font-normal ml-1"
-                >máx. 12:00 pm</span
-              >
-            </label>
-            <select
-              [(ngModel)]="userForm.endTime"
-              name="endTime"
-              (change)="onEndTimeChange()"
-              [class]="inputClass('endTime', 'px-4')"
-            >
-              <option value="" disabled>-- Seleccionar --</option>
-              <option *ngFor="let t of timeOptions" [value]="t">{{ t }}</option>
-            </select>
-            <p
-              *ngIf="hasError('endTime')"
-              class="mt-1 text-sm text-red-600 flex items-center gap-1"
-            >
-              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-              {{ errors.endTime }}
-            </p>
-          </div>
-        </div>
 
-        <!-- Fila 4: Intervalo -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <!-- Días de Atención -->
           <div>
-            <label class="block text-gray-700 text-base font-medium mb-2">
-              Intervalo entre citas (min)
-              <span class="text-sm text-gray-500 font-normal ml-1"
-                >máx. {{ maxInterval }} min</span
-              >
-            </label>
-            <input
-              type="number"
-              [(ngModel)]="userForm.interval"
-              name="interval"
-              (keydown)="onIntervalKeydown($event)"
-              (input)="onIntervalInput()"
-              (blur)="validateField('interval')"
-              [class]="inputClass('interval', 'px-4')"
-              [min]="10"
-              [max]="maxInterval"
-              step="5"
-            />
-            <p
-              *ngIf="hasError('interval')"
-              class="mt-1 text-sm text-red-600 flex items-center gap-1"
+            <label class="block text-gray-700 text-base font-medium mb-1"
+              >Días de Atención</label
             >
-              <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-              {{ errors.interval }}
+            <p class="text-gray-400 text-sm mb-3 flex items-center gap-1">
+              <lucide-icon [name]="Info" [size]="14"></lucide-icon>
+              Disponible de lunes a viernes
             </p>
+            <div class="flex flex-wrap gap-3">
+              @for (day of daysOfWeek; track day.value) {
+                <button
+                  type="button"
+                  (click)="toggleWorkDay(day.value)"
+                  [class]="
+                    'px-5 py-3 rounded-xl border-2 transition-all text-base font-medium ' +
+                    (isWorkDaySelected(day.value)
+                      ? 'border-[#215c98] bg-[#d9e9f8] text-[#215c98]'
+                      : 'border-gray-300 bg-white text-gray-600 hover:border-[#4e92d9]')
+                  "
+                >
+                  {{ day.label }}
+                </button>
+              }
+            </div>
+            @if (hasError("workDays")) {
+              <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
+                <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+                {{ errors.workDays }}
+              </p>
+            }
           </div>
         </div>
-
-        <!-- Fila 6: Días -->
-        <div>
-          <label class="block text-gray-700 text-base font-medium mb-1"
-            >Días de Atención</label
-          >
-          <p class="text-gray-400 text-sm mb-3 flex items-center gap-1">
-            <lucide-icon [name]="Info" [size]="14"></lucide-icon>
-            Disponible de lunes a viernes
-          </p>
-          <div class="flex flex-wrap gap-3">
-            <button
-              *ngFor="let day of daysOfWeek"
-              type="button"
-              (click)="toggleWorkDay(day.value)"
-              [class]="
-                'px-5 py-3 rounded-xl border-2 transition-all text-base font-medium ' +
-                (isWorkDaySelected(day.value)
-                  ? 'border-[#215c98] bg-[#d9e9f8] text-[#215c98]'
-                  : 'border-gray-300 bg-white text-gray-600 hover:border-[#4e92d9]')
-              "
-            >
-              {{ day.label }}
-            </button>
-          </div>
-          <p
-            *ngIf="hasError('workDays')"
-            class="mt-2 text-sm text-red-600 flex items-center gap-1"
-          >
-            <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-            {{ errors.workDays }}
-          </p>
-        </div>
-      </div>
-      <!-- /hasDoctorRole -->
+      }
 
       <!-- ── Botones ── -->
       <div class="flex gap-4 pt-8 border-t-2 border-gray-100 mt-8">
@@ -597,15 +627,14 @@
           [disabled]="isSubmitting"
           class="flex-1 px-6 py-4 bg-[#215c98] hover:bg-[#163c63] disabled:bg-[#a7c9ec] text-white rounded-xl text-lg font-semibold transition-colors flex items-center justify-center gap-2"
         >
-          <lucide-icon
-            *ngIf="!isSubmitting"
-            [name]="UserPlus"
-            [size]="24"
-          ></lucide-icon>
-          <span
-            *ngIf="isSubmitting"
-            class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"
-          ></span>
+          @if (!isSubmitting) {
+            <lucide-icon [name]="UserPlus" [size]="24"></lucide-icon>
+          }
+          @if (isSubmitting) {
+            <span
+              class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"
+            ></span>
+          }
           {{ isSubmitting ? "Guardando..." : "Crear Usuario" }}
         </button>
       </div>
