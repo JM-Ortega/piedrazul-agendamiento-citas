@@ -8,6 +8,8 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorCo
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.PatientRegistrationData;
+import co.edu.unicauca.piedrazul.backend.appointment.application.ScheduleManualAppointmentUseCaseImpl;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

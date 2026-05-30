@@ -8,6 +8,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
+
 
 class AppointmentTest {
 

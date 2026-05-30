@@ -8,6 +8,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidEma
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidPatientInfoException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidPersonNameException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidPhoneException;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;

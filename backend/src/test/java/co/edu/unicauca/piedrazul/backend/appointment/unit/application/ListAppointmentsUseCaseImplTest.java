@@ -9,6 +9,8 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
+import co.edu.unicauca.piedrazul.backend.appointment.application.ListAppointmentsUseCaseImpl;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

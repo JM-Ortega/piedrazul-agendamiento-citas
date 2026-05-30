@@ -14,6 +14,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.Appointm
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
+import co.edu.unicauca.piedrazul.backend.appointment.application.ScheduleAutonomousAppointmentUseCaseImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

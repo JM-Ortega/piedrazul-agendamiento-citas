@@ -4,8 +4,31 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password:
+  sql:
+    init:
+      mode: always
   jpa:
     hibernate:
       ddl-auto: create-drop
-    database-platform: org.hibernate.dialect.H2Dialect
-    show-sql: true
+    show-sql: false
+    properties:
+      hibernate:
+        default_schema: piedrazul
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration
+
+server:
+  port: 8080
+
+# Configuración mock de Keycloak
+keycloak:
+  server-url: http://localhost:8180
+  realm: piedrazul
+  client-id: piedrazul-backend
+  client-secret: test-secret
+
+# Logging
+logging:
+  level:
+    org.springframework.security: INFO
+    org.springframework.boot.test: DEBUG

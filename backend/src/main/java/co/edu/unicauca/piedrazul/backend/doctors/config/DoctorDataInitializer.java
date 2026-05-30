@@ -10,6 +10,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.Doct
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -19,6 +20,7 @@ import java.util.List;
 
 @Component
 @Order(1)
+@Profile("!test")
 public class DoctorDataInitializer implements ApplicationRunner {
 
     private final DoctorRepository doctorRepository;
