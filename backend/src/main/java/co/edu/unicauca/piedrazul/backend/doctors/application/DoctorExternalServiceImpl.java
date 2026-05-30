@@ -1,7 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.DoctorAdminUserData;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
@@ -84,15 +83,6 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
 
         return doctorRepository.findByIdDoctorIn(doctorIds).stream()
                 .map(DoctorResponse::fromEntity)
-                .toList();
-    }
-
-    @Override
-    @Transactional
-    public List<DoctorAdminUserData> getAdminUserData() {
-        return doctorRepository.findAll()
-                .stream()
-                .map(DoctorAdminUserData::fromEntity)
                 .toList();
     }
 

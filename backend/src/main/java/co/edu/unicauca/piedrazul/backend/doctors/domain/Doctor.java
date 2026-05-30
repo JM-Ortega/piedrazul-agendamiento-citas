@@ -66,7 +66,7 @@ public class Doctor {
     @OneToMany(mappedBy = "doctor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Schedule> schedules = new ArrayList<>();
 
-    //Al momento de registrar/crearle una cuenta al doctor se le deben llenar todos estos campos,
+    // Al momento de registrar/crearle una cuenta al doctor se le deben llenar todos estos campos,
     // el registro de doctores deberia hacerlo solo el administrador
     public Doctor(UUID idUser, String firstName, String lastName, String identification, DocumentType documentType,
                   String phone, List<Specialty> specialty, boolean status, LocalDate laborStart,

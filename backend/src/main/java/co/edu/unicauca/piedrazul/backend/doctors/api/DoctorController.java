@@ -1,13 +1,11 @@
 package co.edu.unicauca.piedrazul.backend.doctors.api;
 
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorDetailedResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorShortResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
-import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,18 +23,6 @@ public class DoctorController {
 
     public DoctorController(DoctorService doctorService) {
         this.doctorService = doctorService;
-    }
-
-    /**
-     * Crear un nuevo doctor
-     * @param request Datos del doctor
-     * @return Sin contenido
-     */
-    @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> createDoctor(@Valid @RequestBody CreateDoctorRequest request) {
-        doctorService.createDoctor(request);
-        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -67,7 +53,7 @@ public class DoctorController {
     }
 
     /**
-     * Listar todos los doctores
+     * Listar todos los doctores con más detalle
      * @return Lista de todos los doctores
      */
     @GetMapping("/detailed")
