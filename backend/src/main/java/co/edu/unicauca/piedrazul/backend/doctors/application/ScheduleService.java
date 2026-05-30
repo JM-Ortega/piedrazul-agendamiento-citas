@@ -6,7 +6,6 @@ import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleValidationException;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorDoesNotWorkException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
 import jakarta.transaction.Transactional;
 
@@ -42,7 +41,7 @@ public class ScheduleService {
     @Transactional
     public Schedule updateScheduleByWorkday(Doctor doctor, Workday workday, Schedule newScheduleData) {
         if (doctor == null || doctor.getIdDoctor() == null) {
-            throw new RuntimeException("El doctor debe ser proporcionado");
+            throw new DoctorScheduleValidationException("Se debe seleccionar un doctor");
         }
 
         List<Schedule> schedules = scheduleRepository.findByDoctor(doctor);
@@ -50,7 +49,7 @@ public class ScheduleService {
         Schedule existingSchedule = schedules.stream()
                 .filter(s -> s.getWorkday().equals(workday))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("No se encontró horario para este día."));
+            .orElseThrow(() -> new DoctorScheduleNotFoundException("Schedule not found for this day"));
 
         // Actualizamos los datos
         existingSchedule.setStartTime(newScheduleData.getStartTime());
@@ -62,7 +61,7 @@ public class ScheduleService {
     @Transactional
     public void deleteScheduleByWorkday(Doctor doctor, Workday workday) {
         if (doctor == null || doctor.getIdDoctor() == null) {
-            throw new IllegalArgumentException("El doctor debe ser proporcionado");
+            throw new IllegalArgumentException("Se debe seleccionar un doctor");
         }
 
         scheduleRepository.deleteByDoctorAndWorkday(doctor, workday);
@@ -70,14 +69,14 @@ public class ScheduleService {
 
     public List<Schedule> getSchedulesByDoctor(Doctor doctor) {
         if (doctor == null || doctor.getIdDoctor() == null) {
-            throw new RuntimeException("El doctor debe ser proporcionado");
+            throw new DoctorScheduleValidationException("Se debe seleccionar un doctor");
         }
         return scheduleRepository.findByDoctor(doctor);
     }
 
     public List<LocalTime> getAvailableIntervalsByWorkday(Doctor doctor, Workday workday) {
         if (doctor == null || doctor.getIdDoctor() == null) {
-            throw new RuntimeException("El doctor debe ser proporcionado");
+            throw new DoctorScheduleValidationException("Se debe seleccionar un doctor");
         }
 
         int appointmentInterval = doctor.getAppointmentInterval();
@@ -90,10 +89,10 @@ public class ScheduleService {
                 .toList();
 
         if (schedules.isEmpty()) {
-            throw new DoctorDoesNotWorkException("El doctor no trabaja los " + workday);
+            throw new DoctorScheduleNotFoundException("El doctor no trabaja el " + workday);
         }
         if (schedules.size() > 1) {
-            throw new RuntimeException("El doctor tiene más de un horario para el dia " + workday);
+            throw new DoctorScheduleConflictException("El doctor tiene más de un horario para el " + workday);
         }
 
         Schedule workdaySchedule = schedules.getFirst();
