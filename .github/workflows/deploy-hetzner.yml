@@ -2,7 +2,7 @@ name: Deploy — Hetzner
 
 on:
   push:
-    branches: [main, feat/repo-structure-cicd]
+    branches: [main]
     paths:
       - "backend/**"
       - "!backend/.idea/**"
