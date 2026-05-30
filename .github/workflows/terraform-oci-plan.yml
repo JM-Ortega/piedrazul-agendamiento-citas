@@ -1,14 +1,15 @@
 name: Terraform — OCI Plan
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "infra/terraform/live/oci/**"
-      - "infra/terraform/modules/oci/**"
-      - "infra/terraform/modules/dns/**"
-      - "infra/terraform/modules/pages/**"
-      - ".github/workflows/terraform-oci-*.yml"
+  workflow_dispatch: {}
+#  pull_request:
+#    branches: [main]
+#    paths:
+#      - "infra/terraform/live/oci/**"
+#      - "infra/terraform/modules/oci/**"
+#      - "infra/terraform/modules/dns/**"
+#      - "infra/terraform/modules/pages/**"
+#      - ".github/workflows/terraform-oci-*.yml"
 
 concurrency:
   group: terraform-oci-${{ github.head_ref }}

@@ -1,16 +1,16 @@
 name: Terraform — OCI Apply
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "infra/terraform/live/oci/**"
-      - "infra/terraform/modules/oci/**"
-      - "infra/terraform/modules/dns/**"
-      - "infra/terraform/modules/pages/**"
-      - ".github/workflows/terraform-oci-*.yml"
-  workflow_dispatch:
+  workflow_dispatch: {}
+#  push:
+#    branches:
+#      - main
+#    paths:
+#      - "infra/terraform/live/oci/**"
+#      - "infra/terraform/modules/oci/**"
+#      - "infra/terraform/modules/dns/**"
+#      - "infra/terraform/modules/pages/**"
+#      - ".github/workflows/terraform-oci-*.yml"
 
 concurrency:
   group: terraform-oci-main
