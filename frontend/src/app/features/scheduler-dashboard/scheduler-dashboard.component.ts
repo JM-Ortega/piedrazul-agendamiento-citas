@@ -104,6 +104,7 @@ export class SchedulerDashboardComponent implements OnInit {
   filterDoctor = signal('');
   filterStatus = signal('');
   searched = signal(false);
+  hoveredView = signal<string | null>(null);
 
   // ── Export signals ────────────────────────────────────────────────────────
   showExportModal = signal(false);
