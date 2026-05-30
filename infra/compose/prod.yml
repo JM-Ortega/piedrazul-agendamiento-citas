@@ -20,18 +20,22 @@ services:
     expose:
       - "${KC_PORT}"
     labels:
+      # Traefik — enrutamiento de Keycloak
       - "traefik.enable=true"
       - "traefik.http.routers.keycloak.rule=Host(`${KC_HOSTNAME}`)"
       - "traefik.http.routers.keycloak.entrypoints=websecure"
       - "traefik.http.routers.keycloak.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.keycloak.tls.options=cloudflare-aop@file"
       - "traefik.http.services.keycloak.loadbalancer.server.port=${KC_PORT}"
 
   backend:
     expose:
       - "${SERVER_PORT}"
     labels:
+      # Traefik — enrutamiento del backend API
       - "traefik.enable=true"
       - "traefik.http.routers.backend.rule=Host(`${API_PUBLIC_DOMAIN}`)"
       - "traefik.http.routers.backend.entrypoints=websecure"
       - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend.tls.options=cloudflare-aop@file"
       - "traefik.http.services.backend.loadbalancer.server.port=${SERVER_PORT}"
