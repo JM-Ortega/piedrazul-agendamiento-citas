@@ -47,7 +47,6 @@
           Seleccione un rol para el usuario. Al menos un rol es requerido.
         </p>
         <div class="grid grid-cols-2 gap-4">
-          <!-- Doctor -->
           <button
             type="button"
             (click)="toggleRole('doctor')"
@@ -84,7 +83,6 @@
             </div>
           </button>
 
-          <!-- Agendador -->
           <button
             type="button"
             (click)="toggleRole('scheduler')"
@@ -123,7 +121,7 @@
             </div>
           </button>
         </div>
-        @if (hasError("roles")) {
+        @if (hasError('roles')) {
           <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
             <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
             {{ errors.roles }}
@@ -139,7 +137,6 @@
           Información Básica
         </h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <!-- Documento -->
           <div>
             <label class="block text-gray-700 text-base font-medium mb-2">
               Documento de Identidad *
@@ -165,7 +162,7 @@
                 autocomplete="off"
               />
             </div>
-            @if (hasError("documentId")) {
+            @if (hasError('documentId')) {
               <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
                 <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
                 {{ errors.documentId }}
@@ -173,7 +170,6 @@
             }
           </div>
 
-          <!-- Contraseña -->
           <div>
             <label class="block text-gray-700 text-base font-medium mb-2"
               >Contraseña *</label
@@ -204,7 +200,7 @@
                 ></lucide-icon>
               </button>
             </div>
-            @if (hasError("password")) {
+            @if (hasError('password')) {
               <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
                 <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
                 {{ errors.password }}
@@ -212,7 +208,6 @@
             }
           </div>
 
-          <!-- Nombre -->
           <div>
             <label class="block text-gray-700 text-base font-medium mb-2"
               >Nombre *</label
@@ -235,7 +230,7 @@
                 autocomplete="off"
               />
             </div>
-            @if (hasError("firstName")) {
+            @if (hasError('firstName')) {
               <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
                 <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
                 {{ errors.firstName }}
@@ -243,7 +238,6 @@
             }
           </div>
 
-          <!-- Apellido -->
           <div>
             <label class="block text-gray-700 text-base font-medium mb-2"
               >Apellido *</label
@@ -266,7 +260,7 @@
                 autocomplete="off"
               />
             </div>
-            @if (hasError("lastName")) {
+            @if (hasError('lastName')) {
               <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
                 <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
                 {{ errors.lastName }}
@@ -286,10 +280,7 @@
             Información del Médico
           </h3>
 
-          <!-- Especialidad + Tipo doc + Teléfono -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <!-- Especialidad -->
-            <!-- Especialidad -->
             <div class="sm:col-span-2">
               <label class="block text-gray-700 text-base font-medium mb-1">
                 Especialidades *
@@ -336,14 +327,14 @@
                   Cargando especialidades...
                 </p>
               }
-              @if (hasError("specialty")) {
+              @if (hasError('specialty')) {
                 <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
                   <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
                   {{ errors.specialty }}
                 </p>
               }
             </div>
-            <!-- Tipo de Documento -->
+
             <div>
               <label class="block text-gray-700 text-base font-medium mb-2"
                 >Tipo de Documento *</label
@@ -361,14 +352,14 @@
                   [class]="inputClass('documentType', 'pl-12 pr-4')"
                 >
                   <option value="">
-                    {{ loadingDocumentTypes ? "Cargando..." : "Seleccione..." }}
+                    {{ loadingDocumentTypes ? 'Cargando...' : 'Seleccione...' }}
                   </option>
                   @for (dt of documentTypes; track dt) {
                     <option [value]="dt">{{ dt | formato }}</option>
                   }
                 </select>
               </div>
-              @if (hasError("documentType")) {
+              @if (hasError('documentType')) {
                 <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
                   <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
                   {{ errors.documentType }}
@@ -376,7 +367,6 @@
               }
             </div>
 
-            <!-- Teléfono -->
             <div>
               <label class="block text-gray-700 text-base font-medium mb-2">
                 Teléfono *
@@ -402,7 +392,7 @@
                   autocomplete="off"
                 />
               </div>
-              @if (hasError("phone")) {
+              @if (hasError('phone')) {
                 <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
                   <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
                   {{ errors.phone }}
@@ -411,7 +401,6 @@
             </div>
           </div>
 
-          <!-- Correo -->
           <div>
             <label class="block text-gray-700 text-base font-medium mb-2"
               >Correo Electrónico *</label
@@ -433,7 +422,7 @@
                 autocomplete="off"
               />
             </div>
-            @if (hasError("email")) {
+            @if (hasError('email')) {
               <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
                 <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
                 {{ errors.email }}
@@ -441,7 +430,6 @@
             }
           </div>
 
-          <!-- Período Laboral -->
           <div>
             <label
               class="text-gray-700 text-base font-medium mb-1 flex items-center gap-2"
@@ -466,7 +454,7 @@
                   (blur)="validateField('laborStart')"
                   [class]="inputClass('laborStart', 'px-4')"
                 />
-                @if (hasError("laborStart")) {
+                @if (hasError('laborStart')) {
                   <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
                     <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
                     {{ errors.laborStart }}
@@ -485,7 +473,7 @@
                   (blur)="validateField('laborEnd')"
                   [class]="inputClass('laborEnd', 'px-4')"
                 />
-                @if (hasError("laborEnd")) {
+                @if (hasError('laborEnd')) {
                   <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
                     <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
                     {{ errors.laborEnd }}
@@ -495,7 +483,6 @@
             </div>
           </div>
 
-          <!-- Horario -->
           <div class="grid grid-cols-2 gap-5">
             <div>
               <label class="block text-gray-700 text-base font-medium mb-2"
@@ -512,7 +499,7 @@
                   <option [value]="t">{{ t }}</option>
                 }
               </select>
-              @if (hasError("startTime")) {
+              @if (hasError('startTime')) {
                 <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
                   <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
                   {{ errors.startTime }}
@@ -537,7 +524,7 @@
                   <option [value]="t">{{ t }}</option>
                 }
               </select>
-              @if (hasError("endTime")) {
+              @if (hasError('endTime')) {
                 <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
                   <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
                   {{ errors.endTime }}
@@ -546,7 +533,6 @@
             </div>
           </div>
 
-          <!-- Intervalo -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label class="block text-gray-700 text-base font-medium mb-2">
@@ -567,7 +553,7 @@
                 [max]="maxInterval"
                 step="5"
               />
-              @if (hasError("interval")) {
+              @if (hasError('interval')) {
                 <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
                   <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
                   {{ errors.interval }}
@@ -576,7 +562,6 @@
             </div>
           </div>
 
-          <!-- Días de Atención -->
           <div>
             <label class="block text-gray-700 text-base font-medium mb-1"
               >Días de Atención</label
@@ -601,7 +586,7 @@
                 </button>
               }
             </div>
-            @if (hasError("workDays")) {
+            @if (hasError('workDays')) {
               <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
                 <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
                 {{ errors.workDays }}
@@ -623,7 +608,7 @@
         </button>
         <button
           type="button"
-          (click)="handleCreateUser()"
+          (click)="openConfirmModal()"
           [disabled]="isSubmitting"
           class="flex-1 px-6 py-4 bg-[#215c98] hover:bg-[#163c63] disabled:bg-[#a7c9ec] text-white rounded-xl text-lg font-semibold transition-colors flex items-center justify-center gap-2"
         >
@@ -635,9 +620,180 @@
               class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"
             ></span>
           }
-          {{ isSubmitting ? "Guardando..." : "Crear Usuario" }}
+          {{ isSubmitting ? 'Guardando...' : 'Crear Usuario' }}
         </button>
       </div>
     </div>
   </div>
 </div>
+<!-- ── Modal de Confirmación ── -->
+<!-- ── Modal de Confirmación ── -->
+@if (showConfirmModal) {
+  <div
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    (click)="closeConfirmModal()"
+  >
+    <div
+      class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl"
+      (click)="$event.stopPropagation()"
+    >
+      <!-- Header -->
+      <div
+        class="bg-linear-to-r from-[#163c63] to-[#215c98] text-white rounded-t-2xl px-6 py-4 flex items-center justify-between"
+      >
+        <div class="flex items-center gap-3">
+          <lucide-icon [name]="UserPlus" [size]="24"></lucide-icon>
+          <div>
+            <h2 class="text-lg font-bold leading-tight">Confirmar Creación</h2>
+            <p class="text-[#a7c9ec] text-xs">
+              Revise los datos antes de continuar
+            </p>
+          </div>
+        </div>
+        <button
+          (click)="closeConfirmModal()"
+          class="text-white hover:text-[#a7c9ec] transition-colors"
+        >
+          <lucide-icon [name]="CircleAlert" [size]="20"></lucide-icon>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <<!-- Body -->
+      <div class="px-6 py-5">
+        <!-- Resumen principal -->
+        <div class="bg-[#f8fbff] border border-[#d9e9f8] rounded-xl p-5 mb-5">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h3 class="text-xl font-bold text-gray-900">
+                {{ userForm.firstName }} {{ userForm.lastName }}
+              </h3>
+
+              <div class="mt-2 flex flex-wrap gap-4 text-sm text-gray-600">
+                <span>
+                  <strong>Documento:</strong>
+                  {{ userForm.documentId }}
+                </span>
+
+                <span>
+                  <strong>Correo:</strong>
+                  {{ userForm.email }}
+                </span>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2 justify-end">
+              @if (hasDoctorRole) {
+                <span
+                  class="flex items-center gap-2 px-3 py-1.5 bg-[#eaf2fb] text-[#215c98] border border-[#b8d4ee] rounded-full text-sm font-semibold"
+                >
+                  <lucide-icon [name]="Stethoscope" [size]="14"></lucide-icon>
+                  Médico
+                </span>
+              }
+
+              @if (hasSchedulerRole) {
+                <span
+                  class="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-full text-sm font-semibold"
+                >
+                  <lucide-icon [name]="Calendar" [size]="14"></lucide-icon>
+                  Agendador
+                </span>
+              }
+            </div>
+          </div>
+        </div>
+
+        @if (hasDoctorRole) {
+          <!-- Información médica -->
+          <div class="border border-gray-200 rounded-xl overflow-hidden">
+            <!-- Métricas -->
+            <div class="grid grid-cols-2">
+              <div class="p-4 border-r border-gray-200">
+                <p class="text-xs text-gray-500 mb-1">Intervalo entre citas</p>
+
+                <p class="text-2xl font-bold text-[#163c63]">
+                  {{ userForm.interval }}
+                  <span class="text-sm font-medium text-gray-500"> min </span>
+                </p>
+              </div>
+
+              <div class="p-4">
+                <p class="text-xs text-gray-500 mb-1">Horario de atención</p>
+
+                <p class="text-2xl font-bold text-[#163c63]">
+                  {{ userForm.startTime }}
+                  <span class="text-gray-400">–</span>
+                  {{ userForm.endTime }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Especialidades -->
+            <div class="border-t border-gray-100 p-4">
+              <p class="text-sm font-semibold text-gray-700 mb-3">
+                Especialidades
+              </p>
+
+              <div class="flex flex-wrap gap-2">
+                @for (sp of userForm.specialty; track sp) {
+                  <span
+                    class="px-3 py-1 rounded-full bg-[#f3f7fb] border border-[#d9e9f8] text-[#215c98] text-sm font-medium"
+                  >
+                    {{ sp | formato }}
+                  </span>
+                }
+              </div>
+            </div>
+
+            <!-- Periodo -->
+            <div class="border-t border-gray-100 p-4">
+              <p class="text-sm font-semibold text-gray-700 mb-2">
+                Período laboral
+              </p>
+
+              <p class="text-gray-800 font-medium">
+                {{ userForm.laborStart }}
+                <span class="text-gray-400 mx-1">→</span>
+                {{ userForm.laborEnd }}
+              </p>
+            </div>
+
+            <!-- Días -->
+            <div class="border-t border-gray-100 p-4">
+              <p class="text-sm font-semibold text-gray-700 mb-3">
+                Días de atención
+              </p>
+
+              <div class="flex flex-wrap gap-2">
+                @for (day of userForm.workDays; track day) {
+                  <span
+                    class="px-3 py-1 rounded-full border border-[#b8d4ee] bg-[#eaf2fb] text-[#215c98] text-sm font-medium"
+                  >
+                    {{ getDayLabel(day) }}
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+      <!-- Footer -->
+      <div class="grid grid-cols-2 gap-3 px-6 py-4 border-t border-gray-100">
+        <button
+          (click)="closeConfirmModal()"
+          class="py-3 border-2 border-gray-200 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors"
+        >
+          Revisar
+        </button>
+        <button
+          (click)="confirmAndCreate()"
+          class="py-3 bg-[#215c98] hover:bg-[#163c63] text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+        >
+          <lucide-icon [name]="UserPlus" [size]="16"></lucide-icon>
+          Confirmar y Crear
+        </button>
+      </div>
+    </div>
+  </div>
+}

@@ -108,6 +108,9 @@ export class AdminCreateUserComponent implements OnInit {
   submitError: string | null = null;
   isSubmitting = false;
 
+  // ── Modal de confirmación ─────────────────────────────────────────────────
+  showConfirmModal = false;
+
   // ── Datos dinámicos del backend ───────────────────────────────────────────
   specialtyOptions: { name: string; icon: any; colorClass: string }[] = [];
   specialties: string[] = [];
@@ -146,7 +149,7 @@ export class AdminCreateUserComponent implements OnInit {
       for (let m = 0; m < 60; m += 5) {
         if (h === 12 && m > 0) break;
         opts.push(
-          `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
+          `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
         );
       }
     }
@@ -155,11 +158,10 @@ export class AdminCreateUserComponent implements OnInit {
 
   constructor(
     private router: Router,
-    private adminService: AdminService,
+    private adminService: AdminService
   ) {}
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
-
   ngOnInit(): void {
     this.loadSpecialties();
     this.loadDocumentTypes();
@@ -172,7 +174,6 @@ export class AdminCreateUserComponent implements OnInit {
       FISIOTERAPIA: { icon: Activity, colorClass: 'text-green-700' },
       TERAPIA_NEURAL: { icon: Zap, colorClass: 'text-purple-700' },
     };
-    // fallback si llega una especialidad no mapeada
     return map[name] ?? { icon: Building2, colorClass: 'text-gray-400' };
   }
 
@@ -205,8 +206,7 @@ export class AdminCreateUserComponent implements OnInit {
     });
   }
 
-  // ── Getters ──────────────────────────────────────────────────────────────
-
+  // ── Getters ───────────────────────────────────────────────────────────────
   get hasDoctorRole(): boolean {
     return this.selectedRoles.includes('doctor');
   }
@@ -227,7 +227,6 @@ export class AdminCreateUserComponent implements OnInit {
   }
 
   // ── Sanitización de inputs ────────────────────────────────────────────────
-
   onDocumentKeydown(event: KeyboardEvent): void {
     const allowedKeys = [
       'Backspace',
@@ -311,8 +310,7 @@ export class AdminCreateUserComponent implements OnInit {
     if (this.submitted) this.validateField('email');
   }
 
-  // ── Lógica de tiempo ─────────────────────────────────────────────────────
-
+  // ── Lógica de tiempo ──────────────────────────────────────────────────────
   private timeToMinutes(time: string): number {
     if (!time) return 0;
     const [h, m] = time.split(':').map(Number);
@@ -376,8 +374,7 @@ export class AdminCreateUserComponent implements OnInit {
     if (this.submitted) this.validateField('laborEnd');
   }
 
-  // ── Días de atención ─────────────────────────────────────────────────────
-
+  // ── Días de atención ──────────────────────────────────────────────────────
   toggleWorkDay(day: number): void {
     if (this.userForm.workDays.includes(day)) {
       this.userForm.workDays = this.userForm.workDays.filter((d) => d !== day);
@@ -390,10 +387,11 @@ export class AdminCreateUserComponent implements OnInit {
   isWorkDaySelected(day: number): boolean {
     return this.userForm.workDays.includes(day);
   }
+
   toggleSpecialty(specialty: string): void {
     if (this.userForm.specialty.includes(specialty)) {
       this.userForm.specialty = this.userForm.specialty.filter(
-        (s) => s !== specialty,
+        (s) => s !== specialty
       );
     } else {
       this.userForm.specialty = [...this.userForm.specialty, specialty];
@@ -404,8 +402,8 @@ export class AdminCreateUserComponent implements OnInit {
   isSpecialtySelected(specialty: string): boolean {
     return this.userForm.specialty.includes(specialty);
   }
-  // ── Roles ─────────────────────────────────────────────────────────────────
 
+  // ── Roles ─────────────────────────────────────────────────────────────────
   toggleRole(role: Role): void {
     this.selectedRoles = [role];
     if (this.submitted) this.validateField('roles');
@@ -419,8 +417,88 @@ export class AdminCreateUserComponent implements OnInit {
     return this.selectedRoles.map((r) => this.getRoleLabel(r)).join(' + ');
   }
 
-  // ── Validación por campo ─────────────────────────────────────────────────
+  getDayLabel(value: number): string {
+    return this.daysOfWeek.find((d) => d.value === value)?.label ?? '';
+  }
 
+  // ── Modal de confirmación ─────────────────────────────────────────────────
+  openConfirmModal(): void {
+    this.submitted = true;
+    this.submitSuccess = false;
+    this.submitError = null;
+    if (!this.validateAll()) return;
+    this.showConfirmModal = true;
+  }
+
+  closeConfirmModal(): void {
+    this.showConfirmModal = false;
+  }
+
+  confirmAndCreate(): void {
+    this.showConfirmModal = false;
+    this.isSubmitting = true;
+
+    if (this.hasSchedulerRole && !this.hasDoctorRole) {
+      this.adminService
+        .createScheduler({
+          documentId: this.userForm.documentId,
+          password: this.userForm.password,
+          firstName: this.userForm.firstName.trim(),
+          lastName: this.userForm.lastName.trim(),
+        })
+        .subscribe({
+          next: () => {
+            this.isSubmitting = false;
+            this.router.navigate(['/admin/usuarios']);
+          },
+          error: (err) => {
+            this.isSubmitting = false;
+            this.submitError =
+              err?.error?.message ??
+              'Ocurrió un error al crear el agendador. Inténtalo de nuevo.';
+          },
+        });
+      return;
+    }
+
+    if (this.hasDoctorRole) {
+      const schedules = this.userForm.workDays.map((day) => ({
+        workday: DAY_VALUE_TO_WORKDAY[day],
+        startTime: this.userForm.startTime,
+        endTime: this.userForm.endTime,
+      }));
+
+      this.adminService
+        .createDoctor({
+          firstName: this.userForm.firstName.trim(),
+          lastName: this.userForm.lastName.trim(),
+          identification: this.userForm.documentId,
+          documentType: this.userForm.documentType,
+          phone: this.userForm.phone,
+          specialty: this.userForm.specialty,
+          laborStart: this.userForm.laborStart,
+          laborEnd: this.userForm.laborEnd,
+          appointmentInterval: this.userForm.interval,
+          schedules,
+          email: this.userForm.email.trim(),
+          password: this.userForm.password,
+        })
+        .subscribe({
+          next: () => {
+            this.isSubmitting = false;
+            this.router.navigate(['/admin/usuarios']);
+          },
+          error: (err) => {
+            this.isSubmitting = false;
+            this.submitError =
+              err?.error?.message ??
+              'Ocurrió un error al crear el médico. Inténtalo de nuevo.';
+          },
+        });
+    }
+  }
+
+  // ── Validación por campo ──────────────────────────────────────────────────
   validateField(field: keyof FormErrors): void {
     this.errors[field] = undefined;
 
@@ -575,7 +653,6 @@ export class AdminCreateUserComponent implements OnInit {
   }
 
   // ── Validación completa ───────────────────────────────────────────────────
-
   private validateAll(): boolean {
     const fields: (keyof FormErrors)[] = [
       'documentId',
@@ -595,82 +672,11 @@ export class AdminCreateUserComponent implements OnInit {
         'startTime',
         'endTime',
         'interval',
-        'workDays',
+        'workDays'
       );
     }
     fields.forEach((f) => this.validateField(f));
     return Object.values(this.errors).every((e) => !e);
-  }
-
-  // ── Submit ────────────────────────────────────────────────────────────────
-
-  handleCreateUser(): void {
-    this.submitted = true;
-    this.submitSuccess = false;
-    this.submitError = null;
-
-    if (!this.validateAll()) return;
-
-    this.isSubmitting = true;
-
-    if (this.hasSchedulerRole && !this.hasDoctorRole) {
-      this.adminService
-        .createScheduler({
-          documentId: this.userForm.documentId,
-          password: this.userForm.password,
-          firstName: this.userForm.firstName.trim(),
-          lastName: this.userForm.lastName.trim(),
-        })
-        .subscribe({
-          next: () => {
-            this.isSubmitting = false;
-            this.router.navigate(['/admin/usuarios']);
-          },
-          error: (err) => {
-            this.isSubmitting = false;
-            this.submitError =
-              err?.error?.message ??
-              'Ocurrió un error al crear el agendador. Inténtalo de nuevo.';
-          },
-        });
-      return;
-    }
-
-    if (this.hasDoctorRole) {
-      const schedules = this.userForm.workDays.map((day) => ({
-        workday: DAY_VALUE_TO_WORKDAY[day],
-        startTime: this.userForm.startTime,
-        endTime: this.userForm.endTime,
-      }));
-
-      this.adminService
-        .createDoctor({
-          firstName: this.userForm.firstName.trim(),
-          lastName: this.userForm.lastName.trim(),
-          identification: this.userForm.documentId,
-          documentType: this.userForm.documentType,
-          phone: this.userForm.phone,
-          specialty: this.userForm.specialty,
-          laborStart: this.userForm.laborStart,
-          laborEnd: this.userForm.laborEnd,
-          appointmentInterval: this.userForm.interval,
-          schedules,
-          email: this.userForm.email.trim(),
-          password: this.userForm.password,
-        })
-        .subscribe({
-          next: () => {
-            this.isSubmitting = false;
-            this.router.navigate(['/admin/usuarios']);
-          },
-          error: (err) => {
-            this.isSubmitting = false;
-            this.submitError =
-              err?.error?.message ??
-              'Ocurrió un error al crear el médico. Inténtalo de nuevo.';
-          },
-        });
-    }
   }
 
   navigateBack(): void {
