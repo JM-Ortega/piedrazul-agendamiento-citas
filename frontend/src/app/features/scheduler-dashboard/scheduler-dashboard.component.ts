@@ -115,20 +115,20 @@ export class SchedulerDashboardComponent implements OnInit {
 
   // ── Computed ──────────────────────────────────────────────────────────────
   selectedDoctor = computed(() =>
-    this.doctors().find((d) => d.name === this.filterDoctor()),
+    this.doctors().find((d) => d.name === this.filterDoctor())
   );
 
   todayCount = computed(
     () =>
       this.appointments().filter(
-        (a) => a.date === this.today && a.appointmentState !== 'CANCELADA',
-      ).length,
+        (a) => a.date === this.today && a.appointmentState !== 'CANCELADA'
+      ).length
   );
 
   allActiveCount = computed(
     () =>
       this.appointments().filter((a) => a.appointmentState !== 'CANCELADA')
-        .length,
+        .length
   );
 
   results = computed(() => {
@@ -141,7 +141,7 @@ export class SchedulerDashboardComponent implements OnInit {
       filtered = filtered.filter((a) => a.date === this.filterDate());
     if (this.filterStatus())
       filtered = filtered.filter(
-        (a) => a.appointmentState === this.filterStatus(),
+        (a) => a.appointmentState === this.filterStatus()
       );
     return [...filtered].sort((a, b) =>
       a.date === b.date
@@ -150,12 +150,12 @@ export class SchedulerDashboardComponent implements OnInit {
           : -1
         : a.date > b.date
           ? 1
-          : -1,
+          : -1
     );
   });
 
   activeResults = computed(() =>
-    this.results().filter((a) => a.appointmentState !== 'CANCELADA'),
+    this.results().filter((a) => a.appointmentState !== 'CANCELADA')
   );
 
   exportColors = computed(() => {
@@ -222,7 +222,7 @@ export class SchedulerDashboardComponent implements OnInit {
     if (date && doctorId)
       request$ = this.schedulerService.getAppointmentsByDateAndDoctor(
         date,
-        doctorId,
+        doctorId
       );
     else if (date) request$ = this.schedulerService.getAppointmentsByDate(date);
     else if (doctorId)
@@ -301,7 +301,7 @@ export class SchedulerDashboardComponent implements OnInit {
       },
       error: () => {
         this.exportError.set(
-          'Ocurrió un error al generar el reporte. Intente nuevamente.',
+          'Ocurrió un error al generar el reporte. Intente nuevamente.'
         );
         this.isExporting.set(false);
       },
