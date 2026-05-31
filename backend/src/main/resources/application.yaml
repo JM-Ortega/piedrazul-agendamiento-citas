@@ -11,10 +11,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: ${JPA_DDL_AUTO:update}
-    show-sql: ${JPA_SHOW_SQL:true}
+    show-sql: ${JPA_SHOW_SQL:false}
     properties:
       hibernate:
-        format_sql: ${JPA_FORMAT_SQL:true}
+        format_sql: ${JPA_FORMAT_SQL:false}
         default_schema: ${DB_SCHEMA:piedrazul}
 
   security:
@@ -32,6 +32,13 @@ spring:
     multipart:
       max-file-size: ${MAX_FILE_SIZE:10MB}
       max-request-size: ${MAX_REQUEST_SIZE:10MB}
+
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: ${MODULITH_SCHEMA_INIT:true}
+
 
 server:
   port: ${SERVER_PORT:8080}
@@ -60,6 +67,26 @@ keycloak:
   client-id: ${KC_BACKEND_CLIENT_ID:piedrazul-backend}
   client-secret: ${KC_BACKEND_CLIENT_SECRET:}
 
+notifications:
+  encryption:
+    key: ${NOTIFICATION_ENCRYPTION_KEY:}
+
+  console:
+    show-sensitive-content: ${NOTIFICATIONS_CONSOLE_SHOW_SENSITIVE:false}
+
+  due-job:
+    fixed-delay: ${NOTIFICATIONS_DUE_JOB_FIXED_DELAY:30000}
+
+  stale-attempt:
+    enabled: ${NOTIFICATIONS_STALE_ATTEMPT_ENABLED:true}
+    fixed-delay: ${NOTIFICATIONS_STALE_ATTEMPT_FIXED_DELAY:300000}
+    thresholds:
+      email: ${NOTIFICATIONS_STALE_EMAIL_THRESHOLD:6h}
+      sms: ${NOTIFICATIONS_STALE_SMS_THRESHOLD:30m}
+      whatsapp: ${NOTIFICATIONS_STALE_WHATSAPP_THRESHOLD:30m}
+      default: ${NOTIFICATIONS_STALE_DEFAULT_THRESHOLD:2h}
+
+
 management:
   endpoints:
     web:
@@ -76,3 +103,4 @@ logging:
     org.springframework.security: ${LOG_LEVEL_SECURITY:INFO}
     org.hibernate.SQL: ${LOG_LEVEL_SQL:WARN}
     org.hibernate.orm.jdbc.bind: ${LOG_LEVEL_SQL_BIND:WARN}
+    org.springframework.modulith: ${LOG_LEVEL_MODULITH:WARN}
