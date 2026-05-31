@@ -1,14 +1,14 @@
 <div class="min-h-screen bg-blue-50 py-8 px-4">
   <div class="max-w-4xl mx-auto space-y-8">
     <div
-      class="bg-linear-to-r from-blue-700 to-blue-500 text-white rounded-2xl p-8 shadow-lg"
+      class="bg-linear-to-r from-[#163c63] to-[#215c98] text-white rounded-2xl p-8 shadow-lg"
     >
       <div class="flex items-center gap-4">
         <div class="bg-white bg-opacity-20 rounded-full p-4">
           <lucide-angular
             [img]="User"
             [size]="40"
-            class="text-blue-600"
+            class="text-[#215c98]"
           ></lucide-angular>
         </div>
         <div>
@@ -33,19 +33,19 @@
     <div>
       <a
         routerLink="/paciente/agendar"
-        class="w-full bg-white rounded-2xl shadow-md border-2 border-blue-100 hover:border-blue-400 p-7 flex items-center gap-5 transition-all hover:shadow-lg group"
+        class="w-full bg-white rounded-2xl shadow-md border-2 border-[#a7c9ec] hover:border-[#215c98] p-7 flex items-center gap-5 transition-all hover:shadow-lg group"
       >
         <div
-          class="bg-blue-100 group-hover:bg-blue-200 rounded-full p-4 transition-colors shrink-0"
+          class="bg-[#ddefff] group-hover:bg-[#bdd9f6] rounded-full p-4 transition-colors shrink-0"
         >
           <lucide-angular
             [img]="PlusCircle"
             [size]="36"
-            class="text-blue-600"
+            class="text-[#215c98]"
           ></lucide-angular>
         </div>
         <div class="flex-1">
-          <p class="text-blue-800 text-xl font-semibold">Agendar Nueva Cita</p>
+          <p class="text-[#163c63] text-xl font-semibold">Agendar Nueva Cita</p>
           <p class="text-gray-500 text-base mt-1">
             Seleccione médico y horario
           </p>
@@ -53,17 +53,18 @@
         <lucide-angular
           [img]="ChevronRight"
           [size]="24"
-          class="text-blue-400"
+          class="text-[#4e92d9]"
         ></lucide-angular>
       </a>
     </div>
 
+    <!-- Próximas Citas -->
     <div class="bg-white rounded-2xl shadow-md p-8">
-      <h2 class="text-blue-800 text-2xl mb-6 flex items-center gap-3">
+      <h2 class="text-[#163c63] text-2xl mb-6 flex items-center gap-3">
         <lucide-angular
           [img]="Clock"
           [size]="28"
-          class="text-blue-500"
+          class="text-[#4e92d9]"
         ></lucide-angular>
         Próximas Citas
       </h2>
@@ -79,14 +80,14 @@
           <lucide-angular
             [img]="CalendarDays"
             [size]="64"
-            class="text-blue-200 mx-auto mb-4"
+            class="text-[#a7c9ec] mx-auto mb-4"
           ></lucide-angular>
           <p class="text-gray-500 text-xl mb-4">
             No tiene citas próximas programadas
           </p>
           <a
             routerLink="/paciente/agendar"
-            class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl text-lg transition-colors"
+            class="bg-[#215c98] hover:bg-[#163c63] text-white px-8 py-3 rounded-xl text-lg transition-colors"
           >
             Agendar una Cita
           </a>
@@ -97,36 +98,29 @@
         <div class="space-y-4">
           @for (apt of upcomingAppointments(); track apt.idAppointment) {
             <div
-              class="flex flex-col md:flex-row md:items-center justify-between bg-blue-50 border border-blue-100 rounded-xl p-5 gap-4"
+              class="flex flex-col md:flex-row md:items-center justify-between bg-[#d9e9f8] border border-[#a7c9ec] rounded-xl p-5 gap-4"
             >
               <div class="flex items-start md:items-center gap-4">
-                
-                <div class="flex flex-col gap- 1 items-center">
-                  <div
-                    class="bg-blue-600 text-white rounded-xl p-3 text-center min-w-15 shrink-0"
-                  >
-                    <p class="text-2xl font-bold leading-none">
-                      {{ apt.date.split("-")[2] }}
-                    </p>
-                    <p class="text-xs uppercase">{{ getMonthShort(apt.date) }}</p>
-                  </div>
-                  <div class="flex items-center gap-2 text-gray-600">
-                    <lucide-angular [img]="Clock" [size]="16"></lucide-angular>
-                    <span class="text-base">{{ apt.startTime.slice(0,5) }}</span>
-                  </div>
+                <div
+                  class="bg-[#215c98] text-white rounded-xl p-3 text-center min-w-15 shrink-0"
+                >
+                  <p class="text-2xl font-bold leading-none">
+                    {{ apt.date.split("-")[2] }}
+                  </p>
+                  <p class="text-xs uppercase">{{ getMonthShort(apt.date) }}</p>
                 </div>
 
                 <div>
-                  <p class="text-blue-800 text-xl font-semibold">
+                  <p class="text-[#163c63] text-xl font-semibold">
                     Dr. {{ apt.doctorName }}
                   </p>
-                  <p class="text-gray-500 text-base mb-2">{{ apt.specialty | formato }}</p>
-                  <span
-                    class="px-4 py-2 rounded-lg text-base font-medium whitespace-nowrap"
-                    [ngClass]="statusClasses[apt.appointmentState]"
-                  >
-                    {{ statusLabels[apt.appointmentState] }}
-                  </span>
+                  <p class="text-gray-500 text-base">
+                    {{ apt.specialty | formato }}
+                  </p>
+                  <div class="flex items-center gap-2 mt-1 text-gray-600">
+                    <lucide-angular [img]="Clock" [size]="16"></lucide-angular>
+                    <span class="text-base">{{ apt.startTime }}</span>
+                  </div>
                 </div>
               </div>
 

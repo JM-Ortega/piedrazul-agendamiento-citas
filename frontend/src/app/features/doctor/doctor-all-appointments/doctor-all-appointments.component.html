@@ -224,17 +224,11 @@
                   }
                 </div>
               </div>
-
-              <!-- Right: Status & Action -->
-               <div class="pt-2">
-                  <span [class]="
-                      'px-4 py-2 rounded-lg border-2 text-base font-medium text-center ' +
-                      statusColor(apt.appointmentState)
-                    "
-                  >
-                    {{ statusLabel(apt.appointmentState) }}
-                  </span>
-                </div>
+              <div class="pt-2">
+                <span [class]="'px-4 py-2 rounded-lg border-2 text-base font-medium text-center ' 
+                  + statusColor(apt.appointmentState)"> {{ statusLabel(apt.appointmentState) }}
+                </span>
+              </div>
             </div>
           </div>
         }

@@ -9,11 +9,11 @@
     }
 
     <div class="bg-white rounded-2xl shadow-md p-8">
-      <h2 class="text-blue-800 text-2xl mb-6 flex items-center gap-3">
+      <h2 class="text-[#163c63] text-2xl mb-6 flex items-center gap-3">
         <lucide-angular
           [img]="Clock"
           [size]="28"
-          class="text-blue-500"
+          class="text-[#4e92d9]"
         ></lucide-angular>
         Historial de Citas
       </h2>
@@ -41,11 +41,11 @@
         <div class="space-y-4">
           @for (apt of upcomingAppointments(); track apt.idAppointment) {
             <div
-              class="flex flex-col md:flex-row md:items-center justify-between bg-blue-50 border border-blue-100 rounded-xl p-5 gap-4"
+              class="flex flex-col md:flex-row md:items-center justify-between bg-[#d9e9f8] border border-[#a7c9ec] rounded-xl p-5 gap-4"
             >
               <div class="flex items-start md:items-center gap-4">
                 <div
-                  class="bg-blue-600 text-white rounded-xl p-3 text-center min-w-15 shrink-0"
+                  class="bg-[#215c98] text-white rounded-xl p-3 text-center min-w-15 shrink-0"
                 >
                   <p class="text-2xl font-bold leading-none">
                     {{ apt.date.split("-")[2] }}
@@ -54,7 +54,7 @@
                 </div>
 
                 <div>
-                  <p class="text-blue-800 text-xl font-semibold">
+                  <p class="text-[#163c63] text-xl font-semibold">
                     Dr. {{ apt.doctorName }}
                   </p>
                   <p class="text-gray-500 text-base">{{ apt.specialty | formato }}</p>

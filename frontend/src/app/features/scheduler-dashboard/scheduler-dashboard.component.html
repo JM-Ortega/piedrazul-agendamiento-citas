@@ -2,7 +2,8 @@
   <div class="max-w-5xl mx-auto space-y-6">
     <!-- Header -->
     <div
-      class="bg-linear-to-r from-blue-700 to-blue-500 text-white rounded-2xl p-7 shadow-lg"
+      style="background: linear-gradient(to right, #163c63, #4e92d9)"
+      class="text-white rounded-2xl p-7 shadow-lg"
     >
       <div
         class="flex flex-col md:flex-row md:items-center justify-between gap-4"
@@ -12,13 +13,14 @@
             <lucide-angular [img]="Calendar" [size]="34"></lucide-angular>
             Panel del Agendador
           </h1>
-          <p class="text-blue-100 text-lg mt-2">
+          <p class="text-white/80 text-lg mt-2">
             Consulte y gestione las citas médicas
           </p>
         </div>
         <a
           routerLink="/agendador/nueva"
-          class="flex items-center gap-2 bg-white text-blue-700 hover:bg-blue-50 px-6 py-3 rounded-xl text-lg font-semibold transition-colors shrink-0"
+          class="flex items-center gap-2 bg-white px-6 py-3 rounded-xl text-lg font-semibold transition-colors shrink-0"
+          style="color: #215c98"
         >
           <lucide-angular [img]="PlusCircle" [size]="24"></lucide-angular>
           Nueva Cita
@@ -28,40 +30,43 @@
 
     <!-- Vista Rápida -->
     <div class="bg-white rounded-2xl shadow-md p-7">
-      <h2 class="text-blue-800 text-xl mb-4 font-semibold">Vista Rápida:</h2>
+      <h2 class="text-xl mb-4 font-semibold" style="color: #215c98">
+        Vista Rápida:
+      </h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <!-- Todas las Citas -->
         <button
           (click)="setViewMode('all')"
-          [class]="
-            'p-6 rounded-xl border-2 transition-all duration-300 text-left ' +
-            (viewMode() === 'all'
-              ? 'border-blue-500 bg-blue-50 shadow-lg'
-              : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md')
+          class="p-6 rounded-xl border-2 transition-all duration-300 text-left"
+          [style]="
+            viewMode() === 'all'
+              ? 'border-color: #4e92d9; background-color: #d9e9f8; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);'
+              : 'border-color: #e5e7eb; background-color: white;'
           "
         >
           <div class="flex items-start justify-between mb-3">
             <div class="flex items-center gap-3">
               <div
-                [class]="
-                  'rounded-full p-3 ' +
-                  (viewMode() === 'all' ? 'bg-blue-500' : 'bg-gray-200')
+                class="rounded-full p-3"
+                [style]="
+                  viewMode() === 'all'
+                    ? 'background-color: #215c98;'
+                    : 'background-color: #e5e7eb;'
                 "
               >
                 <lucide-angular
                   [img]="Calendar"
                   [size]="28"
-                  [class]="
-                    viewMode() === 'all' ? 'text-white' : 'text-gray-600'
+                  [style]="
+                    viewMode() === 'all' ? 'color: white;' : 'color: #4b5563;'
                   "
-                >
-                </lucide-angular>
+                ></lucide-angular>
               </div>
               <div>
                 <h3
-                  [class]="
-                    'text-xl font-bold ' +
-                    (viewMode() === 'all' ? 'text-blue-700' : 'text-gray-700')
+                  class="text-xl font-bold"
+                  [style]="
+                    viewMode() === 'all' ? 'color: #215c98;' : 'color: #374151;'
                   "
                 >
                   Todas las Citas
@@ -73,7 +78,8 @@
             </div>
             @if (viewMode() === "all") {
               <div
-                class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold"
+                class="text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold"
+                style="background-color: #163c63"
               >
                 ✓
               </div>
@@ -81,13 +87,12 @@
           </div>
           <div class="flex items-baseline gap-2">
             <span
-              [class]="
-                'text-3xl font-bold ' +
-                (viewMode() === 'all' ? 'text-blue-700' : 'text-gray-600')
+              class="text-3xl font-bold"
+              [style]="
+                viewMode() === 'all' ? 'color: #215c98;' : 'color: #4b5563;'
               "
+              >{{ allActiveCount() }}</span
             >
-              {{ allActiveCount() }}
-            </span>
             <span class="text-gray-500 text-sm">citas activas</span>
           </div>
         </button>
@@ -116,8 +121,7 @@
                   [class]="
                     viewMode() === 'today' ? 'text-white' : 'text-gray-600'
                   "
-                >
-                </lucide-angular>
+                ></lucide-angular>
               </div>
               <div>
                 <h3
@@ -160,7 +164,7 @@
 
     <!-- Filtros Avanzados -->
     <div class="bg-white rounded-2xl shadow-md p-7">
-      <h2 class="text-blue-800 text-2xl mb-2 flex items-center gap-2">
+      <h2 class="text-2xl mb-2 flex items-center gap-2" style="color: #215c98">
         <lucide-angular [img]="Search" [size]="24"></lucide-angular>
         Filtros Avanzados
       </h2>
@@ -175,7 +179,10 @@
           <select
             [value]="filterDoctor()"
             (change)="filterDoctor.set($any($event.target).value)"
-            class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-3 text-lg outline-none transition-colors"
+            class="w-full rounded-xl px-4 py-3 text-lg outline-none transition-colors border-2"
+            style="border-color: #a7c9ec"
+            onfocus="this.style.borderColor = '#215c98'"
+            onblur="this.style.borderColor = '#a7c9ec'"
           >
             <option value="">Todos los médicos</option>
             @for (doc of doctors(); track doc.id) {
@@ -193,7 +200,10 @@
             type="date"
             [value]="filterDate()"
             (change)="filterDate.set($any($event.target).value)"
-            class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-3 text-lg outline-none transition-colors"
+            class="w-full rounded-xl px-4 py-3 text-lg outline-none transition-colors border-2"
+            style="border-color: #a7c9ec"
+            onfocus="this.style.borderColor = '#215c98'"
+            onblur="this.style.borderColor = '#a7c9ec'"
           />
         </div>
         <div>
@@ -203,7 +213,10 @@
           <select
             [value]="filterStatus()"
             (change)="filterStatus.set($any($event.target).value)"
-            class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-3 text-lg outline-none transition-colors"
+            class="w-full rounded-xl px-4 py-3 text-lg outline-none transition-colors border-2"
+            style="border-color: #a7c9ec"
+            onfocus="this.style.borderColor = '#215c98'"
+            onblur="this.style.borderColor = '#a7c9ec'"
           >
             <option value="">Todos los estados</option>
             <option value="AGENDADA">Agendada</option>
@@ -220,12 +233,13 @@
           <span class="text-sm text-gray-600">Filtros activos:</span>
           @if (filterDoctor()) {
             <span
-              class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm"
+              class="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-sm"
+              style="background-color: #d9e9f8; color: #215c98"
             >
               {{ selectedDoctor()?.name }}
               <button
                 (click)="clearDoctorFilter()"
-                class="hover:bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center ml-1"
+                class="rounded-full w-4 h-4 flex items-center justify-center ml-1 hover:opacity-70"
               >
                 ×
               </button>
@@ -233,12 +247,13 @@
           }
           @if (filterDate()) {
             <span
-              class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm"
+              class="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-sm"
+              style="background-color: #d9e9f8; color: #215c98"
             >
               {{ formatDate(filterDate()) }}
               <button
                 (click)="clearDateFilter()"
-                class="hover:bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center ml-1"
+                class="rounded-full w-4 h-4 flex items-center justify-center ml-1 hover:opacity-70"
               >
                 ×
               </button>
@@ -246,12 +261,13 @@
           }
           @if (filterStatus()) {
             <span
-              class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm"
+              class="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-sm"
+              style="background-color: #d9e9f8; color: #215c98"
             >
               {{ statusLabel(filterStatus()) }}
               <button
                 (click)="clearStatusFilter()"
-                class="hover:bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center ml-1"
+                class="rounded-full w-4 h-4 flex items-center justify-center ml-1 hover:opacity-70"
               >
                 ×
               </button>
@@ -261,7 +277,7 @@
       }
     </div>
 
-    <!-- ── Exportar ── -->
+    <!-- Exportar -->
     @if (searched()) {
       <div
         class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200"
@@ -270,7 +286,7 @@
           class="flex flex-col sm:flex-row items-center justify-between gap-4"
         >
           <div class="flex items-center gap-3">
-            <div class="bg-green-500 rounded-full p-3">
+            <div class="bg-[#1f7a52] rounded-full p-3">
               <lucide-angular
                 [img]="Download"
                 [size]="28"
@@ -329,7 +345,7 @@
           class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-3"
         >
           <div>
-            <h2 class="text-blue-800 text-2xl font-semibold">
+            <h2 class="text-2xl font-semibold" style="color: #215c98">
               @if (viewMode() === "all") {
                 Todas las Citas
               }
@@ -361,8 +377,11 @@
             </p>
           </div>
           <div class="flex gap-4">
-            <div class="text-center bg-blue-50 rounded-xl px-5 py-3">
-              <p class="text-2xl font-bold text-blue-700">
+            <div
+              class="text-center rounded-xl px-5 py-3"
+              style="background-color: #d9e9f8"
+            >
+              <p class="text-2xl font-bold" style="color: #215c98">
                 {{ activeResults().length }}
               </p>
               <p class="text-sm text-gray-500">Citas activas</p>
@@ -381,7 +400,8 @@
             <lucide-angular
               [img]="Calendar"
               [size]="64"
-              class="text-blue-200 mx-auto mb-4"
+              style="color: #a7c9ec"
+              class="mx-auto mb-4"
             ></lucide-angular>
             <p class="text-gray-500 text-xl">
               No se encontraron citas para los criterios seleccionados
@@ -391,32 +411,37 @@
           <div class="overflow-x-auto">
             <table class="w-full">
               <thead>
-                <tr class="bg-blue-50">
+                <tr style="background-color: #d9e9f8">
                   @if (viewMode() !== "today") {
                     <th
-                      class="text-left px-4 py-3 text-blue-800 text-base rounded-l-xl"
+                      class="text-left px-4 py-3 text-base rounded-l-xl"
+                      style="color: #163c63"
                     >
                       Fecha
                     </th>
                   }
                   <th
-                    [class]="
-                      'text-left px-4 py-3 text-blue-800 text-base ' +
-                      (viewMode() === 'today' ? 'rounded-l-xl' : '')
-                    "
+                    class="text-left px-4 py-3 text-base"
+                    [class]="viewMode() === 'today' ? 'rounded-l-xl' : ''"
+                    style="color: #163c63"
                   >
                     Hora
                   </th>
-                  <th class="text-left px-4 py-3 text-blue-800 text-base">
+                  <th
+                    class="text-left px-4 py-3 text-base"
+                    style="color: #163c63"
+                  >
                     Paciente
                   </th>
                   <th
-                    class="text-left px-4 py-3 text-blue-800 text-base hidden md:table-cell"
+                    class="text-left px-4 py-3 text-base hidden md:table-cell"
+                    style="color: #163c63"
                   >
                     Médico
                   </th>
                   <th
-                    class="text-left px-4 py-3 text-blue-800 text-base hidden md:table-cell"
+                    class="text-left px-4 py-3 text-base rounded-r-xl"
+                    style="color: #163c63"
                   >
                     Estado
                   </th>
@@ -461,22 +486,26 @@
                         <lucide-angular
                           [img]="Clock"
                           [size]="18"
-                          class="text-blue-400 shrink-0"
+                          style="color: #4e92d9"
+                          class="shrink-0"
                         ></lucide-angular>
-                        <span class="text-blue-800 text-lg font-semibold">{{
-                          apt.startTime.slice(0, 5)
-                        }}</span>
+                        <span
+                          class="text-lg font-semibold"
+                          style="color: #215c98"
+                          >{{ apt.startTime.slice(0, 5) }}</span
+                        >
                       </div>
                     </td>
                     <td class="px-4 py-4">
                       <div class="flex items-center gap-3">
                         <div
-                          class="bg-blue-100 rounded-full w-10 h-10 flex items-center justify-center shrink-0"
+                          class="rounded-full w-10 h-10 flex items-center justify-center shrink-0"
+                          style="background-color: #d9e9f8"
                         >
                           <lucide-angular
                             [img]="User"
                             [size]="18"
-                            class="text-blue-600"
+                            style="color: #215c98"
                           ></lucide-angular>
                         </div>
                         <div>
@@ -532,13 +561,13 @@
     }
   </div>
 </div>
-<!-- ── Modal advertencia disponibilidad ── -->
+
+<!-- Modal advertencia disponibilidad -->
 @if (showAvailabilityWarning()) {
   <div
     class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
   >
     <div class="bg-white rounded-xl max-w-md w-full shadow-2xl">
-      <!-- Header -->
       <div
         class="bg-amber-500 text-white px-8 py-5 rounded-t-xl flex items-center justify-between"
       >
@@ -553,9 +582,7 @@
           ×
         </button>
       </div>
-
       <div class="px-8 py-6">
-        <!-- Aviso -->
         <div
           class="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-xl px-5 py-4 mb-6"
         >
@@ -575,8 +602,6 @@
             </p>
           </div>
         </div>
-
-        <!-- Botones -->
         <div class="flex gap-3">
           <button
             (click)="showAvailabilityWarning.set(false)"
@@ -596,13 +621,13 @@
     </div>
   </div>
 }
-<!-- ── Modal de Exportación ── -->
+
+<!-- Modal de Exportación -->
 @if (showExportModal()) {
   <div
     class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
   >
     <div class="bg-white rounded-xl max-w-md w-full shadow-2xl">
-      <!-- Header del modal -->
       <div
         [class]="
           exportColors().header +
@@ -620,22 +645,23 @@
           ×
         </button>
       </div>
-
       <div class="px-8 py-6">
         <!-- Aviso de fecha -->
         <div
-          class="mb-6 flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-5 py-4"
+          class="mb-6 flex items-start gap-3 rounded-xl px-5 py-4 border"
+          style="background-color: #d9e9f8; border-color: #a7c9ec"
         >
           <lucide-angular
             [img]="Calendar"
             [size]="22"
-            class="text-blue-600 mt-0.5 shrink-0"
+            style="color: #215c98"
+            class="mt-0.5 shrink-0"
           ></lucide-angular>
           <div>
-            <p class="text-blue-800 font-semibold text-base">
+            <p class="font-semibold text-base" style="color: #163c63">
               Fecha del reporte
             </p>
-            <p class="text-blue-600 text-sm mt-0.5">
+            <p class="text-sm mt-0.5" style="color: #215c98">
               Se exportarán las citas del
               <strong>{{ formatDate(filterDate()) }}</strong>
             </p>
@@ -712,7 +738,6 @@
           </div>
         </div>
 
-        <!-- Error -->
         @if (exportError()) {
           <div
             class="mb-4 bg-red-50 border border-red-300 text-red-800 px-4 py-3 rounded-lg text-sm flex items-center gap-2"
@@ -721,7 +746,6 @@
           </div>
         }
 
-        <!-- Botones -->
         <div class="flex gap-3 pt-4 border-t border-gray-200">
           <button
             (click)="closeExportModal()"

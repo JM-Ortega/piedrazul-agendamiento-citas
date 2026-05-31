@@ -3,12 +3,12 @@
     <div class="mb-6">
       <button
         (click)="goBack()"
-        class="flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-4 transition-colors"
+        class="flex items-center gap-2 text-[#215c98] text-lg hover:text-[#4e92d9] mb-4 transition-colors cursor-pointer"
       >
         <lucide-angular [img]="ArrowLeft" [size]="18" />
         <span class="text-sm font-medium">Volver</span>
       </button>
-      <h1 class="text-blue-800 text-3xl font-bold">Crear cuenta</h1>
+      <h1 class="text-[#215c98] text-3xl font-bold">Crear cuenta</h1>
       <p class="text-gray-500 text-lg mt-1">
         Regístrate para agendar tus citas médicas
       </p>
@@ -26,7 +26,7 @@
         <div
           class="flex-1 text-center py-2 rounded-xl text-sm font-medium transition-all"
           [ngClass]="{
-            'bg-blue-600 text-white shadow': step() === $index + 1,
+            'bg-[#215c98] text-white shadow': step() === $index + 1,
             'bg-green-100 text-green-700': step() > $index + 1,
             'bg-white text-gray-400 border border-gray-200':
               step() < $index + 1,
@@ -40,7 +40,7 @@
     <div class="bg-white rounded-2xl shadow-xl p-8">
       @if (step() === 1) {
         <div class="space-y-5">
-          <h2 class="text-blue-800 text-2xl font-bold mb-4">
+          <h2 class="text-[#163c63] text-2xl font-bold mb-4">
             Verificar documento
           </h2>
 
@@ -56,12 +56,12 @@
                 (input)="handleDocInput($event)"
                 (keyup.enter)="searchPatient()"
                 placeholder="Ingresa tu número de documento"
-                class="flex-1 border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors"
+                class="flex-1 border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4e92d9] transition-colors"
               />
               <button
                 (click)="searchPatient()"
                 [disabled]="isLoading()"
-                class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl flex items-center gap-2 disabled:opacity-50 transition-colors"
+                class="bg-[#215c98] hover:bg-[#163c63] text-white px-5 py-3 rounded-xl flex items-center gap-2 disabled:opacity-50 transition-colors cursor-pointer"
               >
                 <lucide-angular [img]="Search" [size]="18" />
                 Buscar
@@ -139,7 +139,7 @@
                 <select
                   [ngModel]="getFormField('documentType')"
                   (ngModelChange)="setFormField('documentType', $event)"
-                  class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500"
+                  class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4e92d9]"
                 >
                   <option value="">Seleccione...</option>
                   @for (type of patientService.documentTypes(); track type) {
@@ -167,7 +167,7 @@
                   [ngClass]="
                     errors()['firstName']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-blue-500'
+                      : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 />
                 @if (firstNameLimitMsg()) {
@@ -193,7 +193,7 @@
                   [ngClass]="
                     errors()['lastName']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-blue-500'
+                      : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 />
                 @if (lastNameLimitMsg()) {
@@ -221,7 +221,7 @@
                   [ngClass]="
                     errors()['phone']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-blue-500'
+                      : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 />
                 @if (phoneLimitMsg()) {
@@ -244,7 +244,7 @@
                   [ngClass]="
                     errors()['gender']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-blue-500'
+                      : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 >
                   <option value="">Seleccione...</option>
@@ -304,7 +304,7 @@
                   [ngClass]="
                     errors()['email']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-blue-500'
+                      : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 />
                 @if (emailLimitMsg()) {
@@ -339,7 +339,7 @@
                   [ngClass]="
                     errors()['guardianPhone']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-blue-500'
+                      : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 />
                 @if (guardianPhoneLimitMsg()) {
@@ -397,7 +397,7 @@
                 <select
                   [ngModel]="getFormField('documentType')"
                   (ngModelChange)="setFormField('documentType', $event)"
-                  class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500"
+                  class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4e92d9]"
                 >
                   <option value="">Seleccione...</option>
                   @for (type of patientService.documentTypes(); track type) {
@@ -425,7 +425,7 @@
                   [ngClass]="
                     errors()['firstName']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-blue-500'
+                      : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 />
                 @if (firstNameLimitMsg()) {
@@ -451,7 +451,7 @@
                   [ngClass]="
                     errors()['lastName']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-blue-500'
+                      : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 />
                 @if (lastNameLimitMsg()) {
@@ -479,7 +479,7 @@
                   [ngClass]="
                     errors()['phone']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-blue-500'
+                      : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 />
                 @if (phoneLimitMsg()) {
@@ -502,7 +502,7 @@
                   [ngClass]="
                     errors()['gender']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-blue-500'
+                      : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 >
                   <option value="">Seleccione...</option>
@@ -572,7 +572,7 @@
                   [ngClass]="
                     errors()['email']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-blue-500'
+                      : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 />
                 @if (emailLimitMsg()) {
@@ -607,7 +607,7 @@
                   [ngClass]="
                     errors()['guardianPhone']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-blue-500'
+                      : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 />
                 @if (guardianPhoneLimitMsg()) {
@@ -633,7 +633,7 @@
             <div class="flex justify-end mt-4">
               <button
                 (click)="goToStep2()"
-                class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-semibold transition-colors"
+                class="bg-[#215c98] hover:bg-[#163c63] text-white px-8 py-3 rounded-xl font-semibold transition-colors cursor-pointer"
               >
                 Continuar
               </button>
@@ -645,7 +645,7 @@
       @if (step() === 2) {
         <div class="space-y-5">
           <div>
-            <h2 class="text-blue-800 text-2xl font-bold">
+            <h2 class="text-[#163c63] text-2xl font-bold">
               @if (requiresPassword()) {
                 Crear tu cuenta
               } @else {
@@ -696,7 +696,7 @@
                   [ngClass]="
                     errors()['password']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-blue-500'
+                      : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 />
                 <button
@@ -731,7 +731,7 @@
                   [ngClass]="
                     errors()['confirmPassword']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-blue-500'
+                      : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 />
                 <button
@@ -770,14 +770,14 @@
           <div class="flex gap-4 mt-4">
             <button
               (click)="goBack()"
-              class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+              class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
             >
               Atrás
             </button>
             <button
               (click)="submit()"
               [disabled]="isLoading()"
-              class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+              class="flex-1 bg-[#215c98] hover:bg-[#163c63] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors cursor-pointer"
             >
               @if (isLoading()) {
                 <span>Procesando...</span>
@@ -822,7 +822,7 @@
               [ngClass]="
                 errors()['verificationCode']
                   ? 'border-red-400 bg-red-50'
-                  : 'border-blue-200 focus:border-blue-500'
+                  : 'border-blue-200 focus:border-[#4e92d9]'
               "
             />
             @if (errors()["verificationCode"]) {
@@ -843,7 +843,7 @@
           <div class="flex gap-4 mt-4">
             <button
               (click)="goBack()"
-              class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+              class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
             >
               Atrás
             </button>
@@ -851,7 +851,7 @@
             <button
               (click)="confirmCode()"
               [disabled]="isLoading()"
-              class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+              class="flex-1 bg-[#215c98] hover:bg-[#163c63] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors cursor-pointer"
             >
               @if (isLoading()) {
                 <span>Verificando...</span>

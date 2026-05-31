@@ -361,7 +361,7 @@ export class SchedulerDashboardComponent implements OnInit {
 
   statusColor(s: string): string {
     const map: Record<string, string> = {
-      AGENDADA: 'bg-blue-100 text-blue-700',
+      AGENDADA: 'bg-blue-100 text-[#163c63]',
       ATENDIDA: 'bg-green-100 text-green-700',
       CANCELADA: 'bg-red-100 text-red-700',
       NO_ASISTIO: 'bg-orange-100 text-orange-700',
