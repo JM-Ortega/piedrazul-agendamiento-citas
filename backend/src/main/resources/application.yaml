@@ -73,6 +73,14 @@ notifications:
 
   console:
     show-sensitive-content: ${NOTIFICATIONS_CONSOLE_SHOW_SENSITIVE:false}
+  email:
+    sendgrid:
+      enabled: ${NOTIFICATIONS_SENDGRID_ENABLED:false}
+      api-key: ${SENDGRID_API_KEY:}
+      from-email: ${NOTIFICATIONS_EMAIL_FROM:no-reply@piedrazul.org}
+      from-name: ${NOTIFICATIONS_EMAIL_FROM_NAME:Piedrazul}
+      sandbox-mode: ${SENDGRID_SANDBOX_MODE:true}
+
 
   due-job:
     fixed-delay: ${NOTIFICATIONS_DUE_JOB_FIXED_DELAY:30000}
@@ -104,3 +112,13 @@ logging:
     org.hibernate.SQL: ${LOG_LEVEL_SQL:WARN}
     org.hibernate.orm.jdbc.bind: ${LOG_LEVEL_SQL_BIND:WARN}
     org.springframework.modulith: ${LOG_LEVEL_MODULITH:WARN}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      sendgrid:
+        sliding-window-size: ${RESILIENCE4J_SENDGRID_WINDOW_SIZE:10}
+        failure-rate-threshold: ${RESILIENCE4J_SENDGRID_FAILURE_RATE:50}
+        wait-duration-in-open-state: ${RESILIENCE4J_SENDGRID_WAIT_DURATION:30s}
+        permitted-number-of-calls-in-half-open-state: ${RESILIENCE4J_SENDGRID_HALF_OPEN_CALLS:3}
+        register-health-indicator: true

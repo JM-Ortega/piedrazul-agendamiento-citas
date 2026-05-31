@@ -12,9 +12,11 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.Notifi
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationScheduleRepository;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.template.NotificationTemplateProvider;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.provider.console.ConsoleNotificationProvider;
+import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.provider.email.sendgrid.SendGridProperties;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.template.InMemoryNotificationTemplateProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -27,6 +29,7 @@ import java.util.List;
 @Configuration
 @EnableScheduling
 @EnableAsync
+@EnableConfigurationProperties(SendGridProperties.class)
 public class NotificationConfig {
 
     @Bean
