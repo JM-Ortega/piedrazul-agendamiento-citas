@@ -29,13 +29,13 @@ services:
           memory: 1g
     healthcheck:
       test: [
-          "CMD-SHELL",
-          "{ printf 'HEAD /health/ready HTTP/1.0\r
+        "CMD-SHELL",
+        "{ printf 'HEAD /health/ready HTTP/1.0\r
 
           \r
 
           ' >&0; grep 'HTTP/1.0 200'; } 0<>/dev/tcp/localhost/9000",
-        ]
+      ]
       interval: 10s
       timeout: 5s
       retries: 30
