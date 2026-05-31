@@ -5,7 +5,7 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { LucideAngularModule, UserSearch } from 'lucide-angular';
+import { LucideAngularModule, UserSearch, Calendar } from 'lucide-angular';
 import { BookingStateService } from '../../services/booking-state.service';
 import { CalendarService } from '../../services/calendar.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
@@ -35,6 +35,7 @@ import {FormatoPipe} from "../../../../shared/pipes/formatoPipe";
 })
 export class BookingScheduleSelectorComponent {
   readonly UserSearch = UserSearch;
+  readonly Calendar = Calendar;
 
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);

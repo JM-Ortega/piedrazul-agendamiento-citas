@@ -1,22 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import Keycloak from 'keycloak-js';
-import {
-  ArrowLeft,
-  CheckCircle,
-  Eye,
-  EyeOff,
-  KeyRound,
-  LucideAngularModule,
-  Search,
-  UserPlus,
-} from 'lucide-angular';
-import {
-  PatientPublicResponse,
-  PatientService,
-} from '../../core/services/patient.service';
+import { ArrowLeft, CheckCircle, Eye, EyeOff, KeyRound, Calendar,
+  LucideAngularModule, Search, UserPlus,} from 'lucide-angular';
+import { PatientPublicResponse, PatientService,} from '../../core/services/patient.service';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { FormatoPipe } from '../../shared/pipes/formatoPipe';
 
 type RegistroStep = 1 | 2 | 3;
 type PatientStatus =
@@ -29,11 +20,14 @@ type PatientStatus =
 @Component({
   selector: 'app-registro',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, MatDatepickerModule, FormatoPipe],
   templateUrl: './registro.component.html',
 })
-export class RegistroComponent {
-  private patientService = inject(PatientService);
+export class RegistroComponent implements OnInit {
+  ngOnInit(): void {
+    this.patientService.loadDocumentTypes();
+  }
+  protected patientService = inject(PatientService);
   private keycloak = inject(Keycloak);
   private router = inject(Router);
 
@@ -44,6 +38,7 @@ export class RegistroComponent {
   readonly EyeOff = EyeOff;
   readonly UserPlus = UserPlus;
   readonly KeyRound = KeyRound;
+  readonly Calendar = Calendar;
 
   step = signal<RegistroStep>(1);
   isLoading = signal(false);
@@ -75,6 +70,7 @@ export class RegistroComponent {
   private readonly PASSWORD_MIN = 6;
   private readonly PASSWORD_MAX = 100;
   private readonly PASSWORD_ALPHANUMERIC = /^(?=.*[a-zA-Z])(?=.*[0-9]).+$/;
+  readonly maxBirthDate = new Date();
 
   errors = signal<Record<string, string>>({});
 
