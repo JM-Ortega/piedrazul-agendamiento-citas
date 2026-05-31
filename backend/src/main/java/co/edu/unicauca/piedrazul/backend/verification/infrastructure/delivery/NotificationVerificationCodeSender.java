@@ -6,6 +6,7 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.verification.application.VerificationCodeSender;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -54,7 +55,7 @@ public class NotificationVerificationCodeSender implements VerificationCodeSende
         try {
             return UUID.fromString(subject);
         } catch (IllegalArgumentException e) {
-            return UUID.nameUUIDFromBytes(subject.getBytes());
+            return UUID.nameUUIDFromBytes(subject.getBytes(StandardCharsets.UTF_8));
         }
     }
 }

@@ -17,6 +17,7 @@ import com.sendgrid.helpers.mail.objects.Content;
 import com.sendgrid.helpers.mail.objects.Email;
 import com.sendgrid.helpers.mail.objects.MailSettings;
 import com.sendgrid.helpers.mail.objects.Setting;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.model.FailureType;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
@@ -177,12 +178,24 @@ public class SendGridEmailProvider implements NotificationProvider {
         String errorBody = response.getBody();
         log.warn("SendGrid respondió con status={} body={}", statusCode, errorBody);
 
+        // Transitorio: 5xx (error de servidor) y 429 (rate limit)
+        // Resilience4j cuenta la excepción como fallo → el circuit breaker puede abrirse
+        // El dispatcher lo atrapa y aplica la retry policy
+        if (statusCode >= 500 || statusCode == 429) {
+            throw new NotificationDispatchException(
+                    "SENDGRID_" + statusCode,
+                    "SendGrid error transitorio (" + statusCode + "): " + errorBody
+            );
+        }
+
+        // Permanente: otros 4xx (401, 403, 400, 422…)
+        // Error del cliente → sin retry, sin contar en el circuit breaker
         return new NotificationSendResult(
                 PROVIDER_NAME,
                 NotificationChannel.EMAIL,
                 null,
                 AttemptStatus.FAILED,
-                null,
+                FailureType.PERMANENT,
                 "SENDGRID_" + statusCode,
                 errorBody
         );
