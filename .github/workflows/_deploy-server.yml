@@ -64,6 +64,10 @@ on:
         required: true
       KC_AUTOMATION_CLIENT_SECRET:
         required: true
+      PIEDRAZUL_BACKEND_MAIL_SEND:
+        required: true
+      NOTIFICATION_ENCRYPTION_KEY:
+        required: true
 
 concurrency:
   group: deploy-${{ inputs.github_environment }}
@@ -426,6 +430,8 @@ jobs:
           IDENTITY_SEED_ADMIN_LAST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_LAST_NAME }}
           IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
           IDENTITY_SEED_ADMIN_PASSWORD: ${{ secrets.IDENTITY_SEED_ADMIN_PASSWORD }}
+          PIEDRAZUL_BACKEND_MAIL_SEND: ${{ secrets.PIEDRAZUL_BACKEND_MAIL_SEND }}
+          NOTIFICATION_ENCRYPTION_KEY: ${{ secrets.NOTIFICATION_ENCRYPTION_KEY }}
 
   app_deploy:
     name: Desplegar aplicación
@@ -520,6 +526,8 @@ jobs:
           IDENTITY_SEED_ADMIN_LAST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_LAST_NAME }}
           IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
           IDENTITY_SEED_ADMIN_PASSWORD: ${{ secrets.IDENTITY_SEED_ADMIN_PASSWORD }}
+          PIEDRAZUL_BACKEND_MAIL_SEND: ${{ secrets.PIEDRAZUL_BACKEND_MAIL_SEND }}
+          NOTIFICATION_ENCRYPTION_KEY: ${{ secrets.NOTIFICATION_ENCRYPTION_KEY }}
 
   health_check:
     name: Health check
