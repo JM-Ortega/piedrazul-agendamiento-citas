@@ -1,6 +1,6 @@
 import { Component, input, output } from '@angular/core';
 import { LucideAngularModule, PowerOff, Save, X } from 'lucide-angular';
-import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
+import { Doctor } from '../../../../../shared/models/interfaces/doctor.model';
 
 @Component({
   selector: 'app-admin-modals',
