@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment;
+package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output;
 
 import java.time.LocalDate;
 import java.util.UUID;

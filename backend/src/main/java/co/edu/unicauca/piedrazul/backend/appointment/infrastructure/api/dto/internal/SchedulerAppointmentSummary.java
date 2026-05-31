@@ -1,7 +1,6 @@
-package co.edu.unicauca.piedrazul.backend.appointment;
+package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal;
 
 
-import java.time.LocalDate;
 import java.time.LocalTime;
 
 public record SchedulerAppointmentSummary(
