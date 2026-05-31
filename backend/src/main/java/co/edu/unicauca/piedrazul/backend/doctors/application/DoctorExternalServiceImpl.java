@@ -86,6 +86,11 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
                 .toList();
     }
 
+    @Override
+    public List<Specialty> getSpecialtiesByDoctor(UUID idDoctor){
+        return doctorRepository.getSpecialtiesByIdDoctor(idDoctor);
+    }
+
     private static Workday toWorkday(DayOfWeek dayOfWeek) {
         return switch (dayOfWeek) {
             case MONDAY    -> Workday.LUNES;

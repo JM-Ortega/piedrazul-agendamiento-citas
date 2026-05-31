@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.user.api;
 
 import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemDoctorResponse;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
 import co.edu.unicauca.piedrazul.backend.user.application.CreateAccountUseCase;
 import co.edu.unicauca.piedrazul.backend.user.application.UserService;
@@ -32,6 +33,17 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<SystemUserResponse>> getSystemUsers() {
         List<SystemUserResponse> users = userService.getSystemUsers();
+        return ResponseEntity.ok(users);
+    }
+
+    /**
+     * Obtiene todos los usuarios con rol DOCTOR del sistema.
+     * @return Lista de usuarios con rol DOCTOR registrados en el sistema
+     */
+    @GetMapping("/system-doctors")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<SystemDoctorResponse>> getSystemDoctors() {
+        List<SystemDoctorResponse> users = userService.getSystemDoctors();
         return ResponseEntity.ok(users);
     }
 
