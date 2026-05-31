@@ -16,6 +16,7 @@ import {
   Zap,
 } from 'lucide-angular';
 import { forkJoin, Observable } from 'rxjs';
+import { AppService } from '../../../../core/services/app.service';
 import { DoctorAdminDto } from '../../models/dtos/DoctorAdminDto';
 import { AdminService } from '../../service/admin.service';
 
@@ -28,6 +29,7 @@ import { AdminService } from '../../service/admin.service';
 export class AdminDoctorsComponent implements OnInit {
   private adminService = inject(AdminService);
   public router = inject(Router);
+  private appService = inject(AppService);
 
   readonly ArrowLeft = ArrowLeft;
   readonly Stethoscope = Stethoscope;
@@ -164,9 +166,8 @@ export class AdminDoctorsComponent implements OnInit {
       this.handleCancel();
       return;
     }
-
     forkJoin(calls).subscribe({
-      next: () => {
+      next: async () => {
         this.doctors.update((list) =>
           list.map((d) => {
             if (d.id !== doctor.id) return d;
@@ -180,6 +181,13 @@ export class AdminDoctorsComponent implements OnInit {
             };
           })
         );
+
+        // Refresh del token solo si cambió el rol
+        const roleChanged = hadScheduler !== wantsScheduler;
+        if (roleChanged) {
+          await this.appService.refreshRoles();
+        }
+
         this.savingDoctorId.set(null);
         this.handleCancel();
       },
