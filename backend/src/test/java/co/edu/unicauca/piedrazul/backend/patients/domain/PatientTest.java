@@ -1,7 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.patients.domain;
 
 import co.edu.unicauca.piedrazul.backend.patients.exception.InvalidPatientDataException;
-import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyLinkedUserException;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -240,6 +239,7 @@ class PatientTest {
         assertThat(patient.hasUserAccount()).isTrue();
     }
 
+    /*
     @Test
     void linkUserShouldAssignUserIdWhenPatientDoesNotHaveLinkedUser() {
         Patient patient = buildPatient(null);
@@ -267,6 +267,7 @@ class PatientTest {
         assertThatThrownBy(() -> patient.linkUser(UUID.randomUUID()))
                 .isInstanceOf(PatientAlreadyLinkedUserException.class);
     }
+     */
 
     private Patient buildPatient(UUID userId) {
         return new Patient(

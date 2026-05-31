@@ -2,10 +2,8 @@ package co.edu.unicauca.piedrazul.backend.user.infrastructure;
 
 import co.edu.unicauca.piedrazul.backend.config.security.KeycloakProperties;
 import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
-import co.edu.unicauca.piedrazul.backend.user.exception.IdentityProviderException;
-import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
-import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsException;
 import jakarta.ws.rs.core.Response;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.keycloak.admin.client.Keycloak;
@@ -13,16 +11,21 @@ import org.keycloak.admin.client.resource.*;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class KeycloakUserClientTest {
@@ -57,220 +60,226 @@ class KeycloakUserClientTest {
     @Mock
     private Response response;
 
-    @InjectMocks
     private KeycloakUserClient keycloakUserClient;
 
-    @Test
-    void createUser_shouldThrowUserAlreadyExistsException_whenKeycloakReturnsConflict() {
+    @BeforeEach
+    void setUp() throws Exception {
+        when(props.getServerUrl()).thenReturn("http://localhost:8080");
         when(props.getRealm()).thenReturn("piedrazul");
-        when(keycloak.realm("piedrazul")).thenReturn(realmResource);
-        when(realmResource.users()).thenReturn(usersResource);
-        when(usersResource.create(any(UserRepresentation.class))).thenReturn(response);
-        when(response.getStatus()).thenReturn(Response.Status.CONFLICT.getStatusCode());
+        when(props.getClientId()).thenReturn("backend");
+        when(props.getClientSecret()).thenReturn("secret");
 
-        assertThrows(
-                UserAlreadyExistsException.class,
-                () -> keycloakUserClient.createUser(
-                        "123456789",
-                        "Juan",
-                        "Perez",
-                        "juan@test.com",
-                        "secret",
-                        Role.PATIENT
-                )
-        );
-
-        verify(response).close();
-        verify(realmResource, never()).roles();
+        keycloakUserClient = new KeycloakUserClient(props);
+        injectKeycloakMock();
     }
 
     @Test
-    void createUser_shouldThrowInvalidUserDataException_whenKeycloakReturnsBadRequest() {
-        when(props.getRealm()).thenReturn("piedrazul");
-        when(keycloak.realm("piedrazul")).thenReturn(realmResource);
-        when(realmResource.users()).thenReturn(usersResource);
-        when(usersResource.create(any(UserRepresentation.class))).thenReturn(response);
-        when(response.getStatus()).thenReturn(Response.Status.BAD_REQUEST.getStatusCode());
-        when(response.hasEntity()).thenReturn(true);
-        when(response.readEntity(String.class)).thenReturn("invalid payload");
+    void findUserByUsernameShouldReturnEmptyWhenUsernameIsNull() {
+        Optional<UserRepresentation> result = keycloakUserClient.findUserByUsername(null);
 
-        assertThrows(
-                InvalidUserDataException.class,
-                () -> keycloakUserClient.createUser(
-                        "123456789",
-                        "Juan",
-                        "Perez",
-                        "juan@test.com",
-                        "secret",
-                        Role.PATIENT
-                )
-        );
-
-        verify(response).close();
-        verify(realmResource, never()).roles();
+        assertTrue(result.isEmpty());
+        verify(keycloak, never()).realm(any());
     }
 
     @Test
-    void createUser_shouldThrowIdentityProviderException_whenStatusIsUnexpected() {
-        when(props.getRealm()).thenReturn("piedrazul");
-        when(keycloak.realm("piedrazul")).thenReturn(realmResource);
-        when(realmResource.users()).thenReturn(usersResource);
-        when(usersResource.create(any(UserRepresentation.class))).thenReturn(response);
-        when(response.getStatus()).thenReturn(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode());
-        when(response.hasEntity()).thenReturn(true);
-        when(response.readEntity(String.class)).thenReturn("server error");
+    void findUserByUsernameShouldReturnEmptyWhenUsernameIsBlank() {
+        Optional<UserRepresentation> result = keycloakUserClient.findUserByUsername("   ");
 
-        assertThrows(
-                IdentityProviderException.class,
-                () -> keycloakUserClient.createUser(
-                        "123456789",
-                        "Juan",
-                        "Perez",
-                        "juan@test.com",
-                        "secret",
-                        Role.PATIENT
-                )
-        );
-
-        verify(response).close();
-        verify(realmResource, never()).roles();
+        assertTrue(result.isEmpty());
+        verify(keycloak, never()).realm(any());
     }
 
     @Test
-    void createUser_shouldThrowIdentityProviderException_whenLocationHeaderIsMissing() {
-        when(props.getRealm()).thenReturn("piedrazul");
+    void findUserByUsernameShouldReturnFirstMatch() {
         when(keycloak.realm("piedrazul")).thenReturn(realmResource);
         when(realmResource.users()).thenReturn(usersResource);
-        when(usersResource.create(any(UserRepresentation.class))).thenReturn(response);
-        when(response.getStatus()).thenReturn(Response.Status.CREATED.getStatusCode());
-        when(response.getHeaderString("Location")).thenReturn(null);
 
-        assertThrows(
-                IdentityProviderException.class,
-                () -> keycloakUserClient.createUser(
-                        "123456789",
-                        "Juan",
-                        "Perez",
-                        "juan@test.com",
-                        "secret",
-                        Role.PATIENT
-                )
-        );
+        UserRepresentation user = new UserRepresentation();
+        user.setId("11111111-1111-1111-1111-111111111111");
+        user.setUsername("doctor01");
+        user.setFirstName("Ana");
+        user.setLastName("Lopez");
+        user.setEmail("ana@test.com");
 
-        verify(response).close();
-        verify(realmResource, never()).roles();
+        when(usersResource.searchByUsername("doctor01", true)).thenReturn(List.of(user));
+
+        Optional<UserRepresentation> result = keycloakUserClient.findUserByUsername("doctor01");
+
+        assertTrue(result.isPresent());
+        assertEquals("doctor01", result.get().getUsername());
+        assertEquals("Ana", result.get().getFirstName());
+        verify(usersResource).searchByUsername("doctor01", true);
     }
 
     @Test
-    void createUser_shouldCreateUserAndAssignRealmRole_whenResponseIsCreated() {
-        when(props.getRealm()).thenReturn("piedrazul");
+    void findUsersByRoleShouldMapMembersFromKeycloak() {
         when(keycloak.realm("piedrazul")).thenReturn(realmResource);
-
-        UUID createdId = UUID.randomUUID();
-        String location = "http://localhost/admin/realms/piedrazul/users/" + createdId;
-
-        RoleRepresentation patientRole = new RoleRepresentation();
-        patientRole.setName(Role.PATIENT.name());
-
-        when(realmResource.users()).thenReturn(usersResource);
-        when(usersResource.create(any(UserRepresentation.class))).thenReturn(response);
-        when(response.getStatus()).thenReturn(Response.Status.CREATED.getStatusCode());
-        when(response.getHeaderString("Location")).thenReturn(location);
-
         when(realmResource.roles()).thenReturn(rolesResource);
-        when(rolesResource.get(Role.PATIENT.name())).thenReturn(roleResource);
-        when(roleResource.toRepresentation()).thenReturn(patientRole);
+        when(rolesResource.get(Role.DOCTOR.name())).thenReturn(roleResource);
 
-        when(usersResource.get(createdId.toString())).thenReturn(userResource);
+        UserRepresentation firstUser = userRepresentation(
+                "22222222-2222-2222-2222-222222222222",
+                "doctor01",
+                "Ana",
+                "Lopez",
+                "ana@test.com"
+        );
+        UserRepresentation secondUser = userRepresentation(
+                "33333333-3333-3333-3333-333333333333",
+                "doctor02",
+                "Luis",
+                "Perez",
+                "luis@test.com"
+        );
+
+        when(roleResource.getUserMembers()).thenReturn(List.of(firstUser, secondUser));
+
+        List<UserRepresentation> result = keycloakUserClient.findUsersByRole(Role.DOCTOR);
+
+        assertEquals(2, result.size());
+        assertEquals("doctor01", result.get(0).getUsername());
+        assertEquals("doctor02", result.get(1).getUsername());
+        verify(rolesResource).get(Role.DOCTOR.name());
+    }
+
+    @Test
+    void getUserRolesShouldReturnRoleNames() {
+        UUID userId = UUID.fromString("44444444-4444-4444-4444-444444444444");
+        when(keycloak.realm("piedrazul")).thenReturn(realmResource);
+        when(realmResource.users()).thenReturn(usersResource);
+        when(usersResource.get(userId.toString())).thenReturn(userResource);
         when(userResource.roles()).thenReturn(roleMappingResource);
         when(roleMappingResource.realmLevel()).thenReturn(roleScopeResource);
 
-        UUID result = keycloakUserClient.createUser(
-                "123456789",
-                "Juan",
-                "Perez",
-                "juan@test.com",
-                "secret",
-                Role.PATIENT
-        );
+        RoleRepresentation doctorRole = new RoleRepresentation();
+        doctorRole.setName(Role.DOCTOR.name());
+        RoleRepresentation schedulerRole = new RoleRepresentation();
+        schedulerRole.setName(Role.SCHEDULER.name());
+        when(roleScopeResource.listAll()).thenReturn(List.of(doctorRole, schedulerRole));
 
-        assertEquals(createdId, result);
+        List<String> result = keycloakUserClient.getUserRoles(userId);
 
-        ArgumentCaptor<UserRepresentation> userCaptor =
-                ArgumentCaptor.forClass(UserRepresentation.class);
-
-        verify(usersResource).create(userCaptor.capture());
-
-        UserRepresentation createdUser = userCaptor.getValue();
-        assertEquals("123456789", createdUser.getUsername());
-        assertEquals("Juan", createdUser.getFirstName());
-        assertEquals("Perez", createdUser.getLastName());
-        assertEquals("juan@test.com", createdUser.getEmail());
-        assertTrue(createdUser.isEnabled());
-        assertTrue(createdUser.isEmailVerified());
-        assertNotNull(createdUser.getCredentials());
-        assertEquals(1, createdUser.getCredentials().size());
-        assertEquals("secret", createdUser.getCredentials().get(0).getValue());
-
-        verify(roleScopeResource).add(List.of(patientRole));
-        verify(response).close();
+        assertEquals(List.of(Role.DOCTOR.name(), Role.SCHEDULER.name()), result);
+        verify(roleScopeResource).listAll();
     }
 
     @Test
-    void findUserIdByUsername_shouldReturnEmpty_whenUsernameIsNull() {
-        Optional<UUID> result = keycloakUserClient.findUserIdByUsername(null);
-
-        assertTrue(result.isEmpty());
-        verify(keycloak, never()).realm(anyString());
-    }
-
-    @Test
-    void findUserIdByUsername_shouldReturnEmpty_whenUsernameIsBlank() {
-        Optional<UUID> result = keycloakUserClient.findUserIdByUsername("   ");
-
-        assertTrue(result.isEmpty());
-        verify(keycloak, never()).realm(anyString());
-    }
-
-    @Test
-    void findUserIdByUsername_shouldReturnEmpty_whenNoUsersAreFound() {
-        when(props.getRealm()).thenReturn("piedrazul");
+    void userHasRoleShouldReturnTrueWhenRoleIsPresent() {
+        UUID userId = UUID.fromString("55555555-5555-5555-5555-555555555555");
         when(keycloak.realm("piedrazul")).thenReturn(realmResource);
         when(realmResource.users()).thenReturn(usersResource);
-        when(usersResource.searchByUsername("123456789", true)).thenReturn(List.of());
+        when(usersResource.get(userId.toString())).thenReturn(userResource);
+        when(userResource.roles()).thenReturn(roleMappingResource);
+        when(roleMappingResource.realmLevel()).thenReturn(roleScopeResource);
 
-        Optional<UUID> result = keycloakUserClient.findUserIdByUsername("123456789");
+        RoleRepresentation doctorRole = new RoleRepresentation();
+        doctorRole.setName(Role.DOCTOR.name());
+        when(roleScopeResource.listAll()).thenReturn(List.of(doctorRole));
 
-        assertTrue(result.isEmpty());
-        verify(usersResource).searchByUsername("123456789", true);
+        assertTrue(keycloakUserClient.userHasRole(userId, Role.DOCTOR));
     }
 
     @Test
-    void findUserIdByUsername_shouldReturnUserId_whenUserExists() {
-        when(props.getRealm()).thenReturn("piedrazul");
+    void userHasRoleShouldReturnFalseWhenRoleIsMissing() {
+        UUID userId = UUID.fromString("66666666-6666-6666-6666-666666666666");
         when(keycloak.realm("piedrazul")).thenReturn(realmResource);
-
-        UUID userId = UUID.randomUUID();
-        UserRepresentation user = new UserRepresentation();
-        user.setId(userId.toString());
-
         when(realmResource.users()).thenReturn(usersResource);
-        when(usersResource.searchByUsername("123456789", true)).thenReturn(List.of(user));
+        when(usersResource.get(userId.toString())).thenReturn(userResource);
+        when(userResource.roles()).thenReturn(roleMappingResource);
+        when(roleMappingResource.realmLevel()).thenReturn(roleScopeResource);
+        when(roleScopeResource.listAll()).thenReturn(List.of());
 
-        Optional<UUID> result = keycloakUserClient.findUserIdByUsername("123456789");
-
-        assertTrue(result.isPresent());
-        assertEquals(userId, result.get());
-        verify(usersResource).searchByUsername("123456789", true);
+        assertFalse(keycloakUserClient.userHasRole(userId, Role.DOCTOR));
     }
 
     @Test
-    void existsUser_shouldReturnTrue_whenUserExists() {
-        when(props.getRealm()).thenReturn("piedrazul");
+    void assignRoleIfMissingShouldAssignWhenUserDoesNotHaveRole() {
+        UUID userId = UUID.fromString("77777777-7777-7777-7777-777777777777");
+        RoleRepresentation assignedRole = new RoleRepresentation();
+        assignedRole.setName(Role.SCHEDULER.name());
+
+        RoleRepresentation doctorRole = new RoleRepresentation();
+        doctorRole.setName(Role.DOCTOR.name());
+
         when(keycloak.realm("piedrazul")).thenReturn(realmResource);
+        when(realmResource.users()).thenReturn(usersResource);
+        when(usersResource.get(userId.toString())).thenReturn(userResource);
+        when(userResource.roles()).thenReturn(roleMappingResource);
+        when(roleMappingResource.realmLevel()).thenReturn(roleScopeResource);
+        when(roleScopeResource.listAll()).thenReturn(List.of(assignedRole));
+        when(realmResource.roles()).thenReturn(rolesResource);
+        when(rolesResource.get(Role.DOCTOR.name())).thenReturn(roleResource);
+        when(roleResource.toRepresentation()).thenReturn(doctorRole);
 
-        UUID userId = UUID.randomUUID();
+        keycloakUserClient.assignRoleIfMissing(userId, Role.DOCTOR);
 
+        verify(roleScopeResource).add(List.of(doctorRole));
+    }
+
+    @Test
+    void assignRoleIfMissingShouldNotAssignWhenUserAlreadyHasRole() {
+        UUID userId = UUID.fromString("88888888-8888-8888-8888-888888888888");
+        RoleRepresentation doctorRole = new RoleRepresentation();
+        doctorRole.setName(Role.DOCTOR.name());
+
+        when(keycloak.realm("piedrazul")).thenReturn(realmResource);
+        when(realmResource.users()).thenReturn(usersResource);
+        when(usersResource.get(userId.toString())).thenReturn(userResource);
+        when(userResource.roles()).thenReturn(roleMappingResource);
+        when(roleMappingResource.realmLevel()).thenReturn(roleScopeResource);
+        when(roleScopeResource.listAll()).thenReturn(List.of(doctorRole));
+
+        keycloakUserClient.assignRoleIfMissing(userId, Role.DOCTOR);
+
+        verify(roleScopeResource, never()).add(any());
+        verify(realmResource, never()).roles();
+    }
+
+    @Test
+    void revokeRoleIfPresentShouldRevokeWhenUserHasRole() {
+        UUID userId = UUID.fromString("99999999-9999-9999-9999-999999999999");
+        RoleRepresentation schedulerRole = new RoleRepresentation();
+        schedulerRole.setName(Role.SCHEDULER.name());
+
+        RoleRepresentation returnedRole = new RoleRepresentation();
+        returnedRole.setName(Role.SCHEDULER.name());
+
+        when(keycloak.realm("piedrazul")).thenReturn(realmResource);
+        when(realmResource.users()).thenReturn(usersResource);
+        when(usersResource.get(userId.toString())).thenReturn(userResource);
+        when(userResource.roles()).thenReturn(roleMappingResource);
+        when(roleMappingResource.realmLevel()).thenReturn(roleScopeResource);
+        when(roleScopeResource.listAll()).thenReturn(List.of(schedulerRole));
+        when(realmResource.roles()).thenReturn(rolesResource);
+        when(rolesResource.get(Role.SCHEDULER.name())).thenReturn(roleResource);
+        when(roleResource.toRepresentation()).thenReturn(returnedRole);
+
+        keycloakUserClient.revokeRoleIfPresent(userId, Role.SCHEDULER);
+
+        verify(roleScopeResource).remove(List.of(returnedRole));
+    }
+
+    @Test
+    void revokeRoleIfPresentShouldNotRevokeWhenUserDoesNotHaveRole() {
+        UUID userId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+
+        when(keycloak.realm("piedrazul")).thenReturn(realmResource);
+        when(realmResource.users()).thenReturn(usersResource);
+        when(usersResource.get(userId.toString())).thenReturn(userResource);
+        when(userResource.roles()).thenReturn(roleMappingResource);
+        when(roleMappingResource.realmLevel()).thenReturn(roleScopeResource);
+        when(roleScopeResource.listAll()).thenReturn(List.of());
+
+        keycloakUserClient.revokeRoleIfPresent(userId, Role.SCHEDULER);
+
+        verify(roleScopeResource, never()).remove(any());
+        verify(realmResource, never()).roles();
+    }
+
+    @Test
+    void existsUserShouldReturnTrueWhenUserExists() {
+        UUID userId = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        when(keycloak.realm("piedrazul")).thenReturn(realmResource);
         when(realmResource.users()).thenReturn(usersResource);
         when(usersResource.get(userId.toString())).thenReturn(userResource);
         when(userResource.toRepresentation()).thenReturn(new UserRepresentation());
@@ -282,12 +291,9 @@ class KeycloakUserClientTest {
     }
 
     @Test
-    void existsUser_shouldReturnFalse_whenKeycloakThrowsException() {
-        when(props.getRealm()).thenReturn("piedrazul");
+    void existsUserShouldReturnFalseWhenKeycloakThrowsException() {
+        UUID userId = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
         when(keycloak.realm("piedrazul")).thenReturn(realmResource);
-
-        UUID userId = UUID.randomUUID();
-
         when(realmResource.users()).thenReturn(usersResource);
         when(usersResource.get(userId.toString())).thenReturn(userResource);
         when(userResource.toRepresentation()).thenThrow(new RuntimeException("not found"));
@@ -299,90 +305,58 @@ class KeycloakUserClientTest {
     }
 
     @Test
-    void activateUser_shouldUpdateUserAsEnabled() {
-        when(props.getRealm()).thenReturn("piedrazul");
+    void activateUserShouldUpdateUserAsEnabled() {
+        UUID userId = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
         when(keycloak.realm("piedrazul")).thenReturn(realmResource);
-
-        UUID userId = UUID.randomUUID();
-
         when(realmResource.users()).thenReturn(usersResource);
         when(usersResource.get(userId.toString())).thenReturn(userResource);
 
         keycloakUserClient.activateUser(userId);
 
-        ArgumentCaptor<UserRepresentation> userCaptor =
-                ArgumentCaptor.forClass(UserRepresentation.class);
-
-        verify(userResource).update(userCaptor.capture());
-        assertTrue(userCaptor.getValue().isEnabled());
+        ArgumentCaptor<UserRepresentation> captor = ArgumentCaptor.forClass(UserRepresentation.class);
+        verify(userResource).update(captor.capture());
+        assertTrue(captor.getValue().isEnabled());
     }
 
     @Test
-    void deactivateUser_shouldUpdateUserAsDisabled() {
-        when(props.getRealm()).thenReturn("piedrazul");
+    void deactivateUserShouldUpdateUserAsDisabled() {
+        UUID userId = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
         when(keycloak.realm("piedrazul")).thenReturn(realmResource);
-
-        UUID userId = UUID.randomUUID();
-
         when(realmResource.users()).thenReturn(usersResource);
         when(usersResource.get(userId.toString())).thenReturn(userResource);
 
         keycloakUserClient.deactivateUser(userId);
 
-        ArgumentCaptor<UserRepresentation> userCaptor =
-                ArgumentCaptor.forClass(UserRepresentation.class);
-
-        verify(userResource).update(userCaptor.capture());
-        assertFalse(userCaptor.getValue().isEnabled());
+        ArgumentCaptor<UserRepresentation> captor = ArgumentCaptor.forClass(UserRepresentation.class);
+        verify(userResource).update(captor.capture());
+        assertFalse(captor.getValue().isEnabled());
     }
 
     @Test
-    void assignRoleIfMissing_shouldAssignRole_whenUserDoesNotHaveRole() {
-        when(props.getRealm()).thenReturn("piedrazul");
+    void deleteUserShouldDelegateToKeycloak() {
+        UUID userId = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
         when(keycloak.realm("piedrazul")).thenReturn(realmResource);
-
-        UUID userId = UUID.randomUUID();
-
-        RoleRepresentation otherRole = new RoleRepresentation();
-        otherRole.setName(Role.DOCTOR.name());
-
-        RoleRepresentation patientRole = new RoleRepresentation();
-        patientRole.setName(Role.PATIENT.name());
-
         when(realmResource.users()).thenReturn(usersResource);
         when(usersResource.get(userId.toString())).thenReturn(userResource);
-        when(userResource.roles()).thenReturn(roleMappingResource);
-        when(roleMappingResource.realmLevel()).thenReturn(roleScopeResource);
-        when(roleScopeResource.listAll()).thenReturn(List.of(otherRole));
 
-        when(realmResource.roles()).thenReturn(rolesResource);
-        when(rolesResource.get(Role.PATIENT.name())).thenReturn(roleResource);
-        when(roleResource.toRepresentation()).thenReturn(patientRole);
+        keycloakUserClient.deleteUser(userId);
 
-        keycloakUserClient.assignRoleIfMissing(userId, Role.PATIENT);
-
-        verify(roleScopeResource).add(List.of(patientRole));
+        verify(userResource).remove();
     }
 
-    @Test
-    void assignRoleIfMissing_shouldNotAssignRole_whenUserAlreadyHasRole() {
-        when(props.getRealm()).thenReturn("piedrazul");
-        when(keycloak.realm("piedrazul")).thenReturn(realmResource);
+    private void injectKeycloakMock() throws Exception {
+        Field field = KeycloakUserClient.class.getDeclaredField("keycloak");
+        field.setAccessible(true);
+        field.set(keycloakUserClient, keycloak);
+    }
 
-        UUID userId = UUID.randomUUID();
-
-        RoleRepresentation patientRole = new RoleRepresentation();
-        patientRole.setName(Role.PATIENT.name());
-
-        when(realmResource.users()).thenReturn(usersResource);
-        when(usersResource.get(userId.toString())).thenReturn(userResource);
-        when(userResource.roles()).thenReturn(roleMappingResource);
-        when(roleMappingResource.realmLevel()).thenReturn(roleScopeResource);
-        when(roleScopeResource.listAll()).thenReturn(List.of(patientRole));
-
-        keycloakUserClient.assignRoleIfMissing(userId, Role.PATIENT);
-
-        verify(roleScopeResource, never()).add(anyList());
-        verify(realmResource, never()).roles();
+    private UserRepresentation userRepresentation(String id, String username, String firstName, String lastName, String email) {
+        UserRepresentation user = new UserRepresentation();
+        user.setId(id);
+        user.setUsername(username);
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setEmail(email);
+        return user;
     }
 }

@@ -32,10 +32,10 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/patients/document/*/public").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/patients/with-user").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/patients/with-user").permitAll() //Creacion antigua de usuarios front
                         .requestMatchers(HttpMethod.POST, "/api/patients/link-user-account/request-code").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/patients/link-user-account/confirm").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/user/patient-user").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/user/patient-user").permitAll() //Creacion nueva de usuarios front
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2

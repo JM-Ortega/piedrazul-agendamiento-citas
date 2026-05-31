@@ -1,120 +1,110 @@
 package co.edu.unicauca.piedrazul.backend.user.application;
 
 import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
-import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
-import co.edu.unicauca.piedrazul.backend.user.api.dto.output.DoctorUserProvisioningResult;
-import org.junit.jupiter.api.BeforeEach;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
+import co.edu.unicauca.piedrazul.backend.user.exception.DoctorRoleRequiredException;
+import co.edu.unicauca.piedrazul.backend.user.exception.UserNotFoundException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class UserServiceTest {
 
-    private TestKeycloakUserService keycloakUserService;
+	@Mock
+	private KeycloakUserService keycloakUserService;
 
-    private UserService userService;
+	@InjectMocks
+	private UserService userService;
 
-    @BeforeEach
-    void setUp() {
-        keycloakUserService = new TestKeycloakUserService();
-        userService = new UserService(keycloakUserService);
-    }
+	@Test
+	void getSystemUsersShouldMergeDoctorsAndSchedulersWithoutDuplicates() {
+		UUID doctorId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+		UUID schedulerId = UUID.fromString("22222222-2222-2222-2222-222222222222");
 
-    @Test
-    void createUserShouldDelegateToKeycloakService() {
-        UUID createdUserId = UUID.randomUUID();
-        CreateSystemUserRequest request = new CreateSystemUserRequest(
-                "doctor1",
-                "Ana",
-                "Lopez",
-                "ana@test.com",
-                "secret123",
-                List.of(Role.DOCTOR)
-        );
+		UserSummary doctor = new UserSummary(doctorId, "doctor01", "Ana", "Lopez", "ana@test.com");
+		UserSummary scheduler = new UserSummary(schedulerId, "scheduler01", "Luis", "Perez", "luis@test.com");
 
-        keycloakUserService.createdUserId = createdUserId;
+		when(keycloakUserService.findDoctors()).thenReturn(List.of(doctor, scheduler));
+		when(keycloakUserService.findSchedulers()).thenReturn(List.of(scheduler));
+		when(keycloakUserService.getUserRoles(doctorId)).thenReturn(List.of(Role.DOCTOR.name(), Role.PATIENT.name()));
+		when(keycloakUserService.getUserRoles(schedulerId)).thenReturn(List.of(Role.SCHEDULER.name(), Role.DOCTOR.name()));
 
-        UUID result = userService.createUser(request);
+		List<SystemUserResponse> result = userService.getSystemUsers();
 
-        assertThat(result).isEqualTo(createdUserId);
-        assertThat(keycloakUserService.lastRequest).isNotNull();
-        assertThat(keycloakUserService.lastRequest.roles()).containsExactly(Role.DOCTOR);
-    }
+		assertEquals(2, result.size());
+		assertEquals(doctorId, result.get(0).id());
+		assertEquals("Ana", result.get(0).firstName());
+		assertEquals("Lopez", result.get(0).lastName());
+		assertEquals("doctor01", result.get(0).documentId());
+		assertEquals(List.of(Role.DOCTOR.name()), result.get(0).roles());
 
-    @Test
-    void createUserShouldNormalizeDuplicateRoles() {
-        UUID createdUserId = UUID.randomUUID();
-        CreateSystemUserRequest request = new CreateSystemUserRequest(
-                "doctor2",
-                "Ana",
-                "Lopez",
-                "ana2@test.com",
-                "secret123",
-                List.of(Role.SCHEDULER, Role.DOCTOR, Role.DOCTOR)
-        );
+		assertEquals(schedulerId, result.get(1).id());
+		assertEquals("Luis", result.get(1).firstName());
+		assertEquals("Perez", result.get(1).lastName());
+		assertEquals("scheduler01", result.get(1).documentId());
+		assertEquals(List.of(Role.SCHEDULER.name(), Role.DOCTOR.name()), result.get(1).roles());
 
-        keycloakUserService.createdUserId = createdUserId;
+		verify(keycloakUserService).findDoctors();
+		verify(keycloakUserService).findSchedulers();
+		verify(keycloakUserService).getUserRoles(doctorId);
+		verify(keycloakUserService).getUserRoles(schedulerId);
+	}
 
-        UUID result = userService.createUser(request);
+	@Test
+	void giveDoctorScheduleRoleShouldDelegateWhenUserIsDoctor() {
+		UUID doctorId = UUID.fromString("33333333-3333-3333-3333-333333333333");
+		UserSummary doctor = new UserSummary(doctorId, "doctor02", "Maria", "Gomez", "maria@test.com");
 
-        assertThat(result).isEqualTo(createdUserId);
-        assertThat(keycloakUserService.lastRequest.roles()).containsExactly(Role.SCHEDULER, Role.DOCTOR);
-    }
+		when(keycloakUserService.findUserByUsername("doctor02")).thenReturn(Optional.of(doctor));
+		when(keycloakUserService.getUserRoles(doctorId)).thenReturn(List.of(Role.DOCTOR.name()));
 
-    @Test
-    void provisionDoctorUserShouldReportSchedulerRoleAddedForExistingUser() {
-        UUID existingUserId = UUID.randomUUID();
-        UUID createdUserId = UUID.randomUUID();
-        CreateSystemUserRequest request = new CreateSystemUserRequest(
-                "doctor3",
-                "Ana",
-                "Lopez",
-                "ana3@test.com",
-                "secret123",
-                List.of(Role.DOCTOR, Role.SCHEDULER)
-        );
+		userService.giveDoctorScheduleRole("doctor02");
 
-        keycloakUserService.createdUserId = createdUserId;
-        keycloakUserService.existingUserId = Optional.of(existingUserId);
-        keycloakUserService.roles = List.of(Role.DOCTOR.name());
+		verify(keycloakUserService).ensureSchedulerRole(doctorId);
+	}
 
-        DoctorUserProvisioningResult result = userService.provisionDoctorUser(request);
+	@Test
+	void giveDoctorScheduleRoleShouldThrowWhenUserHasNoDoctorRole() {
+		UUID userId = UUID.fromString("44444444-4444-4444-4444-444444444444");
+		UserSummary user = new UserSummary(userId, "user01", "Pedro", "Ramirez", "pedro@test.com");
 
-        assertThat(result.userId()).isEqualTo(createdUserId);
-        assertThat(result.createdNewUser()).isFalse();
-        assertThat(result.schedulerRoleAdded()).isTrue();
-    }
+		when(keycloakUserService.findUserByUsername("user01")).thenReturn(Optional.of(user));
+		when(keycloakUserService.getUserRoles(userId)).thenReturn(List.of(Role.PATIENT.name()));
 
-    private static final class TestKeycloakUserService extends KeycloakUserService {
+		assertThrows(DoctorRoleRequiredException.class, () -> userService.giveDoctorScheduleRole("user01"));
+	}
 
-        private Optional<UUID> existingUserId = Optional.empty();
-        private List<String> roles = List.of();
-        private UUID createdUserId = UUID.randomUUID();
-        private CreateSystemUserRequest lastRequest;
+	@Test
+	void revokeDoctorSchedulerRoleShouldDelegateWhenUserIsDoctor() {
+		UUID doctorId = UUID.fromString("55555555-5555-5555-5555-555555555555");
+		UserSummary doctor = new UserSummary(doctorId, "doctor03", "Sofia", "Torres", "sofia@test.com");
 
-        private TestKeycloakUserService() {
-            super(null);
-        }
+		when(keycloakUserService.findUserByUsername("doctor03")).thenReturn(Optional.of(doctor));
+		when(keycloakUserService.getUserRoles(doctorId)).thenReturn(List.of(Role.DOCTOR.name(), Role.SCHEDULER.name()));
 
-        @Override
-        public Optional<UUID> findUserIdByUsername(String username) {
-            return existingUserId;
-        }
+		userService.revokeDoctorSchedulerRole("doctor03");
 
-        @Override
-        public List<String> getUserRoles(UUID userId) {
-            return roles;
-        }
+		verify(keycloakUserService).revokeSchedulerRole(doctorId);
+	}
 
-        @Override
-        public UUID getOrCreateUser(CreateSystemUserRequest request) {
-            this.lastRequest = request;
-            return createdUserId;
-        }
-    }
+	@Test
+	void giveDoctorScheduleRoleShouldThrowWhenUserIsMissing() {
+		when(keycloakUserService.findUserByUsername("missing")).thenReturn(Optional.empty());
+
+		assertThrows(UserNotFoundException.class, () -> userService.giveDoctorScheduleRole("missing"));
+	}
+
 }

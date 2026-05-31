@@ -2,7 +2,7 @@ package co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal;
 
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
-import co.edu.unicauca.piedrazul.backend.jackson.validation.ValidDocument;
+// import co.edu.unicauca.piedrazul.backend.jackson.validation.ValidDocument;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import jakarta.validation.Valid;
