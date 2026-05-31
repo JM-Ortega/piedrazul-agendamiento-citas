@@ -1,113 +1,116 @@
 package co.edu.unicauca.piedrazul.backend.user.api;
 
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRequest;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.DocumentType;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientRequest;
 import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
 import co.edu.unicauca.piedrazul.backend.user.application.CreateAccountUseCase;
 import co.edu.unicauca.piedrazul.backend.user.application.UserService;
-import org.junit.jupiter.api.BeforeEach;
+import co.edu.unicauca.piedrazul.backend.user.exception.InvalidPatientRoleAssignmentException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
+import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class UserControllerTest {
 
-    @Mock
-    private CreateAccountUseCase createAccountUseCase;
+	@Mock
+	private CreateAccountUseCase createAccountUseCase;
 
-    @Mock
-    private UserService userService;
+	@Mock
+	private UserService userService;
 
-    private UserController userController;
+	@InjectMocks
+	private UserController userController;
 
-    @BeforeEach
-    void setUp() {
-    userController = new UserController(createAccountUseCase, userService);
-    }
+	@Test
+	void getSystemUsersReturnsOkWithUsersFromService() {
+		List<SystemUserResponse> expectedUsers = List.of(
+				new SystemUserResponse(
+						UUID.fromString("11111111-1111-1111-1111-111111111111"),
+						"Ana",
+						"Perez",
+						"1001",
+						List.of(Role.DOCTOR.name())
+				)
+		);
+		when(userService.getSystemUsers()).thenReturn(expectedUsers);
 
-    @Test
-    void createUserShouldDelegateToUseCaseForDoctorRole() {
-    CreateSystemUserPayload payload = new CreateSystemUserPayload(
-        new CreateSystemUserRequest(
-            "doctor1",
-            "Laura",
-            "Perez",
-            "laura@test.com",
-            "Pass123!",
-            List.of(Role.DOCTOR)
-        ),
-        new CreateDoctorRequest(
-            "Laura",
-            "Perez",
-            DocumentType.CEDULA,
-            "1234567890",
-            "3001234567",
-            List.of(Specialty.QUIROPRAXIA),
-            LocalDate.now().plusDays(1),
-            LocalDate.now().plusMonths(1),
-            30,
-            List.of(new CreateScheduleRequest(LocalTime.of(8, 0), LocalTime.of(12, 0), Workday.LUNES)),
-            "laura@test.com",
-            "Pass123!"
-        ),
-        null,
-        List.of(Role.DOCTOR)
-    );
+		var response = userController.getSystemUsers();
 
-    ResponseEntity<Void> response = userController.createUser(payload);
+		assertEquals(HttpStatus.OK, response.getStatusCode());
+		assertSame(expectedUsers, response.getBody());
+		verify(userService).getSystemUsers();
+	}
 
-    assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
-    verify(createAccountUseCase).execute(payload);
-    verifyNoInteractions(userService);
-    }
+	@Test
+	void createUserDelegatesToCreateAccountUseCaseAndReturnsNoContent() {
+		CreateSystemUserPayload payload = buildPayload(List.of(Role.ADMIN));
 
-    @Test
-    void createUserShouldDelegateToUseCaseForPatientRole() {
-        CreatePatientRequest patientRequest = mock(CreatePatientRequest.class);
-    CreateSystemUserPayload payload = new CreateSystemUserPayload(
-        new CreateSystemUserRequest(
-            "20202020202",
-            "Juan",
-            "Ortega",
-            "juan@test.com",
-            "Patient123!",
-            List.of(Role.PATIENT)
-        ),
-        null,
-            patientRequest,
-        List.of(Role.PATIENT)
-    );
+		var response = userController.createUser(payload);
 
-    ResponseEntity<Void> response = userController.createUser(payload);
+		assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+		verify(createAccountUseCase).execute(payload);
+	}
 
-    assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
-    verify(createAccountUseCase).execute(payload);
-    verifyNoInteractions(userService);
-    }
+	@Test
+	void createPatientUserDelegatesWhenOnlyPatientRoleIsProvided() {
+		CreateSystemUserPayload payload = buildPayload(List.of(Role.PATIENT));
 
-    @Test
-    void getSystemUsersShouldDelegateToUserService() {
-    ResponseEntity<List<co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse>> response = userController.getSystemUsers();
+		var response = userController.createPatientUser(payload);
 
-    assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
-    verify(userService).getSystemUsers();
-    }
+		assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+		verify(createAccountUseCase).execute(payload);
+	}
+
+	@Test
+	void createPatientUserRejectsAdditionalRoles() {
+		CreateSystemUserPayload payload = buildPayload(List.of(Role.PATIENT, Role.DOCTOR));
+
+		assertThrows(InvalidPatientRoleAssignmentException.class,
+				() -> userController.createPatientUser(payload));
+	}
+
+	@Test
+	void giveScheduleRoleDelegatesToUserService() {
+		userController.giveScheduleRole("doctor-01");
+
+		verify(userService).giveDoctorScheduleRole("doctor-01");
+	}
+
+	@Test
+	void revokeSchedulerRoleDelegatesToUserService() {
+		userController.revokeSchedulerRole("doctor-01");
+
+		verify(userService).revokeDoctorSchedulerRole("doctor-01");
+	}
+
+	private CreateSystemUserPayload buildPayload(List<Role> roles) {
+		return new CreateSystemUserPayload(
+				new CreateSystemUserRequest(
+						"1001",
+						"Ana",
+						"Perez",
+						"ana.perez@example.com",
+						"secret123"
+				),
+				null,
+				null,
+				roles
+		);
+	}
+
+
 }

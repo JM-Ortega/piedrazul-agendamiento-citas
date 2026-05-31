@@ -59,7 +59,7 @@ public class UserController {
     public ResponseEntity<Void> createPatientUser(
             @Valid @RequestBody CreateSystemUserPayload request
     ) {
-        if (request.roles().size()>2 || !request.roles().contains(Role.PATIENT)){
+        if (request.roles() == null || request.roles().size() != 1 || !request.roles().contains(Role.PATIENT)){
             throw new InvalidPatientRoleAssignmentException(
                     "Un paciente solo puede tener asignado el rol PATIENT y ningún otro privilegio adicional."
             );
