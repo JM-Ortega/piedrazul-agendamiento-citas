@@ -60,12 +60,12 @@
         </h2>
 
         <div class="space-y-4">
-          @for (doctor of doctors(); track doctor.doctorId) {
+          @for (doctor of doctors(); track doctor.id) {
             <div
               class="border-2 border-[#a7c9ec] rounded-xl p-6 bg-[#d9e9f8]/30 edit-container hover:shadow-lg transition-shadow relative"
             >
               <!-- ── MODO EDICIÓN ── -->
-              @if (isEditing(doctor.doctorId)) {
+              @if (isEditing(doctor.id)) {
                 <div class="space-y-6">
                   <!-- Header edición -->
                   <div
@@ -76,7 +76,7 @@
                         {{ doctor.firstName }} {{ doctor.lastName }}
                       </h3>
                       <p class="text-sm text-gray-600">
-                        Doc: {{ doctor.document }}
+                        Doc: {{ doctor.documentId }}
                       </p>
                     </div>
                     <div class="flex gap-2">
@@ -88,7 +88,7 @@
                       </button>
                       <button
                         (click)="handleSave(doctor)"
-                        [disabled]="savingDoctorId() === doctor.doctorId"
+                        [disabled]="savingDoctorId() === doctor.id"
                         class="px-6 py-2 bg-[#215c98] hover:bg-[#163c63] disabled:opacity-60 text-white rounded-lg transition-colors flex items-center gap-2"
                       >
                         <lucide-angular
@@ -96,7 +96,7 @@
                           [size]="18"
                         ></lucide-angular>
                         {{
-                          savingDoctorId() === doctor.doctorId
+                          savingDoctorId() === doctor.id
                             ? 'Guardando...'
                             : 'Guardar'
                         }}
@@ -188,10 +188,10 @@
                       ) {
                         <button
                           type="button"
-                          (click)="toggleSpecialty(specialty.name)"
+                          (click)="toggleSpecialty(specialty.value)"
                           [class]="
                             'px-5 py-4 rounded-xl border-2 transition-all text-base font-medium flex items-center gap-3 ' +
-                            (editingSpecialties().includes(specialty.name)
+                            (editingSpecialties().includes(specialty.value)
                               ? 'border-[#215c98] bg-[#d9e9f8] text-[#163c63] shadow-md'
                               : 'border-gray-300 bg-white text-gray-700 hover:border-[#4e92d9]')
                           "
@@ -200,7 +200,7 @@
                             [img]="specialty.icon"
                             [size]="24"
                             [class]="
-                              editingSpecialties().includes(specialty.name)
+                              editingSpecialties().includes(specialty.value)
                                 ? 'text-[#215c98]'
                                 : specialty.color
                             "
@@ -208,7 +208,7 @@
                           <span class="flex-1 text-left">{{
                             specialty.name
                           }}</span>
-                          @if (editingSpecialties().includes(specialty.name)) {
+                          @if (editingSpecialties().includes(specialty.value)) {
                             <div
                               class="bg-[#215c98] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
                             >
@@ -237,7 +237,7 @@
                           {{ doctor.firstName }} {{ doctor.lastName }}
                         </h3>
                         <p class="text-sm text-gray-600">
-                          Doc: {{ doctor.document }}
+                          Doc: {{ doctor.documentId }}
                         </p>
                       </div>
                     </div>
@@ -292,7 +292,7 @@
                   <div class="relative shrink-0 edit-container">
                     <button
                       (click)="handleEdit(doctor)"
-                      (mouseenter)="hoveredDoctorId.set(doctor.doctorId)"
+                      (mouseenter)="hoveredDoctorId.set(doctor.id)"
                       (mouseleave)="hoveredDoctorId.set(null)"
                       class="px-5 py-3 bg-[#215c98] hover:bg-[#163c63] text-white rounded-lg transition-colors flex items-center gap-2 font-semibold"
                     >
@@ -303,7 +303,7 @@
                       Editar
                     </button>
 
-                    @if (hoveredDoctorId() === doctor.doctorId) {
+                    @if (hoveredDoctorId() === doctor.id) {
                       <div
                         class="absolute right-0 top-full mt-1 whitespace-nowrap bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg animate-fade-in pointer-events-none z-10"
                       >

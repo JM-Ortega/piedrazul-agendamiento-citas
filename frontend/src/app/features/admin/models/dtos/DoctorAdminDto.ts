@@ -1,8 +1,8 @@
 export interface DoctorAdminDto {
-  doctorId: string;
+  id: string;
   firstName: string;
   lastName: string;
-  document: string;
-  roles: ('doctor' | 'scheduler')[];
+  documentId: string;
+  roles: ('DOCTOR' | 'SCHEDULER')[];
   specialties: string[];
 }

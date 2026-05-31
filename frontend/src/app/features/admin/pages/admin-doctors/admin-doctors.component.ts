@@ -43,12 +43,31 @@ export class AdminDoctorsComponent implements OnInit {
   readonly Zap = Zap;
 
   readonly specialtiesList = [
-    { name: 'Medicina General', icon: Heart, color: 'text-red-600' },
-    { name: 'Quiropraxia', icon: Bone, color: 'text-orange-600' },
-    { name: 'Fisioterapia', icon: Activity, color: 'text-green-600' },
-    { name: 'Terapia Neural', icon: Zap, color: 'text-purple-600' },
+    {
+      name: 'Medicina General',
+      value: 'MEDICINA_GENERAL',
+      icon: Heart,
+      color: 'text-red-600',
+    },
+    {
+      name: 'Quiropraxia',
+      value: 'QUIROPRAXIA',
+      icon: Bone,
+      color: 'text-orange-600',
+    },
+    {
+      name: 'Fisioterapia',
+      value: 'FISIOTERAPIA',
+      icon: Activity,
+      color: 'text-green-600',
+    },
+    {
+      name: 'Terapia Neural',
+      value: 'TERAPIA_NEURAL',
+      icon: Zap,
+      color: 'text-purple-600',
+    },
   ];
-
   // ── State ─────────────────────────────────────────────────────────────────
   doctors = signal<DoctorAdminDto[]>([]);
   loading = signal(false);
@@ -90,11 +109,14 @@ export class AdminDoctorsComponent implements OnInit {
 
   // ── Edit ──────────────────────────────────────────────────────────────────
   handleEdit(doctor: DoctorAdminDto): void {
-    this.editingDoctorId.set(doctor.doctorId);
-    this.editingSpecialties.set([...doctor.specialties]);
-    this.editingHasScheduler.set(
-      doctor.roles.map((r) => r.toUpperCase()).includes('scheduler')
+    console.log('specialties del doctor:', doctor.specialties);
+    console.log(
+      'values en specialtiesList:',
+      this.specialtiesList.map((s) => s.value)
     );
+    this.editingDoctorId.set(doctor.id);
+    this.editingSpecialties.set([...doctor.specialties]);
+    this.editingHasScheduler.set(doctor.roles.includes('SCHEDULER'));
   }
 
   handleCancel(): void {
@@ -109,7 +131,7 @@ export class AdminDoctorsComponent implements OnInit {
       return;
     }
 
-    this.savingDoctorId.set(doctor.doctorId);
+    this.savingDoctorId.set(doctor.id);
 
     const currentSpecialties = doctor.specialties;
     const newSpecialties = this.editingSpecialties();
@@ -121,21 +143,21 @@ export class AdminDoctorsComponent implements OnInit {
 
     const hadScheduler = doctor.roles
       .map((r) => r.toUpperCase())
-      .includes('scheduler');
+      .includes('SCHEDULER');
     const wantsScheduler = this.editingHasScheduler();
 
     const calls: Observable<void>[] = [];
 
     if (toAdd.length > 0)
-      calls.push(this.adminService.addSpecialties(doctor.doctorId, toAdd));
+      calls.push(this.adminService.addSpecialties(doctor.id, toAdd));
     if (toRemove.length > 0)
-      calls.push(
-        this.adminService.removeSpecialties(doctor.doctorId, toRemove)
-      );
+      calls.push(this.adminService.removeSpecialties(doctor.id, toRemove));
     if (!hadScheduler && wantsScheduler)
-      calls.push(this.adminService.giveDoctorSchedulerRole(doctor.document));
+      calls.push(this.adminService.giveDoctorSchedulerRole(doctor.documentId));
     if (hadScheduler && !wantsScheduler)
-      calls.push(this.adminService.revokeDoctorSchedulerRole(doctor.document));
+      calls.push(
+        this.adminService.revokeDoctorSchedulerRole(doctor.documentId)
+      );
 
     if (calls.length === 0) {
       this.savingDoctorId.set(null);
@@ -147,10 +169,10 @@ export class AdminDoctorsComponent implements OnInit {
       next: () => {
         this.doctors.update((list) =>
           list.map((d) => {
-            if (d.doctorId !== doctor.doctorId) return d;
+            if (d.id !== doctor.id) return d;
             const updatedRoles = wantsScheduler
-              ? [...new Set([...d.roles, 'scheduler'])]
-              : d.roles.filter((r) => r.toUpperCase() !== 'scheduler');
+              ? [...new Set([...d.roles, 'SCHEDULER'])]
+              : d.roles.filter((r) => r.toUpperCase() !== 'SCHEDULER');
             return {
               ...d,
               specialties: newSpecialties,
@@ -179,18 +201,18 @@ export class AdminDoctorsComponent implements OnInit {
   }
 
   hasScheduler(doctor: DoctorAdminDto): boolean {
-    return doctor.roles.map((r) => r.toUpperCase()).includes('scheduler');
+    return doctor.roles.includes('SCHEDULER');
   }
 
   getSpecialtyIcon(name: string) {
     return (
-      this.specialtiesList.find((s) => s.name === name)?.icon || Stethoscope
+      this.specialtiesList.find((s) => s.value === name)?.icon || Stethoscope
     );
   }
 
   getSpecialtyColor(name: string): string {
     return (
-      this.specialtiesList.find((s) => s.name === name)?.color ||
+      this.specialtiesList.find((s) => s.value === name)?.color ||
       'text-blue-600'
     );
   }

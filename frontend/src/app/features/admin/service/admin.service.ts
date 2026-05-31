@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
+import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { dtoSchedule } from '../../../shared/models/dtos/schedule.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
@@ -24,36 +24,10 @@ export class AdminService {
   }
 
   getDoctorsAdmin(): Observable<DoctorAdminDto[]> {
-    const mockData: DoctorAdminDto[] = [
-      {
-        doctorId: 'doc-1',
-        firstName: 'Carlos',
-        lastName: 'Ramírez',
-        document: '12345678',
-        roles: ['doctor'],
-        specialties: ['Medicina General', 'Fisioterapia'],
-      },
-      {
-        doctorId: 'doc-2',
-        firstName: 'Ana',
-        lastName: 'Gómez',
-        document: '87654321',
-        roles: ['doctor', 'scheduler'],
-        specialties: ['Quiropraxia'],
-      },
-      {
-        doctorId: 'doc-3',
-        firstName: 'Luis',
-        lastName: 'Torres',
-        document: '11223344',
-        roles: ['doctor'],
-        specialties: [],
-      },
-    ];
-
-    return of(mockData);
+    return this.http.get<DoctorAdminDto[]>(
+      `${this.apiUrl}/user/system-doctors`
+    );
   }
-
   updateAppointmentInterval(
     doctorId: string,
     appointmentInterval: number
