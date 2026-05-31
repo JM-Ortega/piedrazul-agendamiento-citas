@@ -2,22 +2,20 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   Calendar,
-  Clock,
   CreditCard,
   LucideAngularModule,
   Stethoscope,
   UserPlus,
   Users,
 } from 'lucide-angular';
-import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
-
 import { SystemUser } from '../../models/interfaces/system-user.model';
 import { AdminService } from '../../service/admin.service';
+
 @Component({
   selector: 'app-admin-users',
   templateUrl: './admin-users.component.html',
   standalone: true,
-  imports: [LucideAngularModule, FormatoPipe],
+  imports: [LucideAngularModule],
 })
 export class AdminUsersComponent implements OnInit {
   private adminService = inject(AdminService);
@@ -28,7 +26,6 @@ export class AdminUsersComponent implements OnInit {
   readonly Stethoscope = Stethoscope;
   readonly Calendar = Calendar;
   readonly CreditCard = CreditCard;
-  readonly Clock = Clock;
 
   // ── State ─────────────────────────────────────────────────────────────────
   systemUsers = signal<SystemUser[]>([]);
@@ -40,24 +37,24 @@ export class AdminUsersComponent implements OnInit {
     this.systemUsers().filter(
       (u) =>
         u.roles.map((r) => r.toLowerCase()).includes('doctor') &&
-        !u.roles.map((r) => r.toLowerCase()).includes('scheduler'),
-    ),
+        !u.roles.map((r) => r.toLowerCase()).includes('scheduler')
+    )
   );
 
   schedulers = computed(() =>
     this.systemUsers().filter(
       (u) =>
         u.roles.map((r) => r.toLowerCase()).includes('scheduler') &&
-        !u.roles.map((r) => r.toLowerCase()).includes('doctor'),
-    ),
+        !u.roles.map((r) => r.toLowerCase()).includes('doctor')
+    )
   );
 
   both = computed(() =>
     this.systemUsers().filter(
       (u) =>
         u.roles.map((r) => r.toLowerCase()).includes('doctor') &&
-        u.roles.map((r) => r.toLowerCase()).includes('scheduler'),
-    ),
+        u.roles.map((r) => r.toLowerCase()).includes('scheduler')
+    )
   );
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -69,7 +66,6 @@ export class AdminUsersComponent implements OnInit {
   loadUsers(): void {
     this.loading.set(true);
     this.errorCarga.set('');
-
     this.adminService.getSystemUsers().subscribe({
       next: (users) => {
         this.systemUsers.set(users);
@@ -86,12 +82,8 @@ export class AdminUsersComponent implements OnInit {
     this.router.navigate(['/admin/usuarios/crear']);
   }
 
-  // ── Helpers de lógica ─────────────────────────────────────────────────────
-  hasBothRoles(user: SystemUser): boolean {
-    return user.roles.includes('doctor') && user.roles.includes('scheduler');
-  }
-
+  // ── Helpers ───────────────────────────────────────────────────────────────
   roleLabel(role: string): string {
-    return role === 'doctor' ? 'Médico' : 'Agendador';
+    return role.toUpperCase() === 'DOCTOR' ? 'Médico' : 'Agendador';
   }
 }

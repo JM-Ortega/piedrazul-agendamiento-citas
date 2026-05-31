@@ -66,7 +66,7 @@
       </div>
     }
 
-    <!-- Users List -->
+    <!-- Loading -->
     @if (loading()) {
       <div
         class="bg-white rounded-2xl shadow-md p-7 text-center text-gray-400 text-lg py-10"
@@ -75,6 +75,7 @@
       </div>
     }
 
+    <!-- Empty -->
     @if (!loading() && systemUsers().length === 0) {
       <div class="bg-white rounded-2xl shadow-md p-7">
         <div class="text-center py-12 text-gray-500">
@@ -85,7 +86,7 @@
 
     @if (!loading() && systemUsers().length > 0) {
       <div class="space-y-6">
-        <!-- Ambos Roles -->
+        <!-- ── Ambos Roles ── -->
         @if (both().length > 0) {
           <div class="bg-white rounded-2xl shadow-md p-7">
             <h2
@@ -99,32 +100,37 @@
                 <div
                   class="border-2 rounded-xl p-5 hover:shadow-lg transition-shadow border-purple-100 bg-purple-50/30"
                 >
-                  <div class="flex items-start justify-between mb-3">
-                    <div class="flex items-center gap-3 flex-1">
-                      <div class="rounded-full p-3 bg-[#7d3fc4] shrink-0">
-                        <lucide-angular
-                          [img]="Users"
-                          class="text-white"
-                          [size]="24"
-                        ></lucide-angular>
-                      </div>
-                      <div class="flex-1">
-                        <h3 class="text-lg font-bold text-purple-900">
-                          {{ user.firstName }} {{ user.lastName }}
-                        </h3>
-                        <div class="flex flex-wrap gap-1 mt-1">
-                          @for (role of user.roles; track role) {
-                            <span
-                              class="text-xs px-2 py-1 rounded-full font-medium"
-                              [class.bg-[#d9e9f8]]="role === 'doctor'"
-                              [class.text-[#215c98]]="role === 'doctor'"
-                              [class.bg-green-100]="role !== 'doctor'"
-                              [class.text-green-700]="role !== 'doctor'"
-                            >
-                              {{ roleLabel(role) }}
-                            </span>
-                          }
-                        </div>
+                  <div class="flex items-center gap-3 flex-1 mb-3">
+                    <div class="rounded-full p-3 bg-[#7d3fc4] shrink-0">
+                      <lucide-angular
+                        [img]="Users"
+                        class="text-white"
+                        [size]="24"
+                      ></lucide-angular>
+                    </div>
+                    <div class="flex-1">
+                      <h3 class="text-lg font-bold text-purple-900">
+                        {{ user.firstName }} {{ user.lastName }}
+                      </h3>
+                      <div class="flex flex-wrap gap-1 mt-1">
+                        @for (role of user.roles; track role) {
+                          <span
+                            class="text-xs px-2 py-1 rounded-full font-medium"
+                            [class.bg-[#d9e9f8]]="
+                              role.toUpperCase() === 'DOCTOR'
+                            "
+                            [class.text-[#215c98]]="
+                              role.toUpperCase() === 'DOCTOR'
+                            "
+                            [class.bg-green-100]="
+                              role.toUpperCase() !== 'DOCTOR'
+                            "
+                            [class.text-green-700]="
+                              role.toUpperCase() !== 'DOCTOR'
+                            "
+                            >{{ roleLabel(role) }}</span
+                          >
+                        }
                       </div>
                     </div>
                   </div>
@@ -138,19 +144,6 @@
                       <span class="font-medium">Doc:</span>
                       <span>{{ user.documentId }}</span>
                     </div>
-                    @if (user.doctorData) {
-                      <div class="flex items-center gap-2">
-                        <lucide-angular
-                          [img]="Stethoscope"
-                          [size]="16"
-                          class="text-[#4e92d9]"
-                        ></lucide-angular>
-                        <span class="font-medium">Especialidad:</span>
-                        <span class="truncate">{{
-                          user.doctorData.specialty | formato
-                        }}</span>
-                      </div>
-                    }
                   </div>
                 </div>
               }
@@ -158,7 +151,7 @@
           </div>
         }
 
-        <!-- Solo Médicos -->
+        <!-- ── Solo Médicos ── -->
         @if (doctors().length > 0) {
           <div class="bg-white rounded-2xl shadow-md p-7">
             <h2
@@ -172,26 +165,24 @@
                 <div
                   class="border-2 rounded-xl p-5 hover:shadow-lg transition-shadow border-[#a7c9ec] bg-[#d9e9f8]/30"
                 >
-                  <div class="flex items-start justify-between mb-3">
-                    <div class="flex items-center gap-3 flex-1">
-                      <div class="rounded-full p-3 bg-[#215c98] shrink-0">
-                        <lucide-angular
-                          [img]="Stethoscope"
-                          class="text-white"
-                          [size]="24"
-                        ></lucide-angular>
-                      </div>
-                      <div class="flex-1">
-                        <h3 class="text-lg font-bold text-[#163c63]">
-                          {{ user.firstName }} {{ user.lastName }}
-                        </h3>
-                        <div class="flex flex-wrap gap-1 mt-1">
-                          <span
-                            class="text-xs px-2 py-1 rounded-full font-medium bg-[#d9e9f8] text-[#215c98]"
-                          >
-                            Médico
-                          </span>
-                        </div>
+                  <div class="flex items-center gap-3 flex-1 mb-3">
+                    <div class="rounded-full p-3 bg-[#215c98] shrink-0">
+                      <lucide-angular
+                        [img]="Stethoscope"
+                        class="text-white"
+                        [size]="24"
+                      ></lucide-angular>
+                    </div>
+                    <div class="flex-1">
+                      <h3 class="text-lg font-bold text-[#163c63]">
+                        {{ user.firstName }} {{ user.lastName }}
+                      </h3>
+                      <div class="flex flex-wrap gap-1 mt-1">
+                        <span
+                          class="text-xs px-2 py-1 rounded-full font-medium bg-[#d9e9f8] text-[#215c98]"
+                        >
+                          Médico
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -205,19 +196,6 @@
                       <span class="font-medium">Doc:</span>
                       <span>{{ user.documentId }}</span>
                     </div>
-                    @if (user.doctorData) {
-                      <div class="flex items-center gap-2">
-                        <lucide-angular
-                          [img]="Stethoscope"
-                          [size]="16"
-                          class="text-[#4e92d9]"
-                        ></lucide-angular>
-                        <span class="font-medium">Especialidad:</span>
-                        <span class="truncate">{{
-                          user.doctorData.specialty | formato
-                        }}</span>
-                      </div>
-                    }
                   </div>
                 </div>
               }
@@ -225,11 +203,11 @@
           </div>
         }
 
-        <!-- Solo Agendadores -->
+        <!-- ── Solo Agendadores ── -->
         @if (schedulers().length > 0) {
           <div class="bg-white rounded-2xl shadow-md p-7">
             <h2
-              class="text-green-800 text-2xl font-semibold mb-6 flex items-center gap-2"
+              class="text-green-800 text-2xl font-semibond mb-6 flex items-center gap-2"
             >
               <lucide-angular [img]="Calendar" [size]="26"></lucide-angular>
               Agendadores ({{ schedulers().length }})
@@ -239,26 +217,24 @@
                 <div
                   class="border-2 rounded-xl p-5 hover:shadow-lg transition-shadow border-green-100 bg-green-50/30"
                 >
-                  <div class="flex items-start justify-between mb-3">
-                    <div class="flex items-center gap-3 flex-1">
-                      <div class="rounded-full p-3 bg-[#1fa36a] shrink-0">
-                        <lucide-angular
-                          [img]="Calendar"
-                          class="text-white"
-                          [size]="24"
-                        ></lucide-angular>
-                      </div>
-                      <div class="flex-1">
-                        <h3 class="text-lg font-bold text-green-900">
-                          {{ user.firstName }} {{ user.lastName }}
-                        </h3>
-                        <div class="flex flex-wrap gap-1 mt-1">
-                          <span
-                            class="text-xs px-2 py-1 rounded-full font-medium bg-green-100 text-green-700"
-                          >
-                            Agendador
-                          </span>
-                        </div>
+                  <div class="flex items-center gap-3 flex-1 mb-3">
+                    <div class="rounded-full p-3 bg-[#1fa36a] shrink-0">
+                      <lucide-angular
+                        [img]="Calendar"
+                        class="text-white"
+                        [size]="24"
+                      ></lucide-angular>
+                    </div>
+                    <div class="flex-1">
+                      <h3 class="text-lg font-bold text-green-900">
+                        {{ user.firstName }} {{ user.lastName }}
+                      </h3>
+                      <div class="flex flex-wrap gap-1 mt-1">
+                        <span
+                          class="text-xs px-2 py-1 rounded-full font-medium bg-green-100 text-green-700"
+                        >
+                          Agendador
+                        </span>
                       </div>
                     </div>
                   </div>

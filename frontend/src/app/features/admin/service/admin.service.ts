@@ -1,13 +1,13 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { dtoSchedule } from '../../../shared/models/dtos/schedule.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { CreateSchedulerRequest } from '../models/dtos/create-scheduler-request.dto';
 import { CreateDoctorRequestDto } from '../models/dtos/CreateDoctorRequest.dto';
+import { DoctorAdminDto } from '../models/dtos/DoctorAdminDto';
 import { SystemUser } from '../models/interfaces/system-user.model';
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Injectable({ providedIn: 'root' })
@@ -21,6 +21,37 @@ export class AdminService {
     return this.http.get<Doctor[]>(`${this.apiUrl}/doctor/doctors/detailed`);
   }
 
+  getDoctorsAdmin(): Observable<DoctorAdminDto[]> {
+    const mockData: DoctorAdminDto[] = [
+      {
+        doctorId: 'doc-1',
+        firstName: 'Carlos',
+        lastName: 'Ramírez',
+        document: '12345678',
+        roles: ['doctor'],
+        specialties: ['Medicina General', 'Fisioterapia'],
+      },
+      {
+        doctorId: 'doc-2',
+        firstName: 'Ana',
+        lastName: 'Gómez',
+        document: '87654321',
+        roles: ['doctor', 'scheduler'],
+        specialties: ['Quiropraxia'],
+      },
+      {
+        doctorId: 'doc-3',
+        firstName: 'Luis',
+        lastName: 'Torres',
+        document: '11223344',
+        roles: ['doctor'],
+        specialties: [],
+      },
+    ];
+
+    return of(mockData);
+  }
+
   /**
    * Crea un nuevo doctor en el backend.
    * El servidor responde 204 No Content en caso de éxito.
@@ -32,12 +63,12 @@ export class AdminService {
 
   updateAppointmentInterval(
     doctorId: string,
-    appointmentInterval: number,
+    appointmentInterval: number
   ): Observable<void> {
     return this.http.put<void>(
       `${this.apiUrl}/doctor/doctors/${doctorId}/appointment-interval`,
       null,
-      { params: { appointmentInterval } },
+      { params: { appointmentInterval } }
     );
   }
 
@@ -45,7 +76,7 @@ export class AdminService {
     return this.http.put<void>(
       `${this.apiUrl}/doctor/doctors/${doctorId}/labor-start`,
       null,
-      { params: { laborStart } },
+      { params: { laborStart } }
     );
   }
 
@@ -53,19 +84,19 @@ export class AdminService {
     return this.http.put<void>(
       `${this.apiUrl}/doctor/doctors/${doctorId}/labor-end`,
       null,
-      { params: { laborEnd } },
+      { params: { laborEnd } }
     );
   }
 
   enableDoctor(
     doctorId: string,
     laborStart: string,
-    laborEnd: string,
+    laborEnd: string
   ): Observable<void> {
     return this.http.put<void>(
       `${this.apiUrl}/doctor/doctors/${doctorId}/enable`,
       null,
-      { params: { laborStart, laborEnd } },
+      { params: { laborStart, laborEnd } }
     );
   }
 
@@ -73,7 +104,7 @@ export class AdminService {
     return this.http.put<void>(
       `${this.apiUrl}/doctor/doctors/${doctorId}/disable`,
       null,
-      { params: { force } },
+      { params: { force } }
     );
   }
 
@@ -81,7 +112,7 @@ export class AdminService {
 
   getSchedulesByDoctor(doctorId: string): Observable<dtoSchedule[]> {
     return this.http.get<dtoSchedule[]>(
-      `${this.apiUrl}/doctor/schedules/${doctorId}`,
+      `${this.apiUrl}/doctor/schedules/${doctorId}`
     );
   }
 
@@ -89,11 +120,11 @@ export class AdminService {
     doctorId: string,
     workday: string,
     startTime: string,
-    endTime: string,
+    endTime: string
   ): Observable<dtoSchedule> {
     return this.http.post<dtoSchedule>(
       `${this.apiUrl}/doctor/schedules/${doctorId}`,
-      { startTime, endTime, workday },
+      { startTime, endTime, workday }
     );
   }
 
@@ -101,17 +132,17 @@ export class AdminService {
     doctorId: string,
     workday: string,
     startTime: string,
-    endTime: string,
+    endTime: string
   ): Observable<dtoSchedule> {
     return this.http.put<dtoSchedule>(
       `${this.apiUrl}/doctor/schedules/${doctorId}/${workday}`,
-      { startTime, endTime, workday },
+      { startTime, endTime, workday }
     );
   }
 
   deleteSchedule(doctorId: string, workday: string): Observable<void> {
     return this.http.delete<void>(
-      `${this.apiUrl}/doctor/schedules/${doctorId}/${workday}`,
+      `${this.apiUrl}/doctor/schedules/${doctorId}/${workday}`
     );
   }
 
@@ -123,5 +154,42 @@ export class AdminService {
 
   createScheduler(request: CreateSchedulerRequest): Observable<void> {
     return this.http.post<void>(`${this.apiUrl}/user/schedulers`, request);
+  }
+  // ── Specialties ───────────────────────────────────────────────────────────
+
+  getAllSpecialties(): Observable<string[]> {
+    return this.http.get<string[]>(
+      `${this.apiUrl}/doctor/doctors/all-specialties`
+    );
+  }
+  addSpecialties(doctorId: string, specialties: string[]): Observable<void> {
+    return this.http.post<void>(
+      `${this.apiUrl}/doctor/doctors/${doctorId}/specialties`,
+      specialties
+    );
+  }
+
+  removeSpecialties(doctorId: string, specialties: string[]): Observable<void> {
+    return this.http.delete<void>(
+      `${this.apiUrl}/doctor/doctors/${doctorId}/specialties`,
+      { body: specialties }
+    );
+  }
+  // ── Document Types ────────────────────────────────────────────────────────
+
+  getAllDocumentTypes(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.apiUrl}/patients/document-types`);
+  }
+  giveDoctorSchedulerRole(username: string): Observable<void> {
+    return this.http.post<void>(
+      `${this.apiUrl}/user/${username}/give-doctor-scheduler`,
+      null
+    );
+  }
+
+  revokeDoctorSchedulerRole(username: string): Observable<void> {
+    return this.http.delete<void>(
+      `${this.apiUrl}/user/${username}/revoke-doctor-scheduler`
+    );
   }
 }

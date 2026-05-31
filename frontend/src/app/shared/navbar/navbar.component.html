@@ -17,7 +17,7 @@
 
     <!-- Desktop Nav -->
     <nav class="hidden md:flex items-center gap-2">
-      @if (appService.hasRole("SCHEDULER")) {
+      @if (appService.hasRole('SCHEDULER')) {
         <a
           routerLink="/agendador"
           #rla4="routerLinkActive"
@@ -49,7 +49,7 @@
         </a>
       }
 
-      @if (appService.hasRole("DOCTOR")) {
+      @if (appService.hasRole('DOCTOR')) {
         <a
           routerLink="/medico"
           #rla8="routerLinkActive"
@@ -82,7 +82,7 @@
         </a>
       }
 
-      @if (appService.hasRole("ADMIN")) {
+      @if (appService.hasRole('ADMIN')) {
         <a
           routerLink="/admin"
           #rla6="routerLinkActive"
@@ -112,9 +112,23 @@
           <lucide-angular [img]="Users" [size]="20"></lucide-angular>
           Gestionar Usuarios
         </a>
+        <a
+          routerLink="/admin/medicos"
+          #rla11="routerLinkActive"
+          routerLinkActive
+          [class]="
+            'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
+            (rla11.isActive
+              ? 'bg-white text-blue-700'
+              : 'text-white hover:bg-blue-600')
+          "
+        >
+          <lucide-angular [img]="UserCog" [size]="20"></lucide-angular>
+          Gestión Médicos
+        </a>
       }
 
-      @if (appService.hasRole("PATIENT")) {
+      @if (appService.hasRole('PATIENT')) {
         <a
           routerLink="/paciente"
           #rla7="routerLinkActive"
@@ -270,7 +284,7 @@
   <!-- Mobile Nav -->
   @if (menuOpen()) {
     <div class="md:hidden bg-[#215c98] px-4 py-3 space-y-2">
-      @if (appService.hasRole("SCHEDULER")) {
+      @if (appService.hasRole('SCHEDULER')) {
         <a
           routerLink="/agendador"
           (click)="menuOpen.set(false)"
@@ -289,7 +303,7 @@
         </a>
       }
 
-      @if (appService.hasRole("DOCTOR")) {
+      @if (appService.hasRole('DOCTOR')) {
         <a
           routerLink="/medico"
           (click)="menuOpen.set(false)"
@@ -308,7 +322,7 @@
         </a>
       }
 
-      @if (appService.hasRole("ADMIN")) {
+      @if (appService.hasRole('ADMIN')) {
         <a
           routerLink="/admin"
           (click)="menuOpen.set(false)"
@@ -325,9 +339,17 @@
           <lucide-angular [img]="Users" [size]="20"></lucide-angular>
           Usuarios
         </a>
+        <a
+          routerLink="/admin/medicos"
+          (click)="menuOpen.set(false)"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+        >
+          <lucide-angular [img]="UserCog" [size]="20"></lucide-angular>
+          Gestión Médicos
+        </a>
       }
 
-      @if (appService.hasRole("PATIENT")) {
+      @if (appService.hasRole('PATIENT')) {
         <a
           routerLink="/paciente"
           (click)="menuOpen.set(false)"
