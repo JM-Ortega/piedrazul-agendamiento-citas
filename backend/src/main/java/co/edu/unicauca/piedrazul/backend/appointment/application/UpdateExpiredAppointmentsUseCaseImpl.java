@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.UpdateExpiredAppointmentsUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import org.springframework.stereotype.Service;
@@ -24,7 +25,7 @@ public class UpdateExpiredAppointmentsUseCaseImpl implements UpdateExpiredAppoin
         //el forEach hace que por cada elemento de la lista appointments se le apliquen
         //los dos metodos
         appointments.forEach(appointment -> {
-            appointment.markAsNoShow();
+            appointment.changeState(AppointmentState.NO_ASISTIO);
             appointmentRepository.save(appointment);
         });
     }

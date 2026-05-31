@@ -142,13 +142,15 @@ public class Appointment {
         return appointment;
     }
 
-    public void markAsNoShow() {
+    // Cambiar cuando se implemente lo de reprogramadas
+    public void changeState(AppointmentState appointmentState) {
         if (this.appointmentState != AppointmentState.AGENDADA) {
             throw new IllegalStateException(
-                    "Solo las citas AGENDADAS pueden marcarse como NO_ASISTIO"
+                    "Solo se puede cambiar el estado de citas agendadas"
             );
         }
-        this.appointmentState = AppointmentState.NO_ASISTIO;
+
+        this.appointmentState = appointmentState;
     }
 
     public UUID getIdAppointment() {
@@ -193,9 +195,5 @@ public class Appointment {
 
     public UUID getIdDoctor() {
         return idDoctor;
-    }
-
-    public void setAppointmentState(AppointmentState appointmentState) {
-        this.appointmentState = appointmentState;
     }
 }
