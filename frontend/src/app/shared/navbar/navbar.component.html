@@ -26,8 +26,8 @@
           [class]="
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
             (rla4.isActive
-              ? 'bg-white text-blue-700'
-              : 'text-white hover:bg-blue-600')
+              ? 'bg-white text-[#215c98]'
+              : 'text-white hover:bg-[#4e92d9]')
           "
         >
           <lucide-angular [img]="ClipboardList" [size]="20"></lucide-angular>
@@ -40,8 +40,8 @@
           [class]="
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
             (rla5.isActive
-              ? 'bg-white text-blue-700'
-              : 'text-white hover:bg-blue-600')
+              ? 'bg-white text-[#215c98]'
+              : 'text-white hover:bg-[#4e92d9]')
           "
         >
           <lucide-angular [img]="Calendar" [size]="20"></lucide-angular>
@@ -91,8 +91,8 @@
           [class]="
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
             (rla6.isActive
-              ? 'bg-white text-blue-700'
-              : 'text-white hover:bg-blue-600')
+              ? 'bg-white text-[#215c98]'
+              : 'text-white hover:bg-[#4e92d9]')
           "
         >
           <lucide-angular [img]="Settings" [size]="20"></lucide-angular>
@@ -105,8 +105,8 @@
           [class]="
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
             (rla10.isActive
-              ? 'bg-white text-blue-700'
-              : 'text-white hover:bg-blue-600')
+              ? 'bg-white text-[#215c98]'
+              : 'text-white hover:bg-[#4e92d9]')
           "
         >
           <lucide-angular [img]="Users" [size]="20"></lucide-angular>
@@ -119,11 +119,12 @@
           routerLink="/paciente"
           #rla7="routerLinkActive"
           routerLinkActive
+          [routerLinkActiveOptions]="exactMatch"
           [class]="
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
             (rla7.isActive
-              ? 'bg-white text-blue-700'
-              : 'text-white hover:bg-blue-600')
+              ? 'bg-white text-[#215c98]'
+              : 'bg-[#215c98] text-white hover:bg-[#4e92d9]')
           "
         >
           <lucide-angular [img]="CalendarDays" [size]="20"></lucide-angular>
@@ -131,13 +132,14 @@
         </a>
         <a
           routerLink="/paciente/historial-citas"
-          #rla7="routerLinkActive"
+          #rla1="routerLinkActive"
           routerLinkActive
+          [routerLinkActiveOptions]="exactMatch"
           [class]="
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
-            (rla7.isActive
-              ? 'bg-white text-blue-700'
-              : 'text-white hover:bg-blue-600')
+            (rla1.isActive
+              ? 'bg-white text-[#215c98]'
+              : 'bg-[#215c98] text-white hover:bg-[#4e92d9]')
           "
         >
           <lucide-angular [img]="ClipboardList" [size]="20"></lucide-angular>
@@ -147,12 +149,12 @@
 
       <!-- Usuario logueado -->
       @if (appService.currentRole()) {
-        <div class="flex items-center gap-3 ml-4 pl-4 border-l border-blue-500">
+        <div class="flex items-center gap-3 ml-4 pl-4 border-l border-[#4e92d9]">
           @if (appService.hasMultipleRoles()) {
             <div class="relative">
               <button
                 (click)="toggleRoleDropdown()"
-                class="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 px-3 py-2 rounded-lg transition-colors"
+                class="flex items-center gap-2 bg-[#215c98] hover:bg-[#4e92d9] px-3 py-2 rounded-lg transition-colors"
               >
                 <div class="bg-[#4e92d9] rounded-full p-1">
                   <lucide-angular [img]="User" [size]="16"></lucide-angular>
@@ -193,7 +195,7 @@
                       [class]="
                         'w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ' +
                         (appService.currentRole() === role
-                          ? 'bg-blue-50 text-blue-700'
+                          ? 'bg-blue-50 text-[#215c98]'
                           : 'text-gray-700 hover:bg-gray-50')
                       "
                     >
@@ -269,12 +271,12 @@
 
   <!-- Mobile Nav -->
   @if (menuOpen()) {
-    <div class="md:hidden bg-[#215c98] px-4 py-3 space-y-2">
+    <div class="md:hidden bg-[#215c98] px-4 py-3 space-y-2 max-h-[calc(100vh-80px)] overflow-y-auto">
       @if (appService.hasRole("SCHEDULER")) {
         <a
           routerLink="/agendador"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <lucide-angular [img]="ClipboardList" [size]="20"></lucide-angular>
           Ver Citas
@@ -282,7 +284,7 @@
         <a
           routerLink="/agendador/nueva"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <lucide-angular [img]="Calendar" [size]="20"></lucide-angular>
           Nueva Cita
@@ -312,7 +314,7 @@
         <a
           routerLink="/admin"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <lucide-angular [img]="Settings" [size]="20"></lucide-angular>
           Configuración
@@ -320,7 +322,7 @@
         <a
           routerLink="/admin/usuarios"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <lucide-angular [img]="Users" [size]="20"></lucide-angular>
           Usuarios
@@ -331,7 +333,7 @@
         <a
           routerLink="/paciente"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <lucide-angular [img]="CalendarDays" [size]="20"></lucide-angular>
           Citas pendientes
@@ -339,7 +341,7 @@
         <a
           routerLink="/paciente/historial-citas"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <lucide-angular [img]="ClipboardList" [size]="20"></lucide-angular>
           Historial de Citas
@@ -360,7 +362,7 @@
                 'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ' +
                 (appService.currentRole() === role
                   ? 'bg-white/20 text-white'
-                  : 'text-blue-200 hover:bg-blue-600')
+                  : 'text-blue-200 hover:bg-[#4e92d9]')
               "
             >
               <lucide-angular
@@ -384,7 +386,7 @@
         <a
           routerLink="/acceso"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <lucide-angular [img]="Users" [size]="20"></lucide-angular>
           Otros usuarios

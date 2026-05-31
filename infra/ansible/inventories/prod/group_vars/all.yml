@@ -60,3 +60,9 @@ kc_health_enabled: true
 kc_metrics_enabled: true
 kc_db_username: keycloak_user
 kc_db_schema: keycloak
+
+# Notificaciones
+notifications_sendgrid_enabled: true
+notifications_sendgrid_sandbox_mode: false
+notifications_email_from: no-reply@mail.piedrazul.org
+notifications_email_from_name: Piedrazul Salud

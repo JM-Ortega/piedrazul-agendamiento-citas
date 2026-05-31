@@ -32,6 +32,8 @@ export class DoctorMedicalHistoryComponent implements OnInit {
   readonly patient = signal<Patient | undefined>(undefined);
   readonly newObservation = signal('');
   private readonly idAppointment = signal<string>('');
+  readonly saveError = signal('');
+  readonly saveSuccess = signal('');
 
   ngOnInit(): void {
     const idAppointment = this.route.snapshot.paramMap.get('idAppointment') ?? '';
@@ -48,10 +50,20 @@ export class DoctorMedicalHistoryComponent implements OnInit {
     const idCita = this.idAppointment();
 
     if (!observations || !idCita) return;
-
-    this.doctorService.addMedicalRecord(idCita, observations).subscribe((saved) => {
-      this.doctorService.medicalRecords.update((current) => [saved, ...current]);
-      this.newObservation.set('');
+    this.saveError.set('');
+    this.saveSuccess.set('');
+    this.doctorService.addMedicalRecord(idCita, observations).subscribe({
+      next: (saved) => {this.doctorService.medicalRecords
+        .update((current) => [saved, ...current,]);
+        this.newObservation.set('');
+        this.saveSuccess.set('Historia clínica guardada correctamente');
+      },
+      error: (err) => {
+        this.saveError.set(
+          err?.error?.message ||
+          'Ocurrió un error al guardar la historia clínica'
+        );
+      },
     });
   }
 }
