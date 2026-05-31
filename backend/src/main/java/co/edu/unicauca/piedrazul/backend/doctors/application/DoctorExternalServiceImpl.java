@@ -87,8 +87,8 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     }
 
     @Override
-    public List<Specialty> getSpecialtiesByDoctor(UUID idDoctor){
-        return doctorRepository.getSpecialtiesByIdDoctor(idDoctor);
+    public List<Specialty> findSpecialtiesByIdentification(String identification){
+        return doctorRepository.findSpecialtiesByIdentification(identification);
     }
 
     private static Workday toWorkday(DayOfWeek dayOfWeek) {

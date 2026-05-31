@@ -14,6 +14,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.Appo
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.application.ListMyAppointmentsUseCaseImpl;
+import co.edu.unicauca.piedrazul.backend.patients.PatientLookupApi;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -140,8 +141,8 @@ public class AppointmentConfig {
     @Bean
     public IsNewPatientUseCase isNewPatientUseCase(
             AppointmentRepository appointmentRepository,
-            PatientConsultPort patientConsultPort) {
-        return new IsNewPatientUseCaseImpl(appointmentRepository, patientConsultPort);
+            PatientLookupApi patientLookupApi) {
+        return new IsNewPatientUseCaseImpl(appointmentRepository, patientLookupApi);
     }
 
     @Bean

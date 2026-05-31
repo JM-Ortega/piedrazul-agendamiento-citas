@@ -3,7 +3,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.application;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
+import co.edu.unicauca.piedrazul.backend.patients.PatientLookupApi;
 
 import java.util.EnumSet;
 import java.util.UUID;
@@ -11,13 +11,13 @@ import java.util.UUID;
 public class IsNewPatientUseCaseImpl implements IsNewPatientUseCase {
 
     private final AppointmentRepository appointmentRepository;
-    private final PatientConsultPort patientConsultPort;
+    private final PatientLookupApi patientLookupApi;
 
     public IsNewPatientUseCaseImpl(
             AppointmentRepository appointmentRepository,
-            PatientConsultPort patientConsultPort) {
+            PatientLookupApi patientLookupApi) {
         this.appointmentRepository = appointmentRepository;
-        this.patientConsultPort = patientConsultPort;
+        this.patientLookupApi = patientLookupApi;
     }
 
     /**
@@ -29,9 +29,7 @@ public class IsNewPatientUseCaseImpl implements IsNewPatientUseCase {
      */
     @Override
     public boolean isNewPatient(UUID patientId) {
-        try {
-            patientConsultPort.findById(patientId);
-        } catch (Exception e) {
+        if (!patientLookupApi.existsById(patientId)) {
             return true;
         }
 

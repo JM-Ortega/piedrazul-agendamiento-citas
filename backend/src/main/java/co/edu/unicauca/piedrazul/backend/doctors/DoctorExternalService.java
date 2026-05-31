@@ -27,5 +27,5 @@ public interface DoctorExternalService {
 
     List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
 
-    List<Specialty> getSpecialtiesByDoctor(UUID idDoctor);
+    List<Specialty> findSpecialtiesByIdentification(String identification);
 }

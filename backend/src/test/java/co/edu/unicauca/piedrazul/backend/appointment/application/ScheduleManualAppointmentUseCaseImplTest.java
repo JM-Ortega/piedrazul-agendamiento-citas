@@ -9,6 +9,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.Appointm
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
+import co.edu.unicauca.piedrazul.backend.patients.PatientLookupApi;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,9 @@ class ScheduleManualAppointmentUseCaseImplTest {
     @Mock
     private PatientConsultPort patientConsultPort;
 
+        @Mock
+        private PatientLookupApi patientLookupApi;
+
     private ScheduleManualAppointmentUseCaseImpl useCase;
 
     @BeforeEach
@@ -50,6 +54,7 @@ class ScheduleManualAppointmentUseCaseImplTest {
                 appointmentRepository,
                 doctorConfigConsultPort,
                 appointmentService,
+                patientLookupApi,
                 patientConsultPort
         );
 
@@ -58,6 +63,7 @@ class ScheduleManualAppointmentUseCaseImplTest {
 
         lenient().when(appointmentRepository.existsByPatientIdAndStates(any(UUID.class), anySet()))
                 .thenReturn(true);
+        lenient().when(patientLookupApi.existsById(any(UUID.class))).thenReturn(true);
     }
 
     // ─────────────────────────────────────────────

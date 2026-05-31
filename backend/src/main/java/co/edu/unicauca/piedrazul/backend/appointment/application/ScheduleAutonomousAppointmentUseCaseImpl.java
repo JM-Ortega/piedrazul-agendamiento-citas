@@ -10,6 +10,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.Appointm
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
+import co.edu.unicauca.piedrazul.backend.patients.PatientLookupApi;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
@@ -28,6 +29,7 @@ public class ScheduleAutonomousAppointmentUseCaseImpl implements ScheduleAutonom
 
     public ScheduleAutonomousAppointmentUseCaseImpl(
                         AppointmentRepository appointmentRepository,
+                        PatientLookupApi patientLookupApi,
                         PatientConsultPort patientConsultPort,
                         DoctorConfigConsultPort doctorConfigConsultPort,
                         AppointmentService appointmentService,
@@ -40,7 +42,7 @@ public class ScheduleAutonomousAppointmentUseCaseImpl implements ScheduleAutonom
                                                 eventPublisher,
                                                 new IsNewPatientUseCaseImpl(
                                                         appointmentRepository,
-                                                        patientConsultPort
+                                                        patientLookupApi
                                                 )
                                 ),
                                 new AutonomousPatientResolutionStrategy(patientConsultPort)
@@ -49,11 +51,13 @@ public class ScheduleAutonomousAppointmentUseCaseImpl implements ScheduleAutonom
 
     public ScheduleAutonomousAppointmentUseCaseImpl(
             AppointmentRepository appointmentRepository,
+            PatientLookupApi patientLookupApi,
             PatientConsultPort patientConsultPort,
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService) {
         this(
                 appointmentRepository,
+                patientLookupApi,
                 patientConsultPort,
                 doctorConfigConsultPort,
                 appointmentService,
