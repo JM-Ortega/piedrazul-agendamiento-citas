@@ -10,6 +10,7 @@ import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayl
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
@@ -36,7 +37,11 @@ public class PatientDataInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        seedPatientIfMissing(
+        if (patientRepository.count() > 0) {
+            return;
+        }
+
+        patientService.createPatient(
                 PatientDocumentType.CEDULA,
                 "12345678",
                 "María",
@@ -48,7 +53,7 @@ public class PatientDataInitializer implements ApplicationRunner {
                 null
         );
 
-        seedPatientIfMissing(
+        patientService.createPatient(
                 PatientDocumentType.CEDULA,
                 "87654321",
                 "Carlos",
@@ -60,7 +65,7 @@ public class PatientDataInitializer implements ApplicationRunner {
                 null
         );
 
-        seedPatientIfMissing(
+        patientService.createPatient(
                 PatientDocumentType.TARJETA_IDENTIDAD,
                 "11122233",
                 "Juan",
@@ -91,32 +96,4 @@ public class PatientDataInitializer implements ApplicationRunner {
 
         System.out.println("✔ Pacientes de prueba insertados");
     }
-
-        private void seedPatientIfMissing(
-                        PatientDocumentType documentType,
-                        String documentNumber,
-                        String firstName,
-                        String lastName,
-                        String phone,
-                        String email,
-                        PatientGender gender,
-                        LocalDate birthDate,
-                        String guardianPhone
-        ) {
-                if (patientRepository.existsByDocumentNumber(documentNumber)) {
-                        return;
-                }
-
-                patientService.createPatient(
-                                documentType,
-                                documentNumber,
-                                firstName,
-                                lastName,
-                                phone,
-                                email,
-                                gender,
-                                birthDate,
-                                guardianPhone
-                );
-        }
 }
