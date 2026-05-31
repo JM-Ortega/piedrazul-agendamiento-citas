@@ -22,25 +22,21 @@ public class PatientDataInitializer implements ApplicationRunner {
 
     private final PatientRepository patientRepository;
     private final PatientService patientService;
-        private final UserProvisioningApi userProvisioningApi;
+    private final UserProvisioningApi userProvisioningApi;
 
     public PatientDataInitializer(
             PatientRepository patientRepository,
             PatientService patientService,
-                        UserProvisioningApi userProvisioningApi
+            UserProvisioningApi userProvisioningApi
     ) {
         this.patientRepository = patientRepository;
         this.patientService = patientService;
-                this.userProvisioningApi = userProvisioningApi;
+        this.userProvisioningApi = userProvisioningApi;
     }
 
     @Override
     public void run(ApplicationArguments args) {
-        if (patientRepository.count() > 0) {
-            return;
-        }
-
-        patientService.createPatient(
+        seedPatientIfMissing(
                 PatientDocumentType.CEDULA,
                 "12345678",
                 "María",
@@ -52,7 +48,7 @@ public class PatientDataInitializer implements ApplicationRunner {
                 null
         );
 
-        patientService.createPatient(
+        seedPatientIfMissing(
                 PatientDocumentType.CEDULA,
                 "87654321",
                 "Carlos",
@@ -64,7 +60,7 @@ public class PatientDataInitializer implements ApplicationRunner {
                 null
         );
 
-        patientService.createPatient(
+        seedPatientIfMissing(
                 PatientDocumentType.TARJETA_IDENTIDAD,
                 "11122233",
                 "Juan",
@@ -95,4 +91,32 @@ public class PatientDataInitializer implements ApplicationRunner {
 
         System.out.println("✔ Pacientes de prueba insertados");
     }
+
+        private void seedPatientIfMissing(
+                        PatientDocumentType documentType,
+                        String documentNumber,
+                        String firstName,
+                        String lastName,
+                        String phone,
+                        String email,
+                        PatientGender gender,
+                        LocalDate birthDate,
+                        String guardianPhone
+        ) {
+                if (patientRepository.existsByDocumentNumber(documentNumber)) {
+                        return;
+                }
+
+                patientService.createPatient(
+                                documentType,
+                                documentNumber,
+                                firstName,
+                                lastName,
+                                phone,
+                                email,
+                                gender,
+                                birthDate,
+                                guardianPhone
+                );
+        }
 }
