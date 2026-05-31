@@ -24,12 +24,6 @@ export class BookingSpecialtySelectorComponent {
 
   readonly filteredSpecialties = computed(() => {
     const specialties = this.state.uniqueSpecialties();
-    if (
-      this.state.isNewPatient() &&
-      !this.state.isDoctorContext()
-    ) {
-      return specialties.filter(s => s === 'MEDICINA_GENERAL');
-    }
     return specialties;
   });
 

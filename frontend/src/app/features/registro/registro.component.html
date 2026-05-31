@@ -142,14 +142,9 @@
                   class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4e92d9]"
                 >
                   <option value="">Seleccione...</option>
-                  <option value="REGISTRO_NACIMIENTO">
-                    Registro de Nacimiento
-                  </option>
-                  <option value="TARJETA_IDENTIDAD">
-                    Tarjeta de Identidad
-                  </option>
-                  <option value="CEDULA">Cédula</option>
-                  <option value="PASAPORTE">Pasaporte</option>
+                  @for (type of patientService.documentTypes(); track type) {
+                    <option [value]="type">{{ type | formato }}</option>
+                  }
                 </select>
                 @if (errors()["documentType"]) {
                   <p class="text-red-500 text-sm mt-1">
@@ -268,22 +263,30 @@
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
                   Fecha de nacimiento <span class="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
-                  [ngModel]="getFormField('birthDate')"
-                  (ngModelChange)="setFormField('birthDate', $event)"
-                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['birthDate']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                />
-                @if (errors()["birthDate"]) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["birthDate"] }}
-                  </p>
-                }
+                <div class="relative w-full">
+                  <input
+                    type="text"
+                    [matDatepicker]="birthPicker"
+                    [ngModel]="getFormField('birthDate')"
+                    (ngModelChange)="setFormField('birthDate', $event)"
+                    [max]="maxBirthDate"
+                    placeholder="mm/dd/aaaa"
+                    readonly
+                    class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 pr-12"
+                  />
+                  <button
+                    type="button"
+                    (click)="birthPicker.open()"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 
+                            text-gray-500 p-2 rounded-lg
+                            hover:bg-blue-100 hover:shadow-md
+                            hover:text-blue-600
+                            transition-all duration-200"
+                  >
+                    <lucide-angular [img]="Calendar" [size]="20"></lucide-angular>
+                  </button>
+                  <mat-datepicker #birthPicker startView="multi-year"></mat-datepicker>
+                </div>
               </div>
 
               <div class="sm:col-span-2">
@@ -397,14 +400,9 @@
                   class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4e92d9]"
                 >
                   <option value="">Seleccione...</option>
-                  <option value="REGISTRO_NACIMIENTO">
-                    Registro de Nacimiento
-                  </option>
-                  <option value="TARJETA_IDENTIDAD">
-                    Tarjeta de Identidad
-                  </option>
-                  <option value="CEDULA">Cédula</option>
-                  <option value="PASAPORTE">Pasaporte</option>
+                  @for (type of patientService.documentTypes(); track type) {
+                    <option [value]="type">{{ type | formato }}</option>
+                  }
                 </select>
                 @if (errors()["documentType"]) {
                   <p class="text-red-500 text-sm mt-1">
@@ -523,17 +521,35 @@
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
                   Fecha de nacimiento <span class="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
-                  [ngModel]="getFormField('birthDate')"
-                  (ngModelChange)="setFormField('birthDate', $event)"
-                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['birthDate']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                />
+                <div class="relative w-full">
+                  <input
+                    type="text"
+                    [matDatepicker]="birthPicker2"
+                    [ngModel]="getFormField('birthDate')"
+                    (ngModelChange)="setFormField('birthDate', $event)"
+                    [max]="maxBirthDate"
+                    placeholder="mm/dd/aaaa"
+                    readonly
+                    class="w-full border-2 rounded-xl px-4 py-3 pr-12 focus:outline-none transition-colors"
+                    [ngClass]="
+                      errors()['birthDate']
+                        ? 'border-red-400 bg-red-50'
+                        : 'border-blue-200 focus:border-blue-500'
+                    "
+                  />
+                  <button
+                    type="button"
+                    (click)="birthPicker2.open()"
+                    class="absolute right-3 top-1/2 -translate-y-1/2
+                            text-gray-500 p-2 rounded-lg
+                            hover:bg-blue-100 hover:shadow-md
+                            hover:text-blue-600
+                            transition-all duration-200"
+                  >
+                    <lucide-angular [img]="Calendar" [size]="20"></lucide-angular>
+                  </button>
+                  <mat-datepicker #birthPicker2 startView="multi-year"></mat-datepicker>
+                </div>
                 @if (errors()["birthDate"]) {
                   <p class="text-red-500 text-sm mt-1">
                     {{ errors()["birthDate"] }}

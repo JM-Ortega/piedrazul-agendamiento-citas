@@ -85,7 +85,7 @@
 
     @if (!loading() && systemUsers().length > 0) {
       <div class="space-y-6">
-        <!-- Ambos Roles -->
+        <!-- ── Ambos Roles ── -->
         @if (both().length > 0) {
           <div class="bg-white rounded-2xl shadow-md p-7">
             <h2
@@ -97,9 +97,116 @@
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               @for (user of both(); track user.id) {
                 <div
-                  class="border-2 rounded-xl p-5 hover:shadow-lg transition-shadow border-purple-100 bg-purple-50/30"
+                  class="border-2 rounded-xl p-5 hover:shadow-lg transition-shadow border-purple-100 bg-purple-50/30 relative"
                 >
-                  <div class="flex items-start justify-between mb-3">
+                  <!-- Botón editar + tooltip + popover -->
+                  <div class="absolute top-4 right-4 popover-container">
+                    <div class="relative">
+                      <button
+                        (click)="togglePopover(user.id)"
+                        (mouseenter)="hoveredUserId.set(user.id)"
+                        (mouseleave)="hoveredUserId.set(null)"
+                        class="p-2 bg-white hover:bg-purple-50 text-purple-700 rounded-lg border border-purple-200 transition-colors"
+                      >
+                        <lucide-angular
+                          [img]="Edit3"
+                          [size]="18"
+                        ></lucide-angular>
+                      </button>
+
+                      <!-- Tooltip -->
+                      @if (
+                        hoveredUserId() === user.id &&
+                        editingUserId() !== user.id
+                      ) {
+                        <div
+                          class="absolute right-0 top-full mt-1 whitespace-nowrap bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg animate-fade-in pointer-events-none"
+                        >
+                          Editar Roles
+                          <div
+                            class="absolute -top-1 right-3 w-2 h-2 bg-gray-900 rotate-45"
+                          ></div>
+                        </div>
+                      }
+
+                      <!-- Popover -->
+                      @if (editingUserId() === user.id) {
+                        <div
+                          class="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border-2 border-purple-200 p-4 z-50 animate-fade-in"
+                        >
+                          <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-sm font-bold text-gray-800">
+                              Editar Roles
+                            </h4>
+                            <button
+                              (click)="editingUserId.set(null)"
+                              class="text-gray-400 hover:text-gray-600"
+                            >
+                              <lucide-angular
+                                [img]="X"
+                                [size]="16"
+                              ></lucide-angular>
+                            </button>
+                          </div>
+                          <button
+                            (click)="toggleSchedulerRole(user)"
+                            [disabled]="togglingUserId() === user.id"
+                            [class]="
+                              'w-full border-2 rounded-lg p-3 transition-all text-left disabled:opacity-50 ' +
+                              (hasSchedulerRole(user)
+                                ? 'border-red-400 bg-red-50 hover:bg-red-100'
+                                : 'border-green-400 bg-green-50 hover:bg-green-100')
+                            "
+                          >
+                            <div class="flex items-center gap-3">
+                              <div
+                                [class]="
+                                  'w-6 h-6 rounded flex items-center justify-center ' +
+                                  (hasSchedulerRole(user)
+                                    ? 'bg-red-600'
+                                    : 'bg-green-600')
+                                "
+                              >
+                                <lucide-angular
+                                  [img]="hasSchedulerRole(user) ? X : Check"
+                                  [size]="16"
+                                  class="text-white"
+                                ></lucide-angular>
+                              </div>
+                              <div class="flex items-center gap-2">
+                                <lucide-angular
+                                  [img]="Calendar"
+                                  [size]="16"
+                                  [class]="
+                                    hasSchedulerRole(user)
+                                      ? 'text-red-600'
+                                      : 'text-green-600'
+                                  "
+                                ></lucide-angular>
+                                <span
+                                  [class]="
+                                    'text-sm font-bold ' +
+                                    (hasSchedulerRole(user)
+                                      ? 'text-red-900'
+                                      : 'text-green-900')
+                                  "
+                                >
+                                  {{
+                                    hasSchedulerRole(user)
+                                      ? "Quitar Agendador"
+                                      : "Agregar Agendador"
+                                  }}
+                                </span>
+                              </div>
+                            </div>
+                          </button>
+                        </div>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Card content -->
+                  <div class="flex items-start mb-3 pr-10">
                     <div class="flex items-center gap-3 flex-1">
                       <div class="rounded-full p-3 bg-[#7d3fc4] shrink-0">
                         <lucide-angular
@@ -116,13 +223,20 @@
                           @for (role of user.roles; track role) {
                             <span
                               class="text-xs px-2 py-1 rounded-full font-medium"
-                              [class.bg-[#d9e9f8]]="role === 'doctor'"
-                              [class.text-[#215c98]]="role === 'doctor'"
-                              [class.bg-green-100]="role !== 'doctor'"
-                              [class.text-green-700]="role !== 'doctor'"
+                              [class.bg-[#d9e9f8]]="
+                                role.toUpperCase() === 'DOCTOR'
+                              "
+                              [class.text-[#215c98]]="
+                                role.toUpperCase() === 'DOCTOR'
+                              "
+                              [class.bg-green-100]="
+                                role.toUpperCase() !== 'DOCTOR'
+                              "
+                              [class.text-green-700]="
+                                role.toUpperCase() !== 'DOCTOR'
+                              "
+                              >{{ roleLabel(role) }}</span
                             >
-                              {{ roleLabel(role) }}
-                            </span>
                           }
                         </div>
                       </div>
@@ -138,19 +252,6 @@
                       <span class="font-medium">Doc:</span>
                       <span>{{ user.documentId }}</span>
                     </div>
-                    @if (user.doctorData) {
-                      <div class="flex items-center gap-2">
-                        <lucide-angular
-                          [img]="Stethoscope"
-                          [size]="16"
-                          class="text-[#4e92d9]"
-                        ></lucide-angular>
-                        <span class="font-medium">Especialidad:</span>
-                        <span class="truncate">{{
-                          user.doctorData.specialty | formato
-                        }}</span>
-                      </div>
-                    }
                   </div>
                 </div>
               }
@@ -158,7 +259,7 @@
           </div>
         }
 
-        <!-- Solo Médicos -->
+        <!-- ── Solo Médicos ── -->
         @if (doctors().length > 0) {
           <div class="bg-white rounded-2xl shadow-md p-7">
             <h2
@@ -170,9 +271,91 @@
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               @for (user of doctors(); track user.id) {
                 <div
-                  class="border-2 rounded-xl p-5 hover:shadow-lg transition-shadow border-[#a7c9ec] bg-[#d9e9f8]/30"
+                  class="border-2 rounded-xl p-5 hover:shadow-lg transition-shadow border-[#a7c9ec] bg-[#d9e9f8]/30 relative"
                 >
-                  <div class="flex items-start justify-between mb-3">
+                  <!-- Botón editar + tooltip + popover -->
+                  <div class="absolute top-4 right-4 popover-container">
+                    <div class="relative">
+                      <button
+                        (click)="togglePopover(user.id)"
+                        (mouseenter)="hoveredUserId.set(user.id)"
+                        (mouseleave)="hoveredUserId.set(null)"
+                        class="p-2 bg-white hover:bg-[#d9e9f8] text-[#215c98] rounded-lg border border-[#a7c9ec] transition-colors"
+                      >
+                        <lucide-angular
+                          [img]="Edit3"
+                          [size]="18"
+                        ></lucide-angular>
+                      </button>
+
+                      <!-- Tooltip -->
+                      @if (
+                        hoveredUserId() === user.id &&
+                        editingUserId() !== user.id
+                      ) {
+                        <div
+                          class="absolute right-0 top-full mt-1 whitespace-nowrap bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg animate-fade-in pointer-events-none"
+                        >
+                          Editar Roles
+                          <div
+                            class="absolute -top-1 right-3 w-2 h-2 bg-gray-900 rotate-45"
+                          ></div>
+                        </div>
+                      }
+
+                      <!-- Popover -->
+                      @if (editingUserId() === user.id) {
+                        <div
+                          class="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border-2 border-[#a7c9ec] p-4 z-50 animate-fade-in"
+                        >
+                          <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-sm font-bold text-gray-800">
+                              Editar Roles
+                            </h4>
+                            <button
+                              (click)="editingUserId.set(null)"
+                              class="text-gray-400 hover:text-gray-600"
+                            >
+                              <lucide-angular
+                                [img]="X"
+                                [size]="16"
+                              ></lucide-angular>
+                            </button>
+                          </div>
+                          <button
+                            (click)="toggleSchedulerRole(user)"
+                            [disabled]="togglingUserId() === user.id"
+                            class="w-full border-2 border-green-400 bg-green-50 hover:bg-green-100 rounded-lg p-3 transition-all text-left disabled:opacity-50"
+                          >
+                            <div class="flex items-center gap-3">
+                              <div
+                                class="w-6 h-6 rounded bg-green-600 flex items-center justify-center"
+                              >
+                                <lucide-angular
+                                  [img]="Check"
+                                  [size]="16"
+                                  class="text-white"
+                                ></lucide-angular>
+                              </div>
+                              <div class="flex items-center gap-2">
+                                <lucide-angular
+                                  [img]="Calendar"
+                                  [size]="16"
+                                  class="text-green-600"
+                                ></lucide-angular>
+                                <span class="text-sm font-bold text-green-900"
+                                  >Agregar Agendador</span
+                                >
+                              </div>
+                            </div>
+                          </button>
+                        </div>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Card content -->
+                  <div class="flex items-start mb-3 pr-10">
                     <div class="flex items-center gap-3 flex-1">
                       <div class="rounded-full p-3 bg-[#215c98] shrink-0">
                         <lucide-angular
@@ -188,9 +371,8 @@
                         <div class="flex flex-wrap gap-1 mt-1">
                           <span
                             class="text-xs px-2 py-1 rounded-full font-medium bg-[#d9e9f8] text-[#215c98]"
+                            >Médico</span
                           >
-                            Médico
-                          </span>
                         </div>
                       </div>
                     </div>
@@ -205,26 +387,12 @@
                       <span class="font-medium">Doc:</span>
                       <span>{{ user.documentId }}</span>
                     </div>
-                    @if (user.doctorData) {
-                      <div class="flex items-center gap-2">
-                        <lucide-angular
-                          [img]="Stethoscope"
-                          [size]="16"
-                          class="text-[#4e92d9]"
-                        ></lucide-angular>
-                        <span class="font-medium">Especialidad:</span>
-                        <span class="truncate">{{
-                          user.doctorData.specialty | formato
-                        }}</span>
-                      </div>
-                    }
                   </div>
                 </div>
               }
             </div>
           </div>
         }
-
         <!-- Solo Agendadores -->
         @if (schedulers().length > 0) {
           <div class="bg-white rounded-2xl shadow-md p-7">

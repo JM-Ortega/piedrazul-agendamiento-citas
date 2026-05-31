@@ -93,14 +93,49 @@ public class DoctorController {
     }
 
     /**
-     * Obtiene las especialidades de los medicos activos
+     * Obtiene las especialidades disponibles para un paciente
+     * @param patientId Id del paciente (opcional)
      * @return Lista de especialidades
      */
-    @GetMapping("/specialty")
+    @GetMapping("/patients/specialties")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<?> getSpecialties() {
-        List<Specialty> specialties = doctorService.getSpecialties();
+    public ResponseEntity<List<Specialty>> getSpecialties(@RequestParam(required = false) UUID patientId) {
+        List<Specialty> specialties = doctorService.getSpecialties(patientId);
         return ResponseEntity.ok(specialties);
+    }
+
+    /**
+     * Agregar especialidades de un doctor específico
+     * @param specialties Especialidades a agregar para el doctor
+     * @param doctorId Id del doctor
+     * @return Sin contenido
+     */
+    @PostMapping("/{doctorId}/specialties")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> addSpecialties(
+            @PathVariable UUID doctorId,
+            @RequestBody List<Specialty> specialties) {
+
+        doctorService.addSpecialities(doctorId, specialties);
+
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Eliminar especialidades de un doctor específico
+     * @param specialties Especialidades a agregar para el doctor
+     * @param doctorId Id del doctors
+     * @return Sin contenido
+     */
+    @DeleteMapping("/{doctorId}/specialties")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> removeSpecialties(
+            @PathVariable UUID doctorId,
+            @RequestBody List<Specialty> specialties) {
+
+        doctorService.removeSpecialities(doctorId, specialties);
+
+        return ResponseEntity.noContent().build();
     }
 
     /**

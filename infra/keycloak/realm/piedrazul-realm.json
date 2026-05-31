@@ -741,8 +741,8 @@
       "fullScopeAllowed": true,
       "nodeReRegistrationTimeout": -1,
       "defaultClientScopes": [
-        "web-origins",
         "service_account",
+        "web-origins",
         "acr",
         "roles",
         "profile",
@@ -770,10 +770,12 @@
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
+        "https://piedrazul.org/*",
         "https://piedrazul.narvaezlab.dev/*",
         "http://localhost:4200/*"
       ],
       "webOrigins": [
+        "https://piedrazul.org",
         "http://localhost:4200",
         "https://piedrazul.narvaezlab.dev"
       ],
@@ -788,11 +790,14 @@
       "frontchannelLogout": true,
       "protocol": "openid-connect",
       "attributes": {
+        "logout.confirmation.enabled": "false",
         "realm_client": "false",
         "oidc.ciba.grant.enabled": "false",
         "backchannel.logout.session.required": "true",
         "standard.token.exchange.enabled": "false",
-        "post.logout.redirect.uris": "http://localhost:4200##https://piedrazul.narvaezlab.dev",
+        "frontchannel.logout.session.required": "true",
+        "post.logout.redirect.uris": "http://localhost:4200##https://piedrazul.narvaezlab.dev##https://piedrazul.org",
+        "display.on.consent.screen": "false",
         "oauth2.device.authorization.grant.enabled": "false",
         "pkce.code.challenge.method": "S256",
         "backchannel.logout.revoke.offline.tokens": "false",
@@ -1707,12 +1712,12 @@
         "config": {
           "allowed-protocol-mapper-types": [
             "oidc-sha256-pairwise-sub-mapper",
-            "oidc-address-mapper",
             "oidc-usermodel-attribute-mapper",
             "saml-role-list-mapper",
-            "oidc-usermodel-property-mapper",
+            "oidc-address-mapper",
             "saml-user-property-mapper",
             "saml-user-attribute-mapper",
+            "oidc-usermodel-property-mapper",
             "oidc-full-name-mapper"
           ]
         }
@@ -1754,13 +1759,13 @@
         "config": {
           "allowed-protocol-mapper-types": [
             "oidc-usermodel-property-mapper",
-            "oidc-full-name-mapper",
-            "oidc-usermodel-attribute-mapper",
-            "saml-user-property-mapper",
             "saml-user-attribute-mapper",
-            "saml-role-list-mapper",
+            "saml-user-property-mapper",
+            "oidc-full-name-mapper",
             "oidc-sha256-pairwise-sub-mapper",
-            "oidc-address-mapper"
+            "oidc-usermodel-attribute-mapper",
+            "oidc-address-mapper",
+            "saml-role-list-mapper"
           ]
         }
       }

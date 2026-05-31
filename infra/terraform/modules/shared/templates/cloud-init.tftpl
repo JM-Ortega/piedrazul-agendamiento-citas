@@ -1,0 +1,72 @@
+#cloud-config
+
+# Deshabilitar autenticación por contraseña en SSH
+ssh_pwauth: false
+
+# Deshabilitar acceso SSH como root
+disable_root: true
+
+# Zona horaria del servidor
+timezone: America/Bogota
+
+users:
+  # Usuario principal para automatización (Ansible / CI/CD)
+  - name: ansible
+    gecos: Ansible Automation User
+    groups: [sudo]
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+%{ for key in ssh_public_keys ~}
+      - ${key}
+%{ endfor ~}
+
+  # Usuario de emergencia (break-glass access)
+  - name: ops
+    gecos: Operations Emergency User
+    groups: [sudo]
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ${ops_ssh_public_key}
+
+# Actualizar índice de paquetes (sin upgrade completo)
+package_update: true
+
+# Instalar herramientas básicas de seguridad
+packages:
+  - fail2ban
+
+write_files:
+  # Hardening de SSH usando configuración modular (drop-in)
+  - path: /etc/ssh/sshd_config.d/60-piedrazul-hardening.conf
+    permissions: "0644"
+    owner: root:root
+    content: |
+      PasswordAuthentication no
+      PermitRootLogin no
+      KbdInteractiveAuthentication no
+      ChallengeResponseAuthentication no
+      X11Forwarding no
+
+  # Configuración de Fail2Ban para proteger SSH
+  - path: /etc/fail2ban/jail.d/sshd.local
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [sshd]
+      enabled = true
+      port = 22
+      logpath = %(sshd_log)s
+      maxretry = 5
+      findtime = 10m
+      bantime = 1h
+
+runcmd:
+  # Recargar configuración SSH para aplicar hardening
+  - systemctl reload ssh
+
+  # Habilitar y arrancar fail2ban
+  - systemctl enable --now fail2ban

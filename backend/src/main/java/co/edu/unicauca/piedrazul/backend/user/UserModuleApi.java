@@ -29,11 +29,15 @@ public interface UserModuleApi {
 
     boolean hasSchedulerRole(UUID userId);
 
+    boolean hasDoctrRole(UUID userId);
+
     List<String> getUserRoles(UUID userId);
 
     void ensurePatientRole(UUID userId);
 
     void ensureSchedulerRole(UUID userId);
+
+    void revokeSchedulerRole(UUID userId);
 
     boolean existsById(UUID id);
 

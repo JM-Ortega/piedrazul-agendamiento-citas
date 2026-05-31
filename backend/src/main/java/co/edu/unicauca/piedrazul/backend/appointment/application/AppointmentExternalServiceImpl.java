@@ -7,6 +7,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.SchedulerAppointmentSummary
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAvailableSlotsUseCase;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
 import org.springframework.stereotype.Service;
@@ -22,12 +23,14 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
     private final AppointmentRepository appointmentRepository;
     private final DoctorExternalService doctorExternalService;
     private final GetAvailableSlotsUseCase getAvailableSlotsUseCase;
+    private final IsNewPatientUseCase isNewPatientUseCase;
 
     public AppointmentExternalServiceImpl(AppointmentRepository appointmentRepository, DoctorExternalService doctorExternalService,
-                                          GetAvailableSlotsUseCase getAvailableSlotsUseCase) {
+                                          GetAvailableSlotsUseCase getAvailableSlotsUseCase, IsNewPatientUseCase isNewPatientUseCase) {
         this.appointmentRepository = appointmentRepository;
         this.doctorExternalService = doctorExternalService;
         this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
+        this.isNewPatientUseCase = isNewPatientUseCase;
     }
 
     @Override
@@ -99,5 +102,10 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
             }
         }
         return false;
+    }
+
+    @Override
+    public boolean isNewPatient(UUID patientId){
+        return isNewPatientUseCase.isNewPatient(patientId);
     }
 }

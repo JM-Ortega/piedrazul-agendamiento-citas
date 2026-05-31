@@ -124,12 +124,17 @@
                 </div>
               </div>
 
-              <span
-                class="px-4 py-2 rounded-lg text-base font-medium whitespace-nowrap"
-                [ngClass]="statusClasses[apt.appointmentState]"
-              >
-                {{ statusLabels[apt.appointmentState] }}
-              </span>
+              <div>
+                <button class="bg-red-100 text-red-600 hover:text-red-800 
+                  text-sm font-semibold transition-colors 
+                  rounded-lg px-4 py-2 text-base hover:bg-red-200
+                  border border-red-300"
+                  (click)="requestCancelAppointment(apt.idAppointment)"
+                >
+                  <lucide-angular [img]="X" [size]="16" class="inline-block"></lucide-angular>
+                  Cancelar
+                </button>
+              </div>
             </div>
           }
         </div>
@@ -137,3 +142,73 @@
     </div>
   </div>
 </div>
+
+<!-- Modal de confirmación de cancelación -->
+@if (showCancelModal()) {
+  <div
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4"
+    (click)="dismissCancelModal()"
+  >
+    <div
+      class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm"
+      (click)="$event.stopPropagation()"
+    >
+      <!-- Ícono -->
+      <div class="flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mx-auto mb-5">
+        <lucide-angular [img]="X" [size]="32" class="text-red-500"></lucide-angular>
+      </div>
+
+      <!-- Texto -->
+      <h3 class="text-xl font-bold text-gray-800 text-center mb-2">
+        ¿Cancelar cita médica?
+      </h3>
+      <p class="text-gray-500 text-sm text-center mb-8">
+        Esta acción no se puede deshacer. ¿Está seguro de que desea cancelar su cita?
+      </p>
+
+      <!-- Botones -->
+      <div class="flex gap-3">
+        <button class="flex-1 py-3 px-4 rounded-xl font-semibold text-gray-700
+          bg-gray-100 hover:bg-gray-200 border border-gray-200
+          transition-all duration-200 active:scale-[0.98]"
+          (click)="dismissCancelModal()">
+          Volver
+        </button>
+        <button class="flex-1 py-3 px-4 rounded-xl font-semibold text-white
+          bg-gradient-to-r from-red-500 to-red-600 shadow-md
+          hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]
+          transition-all duration-200"
+          (click)="confirmCancelAppointment()">
+          Sí, cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (toastMessage()) {
+  <div class="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-2xl border
+      px-6 py-4 min-w-[320px] transition-all duration-300 animate-in slide-in-from-top-5"
+    [class.border-green-200]="toastType() === 'success'"
+    [class.border-red-200]="toastType() === 'error'">
+    <div class="flex items-center gap-3">
+      <div class="rounded-full p-2"
+        [class.bg-green-100]="toastType() === 'success'"
+        [class.bg-red-100]="toastType() === 'error'">
+        @if (toastType() === 'success') {
+          <lucide-angular [img]="Check" [size]="20" class="text-green-600"></lucide-angular>
+        } @else {
+          <lucide-angular [img]="AlertCircle" [size]="20" class="text-red-600"></lucide-angular>
+        }
+      </div>
+      <div>
+        <p class="font-semibold"
+          [class.text-green-700]="toastType() === 'success'"
+          [class.text-red-700]="toastType() === 'error'">
+          {{ toastType() === 'success' ? 'Éxito' : 'Error' }}
+        </p>
+        <p class="text-sm text-gray-600">{{ toastMessage() }}</p>
+      </div>
+    </div>
+  </div>
+}

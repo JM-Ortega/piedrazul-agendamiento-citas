@@ -20,9 +20,20 @@ public class IsNewPatientUseCaseImpl implements IsNewPatientUseCase {
         this.patientConsultPort = patientConsultPort;
     }
 
+    /**
+     * Si el paciente no exite en la bd significa que nunca antes se ha registrado una cita para ese paciente
+     * por lo tanto automaticamente es nuevo, por otro lado si si existe toca que ver entonces si ya ha registrado una
+     * cita antes o no
+     * @param patientId
+     * @return true si es nuevo y false si no lo es
+     */
     @Override
     public boolean isNewPatient(UUID patientId) {
-        patientConsultPort.findById(patientId);
+        try {
+            patientConsultPort.findById(patientId);
+        } catch (Exception e) {
+            return true;
+        }
 
         return !appointmentRepository.existsByPatientIdAndStates(
                 patientId,

@@ -1,5 +1,24 @@
 name: ${PROJECT_NAME}
 
+networks:
+  piedrazul_net:
+    name: piedrazul_net
+
 include:
   - ./infra/compose/db.yml
   - ./infra/compose/keycloak.yml
+
+services:
+  postgres:
+    build:
+      context: ./infra/postgres
+      dockerfile: Dockerfile
+    ports:
+      - "${DB_PORT}:5432"
+
+  keycloak:
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_HOSTNAME_STRICT: "false"
+    ports:
+      - "${KC_PORT}:${KC_PORT}"

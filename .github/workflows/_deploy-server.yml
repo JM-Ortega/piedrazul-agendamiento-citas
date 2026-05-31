@@ -1,0 +1,573 @@
+name: Deploy — Servidor (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      workspace_id:
+        description: "ID del workspace de HCP Terraform"
+        type: string
+        required: true
+      ansible_host:
+        description: "Nombre del host en el inventario de Ansible (vps o vps_oci)"
+        type: string
+        required: true
+      github_environment:
+        description: "Environment de GitHub para el deployment"
+        type: string
+        required: true
+      run_host_config:
+        description: "Correr configuración del servidor (common, docker, hardening)"
+        type: boolean
+        default: false
+      run_build:
+        description: "Construir nueva imagen del backend"
+        type: boolean
+        default: false
+      run_build_postgres:
+        description: "Construir nueva imagen de postgres"
+        type: boolean
+        default: false
+      run_app_deploy:
+        description: "Desplegar aplicación"
+        type: boolean
+        default: false
+      image_tag:
+        description: "Tag específico de imagen para rollback (vacío = SHA del commit si run_build=true)"
+        type: string
+        default: ""
+      force_init_keycloak:
+        description: "Forzar re-inicialización de Keycloak (borra marker)"
+        type: boolean
+        default: false
+      kc_realm:
+        description: "Realm de Keycloak para health check"
+        type: string
+        default: "piedrazul"
+    secrets:
+      TF_API_TOKEN:
+        required: true
+      ANSIBLE_SSH_KEY:
+        required: true
+      DB_PASSWORD:
+        required: true
+      KC_DB_PASSWORD:
+        required: true
+      KC_BOOTSTRAP_ADMIN_PASSWORD:
+        required: true
+      KC_ADMIN_PASSWORD:
+        required: true
+      CLOUDFLARE_DNS_API_TOKEN:
+        required: true
+      IDENTITY_SEED_ADMIN_PASSWORD:
+        required: true
+      KC_BACKEND_CLIENT_SECRET:
+        required: true
+      KC_AUTOMATION_CLIENT_SECRET:
+        required: true
+      PIEDRAZUL_BACKEND_MAIL_SEND:
+        required: true
+      NOTIFICATION_ENCRYPTION_KEY:
+        required: true
+
+concurrency:
+  group: deploy-${{ inputs.github_environment }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: jm-ortega/piedrazul-agendamiento-citas/backend
+  POSTGRES_IMAGE_NAME: jm-ortega/piedrazul-agendamiento-citas/postgres
+
+jobs:
+  validate_inputs:
+    name: Validar inputs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Verificar combinaciones inválidas
+        run: |
+          set -euo pipefail
+
+          if [ "${{ inputs.run_host_config }}" = "false" ] && \
+             [ "${{ inputs.run_build }}" = "false" ] && \
+             [ "${{ inputs.run_build_postgres }}" = "false" ] && \
+             [ "${{ inputs.run_app_deploy }}" = "false" ]; then
+            echo "Error: todos los flags están en false — no hay nada que hacer"
+            exit 1
+          fi
+
+          if [ "${{ inputs.run_build }}" = "true" ] && \
+             [ -n "${{ inputs.image_tag }}" ]; then
+            echo "Error: no se puede especificar image_tag cuando run_build=true"
+            exit 1
+          fi
+
+          if [ "${{ inputs.run_app_deploy }}" = "true" ] && \
+             [ "${{ inputs.run_build }}" = "false" ] && \
+             [ "${{ inputs.run_build_postgres }}" = "false" ] && \
+             [ -z "${{ inputs.image_tag }}" ]; then
+            echo "Error: run_app_deploy=true requiere run_build=true, run_build_postgres=true, o un image_tag explícito"
+            exit 1
+          fi
+
+          if [ "${{ inputs.ansible_host }}" != "vps" ] && \
+             [ "${{ inputs.ansible_host }}" != "vps_oci" ]; then
+            echo "Error: ansible_host debe ser 'vps' o 'vps_oci', recibido: ${{ inputs.ansible_host }}"
+            exit 1
+          fi
+
+      - name: Verificar que image_tag exista en GHCR
+        if: |
+          inputs.run_app_deploy == true &&
+          inputs.run_build == false &&
+          inputs.image_tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --head \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json" \
+            "https://ghcr.io/v2/${{ env.IMAGE_NAME }}/manifests/${{ inputs.image_tag }}")
+
+          if [ "$STATUS" != "200" ]; then
+            echo "Error: imagen ${{ env.IMAGE_NAME }}:${{ inputs.image_tag }} no existe o no es accesible en GHCR"
+            exit 1
+          fi
+
+          echo "Imagen ${{ env.IMAGE_NAME }}:${{ inputs.image_tag }} verificada"
+
+  infra:
+    name: Obtener infraestructura
+    runs-on: ubuntu-latest
+    needs: validate_inputs
+    outputs:
+      server_ip: ${{ steps.tf_outputs.outputs.server_ip }}
+      api_fqdn: ${{ steps.tf_outputs.outputs.api_fqdn }}
+      auth_fqdn: ${{ steps.tf_outputs.outputs.auth_fqdn }}
+    steps:
+      - name: Esperar a que Terraform no esté en curso
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            RESPONSE=$(curl -sf \
+              -H "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" \
+              -H "Content-Type: application/vnd.api+json" \
+              "https://app.terraform.io/api/v2/workspaces/${{ inputs.workspace_id }}/runs?page%5Bsize%5D=1")
+
+            STATUS=$(echo "$RESPONSE" | jq -r '.data[0].attributes.status // "none"')
+
+            case "$STATUS" in
+              applied|planned_and_finished|discarded|canceled|force_canceled|none)
+                echo "Terraform libre (status: ${STATUS}) — procediendo"
+                exit 0
+                ;;
+              errored|policy_soft_failed)
+                echo "Error: último run de Terraform terminó mal (status: ${STATUS})"
+                exit 1
+                ;;
+              *)
+                echo "Terraform no está libre todavía (status: ${STATUS}) — esperando 15s... ($i/30)"
+                sleep 15
+                ;;
+            esac
+          done
+          echo "Error: Terraform no liberó el workspace después de 7.5 minutos"
+          exit 1
+
+      - name: Obtener outputs del workspace de Terraform
+        id: tf_outputs
+        run: |
+          set -euo pipefail
+
+          RESPONSE=$(curl -sf \
+            -H "Authorization: Bearer ${{ secrets.TF_API_TOKEN }}" \
+            -H "Content-Type: application/vnd.api+json" \
+            "https://app.terraform.io/api/v2/workspaces/${{ inputs.workspace_id }}/current-state-version-outputs")
+
+          SERVER_IP=$(echo "$RESPONSE" | \
+            jq -r '.data[] | select(.attributes.name=="server_ip") | .attributes.value')
+          API_FQDN=$(echo "$RESPONSE" | \
+            jq -r '.data[] | select(.attributes.name=="api_fqdn") | .attributes.value')
+          AUTH_FQDN=$(echo "$RESPONSE" | \
+            jq -r '.data[] | select(.attributes.name=="auth_fqdn") | .attributes.value')
+
+          if [ -z "$SERVER_IP" ] || [ "$SERVER_IP" = "null" ]; then
+            echo "Error: no se pudo obtener server_ip"
+            exit 1
+          fi
+          if [ -z "$API_FQDN" ] || [ "$API_FQDN" = "null" ]; then
+            echo "Error: no se pudo obtener api_fqdn"
+            exit 1
+          fi
+          if [ -z "$AUTH_FQDN" ] || [ "$AUTH_FQDN" = "null" ]; then
+            echo "Error: no se pudo obtener auth_fqdn"
+            exit 1
+          fi
+
+          echo "server_ip=${SERVER_IP}" >> $GITHUB_OUTPUT
+          echo "api_fqdn=${API_FQDN}" >> $GITHUB_OUTPUT
+          echo "auth_fqdn=${AUTH_FQDN}" >> $GITHUB_OUTPUT
+          echo "Servidor: ${SERVER_IP} | API: ${API_FQDN} | Auth: ${AUTH_FQDN}"
+
+  inventory:
+    name: Generar inventario
+    runs-on: ubuntu-latest
+    needs: infra
+    steps:
+      - name: Generar hosts.runtime.yml
+        run: |
+          set -euo pipefail
+          printf 'all:\n  hosts:\n    %s:\n      ansible_host: %s\n' \
+            "${{ inputs.ansible_host }}" \
+            "${{ needs.infra.outputs.server_ip }}" \
+            > hosts.runtime.yml
+          cat hosts.runtime.yml
+
+      - name: Subir inventario como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hosts-runtime-${{ github.run_id }}
+          path: hosts.runtime.yml
+          retention-days: 1
+
+  readiness:
+    name: Verificar SSH
+    runs-on: ubuntu-latest
+    needs: infra
+    timeout-minutes: 10
+    steps:
+      - name: Configurar clave SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ANSIBLE_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+      - name: Esperar SSH en el servidor
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if ssh -o StrictHostKeyChecking=no \
+                   -o ConnectTimeout=5 \
+                   -o BatchMode=yes \
+                   -i ~/.ssh/id_ed25519 \
+                   ansible@${{ needs.infra.outputs.server_ip }} true 2>/dev/null; then
+              echo "SSH disponible"
+              exit 0
+            fi
+            echo "Intento $i/30 — esperando 10s..."
+            sleep 10
+          done
+          echo "Error: SSH no disponible después de 5 minutos"
+          exit 1
+
+  app_build:
+    name: Build imagen backend
+    runs-on: ubuntu-latest
+    needs: validate_inputs
+    if: inputs.run_build == true
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.tag.outputs.value }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generar IMAGE_TAG
+        id: tag
+        run: |
+          set -euo pipefail
+          echo "value=$(echo ${{ github.sha }} | cut -c1-10)" >> $GITHUB_OUTPUT
+
+      - name: Configurar QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login a GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build y push imagen multi-arch
+        uses: docker/build-push-action@v6
+        with:
+          context: backend/
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  postgres_build:
+    name: Build imagen postgres
+    runs-on: ubuntu-latest
+    needs: validate_inputs
+    if: inputs.run_build_postgres == true
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.tag.outputs.value }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generar POSTGRES_IMAGE_TAG
+        id: tag
+        run: |
+          set -euo pipefail
+          echo "value=$(echo ${{ github.sha }} | cut -c1-10)" >> $GITHUB_OUTPUT
+
+      - name: Configurar QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login a GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build y push imagen multi-arch
+        uses: docker/build-push-action@v6
+        with:
+          context: infra/postgres/
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE_NAME }}:${{ steps.tag.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  host_config:
+    name: Configurar servidor
+    runs-on: ubuntu-latest
+    needs: [infra, inventory, readiness, postgres_build]
+    if: |
+      always() &&
+      inputs.run_host_config == true &&
+      needs.infra.result == 'success' &&
+      needs.inventory.result == 'success' &&
+      needs.readiness.result == 'success' &&
+      (needs.postgres_build.result == 'success' || needs.postgres_build.result == 'skipped')
+    timeout-minutes: 30
+    environment: ${{ inputs.github_environment }}
+    env:
+      ANSIBLE_CONFIG: infra/ansible/ansible.cfg
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar clave SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ANSIBLE_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+      - name: Descargar inventario
+        uses: actions/download-artifact@v4
+        with:
+          name: hosts-runtime-${{ github.run_id }}
+
+      - name: Instalar colecciones de Ansible
+        run: |
+          set -euo pipefail
+          ansible-galaxy collection install \
+            -r infra/ansible/requirements.yml \
+            -p infra/ansible/collections
+
+      - name: Borrar marker de Keycloak
+        if: inputs.force_init_keycloak == true
+        run: |
+          set -euo pipefail
+          ansible ${{ inputs.ansible_host }} \
+            -i infra/ansible/inventories/prod \
+            -i hosts.runtime.yml \
+            -m file \
+            -a "path=/opt/piedrazul/.keycloak_initialized state=absent" \
+            --become
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+
+      - name: Correr converge
+        run: |
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventories/prod \
+            -i hosts.runtime.yml \
+            -e "postgres_image_tag=${POSTGRES_IMAGE_TAG}" \
+            infra/ansible/playbooks/converge.yml
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+          POSTGRES_IMAGE_TAG: ${{ needs.postgres_build.outputs.image_tag }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
+          KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
+          KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
+          CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
+          KC_BACKEND_CLIENT_SECRET: ${{ secrets.KC_BACKEND_CLIENT_SECRET }}
+          KC_AUTOMATION_CLIENT_SECRET: ${{ secrets.KC_AUTOMATION_CLIENT_SECRET }}
+          IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
+          IDENTITY_SEED_ADMIN_USERNAME: ${{ vars.IDENTITY_SEED_ADMIN_USERNAME }}
+          IDENTITY_SEED_ADMIN_FIRST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_FIRST_NAME }}
+          IDENTITY_SEED_ADMIN_LAST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_LAST_NAME }}
+          IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
+          IDENTITY_SEED_ADMIN_PASSWORD: ${{ secrets.IDENTITY_SEED_ADMIN_PASSWORD }}
+          PIEDRAZUL_BACKEND_MAIL_SEND: ${{ secrets.PIEDRAZUL_BACKEND_MAIL_SEND }}
+          NOTIFICATION_ENCRYPTION_KEY: ${{ secrets.NOTIFICATION_ENCRYPTION_KEY }}
+
+  app_deploy:
+    name: Desplegar aplicación
+    runs-on: ubuntu-latest
+    needs:
+      [
+        validate_inputs,
+        infra,
+        inventory,
+        readiness,
+        host_config,
+        app_build,
+        postgres_build,
+      ]
+    if: |
+      always() &&
+      inputs.run_app_deploy == true &&
+      needs.validate_inputs.result == 'success' &&
+      needs.infra.result == 'success' &&
+      needs.inventory.result == 'success' &&
+      needs.readiness.result == 'success' &&
+      (needs.host_config.result == 'success' || needs.host_config.result == 'skipped') &&
+      (needs.app_build.result == 'success' || needs.app_build.result == 'skipped') &&
+      (needs.postgres_build.result == 'success' || needs.postgres_build.result == 'skipped')
+    timeout-minutes: 15
+    environment: ${{ inputs.github_environment }}
+    env:
+      ANSIBLE_CONFIG: infra/ansible/ansible.cfg
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar clave SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ANSIBLE_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+      - name: Descargar inventario
+        uses: actions/download-artifact@v4
+        with:
+          name: hosts-runtime-${{ github.run_id }}
+
+      - name: Instalar colecciones de Ansible
+        run: |
+          set -euo pipefail
+          ansible-galaxy collection install \
+            -r infra/ansible/requirements.yml \
+            -p infra/ansible/collections
+
+      - name: Resolver IMAGE_TAG
+        id: tag
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.image_tag }}" ]; then
+            echo "value=${{ inputs.image_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "value=${{ needs.app_build.outputs.image_tag }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Resolver POSTGRES_IMAGE_TAG
+        id: postgres_tag
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.run_build_postgres }}" = "true" ]; then
+            echo "value=${{ needs.postgres_build.outputs.image_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "value=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Correr deploy
+        run: |
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventories/prod \
+            -i hosts.runtime.yml \
+            -e "image_tag=${IMAGE_TAG}" \
+            -e "postgres_image_tag=${POSTGRES_IMAGE_TAG}" \
+            infra/ansible/playbooks/deploy.yml
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+          IMAGE_TAG: ${{ steps.tag.outputs.value }}
+          POSTGRES_IMAGE_TAG: ${{ steps.postgres_tag.outputs.value }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
+          KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
+          KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
+          CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
+          IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
+          IDENTITY_SEED_ADMIN_USERNAME: ${{ vars.IDENTITY_SEED_ADMIN_USERNAME }}
+          IDENTITY_SEED_ADMIN_FIRST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_FIRST_NAME }}
+          IDENTITY_SEED_ADMIN_LAST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_LAST_NAME }}
+          IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
+          IDENTITY_SEED_ADMIN_PASSWORD: ${{ secrets.IDENTITY_SEED_ADMIN_PASSWORD }}
+          PIEDRAZUL_BACKEND_MAIL_SEND: ${{ secrets.PIEDRAZUL_BACKEND_MAIL_SEND }}
+          NOTIFICATION_ENCRYPTION_KEY: ${{ secrets.NOTIFICATION_ENCRYPTION_KEY }}
+
+  health_check:
+    name: Health check
+    runs-on: ubuntu-latest
+    needs: [validate_inputs, infra, app_deploy]
+    if: |
+      always() &&
+      needs.app_deploy.result == 'success'
+    timeout-minutes: 5
+    steps:
+      - name: Verificar health del backend
+        run: |
+          set -euo pipefail
+          URL="https://${{ needs.infra.outputs.api_fqdn }}/actuator/health"
+          echo "Verificando ${URL}..."
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${URL}" || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "Backend healthy"
+              exit 0
+            fi
+            echo "Intento $i/12 — status: ${STATUS} — esperando 10s..."
+            sleep 10
+          done
+          echo "Error: backend no responde después de 2 minutos"
+          exit 1
+
+      - name: Verificar health de Keycloak
+        run: |
+          set -euo pipefail
+          URL="https://${{ needs.infra.outputs.auth_fqdn }}/realms/${{ inputs.kc_realm }}/.well-known/openid-configuration"
+          echo "Verificando ${URL}..."
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${URL}" || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "Keycloak healthy"
+              exit 0
+            fi
+            echo "Intento $i/12 — status: ${STATUS} — esperando 10s..."
+            sleep 10
+          done
+          echo "Error: Keycloak no responde después de 2 minutos"
+          exit 1

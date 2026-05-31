@@ -64,4 +64,8 @@ export class SchedulerService {
       `${this.apiUrl}/patients/document/${documentNumber}`,
     );
   }
+
+  cancelAppointment(appointmentId: string): Observable<void> {
+    return this.http.put<void>(`${this.apiUrl}/appointments/${appointmentId}/cancel`, {});
+  }
 }

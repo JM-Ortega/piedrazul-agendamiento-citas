@@ -54,7 +54,7 @@
       >
         <option value="">Seleccione un médico...</option>
         @for (d of state.doctorsBySpecialty(); track d.id) {
-          <option [value]="d.id">{{ d.name | formato }}</option>
+          <option [value]="d.id">{{ d.name }}</option>
         }
       </select>
     </div>

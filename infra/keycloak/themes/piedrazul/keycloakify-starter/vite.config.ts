@@ -9,7 +9,8 @@ export default defineConfig({
             accountThemeImplementation: "none",
             keycloakifyBuildDirPath: "../../keycloak-theme",
             environmentVariables: [
-                { name: "REGISTER_URL", default: "http://localhost:4200/registro" }
+                { name: "REGISTER_URL", default: "https://piedrazul.org/registro" },
+                { name: "HOME_URL", default: "https://piedrazul.org" }
             ]
         })
     ]

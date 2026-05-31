@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.patients.api;
 
+import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.ConfirmLinkUserAccountRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
@@ -26,9 +27,11 @@ import java.util.UUID;
 public class PatientController {
 
     private final PatientService patientService;
+    private final AppointmentExternalService appointmentExternalService;
 
-    public PatientController(PatientService patientService) {
+    public PatientController(PatientService patientService, AppointmentExternalService appointmentExternalService) {
         this.patientService = patientService;
+        this.appointmentExternalService = appointmentExternalService;
     }
 
     @PostMapping
@@ -138,14 +141,13 @@ public class PatientController {
     @GetMapping("/{appointmentId}/patient-attended")
     @PreAuthorize("hasRole('DOCTOR')")
     public PatientResponse getPatientByAppointment(@PathVariable UUID appointmentId) {
-        UUID patientId = patientService.getPatientIdByAppointmentId(appointmentId);
+        UUID patientId = appointmentExternalService.getPattientIdByAppointmentId(appointmentId);
         PatientData patient = patientService.findById(patientId)
                 .orElseThrow(() -> new PatientNotFoundException(patientId));
         return toResponse(patient);
     }
 
     @GetMapping("/document-types")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'SCHEDULER', 'PATIENT', 'ADMIN')")
     public List<DocumentType> findAllDocumentTypes() {
         return patientService.getAllDocumentTypes();
     }

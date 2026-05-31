@@ -5,16 +5,16 @@ import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.Pati
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.ResolvedPatient;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientAlreadyScheduledInSpecialtyException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientScheduleTimeConflictException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
+import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentScheduledEvent;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.FirstAppointmentMustBeGeneralMedicineException;
 import co.edu.unicauca.piedrazul.backend.shared.events.AppointmentCreatedEvent;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -26,18 +26,22 @@ public class AppointmentSchedulingService {
     private final DoctorConfigConsultPort doctorConfigConsultPort;
     private final AppointmentService appointmentService;
     private final ApplicationEventPublisher eventPublisher;
+    private final IsNewPatientUseCase isNewPatientUseCase;
 
     public AppointmentSchedulingService(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            IsNewPatientUseCase isNewPatientUseCase) {
         this.appointmentRepository = appointmentRepository;
         this.doctorConfigConsultPort = doctorConfigConsultPort;
         this.appointmentService = appointmentService;
         this.eventPublisher = eventPublisher;
+        this.isNewPatientUseCase = isNewPatientUseCase;
     }
 
+    @Transactional
     public Appointment scheduleManual(
             PatientSchedulingContext patientContext,
             UUID idDoctor,
@@ -49,6 +53,7 @@ public class AppointmentSchedulingService {
         return schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, true);
     }
 
+    @Transactional
     public Appointment scheduleAutonomous(
             PatientSchedulingContext patientContext,
             UUID idDoctor,
@@ -76,6 +81,8 @@ public class AppointmentSchedulingService {
 
         // Srategy
         ResolvedPatient resolvedPatient = patientResolutionStrategy.resolve(patientContext);
+
+        validateNewPatientFirstAppointmentSpecialty(resolvedPatient.idPatient(), specialty);
 
         validateUniqueScheduledAppointmentBySpecialty(resolvedPatient.idPatient(), specialty);
         validateNoTimeConflictForPatient(resolvedPatient.idPatient(), date, startTime);
@@ -112,11 +119,35 @@ public class AppointmentSchedulingService {
 
         eventPublisher.publishEvent(new AppointmentCreatedEvent(saved.getIdAppointment().toString(), performedBy));
 
+        eventPublisher.publishEvent(
+                new AppointmentScheduledEvent(
+                        saved.getIdAppointment(),
+                        resolvedPatient.idPatient(),
+                        patientName,
+                        patientInfo.getPhone(),
+                        patientInfo.getEmail(),
+                        idDoctor,
+                        doctorName,
+                        date,
+                        startTime.getTime(),
+                        specialty.name(),
+                        performedBy
+                )
+        );
         return saved;
     }
 
     private String buildPatientName(PatientInfo patientInfo) {
         return patientInfo.getFirstName() + " " + patientInfo.getLastName();
+    }
+
+    private void validateNewPatientFirstAppointmentSpecialty(UUID idPatient, Specialty specialty) {
+        boolean isNewPatient = isNewPatientUseCase.isNewPatient(idPatient);
+        if (isNewPatient && specialty != Specialty.MEDICINA_GENERAL) {
+            throw new FirstAppointmentMustBeGeneralMedicineException(
+                    "La primera cita de un paciente nuevo debe ser con MEDICINA_GENERAL"
+            );
+        }
     }
 
     private void validateUniqueScheduledAppointmentBySpecialty(UUID idPatient, Specialty specialty) {

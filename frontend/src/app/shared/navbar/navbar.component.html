@@ -149,7 +149,7 @@
 
       <!-- Usuario logueado -->
       @if (appService.currentRole()) {
-        <div class="flex items-center gap-3 ml-4 pl-4 border-l border-blue-500">
+        <div class="flex items-center gap-3 ml-4 pl-4 border-l border-[#4e92d9]">
           @if (appService.hasMultipleRoles()) {
             <div class="relative">
               <button
@@ -271,7 +271,7 @@
 
   <!-- Mobile Nav -->
   @if (menuOpen()) {
-    <div class="md:hidden bg-[#215c98] px-4 py-3 space-y-2">
+    <div class="md:hidden bg-[#215c98] px-4 py-3 space-y-2 max-h-[calc(100vh-80px)] overflow-y-auto">
       @if (appService.hasRole("SCHEDULER")) {
         <a
           routerLink="/agendador"

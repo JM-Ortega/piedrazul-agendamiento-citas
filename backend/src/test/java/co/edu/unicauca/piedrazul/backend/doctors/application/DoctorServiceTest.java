@@ -36,11 +36,15 @@ class DoctorServiceTest {
 
     @Mock
     private UserModuleApi userModuleApi;
+
+    @Mock
+    private AppointmentExternalService appointmentExternalService;
+
     private DoctorService doctorService;
 
     @BeforeEach
     void setUp() {
-        doctorService = new DoctorService(doctorRepository, userModuleApi);
+        doctorService = new DoctorService(doctorRepository, userModuleApi, appointmentExternalService);
     }
 
     @Test
