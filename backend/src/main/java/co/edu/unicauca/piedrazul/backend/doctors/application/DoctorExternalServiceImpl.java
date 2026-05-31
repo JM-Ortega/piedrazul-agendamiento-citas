@@ -91,6 +91,11 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
         return doctorRepository.findSpecialtiesByIdentification(identification);
     }
 
+    @Override
+    public UUID findIdByIdentification(String identification){
+        return doctorRepository.doctorIdByIdentification(identification);
+    }
+
     private static Workday toWorkday(DayOfWeek dayOfWeek) {
         return switch (dayOfWeek) {
             case MONDAY    -> Workday.LUNES;

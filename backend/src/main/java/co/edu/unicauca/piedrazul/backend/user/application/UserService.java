@@ -71,7 +71,7 @@ public class UserService {
                     .toList();
 
             result.add(new SystemDoctorResponse(
-                    doctor.id(),
+                    doctorExternalService.findIdByIdentification(doctor.username()),
                     doctor.firstName(),
                     doctor.lastName(),
                     doctor.username(),

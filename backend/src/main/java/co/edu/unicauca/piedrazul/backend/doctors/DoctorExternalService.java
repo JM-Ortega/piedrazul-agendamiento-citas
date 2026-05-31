@@ -28,4 +28,6 @@ public interface DoctorExternalService {
     List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
 
     List<Specialty> findSpecialtiesByIdentification(String identification);
+
+    UUID findIdByIdentification(String identification);
 }

@@ -40,4 +40,11 @@ public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
         WHERE d.identification = :identification
     """)
     List<Specialty> findSpecialtiesByIdentification(String identification);
+
+    @Query("""
+        SELECT d.idDoctor
+        FROM Doctor d
+        WHERE d.identification = :identification
+    """)
+    UUID doctorIdByIdentification(String identification);
 }
