@@ -4,8 +4,8 @@ import { Observable, of } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { dtoSchedule } from '../../../shared/models/dtos/schedule.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
-import { CreateSchedulerRequest } from '../models/dtos/create-scheduler-request.dto';
-import { CreateDoctorRequestDto } from '../models/dtos/CreateDoctorRequest.dto';
+import { CreateUserRequestDto } from '../models/dtos/CreateUserRequestDto';
+
 import { DoctorAdminDto } from '../models/dtos/DoctorAdminDto';
 import { SystemUser } from '../models/interfaces/system-user.model';
 // ─────────────────────────────────────────────────────────────────────────────
@@ -16,7 +16,9 @@ export class AdminService {
   private apiUrl = environment.apiUrl;
 
   // ── Doctors ──────────────────────────────────────────────────────────────
-
+  createUser(payload: CreateUserRequestDto): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/user/users`, payload);
+  }
   getDoctors(): Observable<Doctor[]> {
     return this.http.get<Doctor[]>(`${this.apiUrl}/doctor/doctors/detailed`);
   }
@@ -50,15 +52,6 @@ export class AdminService {
     ];
 
     return of(mockData);
-  }
-
-  /**
-   * Crea un nuevo doctor en el backend.
-   * El servidor responde 204 No Content en caso de éxito.
-   * @param payload Datos del doctor según CreateDoctorRequest del backend
-   */
-  createDoctor(payload: CreateDoctorRequestDto): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/doctor/doctors`, payload);
   }
 
   updateAppointmentInterval(
@@ -152,9 +145,6 @@ export class AdminService {
     return this.http.get<SystemUser[]>(`${this.apiUrl}/user/system-users`);
   }
 
-  createScheduler(request: CreateSchedulerRequest): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/user/schedulers`, request);
-  }
   // ── Specialties ───────────────────────────────────────────────────────────
 
   getAllSpecialties(): Observable<string[]> {

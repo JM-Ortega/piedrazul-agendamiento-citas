@@ -289,7 +289,38 @@
           </div>
         </div>
       </div>
-
+      <div class="sm:col-span-2">
+        <label
+          for="email"
+          class="block text-gray-700 text-base font-medium mb-2"
+        >
+          Correo Electrónico *
+        </label>
+        <div class="relative">
+          <lucide-icon
+            [name]="Mail"
+            [size]="20"
+            class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+          ></lucide-icon>
+          <input
+            id="email"
+            type="email"
+            [(ngModel)]="userForm.email"
+            name="email"
+            (input)="onEmailInput()"
+            (blur)="validateField('email')"
+            [class]="inputClass('email', 'pl-12 pr-4')"
+            placeholder="usuario@piedrazul.dev"
+            autocomplete="off"
+          />
+        </div>
+        @if (hasError('email')) {
+          <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+            <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
+            {{ errors.email }}
+          </p>
+        }
+      </div>
       <!-- ── Información del Médico ── -->
       @if (hasDoctorRole) {
         <div class="space-y-6 mt-8 pt-8 border-t-2 border-[#a7c9ec]">
@@ -430,40 +461,6 @@
                 </p>
               }
             </div>
-          </div>
-
-          <!-- Correo -->
-          <div>
-            <label
-              for="email"
-              class="block text-gray-700 text-base font-medium mb-2"
-            >
-              Correo Electrónico *
-            </label>
-            <div class="relative">
-              <lucide-icon
-                [name]="Mail"
-                [size]="20"
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              ></lucide-icon>
-              <input
-                id="email"
-                type="email"
-                [(ngModel)]="userForm.email"
-                name="email"
-                (input)="onEmailInput()"
-                (blur)="validateField('email')"
-                [class]="inputClass('email', 'pl-12 pr-4')"
-                placeholder="doctor@ejemplo.com"
-                autocomplete="off"
-              />
-            </div>
-            @if (hasError('email')) {
-              <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-                <lucide-icon [name]="CircleAlert" [size]="14"></lucide-icon>
-                {{ errors.email }}
-              </p>
-            }
           </div>
 
           <!-- Período Laboral -->

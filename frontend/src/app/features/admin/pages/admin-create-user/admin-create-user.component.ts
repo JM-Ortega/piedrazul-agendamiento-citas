@@ -26,6 +26,7 @@ import {
   Zap,
 } from 'lucide-angular';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+import { CreateUserRequestDto } from '../../models/dtos/CreateUserRequestDto';
 import { AdminService } from '../../service/admin.service';
 
 type Role = 'doctor' | 'scheduler';
@@ -391,7 +392,13 @@ export class AdminCreateUserComponent implements OnInit {
   }
 
   toggleRole(role: Role): void {
-    this.selectedRoles = [role];
+    if (this.selectedRoles.includes(role)) {
+      if (this.selectedRoles.length > 1) {
+        this.selectedRoles = this.selectedRoles.filter((r) => r !== role);
+      }
+    } else {
+      this.selectedRoles = [...this.selectedRoles, role];
+    }
     if (this.submitted) this.validateField('roles');
   }
 
@@ -410,71 +417,55 @@ export class AdminCreateUserComponent implements OnInit {
   closeConfirmModal(): void {
     this.showConfirmModal = false;
   }
-
   confirmAndCreate(): void {
     this.showConfirmModal = false;
     this.isSubmitting = true;
 
-    if (this.hasSchedulerRole && !this.hasDoctorRole) {
-      this.adminService
-        .createScheduler({
-          documentId: this.userForm.documentId,
-          password: this.userForm.password,
-          firstName: this.userForm.firstName.trim(),
-          lastName: this.userForm.lastName.trim(),
-        })
-        .subscribe({
-          next: () => {
-            this.isSubmitting = false;
-            this.router.navigate(['/admin/usuarios']);
-          },
-          error: (err) => {
-            this.isSubmitting = false;
-            this.submitError =
-              err?.error?.message ??
-              'Ocurrió un error al crear el agendador. Inténtalo de nuevo.';
-          },
-        });
-      return;
-    }
+    const roles: string[] = [
+      ...(this.hasDoctorRole ? ['DOCTOR'] : []),
+      ...(this.hasSchedulerRole ? ['SCHEDULER'] : []),
+    ];
 
-    if (this.hasDoctorRole) {
-      const schedules = this.userForm.workDays.map((day) => ({
-        workday: DAY_VALUE_TO_WORKDAY[day],
-        startTime: this.userForm.startTime,
-        endTime: this.userForm.endTime,
-      }));
+    const payload: CreateUserRequestDto = {
+      user: {
+        identification: this.userForm.documentId,
+        firstName: this.userForm.firstName.trim(),
+        lastName: this.userForm.lastName.trim(),
+        email: this.userForm.email.trim(),
+        password: this.userForm.password,
+      },
+      doctor: this.hasDoctorRole
+        ? {
+            documentType: this.userForm.documentType,
+            phone: this.userForm.phone,
+            specialty: this.userForm.specialty,
+            laborStart: this.userForm.laborStart,
+            laborEnd: this.userForm.laborEnd,
+            appointmentInterval: this.userForm.interval,
+            schedules: this.userForm.workDays.map((day) => ({
+              workday: DAY_VALUE_TO_WORKDAY[day],
+              startTime: `${this.userForm.startTime}:00`, // "07:00" → "07:00:00"
+              endTime: `${this.userForm.endTime}:00`,
+            })),
+          }
+        : null,
+      patient: null,
+      roles,
+    };
 
-      this.adminService
-        .createDoctor({
-          firstName: this.userForm.firstName.trim(),
-          lastName: this.userForm.lastName.trim(),
-          identification: this.userForm.documentId,
-          documentType: this.userForm.documentType,
-          phone: this.userForm.phone,
-          specialty: this.userForm.specialty,
-          laborStart: this.userForm.laborStart,
-          laborEnd: this.userForm.laborEnd,
-          appointmentInterval: this.userForm.interval,
-          schedules,
-          email: this.userForm.email.trim(),
-          password: this.userForm.password,
-        })
-        .subscribe({
-          next: () => {
-            this.isSubmitting = false;
-            this.router.navigate(['/admin/usuarios']);
-          },
-          error: (err) => {
-            this.isSubmitting = false;
-            this.submitError =
-              err?.error?.message ??
-              'Ocurrió un error al crear el médico. Inténtalo de nuevo.';
-          },
-        });
-    }
+    this.adminService.createUser(payload).subscribe({
+      next: () => {
+        this.isSubmitting = false;
+        this.router.navigate(['/admin/usuarios']);
+      },
+      error: (err) => {
+        this.isSubmitting = false;
+        this.submitError =
+          err?.error?.message ??
+          'Ocurrió un error al crear el usuario. Inténtalo de nuevo.';
+      },
+    });
   }
-
   validateField(field: keyof FormErrors): void {
     this.errors[field] = undefined;
 
@@ -519,14 +510,12 @@ export class AdminCreateUserComponent implements OnInit {
         break;
 
       case 'email':
-        if (this.hasDoctorRole) {
-          if (!this.userForm.email.trim()) {
-            this.errors.email = 'El correo electrónico es obligatorio.';
-          } else if (
-            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.userForm.email.trim())
-          ) {
-            this.errors.email = 'Ingrese un correo electrónico válido.';
-          }
+        if (!this.userForm.email.trim()) {
+          this.errors.email = 'El correo electrónico es obligatorio.';
+        } else if (
+          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.userForm.email.trim())
+        ) {
+          this.errors.email = 'Ingrese un correo electrónico válido.';
         }
         break;
 
@@ -631,15 +620,15 @@ export class AdminCreateUserComponent implements OnInit {
   private validateAll(): boolean {
     const fields: (keyof FormErrors)[] = [
       'documentId',
-      'documentType',
       'password',
       'firstName',
       'lastName',
+      'email',
       'roles',
     ];
     if (this.hasDoctorRole) {
       fields.push(
-        'email',
+        'documentType',
         'phone',
         'specialty',
         'laborStart',
