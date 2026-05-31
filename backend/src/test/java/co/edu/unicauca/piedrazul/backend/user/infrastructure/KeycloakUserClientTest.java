@@ -69,7 +69,7 @@ class KeycloakUserClientTest {
         when(props.getClientId()).thenReturn("backend");
         when(props.getClientSecret()).thenReturn("secret");
 
-        keycloakUserClient = new KeycloakUserClient(props);
+        keycloakUserClient = new KeycloakUserClient(keycloak, props);
         injectKeycloakMock();
     }
 
