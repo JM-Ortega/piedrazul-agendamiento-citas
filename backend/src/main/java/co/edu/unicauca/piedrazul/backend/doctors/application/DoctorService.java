@@ -34,6 +34,10 @@ public class DoctorService implements DoctorProvisioningApi {
     @Transactional
     @Override
     public void createDoctor(UUID userId, String firstName, String lastName, String identificacion, CreateDoctorRequest request) {
+        if (doctorRepository.findByIdUser(userId) != null) {
+            return;
+        }
+
         persistDoctor(userId, firstName, lastName, identificacion, request);
     }
 

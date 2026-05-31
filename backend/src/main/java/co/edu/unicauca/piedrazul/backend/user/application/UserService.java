@@ -65,7 +65,7 @@ public class UserService {
                     .filter(role -> role.equals(Role.DOCTOR.name()) || role.equals(Role.SCHEDULER.name()))
                     .toList();
 
-            List<String> specialties = doctorExternalService.getSpecialtiesByDoctor(doctor.id())
+            List<String> specialties = doctorExternalService.findSpecialtiesByIdentification(doctor.username())
                     .stream()
                     .map(Objects::toString)
                     .toList();

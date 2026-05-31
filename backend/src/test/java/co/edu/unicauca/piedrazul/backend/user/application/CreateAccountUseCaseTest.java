@@ -9,7 +9,7 @@ import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientUserRequest;
 import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
-import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
+import co.edu.unicauca.piedrazul.backend.user.application.KeycloakUserProvisioningService;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
@@ -26,6 +26,8 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,8 +36,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class CreateAccountUseCaseTest {
 
-    @Mock
-    private UserProvisioningApi userProvisioningApi;
+	@Mock
+	private KeycloakUserProvisioningService keycloakUserProvisioningService;
 
     @Mock
     private DoctorProvisioningApi doctorProvisioningApi;
@@ -50,7 +52,7 @@ class CreateAccountUseCaseTest {
     void executeShouldRejectNullPayload() {
 	assertThrows(InvalidUserDataException.class, () -> createAccountUseCase.execute(null));
 
-	verify(userProvisioningApi, never()).createUser(any());
+	verify(keycloakUserProvisioningService, never()).getOrCreateUser(any(co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest.class), any(java.util.List.class));
     }
 
     @Test
@@ -64,7 +66,7 @@ class CreateAccountUseCaseTest {
 
 	assertThrows(InvalidUserDataException.class, () -> createAccountUseCase.execute(payload));
 
-	verify(userProvisioningApi, never()).createUser(any());
+	verify(keycloakUserProvisioningService, never()).getOrCreateUser(any(co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest.class), any(java.util.List.class));
     }
 
     @Test
@@ -78,7 +80,7 @@ class CreateAccountUseCaseTest {
 
 	assertThrows(InvalidUserDataException.class, () -> createAccountUseCase.execute(payload));
 
-	verify(userProvisioningApi, never()).createUser(any());
+	verify(keycloakUserProvisioningService, never()).getOrCreateUser(any(co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest.class), any(java.util.List.class));
     }
 
     @Test
@@ -101,11 +103,11 @@ class CreateAccountUseCaseTest {
 		List.of(Role.DOCTOR)
 	);
 
-	when(userProvisioningApi.createUser(payload)).thenReturn(createdUser);
+	when(keycloakUserProvisioningService.getOrCreateUser(any(co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest.class), any(java.util.List.class))).thenReturn(createdUser);
 
 	createAccountUseCase.execute(payload);
 
-	verify(userProvisioningApi).createUser(payload);
+	verify(keycloakUserProvisioningService).getOrCreateUser(eq(payload.user()), anyList());
 	verify(doctorProvisioningApi).createDoctor(
 		userId,
 		"Ana",
@@ -134,11 +136,11 @@ class CreateAccountUseCaseTest {
 		List.of(Role.PATIENT)
 	);
 
-	when(userProvisioningApi.createUser(payload)).thenReturn(createdUser);
+	when(keycloakUserProvisioningService.getOrCreateUser(any(co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest.class), any(java.util.List.class))).thenReturn(createdUser);
 
 	createAccountUseCase.execute(payload);
 
-	verify(userProvisioningApi).createUser(payload);
+	verify(keycloakUserProvisioningService).getOrCreateUser(eq(payload.user()), anyList());
 	verify(patientModuleApi).createPatientWithUser(
 		userId,
 		"Luis",
@@ -177,11 +179,11 @@ class CreateAccountUseCaseTest {
 		List.of(Role.DOCTOR, Role.PATIENT, Role.DOCTOR)
 	);
 
-	when(userProvisioningApi.createUser(payload)).thenReturn(createdUser);
+	when(keycloakUserProvisioningService.getOrCreateUser(any(co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest.class), any(java.util.List.class))).thenReturn(createdUser);
 
 	assertDoesNotThrow(() -> createAccountUseCase.execute(payload));
 
-	verify(userProvisioningApi).createUser(payload);
+	verify(keycloakUserProvisioningService).getOrCreateUser(eq(payload.user()), anyList());
 	verify(doctorProvisioningApi).createDoctor(
 		userId,
 		"Maria",

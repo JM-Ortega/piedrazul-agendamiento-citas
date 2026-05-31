@@ -4,5 +4,5 @@ import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayl
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 
 public interface UserProvisioningApi {
-    UserSummary createUser(CreateSystemUserPayload request);
+    void createUser(CreateSystemUserPayload payload);
 }

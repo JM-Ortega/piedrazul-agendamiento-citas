@@ -14,13 +14,11 @@ import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyLinked
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.mappers.PatientApiMapper;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientRepository;
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
-import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
-import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
+import co.edu.unicauca.piedrazul.backend.user.UserAccountProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
-import co.edu.unicauca.piedrazul.backend.verification.VerificationModuleApi;
 import co.edu.unicauca.piedrazul.backend.verification.api.VerificationPurpose;
+import co.edu.unicauca.piedrazul.backend.verification.VerificationModuleApi;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,18 +34,18 @@ public class PatientService implements PatientModuleApi {
 
     private final PatientRepository patientRepository;
     private final UserModuleApi userModuleApi;
-    private final UserProvisioningApi userProvisioningApi;
+    private final UserAccountProvisioningApi userAccountProvisioningApi;
     private final VerificationModuleApi verificationModuleApi;
 
     public PatientService(
             PatientRepository patientRepository,
             UserModuleApi userModuleApi,
-            UserProvisioningApi userProvisioningApi,
+            UserAccountProvisioningApi userAccountProvisioningApi,
             VerificationModuleApi verificationModuleApi
     ) {
         this.patientRepository = patientRepository;
         this.userModuleApi = userModuleApi;
-        this.userProvisioningApi = userProvisioningApi;
+        this.userAccountProvisioningApi = userAccountProvisioningApi;
         this.verificationModuleApi = verificationModuleApi;
     }
 
@@ -134,17 +132,16 @@ public class PatientService implements PatientModuleApi {
 
         validatePassword(password);
 
-        /*
-        Lo comento porque la funcion create user automaticamente linkea a el paciente con su usuario
-
-        UserSummary user = userModuleApi.createUser(new CreateSystemUserPayload(new CreateSystemUserRequest(documentNumber, patient.getFirstName(),
-                patient.getLastName(), patient.getEmail(), password),null,null, List.of(Role.PATIENT)));
-
-        patient.linkUser(user.id());
-         */
-
-        userProvisioningApi.createUser(new CreateSystemUserPayload(new CreateSystemUserRequest(documentNumber, patient.getFirstName(),
-            patient.getLastName(), patient.getEmail(), password),null,null, List.of(Role.PATIENT)));
+        userAccountProvisioningApi.getOrCreateUser(
+            new CreateSystemUserRequest(
+                documentNumber,
+                patient.getFirstName(),
+                patient.getLastName(),
+                patient.getEmail(),
+                password
+            ),
+            java.util.List.of(co.edu.unicauca.piedrazul.backend.shared.auth.Role.PATIENT)
+        );
 
         return toData(patientRepository.save(patient));
     }

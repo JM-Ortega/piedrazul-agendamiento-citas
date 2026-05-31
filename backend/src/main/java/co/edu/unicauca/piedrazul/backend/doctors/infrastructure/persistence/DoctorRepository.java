@@ -32,5 +32,12 @@ public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
     @Query("SELECT DISTINCT s FROM Doctor d JOIN d.specialty s WHERE d.status = true")
     List<Specialty> findAllDistinctSpecialtiesByActiveDoctors();
 
-    List<Specialty> getSpecialtiesByIdDoctor(UUID idDoctor);
+    // Devuelve todas las especialidades de un doctor
+    @Query("""
+        SELECT s
+        FROM Doctor d
+        JOIN d.specialty s
+        WHERE d.identification = :identification
+    """)
+    List<Specialty> findSpecialtiesByIdentification(String identification);
 }

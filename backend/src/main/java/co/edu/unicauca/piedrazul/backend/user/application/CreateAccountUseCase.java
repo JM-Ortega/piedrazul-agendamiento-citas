@@ -8,26 +8,32 @@ import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
+import co.edu.unicauca.piedrazul.backend.user.infrastructure.KeycloakUserClient;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
 
 @Service
-public class CreateAccountUseCase {
+public class CreateAccountUseCase implements UserProvisioningApi {
 
-    private final UserProvisioningApi userProvisioningApi;
     private final DoctorProvisioningApi doctorProvisioningApi;
     private final PatientModuleApi patientModuleApi;
+    private final KeycloakUserProvisioningService keycloakUserProvisioningService;
 
     public CreateAccountUseCase(
-            UserProvisioningApi userProvisioningApi,
             DoctorProvisioningApi doctorProvisioningApi,
-            PatientModuleApi patientModuleApi
+            PatientModuleApi patientModuleApi,
+            KeycloakUserProvisioningService keycloakUserProvisioningService
     ) {
-        this.userProvisioningApi = userProvisioningApi;
         this.doctorProvisioningApi = doctorProvisioningApi;
         this.patientModuleApi = patientModuleApi;
+        this.keycloakUserProvisioningService = keycloakUserProvisioningService;
+    }
+
+    @Override
+    public void createUser(CreateSystemUserPayload request){
+        execute(request);
     }
 
     public void execute(CreateSystemUserPayload payload) {
@@ -44,7 +50,7 @@ public class CreateAccountUseCase {
         }
 
         List<Role> roles = payload.roles().stream().distinct().toList();
-        var user = userProvisioningApi.createUser(payload);
+        var user = keycloakUserProvisioningService.getOrCreateUser(payload.user(), roles);
 
         if (roles.contains(Role.DOCTOR)) {
             createDoctor(user.id(), user.firstName(), user.lastName(), user.username(), payload.doctor());
