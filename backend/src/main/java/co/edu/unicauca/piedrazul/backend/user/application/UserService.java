@@ -1,7 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.user.application;
 
+import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
 import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemDoctorResponse;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
 import co.edu.unicauca.piedrazul.backend.user.exception.DoctorRoleRequiredException;
 import co.edu.unicauca.piedrazul.backend.user.exception.UserNotFoundException;
@@ -9,15 +11,18 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
 
 @Service
 public class UserService {
     private final KeycloakUserService keycloakUserService;
+    private final DoctorExternalService doctorExternalService;
 
-    public UserService(KeycloakUserService keycloakUserService) {
+    public UserService(KeycloakUserService keycloakUserService, DoctorExternalService doctorExternalService) {
         this.keycloakUserService = keycloakUserService;
+        this.doctorExternalService = doctorExternalService;
     }
 
     public List<SystemUserResponse> getSystemUsers() {
@@ -46,6 +51,34 @@ public class UserService {
             ));
         }
 
+        return result;
+    }
+
+    public List<SystemDoctorResponse> getSystemDoctors() {
+        List<UserSummary> doctors = keycloakUserService.findDoctors();
+
+        List<SystemDoctorResponse> result = new ArrayList<>();
+
+        for (UserSummary doctor : doctors) {
+            List<String> roles = keycloakUserService.getUserRoles(doctor.id())
+                    .stream()
+                    .filter(role -> role.equals(Role.DOCTOR.name()) || role.equals(Role.SCHEDULER.name()))
+                    .toList();
+
+            List<String> specialties = doctorExternalService.getSpecialtiesByDoctor(doctor.id())
+                    .stream()
+                    .map(Objects::toString)
+                    .toList();
+
+            result.add(new SystemDoctorResponse(
+                    doctor.id(),
+                    doctor.firstName(),
+                    doctor.lastName(),
+                    doctor.username(),
+                    roles,
+                    specialties
+            ));
+        }
         return result;
     }
 
