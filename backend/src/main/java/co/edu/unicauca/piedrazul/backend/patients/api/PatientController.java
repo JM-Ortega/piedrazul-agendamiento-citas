@@ -147,7 +147,6 @@ public class PatientController {
     }
 
     @GetMapping("/document-types")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'SCHEDULER', 'PATIENT', 'ADMIN')")
     public List<DocumentType> findAllDocumentTypes() {
         return patientService.getAllDocumentTypes();
     }

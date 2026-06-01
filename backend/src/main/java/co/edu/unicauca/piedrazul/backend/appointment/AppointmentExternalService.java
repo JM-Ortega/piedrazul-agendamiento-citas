@@ -1,5 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.appointment;
 
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSummary;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.SchedulerAppointmentSummary;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentExternalData;
+
 import java.util.UUID;
 import java.time.LocalDate;
 import java.util.List;

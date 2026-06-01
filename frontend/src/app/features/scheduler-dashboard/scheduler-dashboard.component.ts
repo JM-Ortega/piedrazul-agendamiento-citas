@@ -1,28 +1,15 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import {
-  Calendar,
-  CheckCircle,
-  Clock,
-  CreditCard,
-  Download,
-  FileSpreadsheet,
-  FileText,
-  LucideAngularModule,
-  Phone,
-  PlusCircle,
-  Search,
-  Stethoscope,
-  Tag,
-  User,
-  UserCircle,
-} from 'lucide-angular';
+import {Calendar, CheckCircle, Clock, CreditCard, Download, FileSpreadsheet, FileText, LucideAngularModule, 
+        Phone, PlusCircle, Search, Stethoscope, Tag, User, UserCircle, X, Check, AlertCircle
+      } from 'lucide-angular';
 import { SchedulerService } from '../../core/services/scheduler.service';
 import { AppointmentExportRequest } from '../../shared/models/dtos/AppointmentExportRequest.dto';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
 import { ExportFormatBackend } from '../../shared/models/types/ExportFormatBackend.type';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
+import {CommonModule} from "@angular/common";
 
 type ExportFormat = 'excel' | 'pdf' | 'csv';
 
@@ -48,7 +35,7 @@ const EXT_MAP: Record<ExportFormat, string> = {
   selector: 'app-scheduler-dashboard',
   templateUrl: './scheduler-dashboard.component.html',
   standalone: true,
-  imports: [RouterLink, LucideAngularModule, FormatoPipe],
+  imports: [RouterLink, LucideAngularModule, FormatoPipe, CommonModule],
 })
 export class SchedulerDashboardComponent implements OnInit {
   private schedulerService = inject(SchedulerService);
@@ -68,6 +55,9 @@ export class SchedulerDashboardComponent implements OnInit {
   readonly Tag = Tag;
   readonly User = User;
   readonly UserCircle = UserCircle;
+  readonly X = X;
+  readonly Check = Check;
+  readonly AlertCircle = AlertCircle;
 
   // ── Date helpers ──────────────────────────────────────────────────────────
   today = (() => {
@@ -94,6 +84,9 @@ export class SchedulerDashboardComponent implements OnInit {
     'diciembre',
   ];
 
+  readonly toastMessage = signal('');
+  readonly toastType = signal<'success' | 'error' | null>(null);
+
   // ── Data signals ──────────────────────────────────────────────────────────
   doctors = signal<dtoDoctor[]>([]);
   private appointments = signal<AppointmentsPatient[]>([]);
@@ -107,6 +100,9 @@ export class SchedulerDashboardComponent implements OnInit {
   hoveredView = signal<string | null>(null);
 
   // ── Export signals ────────────────────────────────────────────────────────
+  showCancelModal = signal(false);
+  pendingCancelId = signal<string | null>(null);
+
   showExportModal = signal(false);
   exportFormat = signal<ExportFormat>('excel');
   isExporting = signal(false);
@@ -309,6 +305,44 @@ export class SchedulerDashboardComponent implements OnInit {
     });
   }
 
+  requestCancelAppointment(appointmentId: string): void {
+    this.pendingCancelId.set(appointmentId);
+    this.showCancelModal.set(true);
+  }
+
+  confirmCancelAppointment(): void {
+    const appointmentId = this.pendingCancelId();
+    if (!appointmentId) return;
+    this.showCancelModal.set(false);
+    this.pendingCancelId.set(null);
+    this.schedulerService.cancelAppointment(appointmentId).subscribe({
+      next: () => {
+        this.showToast('La cita fue cancelada exitosamente', 'success');
+        this.appointments.set( this.appointments().map((a) =>
+            a.idAppointment === appointmentId
+              ? { ...a, appointmentState: 'CANCELADA' }
+              : a,),
+        );
+      },
+      error: () => {
+        this.showToast('Ocurrió un error al cancelar la cita', 'error');
+      },
+    });
+  }
+
+  dismissCancelModal(): void {
+    this.showCancelModal.set(false);
+    this.pendingCancelId.set(null);
+  }
+
+  private showToast(message: string, type: 'success' | 'error'): void {
+    this.toastMessage.set(message);
+    this.toastType.set(type);
+    setTimeout(() => {
+      this.toastMessage.set(''); 
+      this.toastType.set(null);}, 3000);
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
   formatDate(dateStr: string): string {
     const d = new Date(dateStr + 'T12:00:00');
@@ -328,7 +362,7 @@ export class SchedulerDashboardComponent implements OnInit {
 
   statusColor(s: string): string {
     const map: Record<string, string> = {
-      AGENDADA: 'bg-blue-100 text-blue-700',
+      AGENDADA: 'bg-blue-100 text-[#163c63]',
       ATENDIDA: 'bg-green-100 text-green-700',
       CANCELADA: 'bg-red-100 text-red-700',
       NO_ASISTIO: 'bg-orange-100 text-orange-700',

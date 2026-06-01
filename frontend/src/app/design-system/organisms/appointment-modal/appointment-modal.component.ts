@@ -17,7 +17,6 @@ import { environment } from '../../../../environments/environment';
   standalone: true,
   imports: [CommonModule, LucideAngularModule],
   templateUrl: './appointment-modal.component.html',
-  styleUrl: './appointment-modal.component.css',
 })
 export class AppointmentModalComponent {
   @Output() close = new EventEmitter<void>();

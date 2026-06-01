@@ -8,7 +8,7 @@
 >
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
     <!-- Header -->
-    <div class="bg-blue-700 px-6 py-5 flex items-start justify-between">
+    <div class="bg-[#215c98] px-6 py-5 flex items-start justify-between">
       <div>
         <h2 class="text-white text-xl font-bold">Agendar una cita</h2>
         <p class="text-blue-200 text-sm mt-1">
@@ -28,7 +28,7 @@
     <div class="p-6 flex flex-col gap-3">
       <button
         (click)="login()"
-        class="flex items-center gap-4 w-full bg-blue-700 hover:bg-blue-800 text-white px-5 py-4 rounded-xl transition-all active:scale-95 text-left"
+        class="flex items-center gap-4 w-full bg-[#215c98] hover:bg-[#1a4a7a] text-white px-5 py-4 rounded-xl transition-all active:scale-95 text-left cursor-pointer"
       >
         <div class="bg-blue-600 p-2 rounded-lg shrink-0">
           <lucide-angular [img]="LogIn" [size]="22" color="white" />
@@ -43,14 +43,14 @@
 
       <button
         (click)="register()"
-        class="flex items-center gap-4 w-full bg-white border-2 border-blue-700 hover:bg-blue-50 text-blue-700 px-5 py-4 rounded-xl transition-all active:scale-95 text-left"
+        class="flex items-center gap-4 w-full bg-white border-2 border-[#215c98] hover:bg-blue-50 text-[#215c98] px-5 py-4 rounded-xl transition-all active:scale-95 text-left cursor-pointer"
       >
-        <div class="bg-blue-100 p-2 rounded-lg shrink-0">
-          <lucide-angular [img]="UserPlus" [size]="22" class="text-blue-700" />
+        <div class="bg-[#d9e9f8] p-2 rounded-lg shrink-0">
+          <lucide-angular [img]="UserPlus" [size]="22" class="text-[#215c98]" />
         </div>
         <div>
           <div class="font-semibold text-base">Crear mi cuenta</div>
-          <div class="text-blue-500 text-sm">
+          <div class="text-[#215c98] text-sm">
             Regístrate para agendar tu cita
           </div>
         </div>
@@ -59,7 +59,7 @@
 
     <!-- Contacto -->
     <div class="border-t border-gray-100 px-6 py-4">
-      <p class="text-gray-500 text-sm text-center mb-3">
+      <p class="text-gray-600 text-sm text-center mb-3">
         ¿Prefieres que te ayudemos?
       </p>
       <div class="flex gap-3">

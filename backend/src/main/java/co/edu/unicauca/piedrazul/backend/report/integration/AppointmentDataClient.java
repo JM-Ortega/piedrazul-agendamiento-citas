@@ -1,8 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.report.integration;
 
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
-import co.edu.unicauca.piedrazul.backend.appointment.AppointmentSummary;
-import co.edu.unicauca.piedrazul.backend.appointment.SchedulerAppointmentSummary;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSummary;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.SchedulerAppointmentSummary;
 import co.edu.unicauca.piedrazul.backend.report.dtos.AppointmentStateFilter;
 import org.springframework.stereotype.Component;
 

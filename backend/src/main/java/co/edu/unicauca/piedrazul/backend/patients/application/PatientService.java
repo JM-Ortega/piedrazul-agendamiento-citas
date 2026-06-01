@@ -162,12 +162,13 @@ public class PatientService implements PatientModuleApi {
 
         Patient patient = getPatientByDocumentNumberOrThrow(documentNumber);
         ensurePatientHasNoLinkedUser(patient);
-        validatePhone(patient.getPhone());
 
         verificationModuleApi.requestCode(
                 documentNumber,
                 VerificationPurpose.LINK_PATIENT_ACCOUNT,
-                patient.getPhone()
+                patient.getFirstName() + " " + patient.getLastName(),
+                patient.getPhone(),
+                patient.getEmail()
         );
     }
 
