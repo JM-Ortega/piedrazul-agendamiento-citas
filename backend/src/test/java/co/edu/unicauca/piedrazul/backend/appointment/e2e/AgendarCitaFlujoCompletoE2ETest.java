@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment.integration;
+package co.edu.unicauca.piedrazul.backend.appointment.e2e;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
@@ -8,9 +8,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
-import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
-import co.edu.unicauca.piedrazul.backend.patients.domain.Gender;
-import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
+import co.edu.unicauca.piedrazul.backend.patients.domain.*;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -22,10 +20,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -36,35 +34,31 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+/*
+ * E2E simple con H2 en memoria y contexto completo de Spring Boot.
+ * - MockMvc simula HTTP dentro del mismo proceso (controladores, filtros, validaciones, seguridad).
+ * - La autenticacion se simula con jwt() para poblar @AuthenticationPrincipal Jwt.
+ * - La persistencia y casos de uso son reales (sin mocks de repositorios/servicios).
+ */
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
-class AppointmentControllerIntegrationTest {
+class AgendarCitaFlujoCompletoE2ETest {
 
     private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final String USER_ID_STRING = "11111111-1111-1111-1111-111111111111";
 
-    @Autowired
-    MockMvc mockMvc;
-
-    @Autowired
-    DoctorRepository doctorRepository;
-
-    @Autowired
-    ScheduleRepository scheduleRepository;
-
-    @Autowired
-    PatientRepository patientRepository;
-
-    @Autowired
-    AppointmentJpaRepository appointmentJpaRepository;
-
+    @Autowired MockMvc mockMvc;
+    @Autowired DoctorRepository doctorRepository;
+    @Autowired ScheduleRepository scheduleRepository;
     private final ObjectMapper objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule());
+    @Autowired PatientRepository patientRepository;
+    @Autowired AppointmentJpaRepository appointmentJpaRepository;
 
     private UUID doctorId;
     private UUID patientId;
@@ -72,6 +66,7 @@ class AppointmentControllerIntegrationTest {
 
     @BeforeEach
     void setUp() {
+
         appointmentJpaRepository.deleteAll();
         scheduleRepository.deleteAll();
         doctorRepository.deleteAll();
@@ -79,6 +74,7 @@ class AppointmentControllerIntegrationTest {
 
         appointmentDate = nextWorkingDay(LocalDate.now().plusDays(1));
 
+        // Crear doctor
         Doctor doctor = new Doctor();
         doctor.setFirstName("Juan");
         doctor.setLastName("Perez");
@@ -101,6 +97,7 @@ class AppointmentControllerIntegrationTest {
         );
         scheduleRepository.save(schedule);
 
+        // Crear paciente
         Patient patient = new Patient(
                 DocumentType.CEDULA,
                 "12345678",
@@ -118,11 +115,13 @@ class AppointmentControllerIntegrationTest {
     }
 
     @Test
-    void deberiaRetornarFranjasDisponibles() throws Exception {
+    void pacienteAutenticadoAgendaCitaAutonomaExitosamente() throws Exception {
+
+        // 1. Consultar slots disponibles
         MvcResult slotsResult = mockMvc.perform(get("/api/appointments/available-slots")
                         .param("doctorId", doctorId.toString())
                         .param("date", appointmentDate.toString())
-                        .with(jwtForRole("PATIENT")))
+                        .with(jwtPatient()))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -131,23 +130,9 @@ class AppointmentControllerIntegrationTest {
                 objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class)
         );
         assertThat(slots).isNotEmpty();
-    }
+        String startTime = slots.getFirst().get("time").toString();
 
-    @Test
-    void deberiaAgendarCitaAutonomaYListarMisCitas() throws Exception {
-        MvcResult slotsResult = mockMvc.perform(get("/api/appointments/available-slots")
-                        .param("doctorId", doctorId.toString())
-                        .param("date", appointmentDate.toString())
-                        .with(jwtForRole("PATIENT")))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        List<Map<String, Object>> slots = objectMapper.readValue(
-                slotsResult.getResponse().getContentAsString(),
-                objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class)
-        );
-        String startTime = slots.get(0).get("time").toString();
-
+        // 2. Agendar la cita
         Map<String, Object> requestBody = Map.of(
                 "doctorId", doctorId.toString(),
                 "specialty", "FISIOTERAPIA",
@@ -160,11 +145,12 @@ class AppointmentControllerIntegrationTest {
         mockMvc.perform(post("/api/appointments")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(requestBody))
-                        .with(jwtForRole("PATIENT")))
+                        .with(jwtPatient()))
                 .andExpect(status().isCreated());
 
+        // 3. Consultar mis citas
         MvcResult myAppointmentsResult = mockMvc.perform(get("/api/appointments/me")
-                        .with(jwtForRole("PATIENT")))
+                        .with(jwtPatient()))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -173,18 +159,10 @@ class AppointmentControllerIntegrationTest {
                 objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class)
         );
 
+        // 4. Verificar que la cita aparece con estado AGENDADA
         assertThat(myAppointments).hasSize(1);
-        assertThat(myAppointments.get(0).get("appointmentState"))
+        assertThat(myAppointments.getFirst().get("appointmentState"))
                 .isEqualTo(AppointmentState.AGENDADA.name());
-    }
-
-    private static RequestPostProcessor jwtForRole(String role) {
-        return jwt()
-                .jwt(token -> token
-                        .subject(USER_ID.toString())
-                        .claim("preferred_username", "test.user")
-                        .claim("realm_access", Map.of("roles", List.of(role))))
-                .authorities(new SimpleGrantedAuthority("ROLE_" + role));
     }
 
     private static LocalDate nextWorkingDay(LocalDate date) {
@@ -204,5 +182,14 @@ class AppointmentControllerIntegrationTest {
             case FRIDAY -> Workday.VIERNES;
             default -> throw new IllegalArgumentException("Dia no laboral: " + dayOfWeek);
         };
+    }
+
+    private static RequestPostProcessor jwtPatient() {
+        return jwt()
+                .jwt(jwt -> jwt
+                        .subject(USER_ID_STRING)
+                        .claim("preferred_username", USER_ID_STRING)
+                        .claim("realm_access", Map.of("roles", List.of("PATIENT"))))
+                .authorities(new SimpleGrantedAuthority("ROLE_PATIENT"));
     }
 }

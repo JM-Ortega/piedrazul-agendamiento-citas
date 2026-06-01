@@ -17,16 +17,6 @@ spring:
   autoconfigure:
     exclude: org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration
 
-server:
-  port: 8080
-
-# Configuración mock de Keycloak
-keycloak:
-  server-url: http://localhost:8180
-  realm: piedrazul
-  client-id: piedrazul-backend
-  client-secret: test-secret
-
 # Logging
 logging:
   level:
