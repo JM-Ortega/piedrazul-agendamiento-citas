@@ -1,6 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { LucideAngularModule, Pencil, Settings } from 'lucide-angular';
-import { forkJoin } from 'rxjs';
+import { forkJoin, Observable } from 'rxjs';
 import { dtoSchedule } from '../../../../shared/models/dtos/schedule.dto';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
@@ -29,7 +29,7 @@ export class AdminConfigComponent implements OnInit {
   readonly Settings = Settings;
   readonly Pencil = Pencil;
 
-  private readonly DAY_TO_WORKDAY: { [day: number]: string } = {
+  private readonly DAY_TO_WORKDAY: Record<number, string> = {
     1: 'LUNES',
     2: 'MARTES',
     3: 'MIERCOLES',
@@ -83,7 +83,7 @@ export class AdminConfigComponent implements OnInit {
               doctors.map((d, i) => ({
                 ...d,
                 workdays: d.workdays ?? [],
-                ...this.mapSchedulesToDoctor(allSchedules[i], d),
+                ...this.mapSchedulesToDoctor(allSchedules[i]),
               }))
             );
             this.loading.set(false);
@@ -115,7 +115,7 @@ export class AdminConfigComponent implements OnInit {
 
   onFormSaved(event: DoctorSaveEvent): void {
     const { form, originalDoctor, originalWorkdays, removedWorkdays } = event; // ← añadir removedWorkdays
-    const calls: any[] = [];
+    const calls: Observable<unknown>[] = [];
 
     if (originalDoctor.appointmentInterval !== form.appointmentInterval)
       calls.push(
@@ -276,12 +276,9 @@ export class AdminConfigComponent implements OnInit {
     return time.length === 5 ? `${time}:00` : time;
   }
 
-  private mapSchedulesToDoctor(
-    schedules: dtoSchedule[],
-    doctor: Doctor
-  ): Partial<Doctor> {
+  private mapSchedulesToDoctor(schedules: dtoSchedule[]): Partial<Doctor> {
     if (!schedules?.length) return {};
-    const daySchedules: { [day: number]: DaySchedule } = {};
+    const daySchedules: Record<number, DaySchedule> = {};
     const workdays: number[] = [];
     schedules.forEach((s) => {
       const day = this.workdayToNumber(s.workday);
@@ -302,7 +299,7 @@ export class AdminConfigComponent implements OnInit {
   }
 
   private workdayToNumber(workday: dtoSchedule['workday']): number | null {
-    const map: { [key: string]: number } = {
+    const map: Record<string, number> = {
       LUNES: 1,
       MARTES: 2,
       MIERCOLES: 3,
@@ -319,7 +316,7 @@ export class AdminConfigComponent implements OnInit {
     ]).subscribe({
       next: ([doctors, schedules]) => {
         const freshDoctor = doctors.find((d) => d.id === doctorId) ?? fallback;
-        const mapped = this.mapSchedulesToDoctor(schedules, freshDoctor);
+        const mapped = this.mapSchedulesToDoctor(schedules);
         this.doctors.update((list) =>
           list.map((d) =>
             d.id === doctorId ? { ...freshDoctor, ...mapped } : d
