@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import Keycloak from 'keycloak-js';
@@ -7,6 +7,7 @@ import { ArrowLeft, CheckCircle, Eye, EyeOff, KeyRound, Calendar,
   LucideAngularModule, Search, UserPlus,} from 'lucide-angular';
 import { PatientPublicResponse, PatientService,} from '../../core/services/patient.service';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { FormatoPipe } from '../../shared/pipes/formatoPipe';
 
 type RegistroStep = 1 | 2 | 3;
 type PatientStatus =
@@ -19,11 +20,14 @@ type PatientStatus =
 @Component({
   selector: 'app-registro',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, MatDatepickerModule],
+  imports: [CommonModule, FormsModule, LucideAngularModule, MatDatepickerModule, FormatoPipe],
   templateUrl: './registro.component.html',
 })
-export class RegistroComponent {
-  private patientService = inject(PatientService);
+export class RegistroComponent implements OnInit {
+  ngOnInit(): void {
+    this.patientService.loadDocumentTypes();
+  }
+  protected patientService = inject(PatientService);
   private keycloak = inject(Keycloak);
   private router = inject(Router);
 

@@ -1,9 +1,11 @@
-import { Component, inject, output, signal } from '@angular/core';
+import { Component, inject, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { ArrowLeft, Calendar, LucideAngularModule } from 'lucide-angular';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
+import { PatientService } from '../../../../core/services/patient.service';
 import { BookingStateService } from '../../services/booking-state.service';
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
 /**
  * Capturar y validar los datos de un paciente que no fue encontrado en el sistema para
@@ -12,13 +14,18 @@ import { BookingStateService } from '../../services/booking-state.service';
 @Component({
   selector: 'app-booking-patient-register',
   standalone: true,
-  imports: [FormsModule, LucideAngularModule, MatDatepickerModule],
+  imports: [FormsModule, LucideAngularModule, MatDatepickerModule, FormatoPipe],
   templateUrl: './booking-patient-register.component.html',
 })
-export class BookingPatientRegisterComponent {
+export class BookingPatientRegisterComponent implements OnInit {
   readonly ArrowLeft = ArrowLeft;
   protected state = inject(BookingStateService);
+  protected patientService = inject(PatientService);
   Calendar = Calendar;
+
+  ngOnInit(): void {
+    this.patientService.loadDocumentTypes();
+  }
 
   advance = output<void>();
   goBack = output<void>();

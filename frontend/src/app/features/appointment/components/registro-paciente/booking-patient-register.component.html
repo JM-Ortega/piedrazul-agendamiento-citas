@@ -23,10 +23,9 @@
         class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
       >
         <option value="">Seleccione...</option>
-        <option value="REGISTRO_NACIMIENTO">Registro de Nacimiento</option>
-        <option value="TARJETA_IDENTIDAD">Tarjeta de Identidad</option>
-        <option value="CEDULA">Cédula</option>
-        <option value="PASAPORTE">Pasaporte</option>
+        @for (type of patientService.documentTypes(); track type) {
+          <option [value]="type">{{ type | formato}}</option>
+        }
       </select>
       @if (docTypeError()) {
         <p class="text-red-500 text-sm mt-1">Este campo es obligatorio</p>

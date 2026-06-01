@@ -22,6 +22,15 @@ export class PatientService {
 
   medicalRecords = signal<MedicalRecord[]>([]);
   error = signal<string | null>(null);
+  readonly documentTypes = signal<string[]>([]);
+
+  loadDocumentTypes(): void {
+    if (this.documentTypes().length > 0) return;
+    this.getAllDocumentTypes().subscribe({
+      next: (types) => this.documentTypes.set(types),
+      error: () => {},
+    });
+  }
 
   getMe(): Observable<Patient> {
     return this.http.get<Patient>(`${this.apiUrl}/patients/me`);
@@ -93,5 +102,9 @@ export class PatientService {
       `${this.apiUrl}/patients/link-user-account/confirm`,
       data,
     );
+  }
+
+  getAllDocumentTypes(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.apiUrl}/patients/document-types`);
   }
 }
