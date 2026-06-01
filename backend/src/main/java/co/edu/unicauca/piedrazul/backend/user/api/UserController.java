@@ -62,19 +62,6 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/patients")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> createPatientUser(
-            @Valid @RequestBody CreateSystemUserPayload request
-    ) {
-        if (request.roles() != null && request.roles().stream().anyMatch(r -> r != Role.PATIENT)) {
-            throw new InvalidPatientRoleAssignmentException("Patients can only be assigned the PATIENT role");
-        }
-
-        createAccountUseCase.execute(request);
-        return ResponseEntity.noContent().build();
-    }
-
     /**
      * Asigna el rol scheduler a un doctor.
      * @param username Identificación del doctor al que se le asignará el rol
