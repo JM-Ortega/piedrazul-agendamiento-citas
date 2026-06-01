@@ -6,7 +6,6 @@ import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequ
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
 import co.edu.unicauca.piedrazul.backend.user.application.CreateAccountUseCase;
 import co.edu.unicauca.piedrazul.backend.user.application.UserService;
-import co.edu.unicauca.piedrazul.backend.user.exception.InvalidPatientRoleAssignmentException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -66,21 +65,13 @@ class UserControllerTest {
 	}
 
 	@Test
-	void createPatientUserDelegatesWhenOnlyPatientRoleIsProvided() {
+	void createUserDelegatesWhenOnlyPatientRoleIsProvided() {
 		CreateSystemUserPayload payload = buildPayload(List.of(Role.PATIENT));
 
-		var response = userController.createPatientUser(payload);
+		var response = userController.createUser(payload);
 
 		assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
 		verify(createAccountUseCase).execute(payload);
-	}
-
-	@Test
-	void createPatientUserRejectsAdditionalRoles() {
-		CreateSystemUserPayload payload = buildPayload(List.of(Role.PATIENT, Role.DOCTOR));
-
-		assertThrows(InvalidPatientRoleAssignmentException.class,
-				() -> userController.createPatientUser(payload));
 	}
 
 	@Test

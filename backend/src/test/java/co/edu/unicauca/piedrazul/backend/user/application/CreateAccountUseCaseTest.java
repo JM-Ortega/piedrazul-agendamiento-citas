@@ -115,7 +115,7 @@ class CreateAccountUseCaseTest {
 		"doctor01",
 		doctorRequest
 	);
-	verify(patientModuleApi, never()).createPatientWithUser(any(), any(), any(), any(), any(), any());
+		verify(patientModuleApi, never()).createPatient(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -141,7 +141,7 @@ class CreateAccountUseCaseTest {
 	createAccountUseCase.execute(payload);
 
 	verify(keycloakUserProvisioningService).getOrCreateUser(eq(payload.user()), anyList());
-	verify(patientModuleApi).createPatientWithUser(
+		verify(patientModuleApi).createPatient(
 		userId,
 		"Luis",
 		"Perez",
@@ -191,7 +191,7 @@ class CreateAccountUseCaseTest {
 		"both01",
 		doctorRequest
 	);
-	verify(patientModuleApi).createPatientWithUser(
+		verify(patientModuleApi).createPatient(
 		userId,
 		"Maria",
 		"Gomez",

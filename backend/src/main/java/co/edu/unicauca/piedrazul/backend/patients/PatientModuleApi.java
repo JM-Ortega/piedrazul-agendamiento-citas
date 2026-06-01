@@ -36,13 +36,4 @@ public interface PatientModuleApi {
 
     void createPatient(UUID userId, String firstName, String lastName, String identificacion,
                                String email, CreatePatientUserRequest request);
-
-        /**
-         * Backwards-compatible alias used by tests and older callers.
-         */
-        default void createPatientWithUser(UUID userId, String firstName, String lastName,
-                                                                           String identificacion, String email,
-                                                                           CreatePatientUserRequest request) {
-                createPatient(userId, firstName, lastName, identificacion, email, request);
-        }
 }
