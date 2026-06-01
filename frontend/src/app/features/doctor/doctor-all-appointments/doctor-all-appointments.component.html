@@ -7,32 +7,36 @@
 
   <!-- Statistics Cards -->
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-    <div class="bg-linear-to-br from-[#215c98] to-[#4e92d9] text-white rounded-xl shadow-lg p-6">
-    <p class="text-white text-sm uppercase tracking-wide mb-1">
-      Total de Citas
-    </p>
-    <p class="text-4xl font-bold text-white">
-      {{ stats().total }}
-    </p>
-  </div>
+    <div
+      class="bg-linear-to-br from-[#215c98] to-[#4e92d9] text-white rounded-xl shadow-lg p-6"
+    >
+      <p class="text-white text-sm uppercase tracking-wide mb-1">
+        Total de Citas
+      </p>
+      <p class="text-4xl font-bold text-white">
+        {{ stats().total }}
+      </p>
+    </div>
 
-  <div class="bg-linear-to-br from-[#1f7a52] to-[#45b884] text-white rounded-xl shadow-lg p-6">
-    <p class="text-white text-sm uppercase tracking-wide mb-1">
-      Próximas Citas
-    </p>
-    <p class="text-4xl font-bold text-white">
-      {{ stats().upcoming }}
-    </p>
-  </div>
+    <div
+      class="bg-linear-to-br from-[#1f7a52] to-[#45b884] text-white rounded-xl shadow-lg p-6"
+    >
+      <p class="text-white text-sm uppercase tracking-wide mb-1">
+        Próximas Citas
+      </p>
+      <p class="text-4xl font-bold text-white">
+        {{ stats().upcoming }}
+      </p>
+    </div>
 
-  <div class="bg-linear-to-br from-[#b86a2d] to-[#e39a58] text-white rounded-xl shadow-lg p-6">
-    <p class="text-white text-sm uppercase tracking-wide mb-1">
-      Pendientes
-    </p>
-    <p class="text-4xl font-bold text-white">
-      {{ stats().pending }}
-    </p>
-  </div>
+    <div
+      class="bg-linear-to-br from-[#b86a2d] to-[#e39a58] text-white rounded-xl shadow-lg p-6"
+    >
+      <p class="text-white text-sm uppercase tracking-wide mb-1">Pendientes</p>
+      <p class="text-4xl font-bold text-white">
+        {{ stats().pending }}
+      </p>
+    </div>
   </div>
 
   <!-- Filters -->
@@ -44,8 +48,11 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <!-- Filtro fecha -->
       <div>
-        <label class="block text-gray-700 text-base mb-2">Por Fecha</label>
+        <label for="filterDate" class="block text-gray-700 text-base mb-2"
+          >Por Fecha</label
+        >
         <select
+          id="filterDate"
           [value]="filterDate()"
           (change)="filterDate.set($any($event.target).value)"
           class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -56,8 +63,9 @@
           <option value="past">Pasadas</option>
         </select>
 
-        @if (filterDate() === "specific") {
+        @if (filterDate() === 'specific') {
           <input
+            id="filterSpecificDate"
             type="date"
             [value]="filterSpecificDate()"
             (change)="filterSpecificDate.set($any($event.target).value)"
@@ -68,8 +76,11 @@
 
       <!-- Filtro estado -->
       <div>
-        <label class="block text-gray-700 text-base mb-2">Por Estado</label>
+        <label for="filterStatus" class="block text-gray-700 text-base mb-2"
+          >Por Estado</label
+        >
         <select
+          id="filterStatus"
           [value]="filterStatus()"
           (change)="filterStatus.set($any($event.target).value)"
           class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -145,7 +156,7 @@
   <div class="bg-white rounded-xl shadow-md border-2 border-blue-100 p-6">
     <h2 class="text-[#163c63] text-xl font-semibold mb-6">
       {{ filteredAppointments().length }}
-      {{ filteredAppointments().length === 1 ? "Cita" : "Citas" }}
+      {{ filteredAppointments().length === 1 ? 'Cita' : 'Citas' }}
     </h2>
 
     @if (filteredAppointments().length === 0) {
@@ -186,12 +197,12 @@
                   "
                 >
                   <p class="text-2xl font-bold leading-none">
-                    {{ apt.date.split("-")[2] }}
+                    {{ apt.date.split('-')[2] }}
                   </p>
                   <p class="text-xs uppercase mt-1">
                     {{ getMonthShort(apt.date) }}
                   </p>
-                  <p class="text-xs">{{ apt.date.split("-")[0] }}</p>
+                  <p class="text-xs">{{ apt.date.split('-')[0] }}</p>
                   <div
                     class="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-current/30"
                   >
@@ -213,10 +224,12 @@
                       [size]="16"
                       class="text-[#4e92d9]"
                     ></lucide-angular>
-                    <span class="text-[#163c63]">Doc: {{ apt.documentNumber }}</span>
+                    <span class="text-[#163c63]"
+                      >Doc: {{ apt.documentNumber }}</span
+                    >
                   </div>
                   @if (
-                    isPast(apt.date) && apt.appointmentState !== "CANCELADA"
+                    isPast(apt.date) && apt.appointmentState !== 'CANCELADA'
                   ) {
                     <span class="inline-block mt-2 text-sm text-gray-500 italic"
                       >(Cita pasada)</span
@@ -225,8 +238,13 @@
                 </div>
               </div>
               <div class="pt-2">
-                <span [class]="'px-4 py-2 rounded-lg border-2 text-base font-medium text-center ' 
-                  + statusColor(apt.appointmentState)"> {{ statusLabel(apt.appointmentState) }}
+                <span
+                  [class]="
+                    'px-4 py-2 rounded-lg border-2 text-base font-medium text-center ' +
+                    statusColor(apt.appointmentState)
+                  "
+                >
+                  {{ statusLabel(apt.appointmentState) }}
                 </span>
               </div>
             </div>
@@ -235,15 +253,15 @@
       </div>
     }
   </div>
-</div>
 
-<!-- Export Modal -->
-@if (showExportModal()) {
-  <app-export-modal
-    [idDoctor]="currentDoctor()?.id ?? null"
-    [filterStatus]="filterStatus()"
-    [doctorName]="currentDoctor()?.name ?? null"
-    [todayFormatted]="formatDate(today)"
-    (closed)="showExportModal.set(false)"
-  />
-}
+  <!-- Export Modal -->
+  @if (showExportModal()) {
+    <app-export-modal
+      [idDoctor]="currentDoctor()?.id ?? null"
+      [filterStatus]="filterStatus()"
+      [doctorName]="currentDoctor()?.name ?? null"
+      [todayFormatted]="formatDate(today)"
+      (closed)="showExportModal.set(false)"
+    />
+  }
+</div>
