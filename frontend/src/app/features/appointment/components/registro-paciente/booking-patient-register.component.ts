@@ -392,4 +392,11 @@ export class BookingPatientRegisterComponent {
     this.emailLimitMsg.set('');
     this.guardianPhoneLimitMsg.set('');
   }
+
+  onBirthDateChange(value: Date | string): void {
+    const formatted = value instanceof Date
+      ? this.state.formatLocalDate(value)
+      : value;
+    this.setPatientField('birthDate', formatted as any);
+  }
 }

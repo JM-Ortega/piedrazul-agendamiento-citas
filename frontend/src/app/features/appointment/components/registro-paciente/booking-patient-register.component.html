@@ -119,7 +119,7 @@
           type="text"
           [matDatepicker]="birthPicker"
           [ngModel]="getPatientField('birthDate')"
-          (ngModelChange)="setPatientField('birthDate', $event)"
+          (ngModelChange)="onBirthDateChange($event)"
           [max]="maxBirthDate"
           placeholder="mm/dd/aaaa"
           readonly
