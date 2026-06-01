@@ -14,6 +14,7 @@ import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyLinked
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.mappers.PatientApiMapper;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientRepository;
+import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import co.edu.unicauca.piedrazul.backend.user.UserAccountProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
@@ -49,6 +50,8 @@ public class PatientService implements PatientModuleApi {
         this.verificationModuleApi = verificationModuleApi;
     }
 
+
+
     @Override
     public PatientData createPatient(
             PatientDocumentType documentType,
@@ -81,7 +84,7 @@ public class PatientService implements PatientModuleApi {
     }
 
     @Override
-    public void createPatientWithUser(UUID userId, String firstName, String lastName, String identificacion,
+    public void createPatient(UUID userId, String firstName, String lastName, String identificacion,
                                       String email, CreatePatientUserRequest request) {
         Patient patient = buildPatient(
                 request.documentType(),
@@ -97,6 +100,61 @@ public class PatientService implements PatientModuleApi {
         );
 
         patientRepository.save(patient);
+    }
+
+    public PatientData createPatientWithUser(
+            String username,
+            String password,
+            PatientDocumentType documentType,
+            String documentNumber,
+            String firstName,
+            String lastName,
+            String phone,
+            String email,
+            PatientGender gender,
+            LocalDate birthDate,
+            String guardianPhone
+    ) {
+        validateUsername(username);
+        validateDocumentNumber(documentNumber);
+        validateUsernameMatchesDocumentNumber(username, documentNumber);
+        ensurePatientDoesNotExist(documentNumber);
+
+        UUID userId = userModuleApi.findUserByUsername(username)
+                .map(user -> user.id())
+                .orElseGet(() -> {
+                    validatePassword(password);
+
+                    return userAccountProvisioningApi.getOrCreateUser(
+                            new CreateSystemUserRequest(
+                                    username,
+                                    firstName,
+                                    lastName,
+                                    email,
+                                    password
+                            ),
+                            List.of(Role.PATIENT)
+                    ).id();
+                });
+
+        if (userModuleApi.findUserByUsername(username).isPresent()) {
+            userModuleApi.ensurePatientRole(userId);
+        }
+
+        Patient patient = buildPatient(
+                documentType,
+                documentNumber,
+                firstName,
+                lastName,
+                phone,
+                email,
+                gender,
+                birthDate,
+                guardianPhone,
+                userId
+        );
+
+        return toData(patientRepository.save(patient));
     }
 
     public void requestLinkUserAccountCode(String documentNumber) {

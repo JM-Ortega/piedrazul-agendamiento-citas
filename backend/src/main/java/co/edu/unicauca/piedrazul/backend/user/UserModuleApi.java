@@ -26,4 +26,6 @@ public interface UserModuleApi {
     void activateUser(UUID id);
 
     void deactivateUser(UUID id);
+
+    void ensurePatientRole(UUID userId);
 }

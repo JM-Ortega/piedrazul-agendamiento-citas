@@ -62,23 +62,16 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Endpoind público para crear un nuevo paciente en el sistema.
-     * @param request Datos del usuario a crear
-     * @return Respuesta HTTP 204 si la operación fue exitosa
-     */
-    @PostMapping("/patient-user")
+    @PostMapping("/patients")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> createPatientUser(
             @Valid @RequestBody CreateSystemUserPayload request
     ) {
-        if (request.roles() == null || request.roles().size() != 1 || !request.roles().contains(Role.PATIENT)){
-            throw new InvalidPatientRoleAssignmentException(
-                    "Un paciente solo puede tener asignado el rol PATIENT y ningún otro privilegio adicional."
-            );
+        if (request.roles() != null && request.roles().stream().anyMatch(r -> r != Role.PATIENT)) {
+            throw new InvalidPatientRoleAssignmentException("Patients can only be assigned the PATIENT role");
         }
 
         createAccountUseCase.execute(request);
-
         return ResponseEntity.noContent().build();
     }
 

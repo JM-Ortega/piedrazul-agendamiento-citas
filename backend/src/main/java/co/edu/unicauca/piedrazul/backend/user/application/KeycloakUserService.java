@@ -67,6 +67,11 @@ public class KeycloakUserService implements UserModuleApi {
         keycloakClient.deleteUser(id);
     }
 
+    @Override
+    public void ensurePatientRole(UUID userId) {
+        keycloakClient.assignRoleIfMissing(userId, Role.PATIENT);
+    }
+
     private List<UserSummary> findUsersByRole(Role role) {
         return keycloakClient.findUsersByRole(role)
                 .stream()

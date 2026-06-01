@@ -74,6 +74,7 @@ public class CreateAccountUseCase implements UserProvisioningApi {
             throw new InvalidUserDataException("Los datos del paciente son requeridos para crearlo");
         }
 
+        // Use the newer alias to match external API/tests
         patientModuleApi.createPatientWithUser(userId, firstName, lastName, identificacion, email, patientRequest);
     }
 

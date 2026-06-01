@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.patients.api;
 
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.CreatePatientWithUserRequest;
 import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.ConfirmLinkUserAccountRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
@@ -36,6 +37,24 @@ public class PatientController {
     @PreAuthorize("hasRole('ADMIN')")
     public PatientResponse create(@Valid @RequestBody CreatePatientRequest request) {
         PatientData patient = patientService.createPatient(
+                request.getDocumentType(),
+                request.getDocumentNumber(),
+                request.getFirstName(),
+                request.getLastName(),
+                request.getPhone(),
+                request.getEmail(),
+                request.getGender(),
+                request.getBirthDate(),
+                request.getGuardianPhone()
+        );
+        return toResponse(patient);
+    }
+
+    @PostMapping("/with-user")
+    public PatientResponse createWithUser(@Valid @RequestBody CreatePatientWithUserRequest request) {
+        PatientData patient = patientService.createPatientWithUser(
+                request.getUsername(),
+                request.getPassword(),
                 request.getDocumentType(),
                 request.getDocumentNumber(),
                 request.getFirstName(),
