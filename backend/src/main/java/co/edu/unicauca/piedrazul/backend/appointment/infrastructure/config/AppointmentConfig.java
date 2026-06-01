@@ -85,26 +85,6 @@ public class AppointmentConfig {
     }
 
     @Bean
-    public ScheduleManualAppointmentUseCase scheduleManualAppointmentUseCase(
-            AppointmentSchedulingService appointmentSchedulingService,
-            ManualPatientResolutionStrategy manualPatientResolutionStrategy) {
-        return new ScheduleManualAppointmentUseCaseImpl(
-                appointmentSchedulingService,
-                manualPatientResolutionStrategy
-        );
-    }
-
-    @Bean
-    public ScheduleAutonomousAppointmentUseCase scheduleAutonomousAppointmentUseCase(
-            AppointmentSchedulingService appointmentSchedulingService,
-            AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy) {
-        return new ScheduleAutonomousAppointmentUseCaseImpl(
-                appointmentSchedulingService,
-                autonomousPatientResolutionStrategy
-        );
-    }
-
-    @Bean
     public GetAvailableSlotsUseCase getAvailableSlotsUseCase(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
