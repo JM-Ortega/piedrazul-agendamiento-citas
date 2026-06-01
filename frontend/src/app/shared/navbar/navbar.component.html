@@ -119,8 +119,8 @@
           [class]="
             'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
             (rla11.isActive
-              ? 'bg-white text-blue-700'
-              : 'text-white hover:bg-blue-600')
+              ? 'bg-white text-[#215c98]'
+              : 'text-white hover:bg-[#4e92d9]')
           "
         >
           <lucide-angular [img]="UserCog" [size]="20"></lucide-angular>
@@ -196,7 +196,10 @@
               @if (showRoleDropdown()) {
                 <div
                   class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50"
+                  role="menu"
+                  tabindex="0"
                   (click)="$event.stopPropagation()"
+                  (keydown)="$event.stopPropagation()"
                 >
                   <div class="px-4 py-3 bg-gray-50 border-b border-gray-100">
                     <p
@@ -348,7 +351,7 @@
         <a
           routerLink="/admin/medicos"
           (click)="menuOpen.set(false)"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-blue-600 text-white"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <lucide-angular [img]="UserCog" [size]="20"></lucide-angular>
           Gestión Médicos
@@ -434,18 +437,30 @@
 
 <!-- Overlay para cerrar dropdown al hacer click fuera -->
 @if (showRoleDropdown()) {
-  <div class="fixed inset-0 z-40" (click)="showRoleDropdown.set(false)"></div>
+  <div
+    class="fixed inset-0 z-40"
+    role="button"
+    tabindex="0"
+    (click)="showRoleDropdown.set(false)"
+    (keydown.escape)="showRoleDropdown.set(false)"
+  ></div>
 }
 
 <!-- Modal Cerrar Sesión -->
 @if (showLogoutModal()) {
   <div
     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    role="button"
+    tabindex="0"
     (click)="cancelLogout()"
+    (keydown.escape)="cancelLogout()"
   >
     <div
       class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md"
+      role="dialog"
+      tabindex="0"
       (click)="$event.stopPropagation()"
+      (keydown)="$event.stopPropagation()"
     >
       <div class="flex flex-col items-center text-center">
         <div class="bg-red-100 rounded-full p-4 mb-4">

@@ -1,15 +1,32 @@
+import { CommonModule } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import {Calendar, CheckCircle, Clock, CreditCard, Download, FileSpreadsheet, FileText, LucideAngularModule, 
-        Phone, PlusCircle, Search, Stethoscope, Tag, User, UserCircle, X, Check, AlertCircle
-      } from 'lucide-angular';
+import {
+  AlertCircle,
+  Calendar,
+  Check,
+  CheckCircle,
+  Clock,
+  CreditCard,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  LucideAngularModule,
+  Phone,
+  PlusCircle,
+  Search,
+  Stethoscope,
+  Tag,
+  User,
+  UserCircle,
+  X,
+} from 'lucide-angular';
 import { SchedulerService } from '../../core/services/scheduler.service';
 import { AppointmentExportRequest } from '../../shared/models/dtos/AppointmentExportRequest.dto';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
 import { ExportFormatBackend } from '../../shared/models/types/ExportFormatBackend.type';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
-import {CommonModule} from "@angular/common";
 
 type ExportFormat = 'excel' | 'pdf' | 'csv';
 
@@ -318,10 +335,12 @@ export class SchedulerDashboardComponent implements OnInit {
     this.schedulerService.cancelAppointment(appointmentId).subscribe({
       next: () => {
         this.showToast('La cita fue cancelada exitosamente', 'success');
-        this.appointments.set( this.appointments().map((a) =>
+        this.appointments.set(
+          this.appointments().map((a) =>
             a.idAppointment === appointmentId
               ? { ...a, appointmentState: 'CANCELADA' }
-              : a,),
+              : a
+          )
         );
       },
       error: () => {
@@ -339,8 +358,9 @@ export class SchedulerDashboardComponent implements OnInit {
     this.toastMessage.set(message);
     this.toastType.set(type);
     setTimeout(() => {
-      this.toastMessage.set(''); 
-      this.toastType.set(null);}, 3000);
+      this.toastMessage.set('');
+      this.toastType.set(null);
+    }, 3000);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
