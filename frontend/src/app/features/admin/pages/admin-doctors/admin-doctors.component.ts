@@ -224,4 +224,7 @@ export class AdminDoctorsComponent implements OnInit {
       'text-blue-600'
     );
   }
+  getSpecialtyName(value: string): string {
+    return this.specialtiesList.find((s) => s.value === value)?.name || value;
+  }
 }
