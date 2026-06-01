@@ -157,15 +157,18 @@ export class SchedulerDashboardComponent implements OnInit {
       filtered = filtered.filter(
         (a) => a.appointmentState === this.filterStatus()
       );
-    return [...filtered].sort((a, b) =>
-      a.date === b.date
-        ? a.startTime > b.startTime
-          ? 1
-          : -1
-        : a.date > b.date
-          ? 1
-          : -1
-    );
+    const stateOrder: Record<string, number> = {
+      AGENDADA: 1,
+      ATENDIDA: 2,
+      CANCELADA: 3,
+    };
+    return [...filtered].sort((a, b) => {
+      const stateDiff = stateOrder[a.appointmentState] - stateOrder[b.appointmentState];
+      if (stateDiff !== 0) return stateDiff;
+      const dateTimeA = new Date(`${a.date}T${a.startTime}`);
+      const dateTimeB = new Date(`${b.date}T${b.startTime}`);
+      return dateTimeA.getTime() - dateTimeB.getTime();
+    });
   });
 
   activeResults = computed(() =>
