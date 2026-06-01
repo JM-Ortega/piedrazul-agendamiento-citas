@@ -4,6 +4,8 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientRegistrationData;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientSnapshot;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.ResolvedPatient;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -25,6 +27,7 @@ public class ManualPatientResolutionStrategy implements PatientResolutionStrateg
             return new ResolvedPatient(snapshot.idPatient(), snapshot.patientInfo());
         }
 
+        // Mapeo a la entidad del dominio
         PatientInfo patientInfo = PatientInfo.of(
                 context.documentType(),
                 context.documentNumber(),
