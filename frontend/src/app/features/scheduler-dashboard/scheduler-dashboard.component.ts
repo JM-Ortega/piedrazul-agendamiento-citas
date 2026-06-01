@@ -99,6 +99,9 @@ export class SchedulerDashboardComponent implements OnInit {
   searched = signal(false);
 
   // ── Export signals ────────────────────────────────────────────────────────
+  showCancelModal = signal(false);
+  pendingCancelId = signal<string | null>(null);
+
   showExportModal = signal(false);
   exportFormat = signal<ExportFormat>('excel');
   isExporting = signal(false);
@@ -301,7 +304,16 @@ export class SchedulerDashboardComponent implements OnInit {
     });
   }
 
-  cancelAppointment(appointmentId: string): void {
+  requestCancelAppointment(appointmentId: string): void {
+    this.pendingCancelId.set(appointmentId);
+    this.showCancelModal.set(true);
+  }
+
+  confirmCancelAppointment(): void {
+    const appointmentId = this.pendingCancelId();
+    if (!appointmentId) return;
+    this.showCancelModal.set(false);
+    this.pendingCancelId.set(null);
     this.schedulerService.cancelAppointment(appointmentId).subscribe({
       next: () => {
         this.showToast('La cita fue cancelada exitosamente', 'success');
@@ -315,6 +327,11 @@ export class SchedulerDashboardComponent implements OnInit {
         this.showToast('Ocurrió un error al cancelar la cita', 'error');
       },
     });
+  }
+
+  dismissCancelModal(): void {
+    this.showCancelModal.set(false);
+    this.pendingCancelId.set(null);
   }
 
   private showToast(message: string, type: 'success' | 'error'): void {

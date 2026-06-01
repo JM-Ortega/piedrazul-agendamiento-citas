@@ -34,6 +34,9 @@ export class PatientDashboardComponent implements OnInit {
   readonly toastMessage = signal('');
   readonly toastType = signal<'success' | 'error' | null>(null);
 
+  readonly showCancelModal = signal(false);
+  readonly pendingCancelId = signal<string | null>(null);
+
   readonly monthNames = [
     'enero',
     'febrero',
@@ -97,7 +100,18 @@ export class PatientDashboardComponent implements OnInit {
     return this.monthNames[month].slice(0, 3);
   }
 
-  cancelAppointment(appointmentId: string): void {
+  requestCancelAppointment(appointmentId: string): void {
+    this.pendingCancelId.set(appointmentId);
+    this.showCancelModal.set(true);
+  }
+
+  confirmCancelAppointment(): void {
+    const appointmentId = this.pendingCancelId();
+    if (!appointmentId) return;
+
+    this.showCancelModal.set(false);
+    this.pendingCancelId.set(null);
+
     this.appointmentService.cancelAppointment(appointmentId).subscribe({
       next: () => {
         this.showToast('La cita fue cancelada exitosamente', 'success');
@@ -113,6 +127,11 @@ export class PatientDashboardComponent implements OnInit {
         this.showToast('Ocurrió un error al cancelar la cita', 'error');
       },
     });
+  }
+
+  dismissCancelModal(): void {
+    this.showCancelModal.set(false);
+    this.pendingCancelId.set(null);
   }
 
   private showToast(message: string, type: 'success' | 'error'): void {
