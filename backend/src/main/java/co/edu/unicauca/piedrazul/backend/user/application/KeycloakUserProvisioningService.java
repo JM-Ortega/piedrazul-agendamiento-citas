@@ -8,9 +8,7 @@ import co.edu.unicauca.piedrazul.backend.user.infrastructure.KeycloakUserClient;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.stereotype.Service;
 
-import java.util.EnumSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -54,5 +52,4 @@ public class KeycloakUserProvisioningService implements UserAccountProvisioningA
                 user.getEmail()
         );
     }
-
 }
