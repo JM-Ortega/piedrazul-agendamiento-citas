@@ -8,10 +8,11 @@ import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
-import co.edu.unicauca.piedrazul.backend.user.infrastructure.KeycloakUserClient;
 import org.springframework.stereotype.Service;
 
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -50,6 +51,8 @@ public class CreateAccountUseCase implements UserProvisioningApi {
         }
 
         List<Role> roles = payload.roles().stream().distinct().toList();
+        validateRoles(roles);
+
         var user = keycloakUserProvisioningService.getOrCreateUser(payload.user(), roles);
 
         if (roles.contains(Role.DOCTOR)) {
@@ -77,5 +80,21 @@ public class CreateAccountUseCase implements UserProvisioningApi {
         patientModuleApi.createPatient(userId, firstName, lastName, identificacion, email, patientRequest);
     }
 
+    private void validateRoles(List<Role> roles) {
+        Set<Role> roleSet = EnumSet.copyOf(roles);
 
+        Set<Set<Role>> validCombinations = Set.of(
+                Set.of(Role.PATIENT),
+                Set.of(Role.ADMIN),
+                Set.of(Role.DOCTOR),
+                Set.of(Role.SCHEDULER),
+                Set.of(Role.DOCTOR, Role.SCHEDULER),
+                Set.of(Role.DOCTOR, Role.PATIENT),
+                Set.of(Role.DOCTOR, Role.SCHEDULER, Role.PATIENT)
+        );
+
+        if (!validCombinations.contains(roleSet)) {
+            throw new InvalidUserDataException("Combinación de roles no valida: " + roles);
+        }
+    }
 }
