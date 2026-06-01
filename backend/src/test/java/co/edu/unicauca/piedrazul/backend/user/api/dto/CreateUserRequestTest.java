@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.user.api.dto;
 
 import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateUserRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;

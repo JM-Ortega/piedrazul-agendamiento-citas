@@ -4,6 +4,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.DoctorAdminUserData;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import jakarta.transaction.Transactional;
@@ -36,8 +37,6 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
 
     @Override
     public List<LocalTime> getSlotsByDoctor(UUID idDoctor, LocalDate date) {
-
-
         return scheduleService.getAvailableIntervalsByWorkday(doctorRepository.findByIdDoctor(idDoctor), toWorkday(date.getDayOfWeek()));
     }
 
@@ -63,6 +62,15 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     public List<UUID> getActiveDoctorIds() {
         return doctorRepository.findByStatusTrue()
                 .stream()
+                .map(Doctor::getIdDoctor)
+                .toList();
+    }
+
+    @Override
+    public List<UUID> getActiveGeneralDoctorIds(){
+        return doctorRepository.findByStatusTrue()
+                .stream()
+                .filter(doctor -> doctor.getSpecialty().contains(Specialty.MEDICINA_GENERAL))
                 .map(Doctor::getIdDoctor)
                 .toList();
     }

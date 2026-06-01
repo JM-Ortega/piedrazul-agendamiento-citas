@@ -1,5 +1,5 @@
 <div class="space-y-5">
-  <h2 class="text-blue-800 text-2xl mb-4">Datos del Paciente</h2>
+  <h2 class="text-[#163c63] text-2xl mb-4">Datos del Paciente</h2>
 
   <div>
     <label class="block text-gray-700 mb-2 text-lg">Buscar por Número de Documento</label>
@@ -24,7 +24,7 @@
 
           @if (state.searchLoading()) {
             <div class="absolute right-3 top-1/2 -translate-y-1/2">
-              <svg class="animate-spin h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24">
+              <svg class="animate-spin h-5 w-5 text-[#215c98]" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10"
                         stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
@@ -37,8 +37,8 @@
           type="button"
           (click)="onSearchExact()"
           [disabled]="state.searchLoading()"
-          class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl
-                 transition-colors flex items-center gap-2 disabled:opacity-50"
+          class="bg-[#215c98] hover:bg-[#163c63] text-white px-5 py-3 rounded-xl
+                 transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer"
         >
           <lucide-angular [img]="Search" [size]="18"></lucide-angular>
           Buscar
@@ -101,7 +101,7 @@
         </div>
         <div>
           <p class="text-gray-500 text-sm">Género</p>
-          <p class="font-medium">{{ p.gender }}</p>
+          <p class="font-medium">{{ p.gender | formato }}</p>
         </div>
       </div>
     </div>
@@ -112,7 +112,7 @@
       type="button"
       (click)="onChangeMode()"
       class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600
-             hover:bg-gray-50 transition-colors"
+             hover:bg-gray-50 transition-colors cursor-pointer"
     >
       ← Cambiar modo
     </button>
@@ -121,8 +121,8 @@
       <button
         type="button"
         (click)="confirmPatient()"
-        class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl
-               text-lg transition-colors"
+        class="flex-1 bg-[#215c98] hover:bg-[#163c63] text-white py-3 rounded-xl
+               text-lg transition-colors cursor-pointer"
       >
         Continuar →
       </button>

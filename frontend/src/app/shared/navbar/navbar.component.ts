@@ -24,6 +24,7 @@ import {
   UserCog,
   Users,
   X,
+  FolderOpen,
 } from 'lucide-angular';
 import { AppService } from '../../core/services/app.service';
 
@@ -54,6 +55,7 @@ export class NavbarComponent implements OnInit {
   readonly ChevronDown = ChevronDown;
   readonly UserCog = UserCog;
   readonly Check = Check;
+  readonly FolderOpen = FolderOpen;
   readonly exactMatch = { exact: true };
 
   menuOpen = signal(false);

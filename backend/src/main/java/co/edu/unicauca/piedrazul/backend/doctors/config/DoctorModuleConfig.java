@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.doctors.config;
 
+import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorExternalServiceImpl;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
@@ -29,8 +30,8 @@ public class DoctorModuleConfig {
      * Bean para DoctorService
      */
     @Bean
-    public DoctorService doctorService(DoctorRepository doctorRepository, UserModuleApi userModuleApi) {
-        return new DoctorService(doctorRepository, userModuleApi);
+    public DoctorService doctorService(DoctorRepository doctorRepository, UserModuleApi userModuleApi, AppointmentExternalService appointmentExternalService) {
+        return new DoctorService(doctorRepository, userModuleApi, appointmentExternalService);
     }
 
     /**

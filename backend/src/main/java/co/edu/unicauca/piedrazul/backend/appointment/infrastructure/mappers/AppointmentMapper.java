@@ -2,18 +2,11 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
 import org.springframework.stereotype.Component;
 
 @Component
 public class AppointmentMapper {
-    private final PatientConsultPort patientConsultPort;
-
-    public AppointmentMapper(PatientConsultPort patientConsultPort) {
-        this.patientConsultPort = patientConsultPort;
-    }
-
     //De dominio a JPA
     public AppointmentEntity toEntity(Appointment appointment) {
         if (appointment == null) {
@@ -28,8 +21,7 @@ public class AppointmentMapper {
         appointmentEntity.setIdDoctor(appointment.getIdDoctor());
         appointmentEntity.setDoctorName(appointment.getDoctorName());
         appointmentEntity.setIdPatient(appointment.getIdPatient());
-        appointmentEntity.setPatientName(patientConsultPort.findById(appointment.getIdPatient()).getFirstName()
-                + " " + patientConsultPort.findById(appointment.getIdPatient()).getLastName());
+        appointmentEntity.setPatientName(appointment.getPatientName());
         appointmentEntity.setSpecialty(appointment.getSpecialty());
         appointmentEntity.setAppointmentState(appointment.getAppointmentState());
         appointmentEntity.setDate(appointment.getDate());

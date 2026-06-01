@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.config.security;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -37,10 +38,16 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/patients/with-user").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/patients/link-user-account/request-code").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/patients/link-user-account/confirm").permitAll()
+                        .requestMatchers(HttpMethod.GET,"/api/patients/document-types").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter))
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json");
+                            response.getWriter().write("{\"error\":\"unauthorized\"}");
+                        })
                 );
 
         return http.build();

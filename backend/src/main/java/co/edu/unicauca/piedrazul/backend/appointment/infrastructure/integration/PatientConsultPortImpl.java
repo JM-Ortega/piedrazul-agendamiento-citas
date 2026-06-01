@@ -1,13 +1,13 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientRegistrationData;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientSnapshot;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.PatientRegistrationData;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.PatientInfoMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.PatientRegistrationMapper;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientData;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -27,7 +27,7 @@ public class PatientConsultPortImpl implements PatientConsultPort {
     public PatientInfo findById(UUID idPatient) {
         return patientModuleApi.findById(idPatient)
                 .map(PatientInfoMapper::toPatientInfo)
-                .orElseThrow(() -> new AppointmentPatientNotFoundException("Patient not found: " + idPatient));
+                .orElseThrow(() -> new AppointmentPatientNotFoundException("Paciente con id " + idPatient + " no encontrado"));
     }
 
     @Override

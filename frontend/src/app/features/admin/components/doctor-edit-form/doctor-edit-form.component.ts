@@ -57,7 +57,7 @@ export class DoctorEditFormComponent implements OnInit {
 
   readonly timeOptions: string[] = (() => {
     const opts: string[] = [];
-    for (let h = 5; h <= 12; h++) {
+    for (let h = 7; h <= 12; h++) {
       for (let m = 0; m < 60; m += 5) {
         if (h === 12 && m > 0) break;
         opts.push(
@@ -228,5 +228,30 @@ export class DoctorEditFormComponent implements OnInit {
       originalWorkdays: this.originalWorkdays(),
       removedWorkdays, // ← añadir
     });
+  }
+  onLaborStartInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value;
+    if (value) {
+      const parts = value.split('-');
+      if (parts[0].length > 4) {
+        parts[0] = parts[0].slice(0, 4);
+        input.value = parts.join('-');
+        this.updateField('laborStart', input.value);
+      }
+    }
+  }
+
+  onLaborEndInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value;
+    if (value) {
+      const parts = value.split('-');
+      if (parts[0].length > 4) {
+        parts[0] = parts[0].slice(0, 4);
+        input.value = parts.join('-');
+        this.updateField('laborEnd', input.value);
+      }
+    }
   }
 }

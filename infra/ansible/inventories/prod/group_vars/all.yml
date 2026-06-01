@@ -1,0 +1,68 @@
+---
+# Directorios
+app_dir: /opt/piedrazul
+compose_project_name: piedrazul
+compose_file: "{{ app_dir }}/compose/prod.yml"
+compose_src_dir: "{{ playbook_dir }}/../../compose"
+
+# Container registry
+ghcr_registry: ghcr.io
+ghcr_namespace: jm-ortega/piedrazul-agendamiento-citas
+backend_image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/backend"
+
+# Dominio base
+base_domain: piedrazul.org
+
+# Spring / backend
+spring_profiles_active: prod
+server_port: 8080
+server_forward_headers_strategy: framework
+app_timezone: America/Bogota
+
+# Base de datos app
+db_host: postgres
+db_port: 5432
+db_name: piedrazul_db
+db_user: piedrazul
+db_schema: piedrazul
+
+# JPA / Hibernate
+jpa_ddl_auto: update
+jpa_show_sql: false
+jpa_format_sql: false
+
+# Errores
+error_include_stacktrace: never
+error_include_message: always
+
+# Uploads
+max_file_size: 10MB
+max_request_size: 10MB
+
+# Actuator
+management_exposed_endpoints: health,info
+management_health_details: when-authorized
+
+# Logging
+log_level_root: INFO
+log_level_security: INFO
+log_level_sql: WARN
+log_level_sql_bind: WARN
+
+# Keycloak
+kc_realm: piedrazul
+kc_port: 8180
+kc_backend_client_id: piedrazul-backend
+kc_automation_client_id: piedrazul-keycloak-automation
+kc_bootstrap_admin_user: kc-bootstrap
+kc_admin_user: kc-admin
+kc_health_enabled: true
+kc_metrics_enabled: true
+kc_db_username: keycloak_user
+kc_db_schema: keycloak
+
+# Notificaciones
+notifications_sendgrid_enabled: true
+notifications_sendgrid_sandbox_mode: false
+notifications_email_from: no-reply@mail.piedrazul.org
+notifications_email_from_name: Piedrazul Salud

@@ -1,0 +1,14 @@
+---
+# Playbook de deploy: rollout de nueva imagen.
+# No reconfigura el servidor ni toca Keycloak.
+# Requiere IMAGE_TAG como variable extra: -e "image_tag=abc123"
+
+- name: Deploy piedrazul
+  hosts: vps
+  gather_facts: false
+
+  tasks:
+    - name: Desplegar nueva imagen
+      ansible.builtin.include_role:
+        name: app
+        tasks_from: deploy.yml

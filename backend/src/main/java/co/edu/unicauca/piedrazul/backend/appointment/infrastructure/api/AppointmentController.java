@@ -29,7 +29,9 @@ public class AppointmentController {
     private final GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase;
     private final CitaDtoMapper citaDtoMapper;
     private final ListMyAppointmentsUseCase listMyAppointmentsUseCase;
+    private final IsNewPatientUseCase isNewPatientUseCase;
     private final UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase;
+    private final CancelAppointmentUseCase cancelAppointmentUseCase;
 
     public AppointmentController(
             GetAvailableSlotsUseCase getAvailableSlotsUseCase,
@@ -39,7 +41,9 @@ public class AppointmentController {
             GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase,
             CitaDtoMapper citaDtoMapper,
             ListMyAppointmentsUseCase listMyAppointmentsUseCase,
-            UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase) {
+            IsNewPatientUseCase isNewPatientUseCase,
+            UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase,
+            CancelAppointmentUseCase cancelAppointmentUseCase) {
         this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
         this.scheduleManualAppointmentUseCase = scheduleManualAppointmentUseCase;
         this.scheduleAutonomousAppointmentUseCase = scheduleAutonomousAppointmentUseCase;
@@ -47,7 +51,9 @@ public class AppointmentController {
         this.getSpecialtiesWithDoctorUseCase = getSpecialtiesWithDoctorUseCase;
         this.citaDtoMapper = citaDtoMapper;
         this.listMyAppointmentsUseCase = listMyAppointmentsUseCase;
+        this.isNewPatientUseCase = isNewPatientUseCase;
         this.updateAppointmentStatusUseCase = updateAppointmentStatusUseCase;
+        this.cancelAppointmentUseCase = cancelAppointmentUseCase;
     }
 
     // Franjas disponibles según el médico y la fecha
@@ -88,6 +94,13 @@ public class AppointmentController {
                         .map(citaDtoMapper::toResponse)
                         .toList()
         );
+    }
+
+    // Sirve para saber si un paciente es nuevo
+    @GetMapping({"/{patientId}/is-new-patient"})
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
+    public ResponseEntity<Boolean> isNewPatient(@PathVariable UUID patientId) {
+        return ResponseEntity.ok(isNewPatientUseCase.isNewPatient(patientId));
     }
 
     // Crear cita
@@ -137,8 +150,8 @@ public class AppointmentController {
     // Listar un médico por defecto para cada especialidad
     @GetMapping("/specialties-with-doctor")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<List<DoctorResponse>> getSpecialtiesWithDoctor() {
-        return ResponseEntity.ok(getSpecialtiesWithDoctorUseCase.getSpecialtiesWithDoctor());
+    public ResponseEntity<List<DoctorResponse>> getSpecialtiesWithDoctor(@RequestParam(required = false) UUID patientId) {
+        return ResponseEntity.ok(getSpecialtiesWithDoctorUseCase.getSpecialtiesWithDoctor(patientId));
     }
 
     // Actualizar el estado de una cita a atendida
@@ -155,6 +168,14 @@ public class AppointmentController {
     public ResponseEntity<Void> markAppointmentAsUnassisted(@PathVariable UUID appointmentId) {
         updateAppointmentStatusUseCase.markAsUnassisted(appointmentId);
         return ResponseEntity.ok().build();
+    }
+
+    //Cancelar una cita
+    @PutMapping("/{appointmentId}/cancel")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT')")
+    public ResponseEntity<Void> cancelAppointment(@PathVariable UUID appointmentId) {
+        cancelAppointmentUseCase.cancel(appointmentId);
+        return ResponseEntity.noContent().build(); // 204
     }
 
     private String resolvePerformedBy(Jwt jwt) {

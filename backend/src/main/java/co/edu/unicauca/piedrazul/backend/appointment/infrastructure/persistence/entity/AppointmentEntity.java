@@ -45,7 +45,7 @@ public class AppointmentEntity {
     @Column(name = "appot_state", nullable = false)
     private AppointmentState appointmentState;
 
-    @FutureOrPresent
+
     @Column(name = "date", nullable = false)
     private LocalDate date;
 

@@ -5,11 +5,11 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { LucideAngularModule, UserSearch } from 'lucide-angular';
+import { LucideAngularModule, UserSearch, Calendar } from 'lucide-angular';
 import { BookingStateService } from '../../services/booking-state.service';
 import { CalendarService } from '../../services/calendar.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import {SpecialtyPipe} from "../seleccion-especialidad/specialtyPipe";
+import {FormatoPipe} from "../../../../shared/pipes/formatoPipe";
 
 /**
  * Permite al usuario elegir una fecha y hora
@@ -29,12 +29,13 @@ import {SpecialtyPipe} from "../seleccion-especialidad/specialtyPipe";
     MatInputModule,
     MatFormFieldModule,
     MatNativeDateModule,
-    SpecialtyPipe,
+    FormatoPipe,
   ],
   templateUrl: './booking-schedule-selector.component.html',
 })
 export class BookingScheduleSelectorComponent {
   readonly UserSearch = UserSearch;
+  readonly Calendar = Calendar;
 
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
@@ -83,7 +84,7 @@ export class BookingScheduleSelectorComponent {
       .getAvailableSlots(this.state.effectiveDoctorId(), dateStr)
       .subscribe({
         next: (slots) => {
-          if (this.state.isSchedulerContext()) {
+          if (this.state.isSchedulerContext() || this.state.isDoctorContext()) {
             const today = this.state.formatLocalDate(new Date());
             if (dateStr === today) {
               const cutoff = new Date(Date.now() + 10 * 60 * 1000);
