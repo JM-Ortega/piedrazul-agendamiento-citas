@@ -336,8 +336,10 @@ export class AdminCreateUserComponent implements OnInit {
         if (this.hasDoctorRole) {
           if (!this.userForm.phone.trim()) {
             this.errors.phone = 'El teléfono es obligatorio.';
-          } else if (!/^\d{7,15}$/.test(this.userForm.phone)) {
-            this.errors.phone = 'Debe contener entre 7 y 15 dígitos numéricos.';
+          } else if (!/^\d{10}$/.test(this.userForm.phone)) {
+            // ← exactamente 10
+            this.errors.phone =
+              'El teléfono debe tener exactamente 10 dígitos.';
           }
         }
         break;
