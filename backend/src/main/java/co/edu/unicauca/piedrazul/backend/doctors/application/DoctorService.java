@@ -1,15 +1,15 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
-import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
+import co.edu.unicauca.piedrazul.backend.doctors.DoctorProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
+import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import jakarta.transaction.Transactional;
 
@@ -20,7 +20,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-public class DoctorService {
+public class DoctorService implements DoctorProvisioningApi {
     private final DoctorRepository doctorRepository;
     private final UserModuleApi userModuleApi;
     private final AppointmentExternalService appointmentExternalService;
@@ -31,23 +31,32 @@ public class DoctorService {
         this.appointmentExternalService = appointmentExternalService;
     }
 
-    // Crear un nuevo doctor
     @Transactional
-    public DoctorResponse createDoctor(CreateDoctorRequest request) {
+    @Override
+    public void createDoctor(UUID userId, String firstName, String lastName, String identificacion, CreateDoctorRequest request) {
+        if (doctorRepository.findByIdUser(userId) != null) {
+            return;
+        }
+
+        persistDoctor(userId, firstName, lastName, identificacion, request);
+    }
+
+    private void persistDoctor(UUID userId, String firstName, String lastName, String identificacion, CreateDoctorRequest request) {
         validateLaborDateRange(request.laborStart(), request.laborEnd());
 
         // 1. Mapeo de DTO a Entidad
         Doctor doctor = new Doctor();
-        doctor.setFirstName(request.firstName());
-        doctor.setLastName(request.lastName());
+        doctor.setFirstName(firstName);
+        doctor.setLastName(lastName);
         doctor.setDocumentType(request.documentType());
-        doctor.setIdentification(request.identification());
+        doctor.setIdentification(identificacion);
         doctor.setPhone(request.phone());
         doctor.setSpecialty(request.specialty());
         doctor.setLaborStart(request.laborStart());
         doctor.setLaborEnd(request.laborEnd());
         doctor.setAppointmentInterval(request.appointmentInterval());
         doctor.setStatus(calculateActiveStatus(request.laborStart(), request.laborEnd()));
+        doctor.setIdUser(userId);
 
         List<Schedule> schedules = request.schedules().stream()
                 .map(s -> new Schedule(
@@ -60,24 +69,13 @@ public class DoctorService {
 
         doctor.setSchedules(schedules);
 
-        // 2. Crear el usuario
-        doctor.setIdUser(userModuleApi.getOrCreateDoctorUser(
-                request.identification(),
-                request.firstName(),
-                request.lastName(),
-                request.email(),
-                request.password()
-        ));
-
-        // 3. Deshabilitar el usuario si el doctor no está activo
-        if (!doctor.isStatus())
-            userModuleApi.deactivateUser(doctor.getIdUser());
-
-        // 4. Persistencia
+        // 3. Persistencia
         Doctor savedDoctor = doctorRepository.save(doctor);
 
-        // 5. Retornar un DTO de respuesta
-        return DoctorResponse.fromEntity(savedDoctor);
+        // 4. Deshabilitar el usuario si el doctor no está activo.
+        if (!savedDoctor.isStatus()) {
+            userModuleApi.deactivateUser(savedDoctor.getIdUser());
+        }
     }
 
     private boolean calculateActiveStatus(LocalDate start, LocalDate end) {

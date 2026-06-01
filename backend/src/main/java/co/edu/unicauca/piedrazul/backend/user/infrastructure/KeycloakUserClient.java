@@ -8,7 +8,6 @@ import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsExcepti
 import jakarta.ws.rs.core.Response;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
-import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -33,13 +32,12 @@ public class KeycloakUserClient {
         this.props = props;
     }
 
-    public UUID createUser(
+    public UserRepresentation createUser(
             String username,
             String firstName,
             String lastName,
             String email,
-            String password,
-            Role role
+            String password
     ) {
         RealmResource realm = keycloak.realm(props.getRealm());
 
@@ -89,9 +87,8 @@ public class KeycloakUserClient {
             keycloakId = location.substring(location.lastIndexOf('/') + 1);
         }
 
-        assignRealmRole(keycloakId, role);
-
-        return UUID.fromString(keycloakId);
+        user.setId(keycloakId);
+        return user;
     }
 
     public List<UserRepresentation> findUsersByRole(Role role) {
@@ -101,19 +98,16 @@ public class KeycloakUserClient {
                 .getUserMembers();
     }
 
-    public Optional<UUID> findUserIdByUsername(String username) {
+    public Optional<UserRepresentation> findUserByUsername(String username) {
         if (username == null || username.isBlank()) {
             return Optional.empty();
         }
 
-        List<UserRepresentation> users = keycloak.realm(props.getRealm())
+        return keycloak.realm(props.getRealm())
                 .users()
-                .searchByUsername(username, true);
-
-        return users.stream()
-                .findFirst()
-                .map(UserRepresentation::getId)
-                .map(UUID::fromString);
+                .searchByUsername(username, true)
+                .stream()
+                .findFirst();
     }
 
     public void assignRoleIfMissing(UUID keycloakId, Role role) {
@@ -147,6 +141,13 @@ public class KeycloakUserClient {
                 .users()
                 .get(keycloakId.toString())
                 .update(user);
+    }
+
+    public void deleteUser(UUID keycloakId) {
+        keycloak.realm(props.getRealm())
+                .users()
+                .get(keycloakId.toString())
+                .remove();
     }
 
     public boolean existsUser(UUID keycloakId) {

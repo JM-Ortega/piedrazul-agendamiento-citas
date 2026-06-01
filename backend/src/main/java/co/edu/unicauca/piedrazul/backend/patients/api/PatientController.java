@@ -1,11 +1,11 @@
 package co.edu.unicauca.piedrazul.backend.patients.api;
 
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.CreatePatientWithUserRequest;
 import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.ConfirmLinkUserAccountRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.CreatePatientRequest;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.CreatePatientWithUserRequest;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.RequestLinkUserAccountCodeRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientPublicResponse;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientResponse;
@@ -13,7 +13,6 @@ import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientSummaryR
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientService;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import jakarta.validation.Valid;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;

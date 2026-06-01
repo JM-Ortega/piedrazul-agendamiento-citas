@@ -17,7 +17,7 @@
 
     <!-- Desktop Nav -->
     <nav class="hidden md:flex items-center gap-2">
-      @if (appService.hasRole("SCHEDULER")) {
+      @if (appService.hasRole('SCHEDULER')) {
         <a
           routerLink="/agendador"
           #rla4="routerLinkActive"
@@ -49,7 +49,7 @@
         </a>
       }
 
-      @if (appService.hasRole("DOCTOR")) {
+      @if (appService.hasRole('DOCTOR')) {
         <a
           routerLink="/medico"
           #rla8="routerLinkActive"
@@ -82,7 +82,7 @@
         </a>
       }
 
-      @if (appService.hasRole("ADMIN")) {
+      @if (appService.hasRole('ADMIN')) {
         <a
           routerLink="/admin"
           #rla6="routerLinkActive"
@@ -112,9 +112,23 @@
           <lucide-angular [img]="Users" [size]="20"></lucide-angular>
           Gestionar Usuarios
         </a>
+        <a
+          routerLink="/admin/medicos"
+          #rla11="routerLinkActive"
+          routerLinkActive
+          [class]="
+            'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
+            (rla11.isActive
+              ? 'bg-white text-[#215c98]'
+              : 'text-white hover:bg-[#4e92d9]')
+          "
+        >
+          <lucide-angular [img]="UserCog" [size]="20"></lucide-angular>
+          Gestión Médicos
+        </a>
       }
 
-      @if (appService.hasRole("PATIENT")) {
+      @if (appService.hasRole('PATIENT')) {
         <a
           routerLink="/paciente"
           #rla7="routerLinkActive"
@@ -149,7 +163,9 @@
 
       <!-- Usuario logueado -->
       @if (appService.currentRole()) {
-        <div class="flex items-center gap-3 ml-4 pl-4 border-l border-[#4e92d9]">
+        <div
+          class="flex items-center gap-3 ml-4 pl-4 border-l border-[#4e92d9]"
+        >
           @if (appService.hasMultipleRoles()) {
             <div class="relative">
               <button
@@ -180,7 +196,10 @@
               @if (showRoleDropdown()) {
                 <div
                   class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50"
+                  role="menu"
+                  tabindex="0"
                   (click)="$event.stopPropagation()"
+                  (keydown)="$event.stopPropagation()"
                 >
                   <div class="px-4 py-3 bg-gray-50 border-b border-gray-100">
                     <p
@@ -271,8 +290,10 @@
 
   <!-- Mobile Nav -->
   @if (menuOpen()) {
-    <div class="md:hidden bg-[#215c98] px-4 py-3 space-y-2 max-h-[calc(100vh-80px)] overflow-y-auto">
-      @if (appService.hasRole("SCHEDULER")) {
+    <div
+      class="md:hidden bg-[#215c98] px-4 py-3 space-y-2 max-h-[calc(100vh-80px)] overflow-y-auto"
+    >
+      @if (appService.hasRole('SCHEDULER')) {
         <a
           routerLink="/agendador"
           (click)="menuOpen.set(false)"
@@ -291,7 +312,7 @@
         </a>
       }
 
-      @if (appService.hasRole("DOCTOR")) {
+      @if (appService.hasRole('DOCTOR')) {
         <a
           routerLink="/medico"
           (click)="menuOpen.set(false)"
@@ -310,7 +331,7 @@
         </a>
       }
 
-      @if (appService.hasRole("ADMIN")) {
+      @if (appService.hasRole('ADMIN')) {
         <a
           routerLink="/admin"
           (click)="menuOpen.set(false)"
@@ -327,9 +348,17 @@
           <lucide-angular [img]="Users" [size]="20"></lucide-angular>
           Usuarios
         </a>
+        <a
+          routerLink="/admin/medicos"
+          (click)="menuOpen.set(false)"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
+        >
+          <lucide-angular [img]="UserCog" [size]="20"></lucide-angular>
+          Gestión Médicos
+        </a>
       }
 
-      @if (appService.hasRole("PATIENT")) {
+      @if (appService.hasRole('PATIENT')) {
         <a
           routerLink="/paciente"
           (click)="menuOpen.set(false)"
@@ -408,18 +437,30 @@
 
 <!-- Overlay para cerrar dropdown al hacer click fuera -->
 @if (showRoleDropdown()) {
-  <div class="fixed inset-0 z-40" (click)="showRoleDropdown.set(false)"></div>
+  <div
+    class="fixed inset-0 z-40"
+    role="button"
+    tabindex="0"
+    (click)="showRoleDropdown.set(false)"
+    (keydown.escape)="showRoleDropdown.set(false)"
+  ></div>
 }
 
 <!-- Modal Cerrar Sesión -->
 @if (showLogoutModal()) {
   <div
     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    role="button"
+    tabindex="0"
     (click)="cancelLogout()"
+    (keydown.escape)="cancelLogout()"
   >
     <div
       class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md"
+      role="dialog"
+      tabindex="0"
       (click)="$event.stopPropagation()"
+      (keydown)="$event.stopPropagation()"
     >
       <div class="flex flex-col items-center text-center">
         <div class="bg-red-100 rounded-full p-4 mb-4">

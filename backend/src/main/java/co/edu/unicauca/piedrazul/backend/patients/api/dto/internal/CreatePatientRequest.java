@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.patients.api.dto.output;
+package co.edu.unicauca.piedrazul.backend.patients.api.dto.internal;
 
 import co.edu.unicauca.piedrazul.backend.jackson.normalization.NormalizeName;
 import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;

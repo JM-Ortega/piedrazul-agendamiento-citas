@@ -4,9 +4,9 @@ import { map, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
+import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
 import { dtoSchedule } from '../../shared/models/dtos/schedule.dto';
 import { Doctor } from '../../shared/models/interfaces/doctor.model';
-import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
 import { Patient } from '../../shared/models/interfaces/patient.model';
 
 @Injectable({ providedIn: 'root' })
@@ -15,42 +15,52 @@ export class DoctorService {
   private apiUrl = environment.apiUrl;
 
   medicalRecords = signal<MedicalRecord[]>([]);
-
   getMe(): Observable<Doctor> {
-    return this.http.get<any>(`${this.apiUrl}/doctor/doctors/me`).pipe(
-      map(
-        (res) =>
-          ({
-            id: res.id,
-            name: res.name,
-            specialty: res.specialty,
-            appointmentInterval: res.appointmentInterval,
-            laborStart: res.laborStart,
-            laborEnd: res.laborEnd,
-            status: res.status,
-            workdays: [],
-            startTime: '',
-            endTime: '',
-            daySchedules: {},
-          }) as Doctor,
-      ),
-    );
-  }
+    interface DoctorMeResponse {
+      id: string;
+      name: string;
+      specialty: string;
+      appointmentInterval: number;
+      laborStart: string;
+      laborEnd: string;
+      status: boolean;
+    }
 
+    return this.http
+      .get<DoctorMeResponse>(`${this.apiUrl}/doctor/doctors/me`)
+      .pipe(
+        map(
+          (res) =>
+            ({
+              id: res.id,
+              name: res.name,
+              specialty: res.specialty,
+              appointmentInterval: res.appointmentInterval,
+              laborStart: res.laborStart,
+              laborEnd: res.laborEnd,
+              status: res.status,
+              workdays: [],
+              startTime: '',
+              endTime: '',
+              daySchedules: {},
+            }) as Doctor
+        )
+      );
+  }
   getDoctorById(doctorId: string): Observable<dtoDoctor> {
     return this.http.get<dtoDoctor>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}`,
+      `${this.apiUrl}/doctor/doctors/${doctorId}`
     );
   }
 
   getSchedulesByDoctor(doctorId: string): Observable<dtoSchedule[]> {
     return this.http.get<dtoSchedule[]>(
-      `${this.apiUrl}/doctor/schedules/${doctorId}`,
+      `${this.apiUrl}/doctor/schedules/${doctorId}`
     );
   }
 
   getTodayAppointmentsByDoctor(
-    doctorId: string,
+    doctorId: string
   ): Observable<AppointmentsPatient[]> {
     const d = new Date();
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -61,30 +71,36 @@ export class DoctorService {
 
   updateAppointmentAsAttended(
     appointmentId: string,
-    state: string,
+    state: string
   ): Observable<void> {
     return this.http.put<void>(
       `${this.apiUrl}/appointments/${appointmentId}/mark-as-attended`,
-      { appointmentState: state },
+      { appointmentState: state }
     );
   }
 
   updateAppointmentAsUnassisted(
     appointmentId: string,
-    state: string,
+    state: string
   ): Observable<void> {
     return this.http.put<void>(
       `${this.apiUrl}/appointments/${appointmentId}/mark-as-unassisted`,
-      { appointmentState: state },
+      { appointmentState: state }
     );
   }
 
   loadMedicalRecordsByPatient(patientId: string): void {
-    this.http.get<MedicalRecord[]>(`${this.apiUrl}/clinical-history/patient/${patientId}`)
+    this.http
+      .get<
+        MedicalRecord[]
+      >(`${this.apiUrl}/clinical-history/patient/${patientId}`)
       .subscribe((records) => this.medicalRecords.set(records));
   }
 
-  addMedicalRecord(idAppointment: string, description: string): Observable<MedicalRecord> {
+  addMedicalRecord(
+    idAppointment: string,
+    description: string
+  ): Observable<MedicalRecord> {
     return this.http.post<MedicalRecord>(`${this.apiUrl}/clinical-history`, {
       idAppointment,
       description,
@@ -92,6 +108,8 @@ export class DoctorService {
   }
 
   getPatientByAppointment(appointmentId: string): Observable<Patient> {
-    return this.http.get<Patient>(`${this.apiUrl}/patients/${appointmentId}/patient-attended`);
+    return this.http.get<Patient>(
+      `${this.apiUrl}/patients/${appointmentId}/patient-attended`
+    );
   }
 }

@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.patients;
 
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientUserRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 
 import java.time.LocalDate;
@@ -32,4 +33,16 @@ public interface PatientModuleApi {
             LocalDate birthDate,
             String guardianPhone
     );
+
+    void createPatient(UUID userId, String firstName, String lastName, String identificacion,
+                               String email, CreatePatientUserRequest request);
+
+        /**
+         * Backwards-compatible alias used by tests and older callers.
+         */
+        default void createPatientWithUser(UUID userId, String firstName, String lastName,
+                                                                           String identificacion, String email,
+                                                                           CreatePatientUserRequest request) {
+                createPatient(userId, firstName, lastName, identificacion, email, request);
+        }
 }

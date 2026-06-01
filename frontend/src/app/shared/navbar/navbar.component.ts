@@ -12,6 +12,7 @@ import {
   Check,
   ChevronDown,
   ClipboardList,
+  FolderOpen,
   Home,
   Hospital,
   LogOut,
@@ -24,7 +25,6 @@ import {
   UserCog,
   Users,
   X,
-  FolderOpen,
 } from 'lucide-angular';
 import { AppService } from '../../core/services/app.service';
 

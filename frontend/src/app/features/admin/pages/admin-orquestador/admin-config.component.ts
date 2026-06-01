@@ -4,13 +4,13 @@ import { forkJoin } from 'rxjs';
 import { dtoSchedule } from '../../../../shared/models/dtos/schedule.dto';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
-import { AdminService } from '../../service/admin.service';
-import { DoctorCardComponent } from '../doctor-card/doctor-card.component';
+import { DoctorCardComponent } from '../../components/doctor-card/doctor-card.component';
 import {
   DoctorEditFormComponent,
   DoctorSaveEvent,
-} from '../doctor-edit-form/doctor-edit-form.component';
-import { AdminModalsComponent } from '../modals/admin-modals.component';
+} from '../../components/doctor-edit-form/doctor-edit-form.component';
+import { AdminModalsComponent } from '../../components/modals/modals-horarios/admin-modals.component';
+import { AdminService } from '../../service/admin.service';
 
 @Component({
   selector: 'app-admin-config',
@@ -53,13 +53,13 @@ export class AdminConfigComponent implements OnInit {
 
   // ── Computed ──────────────────────────────────────────────────────────────
   totalSpecialties = computed(
-    () => new Set(this.doctors().map((d) => d.specialty)).size,
+    () => new Set(this.doctors().map((d) => d.specialty)).size
   );
   avgInterval = computed(() => {
     const docs = this.doctors();
     return docs.length
       ? Math.round(
-          docs.reduce((acc, d) => acc + d.appointmentInterval, 0) / docs.length,
+          docs.reduce((acc, d) => acc + d.appointmentInterval, 0) / docs.length
         )
       : 0;
   });
@@ -76,7 +76,7 @@ export class AdminConfigComponent implements OnInit {
     this.adminService.getDoctors().subscribe({
       next: (doctors) => {
         forkJoin(
-          doctors.map((d) => this.adminService.getSchedulesByDoctor(d.id)),
+          doctors.map((d) => this.adminService.getSchedulesByDoctor(d.id))
         ).subscribe({
           next: (allSchedules) => {
             this.doctors.set(
@@ -84,13 +84,13 @@ export class AdminConfigComponent implements OnInit {
                 ...d,
                 workdays: d.workdays ?? [],
                 ...this.mapSchedulesToDoctor(allSchedules[i], d),
-              })),
+              }))
             );
             this.loading.set(false);
           },
           error: () => {
             this.doctors.set(
-              doctors.map((d) => ({ ...d, workdays: d.workdays ?? [] })),
+              doctors.map((d) => ({ ...d, workdays: d.workdays ?? [] }))
             );
             this.loading.set(false);
           },
@@ -121,8 +121,8 @@ export class AdminConfigComponent implements OnInit {
       calls.push(
         this.adminService.updateAppointmentInterval(
           form.id,
-          form.appointmentInterval,
-        ),
+          form.appointmentInterval
+        )
       );
     if (originalDoctor.laborStart !== form.laborStart)
       calls.push(this.adminService.updateLaborStart(form.id, form.laborStart));
@@ -139,28 +139,18 @@ export class AdminConfigComponent implements OnInit {
       const workday = this.DAY_TO_WORKDAY[day];
       const ds = form.daySchedules?.[day];
       const startTime = this.toTimeBackend(
-        ds?.startTime ?? form.startTime ?? '05:00',
+        ds?.startTime ?? form.startTime ?? '05:00'
       );
       const endTime = this.toTimeBackend(
-        ds?.endTime ?? form.endTime ?? '12:00',
+        ds?.endTime ?? form.endTime ?? '12:00'
       );
       if (!originalWorkdays.includes(day))
         calls.push(
-          this.adminService.createSchedule(
-            form.id,
-            workday,
-            startTime,
-            endTime,
-          ),
+          this.adminService.createSchedule(form.id, workday, startTime, endTime)
         );
       else
         calls.push(
-          this.adminService.updateSchedule(
-            form.id,
-            workday,
-            startTime,
-            endTime,
-          ),
+          this.adminService.updateSchedule(form.id, workday, startTime, endTime)
         );
     });
 
@@ -183,7 +173,7 @@ export class AdminConfigComponent implements OnInit {
         this.errorGuardado.set(
           raw.startsWith('User is already active')
             ? 'El médico ya está trabajando activamente. Debe deshabilitarlo primero para poder cambiar su período laboral.'
-            : raw,
+            : raw
         );
         this.showErrorModal.set(true);
       },
@@ -210,15 +200,13 @@ export class AdminConfigComponent implements OnInit {
         .subscribe({
           next: () => {
             this.doctors.update((list) =>
-              list.map((d) =>
-                d.id === doctor.id ? { ...d, status: true } : d,
-              ),
+              list.map((d) => (d.id === doctor.id ? { ...d, status: true } : d))
             );
             this.onCloseToggleModal();
           },
           error: (err) => {
             this.forceModalMessage.set(
-              err?.error?.detail ?? 'Error al habilitar el médico.',
+              err?.error?.detail ?? 'Error al habilitar el médico.'
             );
             this.onCloseToggleModal();
             this.showForceModal.set(true);
@@ -229,14 +217,14 @@ export class AdminConfigComponent implements OnInit {
     this.adminService.disableDoctor(doctor.id, false).subscribe({
       next: () => {
         this.doctors.update((list) =>
-          list.map((d) => (d.id === doctor.id ? { ...d, status: false } : d)),
+          list.map((d) => (d.id === doctor.id ? { ...d, status: false } : d))
         );
         this.onCloseToggleModal();
       },
       error: (err) => {
         this.forceModalMessage.set(
           err?.error?.detail ??
-            'El médico tiene restricciones para ser deshabilitado.',
+            'El médico tiene restricciones para ser deshabilitado.'
         );
         this.showConfirmModal.set(false);
         this.showForceModal.set(true);
@@ -250,7 +238,7 @@ export class AdminConfigComponent implements OnInit {
     this.adminService.disableDoctor(target.id, true).subscribe({
       next: () => {
         this.doctors.update((list) =>
-          list.map((d) => (d.id === target.id ? { ...d, status: false } : d)),
+          list.map((d) => (d.id === target.id ? { ...d, status: false } : d))
         );
         this.showForceModal.set(false);
         this.forceModalMessage.set('');
@@ -258,7 +246,7 @@ export class AdminConfigComponent implements OnInit {
       },
       error: (err) => {
         this.forceModalMessage.set(
-          err?.error?.detail ?? 'Error al forzar la deshabilitación.',
+          err?.error?.detail ?? 'Error al forzar la deshabilitación.'
         );
       },
     });
@@ -290,7 +278,7 @@ export class AdminConfigComponent implements OnInit {
 
   private mapSchedulesToDoctor(
     schedules: dtoSchedule[],
-    doctor: Doctor,
+    doctor: Doctor
   ): Partial<Doctor> {
     if (!schedules?.length) return {};
     const daySchedules: { [day: number]: DaySchedule } = {};
@@ -334,13 +322,13 @@ export class AdminConfigComponent implements OnInit {
         const mapped = this.mapSchedulesToDoctor(schedules, freshDoctor);
         this.doctors.update((list) =>
           list.map((d) =>
-            d.id === doctorId ? { ...freshDoctor, ...mapped } : d,
-          ),
+            d.id === doctorId ? { ...freshDoctor, ...mapped } : d
+          )
         );
       },
       error: () => {
         this.doctors.update((list) =>
-          list.map((d) => (d.id === doctorId ? fallback : d)),
+          list.map((d) => (d.id === doctorId ? fallback : d))
         );
       },
     });

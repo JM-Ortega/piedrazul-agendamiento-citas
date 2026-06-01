@@ -12,6 +12,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.Appointm
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
+import co.edu.unicauca.piedrazul.backend.patients.PatientLookupApi;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
@@ -29,20 +30,21 @@ public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppoi
     }
 
     public ScheduleManualAppointmentUseCaseImpl(
-                        AppointmentRepository appointmentRepository,
-                        DoctorConfigConsultPort doctorConfigConsultPort,
-                        AppointmentService appointmentService,
-                        PatientConsultPort patientConsultPort,
-                        ApplicationEventPublisher eventPublisher) {
+            AppointmentRepository appointmentRepository,
+            DoctorConfigConsultPort doctorConfigConsultPort,
+            AppointmentService appointmentService,
+            PatientLookupApi patientLookupApi,
+            PatientConsultPort patientConsultPort,
+            ApplicationEventPublisher eventPublisher) {
                 this(
-                                new AppointmentSchedulingService(
+                        new AppointmentSchedulingService(
                                                 appointmentRepository,
                                                 doctorConfigConsultPort,
                                                 appointmentService,
                                                                 eventPublisher,
                                                                 new IsNewPatientUseCaseImpl(
                                                                         appointmentRepository,
-                                                                        patientConsultPort
+                                                                        patientLookupApi
                                                                 )
                                 ),
                                 new ManualPatientResolutionStrategy(patientConsultPort)
@@ -53,11 +55,13 @@ public class ScheduleManualAppointmentUseCaseImpl implements ScheduleManualAppoi
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService,
+                        PatientLookupApi patientLookupApi,
             PatientConsultPort patientConsultPort) {
         this(
                 appointmentRepository,
                 doctorConfigConsultPort,
                 appointmentService,
+                                patientLookupApi,
                 patientConsultPort,
                 event -> { }
         );

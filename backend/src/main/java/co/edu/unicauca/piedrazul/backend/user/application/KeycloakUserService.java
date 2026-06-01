@@ -4,12 +4,9 @@ import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.KeycloakUserClient;
-import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class KeycloakUserService implements UserModuleApi {
@@ -21,75 +18,33 @@ public class KeycloakUserService implements UserModuleApi {
     }
 
     @Override
-    public UUID getOrCreatePatientUser(
-            String username,
-            String firstName,
-            String lastName,
-            String email,
-            String password
-    ) {
-        return getOrCreateUserWithRole(
-                username,
-                firstName,
-                lastName,
-                email,
-                password,
-                Role.PATIENT
-        );
+    public Optional<UserSummary> findUserByUsername(String username) {
+        return keycloakClient.findUserByUsername(username).map(this::toUserSummary);
     }
 
     @Override
-    public UUID getOrCreateDoctorUser(
-            String username,
-            String firstName,
-            String lastName,
-            String email,
-            String password
-    ) {
-        return getOrCreateUserWithRole(
-                username,
-                firstName,
-                lastName,
-                email,
-                password,
-                Role.DOCTOR
-        );
+    public List<UserSummary> findSchedulers() {
+        return findUsersByRole(Role.SCHEDULER);
     }
 
     @Override
-    public UUID getOrCreateSchedulerUser(
-            String username,
-            String firstName,
-            String lastName,
-            String email,
-            String password
-    ) {
-        return getOrCreateUserWithRole(
-                username,
-                firstName,
-                lastName,
-                email,
-                password,
-                Role.SCHEDULER
-        );
+    public List<UserSummary> findDoctors() {
+        return findUsersByRole(Role.DOCTOR);
     }
 
     @Override
-    public UUID getOrCreateAdminUser(
-            String username,
-            String firstName,
-            String lastName,
-            String email,
-            String password
-    ) {
-        return getOrCreateUserWithRole(
-                username,
-                firstName,
-                lastName,
-                email,
-                password,
-                Role.ADMIN
-        );
+    public List<String> getUserRoles (UUID userId) {
+        return keycloakClient.getUserRoles(userId);
+    }
+
+    @Override
+    public void ensureSchedulerRole(UUID userId) {
+        keycloakClient.assignRoleIfMissing(userId, Role.SCHEDULER);
+    }
+
+    @Override
+    public void revokeSchedulerRole(UUID userId) {
+        keycloakClient.revokeRoleIfPresent(userId, Role.SCHEDULER);
     }
 
     @Override
@@ -107,66 +62,9 @@ public class KeycloakUserService implements UserModuleApi {
         keycloakClient.deactivateUser(id);
     }
 
-    private UUID getOrCreateUserWithRole(
-            String username,
-            String firstName,
-            String lastName,
-            String email,
-            String password,
-            Role role
-    ) {
-        return keycloakClient.findUserIdByUsername(username)
-                .map(userId -> {
-                    keycloakClient.assignRoleIfMissing(userId, role);
-                    return userId;
-                })
-                .orElseGet(() ->
-                        keycloakClient.createUser(
-                                username,
-                                firstName,
-                                lastName,
-                                email,
-                                password,
-                                role
-                        )
-                );
-    }
-
     @Override
-    public Optional<UUID> findUserIdByUsername(String username) {
-        return keycloakClient.findUserIdByUsername(username);
-    }
-
-    @Override
-    public List<UserSummary> findSchedulers() {
-        return keycloakClient.findUsersByRole(Role.SCHEDULER)
-                .stream()
-                .map(this::toUserSummary)
-                .toList();
-    }
-
-    @Override
-    public List<UserSummary> findDoctors() {
-        return keycloakClient.findUsersByRole(Role.DOCTOR)
-                .stream()
-                .map(this::toUserSummary)
-                .toList();
-    }
-
-    // BORRAR
-    @Override
-    public boolean hasSchedulerRole(UUID userId) {
-        return keycloakClient.userHasRole(userId, Role.SCHEDULER);
-    }
-
-    @Override
-    public boolean hasDoctrRole(UUID userId) {
-        return keycloakClient.userHasRole(userId, Role.DOCTOR);
-    }
-
-    @Override
-    public List<String> getUserRoles (UUID userId) {
-        return keycloakClient.getUserRoles(userId);
+    public void deleteUser(UUID id) {
+        keycloakClient.deleteUser(id);
     }
 
     @Override
@@ -174,17 +72,14 @@ public class KeycloakUserService implements UserModuleApi {
         keycloakClient.assignRoleIfMissing(userId, Role.PATIENT);
     }
 
-    @Override
-    public void ensureSchedulerRole(UUID userId) {
-        keycloakClient.assignRoleIfMissing(userId, Role.SCHEDULER);
+    private List<UserSummary> findUsersByRole(Role role) {
+        return keycloakClient.findUsersByRole(role)
+                .stream()
+                .map(this::toUserSummary)
+                .toList();
     }
 
-    @Override
-    public void revokeSchedulerRole(UUID userId) {
-        keycloakClient.revokeRoleIfPresent(userId, Role.SCHEDULER);
-    }
-
-    private UserSummary toUserSummary(UserRepresentation user) {
+    private UserSummary toUserSummary(org.keycloak.representations.idm.UserRepresentation user) {
         return new UserSummary(
                 UUID.fromString(user.getId()),
                 user.getUsername(),

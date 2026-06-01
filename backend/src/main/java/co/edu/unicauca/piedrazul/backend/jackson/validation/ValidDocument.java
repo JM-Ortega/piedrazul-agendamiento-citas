@@ -13,7 +13,7 @@ import java.lang.annotation.Target;
 @Constraint(validatedBy = ValidDocumentValidator.class)
 public @interface ValidDocument {
 
-    String message() default "documentNumber does not match documentType format";
+    String message() default "El número de documento no coincide con el tipo de documento";
 
     Class<?>[] groups() default {};
 

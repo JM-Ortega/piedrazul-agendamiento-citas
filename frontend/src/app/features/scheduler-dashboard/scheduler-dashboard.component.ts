@@ -1,15 +1,32 @@
+import { CommonModule } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import {Calendar, CheckCircle, Clock, CreditCard, Download, FileSpreadsheet, FileText, LucideAngularModule, 
-        Phone, PlusCircle, Search, Stethoscope, Tag, User, UserCircle, X, Check, AlertCircle
-      } from 'lucide-angular';
+import {
+  AlertCircle,
+  Calendar,
+  Check,
+  CheckCircle,
+  Clock,
+  CreditCard,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  LucideAngularModule,
+  Phone,
+  PlusCircle,
+  Search,
+  Stethoscope,
+  Tag,
+  User,
+  UserCircle,
+  X,
+} from 'lucide-angular';
 import { SchedulerService } from '../../core/services/scheduler.service';
 import { AppointmentExportRequest } from '../../shared/models/dtos/AppointmentExportRequest.dto';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
 import { ExportFormatBackend } from '../../shared/models/types/ExportFormatBackend.type';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
-import {CommonModule} from "@angular/common";
 
 type ExportFormat = 'excel' | 'pdf' | 'csv';
 
@@ -97,6 +114,7 @@ export class SchedulerDashboardComponent implements OnInit {
   filterDoctor = signal('');
   filterStatus = signal('');
   searched = signal(false);
+  hoveredView = signal<string | null>(null);
 
   // ── Export signals ────────────────────────────────────────────────────────
   showCancelModal = signal(false);
@@ -111,20 +129,20 @@ export class SchedulerDashboardComponent implements OnInit {
 
   // ── Computed ──────────────────────────────────────────────────────────────
   selectedDoctor = computed(() =>
-    this.doctors().find((d) => d.name === this.filterDoctor()),
+    this.doctors().find((d) => d.name === this.filterDoctor())
   );
 
   todayCount = computed(
     () =>
       this.appointments().filter(
-        (a) => a.date === this.today && a.appointmentState !== 'CANCELADA',
-      ).length,
+        (a) => a.date === this.today && a.appointmentState !== 'CANCELADA'
+      ).length
   );
 
   allActiveCount = computed(
     () =>
       this.appointments().filter((a) => a.appointmentState !== 'CANCELADA')
-        .length,
+        .length
   );
 
   results = computed(() => {
@@ -137,7 +155,7 @@ export class SchedulerDashboardComponent implements OnInit {
       filtered = filtered.filter((a) => a.date === this.filterDate());
     if (this.filterStatus())
       filtered = filtered.filter(
-        (a) => a.appointmentState === this.filterStatus(),
+        (a) => a.appointmentState === this.filterStatus()
       );
     return [...filtered].sort((a, b) =>
       a.date === b.date
@@ -146,12 +164,12 @@ export class SchedulerDashboardComponent implements OnInit {
           : -1
         : a.date > b.date
           ? 1
-          : -1,
+          : -1
     );
   });
 
   activeResults = computed(() =>
-    this.results().filter((a) => a.appointmentState !== 'CANCELADA'),
+    this.results().filter((a) => a.appointmentState !== 'CANCELADA')
   );
 
   exportColors = computed(() => {
@@ -218,7 +236,7 @@ export class SchedulerDashboardComponent implements OnInit {
     if (date && doctorId)
       request$ = this.schedulerService.getAppointmentsByDateAndDoctor(
         date,
-        doctorId,
+        doctorId
       );
     else if (date) request$ = this.schedulerService.getAppointmentsByDate(date);
     else if (doctorId)
@@ -297,7 +315,7 @@ export class SchedulerDashboardComponent implements OnInit {
       },
       error: () => {
         this.exportError.set(
-          'Ocurrió un error al generar el reporte. Intente nuevamente.',
+          'Ocurrió un error al generar el reporte. Intente nuevamente.'
         );
         this.isExporting.set(false);
       },
@@ -317,10 +335,12 @@ export class SchedulerDashboardComponent implements OnInit {
     this.schedulerService.cancelAppointment(appointmentId).subscribe({
       next: () => {
         this.showToast('La cita fue cancelada exitosamente', 'success');
-        this.appointments.set( this.appointments().map((a) =>
+        this.appointments.set(
+          this.appointments().map((a) =>
             a.idAppointment === appointmentId
               ? { ...a, appointmentState: 'CANCELADA' }
-              : a,),
+              : a
+          )
         );
       },
       error: () => {
@@ -338,8 +358,9 @@ export class SchedulerDashboardComponent implements OnInit {
     this.toastMessage.set(message);
     this.toastType.set(type);
     setTimeout(() => {
-      this.toastMessage.set(''); 
-      this.toastType.set(null);}, 3000);
+      this.toastMessage.set('');
+      this.toastType.set(null);
+    }, 3000);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

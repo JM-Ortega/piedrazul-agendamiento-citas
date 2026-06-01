@@ -1,7 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.DoctorAdminUserData;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
@@ -88,12 +87,13 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     }
 
     @Override
-    @Transactional
-    public List<DoctorAdminUserData> getAdminUserData() {
-        return doctorRepository.findAll()
-                .stream()
-                .map(DoctorAdminUserData::fromEntity)
-                .toList();
+    public List<Specialty> findSpecialtiesByIdentification(String identification){
+        return doctorRepository.findSpecialtiesByIdentification(identification);
+    }
+
+    @Override
+    public UUID findIdByIdentification(String identification){
+        return doctorRepository.doctorIdByIdentification(identification);
     }
 
     private static Workday toWorkday(DayOfWeek dayOfWeek) {

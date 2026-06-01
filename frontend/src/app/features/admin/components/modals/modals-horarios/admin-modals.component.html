@@ -2,7 +2,10 @@
 @if (showConfirmModal() && doctorToToggle()) {
   <div
     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    role="button"
+    tabindex="0"
     (click)="$event.target === $event.currentTarget && closeToggleModal.emit()"
+    (keydown.escape)="closeToggleModal.emit()"
   >
     <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
       <div class="flex items-center justify-between mb-4">
@@ -17,7 +20,7 @@
       <p class="text-gray-600 text-base mb-6">
         ¿Está seguro de que desea
         <strong>{{
-          doctorToToggle()!.status === false ? "habilitar" : "deshabilitar"
+          doctorToToggle()!.status === false ? 'habilitar' : 'deshabilitar'
         }}</strong>
         a <strong>{{ doctorToToggle()!.name }}</strong
         >?
@@ -41,7 +44,7 @@
           <lucide-angular [img]="Save" [size]="18"></lucide-angular>
           Sí,
           {{
-            doctorToToggle()!.status === false ? "Habilitar" : "Deshabilitar"
+            doctorToToggle()!.status === false ? 'Habilitar' : 'Deshabilitar'
           }}
         </button>
       </div>
@@ -53,9 +56,12 @@
 @if (showForceModal() && doctorToToggle()) {
   <div
     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    role="button"
+    tabindex="0"
     (click)="
       $event.target === $event.currentTarget && cancelForceDisable.emit()
     "
+    (keydown.escape)="cancelForceDisable.emit()"
   >
     <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
       <div class="flex items-center justify-between mb-4">
@@ -90,16 +96,21 @@
     </div>
   </div>
 }
-
 <!-- Modal: Error al Guardar -->
 @if (showErrorModal()) {
   <div
     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    role="button"
+    tabindex="0"
     (click)="closeErrorModal.emit()"
+    (keydown.escape)="closeErrorModal.emit()"
   >
     <div
       class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl"
+      role="dialog"
+      tabindex="0"
       (click)="$event.stopPropagation()"
+      (keydown)="$event.stopPropagation()"
     >
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-xl font-bold text-gray-800">⚠️ Error al guardar</h3>

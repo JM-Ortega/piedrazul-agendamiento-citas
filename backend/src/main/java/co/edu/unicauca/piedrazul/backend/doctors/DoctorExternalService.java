@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.doctors;
 
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.DoctorAdminUserData;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 
 import java.time.LocalDate;
@@ -27,5 +27,7 @@ public interface DoctorExternalService {
 
     List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
 
-    List<DoctorAdminUserData> getAdminUserData();
+    List<Specialty> findSpecialtiesByIdentification(String identification);
+
+    UUID findIdByIdentification(String identification);
 }

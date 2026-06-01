@@ -2,13 +2,20 @@ package co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence;
 
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientUserRequest;
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientService;
+import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Component
 @Order(2)
@@ -16,13 +23,16 @@ public class PatientDataInitializer implements ApplicationRunner {
 
     private final PatientRepository patientRepository;
     private final PatientService patientService;
+    private final UserProvisioningApi userProvisioningApi;
 
     public PatientDataInitializer(
             PatientRepository patientRepository,
-            PatientService patientService
+            PatientService patientService,
+            UserProvisioningApi userProvisioningApi
     ) {
         this.patientRepository = patientRepository;
         this.patientService = patientService;
+        this.userProvisioningApi = userProvisioningApi;
     }
 
     @Override
@@ -67,19 +77,22 @@ public class PatientDataInitializer implements ApplicationRunner {
                 "3204445566"
         );
 
-        patientService.createPatientWithUser(
-                "20202020202",
-                "Patient123!",
-                PatientDocumentType.CEDULA,
-                "20202020202",
-                "Juan",
-                "Ortega",
-                "3001234567",
-                "jhon@de.com",
-                PatientGender.MASCULINO,
-                LocalDate.of(1995, 1, 1),
-                null
-        );
+        userProvisioningApi.createUser(new CreateSystemUserPayload(
+                new CreateSystemUserRequest(
+                        "2020202020",
+                        "José",
+                        "Paz",
+                        "jose@gmail.com",
+                        "Patient123!"
+                ),null,
+                new CreatePatientUserRequest(
+                        PatientDocumentType.CEDULA,
+                        "3001234567",
+                        PatientGender.MASCULINO,
+                        LocalDate.of(1995, 1, 1),
+                        null
+                ), List.of(Role.PATIENT)
+        ));
 
         System.out.println("✔ Pacientes de prueba insertados");
     }
