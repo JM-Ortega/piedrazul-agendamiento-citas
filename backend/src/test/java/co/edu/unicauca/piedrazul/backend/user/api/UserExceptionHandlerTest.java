@@ -39,7 +39,7 @@ class UserExceptionHandlerTest {
     @Test
     void handleUserNotFound_shouldReturnNotFound() {
         UUID id = UUID.randomUUID();
-        UserNotFoundException ex = new UserNotFoundException("Usuario con id "+ id +" no encontrado");
+        UserNotFoundException ex = new UserNotFoundException(id);
 
         ProblemDetail result = handler.handleUserNotFound(ex, request);
 

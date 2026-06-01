@@ -1,5 +1,5 @@
 <!-- Botones Cancelar / Guardar -->
-<div class="flex justify-end gap-2 px-5 py-3 border-t border-[#a7c9ec]">
+<div class="flex justify-end gap-2 px-5 py-3 border-t border-blue-200">
   <button
     (click)="cancelled.emit()"
     class="border-2 border-gray-300 text-gray-600 px-4 py-2 rounded-xl text-base hover:bg-gray-50"
@@ -40,9 +40,7 @@
         <label class="block text-gray-700 mb-1 text-base">Fecha Inicio</label>
         <input
           type="date"
-          maxlength="10"
           [value]="editForm()!.laborStart"
-          (input)="onLaborStartInput($event)"
           (change)="updateField('laborStart', $any($event.target).value)"
           class="w-full border-2 focus:border-purple-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
           [class]="
@@ -59,9 +57,7 @@
         <label class="block text-gray-700 mb-1 text-base">Fecha Fin</label>
         <input
           type="date"
-          maxlength="10"
           [value]="editForm()!.laborEnd"
-          (input)="onLaborEndInput($event)"
           (change)="updateField('laborEnd', $any($event.target).value)"
           class="w-full border-2 focus:border-purple-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
           [class]="
@@ -88,7 +84,7 @@
       <lucide-angular
         [img]="Clock"
         [size]="18"
-        class="text-[#4e92d9]"
+        class="text-blue-500"
       ></lucide-angular>
       Horario Semanal
     </p>
@@ -100,9 +96,9 @@
         <select
           [value]="editForm()!.startTime"
           (change)="updateField('startTime', $any($event.target).value)"
-          class="w-full border-2 focus:border-[#215c98] rounded-xl px-4 py-2.5 text-base outline-none transition-colors bg-white"
+          class="w-full border-2 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors bg-white"
           [class]="
-            errors().horarioGlobal ? 'border-red-400' : 'border-[#a7c9ec]'
+            errors().horarioGlobal ? 'border-red-400' : 'border-blue-200'
           "
         >
           <option value="" disabled [selected]="!editForm()!.startTime">
@@ -122,9 +118,9 @@
         <select
           [value]="editForm()!.endTime"
           (change)="updateField('endTime', $any($event.target).value)"
-          class="w-full border-2 focus:border-[#215c98] rounded-xl px-4 py-2.5 text-base outline-none transition-colors bg-white"
+          class="w-full border-2 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors bg-white"
           [class]="
-            errors().horarioGlobal ? 'border-red-400' : 'border-[#a7c9ec]'
+            errors().horarioGlobal ? 'border-red-400' : 'border-blue-200'
           "
         >
           <option value="" disabled [selected]="!editForm()!.endTime">
@@ -150,8 +146,8 @@
           (input)="
             updateField('appointmentInterval', +$any($event.target).value)
           "
-          class="w-full border-2 focus:border-[#215c98] rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
-          [class]="errors().intervalo ? 'border-red-400' : 'border-[#a7c9ec]'"
+          class="w-full border-2 focus:border-blue-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
+          [class]="errors().intervalo ? 'border-red-400' : 'border-blue-200'"
         />
         @if (errors().intervalo) {
           <p class="text-red-500 text-sm mt-1">⚠️ {{ errors().intervalo }}</p>
@@ -162,6 +158,7 @@
       <p class="text-red-500 text-sm mt-2">⚠️ {{ errors().horarioGlobal }}</p>
     }
   </div>
+
   <!-- Días de Atención -->
   <div>
     <label class="block text-gray-700 mb-2 text-base font-semibold"
@@ -174,8 +171,8 @@
           class="w-14 py-3 rounded-xl text-base font-semibold border-2 transition-all"
           [class]="
             editForm()!.workdays.includes(day)
-              ? 'bg-[#215c98] text-white border-[#215c98]'
-              : 'bg-white text-gray-500 border-gray-200 hover:border-[#4e92d9]'
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'
           "
         >
           {{ DAY_LABELS[day] }}
@@ -189,10 +186,10 @@
 
   <!-- Horarios específicos por día -->
   @if (editForm()!.workdays.length > 0) {
-    <div class="border-2 border-[#a7c9ec] rounded-xl overflow-hidden">
+    <div class="border-2 border-blue-100 rounded-xl overflow-hidden">
       <button
         (click)="showDaySchedules.set(!showDaySchedules())"
-        class="w-full flex items-center justify-between px-5 py-3 bg-[#d9e9f8] hover:bg-[#a7c9ec] transition-colors text-[#163c63] text-base"
+        class="w-full flex items-center justify-between px-5 py-3 bg-blue-50 hover:bg-blue-100 transition-colors text-blue-800 text-base"
       >
         <span class="flex items-center gap-2">
           <lucide-angular [img]="Clock" [size]="18"></lucide-angular>
@@ -227,7 +224,7 @@
                 [class]="
                   hasDayOverride(day)
                     ? 'border-amber-300 bg-amber-50'
-                    : 'border-[#d9e9f8] bg-[#d9e9f8]/30'
+                    : 'border-gray-100 bg-gray-50'
                 "
               >
                 <div class="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -237,14 +234,14 @@
                       [class]="
                         hasDayOverride(day)
                           ? 'bg-amber-400 text-white'
-                          : 'bg-[#d9e9f8] text-[#215c98]'
+                          : 'bg-blue-100 text-blue-700'
                       "
                     >
                       {{ DAY_LABELS[day] }}
                     </div>
-                    <span class="text-gray-700 text-base hidden sm:block">
-                      {{ DAY_FULL_LABELS[day] }}
-                    </span>
+                    <span class="text-gray-700 text-base hidden sm:block">{{
+                      DAY_FULL_LABELS[day]
+                    }}</span>
                   </div>
 
                   <div class="flex flex-1 flex-wrap gap-3 items-end">
@@ -261,11 +258,11 @@
                             $any($event.target).value
                           )
                         "
-                        class="w-full border-2 focus:border-[#215c98] rounded-xl px-3 py-2 text-base outline-none transition-colors bg-white"
+                        class="w-full border-2 focus:border-blue-500 rounded-xl px-3 py-2 text-base outline-none transition-colors bg-white"
                         [class]="
                           errors().horariosDia[day]
                             ? 'border-red-400'
-                            : 'border-[#a7c9ec]'
+                            : 'border-blue-200'
                         "
                       >
                         @for (t of timeOptions; track t) {
@@ -293,11 +290,11 @@
                             $any($event.target).value
                           )
                         "
-                        class="w-full border-2 focus:border-[#215c98] rounded-xl px-3 py-2 text-base outline-none transition-colors bg-white"
+                        class="w-full border-2 focus:border-blue-500 rounded-xl px-3 py-2 text-base outline-none transition-colors bg-white"
                         [class]="
                           errors().horariosDia[day]
                             ? 'border-red-400'
-                            : 'border-[#a7c9ec]'
+                            : 'border-blue-200'
                         "
                       >
                         @for (t of timeOptions; track t) {

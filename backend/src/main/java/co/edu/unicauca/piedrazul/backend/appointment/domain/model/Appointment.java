@@ -142,26 +142,6 @@ public class Appointment {
         return appointment;
     }
 
-    // Cambiar cuando se implemente lo de reprogramadas
-    public void changeState(AppointmentState appointmentState) {
-        if (this.appointmentState != AppointmentState.AGENDADA) {
-            throw new IllegalStateException(
-                    "Solo se puede cambiar el estado de citas agendadas"
-            );
-        }
-
-        this.appointmentState = appointmentState;
-    }
-
-    public void cancel() {
-        if (this.appointmentState != AppointmentState.AGENDADA) {
-            throw new IllegalStateException(
-                    "Solo las citas AGENDADAS pueden cancelarse. Estado actual: " + this.appointmentState
-            );
-        }
-        this.appointmentState = AppointmentState.CANCELADA;
-    }
-
     public UUID getIdAppointment() {
         return idAppointment;
     }
@@ -204,5 +184,9 @@ public class Appointment {
 
     public UUID getIdDoctor() {
         return idDoctor;
+    }
+
+    public void setAppointmentState(AppointmentState appointmentState) {
+        this.appointmentState = appointmentState;
     }
 }

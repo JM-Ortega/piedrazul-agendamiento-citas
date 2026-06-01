@@ -39,9 +39,9 @@ public class VerificationService implements VerificationModuleApi {
     }
 
     @Override
-    public void requestCode(String subject, VerificationPurpose purpose, String displayName, String phone, String email) {
+    public void requestCode(String subject, VerificationPurpose purpose, String destination) {
         validateSubject(subject);
-        validateAtLeastOneContact(phone, email);
+        validateDestination(destination);
 
         Optional<VerificationCode> existing =
                 verificationCodeStore.findLatestActive(subject, purpose);
@@ -63,7 +63,7 @@ public class VerificationService implements VerificationModuleApi {
         );
 
         verificationCodeStore.save(verificationCode);
-        sender.sendCode(subject, displayName, phone, email, rawCode, EXPIRATION_MINUTES);
+        sender.sendCode(destination, rawCode);
     }
 
     @Override
@@ -109,11 +109,9 @@ public class VerificationService implements VerificationModuleApi {
         }
     }
 
-    private void validateAtLeastOneContact(String phone, String email) {
-        boolean hasPhone = phone != null && !phone.isBlank();
-        boolean hasEmail = email != null && !email.isBlank();
-        if (!hasPhone && !hasEmail) {
-            throw new IllegalArgumentException("At least one contact (phone or email) is required");
+    private void validateDestination(String destination) {
+        if (destination == null || destination.isBlank()) {
+            throw new IllegalArgumentException("Destination cannot be blank");
         }
     }
 

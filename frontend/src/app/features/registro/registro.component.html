@@ -3,12 +3,12 @@
     <div class="mb-6">
       <button
         (click)="goBack()"
-        class="flex items-center gap-2 text-[#215c98] text-lg hover:text-[#4e92d9] mb-4 transition-colors cursor-pointer"
+        class="flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-4 transition-colors"
       >
         <lucide-angular [img]="ArrowLeft" [size]="18" />
         <span class="text-sm font-medium">Volver</span>
       </button>
-      <h1 class="text-[#215c98] text-3xl font-bold">Crear cuenta</h1>
+      <h1 class="text-blue-800 text-3xl font-bold">Crear cuenta</h1>
       <p class="text-gray-500 text-lg mt-1">
         Regístrate para agendar tus citas médicas
       </p>
@@ -26,7 +26,7 @@
         <div
           class="flex-1 text-center py-2 rounded-xl text-sm font-medium transition-all"
           [ngClass]="{
-            'bg-[#215c98] text-white shadow': step() === $index + 1,
+            'bg-blue-600 text-white shadow': step() === $index + 1,
             'bg-green-100 text-green-700': step() > $index + 1,
             'bg-white text-gray-400 border border-gray-200':
               step() < $index + 1,
@@ -40,7 +40,7 @@
     <div class="bg-white rounded-2xl shadow-xl p-8">
       @if (step() === 1) {
         <div class="space-y-5">
-          <h2 class="text-[#163c63] text-2xl font-bold mb-4">
+          <h2 class="text-blue-800 text-2xl font-bold mb-4">
             Verificar documento
           </h2>
 
@@ -48,7 +48,7 @@
             <label class="block text-gray-700 mb-2 font-medium">
               Número de documento
             </label>
-            <div class="flex flex-col sm:flex-row gap-3">
+            <div class="flex gap-3">
               <input
                 type="text"
                 [ngModel]="documentNumber()"
@@ -56,12 +56,12 @@
                 (input)="handleDocInput($event)"
                 (keyup.enter)="searchPatient()"
                 placeholder="Ingresa tu número de documento"
-                class="flex-1 border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4e92d9] transition-colors"
+                class="flex-1 border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors"
               />
               <button
                 (click)="searchPatient()"
                 [disabled]="isLoading()"
-                class="bg-[#215c98] hover:bg-[#163c63] text-white px-5 py-3 rounded-xl flex items-center gap-2 disabled:opacity-50 transition-colors cursor-pointer"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl flex items-center gap-2 disabled:opacity-50 transition-colors"
               >
                 <lucide-angular [img]="Search" [size]="18" />
                 Buscar
@@ -139,12 +139,17 @@
                 <select
                   [ngModel]="getFormField('documentType')"
                   (ngModelChange)="setFormField('documentType', $event)"
-                  class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4e92d9]"
+                  class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500"
                 >
                   <option value="">Seleccione...</option>
-                  @for (type of patientService.documentTypes(); track type) {
-                    <option [value]="type">{{ type | formato }}</option>
-                  }
+                  <option value="REGISTRO_NACIMIENTO">
+                    Registro de Nacimiento
+                  </option>
+                  <option value="TARJETA_IDENTIDAD">
+                    Tarjeta de Identidad
+                  </option>
+                  <option value="CEDULA">Cédula</option>
+                  <option value="PASAPORTE">Pasaporte</option>
                 </select>
                 @if (errors()["documentType"]) {
                   <p class="text-red-500 text-sm mt-1">
@@ -167,7 +172,7 @@
                   [ngClass]="
                     errors()['firstName']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
+                      : 'border-blue-200 focus:border-blue-500'
                   "
                 />
                 @if (firstNameLimitMsg()) {
@@ -193,7 +198,7 @@
                   [ngClass]="
                     errors()['lastName']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
+                      : 'border-blue-200 focus:border-blue-500'
                   "
                 />
                 @if (lastNameLimitMsg()) {
@@ -207,7 +212,7 @@
 
               <div>
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
-                  Teléfono <span class="text-red-500">*</span>
+                  Celular <span class="text-red-500">*</span>
                 </label>
                 <input
                   type="tel"
@@ -221,7 +226,7 @@
                   [ngClass]="
                     errors()['phone']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
+                      : 'border-blue-200 focus:border-blue-500'
                   "
                 />
                 @if (phoneLimitMsg()) {
@@ -244,7 +249,7 @@
                   [ngClass]="
                     errors()['gender']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
+                      : 'border-blue-200 focus:border-blue-500'
                   "
                 >
                   <option value="">Seleccione...</option>
@@ -263,36 +268,28 @@
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
                   Fecha de nacimiento <span class="text-red-500">*</span>
                 </label>
-                <div class="relative w-full">
-                  <input
-                    type="text"
-                    [matDatepicker]="birthPicker"
-                    [ngModel]="getFormField('birthDate')"
-                    (ngModelChange)="setFormField('birthDate', $event)"
-                    [max]="maxBirthDate"
-                    placeholder="mm/dd/aaaa"
-                    readonly
-                    class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 pr-12"
-                  />
-                  <button
-                    type="button"
-                    (click)="birthPicker.open()"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 
-                            text-gray-500 p-2 rounded-lg
-                            hover:bg-blue-100 hover:shadow-md
-                            hover:text-blue-600
-                            transition-all duration-200"
-                  >
-                    <lucide-angular [img]="Calendar" [size]="20"></lucide-angular>
-                  </button>
-                  <mat-datepicker #birthPicker startView="multi-year"></mat-datepicker>
-                </div>
+                <input
+                  type="date"
+                  [ngModel]="getFormField('birthDate')"
+                  (ngModelChange)="setFormField('birthDate', $event)"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['birthDate']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
+                @if (errors()["birthDate"]) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()["birthDate"] }}
+                  </p>
+                }
               </div>
 
               <div class="sm:col-span-2">
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
                   Correo electrónico
-                  <span class="text-gray-400 text-sm">(opcional)</span>
+                  <span class="text-gray-400 text-xs">(opcional)</span>
                 </label>
                 <input
                   type="email"
@@ -304,7 +301,7 @@
                   [ngClass]="
                     errors()['email']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
+                      : 'border-blue-200 focus:border-blue-500'
                   "
                 />
                 @if (emailLimitMsg()) {
@@ -318,11 +315,11 @@
 
               <div class="sm:col-span-2">
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
-                  Teléfono de familiar
+                  Celular de acudiente
                   @if (isMinorPatient()) {
                     <span class="text-red-500">*</span>
                   } @else {
-                    <span class="text-gray-400 text-sm">
+                    <span class="text-gray-400 text-xs">
                       (requerido para menores de edad)
                     </span>
                   }
@@ -339,7 +336,7 @@
                   [ngClass]="
                     errors()['guardianPhone']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
+                      : 'border-blue-200 focus:border-blue-500'
                   "
                 />
                 @if (guardianPhoneLimitMsg()) {
@@ -397,12 +394,17 @@
                 <select
                   [ngModel]="getFormField('documentType')"
                   (ngModelChange)="setFormField('documentType', $event)"
-                  class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4e92d9]"
+                  class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500"
                 >
                   <option value="">Seleccione...</option>
-                  @for (type of patientService.documentTypes(); track type) {
-                    <option [value]="type">{{ type | formato }}</option>
-                  }
+                  <option value="REGISTRO_NACIMIENTO">
+                    Registro de Nacimiento
+                  </option>
+                  <option value="TARJETA_IDENTIDAD">
+                    Tarjeta de Identidad
+                  </option>
+                  <option value="CEDULA">Cédula</option>
+                  <option value="PASAPORTE">Pasaporte</option>
                 </select>
                 @if (errors()["documentType"]) {
                   <p class="text-red-500 text-sm mt-1">
@@ -425,7 +427,7 @@
                   [ngClass]="
                     errors()['firstName']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
+                      : 'border-blue-200 focus:border-blue-500'
                   "
                 />
                 @if (firstNameLimitMsg()) {
@@ -451,7 +453,7 @@
                   [ngClass]="
                     errors()['lastName']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
+                      : 'border-blue-200 focus:border-blue-500'
                   "
                 />
                 @if (lastNameLimitMsg()) {
@@ -465,7 +467,7 @@
 
               <div>
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
-                  Teléfono <span class="text-red-500">*</span>
+                  Celular <span class="text-red-500">*</span>
                 </label>
                 <input
                   type="tel"
@@ -479,7 +481,7 @@
                   [ngClass]="
                     errors()['phone']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
+                      : 'border-blue-200 focus:border-blue-500'
                   "
                 />
                 @if (phoneLimitMsg()) {
@@ -502,7 +504,7 @@
                   [ngClass]="
                     errors()['gender']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
+                      : 'border-blue-200 focus:border-blue-500'
                   "
                 >
                   <option value="">Seleccione...</option>
@@ -521,35 +523,17 @@
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
                   Fecha de nacimiento <span class="text-red-500">*</span>
                 </label>
-                <div class="relative w-full">
-                  <input
-                    type="text"
-                    [matDatepicker]="birthPicker2"
-                    [ngModel]="getFormField('birthDate')"
-                    (ngModelChange)="setFormField('birthDate', $event)"
-                    [max]="maxBirthDate"
-                    placeholder="mm/dd/aaaa"
-                    readonly
-                    class="w-full border-2 rounded-xl px-4 py-3 pr-12 focus:outline-none transition-colors"
-                    [ngClass]="
-                      errors()['birthDate']
-                        ? 'border-red-400 bg-red-50'
-                        : 'border-blue-200 focus:border-blue-500'
-                    "
-                  />
-                  <button
-                    type="button"
-                    (click)="birthPicker2.open()"
-                    class="absolute right-3 top-1/2 -translate-y-1/2
-                            text-gray-500 p-2 rounded-lg
-                            hover:bg-blue-100 hover:shadow-md
-                            hover:text-blue-600
-                            transition-all duration-200"
-                  >
-                    <lucide-angular [img]="Calendar" [size]="20"></lucide-angular>
-                  </button>
-                  <mat-datepicker #birthPicker2 startView="multi-year"></mat-datepicker>
-                </div>
+                <input
+                  type="date"
+                  [ngModel]="getFormField('birthDate')"
+                  (ngModelChange)="setFormField('birthDate', $event)"
+                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
+                  [ngClass]="
+                    errors()['birthDate']
+                      ? 'border-red-400 bg-red-50'
+                      : 'border-blue-200 focus:border-blue-500'
+                  "
+                />
                 @if (errors()["birthDate"]) {
                   <p class="text-red-500 text-sm mt-1">
                     {{ errors()["birthDate"] }}
@@ -560,7 +544,7 @@
               <div class="sm:col-span-2">
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
                   Correo electrónico
-                  <span class="text-gray-400 text-sm">(opcional)</span>
+                  <span class="text-gray-400 text-xs">(opcional)</span>
                 </label>
                 <input
                   type="email"
@@ -572,7 +556,7 @@
                   [ngClass]="
                     errors()['email']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
+                      : 'border-blue-200 focus:border-blue-500'
                   "
                 />
                 @if (emailLimitMsg()) {
@@ -586,11 +570,11 @@
 
               <div class="sm:col-span-2">
                 <label class="block text-gray-700 mb-1 text-sm font-medium">
-                  Teléfono de familiar
+                  Celular de acudiente
                   @if (isMinorPatient()) {
                     <span class="text-red-500">*</span>
                   } @else {
-                    <span class="text-gray-400 text-sm">
+                    <span class="text-gray-400 text-xs">
                       (requerido para menores de edad)
                     </span>
                   }
@@ -607,7 +591,7 @@
                   [ngClass]="
                     errors()['guardianPhone']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
+                      : 'border-blue-200 focus:border-blue-500'
                   "
                 />
                 @if (guardianPhoneLimitMsg()) {
@@ -633,7 +617,7 @@
             <div class="flex justify-end mt-4">
               <button
                 (click)="goToStep2()"
-                class="bg-[#215c98] hover:bg-[#163c63] text-white px-8 py-3 rounded-xl font-semibold transition-colors cursor-pointer"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-semibold transition-colors"
               >
                 Continuar
               </button>
@@ -645,7 +629,7 @@
       @if (step() === 2) {
         <div class="space-y-5">
           <div>
-            <h2 class="text-[#163c63] text-2xl font-bold">
+            <h2 class="text-blue-800 text-2xl font-bold">
               @if (requiresPassword()) {
                 Crear tu cuenta
               } @else {
@@ -691,12 +675,12 @@
                   [type]="showPassword() ? 'text' : 'password'"
                   [ngModel]="password()"
                   (ngModelChange)="password.set($event)"
-                  placeholder="Mínimo 6 letras y números"
+                  placeholder="Mínimo 8 caracteres"
                   class="w-full border-2 rounded-xl px-4 py-3 pr-12 focus:outline-none transition-colors"
                   [ngClass]="
                     errors()['password']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
+                      : 'border-blue-200 focus:border-blue-500'
                   "
                 />
                 <button
@@ -731,7 +715,7 @@
                   [ngClass]="
                     errors()['confirmPassword']
                       ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
+                      : 'border-blue-200 focus:border-blue-500'
                   "
                 />
                 <button
@@ -770,14 +754,14 @@
           <div class="flex gap-4 mt-4">
             <button
               (click)="goBack()"
-              class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+              class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
             >
               Atrás
             </button>
             <button
               (click)="submit()"
               [disabled]="isLoading()"
-              class="flex-1 bg-[#215c98] hover:bg-[#163c63] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors cursor-pointer"
+              class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
             >
               @if (isLoading()) {
                 <span>Procesando...</span>
@@ -822,7 +806,7 @@
               [ngClass]="
                 errors()['verificationCode']
                   ? 'border-red-400 bg-red-50'
-                  : 'border-blue-200 focus:border-[#4e92d9]'
+                  : 'border-blue-200 focus:border-blue-500'
               "
             />
             @if (errors()["verificationCode"]) {
@@ -843,7 +827,7 @@
           <div class="flex gap-4 mt-4">
             <button
               (click)="goBack()"
-              class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+              class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
             >
               Atrás
             </button>
@@ -851,7 +835,7 @@
             <button
               (click)="confirmCode()"
               [disabled]="isLoading()"
-              class="flex-1 bg-[#215c98] hover:bg-[#163c63] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors cursor-pointer"
+              class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
             >
               @if (isLoading()) {
                 <span>Verificando...</span>

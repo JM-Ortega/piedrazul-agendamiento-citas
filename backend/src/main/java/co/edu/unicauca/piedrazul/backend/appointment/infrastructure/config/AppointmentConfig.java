@@ -1,8 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.config;
 
 import co.edu.unicauca.piedrazul.backend.appointment.application.*;
-import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.AutonomousPatientResolutionStrategy;
-import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.ManualPatientResolutionStrategy;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
@@ -14,8 +12,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.Appo
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.application.ListMyAppointmentsUseCaseImpl;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.CancelAppointmentUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.application.CancelAppointmentUseCaseImpl;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -49,32 +45,6 @@ public class AppointmentConfig {
         return new AppointmentService(busySlotService);
     }
 
-    @Bean
-    public AppointmentSchedulingService appointmentSchedulingService(
-            AppointmentRepository appointmentRepository,
-            DoctorConfigConsultPort doctorConfigConsultPort,
-            AppointmentService appointmentService,
-            ApplicationEventPublisher eventPublisher,
-            IsNewPatientUseCase isNewPatientUseCase) {
-        return new AppointmentSchedulingService(
-                appointmentRepository,
-                doctorConfigConsultPort,
-                appointmentService,
-                eventPublisher,
-                isNewPatientUseCase
-        );
-    }
-
-    @Bean
-    public ManualPatientResolutionStrategy manualPatientResolutionStrategy(PatientConsultPort patientConsultPort) {
-        return new ManualPatientResolutionStrategy(patientConsultPort);
-    }
-
-    @Bean
-    public AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy(PatientConsultPort patientConsultPort) {
-        return new AutonomousPatientResolutionStrategy(patientConsultPort);
-    }
-
     // --- CASOS DE USO (PUERTOS DE ENTRADA) ---
 
     @Bean
@@ -85,21 +55,33 @@ public class AppointmentConfig {
 
     @Bean
     public ScheduleManualAppointmentUseCase scheduleManualAppointmentUseCase(
-            AppointmentSchedulingService appointmentSchedulingService,
-            ManualPatientResolutionStrategy manualPatientResolutionStrategy) {
+            AppointmentRepository appointmentRepository,
+            DoctorConfigConsultPort doctorConfigConsultPort,
+            AppointmentService appointmentService,
+            PatientConsultPort patientConsultPort,
+            ApplicationEventPublisher eventPublisher) {
         return new ScheduleManualAppointmentUseCaseImpl(
-                appointmentSchedulingService,
-                manualPatientResolutionStrategy
+                appointmentRepository,
+                doctorConfigConsultPort,
+                appointmentService,
+                patientConsultPort,
+                eventPublisher
         );
     }
 
     @Bean
     public ScheduleAutonomousAppointmentUseCase scheduleAutonomousAppointmentUseCase(
-            AppointmentSchedulingService appointmentSchedulingService,
-            AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy) {
+            AppointmentRepository appointmentRepository,
+            PatientConsultPort patientConsultPort,
+            DoctorConfigConsultPort doctorConfigConsultPort,
+            AppointmentService appointmentService,
+            ApplicationEventPublisher eventPublisher) {
         return new ScheduleAutonomousAppointmentUseCaseImpl(
-                appointmentSchedulingService,
-                autonomousPatientResolutionStrategy
+                appointmentRepository,
+                patientConsultPort,
+                doctorConfigConsultPort,
+                appointmentService,
+                eventPublisher
         );
     }
 
@@ -119,13 +101,11 @@ public class AppointmentConfig {
     public GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
-            SlotTimeService slotTimeService,
-            IsNewPatientUseCase isNewPatientUseCase) {
+            SlotTimeService slotTimeService) {
         return new GetSpecialtiesWithDoctorUseCaseImpl(
                 appointmentRepository,
                 doctorConfigConsultPort,
-                slotTimeService,
-                isNewPatientUseCase
+                slotTimeService
         );
     }
 
@@ -140,21 +120,8 @@ public class AppointmentConfig {
     }
 
     @Bean
-    public IsNewPatientUseCase isNewPatientUseCase(
-            AppointmentRepository appointmentRepository,
-            PatientConsultPort patientConsultPort) {
-        return new IsNewPatientUseCaseImpl(appointmentRepository, patientConsultPort);
-    }
-
-    @Bean
     public UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase(
             AppointmentRepository appointmentRepository) {
         return new UpdateAppointmentStatusUseCaseImpl(appointmentRepository);
-    }
-
-    @Bean
-    public CancelAppointmentUseCase cancelAppointmentUseCase(
-            AppointmentRepository appointmentRepository) {
-        return new CancelAppointmentUseCaseImpl(appointmentRepository);
     }
 }

@@ -9,8 +9,8 @@ import { useScript } from "keycloakify/login/pages/Login.useScript";
 import "./login.css";
 import { kcEnvDefaults } from "../../kc.gen";
 
+// dentro del componente:
 const REGISTER_URL = kcEnvDefaults.REGISTER_URL;
-const HOME_URL = kcEnvDefaults.HOME_URL;
 
 export default function Login(props: PageProps<Extract<KcContext, { pageId: "login.ftl" }>, I18n>) {
     const { kcContext, i18n } = props;
@@ -58,15 +58,6 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
                             <div className="pz-brand-sub">Centro Médico</div>
                         </div>
                     </div>
-
-                    {/* ── Botón Inicio ── */}
-                    <a href={HOME_URL} className="pz-home-btn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M3 11.5L12 4l9 7.5" />
-                            <path d="M5 10v9h14v-9" />
-                        </svg>
-                        Volver al inicio
-                    </a>
                 </div>
 
                 <div className="pz-left-center">
@@ -122,6 +113,7 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
                                     <label htmlFor="username" className="pz-label">
                                         Cédula
                                     </label>
+
                                     <input
                                         tabIndex={2}
                                         id="username"

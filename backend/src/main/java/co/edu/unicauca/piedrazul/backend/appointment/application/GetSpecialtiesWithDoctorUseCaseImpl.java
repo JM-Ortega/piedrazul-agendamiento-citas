@@ -4,7 +4,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.NoAvailabl
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetSpecialtiesWithDoctorUseCase;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
@@ -20,31 +19,22 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
     private final AppointmentRepository appointmentRepository;
     private final DoctorConfigConsultPort doctorConfigConsultPort;
     private final SlotTimeService slotTimeService;
-    private final IsNewPatientUseCase isNewPatientUseCase;
 
     public GetSpecialtiesWithDoctorUseCaseImpl(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
-            SlotTimeService slotTimeService,
-            IsNewPatientUseCase isNewPatientUseCase) {
+            SlotTimeService slotTimeService) {
         this.appointmentRepository = appointmentRepository;
         this.doctorConfigConsultPort = doctorConfigConsultPort;
         this.slotTimeService = slotTimeService;
-        this.isNewPatientUseCase = isNewPatientUseCase;
     }
 
     @Override
-    public List<DoctorResponse> getSpecialtiesWithDoctor(UUID patientId) {
+    public List<DoctorResponse> getSpecialtiesWithDoctor() {
         LocalDate from = LocalDate.now();
         LocalDate to = from.plusMonths(1);
 
-        List<UUID> activeDoctorIds;
-
-        if(isNewPatientUseCase.isNewPatient(patientId)){
-            activeDoctorIds = getActiveGeneralDoctorsOrThrow();
-        }else{
-            activeDoctorIds = getActiveDoctorsOrThrow();
-        }
+        List<UUID> activeDoctorIds = getActiveDoctorsOrThrow();
 
         Map<UUID, Integer> availability = calculateAvailability(activeDoctorIds, from, to);
 
@@ -57,16 +47,6 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
 
     private List<UUID> getActiveDoctorsOrThrow() {
         List<UUID> doctors = doctorConfigConsultPort.getActiveDoctorIds();
-
-        if (doctors.isEmpty()) {
-            throw new NoAvailableDoctorsException("No hay medicos activos con disponibilidad.");
-        }
-
-        return doctors;
-    }
-
-    private List<UUID> getActiveGeneralDoctorsOrThrow() {
-        List<UUID> doctors = doctorConfigConsultPort.getActiveGeneralDoctorIds();
 
         if (doctors.isEmpty()) {
             throw new NoAvailableDoctorsException("No hay medicos activos con disponibilidad.");

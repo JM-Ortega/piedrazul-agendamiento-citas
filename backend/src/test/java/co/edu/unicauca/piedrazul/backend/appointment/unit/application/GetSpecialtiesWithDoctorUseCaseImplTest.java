@@ -2,7 +2,6 @@ package co.edu.unicauca.piedrazul.backend.appointment.unit.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.NoAvailableDoctorsException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
@@ -36,11 +35,8 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
     @Mock
     private DoctorConfigConsultPort doctorConfigConsultPort;
 
-    @Mock
-    private SlotTimeService slotTimeService;
-
-    @Mock
-    private IsNewPatientUseCase isNewPatientUseCase;
+        @Mock
+        private SlotTimeService slotTimeService;
 
     private GetSpecialtiesWithDoctorUseCaseImpl useCase;
 
@@ -49,8 +45,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
         useCase = new GetSpecialtiesWithDoctorUseCaseImpl(
                 appointmentRepository,
                 doctorConfigConsultPort,
-                slotTimeService,
-                isNewPatientUseCase
+                slotTimeService
         );
     }
 
@@ -62,7 +57,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
     void getSpecialtiesWithDoctorShouldThrowWhenNoActiveDoctors() {
         when(doctorConfigConsultPort.getActiveDoctorIds()).thenReturn(List.of());
 
-        assertThatThrownBy(() -> useCase.getSpecialtiesWithDoctor(UUID.randomUUID()))
+        assertThatThrownBy(() -> useCase.getSpecialtiesWithDoctor())
                 .isInstanceOf(NoAvailableDoctorsException.class)
                 .hasMessageContaining("No hay medicos activos");
     }
@@ -85,7 +80,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
         when(slotTimeService.calculateAvailable(any(), any(), anyInt()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThatThrownBy(() -> useCase.getSpecialtiesWithDoctor(UUID.randomUUID()))
+        assertThatThrownBy(() -> useCase.getSpecialtiesWithDoctor())
                 .isInstanceOf(NoAvailableDoctorsException.class)
                 .hasMessageContaining("No hay medicos con espacios disponibles");
     }
@@ -114,7 +109,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
         when(doctorConfigConsultPort.getDoctorInfoByIds(List.of(idDoctor)))
                 .thenReturn(List.of(doctorInfo));
 
-        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor(UUID.randomUUID());
+        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor();
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().id()).isEqualTo(idDoctor);
@@ -163,7 +158,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
         when(doctorConfigConsultPort.getDoctorInfoByIds(List.of(idDoctor2, idDoctor1)))
                 .thenReturn(List.of(response2, response1));
 
-        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor(UUID.randomUUID());
+        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor();
 
         // El primero debe ser el que tiene más slots
         assertThat(result.getFirst().id()).isEqualTo(idDoctor2);
@@ -199,7 +194,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
         when(doctorConfigConsultPort.getDoctorInfoByIds(any()))
                 .thenReturn(List.of(response1, response2));
 
-        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor(UUID.randomUUID());
+        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor();
 
         // Solo debe aparecer una vez FISIOTERAPIA
         assertThat(result).hasSize(1);

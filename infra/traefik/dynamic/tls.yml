@@ -1,7 +1,0 @@
-tls:
-  options:
-    cloudflare-aop:
-      clientAuth:
-        caFiles:
-          - /certs/cloudflare-authenticated-origin-pull-ca.pem
-        clientAuthType: RequireAndVerifyClientCert

@@ -1,8 +1,8 @@
-import { Component, inject, output, computed } from '@angular/core';
+import { Component, inject, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, UserSearch } from 'lucide-angular';
 import { BookingStateService } from '../../services/booking-state.service';
-import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+import { SpecialtyPipe } from './specialtyPipe';
 
 /**
  * Permite al usuario elegir una especialidad y,
@@ -11,7 +11,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 @Component({
   selector: 'app-booking-specialty-selector',
   standalone: true,
-  imports: [FormsModule, LucideAngularModule, FormatoPipe],
+  imports: [FormsModule, LucideAngularModule, SpecialtyPipe],
   templateUrl: './booking-specialty-selector.component.html',
 })
 export class BookingSpecialtySelectorComponent {
@@ -21,11 +21,6 @@ export class BookingSpecialtySelectorComponent {
 
   advance = output<void>();
   back = output<void>();
-
-  readonly filteredSpecialties = computed(() => {
-    const specialties = this.state.uniqueSpecialties();
-    return specialties;
-  });
 
   onSpecialtyChange(specialty: string): void {
     this.state.selectedSpecialty.set(specialty);

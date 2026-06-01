@@ -118,35 +118,10 @@ export class AdminService {
   // ── System Users ──────────────────────────────────────────────────────────
 
   getSystemUsers(): Observable<SystemUser[]> {
-    return this.http.get<SystemUser[]>(`${this.apiUrl}/user/system-users`);
+    return this.http.get<SystemUser[]>(`${this.apiUrl}/admin/system-users`);
   }
 
   createScheduler(request: CreateSchedulerRequest): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/user/schedulers`, request);
-  }
-  // ── Specialties ───────────────────────────────────────────────────────────
-
-  getAllSpecialties(): Observable<string[]> {
-    return this.http.get<string[]>(
-      `${this.apiUrl}/doctor/doctors/all-specialties`,
-    );
-  }
-
-  // ── Document Types ────────────────────────────────────────────────────────
-
-  getAllDocumentTypes(): Observable<string[]> {
-    return this.http.get<string[]>(`${this.apiUrl}/patients/document-types`);
-  }
-  giveDoctorSchedulerRole(username: string): Observable<void> {
-    return this.http.post<void>(
-      `${this.apiUrl}/user/${username}/give-doctor-scheduler`,
-      null,
-    );
-  }
-
-  revokeDoctorSchedulerRole(username: string): Observable<void> {
-    return this.http.delete<void>(
-      `${this.apiUrl}/user/${username}/revoke-doctor-scheduler`,
-    );
+    return this.http.post<void>(`${this.apiUrl}/admin/schedulers`, request);
   }
 }

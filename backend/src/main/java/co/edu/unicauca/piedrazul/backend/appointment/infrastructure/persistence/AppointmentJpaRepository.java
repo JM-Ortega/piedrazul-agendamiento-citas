@@ -6,7 +6,6 @@ import org.jmolecules.ddd.annotation.Repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,10 +27,6 @@ public interface AppointmentJpaRepository extends JpaRepository<AppointmentEntit
     List<AppointmentEntity> findByIdDoctorAndIdPatient(UUID idDoctor, UUID idPatient);
 
     List<AppointmentEntity> findByIdDoctorAndIdPatientAndDate(UUID idDoctor, UUID idPatient, LocalDate date);
-
-    List<AppointmentEntity> findByAppointmentStateAndDateBefore(AppointmentState state, LocalDate date);
-
-    boolean existsByIdPatientAndAppointmentStateIn(UUID idPatient, Collection<AppointmentState> appointmentStates);
 
 
 }

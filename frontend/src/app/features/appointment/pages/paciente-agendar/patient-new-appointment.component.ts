@@ -7,12 +7,11 @@ import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
 import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
 import { PatientAppointmentService } from '../../services/PatientApointment.service';
-import {ArrowLeft, LucideAngularModule,} from 'lucide-angular';
 
 @Component({
   selector: 'app-patient-new-appointment',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, AppointmentBookingComponent],
+  imports: [CommonModule, AppointmentBookingComponent],
   templateUrl: './patient-new-appointment.component.html',
 })
 export class PatientNewAppointmentComponent implements OnInit {
@@ -21,9 +20,6 @@ export class PatientNewAppointmentComponent implements OnInit {
   private appointmentService = inject(PatientAppointmentService);
   private router = inject(Router);
   private currentPatient = signal<Patient | null>(null);
-  protected isNewPatient = signal<boolean>(false);
-
-  readonly ArrowLeft = ArrowLeft;
 
   /**
    * Snapshot que se pasa al componente atómico.
@@ -45,19 +41,12 @@ export class PatientNewAppointmentComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    // Carga datos del paciente desde el backend usando el keycloakId del token
     this.patientService.getMe().subscribe({
-      next: (patient) => {
-        this.currentPatient.set(patient);
-
-        if (patient?.id) {
-          this.appointmentService.hasAppointments(patient.id).subscribe({
-            next: (isNew) => this.isNewPatient.set(isNew),
-            error: () => this.isNewPatient.set(false),
-          });
-        }
-      },
+      next: (patient) => this.currentPatient.set(patient),
       error: () => {
-        this.isNewPatient.set(false);
+        // Si no existe el paciente en la DB aún, no bloqueamos el flujo
+        // El backend lo creará con los datos mínimos del token
       },
     });
   }

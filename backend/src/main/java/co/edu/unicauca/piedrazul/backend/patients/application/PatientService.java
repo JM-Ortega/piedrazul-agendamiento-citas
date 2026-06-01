@@ -1,12 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.patients.application;
 
-import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientPublicResponse;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientResponse;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientData;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientPublicResponse;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
 import co.edu.unicauca.piedrazul.backend.patients.exception.InvalidPatientDataException;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyExistsException;
@@ -21,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -130,13 +127,12 @@ public class PatientService implements PatientModuleApi {
 
         Patient patient = getPatientByDocumentNumberOrThrow(documentNumber);
         ensurePatientHasNoLinkedUser(patient);
+        validatePhone(patient.getPhone());
 
         verificationModuleApi.requestCode(
                 documentNumber,
                 VerificationPurpose.LINK_PATIENT_ACCOUNT,
-                patient.getFirstName() + " " + patient.getLastName(),
-                patient.getPhone(),
-                patient.getEmail()
+                patient.getPhone()
         );
     }
 
@@ -249,10 +245,6 @@ public class PatientService implements PatientModuleApi {
                 .stream()
                 .map(this::toData)
                 .toList();
-    }
-
-    public List<DocumentType> getAllDocumentTypes(){
-        return Arrays.asList(DocumentType.values());
     }
 
     private void ensurePatientDoesNotExist(String documentNumber) {

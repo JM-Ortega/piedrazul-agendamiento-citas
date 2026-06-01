@@ -1,6 +1,5 @@
 package co.edu.unicauca.piedrazul.backend.user;
 
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 
 import java.util.List;
@@ -25,19 +24,11 @@ public interface UserModuleApi {
 
     List<UserSummary> findSchedulers();
 
-    List<UserSummary> findDoctors();
-
     boolean hasSchedulerRole(UUID userId);
-
-    boolean hasDoctrRole(UUID userId);
-
-    List<String> getUserRoles(UUID userId);
 
     void ensurePatientRole(UUID userId);
 
     void ensureSchedulerRole(UUID userId);
-
-    void revokeSchedulerRole(UUID userId);
 
     boolean existsById(UUID id);
 

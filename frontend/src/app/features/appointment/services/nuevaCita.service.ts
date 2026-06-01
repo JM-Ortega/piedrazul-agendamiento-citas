@@ -28,18 +28,14 @@ export class NuevaCitaService {
     );
   }
 
-  getSpecialtiesWithDoctor(patientId: string | null): Observable<SpecialtyDoctor[]> {
-    const url = patientId
-      ? `${this.apiUrl}/appointments/specialties-with-doctor?patientId=${patientId}`
-      : `${this.apiUrl}/appointments/specialties-with-doctor`;
-    return this.http.get<SpecialtyDoctor[]>(url);
+  getSpecialtiesWithDoctor(): Observable<SpecialtyDoctor[]> {
+    return this.http.get<SpecialtyDoctor[]>(
+      `${this.apiUrl}/appointments/specialties-with-doctor`,
+    );
   }
 
-  getSpecialties(patientId: string | null): Observable<string[]> {
-    const url = patientId
-      ? `${this.apiUrl}/doctor/doctors/patients/specialties?patientId=${patientId}`
-      : `${this.apiUrl}/doctor/doctors/patients/specialties`;
-    return this.http.get<string[]>(url);
+  getSpecialties(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.apiUrl}/doctor/doctors/specialty`);
   }
 
   getDoctorsBySpecialty(specialty: string): Observable<SpecialtyDoctor[]> {

@@ -1,6 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.jackson.sanitization;
 
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.ConfirmLinkUserAccountRequest;
+import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
+import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitizer;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.ConfirmLinkUserAccountRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 

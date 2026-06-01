@@ -7,9 +7,7 @@ public interface VerificationModuleApi {
     void requestCode(
             String subject,
             VerificationPurpose purpose,
-            String displayName,
-            String phone,
-            String email
+            String destination
     );
 
     boolean verifyCode(

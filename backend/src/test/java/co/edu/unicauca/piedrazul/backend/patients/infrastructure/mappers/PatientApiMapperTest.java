@@ -2,7 +2,7 @@ package co.edu.unicauca.piedrazul.backend.patients.infrastructure.mappers;
 
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.PatientData;
 import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Gender;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;

@@ -2,7 +2,6 @@ package co.edu.unicauca.piedrazul.backend.report.domain;
 
 import co.edu.unicauca.piedrazul.backend.report.dtos.AppointmentReportRow;
 import co.edu.unicauca.piedrazul.backend.report.dtos.DailyReportDto;
-import co.edu.unicauca.piedrazul.backend.report.dtos.DoctorDailyScheduleDto;
 import co.edu.unicauca.piedrazul.backend.report.dtos.ReportColumn;
 import co.edu.unicauca.piedrazul.backend.report.util.ReportRowMapper;
 import com.lowagie.text.*;
@@ -11,7 +10,6 @@ import org.springframework.stereotype.Component;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
-import java.time.LocalDate;
 import java.util.List;
 
 @Component
@@ -109,111 +107,6 @@ public class PdfExporter {
 
         } catch (Exception e) {
             throw new RuntimeException("Error al generar el PDF", e);
-        }
-    }
-
-    public byte[] exportScheduler(List<DoctorDailyScheduleDto> schedules, LocalDate date, boolean hasAvailableSlots) {
-        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-
-            Document doc = new Document(PageSize.A4.rotate(), 30, 30, 40, 30);
-            PdfWriter.getInstance(doc, out);
-            doc.open();
-
-            // Título principal
-            Font fuenteTitulo    = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, COLOR_TEXT_DARK);
-            Font fuenteSubtitulo = FontFactory.getFont(FontFactory.HELVETICA, 10, COLOR_TEXT_DARK);
-
-            Paragraph titulo = new Paragraph("Agenda de Citas por Médico", fuenteTitulo);
-            titulo.setAlignment(Element.ALIGN_CENTER);
-            titulo.setSpacingAfter(4);
-            doc.add(titulo);
-
-            int totalCitas = schedules.stream().mapToInt(s -> s.patientNames().size()).sum();
-
-            Paragraph subtitulo = new Paragraph(
-                    "Fecha: " + date + "   |   Total médicos: " + schedules.size()
-                            + "   |   Total citas: " + totalCitas,
-                    fuenteSubtitulo
-            );
-
-            if (hasAvailableSlots) {
-                Font fuenteWarning = FontFactory.getFont(
-                        FontFactory.HELVETICA_BOLD, 9, new Color(180, 0, 0));
-                Paragraph warning = new Paragraph(
-                        "⚠ ADVERTENCIA: Aún existen horarios disponibles para esta fecha. " +
-                                "Este documento puede estar sujeto a desactualizaciones.",
-                        fuenteWarning
-                );
-                warning.setAlignment(Element.ALIGN_CENTER);
-                warning.setSpacingAfter(10);
-                doc.add(warning);
-            }
-
-            subtitulo.setAlignment(Element.ALIGN_CENTER);
-            subtitulo.setSpacingAfter(14);
-            doc.add(subtitulo);
-
-            // Tabla — una columna por médico
-            PdfPTable tabla = new PdfPTable(schedules.size());
-            tabla.setWidthPercentage(100);
-            tabla.setSpacingBefore(4);
-
-            // Encabezados — nombres de médicos
-            Font fuenteHeader = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, COLOR_WHITE);
-            for (DoctorDailyScheduleDto schedule : schedules) {
-                PdfPCell celda = new PdfPCell(new Phrase(schedule.doctorName(), fuenteHeader));
-                celda.setBackgroundColor(COLOR_HEADER_BG);
-                celda.setHorizontalAlignment(Element.ALIGN_CENTER);
-                celda.setVerticalAlignment(Element.ALIGN_MIDDLE);
-                celda.setPadding(6);
-                celda.setBorderColor(COLOR_BORDER);
-                tabla.addCell(celda);
-            }
-
-            // Filas de pacientes — una por slot, columna por médico
-            int maxPatients = schedules.stream()
-                    .mapToInt(s -> s.patientNames().size())
-                    .max()
-                    .orElse(0);
-
-            Font fuenteDatos = FontFactory.getFont(FontFactory.HELVETICA, 8, COLOR_TEXT_DARK);
-
-            for (int i = 0; i < maxPatients; i++) {
-                final int index = i;
-                Color bgFila = (i % 2 == 0) ? COLOR_WHITE : COLOR_ROW_ALT;
-
-                for (DoctorDailyScheduleDto schedule : schedules) {
-                    String nombre = index < schedule.patientNames().size()
-                            ? schedule.patientNames().get(index)
-                            : "";
-                    PdfPCell celda = new PdfPCell(new Phrase(nombre, fuenteDatos));
-                    celda.setBackgroundColor(bgFila);
-                    celda.setHorizontalAlignment(Element.ALIGN_CENTER);
-                    celda.setVerticalAlignment(Element.ALIGN_MIDDLE);
-                    celda.setPadding(5);
-                    celda.setBorderColor(COLOR_BORDER);
-                    tabla.addCell(celda);
-                }
-            }
-
-            doc.add(tabla);
-
-            // Pie de página
-            Font fuentePie = FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8,
-                    new Color(120, 120, 120));
-            Paragraph pie = new Paragraph(
-                    "Generado automáticamente  •  Total de registros: " + totalCitas,
-                    fuentePie
-            );
-            pie.setAlignment(Element.ALIGN_RIGHT);
-            pie.setSpacingBefore(10);
-            doc.add(pie);
-
-            doc.close();
-            return out.toByteArray();
-
-        } catch (Exception e) {
-            throw new RuntimeException("Error al generar el PDF del agendador", e);
         }
     }
 

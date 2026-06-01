@@ -62,7 +62,7 @@ public record CreateDoctorRequest(
         @Sanitize
         String email,
 
-        @Size(min = 6, max = 100)
+        @Size(min = 8, max = 100)
         @NotBlank
         String password
 ) {}

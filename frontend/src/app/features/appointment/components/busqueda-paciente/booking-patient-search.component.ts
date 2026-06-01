@@ -13,7 +13,6 @@ import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { PatientSuggestion } from '../../models/dtos/patient-suggestion.dto';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import {FormatoPipe} from "../../../../shared/pipes/formatoPipe";
 
 const MIN_CHARS = 3;
 const MAX_DOC_LENGTH = 12;
@@ -26,7 +25,7 @@ const MIN_DOC_LENGTH = 6;
 @Component({
   selector: 'app-booking-patient-search',
   standalone: true,
-  imports: [FormsModule, LucideAngularModule, FormatoPipe],
+  imports: [FormsModule, LucideAngularModule],
   templateUrl: './booking-patient-search.component.html',
 })
 export class BookingPatientSearchComponent implements OnDestroy {

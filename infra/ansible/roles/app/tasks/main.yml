@@ -1,6 +1,0 @@
----
-# Punto de entrada seguro por defecto.
-# Los playbooks usan include_role con tasks_from para controlar el flujo exacto.
-
-- name: Importar setup por defecto
-  ansible.builtin.import_tasks: setup.yml

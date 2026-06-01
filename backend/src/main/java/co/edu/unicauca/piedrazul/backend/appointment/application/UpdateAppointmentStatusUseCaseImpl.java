@@ -20,7 +20,7 @@ public class UpdateAppointmentStatusUseCaseImpl implements UpdateAppointmentStat
         Appointment appointment = appointmentRepository.findById(appointmentId);
 
         // Actualizar el estado a ATENDIDA
-        appointment.changeState(AppointmentState.ATENDIDA);
+        appointment.setAppointmentState(AppointmentState.ATENDIDA);
 
         // Guardar la cita actualizada
         appointmentRepository.save(appointment);
@@ -32,7 +32,7 @@ public class UpdateAppointmentStatusUseCaseImpl implements UpdateAppointmentStat
         Appointment appointment = appointmentRepository.findById(appointmentId);
 
         // Actualizar el estado a NO ASISTIDA
-        appointment.changeState(AppointmentState.NO_ASISTIO);
+        appointment.setAppointmentState(AppointmentState.NO_ASISTIO);
 
         // Guardar la cita actualizada
         appointmentRepository.save(appointment);

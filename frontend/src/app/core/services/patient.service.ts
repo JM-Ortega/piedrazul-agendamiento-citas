@@ -1,9 +1,8 @@
 import { HttpClient } from '@angular/common/http';
-import { inject, Injectable, signal } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Patient } from '../../shared/models/interfaces/patient.model';
-import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
 
 export interface PatientPublicResponse {
   documentType: string | null;
@@ -20,34 +19,8 @@ export class PatientService {
   private http = inject(HttpClient);
   private apiUrl = environment.apiUrl;
 
-  medicalRecords = signal<MedicalRecord[]>([]);
-  error = signal<string | null>(null);
-  readonly documentTypes = signal<string[]>([]);
-
-  loadDocumentTypes(): void {
-    if (this.documentTypes().length > 0) return;
-    this.getAllDocumentTypes().subscribe({
-      next: (types) => this.documentTypes.set(types),
-      error: () => {},
-    });
-  }
-
   getMe(): Observable<Patient> {
     return this.http.get<Patient>(`${this.apiUrl}/patients/me`);
-  }
-
-  loadMyMedicalRecords(patientId: string | null): void {
-    this.http.get<MedicalRecord[]>(`${this.apiUrl}/clinical-history/patient/${patientId}`)
-      .subscribe({
-        next: (records) => this.medicalRecords.set(records),
-        error: (err) => {
-          if (err.status === 0) {
-            this.error.set('No se pudo conectar con el servidor.');
-          } else {
-            this.error.set(err.error?.message ?? 'Error al cargar el historial.');
-          }
-        }
-      });
   }
 
   getByDocument(documentNumber: string): Observable<Patient> {
@@ -102,9 +75,5 @@ export class PatientService {
       `${this.apiUrl}/patients/link-user-account/confirm`,
       data,
     );
-  }
-
-  getAllDocumentTypes(): Observable<string[]> {
-    return this.http.get<string[]>(`${this.apiUrl}/patients/document-types`);
   }
 }

@@ -7,8 +7,8 @@ import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException
 import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsException;
 import jakarta.ws.rs.core.Response;
 import org.keycloak.admin.client.Keycloak;
+import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.admin.client.resource.RealmResource;
-import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -28,9 +28,15 @@ public class KeycloakUserClient {
     private final Keycloak keycloak;
     private final KeycloakProperties props;
 
-    public KeycloakUserClient(Keycloak keycloak, KeycloakProperties props) {
-        this.keycloak = keycloak;
+    public KeycloakUserClient(KeycloakProperties props) {
         this.props = props;
+        this.keycloak = KeycloakBuilder.builder()
+                .serverUrl(props.getServerUrl())
+                .realm(props.getRealm())
+                .clientId(props.getClientId())
+                .clientSecret(props.getClientSecret())
+                .grantType("client_credentials")
+                .build();
     }
 
     public UUID createUser(
@@ -63,27 +69,43 @@ public class KeycloakUserClient {
             int status = response.getStatus();
 
             if (status == Response.Status.CONFLICT.getStatusCode()) {
-                return findUserIdByUsername(username)
-                        .orElseThrow(() -> new IdentityProviderException(
-                                "Conflicto al crear usuario pero no se pudo recuperar: " + username
-                        ));
+                throw new UserAlreadyExistsException(username);
             }
 
             if (status == Response.Status.BAD_REQUEST.getStatusCode()) {
                 String errorBody = response.hasEntity() ? response.readEntity(String.class) : "";
-                log.warn("Datos inválidos en Keycloak: {}", errorBody);
+                log.warn(
+                        "Datos inválidos al crear usuario en Keycloak. username={}, status={}, body={}",
+                        username,
+                        status,
+                        errorBody
+                );
                 throw new InvalidUserDataException("Datos inválidos para crear el usuario");
             }
 
             if (status != Response.Status.CREATED.getStatusCode()) {
                 String errorBody = response.hasEntity() ? response.readEntity(String.class) : "";
-                log.error("Error Keycloak: {}", errorBody);
-                throw new IdentityProviderException("No se pudo crear el usuario");
+                log.error(
+                        "Error al crear usuario en Keycloak. username={}, status={}, body={}",
+                        username,
+                        status,
+                        errorBody
+                );
+                throw new IdentityProviderException(
+                        "No se pudo crear el usuario en el proveedor de identidad"
+                );
             }
 
             String location = response.getHeaderString("Location");
             if (location == null || location.isBlank()) {
-                throw new IdentityProviderException("No se pudo obtener el ID del usuario");
+                log.error(
+                        "Keycloak creó usuario sin header Location. username={}, status={}",
+                        username,
+                        status
+                );
+                throw new IdentityProviderException(
+                        "No se pudo obtener el identificador del usuario creado"
+                );
             }
 
             keycloakId = location.substring(location.lastIndexOf('/') + 1);
@@ -122,17 +144,9 @@ public class KeycloakUserClient {
         }
     }
 
-    public void revokeRoleIfPresent(UUID keycloakId, Role role) {
-
-        if (userHasRole(keycloakId, role)) {
-            revokeRealmRole(keycloakId.toString(), role);
-        }
-    }
-
     public void activateUser(UUID keycloakId) {
         UserRepresentation user = new UserRepresentation();
         user.setEnabled(true);
-
         keycloak.realm(props.getRealm())
                 .users()
                 .get(keycloakId.toString())
@@ -142,7 +156,6 @@ public class KeycloakUserClient {
     public void deactivateUser(UUID keycloakId) {
         UserRepresentation user = new UserRepresentation();
         user.setEnabled(false);
-
         keycloak.realm(props.getRealm())
                 .users()
                 .get(keycloakId.toString())
@@ -159,18 +172,6 @@ public class KeycloakUserClient {
         } catch (Exception e) {
             return false;
         }
-    }
-
-    public List<String> getUserRoles(UUID keycloakId) {
-        return keycloak.realm(props.getRealm())
-                .users()
-                .get(keycloakId.toString())
-                .roles()
-                .realmLevel()
-                .listAll()
-                .stream()
-                .map(RoleRepresentation::getName)
-                .toList();
     }
 
     public boolean userHasRole(UUID keycloakId, Role role) {
@@ -197,20 +198,5 @@ public class KeycloakUserClient {
                 .roles()
                 .realmLevel()
                 .add(List.of(realmRole));
-    }
-
-    private void revokeRealmRole(String keycloakId, Role role) {
-
-        RealmResource realm = keycloak.realm(props.getRealm());
-
-        RoleRepresentation realmRole = realm.roles()
-                .get(role.name())
-                .toRepresentation();
-
-        realm.users()
-                .get(keycloakId)
-                .roles()
-                .realmLevel()
-                .remove(List.of(realmRole));
     }
 }

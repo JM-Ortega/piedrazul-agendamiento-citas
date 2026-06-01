@@ -51,7 +51,6 @@ export class BookingStateService {
   });
 
   patientSnapshot = signal<Partial<Patient> | null>(null);
-  isNewPatient = signal<boolean>(false);
 
   // Agendador: resultado de búsqueda por documento
   foundPatient = signal<Patient | null>(null);

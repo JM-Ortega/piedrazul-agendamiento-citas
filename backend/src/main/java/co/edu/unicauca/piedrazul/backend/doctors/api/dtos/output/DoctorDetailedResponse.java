@@ -8,7 +8,7 @@ import java.time.LocalDate;
 import java.util.*;
 
 // Lo pidió Nicolle
-public record   DoctorDetailedResponse(
+public record DoctorDetailedResponse(
         UUID id,
         String name,
         String specialty,

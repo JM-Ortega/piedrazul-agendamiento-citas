@@ -1,6 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.report.domain;
 
-import co.edu.unicauca.piedrazul.backend.report.dtos.*;
+import co.edu.unicauca.piedrazul.backend.report.dtos.AppointmentReportRow;
+import co.edu.unicauca.piedrazul.backend.report.dtos.DailyReportDto;
+import co.edu.unicauca.piedrazul.backend.report.dtos.ReportColumn;
 import co.edu.unicauca.piedrazul.backend.report.util.ReportRowMapper;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
@@ -10,11 +12,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
 import java.util.List;
 
 @Component
 public class CsvExporter {
+
 
     public final byte[] export(DailyReportDto report, List<ReportColumn> columns) {
 
@@ -51,46 +53,7 @@ public class CsvExporter {
         }
     }
 
-    public byte[] exportScheduler(List<DoctorDailyScheduleDto> schedules, LocalDate date, boolean hasAvailableSlots) {
-        try (ByteArrayOutputStream out = new ByteArrayOutputStream();
-             OutputStreamWriter writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
-             CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT)) {
 
-            out.write(0xEF); out.write(0xBB); out.write(0xBF);
-
-            if (hasAvailableSlots) {
-                printer.printRecord(
-                        "⚠ ADVERTENCIA: Aún existen horarios disponibles para esta fecha. " +
-                                "Este documento puede estar sujeto a desactualizaciones."
-                );
-                printer.println(); // línea en blanco separadora
-            }
-
-            printer.printRecord(
-                    schedules.stream().map(DoctorDailyScheduleDto::doctorName).toArray()
-            );
-
-            int maxPatients = schedules.stream()
-                    .mapToInt(s -> s.patientNames().size())
-                    .max().orElse(0);
-
-            for (int i = 0; i < maxPatients; i++) {
-                final int index = i;
-                printer.printRecord(
-                        schedules.stream()
-                                .map(s -> index < s.patientNames().size()
-                                        ? s.patientNames().get(index) : "")
-                                .toArray()
-                );
-            }
-
-            writer.flush();
-            return out.toByteArray();
-
-        } catch (IOException e) {
-            throw new RuntimeException("Error al generar el CSV del agendador", e);
-        }
-    }
 
 }
 

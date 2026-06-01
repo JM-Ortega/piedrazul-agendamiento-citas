@@ -1,8 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.report.integration;
 
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSummary;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.SchedulerAppointmentSummary;
+import co.edu.unicauca.piedrazul.backend.appointment.AppointmentSummary;
 import co.edu.unicauca.piedrazul.backend.report.dtos.AppointmentStateFilter;
 import org.springframework.stereotype.Component;
 
@@ -18,17 +17,11 @@ public class AppointmentDataClient {
         this.appointmentExternalService = appointmentExternalService;
     }
 
+
+
     public List<AppointmentSummary> getAppointmentForDoctorsToday(UUID doctorId, AppointmentStateFilter state) {
         // Si state es null, pasa null al servicio externo (traer todas)
         String stateName = state != null ? state.name() : null;
         return appointmentExternalService.findByDoctorAndDate(doctorId, LocalDate.now(), stateName);
-    }
-
-    public List<SchedulerAppointmentSummary> getAllAppointmentsByDate(LocalDate date){
-        return appointmentExternalService.findAllByDate(date);
-    }
-
-    public boolean hasAvailableSlots(LocalDate date){
-        return appointmentExternalService.hasAvailableSlots(date);
     }
 }

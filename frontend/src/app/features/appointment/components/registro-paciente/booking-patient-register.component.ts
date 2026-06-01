@@ -1,11 +1,9 @@
-import { Component, inject, OnInit, output, signal } from '@angular/core';
+import { Component, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { ArrowLeft, Calendar, LucideAngularModule } from 'lucide-angular';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
-import { PatientService } from '../../../../core/services/patient.service';
 import { BookingStateService } from '../../services/booking-state.service';
-import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
 /**
  * Capturar y validar los datos de un paciente que no fue encontrado en el sistema para
@@ -14,18 +12,13 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 @Component({
   selector: 'app-booking-patient-register',
   standalone: true,
-  imports: [FormsModule, LucideAngularModule, MatDatepickerModule, FormatoPipe],
+  imports: [FormsModule, LucideAngularModule, MatDatepickerModule],
   templateUrl: './booking-patient-register.component.html',
 })
-export class BookingPatientRegisterComponent implements OnInit {
+export class BookingPatientRegisterComponent {
   readonly ArrowLeft = ArrowLeft;
   protected state = inject(BookingStateService);
-  protected patientService = inject(PatientService);
   Calendar = Calendar;
-
-  ngOnInit(): void {
-    this.patientService.loadDocumentTypes();
-  }
 
   advance = output<void>();
   goBack = output<void>();
@@ -77,28 +70,22 @@ export class BookingPatientRegisterComponent implements OnInit {
 
   handleNameInput(event: Event, field: 'firstName' | 'lastName'): void {
     const el = event.target as HTMLInputElement;
+    const value = el.value;
     const limitMsg =
       field === 'firstName' ? this.firstNameLimitMsg : this.lastNameLimitMsg;
-    let value = el.value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    value = value.replace(/[^a-zA-ZñÑ\s]/g, '');
-    value = value.replace(/^\s+/, '');
-    value = value.replace(/\s{2,}/g, ' ');
-    value = value.replace(/(\S+)/g, (word) =>
-      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-    );
+
     if (value.length > this.NAME_MAX) {
-      value = value.slice(0, this.NAME_MAX);
+      el.value = value.slice(0, this.NAME_MAX);
+      this.setPatientField(field, el.value as any);
       this.flash(
         limitMsg,
         `Solo se permiten máximo ${this.NAME_MAX} caracteres`,
         field,
       );
     } else {
+      this.setPatientField(field, value as any);
       limitMsg.set('');
     }
-
-    el.value = value;
-    this.setPatientField(field, value as any);
   }
 
   handlePhoneInput(event: Event): void {
@@ -398,12 +385,5 @@ export class BookingPatientRegisterComponent implements OnInit {
     this.phoneLimitMsg.set('');
     this.emailLimitMsg.set('');
     this.guardianPhoneLimitMsg.set('');
-  }
-
-  onBirthDateChange(value: Date | string): void {
-    const formatted = value instanceof Date
-      ? this.state.formatLocalDate(value)
-      : value;
-    this.setPatientField('birthDate', formatted as any);
   }
 }

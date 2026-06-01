@@ -1,7 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.unit.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientAlreadyScheduledInSpecialtyException;
-import co.edu.unicauca.piedrazul.backend.appointment.exception.FirstAppointmentMustBeGeneralMedicineException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientScheduleTimeConflictException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
@@ -32,8 +31,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anySet;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -68,9 +65,6 @@ class ScheduleAutonomousAppointmentUseCaseImplTest {
 
         lenient().when(appointmentRepository.save(any(Appointment.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-
-        lenient().when(appointmentRepository.existsByPatientIdAndStates(any(UUID.class), anySet()))
-                .thenReturn(true);
     }
 
     // ─────────────────────────────────────────────
@@ -94,9 +88,6 @@ class ScheduleAutonomousAppointmentUseCaseImplTest {
         when(appointmentRepository.findByPatientId(idPatient))
                 .thenReturn(List.of());
 
-        when(appointmentRepository.existsByPatientIdAndStates(idPatient, java.util.EnumSet.of(AppointmentState.AGENDADA, AppointmentState.ATENDIDA)))
-                .thenReturn(true);
-
         when(appointmentRepository.findByPatientIdAndDate(idPatient, date))
                 .thenReturn(List.of());
 
@@ -118,38 +109,6 @@ class ScheduleAutonomousAppointmentUseCaseImplTest {
         assertThat(result).isEqualTo(expected);
 
         verify(appointmentRepository).save(expected);
-    }
-
-    @Test
-    void scheduleAutonomousShouldThrowWhenNewPatientFirstAppointmentIsNotGeneralMedicine() {
-        UUID idDoctor  = UUID.randomUUID();
-        UUID idPatient = UUID.randomUUID();
-        AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
-        LocalDate date = LocalDate.now().plusDays(1);
-        PatientInfo patientInfo = buildPatientInfo();
-
-        stubDoctorConfig(idDoctor, 30, "Dr. Lopez");
-        when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
-        when(appointmentRepository.existsByPatientIdAndStates(eq(idPatient), anySet())).thenReturn(false);
-        stubPatientName(idPatient, patientInfo);
-
-        assertThatThrownBy(() ->
-                useCase.scheduleAutonomous(
-                        idPatient,
-                        idDoctor,
-                        Specialty.FISIOTERAPIA,
-                        date,
-                        startTime
-                )
-        )
-                .isInstanceOf(FirstAppointmentMustBeGeneralMedicineException.class)
-                .hasMessageContaining("primera cita");
-
-        verify(appointmentRepository, never()).save(any(Appointment.class));
-        verify(appointmentService, never()).scheduleAutonomous(
-                any(), any(), any(), any(), any(),
-                any(), any(), any(), anyInt(), anyList()
-        );
     }
 
     // ─────────────────────────────────────────────

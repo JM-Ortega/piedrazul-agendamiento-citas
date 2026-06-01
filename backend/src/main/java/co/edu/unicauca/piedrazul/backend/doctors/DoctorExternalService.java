@@ -23,8 +23,6 @@ public interface DoctorExternalService {
 
     List<UUID> getActiveDoctorIds();
 
-    List<UUID> getActiveGeneralDoctorIds();
-
     List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
 
     List<DoctorAdminUserData> getAdminUserData();

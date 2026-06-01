@@ -3,9 +3,11 @@ services:
     image: quay.io/keycloak/keycloak:26.5.6
     container_name: keycloak
     restart: unless-stopped
+    command: ["start-dev", "--import-realm"]
     environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN_USER}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD}
+
       KC_DB: postgres
       KC_DB_URL_HOST: postgres
       KC_DB_URL_PORT: 5432
@@ -13,13 +15,20 @@ services:
       KC_DB_SCHEMA: ${KC_DB_SCHEMA}
       KC_DB_USERNAME: ${KC_DB_USERNAME}
       KC_DB_PASSWORD: ${KC_DB_PASSWORD}
+
       KC_HTTP_ENABLED: "true"
       KC_HTTP_PORT: ${KC_PORT}
-      KC_HEALTH_ENABLED: ${KC_HEALTH_ENABLED}
-      KC_METRICS_ENABLED: ${KC_METRICS_ENABLED}
+
+      KC_HOSTNAME_STRICT: "false"
+
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+    ports:
+      - "${KC_PORT}:${KC_PORT}"
     volumes:
       - ../keycloak/realm:/opt/keycloak/data/import
-      - ../keycloak/themes/keycloak-theme/keycloak-theme-for-kc-all-other-versions.jar:/opt/keycloak/providers/keycloak-theme.jar
+      - ../keycloak/themes/dist/keycloak-theme/keycloak-theme-for-kc-all-other-versions.jar:/opt/keycloak/providers/keycloak-theme.jar
+
     depends_on:
       postgres:
         condition: service_healthy
@@ -28,17 +37,12 @@ services:
         limits:
           memory: 1g
     healthcheck:
-      test: [
+      test:
+        [
           "CMD-SHELL",
-          "{ printf 'HEAD /health/ready HTTP/1.0\r
-
-          \r
-
-          ' >&0; grep 'HTTP/1.0 200'; } 0<>/dev/tcp/localhost/9000",
+          "{ printf 'HEAD /health/ready HTTP/1.0\r\n\r\n' >&0; grep 'HTTP/1.0 200'; } 0<>/dev/tcp/localhost/9000",
         ]
       interval: 10s
       timeout: 5s
       retries: 30
       start_period: 40s
-    networks:
-      - piedrazul_net

@@ -146,27 +146,8 @@ public class KeycloakUserService implements UserModuleApi {
     }
 
     @Override
-    public List<UserSummary> findDoctors() {
-        return keycloakClient.findUsersByRole(Role.DOCTOR)
-                .stream()
-                .map(this::toUserSummary)
-                .toList();
-    }
-
-    // BORRAR
-    @Override
     public boolean hasSchedulerRole(UUID userId) {
         return keycloakClient.userHasRole(userId, Role.SCHEDULER);
-    }
-
-    @Override
-    public boolean hasDoctrRole(UUID userId) {
-        return keycloakClient.userHasRole(userId, Role.DOCTOR);
-    }
-
-    @Override
-    public List<String> getUserRoles (UUID userId) {
-        return keycloakClient.getUserRoles(userId);
     }
 
     @Override
@@ -177,11 +158,6 @@ public class KeycloakUserService implements UserModuleApi {
     @Override
     public void ensureSchedulerRole(UUID userId) {
         keycloakClient.assignRoleIfMissing(userId, Role.SCHEDULER);
-    }
-
-    @Override
-    public void revokeSchedulerRole(UUID userId) {
-        keycloakClient.revokeRoleIfPresent(userId, Role.SCHEDULER);
     }
 
     private UserSummary toUserSummary(UserRepresentation user) {

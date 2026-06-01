@@ -1,20 +1,20 @@
 <div>
-  <h2 class="text-[#163c63] text-2xl mb-6">Confirmar Cita</h2>
+  <h2 class="text-blue-800 text-2xl mb-6">Confirmar Cita</h2>
 
   <div class="space-y-4">
 
     <div class="bg-blue-50 rounded-xl p-5">
-      <h3 class="text-[#163c63] font-semibold mb-3 flex items-center gap-2">
+      <h3 class="text-blue-700 font-semibold mb-3 flex items-center gap-2">
         <lucide-angular [img]="UserSearch" [size]="18"></lucide-angular>
         Paciente
       </h3>
       <p><strong>Nombre:</strong> {{ state.confirmFirstName() }} {{ state.confirmLastName() }}</p>
 
       @if (state.isSchedulerContext()) {
-        <p><strong>Tipo de Documento:</strong> {{ state.confirmDocumentType() | formato }}</p>
+        <p><strong>Tipo de Documento:</strong> {{ state.confirmDocumentType() }}</p>
         <p><strong>Documento:</strong> {{ state.confirmDocument() }}</p>
         <p><strong>Celular:</strong> {{ state.confirmPhone() }}</p>
-        <p><strong>Género:</strong> {{ state.confirmGender() | formato }}</p>
+        <p><strong>Género:</strong> {{ state.confirmGender() }}</p>
         <p><strong>Fecha de Nacimiento:</strong> {{ state.confirmBirthDate() }}</p>
       } @else {
         @if (state.confirmDocument()) {
@@ -28,7 +28,7 @@
         <lucide-angular [img]="Stethoscope" [size]="18"></lucide-angular>
         Cita
       </h3>
-      <p><strong>Especialidad:</strong> {{ state.selectedSpecialty() | formato }}</p>
+      <p><strong>Especialidad:</strong> {{ state.selectedSpecialty() | specialty }}</p>
       <p><strong>Médico:</strong> {{ state.confirmDoctorName() }}</p>
       <p><strong>Fecha:</strong> {{ state.confirmDate() }}</p>
       <p><strong>Hora:</strong> {{ state.selectedTime().slice(0, 5) }}</p>
@@ -38,14 +38,14 @@
 
   @if (state.errorMessage()) {
     <div class="mt-4 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4">
-      ⚠️ {{ state.errorMessage() | errores }}
+      ⚠️ {{ state.errorMessage() }}
     </div>
   }
 
   <div class="flex gap-4 mt-8">
     <button
       (click)="goBack()"
-      class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+      class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
     >
       ← Atrás
     </button>
@@ -53,7 +53,7 @@
       (click)="confirm()"
       [disabled]="state.isLoading()"
       class="flex-1 bg-green-600 text-white py-3 rounded-xl flex items-center
-             justify-center gap-2 hover:bg-green-700 transition-colors disabled:opacity-50 cursor-pointer"
+             justify-center gap-2 hover:bg-green-700 transition-colors disabled:opacity-50"
     >
       <lucide-angular [img]="CheckCircle" [size]="22"></lucide-angular>
       Confirmar y Registrar
