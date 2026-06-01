@@ -8,6 +8,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,14 +50,19 @@ class AppointmentServiceTest {
         UUID idDoctor  = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
+        AppointmentSchedulingRequest request = buildRequest(
+                idDoctor,
+                "Dr. Lopez",
+                idPatient,
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
+                LocalDate.now().plusDays(1),
+                startTime
+        );
 
         when(busySlotService.isBusy(anyList(), eq(startTime), eq(30))).thenReturn(false);
 
-        Appointment result = appointmentService.scheduleManual(
-                "Dr. Lopez", idPatient, buildPatientInfo(),
-                idDoctor, "Carlos Gomez", Specialty.FISIOTERAPIA,
-                LocalDate.now().plusDays(1), startTime, 30, List.of()
-        );
+        Appointment result = appointmentService.scheduleManual(request, 30, List.of());
 
         assertThat(result).isNotNull();
         assertThat(result.getIdDoctor()).isEqualTo(idDoctor);
@@ -70,14 +76,19 @@ class AppointmentServiceTest {
     void scheduleManualShouldAllowNullIdPatient() {
         // En manual el paciente puede no tener cuenta en el sistema
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
+        AppointmentSchedulingRequest request = buildRequest(
+                UUID.randomUUID(),
+                "Dr. Lopez",
+                null,
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
+                LocalDate.now().plusDays(1),
+                startTime
+        );
 
         when(busySlotService.isBusy(anyList(), eq(startTime), eq(30))).thenReturn(false);
 
-        Appointment result = appointmentService.scheduleManual(
-                "Dr. Lopez", null, buildPatientInfo(),
-                UUID.randomUUID(), "Carlos Gomez", Specialty.FISIOTERAPIA,
-                LocalDate.now().plusDays(1), startTime, 30, List.of()
-        );
+        Appointment result = appointmentService.scheduleManual(request, 30, List.of());
 
         assertThat(result.getIdPatient()).isNull();
     }
@@ -86,14 +97,19 @@ class AppointmentServiceTest {
     void scheduleManualShouldDelegateBusyCheckToBusySlotService() {
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
         List<Appointment> existingAppointments = List.of();
+        AppointmentSchedulingRequest request = buildRequest(
+                UUID.randomUUID(),
+                "Dr. Lopez",
+                UUID.randomUUID(),
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
+                LocalDate.now().plusDays(1),
+                startTime
+        );
 
         when(busySlotService.isBusy(existingAppointments, startTime, 30)).thenReturn(false);
 
-        appointmentService.scheduleManual(
-                "Dr. Lopez", UUID.randomUUID(), buildPatientInfo(),
-                UUID.randomUUID(), "Carlos Gomez", Specialty.FISIOTERAPIA,
-                LocalDate.now().plusDays(1), startTime, 30, existingAppointments
-        );
+        appointmentService.scheduleManual(request, 30, existingAppointments);
 
         verify(busySlotService).isBusy(existingAppointments, startTime, 30);
     }
@@ -105,14 +121,19 @@ class AppointmentServiceTest {
     @Test
     void scheduleManualShouldThrowWhenSlotIsBusy() {
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
+        AppointmentSchedulingRequest request = buildRequest(
+                UUID.randomUUID(),
+                "Dr. Lopez",
+                UUID.randomUUID(),
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
+                LocalDate.now().plusDays(1),
+                startTime
+        );
 
         when(busySlotService.isBusy(anyList(), eq(startTime), eq(30))).thenReturn(true);
 
-        assertThatThrownBy(() -> appointmentService.scheduleManual(
-                "Dr. Lopez", UUID.randomUUID(), buildPatientInfo(),
-                UUID.randomUUID(), "Carlos Gomez", Specialty.FISIOTERAPIA,
-                LocalDate.now().plusDays(1), startTime, 30, List.of()
-        ))
+        assertThatThrownBy(() -> appointmentService.scheduleManual(request, 30, List.of()))
                 .isInstanceOf(SlotNotAvailableException.class)
                 .hasMessageContaining("ya está ocupado");
     }
@@ -122,14 +143,20 @@ class AppointmentServiceTest {
         // Si el slot está ocupado, la cita nunca debe crearse — verificamos
         // que no se llama a ningún factory method del aggregate
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
+        AppointmentSchedulingRequest request = buildRequest(
+                UUID.randomUUID(),
+                "Dr. Lopez",
+                UUID.randomUUID(),
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
+                LocalDate.now().plusDays(1),
+                startTime
+        );
 
         when(busySlotService.isBusy(anyList(), eq(startTime), anyInt())).thenReturn(true);
 
-        assertThatThrownBy(() -> appointmentService.scheduleManual(
-                "Dr. Lopez", UUID.randomUUID(), buildPatientInfo(),
-                UUID.randomUUID(), "Carlos Gomez", Specialty.FISIOTERAPIA,
-                LocalDate.now().plusDays(1), startTime, 30, List.of()
-        )).isInstanceOf(SlotNotAvailableException.class);
+        assertThatThrownBy(() -> appointmentService.scheduleManual(request, 30, List.of()))
+                .isInstanceOf(SlotNotAvailableException.class);
     }
 
     // ─────────────────────────────────────────────
@@ -141,14 +168,19 @@ class AppointmentServiceTest {
         UUID idDoctor  = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(10, 0));
+        AppointmentSchedulingRequest request = buildRequest(
+                idDoctor,
+                "Dr. Lopez",
+                idPatient,
+                "Carlos Gomez",
+                Specialty.QUIROPRAXIA,
+                LocalDate.now().plusDays(1),
+                startTime
+        );
 
         when(busySlotService.isBusy(anyList(), eq(startTime), eq(30))).thenReturn(false);
 
-        Appointment result = appointmentService.scheduleAutonomous(
-                "Dr. Lopez", idPatient, buildPatientInfo(),
-                idDoctor, "Carlos Gomez", Specialty.QUIROPRAXIA,
-                LocalDate.now().plusDays(1), startTime, 30, List.of()
-        );
+        Appointment result = appointmentService.scheduleAutonomous(request, 30, List.of());
 
         assertThat(result).isNotNull();
         assertThat(result.getIdDoctor()).isEqualTo(idDoctor);
@@ -162,14 +194,19 @@ class AppointmentServiceTest {
     void scheduleAutonomousShouldDelegateBusyCheckToBusySlotService() {
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(10, 0));
         List<Appointment> existingAppointments = List.of();
+        AppointmentSchedulingRequest request = buildRequest(
+                UUID.randomUUID(),
+                "Dr. Lopez",
+                UUID.randomUUID(),
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
+                LocalDate.now().plusDays(1),
+                startTime
+        );
 
         when(busySlotService.isBusy(existingAppointments, startTime, 30)).thenReturn(false);
 
-        appointmentService.scheduleAutonomous(
-                "Dr. Lopez", UUID.randomUUID(), buildPatientInfo(),
-                UUID.randomUUID(), "Carlos Gomez", Specialty.FISIOTERAPIA,
-                LocalDate.now().plusDays(1), startTime, 30, existingAppointments
-        );
+        appointmentService.scheduleAutonomous(request, 30, existingAppointments);
 
         verify(busySlotService).isBusy(existingAppointments, startTime, 30);
     }
@@ -181,14 +218,19 @@ class AppointmentServiceTest {
     @Test
     void scheduleAutonomousShouldThrowWhenSlotIsBusy() {
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(10, 0));
+        AppointmentSchedulingRequest request = buildRequest(
+                UUID.randomUUID(),
+                "Dr. Lopez",
+                UUID.randomUUID(),
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
+                LocalDate.now().plusDays(1),
+                startTime
+        );
 
         when(busySlotService.isBusy(anyList(), eq(startTime), eq(30))).thenReturn(true);
 
-        assertThatThrownBy(() -> appointmentService.scheduleAutonomous(
-                "Dr. Lopez", UUID.randomUUID(), buildPatientInfo(),
-                UUID.randomUUID(), "Carlos Gomez", Specialty.FISIOTERAPIA,
-                LocalDate.now().plusDays(1), startTime, 30, List.of()
-        ))
+        assertThatThrownBy(() -> appointmentService.scheduleAutonomous(request, 30, List.of()))
                 .isInstanceOf(SlotNotAvailableException.class)
                 .hasMessageContaining("ya está ocupado");
     }
@@ -196,14 +238,40 @@ class AppointmentServiceTest {
     @Test
     void scheduleAutonomousShouldNotCreateAppointmentWhenSlotIsBusy() {
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(10, 0));
+        AppointmentSchedulingRequest request = buildRequest(
+                UUID.randomUUID(),
+                "Dr. Lopez",
+                UUID.randomUUID(),
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
+                LocalDate.now().plusDays(1),
+                startTime
+        );
 
         when(busySlotService.isBusy(anyList(), eq(startTime), anyInt())).thenReturn(true);
 
-        assertThatThrownBy(() -> appointmentService.scheduleAutonomous(
-                "Dr. Lopez", UUID.randomUUID(), buildPatientInfo(),
-                UUID.randomUUID(), "Carlos Gomez", Specialty.FISIOTERAPIA,
-                LocalDate.now().plusDays(1), startTime, 30, List.of()
-        )).isInstanceOf(SlotNotAvailableException.class);
+        assertThatThrownBy(() -> appointmentService.scheduleAutonomous(request, 30, List.of()))
+                .isInstanceOf(SlotNotAvailableException.class);
+    }
+
+    @Test
+    void scheduleAutonomousShouldThrowWhenIdPatientIsNull() {
+        AppointmentTime startTime = new AppointmentTime(LocalTime.of(10, 0));
+        AppointmentSchedulingRequest request = buildRequest(
+                UUID.randomUUID(),
+                "Dr. Lopez",
+                null,
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
+                LocalDate.now().plusDays(1),
+                startTime
+        );
+
+        when(busySlotService.isBusy(anyList(), eq(startTime), eq(30))).thenReturn(false);
+
+        assertThatThrownBy(() -> appointmentService.scheduleAutonomous(request, 30, List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("obligatorio");
     }
 
     // ─────────────────────────────────────────────
@@ -215,19 +283,20 @@ class AppointmentServiceTest {
         UUID idDoctor  = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
+        AppointmentSchedulingRequest request = buildRequest(
+                idDoctor,
+                "Dr. Lopez",
+                idPatient,
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
+                LocalDate.now().plusDays(1),
+                startTime
+        );
 
         when(busySlotService.isBusy(anyList(), eq(startTime), anyInt())).thenReturn(false);
 
-        Appointment manual = appointmentService.scheduleManual(
-                "Dr. Lopez", idPatient, buildPatientInfo(),
-                idDoctor, "Carlos Gomez", Specialty.FISIOTERAPIA,
-                LocalDate.now().plusDays(1), startTime, 30, List.of()
-        );
-        Appointment autonomo = appointmentService.scheduleAutonomous(
-                "Dr. Lopez", idPatient, buildPatientInfo(),
-                idDoctor, "Carlos Gomez", Specialty.FISIOTERAPIA,
-                LocalDate.now().plusDays(1), startTime, 30, List.of()
-        );
+        Appointment manual = appointmentService.scheduleManual(request, 30, List.of());
+        Appointment autonomo = appointmentService.scheduleAutonomous(request, 30, List.of());
 
         assertThat(manual.getSchedulingOrigin()).isEqualTo(SchedulingOrigin.MANUAL);
         assertThat(autonomo.getSchedulingOrigin()).isEqualTo(SchedulingOrigin.AUTONOMO);
@@ -250,4 +319,25 @@ class AppointmentServiceTest {
                 null
         );
     }
+
+        private AppointmentSchedulingRequest buildRequest(
+                        UUID idDoctor,
+                        String doctorName,
+                        UUID idPatient,
+                        String patientName,
+                        Specialty specialty,
+                        LocalDate date,
+                        AppointmentTime startTime
+        ) {
+                return new AppointmentSchedulingRequest(
+                                idDoctor,
+                                doctorName,
+                                idPatient,
+                                patientName,
+                                buildPatientInfo(),
+                                specialty,
+                                date,
+                                startTime
+                );
+        }
 }

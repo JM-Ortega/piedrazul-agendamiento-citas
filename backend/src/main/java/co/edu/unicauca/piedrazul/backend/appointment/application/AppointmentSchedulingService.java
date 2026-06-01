@@ -1,8 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.PatientResolutionStrategy;
-import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.PatientSchedulingContext;
-import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.ResolvedPatient;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.ResolvedPatient;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientAlreadyScheduledInSpecialtyException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientScheduleTimeConflictException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
@@ -42,7 +43,7 @@ public class AppointmentSchedulingService {
     }
 
     @Transactional
-    public Appointment scheduleManual(
+    public void scheduleManual(
             PatientSchedulingContext patientContext,
             UUID idDoctor,
             Specialty specialty,
@@ -50,11 +51,11 @@ public class AppointmentSchedulingService {
             AppointmentTime startTime,
             String performedBy,
             PatientResolutionStrategy patientResolutionStrategy) {
-        return schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, true);
+        schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, true);
     }
 
     @Transactional
-    public Appointment scheduleAutonomous(
+    public void scheduleAutonomous(
             PatientSchedulingContext patientContext,
             UUID idDoctor,
             Specialty specialty,
@@ -62,7 +63,7 @@ public class AppointmentSchedulingService {
             AppointmentTime startTime,
             String performedBy,
             PatientResolutionStrategy patientResolutionStrategy) {
-        return schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, false);
+        schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, false);
     }
 
     private Appointment schedule(
@@ -91,29 +92,29 @@ public class AppointmentSchedulingService {
         String patientName = buildPatientName(patientInfo);
 
         // Validación contra el dominio
-        Appointment appointment = manualFlow
-                ? appointmentService.scheduleManual(
-                doctorName,
-                resolvedPatient.idPatient(),
-                patientInfo,
-                idDoctor,
-                patientName,
-                specialty,
-                date,
-                startTime,
-                intervalMinutes,
-                existingAppointments)
-                : appointmentService.scheduleAutonomous(
-                doctorName,
-                resolvedPatient.idPatient(),
-                patientInfo,
-                idDoctor,
-                patientName,
-                specialty,
-                date,
-                startTime,
-                intervalMinutes,
-                existingAppointments);
+        AppointmentSchedulingRequest request =
+                new AppointmentSchedulingRequest(
+                        idDoctor,
+                        doctorName,
+                        resolvedPatient.idPatient(),
+                        patientName,
+                        patientInfo,
+                        specialty,
+                        date,
+                        startTime
+                );
+
+        Appointment appointment =
+                manualFlow
+                        ? appointmentService.scheduleManual(
+                        request,
+                        intervalMinutes,
+                        existingAppointments)
+                        : appointmentService.scheduleAutonomous(
+                        request,
+                        intervalMinutes,
+                        existingAppointments);
+
 
         Appointment saved = appointmentRepository.save(appointment);
 

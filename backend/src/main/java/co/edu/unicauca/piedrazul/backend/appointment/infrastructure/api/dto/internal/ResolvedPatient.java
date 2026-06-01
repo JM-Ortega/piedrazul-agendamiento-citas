@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment.application.scheduling;
+package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 

@@ -1,8 +1,12 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api;
 
+import co.edu.unicauca.piedrazul.backend.appointment.application.AppointmentSchedulingService;
+import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.AutonomousPatientResolutionStrategy;
+import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.ManualPatientResolutionStrategy;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.CitaDtoMapper;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
@@ -23,8 +27,6 @@ import java.util.UUID;
 @RequestMapping("/api/appointments")
 public class AppointmentController {
     private final GetAvailableSlotsUseCase getAvailableSlotsUseCase;
-    private final ScheduleManualAppointmentUseCase scheduleManualAppointmentUseCase;
-    private final ScheduleAutonomousAppointmentUseCase scheduleAutonomousAppointmentUseCase;
     private final ListAppointmentsUseCase listAppointmentsUseCase;
     private final GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase;
     private final CitaDtoMapper citaDtoMapper;
@@ -33,20 +35,23 @@ public class AppointmentController {
     private final UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase;
     private final CancelAppointmentUseCase cancelAppointmentUseCase;
 
+    private final AppointmentSchedulingService appointmentSchedulingService;
+    private final ManualPatientResolutionStrategy manualPatientResolutionStrategy;
+    private final AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy;
+
     public AppointmentController(
             GetAvailableSlotsUseCase getAvailableSlotsUseCase,
-            ScheduleManualAppointmentUseCase scheduleManualAppointmentUseCase,
-            ScheduleAutonomousAppointmentUseCase scheduleAutonomousAppointmentUseCase,
             ListAppointmentsUseCase listAppointmentsUseCase,
             GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase,
             CitaDtoMapper citaDtoMapper,
             ListMyAppointmentsUseCase listMyAppointmentsUseCase,
             IsNewPatientUseCase isNewPatientUseCase,
             UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase,
-            CancelAppointmentUseCase cancelAppointmentUseCase) {
+            CancelAppointmentUseCase cancelAppointmentUseCase,
+            AppointmentSchedulingService appointmentSchedulingService,
+            ManualPatientResolutionStrategy manualPatientResolutionStrategy,
+            AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy) {
         this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
-        this.scheduleManualAppointmentUseCase = scheduleManualAppointmentUseCase;
-        this.scheduleAutonomousAppointmentUseCase = scheduleAutonomousAppointmentUseCase;
         this.listAppointmentsUseCase = listAppointmentsUseCase;
         this.getSpecialtiesWithDoctorUseCase = getSpecialtiesWithDoctorUseCase;
         this.citaDtoMapper = citaDtoMapper;
@@ -54,6 +59,9 @@ public class AppointmentController {
         this.isNewPatientUseCase = isNewPatientUseCase;
         this.updateAppointmentStatusUseCase = updateAppointmentStatusUseCase;
         this.cancelAppointmentUseCase = cancelAppointmentUseCase;
+        this.appointmentSchedulingService = appointmentSchedulingService;
+        this.manualPatientResolutionStrategy = manualPatientResolutionStrategy;
+        this.autonomousPatientResolutionStrategy = autonomousPatientResolutionStrategy;
     }
 
     // Franjas disponibles según el médico y la fecha
@@ -114,33 +122,34 @@ public class AppointmentController {
         String performedBy = resolvePerformedBy(jwt);
 
         switch (request.getSchedulingOrigin()) {
-
-            // Agendador manual, el paciente no tiene cuenta
-            case MANUAL -> scheduleManualAppointmentUseCase.scheduleManual(
-                    request.getDocumentType(),
-                    request.getDocumentNumber(),
-                    request.getFirstName(),
-                    request.getLastName(),
-                    request.getPhone(),
-                    request.getGender(),
-                    request.getBirthDate(),
-                    request.getEmail(),
-                    request.getGuardianPhone(),
+            case MANUAL -> appointmentSchedulingService.scheduleManual(
+                    PatientSchedulingContext.manual(
+                            request.getDocumentType(),
+                            request.getDocumentNumber(),
+                            request.getFirstName(),
+                            request.getLastName(),
+                            request.getPhone(),
+                            request.getGender(),
+                            request.getBirthDate(),
+                            request.getEmail(),
+                            request.getGuardianPhone()
+                    ),
                     request.getDoctorId(),
                     request.getSpecialty(),
                     request.getDate(),
                     new AppointmentTime(request.getStartTime()),
-                    performedBy
+                    performedBy,
+                    manualPatientResolutionStrategy
             );
 
-            // Paciente agenda por la web, ya tiene cuenta en el sistema
-            case AUTONOMO -> scheduleAutonomousAppointmentUseCase.scheduleAutonomous(
-                    request.getPatientId(),
+            case AUTONOMO -> appointmentSchedulingService.scheduleAutonomous(
+                    PatientSchedulingContext.autonomous(request.getPatientId()),
                     request.getDoctorId(),
                     request.getSpecialty(),
                     request.getDate(),
                     new AppointmentTime(request.getStartTime()),
-                    performedBy
+                    performedBy,
+                    autonomousPatientResolutionStrategy
             );
         }
 
