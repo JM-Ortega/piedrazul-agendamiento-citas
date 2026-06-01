@@ -111,11 +111,6 @@ export class AdminDoctorsComponent implements OnInit {
 
   // ── Edit ──────────────────────────────────────────────────────────────────
   handleEdit(doctor: DoctorAdminDto): void {
-    console.log('specialties del doctor:', doctor.specialties);
-    console.log(
-      'values en specialtiesList:',
-      this.specialtiesList.map((s) => s.value)
-    );
     this.editingDoctorId.set(doctor.id);
     this.editingSpecialties.set([...doctor.specialties]);
     this.editingHasScheduler.set(doctor.roles.includes('SCHEDULER'));

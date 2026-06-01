@@ -1,8 +1,9 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, signal } from '@angular/core';
 import {
   Calendar,
   CheckCircle,
   Clock,
+  Edit3,
   LucideAngularModule,
   Pencil,
   Power,
@@ -10,6 +11,7 @@ import {
 } from 'lucide-angular';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+
 @Component({
   selector: 'app-doctor-card',
   templateUrl: './doctor-card.component.html',
@@ -20,6 +22,7 @@ export class DoctorCardComponent {
   readonly Clock = Clock;
   readonly Calendar = Calendar;
   readonly Pencil = Pencil;
+  readonly Edit3 = Edit3;
   readonly Power = Power;
   readonly PowerOff = PowerOff;
   readonly CheckCircle = CheckCircle;
@@ -31,6 +34,13 @@ export class DoctorCardComponent {
 
   edit = output<Doctor>();
   toggleModal = output<Doctor>();
+
+  hoveredButton = signal(false);
+  hoveredStatus = signal(false);
+
+  handleEdit(): void {
+    this.edit.emit(this.doctor());
+  }
 
   getWorkDayLabels(workdays: number[]): string {
     if (!workdays?.length) return '';

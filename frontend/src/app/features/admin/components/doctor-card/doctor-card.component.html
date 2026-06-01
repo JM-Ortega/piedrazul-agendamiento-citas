@@ -7,8 +7,8 @@
       class="text-white rounded-full w-12 h-12 flex items-center justify-center text-lg font-bold shrink-0"
       [class]="doctor().status === false ? 'bg-gray-400' : 'bg-[#215c98]'"
     >
-      {{ doctor().name.split(" ").slice(-2)[0][0]
-      }}{{ doctor().name.split(" ").slice(-2)[1][0] }}
+      {{ doctor().name.split(' ').slice(-2)[0][0]
+      }}{{ doctor().name.split(' ').slice(-2)[1][0] }}
     </div>
     <div>
       <p class="text-[#163c63] text-lg font-semibold flex items-center gap-2">
@@ -16,8 +16,9 @@
         @if (doctor().status === false) {
           <span
             class="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full"
-            >Inactivo</span
           >
+            Inactivo
+          </span>
         }
       </p>
       <p class="text-gray-600 text-base">
@@ -34,13 +35,28 @@
   }
 
   @if (!isEditing()) {
-    <button
-      (click)="edit.emit(doctor())"
-      class="flex items-center gap-2 px-5 py-2.5 rounded-xl transition-colors text-base bg-[#d9e9f8] hover:bg-[#a7c9ec] text-[#215c98] cursor-pointer"
-    >
-      <lucide-angular [img]="Pencil" [size]="18"></lucide-angular>
-      Editar
-    </button>
+    <div class="relative shrink-0">
+      <button
+        (click)="handleEdit()"
+        (mouseenter)="hoveredButton.set(true)"
+        (mouseleave)="hoveredButton.set(false)"
+        class="flex items-center gap-2 px-5 py-2.5 rounded-xl transition-colors text-base bg-[#d9e9f8] hover:bg-[#a7c9ec] text-[#215c98] cursor-pointer"
+      >
+        <lucide-angular [img]="Pencil" [size]="18"></lucide-angular>
+        Editar
+      </button>
+
+      @if (hoveredButton()) {
+        <div
+          class="absolute right-0 top-full mt-2 whitespace-nowrap bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg pointer-events-none z-10"
+        >
+          ⚙️ Editar configuración del médico
+          <div
+            class="absolute -top-1 right-4 w-2 h-2 bg-gray-900 rotate-45"
+          ></div>
+        </div>
+      }
+    </div>
   }
 </div>
 
@@ -75,23 +91,44 @@
           Horarios personalizados por día
         </span>
       }
-      <button
-        (click)="toggleModal.emit(doctor())"
-        class="flex items-center gap-2 px-4 py-1.5 rounded-lg font-semibold text-base transition-all"
-        [class]="
-          doctor().status !== false
-            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-            : 'bg-red-100 text-red-700 hover:bg-red-200'
-        "
-      >
-        @if (doctor().status !== false) {
-          <lucide-angular [img]="Power" [size]="16"></lucide-angular>
-          Habilitado
-        } @else {
-          <lucide-angular [img]="PowerOff" [size]="16"></lucide-angular>
-          Deshabilitado
+
+      <!-- Botón Habilitado/Deshabilitado con tooltip -->
+      <div class="relative">
+        <button
+          (click)="toggleModal.emit(doctor())"
+          (mouseenter)="hoveredStatus.set(true)"
+          (mouseleave)="hoveredStatus.set(false)"
+          class="flex items-center gap-2 px-4 py-1.5 rounded-lg font-semibold text-base transition-all"
+          [class]="
+            doctor().status !== false
+              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+              : 'bg-red-100 text-red-700 hover:bg-red-200'
+          "
+        >
+          @if (doctor().status !== false) {
+            <lucide-angular [img]="Power" [size]="16"></lucide-angular>
+            Habilitado
+          } @else {
+            <lucide-angular [img]="PowerOff" [size]="16"></lucide-angular>
+            Deshabilitado
+          }
+        </button>
+
+        @if (hoveredStatus()) {
+          <div
+            class="absolute left-0 top-full mt-2 whitespace-nowrap bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg pointer-events-none z-10"
+          >
+            {{
+              doctor().status !== false
+                ? ' Deshabilitar médico'
+                : ' Habilitar médico'
+            }}
+            <div
+              class="absolute -top-1 left-4 w-2 h-2 bg-gray-900 rotate-45"
+            ></div>
+          </div>
         }
-      </button>
+      </div>
     </div>
 
     <div class="flex flex-wrap gap-3 text-sm text-gray-600">
