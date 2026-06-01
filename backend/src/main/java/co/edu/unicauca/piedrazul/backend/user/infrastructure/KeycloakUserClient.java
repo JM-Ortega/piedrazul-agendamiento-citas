@@ -61,7 +61,7 @@ public class KeycloakUserClient {
             int status = response.getStatus();
 
             if (status == Response.Status.CONFLICT.getStatusCode()) {
-                return findUserIdByUsername(username)
+                return findUserByUsername(username)
                         .orElseThrow(() -> new IdentityProviderException(
                                 "Conflicto al crear usuario pero no se pudo recuperar: " + username
                         ));
