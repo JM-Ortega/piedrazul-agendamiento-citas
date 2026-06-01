@@ -15,28 +15,38 @@ export class DoctorService {
   private apiUrl = environment.apiUrl;
 
   medicalRecords = signal<MedicalRecord[]>([]);
-
   getMe(): Observable<Doctor> {
-    return this.http.get<any>(`${this.apiUrl}/doctor/doctors/me`).pipe(
-      map(
-        (res) =>
-          ({
-            id: res.id,
-            name: res.name,
-            specialty: res.specialty,
-            appointmentInterval: res.appointmentInterval,
-            laborStart: res.laborStart,
-            laborEnd: res.laborEnd,
-            status: res.status,
-            workdays: [],
-            startTime: '',
-            endTime: '',
-            daySchedules: {},
-          }) as Doctor
-      )
-    );
-  }
+    interface DoctorMeResponse {
+      id: string;
+      name: string;
+      specialty: string;
+      appointmentInterval: number;
+      laborStart: string;
+      laborEnd: string;
+      status: boolean;
+    }
 
+    return this.http
+      .get<DoctorMeResponse>(`${this.apiUrl}/doctor/doctors/me`)
+      .pipe(
+        map(
+          (res) =>
+            ({
+              id: res.id,
+              name: res.name,
+              specialty: res.specialty,
+              appointmentInterval: res.appointmentInterval,
+              laborStart: res.laborStart,
+              laborEnd: res.laborEnd,
+              status: res.status,
+              workdays: [],
+              startTime: '',
+              endTime: '',
+              daySchedules: {},
+            }) as Doctor
+        )
+      );
+  }
   getDoctorById(doctorId: string): Observable<dtoDoctor> {
     return this.http.get<dtoDoctor>(
       `${this.apiUrl}/doctor/doctors/${doctorId}`

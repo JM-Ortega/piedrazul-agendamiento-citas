@@ -37,7 +37,7 @@ export class SchedulerService {
       payload,
       {
         responseType: 'blob',
-      },
+      }
     );
   }
   exportScheduler(payload: AppointmentExportRequest): Observable<Blob> {
@@ -48,12 +48,12 @@ export class SchedulerService {
   checkSchedulerAvailability(date: string): Observable<boolean> {
     return this.http.get<boolean>(
       `${this.apiUrl}/reports/scheduler/availability`,
-      { params: { date } },
+      { params: { date } }
     );
   }
   getAppointmentsByDateAndDoctor(
     date: string,
-    doctorId: string,
+    doctorId: string
   ): Observable<AppointmentsPatient[]> {
     return this.http.get<AppointmentsPatient[]>(`${this.apiUrl}/appointments`, {
       params: { idDoctor: doctorId, date: date },
@@ -61,7 +61,7 @@ export class SchedulerService {
   }
   getByDocument(documentNumber: string): Observable<Patient> {
     return this.http.get<Patient>(
-      `${this.apiUrl}/patients/document/${documentNumber}`,
+      `${this.apiUrl}/patients/document/${documentNumber}`
     );
   }
 }
