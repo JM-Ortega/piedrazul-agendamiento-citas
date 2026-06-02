@@ -1,10 +1,11 @@
 package co.edu.unicauca.piedrazul.backend.patients.api;
 
+import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.CreatePatientWithUserRequest;
 import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.ConfirmLinkUserAccountRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.CreatePatientRequest;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.CreatePatientWithUserRequest;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.RequestLinkUserAccountCodeRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientPublicResponse;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientResponse;
@@ -25,9 +26,11 @@ import java.util.UUID;
 public class PatientController {
 
     private final PatientService patientService;
+    private final AppointmentExternalService appointmentExternalService;
 
-    public PatientController(PatientService patientService) {
+    public PatientController(PatientService patientService, AppointmentExternalService appointmentExternalService) {
         this.patientService = patientService;
+        this.appointmentExternalService = appointmentExternalService;
     }
 
     @PostMapping
@@ -132,6 +135,15 @@ public class PatientController {
     @GetMapping("/document/{documentNumber}/public")
     public PatientPublicResponse findPublicByDocument(@PathVariable String documentNumber) {
         return patientService.findPublicByDocumentNumber(documentNumber);
+    }
+
+    @GetMapping("/{appointmentId}/patient-attended")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public PatientResponse getPatientByAppointment(@PathVariable UUID appointmentId) {
+        UUID patientId = appointmentExternalService.getPattientIdByAppointmentId(appointmentId);
+        PatientData patient = patientService.findById(patientId)
+                .orElseThrow(() -> new PatientNotFoundException(patientId));
+        return toResponse(patient);
     }
 
     @GetMapping("/document-types")

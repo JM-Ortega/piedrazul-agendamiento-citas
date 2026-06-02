@@ -1,7 +1,10 @@
+import { CommonModule } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
+  AlertCircle,
   Calendar,
+  Check,
   CheckCircle,
   Clock,
   CreditCard,
@@ -16,35 +19,40 @@ import {
   Tag,
   User,
   UserCircle,
+  X,
 } from 'lucide-angular';
 import { SchedulerService } from '../../core/services/scheduler.service';
-import { ExportModalComponent } from '../../design-system/organisms/export-modal/export-modal.component';
+import { AppointmentExportRequest } from '../../shared/models/dtos/AppointmentExportRequest.dto';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
+import { ExportFormatBackend } from '../../shared/models/types/ExportFormatBackend.type';
+import { FormatoPipe } from '../../shared/pipes/formatoPipe';
 
-type ExportColumnKey =
-  | 'date'
-  | 'time'
-  | 'patient'
-  | 'documentId'
-  | 'phone'
-  | 'doctor'
-  | 'specialty'
-  | 'status';
+type ExportFormat = 'excel' | 'pdf' | 'csv';
 
-type ExportColumns = Record<ExportColumnKey, boolean>;
+const FORMAT_MAP: Record<ExportFormat, ExportFormatBackend> = {
+  excel: 'EXCEL',
+  pdf: 'PDF',
+  csv: 'CSV',
+};
 
-interface ColumnDef {
-  key: ExportColumnKey;
-  label: string;
-  icon: any;
-}
+const MIME_MAP: Record<ExportFormat, string> = {
+  excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pdf: 'application/pdf',
+  csv: 'text/csv;charset=utf-8;',
+};
+
+const EXT_MAP: Record<ExportFormat, string> = {
+  excel: 'xlsx',
+  pdf: 'pdf',
+  csv: 'csv',
+};
 
 @Component({
   selector: 'app-scheduler-dashboard',
   templateUrl: './scheduler-dashboard.component.html',
   standalone: true,
-  imports: [RouterLink, LucideAngularModule, ExportModalComponent],
+  imports: [RouterLink, LucideAngularModule, FormatoPipe, CommonModule],
 })
 export class SchedulerDashboardComponent implements OnInit {
   private schedulerService = inject(SchedulerService);
@@ -64,6 +72,9 @@ export class SchedulerDashboardComponent implements OnInit {
   readonly Tag = Tag;
   readonly User = User;
   readonly UserCircle = UserCircle;
+  readonly X = X;
+  readonly Check = Check;
+  readonly AlertCircle = AlertCircle;
 
   // ── Date helpers ──────────────────────────────────────────────────────────
   today = (() => {
@@ -73,6 +84,7 @@ export class SchedulerDashboardComponent implements OnInit {
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   })();
+
   dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   monthNames = [
     'enero',
@@ -88,17 +100,10 @@ export class SchedulerDashboardComponent implements OnInit {
     'noviembre',
     'diciembre',
   ];
-  // ── Filter Helpers ──────────────────────────────────────────────────────────
-  private readonly specialtyLabels: Record<string, string> = {
-    FISIOTERAPIA: 'Fisioterapia',
-    TERAPIA_NEURAL: 'Terapia Neural',
-    QUIROPRAXIA: 'Quiropraxia',
-  };
 
-  specialtyLabel(specialty: string): string {
-    const clean = specialty.replace(/^\[|\]$/g, '').trim();
-    return this.specialtyLabels[clean] ?? clean;
-  }
+  readonly toastMessage = signal('');
+  readonly toastType = signal<'success' | 'error' | null>(null);
+
   // ── Data signals ──────────────────────────────────────────────────────────
   doctors = signal<dtoDoctor[]>([]);
   private appointments = signal<AppointmentsPatient[]>([]);
@@ -109,46 +114,35 @@ export class SchedulerDashboardComponent implements OnInit {
   filterDoctor = signal('');
   filterStatus = signal('');
   searched = signal(false);
+  hoveredView = signal<string | null>(null);
 
   // ── Export signals ────────────────────────────────────────────────────────
-  showExportModal = signal(false);
+  showCancelModal = signal(false);
+  pendingCancelId = signal<string | null>(null);
 
-  readonly columnDefs: ColumnDef[] = [
-    { key: 'date', label: 'Fecha de la Cita', icon: Calendar },
-    { key: 'time', label: 'Hora de la Cita', icon: Clock },
-    { key: 'patient', label: 'Nombre del Paciente', icon: UserCircle },
-    { key: 'documentId', label: 'Documento de Identidad', icon: CreditCard },
-    { key: 'phone', label: 'Teléfono del Paciente', icon: Phone },
-    { key: 'doctor', label: 'Nombre del Médico', icon: Stethoscope },
-    { key: 'specialty', label: 'Especialidad', icon: Tag },
-    { key: 'status', label: 'Estado de la Cita', icon: CheckCircle },
-  ];
+  showExportModal = signal(false);
+  exportFormat = signal<ExportFormat>('excel');
+  isExporting = signal(false);
+  exportError = signal<string | null>(null);
+  showAvailabilityWarning = signal(false);
+  isCheckingAvailability = signal(false);
 
   // ── Computed ──────────────────────────────────────────────────────────────
-  hasTodayAppointments = computed(() => {
-    const doctorFilter = this.filterDoctor();
-    return this.appointments().some(
-      (a) =>
-        a.date === this.today &&
-        a.appointmentState !== 'CANCELADA' &&
-        (doctorFilter ? a.doctorName === doctorFilter : true),
-    );
-  });
   selectedDoctor = computed(() =>
-    this.doctors().find((d) => d.name === this.filterDoctor()),
+    this.doctors().find((d) => d.name === this.filterDoctor())
   );
 
   todayCount = computed(
     () =>
       this.appointments().filter(
-        (a) => a.date === this.today && a.appointmentState !== 'CANCELADA',
-      ).length,
+        (a) => a.date === this.today && a.appointmentState !== 'CANCELADA'
+      ).length
   );
 
   allActiveCount = computed(
     () =>
       this.appointments().filter((a) => a.appointmentState !== 'CANCELADA')
-        .length,
+        .length
   );
 
   results = computed(() => {
@@ -161,22 +155,54 @@ export class SchedulerDashboardComponent implements OnInit {
       filtered = filtered.filter((a) => a.date === this.filterDate());
     if (this.filterStatus())
       filtered = filtered.filter(
-        (a) => a.appointmentState === this.filterStatus(),
+        (a) => a.appointmentState === this.filterStatus()
       );
-    return [...filtered].sort((a, b) =>
-      a.date === b.date
-        ? a.startTime > b.startTime
-          ? 1
-          : -1
-        : a.date > b.date
-          ? 1
-          : -1,
-    );
+    const stateOrder: Record<string, number> = {
+      AGENDADA: 1,
+      ATENDIDA: 2,
+      CANCELADA: 3,
+    };
+    return [...filtered].sort((a, b) => {
+      const stateDiff = stateOrder[a.appointmentState] - stateOrder[b.appointmentState];
+      if (stateDiff !== 0) return stateDiff;
+      const dateTimeA = new Date(`${a.date}T${a.startTime}`);
+      const dateTimeB = new Date(`${b.date}T${b.startTime}`);
+      return dateTimeA.getTime() - dateTimeB.getTime();
+    });
   });
 
   activeResults = computed(() =>
-    this.results().filter((a) => a.appointmentState !== 'CANCELADA'),
+    this.results().filter((a) => a.appointmentState !== 'CANCELADA')
   );
+
+  exportColors = computed(() => {
+    switch (this.exportFormat()) {
+      case 'excel':
+        return {
+          header: 'bg-green-700',
+          border: 'border-green-600',
+          bg: 'bg-green-50',
+          icon: 'text-green-600',
+          button: 'bg-green-600 hover:bg-green-700',
+        };
+      case 'pdf':
+        return {
+          header: 'bg-red-700',
+          border: 'border-red-600',
+          bg: 'bg-red-50',
+          icon: 'text-red-600',
+          button: 'bg-red-600 hover:bg-red-700',
+        };
+      default:
+        return {
+          header: 'bg-orange-700',
+          border: 'border-orange-600',
+          bg: 'bg-orange-50',
+          icon: 'text-orange-600',
+          button: 'bg-orange-600 hover:bg-orange-700',
+        };
+    }
+  });
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
@@ -193,12 +219,15 @@ export class SchedulerDashboardComponent implements OnInit {
   setViewMode(mode: 'all' | 'today'): void {
     this.viewMode.set(mode);
   }
+
   clearDoctorFilter(): void {
     this.filterDoctor.set('');
   }
+
   clearDateFilter(): void {
     this.filterDate.set('');
   }
+
   clearStatusFilter(): void {
     this.filterStatus.set('');
   }
@@ -210,7 +239,7 @@ export class SchedulerDashboardComponent implements OnInit {
     if (date && doctorId)
       request$ = this.schedulerService.getAppointmentsByDateAndDoctor(
         date,
-        doctorId,
+        doctorId
       );
     else if (date) request$ = this.schedulerService.getAppointmentsByDate(date);
     else if (doctorId)
@@ -223,6 +252,121 @@ export class SchedulerDashboardComponent implements OnInit {
     });
   }
 
+  // ── Export ────────────────────────────────────────────────────────────────
+  openExportModal(): void {
+    this.exportError.set(null);
+    this.exportFormat.set('excel');
+    this.showExportModal.set(true);
+  }
+
+  handleExportClick(): void {
+    const date = this.filterDate();
+    if (!date) return;
+
+    this.isCheckingAvailability.set(true);
+
+    this.schedulerService.checkSchedulerAvailability(date).subscribe({
+      next: (hasAvailability) => {
+        this.isCheckingAvailability.set(false);
+        if (hasAvailability) {
+          this.showAvailabilityWarning.set(true);
+        } else {
+          this.openExportModal();
+        }
+      },
+      error: () => {
+        this.isCheckingAvailability.set(false);
+        this.openExportModal();
+      },
+    });
+  }
+
+  confirmExportDespiteAvailability(): void {
+    this.showAvailabilityWarning.set(false);
+    this.openExportModal();
+  }
+
+  closeExportModal(): void {
+    this.showExportModal.set(false);
+    this.exportError.set(null);
+  }
+
+  handleExport(): void {
+    const date = this.filterDate();
+    if (!date) return;
+
+    this.isExporting.set(true);
+    this.exportError.set(null);
+
+    const fmt = this.exportFormat();
+    const payload: AppointmentExportRequest = {
+      date,
+      format: FORMAT_MAP[fmt],
+    };
+
+    this.schedulerService.exportScheduler(payload).subscribe({
+      next: (blob) => {
+        const typedBlob = new Blob([blob], { type: MIME_MAP[fmt] });
+        const url = URL.createObjectURL(typedBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `agenda-${date}.${EXT_MAP[fmt]}`;
+        link.click();
+        URL.revokeObjectURL(url);
+        this.isExporting.set(false);
+        this.closeExportModal();
+      },
+      error: () => {
+        this.exportError.set(
+          'Ocurrió un error al generar el reporte. Intente nuevamente.'
+        );
+        this.isExporting.set(false);
+      },
+    });
+  }
+
+  requestCancelAppointment(appointmentId: string): void {
+    this.pendingCancelId.set(appointmentId);
+    this.showCancelModal.set(true);
+  }
+
+  confirmCancelAppointment(): void {
+    const appointmentId = this.pendingCancelId();
+    if (!appointmentId) return;
+    this.showCancelModal.set(false);
+    this.pendingCancelId.set(null);
+    this.schedulerService.cancelAppointment(appointmentId).subscribe({
+      next: () => {
+        this.showToast('La cita fue cancelada exitosamente', 'success');
+        this.appointments.set(
+          this.appointments().map((a) =>
+            a.idAppointment === appointmentId
+              ? { ...a, appointmentState: 'CANCELADA' }
+              : a
+          )
+        );
+      },
+      error: () => {
+        this.showToast('Ocurrió un error al cancelar la cita', 'error');
+      },
+    });
+  }
+
+  dismissCancelModal(): void {
+    this.showCancelModal.set(false);
+    this.pendingCancelId.set(null);
+  }
+
+  private showToast(message: string, type: 'success' | 'error'): void {
+    this.toastMessage.set(message);
+    this.toastType.set(type);
+    setTimeout(() => {
+      this.toastMessage.set('');
+      this.toastType.set(null);
+    }, 3000);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
   formatDate(dateStr: string): string {
     const d = new Date(dateStr + 'T12:00:00');
     return `${this.dayNames[d.getDay()]} ${d.getDate()} de ${this.monthNames[d.getMonth()]} de ${d.getFullYear()}`;
@@ -241,7 +385,7 @@ export class SchedulerDashboardComponent implements OnInit {
 
   statusColor(s: string): string {
     const map: Record<string, string> = {
-      AGENDADA: 'bg-blue-100 text-blue-700',
+      AGENDADA: 'bg-blue-100 text-[#163c63]',
       ATENDIDA: 'bg-green-100 text-green-700',
       CANCELADA: 'bg-red-100 text-red-700',
       NO_ASISTIO: 'bg-orange-100 text-orange-700',

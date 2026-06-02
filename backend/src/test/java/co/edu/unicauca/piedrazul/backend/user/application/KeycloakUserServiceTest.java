@@ -1,253 +1,171 @@
 package co.edu.unicauca.piedrazul.backend.user.application;
 
 import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.KeycloakUserClient;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.keycloak.representations.idm.UserRepresentation;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class KeycloakUserServiceTest {
 
-    @Mock
-    private KeycloakUserClient keycloakClient;
+	@Mock
+	private KeycloakUserClient keycloakClient;
 
-    @InjectMocks
-    private KeycloakUserService keycloakUserService;
+	@InjectMocks
+	private KeycloakUserService keycloakUserService;
 
-    @Test
-    void getOrCreatePatientUser_shouldReturnExistingUserAndAssignPatientRole_whenUserAlreadyExists() {
-        String username = "juanperez";
-        String firstName = "Juan";
-        String lastName = "Perez";
-        String email = "juan@test.com";
-        String password = "secret";
-        UUID existingUserId = UUID.randomUUID();
+	@Test
+	void findUserByUsernameShouldMapUserRepresentationToSummary() {
+		UserRepresentation representation = userRepresentation(
+				"11111111-1111-1111-1111-111111111111",
+				"doctor01",
+				"Ana",
+				"Lopez",
+				"ana@test.com"
+		);
+		when(keycloakClient.findUserByUsername("doctor01")).thenReturn(Optional.of(representation));
 
-        when(keycloakClient.findUserIdByUsername(username)).thenReturn(Optional.of(existingUserId));
+		Optional<UserSummary> result = keycloakUserService.findUserByUsername("doctor01");
 
-        UUID result = keycloakUserService.getOrCreatePatientUser(
-                username, firstName, lastName, email, password
-        );
+		assertTrue(result.isPresent());
+		assertEquals(UUID.fromString("11111111-1111-1111-1111-111111111111"), result.get().id());
+		assertEquals("doctor01", result.get().username());
+		assertEquals("Ana", result.get().firstName());
+		assertEquals("Lopez", result.get().lastName());
+		assertEquals("ana@test.com", result.get().email());
+		verify(keycloakClient).findUserByUsername("doctor01");
+	}
 
-        assertEquals(existingUserId, result);
-        verify(keycloakClient).findUserIdByUsername(username);
-        verify(keycloakClient).assignRoleIfMissing(existingUserId, Role.PATIENT);
-        verify(keycloakClient, never()).createUser(anyString(), anyString(), anyString(), anyString(), anyString(), any());
-    }
+	@Test
+	void findDoctorsShouldMapAllRepresentations() {
+		UserRepresentation representation = userRepresentation(
+				"22222222-2222-2222-2222-222222222222",
+				"doctor02",
+				"Luis",
+				"Perez",
+				"luis@test.com"
+		);
+		when(keycloakClient.findUsersByRole(Role.DOCTOR)).thenReturn(List.of(representation));
 
-    @Test
-    void getOrCreatePatientUser_shouldCreateUserWithPatientRole_whenUserDoesNotExist() {
-        String username = "juanperez";
-        String firstName = "Juan";
-        String lastName = "Perez";
-        String email = "juan@test.com";
-        String password = "secret";
-        UUID createdUserId = UUID.randomUUID();
+		List<UserSummary> result = keycloakUserService.findDoctors();
 
-        when(keycloakClient.findUserIdByUsername(username)).thenReturn(Optional.empty());
-        when(keycloakClient.createUser(username, firstName, lastName, email, password, Role.PATIENT))
-                .thenReturn(createdUserId);
+		assertEquals(1, result.size());
+		assertEquals("doctor02", result.get(0).username());
+		assertEquals("Luis", result.get(0).firstName());
+		verify(keycloakClient).findUsersByRole(Role.DOCTOR);
+	}
 
-        UUID result = keycloakUserService.getOrCreatePatientUser(
-                username, firstName, lastName, email, password
-        );
+	@Test
+	void findSchedulersShouldDelegateToClient() {
+		when(keycloakClient.findUsersByRole(Role.SCHEDULER)).thenReturn(List.of());
 
-        assertEquals(createdUserId, result);
-        verify(keycloakClient).findUserIdByUsername(username);
-        verify(keycloakClient).createUser(username, firstName, lastName, email, password, Role.PATIENT);
-        verify(keycloakClient, never()).assignRoleIfMissing(any(UUID.class), any(Role.class));
-    }
+		List<UserSummary> result = keycloakUserService.findSchedulers();
 
-    @Test
-    void getOrCreateDoctorUser_shouldReturnExistingUserAndAssignDoctorRole_whenUserAlreadyExists() {
-        String username = "doctor1";
-        String firstName = "Ana";
-        String lastName = "Lopez";
-        String email = "ana@test.com";
-        String password = "secret";
-        UUID existingUserId = UUID.randomUUID();
+		assertTrue(result.isEmpty());
+		verify(keycloakClient).findUsersByRole(Role.SCHEDULER);
+	}
 
-        when(keycloakClient.findUserIdByUsername(username)).thenReturn(Optional.of(existingUserId));
+	@Test
+	void getUserRolesShouldDelegateToClient() {
+		UUID userId = UUID.fromString("33333333-3333-3333-3333-333333333333");
+		when(keycloakClient.getUserRoles(userId)).thenReturn(List.of(Role.DOCTOR.name(), Role.SCHEDULER.name()));
 
-        UUID result = keycloakUserService.getOrCreateDoctorUser(
-                username, firstName, lastName, email, password
-        );
+		List<String> result = keycloakUserService.getUserRoles(userId);
 
-        assertEquals(existingUserId, result);
-        verify(keycloakClient).findUserIdByUsername(username);
-        verify(keycloakClient).assignRoleIfMissing(existingUserId, Role.DOCTOR);
-        verify(keycloakClient, never()).createUser(anyString(), anyString(), anyString(), anyString(), anyString(), any());
-    }
+		assertEquals(List.of(Role.DOCTOR.name(), Role.SCHEDULER.name()), result);
+		verify(keycloakClient).getUserRoles(userId);
+	}
 
-    @Test
-    void getOrCreateDoctorUser_shouldCreateUserWithDoctorRole_whenUserDoesNotExist() {
-        String username = "doctor1";
-        String firstName = "Ana";
-        String lastName = "Lopez";
-        String email = "ana@test.com";
-        String password = "secret";
-        UUID createdUserId = UUID.randomUUID();
+	@Test
+	void ensureSchedulerRoleShouldDelegateToClient() {
+		UUID userId = UUID.fromString("44444444-4444-4444-4444-444444444444");
 
-        when(keycloakClient.findUserIdByUsername(username)).thenReturn(Optional.empty());
-        when(keycloakClient.createUser(username, firstName, lastName, email, password, Role.DOCTOR))
-                .thenReturn(createdUserId);
+		keycloakUserService.ensureSchedulerRole(userId);
 
-        UUID result = keycloakUserService.getOrCreateDoctorUser(
-                username, firstName, lastName, email, password
-        );
+		verify(keycloakClient).assignRoleIfMissing(userId, Role.SCHEDULER);
+	}
 
-        assertEquals(createdUserId, result);
-        verify(keycloakClient).findUserIdByUsername(username);
-        verify(keycloakClient).createUser(username, firstName, lastName, email, password, Role.DOCTOR);
-        verify(keycloakClient, never()).assignRoleIfMissing(any(UUID.class), any(Role.class));
-    }
+	@Test
+	void revokeSchedulerRoleShouldDelegateToClient() {
+		UUID userId = UUID.fromString("55555555-5555-5555-5555-555555555555");
 
-    @Test
-    void getOrCreateSchedulerUser_shouldReturnExistingUserAndAssignSchedulerRole_whenUserAlreadyExists() {
-        String username = "scheduler1";
-        String firstName = "Maria";
-        String lastName = "Gomez";
-        String email = "maria@test.com";
-        String password = "secret";
-        UUID existingUserId = UUID.randomUUID();
+		keycloakUserService.revokeSchedulerRole(userId);
 
-        when(keycloakClient.findUserIdByUsername(username)).thenReturn(Optional.of(existingUserId));
+		verify(keycloakClient).revokeRoleIfPresent(userId, Role.SCHEDULER);
+	}
 
-        UUID result = keycloakUserService.getOrCreateSchedulerUser(
-                username, firstName, lastName, email, password
-        );
+	@Test
+	void existsByIdShouldDelegateToClient() {
+		UUID userId = UUID.fromString("66666666-6666-6666-6666-666666666666");
+		when(keycloakClient.existsUser(userId)).thenReturn(true);
 
-        assertEquals(existingUserId, result);
-        verify(keycloakClient).findUserIdByUsername(username);
-        verify(keycloakClient).assignRoleIfMissing(existingUserId, Role.SCHEDULER);
-        verify(keycloakClient, never()).createUser(anyString(), anyString(), anyString(), anyString(), anyString(), any());
-    }
+		boolean result = keycloakUserService.existsById(userId);
 
-    @Test
-    void getOrCreateSchedulerUser_shouldCreateUserWithSchedulerRole_whenUserDoesNotExist() {
-        String username = "scheduler1";
-        String firstName = "Maria";
-        String lastName = "Gomez";
-        String email = "maria@test.com";
-        String password = "secret";
-        UUID createdUserId = UUID.randomUUID();
+		assertTrue(result);
+		verify(keycloakClient).existsUser(userId);
+	}
 
-        when(keycloakClient.findUserIdByUsername(username)).thenReturn(Optional.empty());
-        when(keycloakClient.createUser(username, firstName, lastName, email, password, Role.SCHEDULER))
-                .thenReturn(createdUserId);
+	@Test
+	void deactivateUserShouldDelegateToClient() {
+		UUID userId = UUID.fromString("77777777-7777-7777-7777-777777777777");
 
-        UUID result = keycloakUserService.getOrCreateSchedulerUser(
-                username, firstName, lastName, email, password
-        );
+		keycloakUserService.deactivateUser(userId);
 
-        assertEquals(createdUserId, result);
-        verify(keycloakClient).findUserIdByUsername(username);
-        verify(keycloakClient).createUser(username, firstName, lastName, email, password, Role.SCHEDULER);
-        verify(keycloakClient, never()).assignRoleIfMissing(any(UUID.class), any(Role.class));
-    }
+		verify(keycloakClient).deactivateUser(userId);
+	}
 
-    @Test
-    void getOrCreateAdminUser_shouldReturnExistingUserAndAssignAdminRole_whenUserAlreadyExists() {
-        String username = "admin1";
-        String firstName = "Carlos";
-        String lastName = "Ruiz";
-        String email = "carlos@test.com";
-        String password = "secret";
-        UUID existingUserId = UUID.randomUUID();
+	@Test
+	void activateUserShouldDelegateToClient() {
+		UUID userId = UUID.fromString("88888888-8888-8888-8888-888888888888");
 
-        when(keycloakClient.findUserIdByUsername(username)).thenReturn(Optional.of(existingUserId));
+		keycloakUserService.activateUser(userId);
 
-        UUID result = keycloakUserService.getOrCreateAdminUser(
-                username, firstName, lastName, email, password
-        );
+		verify(keycloakClient).activateUser(userId);
+	}
 
-        assertEquals(existingUserId, result);
-        verify(keycloakClient).findUserIdByUsername(username);
-        verify(keycloakClient).assignRoleIfMissing(existingUserId, Role.ADMIN);
-        verify(keycloakClient, never()).createUser(anyString(), anyString(), anyString(), anyString(), anyString(), any());
-    }
+	@Test
+	void deleteUserShouldDelegateToClient() {
+		UUID userId = UUID.fromString("99999999-9999-9999-9999-999999999999");
 
-    @Test
-    void getOrCreateAdminUser_shouldCreateUserWithAdminRole_whenUserDoesNotExist() {
-        String username = "admin1";
-        String firstName = "Carlos";
-        String lastName = "Ruiz";
-        String email = "carlos@test.com";
-        String password = "secret";
-        UUID createdUserId = UUID.randomUUID();
+		keycloakUserService.deleteUser(userId);
 
-        when(keycloakClient.findUserIdByUsername(username)).thenReturn(Optional.empty());
-        when(keycloakClient.createUser(username, firstName, lastName, email, password, Role.ADMIN))
-                .thenReturn(createdUserId);
+		verify(keycloakClient).deleteUser(userId);
+	}
 
-        UUID result = keycloakUserService.getOrCreateAdminUser(
-                username, firstName, lastName, email, password
-        );
+	@Test
+	void existsByIdShouldReturnFalseWhenClientDoesNotFindUser() {
+		UUID userId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+		when(keycloakClient.existsUser(userId)).thenReturn(false);
 
-        assertEquals(createdUserId, result);
-        verify(keycloakClient).findUserIdByUsername(username);
-        verify(keycloakClient).createUser(username, firstName, lastName, email, password, Role.ADMIN);
-        verify(keycloakClient, never()).assignRoleIfMissing(any(UUID.class), any(Role.class));
-    }
+		boolean result = keycloakUserService.existsById(userId);
 
-    @Test
-    void existsById_shouldDelegateToKeycloakClient() {
-        UUID userId = UUID.randomUUID();
-        when(keycloakClient.existsUser(userId)).thenReturn(true);
+		assertFalse(result);
+		verify(keycloakClient).existsUser(userId);
+	}
 
-        boolean result = keycloakUserService.existsById(userId);
+	private UserRepresentation userRepresentation(String id, String username, String firstName, String lastName, String email) {
+		UserRepresentation representation = new UserRepresentation();
+		representation.setId(id);
+		representation.setUsername(username);
+		representation.setFirstName(firstName);
+		representation.setLastName(lastName);
+		representation.setEmail(email);
+		return representation;
+	}
 
-        assertTrue(result);
-        verify(keycloakClient).existsUser(userId);
-    }
-
-    @Test
-    void activateUser_shouldDelegateToKeycloakClient() {
-        UUID userId = UUID.randomUUID();
-
-        keycloakUserService.activateUser(userId);
-
-        verify(keycloakClient).activateUser(userId);
-    }
-
-    @Test
-    void deactivateUser_shouldDelegateToKeycloakClient() {
-        UUID userId = UUID.randomUUID();
-
-        keycloakUserService.deactivateUser(userId);
-
-        verify(keycloakClient).deactivateUser(userId);
-    }
-
-    @Test
-    void findUserIdByUsername_shouldDelegateToKeycloakClient() {
-        String username = "juanperez";
-        UUID userId = UUID.randomUUID();
-        when(keycloakClient.findUserIdByUsername(username)).thenReturn(Optional.of(userId));
-
-        Optional<UUID> result = keycloakUserService.findUserIdByUsername(username);
-
-        assertTrue(result.isPresent());
-        assertEquals(userId, result.get());
-        verify(keycloakClient).findUserIdByUsername(username);
-    }
-
-    @Test
-    void ensurePatientRole_shouldAssignPatientRole() {
-        UUID userId = UUID.randomUUID();
-
-        keycloakUserService.ensurePatientRole(userId);
-
-        verify(keycloakClient).assignRoleIfMissing(userId, Role.PATIENT);
-    }
 }

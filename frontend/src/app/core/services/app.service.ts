@@ -18,9 +18,9 @@ export class AppService {
   private currentUrl = toSignal(
     this.router.events.pipe(
       filter((e) => e instanceof NavigationEnd),
-      map((e) => (e as NavigationEnd).urlAfterRedirects),
+      map((e) => (e as NavigationEnd).urlAfterRedirects)
     ),
-    { initialValue: this.router.url },
+    { initialValue: this.router.url }
   );
 
   // ── Rol activo seleccionado manualmente ───────────────────────────────────
@@ -39,7 +39,7 @@ export class AppService {
     if (!this.keycloak.authenticated) return [];
     const roles = this.keycloak.realmAccess?.roles ?? [];
     return roles.filter((r) =>
-      ['ADMIN', 'SCHEDULER', 'DOCTOR', 'PATIENT'].includes(r),
+      ['ADMIN', 'SCHEDULER', 'DOCTOR', 'PATIENT'].includes(r)
     );
   });
 
@@ -127,5 +127,12 @@ export class AppService {
 
   logout(): void {
     this.keycloak.logout({ redirectUri: window.location.origin });
+  }
+  async refreshRoles(): Promise<void> {
+    try {
+      await this.keycloak.updateToken(-1);
+    } catch {
+      // silencioso
+    }
   }
 }

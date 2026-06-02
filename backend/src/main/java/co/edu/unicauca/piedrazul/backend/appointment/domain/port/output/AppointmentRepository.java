@@ -13,6 +13,7 @@ public interface AppointmentRepository {
     // Metodos que solo hablan en terminos del dominio
     Appointment save(Appointment appointment);
 
+    //metodo para el modulo de historia clinica
     List<Appointment> findByDoctorId(UUID idDoctor);
 
     List<Appointment> findByPatientId(UUID idPatient);
@@ -36,5 +37,9 @@ public interface AppointmentRepository {
     Appointment findById(UUID appointmentId);
   
     List<Appointment> findAllByDate(LocalDate date);
+
+    List<Appointment> findScheduledAppointmentsBefore(LocalDate date);
+
+    UUID getPattientIdByAppointmentId(UUID appointmentId);
 
 }

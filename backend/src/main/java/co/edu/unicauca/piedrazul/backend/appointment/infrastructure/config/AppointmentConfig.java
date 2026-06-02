@@ -14,6 +14,9 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.Appo
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.application.ListMyAppointmentsUseCaseImpl;
+import co.edu.unicauca.piedrazul.backend.patients.PatientLookupApi;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.CancelAppointmentUseCase;
+import co.edu.unicauca.piedrazul.backend.appointment.application.CancelAppointmentUseCaseImpl;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -52,12 +55,14 @@ public class AppointmentConfig {
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            IsNewPatientUseCase isNewPatientUseCase) {
         return new AppointmentSchedulingService(
                 appointmentRepository,
                 doctorConfigConsultPort,
                 appointmentService,
-                eventPublisher
+                eventPublisher,
+                isNewPatientUseCase
         );
     }
 
@@ -80,26 +85,6 @@ public class AppointmentConfig {
     }
 
     @Bean
-    public ScheduleManualAppointmentUseCase scheduleManualAppointmentUseCase(
-            AppointmentSchedulingService appointmentSchedulingService,
-            ManualPatientResolutionStrategy manualPatientResolutionStrategy) {
-        return new ScheduleManualAppointmentUseCaseImpl(
-                appointmentSchedulingService,
-                manualPatientResolutionStrategy
-        );
-    }
-
-    @Bean
-    public ScheduleAutonomousAppointmentUseCase scheduleAutonomousAppointmentUseCase(
-            AppointmentSchedulingService appointmentSchedulingService,
-            AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy) {
-        return new ScheduleAutonomousAppointmentUseCaseImpl(
-                appointmentSchedulingService,
-                autonomousPatientResolutionStrategy
-        );
-    }
-
-    @Bean
     public GetAvailableSlotsUseCase getAvailableSlotsUseCase(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
@@ -115,11 +100,13 @@ public class AppointmentConfig {
     public GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
-            SlotTimeService slotTimeService) {
+            SlotTimeService slotTimeService,
+            IsNewPatientUseCase isNewPatientUseCase) {
         return new GetSpecialtiesWithDoctorUseCaseImpl(
                 appointmentRepository,
                 doctorConfigConsultPort,
-                slotTimeService
+                slotTimeService,
+                isNewPatientUseCase
         );
     }
 
@@ -136,13 +123,19 @@ public class AppointmentConfig {
     @Bean
     public IsNewPatientUseCase isNewPatientUseCase(
             AppointmentRepository appointmentRepository,
-            PatientConsultPort patientConsultPort) {
-        return new IsNewPatientUseCaseImpl(appointmentRepository, patientConsultPort);
+            PatientLookupApi patientLookupApi) {
+        return new IsNewPatientUseCaseImpl(appointmentRepository, patientLookupApi);
     }
 
     @Bean
     public UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase(
             AppointmentRepository appointmentRepository) {
         return new UpdateAppointmentStatusUseCaseImpl(appointmentRepository);
+    }
+
+    @Bean
+    public CancelAppointmentUseCase cancelAppointmentUseCase(
+            AppointmentRepository appointmentRepository) {
+        return new CancelAppointmentUseCaseImpl(appointmentRepository);
     }
 }

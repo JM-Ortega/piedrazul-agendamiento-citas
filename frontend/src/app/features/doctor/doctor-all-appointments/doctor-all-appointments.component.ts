@@ -113,8 +113,8 @@ export class DoctorAllAppointmentsComponent {
   // ── Computed ──────────────────────────────────────────────────────────────
   hasTodayAppointments = computed(() =>
     this.allAppointments().some(
-      (a) => a.date === this.today && a.appointmentState !== 'CANCELADA',
-    ),
+      (a) => a.date === this.today && a.appointmentState !== 'CANCELADA'
+    )
   );
   hasAnyAppointments = computed(() => this.allAppointments().length > 0);
   filteredAppointments = computed(() => {
@@ -127,7 +127,7 @@ export class DoctorAllAppointmentsComponent {
       result = result.filter((a) => a.date === this.filterSpecificDate());
     else if (this.filterDate() === 'upcoming')
       result = result.filter(
-        (a) => a.date >= this.today && a.appointmentState !== 'CANCELADA',
+        (a) => a.date >= this.today && a.appointmentState !== 'CANCELADA'
       );
     else if (this.filterDate() === 'past')
       result = result.filter((a) => a.date < this.today);
@@ -141,10 +141,10 @@ export class DoctorAllAppointmentsComponent {
   stats = computed(() => ({
     total: this.allAppointments().length,
     upcoming: this.allAppointments().filter(
-      (a) => a.date >= this.today && a.appointmentState !== 'CANCELADA',
+      (a) => a.date >= this.today && a.appointmentState !== 'CANCELADA'
     ).length,
     pending: this.allAppointments().filter(
-      (a) => a.appointmentState === 'REPROGRAMADA',
+      (a) => a.appointmentState === 'ATENDIDA'
     ).length,
   }));
 

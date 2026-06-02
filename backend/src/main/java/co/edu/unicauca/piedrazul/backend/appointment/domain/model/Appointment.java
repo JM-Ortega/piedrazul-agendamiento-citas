@@ -1,8 +1,12 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.model;
 
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
+
 import java.time.LocalDate;
 import java.util.Objects;
 import java.util.UUID;
+
+import static org.hibernate.action.internal.BulkOperationCleanupAction.schedule;
 
 
 public class Appointment {
@@ -47,65 +51,53 @@ public class Appointment {
     // Factory Method 1
     // El agendador pasa los datos crudos del paciente
     // pacienteId es null porque el paciente no tiene cuenta aún
-    public static Appointment scheduleManual(String doctorName,
-                                             UUID idDoctor,
-                                             UUID idPatient,
-                                             String patientName,
-                                             PatientInfo patientInfo,
-                                             Specialty specialty,
-                                             LocalDate date,
-                                             AppointmentTime startTime) {
-        Objects.requireNonNull(idDoctor,"El médico es obligatorio");
-        Objects.requireNonNull(doctorName, "El nombre del médico es obligatorio");
-        Objects.requireNonNull(patientInfo, "Los datos del paciente son obligatorios");
-        Objects.requireNonNull(specialty, "La especialidad es obligatoria");
-        Objects.requireNonNull(date, "La fecha es obligatoria");
-        Objects.requireNonNull(startTime, "La hora es obligatoria");
+    public static Appointment scheduleManual(
+            AppointmentSchedulingRequest request) {
 
-        return new Appointment(
-                //Se genera automáticamente por la anotación jpa si también lo hacemos aquí genera fallos
-                null,
-                idDoctor,
-                doctorName,
-                idPatient,
-                patientName,
-                patientInfo,
-                specialty,
-                date,
-                startTime,
+        return schedule(
+                request,
                 SchedulingOrigin.MANUAL
         );
     }
 
     // Factory Method 2
     // El paciente web agenda de forma autónoma entonces el idPatient siempre debe estar presente
-    public static Appointment scheduleAutonomous(String doctorName,
-                                                 UUID idDoctor,
-                                                 UUID idPatient,
-                                                 String patientName,
-                                                 PatientInfo patientInfo,
-                                                 Specialty specialty,
-                                                 LocalDate date,
-                                                 AppointmentTime startTime) {
-        Objects.requireNonNull(idDoctor, "El médico es obligatorio");
-        Objects.requireNonNull(doctorName, "El nombre del médico es obligatorio");
-        Objects.requireNonNull(idPatient, "El pacienteId es obligatorio en agendamiento autónomo");
-        Objects.requireNonNull(specialty, "La especialidad es obligatoria");
-        Objects.requireNonNull(date, "La fecha es obligatoria");
-        Objects.requireNonNull(startTime, "La hora es obligatoria");
+    public static Appointment scheduleAutonomous(
+            AppointmentSchedulingRequest request) {
+
+        if (request.idPatient() == null) {
+            throw new IllegalArgumentException(
+                    "El paciente es obligatorio para el agendamiento autónomo"
+            );
+        }
+
+        return schedule(
+                request,
+                SchedulingOrigin.AUTONOMO
+        );
+    }
+
+    private static Appointment schedule(
+            AppointmentSchedulingRequest request,
+            SchedulingOrigin origin) {
+
+        Objects.requireNonNull(request.idDoctor());
+        Objects.requireNonNull(request.doctorName());
+        Objects.requireNonNull(request.specialty());
+        Objects.requireNonNull(request.date());
+        Objects.requireNonNull(request.startTime());
 
         return new Appointment(
-                //Se genera automáticamente por la anotación jpa si también lo hacemos aquí genera fallos
                 null,
-                idDoctor,
-                doctorName,
-                idPatient,
-                patientName,
-                patientInfo,
-                specialty,
-                date,
-                startTime,
-                SchedulingOrigin.AUTONOMO
+                request.idDoctor(),
+                request.doctorName(),
+                request.idPatient(),
+                request.patientName(),
+                request.patientInfo(),
+                request.specialty(),
+                request.date(),
+                request.startTime(),
+                origin
         );
     }
 
@@ -140,6 +132,26 @@ public class Appointment {
         appointment.appointmentState = appointmentState;
 
         return appointment;
+    }
+
+    // Cambiar cuando se implemente lo de reprogramadas
+    public void changeState(AppointmentState appointmentState) {
+        if (this.appointmentState != AppointmentState.AGENDADA) {
+            throw new IllegalStateException(
+                    "Solo se puede cambiar el estado de citas agendadas"
+            );
+        }
+
+        this.appointmentState = appointmentState;
+    }
+
+    public void cancel() {
+        if (this.appointmentState != AppointmentState.AGENDADA) {
+            throw new IllegalStateException(
+                    "Solo las citas AGENDADAS pueden cancelarse. Estado actual: " + this.appointmentState
+            );
+        }
+        this.appointmentState = AppointmentState.CANCELADA;
     }
 
     public UUID getIdAppointment() {
@@ -184,9 +196,5 @@ public class Appointment {
 
     public UUID getIdDoctor() {
         return idDoctor;
-    }
-
-    public void setAppointmentState(AppointmentState appointmentState) {
-        this.appointmentState = appointmentState;
     }
 }

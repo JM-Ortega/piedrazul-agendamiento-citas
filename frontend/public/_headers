@@ -1,0 +1,27 @@
+# Aplica a todas las rutas
+/*
+  # Fuerza HTTPS por 1 año, incluye subdominios
+  # Sin 'preload' aún — requiere verificar que todos los subdominios
+  # estén estables antes de entrar a la lista HSTS preload (irreversible)
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+  # Evita MIME type sniffing
+  X-Content-Type-Options: nosniff
+
+  # Protección contra clickjacking para browsers que no entienden CSP
+  # frame-ancestors 'none' en el CSP hace lo mismo para browsers modernos
+  X-Frame-Options: DENY
+
+  # Envía solo el origen (sin path) en requests cross-origin HTTPS→HTTPS
+  # y nada en cross-origin HTTPS→HTTP
+  Referrer-Policy: strict-origin-when-cross-origin
+
+  # Deshabilita APIs del browser que Piedrazul no necesita
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+
+  # Content Security Policy — pendiente de configurar
+  # Requiere ajustes en el build de Angular (inlineCritical) y en Keycloak
+  # antes de poder activarse sin romper la app.
+  # Se retomará con el proceso correcto: primero Content-Security-Policy-Report-Only,
+  # observar violaciones, ajustar, luego activar.
+  # Content-Security-Policy: ...

@@ -1,10 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
-import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentPatientNotFoundException;
+import co.edu.unicauca.piedrazul.backend.patients.PatientLookupApi;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,13 +27,13 @@ class IsNewPatientUseCaseImplTest {
     private AppointmentRepository appointmentRepository;
 
     @Mock
-    private PatientConsultPort patientConsultPort;
+    private PatientLookupApi patientLookupApi;
 
     private IsNewPatientUseCaseImpl useCase;
 
     @BeforeEach
     void setUp() {
-        useCase = new IsNewPatientUseCaseImpl(appointmentRepository, patientConsultPort);
+        useCase = new IsNewPatientUseCaseImpl(appointmentRepository, patientLookupApi);
     }
 
     @Test
@@ -43,7 +41,7 @@ class IsNewPatientUseCaseImplTest {
         UUID patientId = UUID.randomUUID();
         Collection<AppointmentState> expectedStates = EnumSet.of(AppointmentState.AGENDADA, AppointmentState.ATENDIDA);
 
-        when(patientConsultPort.findById(patientId)).thenReturn(org.mockito.Mockito.mock(PatientInfo.class));
+        when(patientLookupApi.existsById(patientId)).thenReturn(true);
         when(appointmentRepository.existsByPatientIdAndStates(patientId, expectedStates)).thenReturn(true);
 
         boolean result = useCase.isNewPatient(patientId);
@@ -60,7 +58,7 @@ class IsNewPatientUseCaseImplTest {
         UUID patientId = UUID.randomUUID();
         Collection<AppointmentState> expectedStates = EnumSet.of(AppointmentState.AGENDADA, AppointmentState.ATENDIDA);
 
-        when(patientConsultPort.findById(patientId)).thenReturn(org.mockito.Mockito.mock(PatientInfo.class));
+        when(patientLookupApi.existsById(patientId)).thenReturn(true);
         when(appointmentRepository.existsByPatientIdAndStates(patientId, expectedStates)).thenReturn(false);
 
         boolean result = useCase.isNewPatient(patientId);
@@ -72,11 +70,9 @@ class IsNewPatientUseCaseImplTest {
     void isNewPatientShouldPropagatePatientNotFoundWhenPatientDoesNotExist() {
         UUID patientId = UUID.randomUUID();
 
-        when(patientConsultPort.findById(patientId))
-                .thenThrow(new AppointmentPatientNotFoundException("Patient not found: " + patientId));
+        when(patientLookupApi.existsById(patientId)).thenReturn(false);
 
-        assertThatThrownBy(() -> useCase.isNewPatient(patientId))
-                .isInstanceOf(AppointmentPatientNotFoundException.class)
-                .hasMessageContaining("Patient not found");
+        boolean result = useCase.isNewPatient(patientId);
+        assertThat(result).isTrue();
     }
 }

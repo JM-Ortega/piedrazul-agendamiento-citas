@@ -57,11 +57,11 @@ export class DoctorEditFormComponent implements OnInit {
 
   readonly timeOptions: string[] = (() => {
     const opts: string[] = [];
-    for (let h = 5; h <= 12; h++) {
+    for (let h = 7; h <= 12; h++) {
       for (let m = 0; m < 60; m += 5) {
         if (h === 12 && m > 0) break;
         opts.push(
-          `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
+          `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
         );
       }
     }
@@ -146,7 +146,7 @@ export class DoctorEditFormComponent implements OnInit {
   }
 
   // ── Form methods ──────────────────────────────────────────────────────────
-  updateField(field: keyof Doctor, value: any): void {
+  updateField(field: keyof Doctor, value: Doctor[keyof Doctor]): void {
     const form = this.editForm();
     if (!form) return;
     const updated = { ...form, [field]: value };
@@ -170,7 +170,7 @@ export class DoctorEditFormComponent implements OnInit {
   updateDaySchedule(
     day: number,
     field: keyof DaySchedule,
-    value: string,
+    value: string
   ): void {
     const form = this.editForm();
     if (!form) return;
@@ -219,7 +219,7 @@ export class DoctorEditFormComponent implements OnInit {
     if (!form || !orig) return;
 
     const removedWorkdays = this.originalWorkdays().filter(
-      (day) => !form.workdays.includes(day),
+      (day) => !form.workdays.includes(day)
     );
 
     this.saved.emit({
@@ -228,5 +228,30 @@ export class DoctorEditFormComponent implements OnInit {
       originalWorkdays: this.originalWorkdays(),
       removedWorkdays, // ← añadir
     });
+  }
+  onLaborStartInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value;
+    if (value) {
+      const parts = value.split('-');
+      if (parts[0].length > 4) {
+        parts[0] = parts[0].slice(0, 4);
+        input.value = parts.join('-');
+        this.updateField('laborStart', input.value);
+      }
+    }
+  }
+
+  onLaborEndInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value;
+    if (value) {
+      const parts = value.split('-');
+      if (parts[0].length > 4) {
+        parts[0] = parts[0].slice(0, 4);
+        input.value = parts.join('-');
+        this.updateField('laborEnd', input.value);
+      }
+    }
   }
 }

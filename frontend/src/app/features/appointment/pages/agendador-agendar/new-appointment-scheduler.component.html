@@ -3,17 +3,16 @@
     <div class="mb-6">
       <button
         (click)="goToScheduler()"
-        class="flex items-center gap-2 text-blue-600 text-lg hover:text-blue-800 mb-4 transition-colors cursor-pointer"
+        class="flex items-center gap-2 text-[#215c98] text-lg hover:text-[#4e92d9] mb-4 transition-colors cursor-pointer"
       >
-      <lucide-angular [img]="ArrowLeft" [size]="20"></lucide-angular>
-       Volver al inicio
+        <lucide-angular [img]="ArrowLeft" [size]="20"></lucide-angular>
+        Volver al inicio
       </button>
-      <h1 class="text-blue-800 text-3xl font-bold">Nueva Cita</h1>
+      <h1 class="text-[#215c98] text-3xl font-bold">Nueva Cita</h1>
       <p class="text-gray-500 text-lg mt-1">
         Registre una cita para un paciente
       </p>
     </div>
-
     <app-appointment-booking
       context="scheduler"
       (appointmentConfirmed)="onAppointmentConfirmed($event)"

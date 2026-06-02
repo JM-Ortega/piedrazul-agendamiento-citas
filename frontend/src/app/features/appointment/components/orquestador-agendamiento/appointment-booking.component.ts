@@ -89,7 +89,7 @@ export class AppointmentBookingComponent implements OnInit {
         this.state.doctorSnapshot.set(doctor);
         const cleanSpecialty = doctor.specialty.replace(/[\[\]]/g, '');
         this.state.selectedSpecialty.set(cleanSpecialty);
-        this.loadSpecialtiesForMode('specialty-doctor');
+
         const doctors$ = this.citaService.getDoctorsBySpecialty(cleanSpecialty);
 
         if (this.pendingDocumentNumber) {
@@ -98,16 +98,19 @@ export class AppointmentBookingComponent implements OnInit {
           );
           forkJoin({ doctors: doctors$, patient: patient$ }).subscribe({
             next: ({ doctors, patient }) => {
-              this.applyDoctorsPreselection(doctors, doctor.id, doctor.name);
               this.state.foundPatient.set(patient);
               this.state.patientId.set(patient?.id ?? null);
+              this.loadSpecialtiesForMode('specialty-doctor');
+              this.applyDoctorsPreselection(doctors, doctor.id, doctor.name);
               this.state.step.set(this.state.specialtyStep());
             },
             error: () => {
+              this.loadSpecialtiesForMode('specialty-doctor');
               this.state.step.set(this.state.specialtyStep());
             },
           });
         } else {
+          this.loadSpecialtiesForMode('specialty-doctor');
           doctors$.subscribe({
             next: (docs) => {
               this.applyDoctorsPreselection(docs, doctor.id, doctor.name);
@@ -236,12 +239,11 @@ export class AppointmentBookingComponent implements OnInit {
   }
 
   private loadSpecialtiesWithDoctor(): void {
-    this.citaService.getSpecialtiesWithDoctor().subscribe({
+    const patientId = this.resolvePatientIdForSpecialties() || null;
+
+    this.citaService.getSpecialtiesWithDoctor(patientId).subscribe({
       next: (data) => {
-        const filtered = this.state.isNewPatient()
-          ? data.filter((s) => s.specialty === 'MEDICINA_GENERAL')
-          : data;
-        this.state.specialtiesWithDoctor.set(filtered);
+        this.state.specialtiesWithDoctor.set(data);
       },
       error: (err) => {
         this.state.noSpecialtyAvailable.set(true);
@@ -266,7 +268,17 @@ export class AppointmentBookingComponent implements OnInit {
   }
 
   private loadSpecialties(): void {
-    this.citaService.getSpecialties().subscribe({
+    const patientId = this.resolvePatientIdForSpecialties();
+
+    if (!patientId) {
+      this.traerEspecialidades(null);
+      return;
+    }
+    this.traerEspecialidades(patientId)
+  }
+
+  private traerEspecialidades(patientId: string | null): void {
+    this.citaService.getSpecialties(patientId).subscribe({
       next: (specs) => {
         if (!specs || specs.length === 0) {
           this.state.noSpecialtyAvailable.set(true);
@@ -370,5 +382,12 @@ export class AppointmentBookingComponent implements OnInit {
         this.state.selectedDoctorName.set(doctor.name);
       },
     });
+  }
+
+  private resolvePatientIdForSpecialties(): string {
+    if (this.state.isSchedulerContext()) {
+      return this.state.patientId() ?? '';
+    }
+    return this.state.patientId() ?? this.state.patientSnapshot()?.id ?? '';
   }
 }

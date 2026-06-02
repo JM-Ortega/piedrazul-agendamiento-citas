@@ -1,0 +1,349 @@
+<div class="space-y-6 mt-8 pt-8 border-t-2 border-[#a7c9ec]">
+  <h3 class="text-[#215c98] text-xl font-semibold flex items-center gap-2">
+    <lucide-angular [img]="Stethoscope" [size]="24"></lucide-angular>
+    Información del Médico
+  </h3>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+    <!-- Especialidades -->
+    <div class="sm:col-span-2">
+      <p class="block text-gray-700 text-base font-medium mb-1">
+        Especialidades *
+        <span class="text-sm text-gray-500 font-normal ml-1"
+          >(puede seleccionar varias)</span
+        >
+      </p>
+      <div class="grid grid-cols-2 gap-3 mt-2">
+        @for (sp of specialtyOptions; track sp.name) {
+          <button
+            type="button"
+            (click)="toggleSpecialty(sp.name)"
+            [class]="
+              'flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-base font-medium ' +
+              (isSpecialtySelected(sp.name)
+                ? 'border-[#215c98] bg-[#d9e9f8] text-[#215c98] shadow-md'
+                : 'border-gray-300 bg-white text-gray-700 hover:border-[#4e92d9]')
+            "
+          >
+            <lucide-angular
+              [img]="sp.icon"
+              [size]="22"
+              [class]="
+                isSpecialtySelected(sp.name)
+                  ? 'text-[#215c98] shrink-0'
+                  : sp.colorClass + ' shrink-0'
+              "
+            ></lucide-angular>
+            <span class="flex-1 text-left">{{ sp.name | formato }}</span>
+            @if (isSpecialtySelected(sp.name)) {
+              <div
+                class="bg-[#215c98] text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shrink-0"
+              >
+                ✓
+              </div>
+            }
+          </button>
+        }
+      </div>
+      @if (loadingSpecialties) {
+        <p class="mt-2 text-sm text-gray-400">Cargando especialidades...</p>
+      }
+      @if (errors['specialty']) {
+        <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
+          <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+          {{ errors['specialty'] }}
+        </p>
+      }
+    </div>
+
+    <!-- Tipo de Documento -->
+    <div>
+      <label
+        for="documentType"
+        class="block text-gray-700 text-base font-medium mb-2"
+      >
+        Tipo de Documento *
+      </label>
+      <div class="relative">
+        <lucide-angular
+          [img]="CreditCard"
+          [size]="20"
+          class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+        >
+        </lucide-angular>
+        <select
+          id="documentType"
+          [ngModel]="data.documentType"
+          (ngModelChange)="emit('documentType', $event)"
+          name="documentType"
+          (blur)="fieldBlurred.emit('documentType')"
+          [class]="
+            'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 pl-12 pr-4 ' +
+            (errors['documentType']
+              ? 'border-red-400 focus:ring-red-400 bg-red-50'
+              : 'border-gray-300 focus:ring-blue-500')
+          "
+        >
+          <option value="">
+            {{ loadingDocumentTypes ? 'Cargando...' : 'Seleccione...' }}
+          </option>
+          @for (dt of documentTypes; track dt) {
+            <option [value]="dt">{{ dt | formato }}</option>
+          }
+        </select>
+      </div>
+      @if (errors['documentType']) {
+        <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+          <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+          {{ errors['documentType'] }}
+        </p>
+      }
+    </div>
+
+    <!-- Teléfono -->
+    <div>
+      <label for="phone" class="block text-gray-700 text-base font-medium mb-2">
+        Teléfono * <span class="text-sm text-gray-500">(solo dígitos)</span>
+      </label>
+      <div class="relative">
+        <lucide-angular
+          [img]="Phone"
+          [size]="20"
+          class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+        >
+        </lucide-angular>
+        <input
+          id="phone"
+          type="text"
+          inputmode="numeric"
+          [ngModel]="data.phone"
+          (ngModelChange)="emit('phone', $event)"
+          name="phone"
+          (blur)="fieldBlurred.emit('phone')"
+          [class]="
+            'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 pl-12 pr-4 ' +
+            (errors['phone']
+              ? 'border-red-400 focus:ring-red-400 bg-red-50'
+              : 'border-gray-300 focus:ring-blue-500')
+          "
+          placeholder="3001234567"
+          maxlength="10"
+          autocomplete="off"
+        />
+      </div>
+      @if (errors['phone']) {
+        <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+          <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+          {{ errors['phone'] }}
+        </p>
+      }
+    </div>
+  </div>
+
+  <!-- Período Laboral -->
+  <div>
+    <p class="text-gray-700 text-base font-medium mb-1 flex items-center gap-2">
+      <lucide-angular [img]="CalendarRange" [size]="18"></lucide-angular>
+      Período Laboral *
+    </p>
+    <p class="text-gray-400 text-sm mb-3 flex items-center gap-1">
+      <lucide-angular [img]="Info" [size]="14"></lucide-angular>
+      Rango de fechas en que el médico estará activo en el sistema
+    </p>
+    <div class="grid grid-cols-2 gap-5">
+      <div>
+        <label
+          for="laborStart"
+          class="block text-gray-600 text-sm font-medium mb-2"
+          >Fecha de Inicio</label
+        >
+        <input
+          id="laborStart"
+          type="date"
+          [value]="data.laborStart"
+          (change)="emit('laborStart', $any($event.target).value)"
+          (blur)="fieldBlurred.emit('laborStart')"
+          [class]="
+            'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 px-4 ' +
+            (errors['laborStart']
+              ? 'border-red-400 focus:ring-red-400 bg-red-50'
+              : 'border-gray-300 focus:ring-blue-500')
+          "
+        />
+        @if (errors['laborStart']) {
+          <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+            <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+            {{ errors['laborStart'] }}
+          </p>
+        }
+      </div>
+      <div>
+        <label
+          for="laborEnd"
+          class="block text-gray-600 text-sm font-medium mb-2"
+          >Fecha de Fin</label
+        >
+        <input
+          id="laborEnd"
+          type="date"
+          [value]="data.laborEnd"
+          (change)="emit('laborEnd', $any($event.target).value)"
+          (blur)="fieldBlurred.emit('laborEnd')"
+          [class]="
+            'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 px-4 ' +
+            (errors['laborEnd']
+              ? 'border-red-400 focus:ring-red-400 bg-red-50'
+              : 'border-gray-300 focus:ring-blue-500')
+          "
+        />
+        @if (errors['laborEnd']) {
+          <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+            <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+            {{ errors['laborEnd'] }}
+          </p>
+        }
+      </div>
+    </div>
+  </div>
+
+  <!-- Horario -->
+  <div class="grid grid-cols-2 gap-5">
+    <div>
+      <label
+        for="startTime"
+        class="block text-gray-700 text-base font-medium mb-2"
+        >Hora de Inicio</label
+      >
+      <select
+        id="startTime"
+        [ngModel]="data.startTime"
+        (ngModelChange)="
+          emit('startTime', $event); fieldBlurred.emit('startTime')
+        "
+        name="startTime"
+        [class]="
+          'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 px-4 ' +
+          (errors['startTime']
+            ? 'border-red-400 focus:ring-red-400 bg-red-50'
+            : 'border-gray-300 focus:ring-blue-500')
+        "
+      >
+        <option value="" disabled>-- Seleccionar --</option>
+        @for (t of timeOptions; track t) {
+          <option [value]="t">{{ t }}</option>
+        }
+      </select>
+      @if (errors['startTime']) {
+        <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+          <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+          {{ errors['startTime'] }}
+        </p>
+      }
+    </div>
+    <div>
+      <label
+        for="endTime"
+        class="block text-gray-700 text-base font-medium mb-2"
+      >
+        Hora de Fin
+        <span class="text-sm text-gray-500 font-normal ml-1"
+          >máx. 12:00 pm</span
+        >
+      </label>
+      <select
+        id="endTime"
+        [ngModel]="data.endTime"
+        (ngModelChange)="emit('endTime', $event); fieldBlurred.emit('endTime')"
+        name="endTime"
+        [class]="
+          'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 px-4 ' +
+          (errors['endTime']
+            ? 'border-red-400 focus:ring-red-400 bg-red-50'
+            : 'border-gray-300 focus:ring-blue-500')
+        "
+      >
+        <option value="" disabled>-- Seleccionar --</option>
+        @for (t of timeOptions; track t) {
+          <option [value]="t">{{ t }}</option>
+        }
+      </select>
+      @if (errors['endTime']) {
+        <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+          <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+          {{ errors['endTime'] }}
+        </p>
+      }
+    </div>
+  </div>
+
+  <!-- Intervalo -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+    <div>
+      <label
+        for="interval"
+        class="block text-gray-700 text-base font-medium mb-2"
+      >
+        Intervalo entre citas (min)
+        <span class="text-sm text-gray-500 font-normal ml-1"
+          >máx. {{ maxInterval }} min</span
+        >
+      </label>
+      <input
+        id="interval"
+        type="number"
+        [ngModel]="data.interval"
+        (ngModelChange)="emit('interval', +$event)"
+        name="interval"
+        (blur)="fieldBlurred.emit('interval')"
+        [class]="
+          'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 px-4 ' +
+          (errors['interval']
+            ? 'border-red-400 focus:ring-red-400 bg-red-50'
+            : 'border-gray-300 focus:ring-blue-500')
+        "
+        [min]="10"
+        [max]="maxInterval"
+        step="5"
+      />
+      @if (errors['interval']) {
+        <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
+          <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+          {{ errors['interval'] }}
+        </p>
+      }
+    </div>
+  </div>
+
+  <!-- Días de Atención -->
+  <div>
+    <p class="block text-gray-700 text-base font-medium mb-1">
+      Días de Atención
+    </p>
+    <p class="text-gray-400 text-sm mb-3 flex items-center gap-1">
+      <lucide-angular [img]="Info" [size]="14"></lucide-angular>
+      Disponible de lunes a viernes
+    </p>
+    <div class="flex flex-wrap gap-3">
+      @for (day of daysOfWeek; track day.value) {
+        <button
+          type="button"
+          (click)="toggleWorkDay(day.value)"
+          [class]="
+            'px-5 py-3 rounded-xl border-2 transition-all text-base font-medium ' +
+            (isWorkDaySelected(day.value)
+              ? 'border-[#215c98] bg-[#d9e9f8] text-[#215c98]'
+              : 'border-gray-300 bg-white text-gray-600 hover:border-[#4e92d9]')
+          "
+        >
+          {{ day.label }}
+        </button>
+      }
+    </div>
+    @if (errors['workDays']) {
+      <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
+        <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+        {{ errors['workDays'] }}
+      </p>
+    }
+  </div>
+</div>

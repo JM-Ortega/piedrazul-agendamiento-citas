@@ -1,0 +1,318 @@
+<div class="min-h-screen bg-blue-50 py-8 px-4">
+  <div class="max-w-5xl mx-auto space-y-6">
+    <!-- Header -->
+    <div
+      class="bg-linear-to-r from-[#163c63] to-[#215c98] text-white rounded-2xl p-7 shadow-lg"
+    >
+      <div class="flex items-center gap-3">
+        <lucide-angular [img]="Stethoscope" [size]="34"></lucide-angular>
+        <div>
+          <h1 class="text-3xl font-bold">Gestión de Médicos</h1>
+          <p class="text-[#a7c9ec] text-lg mt-2">
+            Administre especialidades y roles de los médicos
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error -->
+    @if (errorCarga()) {
+      <div
+        class="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-4 text-base"
+      >
+        ⚠️ {{ errorCarga() }}
+      </div>
+    }
+
+    <!-- Loading -->
+    @if (loading()) {
+      <div
+        class="bg-white rounded-2xl shadow-md p-7 text-center text-gray-400 text-lg py-10"
+      >
+        Cargando médicos...
+      </div>
+    }
+
+    <!-- Empty -->
+    @if (!loading() && doctors().length === 0 && !errorCarga()) {
+      <div class="bg-white rounded-2xl shadow-md p-7">
+        <div class="text-center py-12 text-gray-500">
+          No hay médicos registrados
+        </div>
+      </div>
+    }
+
+    <!-- Lista -->
+    @if (!loading() && doctors().length > 0) {
+      <div class="bg-white rounded-2xl shadow-md p-7">
+        <h2
+          class="text-[#163c63] text-2xl font-semibold mb-6 flex items-center gap-2"
+        >
+          <lucide-angular [img]="Stethoscope" [size]="26"></lucide-angular>
+          Médicos Registrados ({{ doctors().length }})
+        </h2>
+
+        <div class="space-y-4">
+          @for (doctor of doctors(); track doctor.id) {
+            <div
+              class="border-2 border-[#a7c9ec] rounded-xl p-6 bg-[#d9e9f8]/30 edit-container hover:shadow-lg transition-shadow relative"
+            >
+              <!-- ── MODO EDICIÓN ── -->
+              @if (isEditing(doctor.id)) {
+                <div class="space-y-6">
+                  <!-- Header edición -->
+                  <div
+                    class="flex items-center justify-between pb-4 border-b-2 border-[#a7c9ec]"
+                  >
+                    <div>
+                      <h3 class="text-xl font-bold text-[#163c63]">
+                        {{ doctor.firstName }} {{ doctor.lastName }}
+                      </h3>
+                      <p class="text-sm text-gray-600">
+                        Doc: {{ doctor.documentId }}
+                      </p>
+                    </div>
+                    <div class="flex gap-2">
+                      <button
+                        (click)="handleCancel()"
+                        class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <lucide-angular [img]="X" [size]="18"></lucide-angular>
+                      </button>
+                      <button
+                        (click)="handleSave(doctor)"
+                        [disabled]="savingDoctorId() === doctor.id"
+                        class="px-6 py-2 bg-[#215c98] hover:bg-[#163c63] disabled:opacity-60 text-white rounded-lg transition-colors flex items-center gap-2 cursor-pointer"
+                      >
+                        <lucide-angular
+                          [img]="Save"
+                          [size]="18"
+                        ></lucide-angular>
+                        {{
+                          savingDoctorId() === doctor.id
+                            ? 'Guardando...'
+                            : 'Guardar'
+                        }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Toggle Agendador -->
+                  <div>
+                    <p class="block text-gray-700 text-lg font-semibold mb-3">
+                      Rol Adicional
+                    </p>
+                    <button
+                      (click)="editingHasScheduler.set(!editingHasScheduler())"
+                      [class]="
+                        'w-full border-2 rounded-xl p-4 transition-all text-left ' +
+                        (editingHasScheduler()
+                          ? 'border-green-400 bg-green-50'
+                          : 'border-gray-300 bg-white hover:border-green-300')
+                      "
+                    >
+                      <div class="flex items-center gap-4">
+                        <div
+                          [class]="
+                            'w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all ' +
+                            (editingHasScheduler()
+                              ? 'bg-green-600 border-green-600'
+                              : 'bg-white border-gray-300')
+                          "
+                        >
+                          @if (editingHasScheduler()) {
+                            <lucide-angular
+                              [img]="Check"
+                              [size]="16"
+                              class="text-white"
+                            ></lucide-angular>
+                          }
+                        </div>
+                        <div class="flex-1">
+                          <div class="flex items-center gap-2">
+                            <lucide-angular
+                              [img]="Calendar"
+                              [size]="20"
+                              [class]="
+                                editingHasScheduler()
+                                  ? 'text-green-600'
+                                  : 'text-gray-600'
+                              "
+                            ></lucide-angular>
+                            <span
+                              [class]="
+                                'text-base font-bold ' +
+                                (editingHasScheduler()
+                                  ? 'text-green-900'
+                                  : 'text-gray-700')
+                              "
+                            >
+                              Agendador
+                            </span>
+                          </div>
+                          <p
+                            [class]="
+                              'text-sm mt-1 ' +
+                              (editingHasScheduler()
+                                ? 'text-green-700'
+                                : 'text-gray-500')
+                            "
+                          >
+                            {{
+                              editingHasScheduler()
+                                ? 'Este médico también puede agendar citas'
+                                : 'Haga clic para activar'
+                            }}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+
+                  <!-- Especialidades -->
+                  <div>
+                    <p class="block text-gray-700 text-lg font-semibold mb-3">
+                      Especialidades
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      @for (
+                        specialty of specialtiesList;
+                        track specialty.name
+                      ) {
+                        <button
+                          type="button"
+                          (click)="toggleSpecialty(specialty.value)"
+                          [class]="
+                            'px-5 py-4 rounded-xl border-2 transition-all text-base font-medium flex items-center gap-3 ' +
+                            (editingSpecialties().includes(specialty.value)
+                              ? 'border-[#215c98] bg-[#d9e9f8] text-[#163c63] shadow-md'
+                              : 'border-gray-300 bg-white text-gray-700 hover:border-[#4e92d9]')
+                          "
+                        >
+                          <lucide-angular
+                            [img]="specialty.icon"
+                            [size]="24"
+                            [class]="
+                              editingSpecialties().includes(specialty.value)
+                                ? 'text-[#215c98]'
+                                : specialty.color
+                            "
+                          ></lucide-angular>
+                          <span class="flex-1 text-left">{{
+                            specialty.name
+                          }}</span>
+                          @if (editingSpecialties().includes(specialty.value)) {
+                            <div
+                              class="bg-[#215c98] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
+                            >
+                              ✓
+                            </div>
+                          }
+                        </button>
+                      }
+                    </div>
+                  </div>
+                </div>
+              } @else {
+                <!-- ── MODO VISTA ── -->
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-3">
+                      <div class="rounded-full p-3 bg-[#215c98] shrink-0">
+                        <lucide-angular
+                          [img]="Stethoscope"
+                          class="text-white"
+                          [size]="24"
+                        ></lucide-angular>
+                      </div>
+                      <div>
+                        <h3 class="text-xl font-bold text-[#163c63]">
+                          {{ doctor.firstName }} {{ doctor.lastName }}
+                        </h3>
+                        <p class="text-sm text-gray-600">
+                          Doc: {{ doctor.documentId }}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="ml-14 space-y-2">
+                      <!-- Roles -->
+                      <div>
+                        <span class="text-sm font-semibold text-gray-700"
+                          >Roles:</span
+                        >
+                        <div class="flex flex-wrap gap-2 mt-1">
+                          <span
+                            class="text-xs px-3 py-1 rounded-full font-medium bg-[#d9e9f8] text-[#215c98]"
+                          >
+                            Médico
+                          </span>
+                          @if (hasScheduler(doctor)) {
+                            <span
+                              class="text-xs px-3 py-1 rounded-full font-medium bg-green-100 text-green-700"
+                            >
+                              Agendador
+                            </span>
+                          }
+                        </div>
+                      </div>
+
+                      <!-- Especialidades -->
+                      @if (doctor.specialties.length > 0) {
+                        <div>
+                          <span class="text-sm font-semibold text-gray-700"
+                            >Especialidades:</span
+                          >
+                          <div class="flex flex-wrap gap-2 mt-1">
+                            @for (spec of doctor.specialties; track spec) {
+                              <span
+                                class="text-xs px-3 py-1 rounded-full font-medium bg-white border-2 border-[#a7c9ec] text-[#163c63] flex items-center gap-1"
+                              >
+                                <lucide-angular
+                                  [img]="getSpecialtyIcon(spec)"
+                                  [size]="14"
+                                  [class]="getSpecialtyColor(spec)"
+                                ></lucide-angular>
+                                {{ getSpecialtyName(spec) }}
+                              </span>
+                            }
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+
+                  <div class="relative shrink-0 edit-container">
+                    <button
+                      (click)="handleEdit(doctor)"
+                      (mouseenter)="hoveredDoctorId.set(doctor.id)"
+                      (mouseleave)="hoveredDoctorId.set(null)"
+                      class="px-5 py-3 bg-[#215c98] hover:bg-[#163c63] text-white rounded-lg transition-colors flex items-center gap-2 font-semibold cursor-pointer"
+                    >
+                      <lucide-angular
+                        [img]="Edit3"
+                        [size]="18"
+                      ></lucide-angular>
+                      Editar
+                    </button>
+
+                    @if (hoveredDoctorId() === doctor.id) {
+                      <div
+                        class="absolute right-0 top-full mt-1 whitespace-nowrap bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg animate-fade-in pointer-events-none z-10"
+                      >
+                        Editar roles y especialidades
+                        <div
+                          class="absolute -top-1 right-4 w-2 h-2 bg-gray-900 rotate-45"
+                        ></div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </div>
+</div>

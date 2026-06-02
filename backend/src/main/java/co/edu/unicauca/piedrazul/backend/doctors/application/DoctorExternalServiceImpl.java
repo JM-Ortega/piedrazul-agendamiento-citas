@@ -1,9 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.DoctorAdminUserData;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import jakarta.transaction.Transactional;
@@ -66,6 +66,15 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     }
 
     @Override
+    public List<UUID> getActiveGeneralDoctorIds(){
+        return doctorRepository.findByStatusTrue()
+                .stream()
+                .filter(doctor -> doctor.getSpecialty().contains(Specialty.MEDICINA_GENERAL))
+                .map(Doctor::getIdDoctor)
+                .toList();
+    }
+
+    @Override
     @Transactional
     public List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds) {
         if (doctorIds == null || doctorIds.isEmpty()) {
@@ -78,12 +87,13 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     }
 
     @Override
-    @Transactional
-    public List<DoctorAdminUserData> getAdminUserData() {
-        return doctorRepository.findAll()
-                .stream()
-                .map(DoctorAdminUserData::fromEntity)
-                .toList();
+    public List<Specialty> findSpecialtiesByIdentification(String identification){
+        return doctorRepository.findSpecialtiesByIdentification(identification);
+    }
+
+    @Override
+    public UUID findIdByIdentification(String identification){
+        return doctorRepository.doctorIdByIdentification(identification);
     }
 
     private static Workday toWorkday(DayOfWeek dayOfWeek) {

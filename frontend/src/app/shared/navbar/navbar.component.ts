@@ -12,6 +12,7 @@ import {
   Check,
   ChevronDown,
   ClipboardList,
+  FolderOpen,
   Home,
   Hospital,
   LogOut,
@@ -54,6 +55,7 @@ export class NavbarComponent implements OnInit {
   readonly ChevronDown = ChevronDown;
   readonly UserCog = UserCog;
   readonly Check = Check;
+  readonly FolderOpen = FolderOpen;
   readonly exactMatch = { exact: true };
 
   menuOpen = signal(false);

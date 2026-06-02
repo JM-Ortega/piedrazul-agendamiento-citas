@@ -1,96 +1,199 @@
 package co.edu.unicauca.piedrazul.backend.jackson.normalization;
 
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateDoctorRequest;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.CreatePatientWithUserRequest;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+@DisplayName("NameSanitizerDeserializer - Tests Unitarios")
 class NameSanitizerDeserializerTest {
 
-    private final ObjectMapper objectMapper = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .findAndRegisterModules();
+    private NameSanitizerDeserializer deserializer;
+    private JsonParser jsonParser;
+    private DeserializationContext context;
 
-    @Test
-    void shouldNormalizeWhitespaceAndCasing() throws Exception {
-        String json = """
-                {
-                  "firstName": "   jUaN   pÉrEz   "
-                }
-                """;
-
-        NormalizedNamePayload payload = objectMapper.readValue(json, NormalizedNamePayload.class);
-
-        assertThat(payload.firstName()).isEqualTo("Juan Pérez");
+    @BeforeEach
+    void setUp() {
+        deserializer = new NameSanitizerDeserializer();
+        jsonParser   = mock(JsonParser.class);
+        context      = mock(DeserializationContext.class);
     }
 
-    @Test
-    void shouldNormalizeNamesInsideCreateDoctorRequest() throws Exception {
-        String json = """
-                {
-                  "firstName": "   jUaN   pErEz   ",
-                  "lastName": "   dE   lA   cRuZ   ",
-                  "documentType": "CEDULA",
-                  "identification": "123456789",
-                  "phone": "3001234567",
-                  "specialty": ["FISIOTERAPIA"],
-                  "laborStart": "2026-01-01",
-                  "laborEnd": "2026-12-31",
-                  "appointmentInterval": 30,
-                  "schedules": [
-                    {
-                      "startTime": "07:00:00",
-                      "endTime": "11:00:00",
-                      "workday": "LUNES"
-                    }
-                  ],
-                  "email": "juan.perez@example.com",
-                  "password": "Doctor123!"
-                }
-                """;
+    // ─── Helper ───────────────────────────────────────────────────────────────
 
-        CreateDoctorRequest request = objectMapper.readValue(json, CreateDoctorRequest.class);
-
-        assertThat(request.firstName()).isEqualTo("Juan Perez");
-        assertThat(request.lastName()).isEqualTo("De La Cruz");
-        assertThat(request.documentType().name()).isEqualTo("CEDULA");
-        assertThat(request.specialty()).containsExactly(Specialty.FISIOTERAPIA);
-        assertThat(request.schedules()).hasSize(1);
+    private String deserialize(String raw) throws IOException {
+        when(jsonParser.getValueAsString()).thenReturn(raw);
+        return deserializer.deserialize(jsonParser, context);
     }
 
-      @Test
-      void shouldNormalizeNamesInsideCreatePatientWithUserRequest() throws Exception {
-        String json = """
-            {
-              "username": "juan.perez",
-              "documentType": "CEDULA",
-              "documentNumber": "123456789",
-              "firstName": "   jUaN   cArLoS   ",
-              "lastName": "   dE   lA   cRuZ   ",
-              "phone": "3001234567",
-              "email": "juan.perez@example.com",
-              "gender": "MASCULINO",
-              "birthDate": "2000-01-01",
-              "guardianPhone": "3007654321",
-              "password": "Doctor123!"
+    // =========================================================================
+    // Caso nulo
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Cuando el valor es null")
+    class NullValueTests {
+
+        @Test
+        @DisplayName("Retorna null sin lanzar excepción")
+        void deserialize_null_returnsNull() throws IOException {
+            assertThat(deserialize(null)).isNull();
+        }
+    }
+
+    // =========================================================================
+    // Capitalización
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Capitalización de palabras")
+    class CapitalizationTests {
+
+        @ParameterizedTest(name = "\"{0}\" → \"{1}\"")
+        @CsvSource({
+                "juan,             Juan",
+                "JUAN,             Juan",
+                "jUaN,             Juan",
+                "juan perez,       Juan Perez",
+                "JUAN PEREZ,       Juan Perez",
+                "ana maría lópez,  Ana María López"
+        })
+        @DisplayName("Capitaliza la primera letra de cada palabra y el resto en minúsculas")
+        void deserialize_variousCases_capitalizesCorrectly(String input, String expected)
+                throws IOException {
+            assertThat(deserialize(input)).isEqualTo(expected);
+        }
+    }
+
+    // =========================================================================
+    // Espacios en blanco
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Manejo de espacios en blanco")
+    class WhitespaceTests {
+
+        @Test
+        @DisplayName("Elimina espacios al inicio y al final (trim)")
+        void deserialize_leadingAndTrailingSpaces_trimsCorrectly() throws IOException {
+            assertThat(deserialize("  juan  ")).isEqualTo("Juan");
+        }
+
+        @Test
+        @DisplayName("Colapsa múltiples espacios internos en uno solo")
+        void deserialize_multipleInternalSpaces_collapsesToSingle() throws IOException {
+            assertThat(deserialize("juan   perez")).isEqualTo("Juan Perez");
+        }
+
+        @Test
+        @DisplayName("Combina trim y colapso de espacios internos")
+        void deserialize_mixedWhitespace_sanitizesCompletely() throws IOException {
+            assertThat(deserialize("  juan   perez  ")).isEqualTo("Juan Perez");
+        }
+
+        @Test
+        @DisplayName("Mantiene una sola palabra sin espacios extra")
+        void deserialize_singleWordNoSpaces_returnsCapitalized() throws IOException {
+            assertThat(deserialize("maria")).isEqualTo("Maria");
+        }
+    }
+
+    // =========================================================================
+    // Cadena vacía
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Cadena vacía")
+    class EmptyStringTests {
+
+        @Test
+        @DisplayName("Lanza excepción con cadena vacía (comportamiento esperado: charAt(0) en string vacío)")
+        void deserialize_emptyString_throwsStringIndexOutOfBounds() {
+            org.junit.jupiter.api.Assertions.assertThrows(
+                    StringIndexOutOfBoundsException.class,
+                    () -> deserialize("")
+            );
+        }
+
+        @Test
+        @DisplayName("Lanza excepción con cadena de solo espacios (queda vacía tras trim)")
+        void deserialize_onlySpaces_throwsStringIndexOutOfBounds() {
+            org.junit.jupiter.api.Assertions.assertThrows(
+                    StringIndexOutOfBoundsException.class,
+                    () -> deserialize("   ")
+            );
+        }
+    }
+
+    // =========================================================================
+    // Nombres compuestos y con caracteres especiales
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Nombres compuestos y caracteres especiales")
+    class CompoundNamesTests {
+
+        @ParameterizedTest(name = "\"{0}\" → \"{1}\"")
+        @CsvSource({
+                "luis angel garcia torres, Luis Angel Garcia Torres",
+                "MARÍA DEL CARMEN,          María Del Carmen",
+                "jose de la cruz,           Jose De La Cruz"
+        })
+        @DisplayName("Capitaliza cada palabra en nombres compuestos")
+        void deserialize_compoundNames_capitalizesEachWord(String input, String expected)
+                throws IOException {
+            assertThat(deserialize(input)).isEqualTo(expected);
+        }
+
+        @Test
+        @DisplayName("Palabras con números conservan su forma salvo la capitalización inicial")
+        void deserialize_wordWithDigits_capitalizesFirstChar() throws IOException {
+            // "3rd" → "3rd" (Character.toUpperCase('3') == '3')
+            assertThat(deserialize("calle 3rd norte")).isEqualTo("Calle 3rd Norte");
+        }
+    }
+
+    // =========================================================================
+    // Integridad: el resultado nunca tiene espacios dobles ni extremos
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Integridad del resultado")
+    class OutputIntegrityTests {
+
+        @Test
+        @DisplayName("El resultado no contiene espacios al inicio ni al final")
+        void deserialize_result_hasNoLeadingOrTrailingSpaces() throws IOException {
+            String result = deserialize("  ana  maria  ");
+            assertThat(result).doesNotStartWith(" ").doesNotEndWith(" ");
+        }
+
+        @Test
+        @DisplayName("El resultado no contiene espacios dobles internos")
+        void deserialize_result_hasNoDoubleSpaces() throws IOException {
+            String result = deserialize("juan   carlos   perez");
+            assertThat(result).doesNotContain("  ");
+        }
+
+        @Test
+        @DisplayName("El resultado no contiene letras mayúsculas en posición distinta a la primera de cada palabra")
+        void deserialize_result_onlyFirstLetterUpperCase() throws IOException {
+            String result = deserialize("PEDRO ANTONIO RAMIREZ");
+            for (String word : result.split(" ")) {
+                if (word.length() > 1) {
+                    assertThat(word.substring(1)).isEqualTo(word.substring(1).toLowerCase());
+                }
             }
-            """;
-
-        CreatePatientWithUserRequest request = objectMapper.readValue(json, CreatePatientWithUserRequest.class);
-
-        assertThat(request.getFirstName()).isEqualTo("Juan Carlos");
-        assertThat(request.getLastName()).isEqualTo("De La Cruz");
-        assertThat(request.getDocumentType()).isEqualTo(PatientDocumentType.CEDULA);
-        assertThat(request.getGender()).isEqualTo(PatientGender.MASCULINO);
-        assertThat(request.getBirthDate()).isEqualTo(java.time.LocalDate.of(2000, 1, 1));
-      }
-
-    private record NormalizedNamePayload(@NormalizeName String firstName) {
+        }
     }
 }

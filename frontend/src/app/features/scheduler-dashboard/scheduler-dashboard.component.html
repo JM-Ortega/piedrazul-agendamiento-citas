@@ -1,8 +1,9 @@
 <div class="min-h-screen bg-blue-50 py-8 px-4">
   <div class="max-w-5xl mx-auto space-y-6">
-    <!-- Header -->
+    <!-- Header — SIN CAMBIOS -->
     <div
-      class="bg-linear-to-r from-blue-700 to-blue-500 text-white rounded-2xl p-7 shadow-lg"
+      style="background: linear-gradient(to right, #163c63, #4e92d9)"
+      class="text-white rounded-2xl p-7 shadow-lg"
     >
       <div
         class="flex flex-col md:flex-row md:items-center justify-between gap-4"
@@ -12,13 +13,14 @@
             <lucide-angular [img]="Calendar" [size]="34"></lucide-angular>
             Panel del Agendador
           </h1>
-          <p class="text-blue-100 text-lg mt-2">
+          <p class="text-white/80 text-lg mt-2">
             Consulte y gestione las citas médicas
           </p>
         </div>
         <a
           routerLink="/agendador/nueva"
-          class="flex items-center gap-2 bg-white text-blue-700 hover:bg-blue-50 px-6 py-3 rounded-xl text-lg font-semibold transition-colors shrink-0"
+          class="flex items-center gap-2 bg-white px-6 py-3 rounded-xl text-lg font-semibold transition-colors shrink-0"
+          style="color: #215c98"
         >
           <lucide-angular [img]="PlusCircle" [size]="24"></lucide-angular>
           Nueva Cita
@@ -28,502 +30,852 @@
 
     <!-- Vista Rápida -->
     <div class="bg-white rounded-2xl shadow-md p-7">
-      <h2 class="text-blue-800 text-xl mb-4 font-semibold">Vista Rápida:</h2>
+      <h2 class="text-xl mb-4 font-semibold text-[#163c63]">Vista Rápida:</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <!-- Todas las Citas -->
-        <button
-          (click)="setViewMode('all')"
-          [class]="
-            'p-6 rounded-xl border-2 transition-all duration-300 text-left ' +
-            (viewMode() === 'all'
-              ? 'border-blue-500 bg-blue-50 shadow-lg'
-              : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md')
-          "
-        >
-          <div class="flex items-start justify-between mb-3">
-            <div class="flex items-center gap-3">
-              <div
-                [class]="
-                  'rounded-full p-3 ' +
-                  (viewMode() === 'all' ? 'bg-blue-500' : 'bg-gray-200')
-                "
-              >
-                <lucide-angular
-                  [img]="Calendar"
-                  [size]="28"
+        <div class="relative">
+          <button
+            (click)="setViewMode('all')"
+            (mouseenter)="hoveredView.set('all')"
+            (mouseleave)="hoveredView.set(null)"
+            [class]="
+              'cursor-pointer p-6 rounded-xl border-2 transition-all duration-300 text-left w-full ' +
+              (viewMode() === 'all'
+                ? 'border-[#215c98] bg-[#d9e9f8]/30 shadow-lg'
+                : 'border-gray-200 bg-white hover:border-[#a7c9ec] hover:shadow-md')
+            "
+          >
+            <div class="flex items-start justify-between mb-3">
+              <div class="flex items-center gap-3">
+                <div
                   [class]="
-                    viewMode() === 'all' ? 'text-white' : 'text-gray-600'
-                  "
-                ></lucide-angular>
-              </div>
-              <div>
-                <h3
-                  [class]="
-                    'text-xl font-bold ' +
-                    (viewMode() === 'all' ? 'text-blue-700' : 'text-gray-700')
+                    'rounded-full p-3 ' +
+                    (viewMode() === 'all' ? 'bg-[#215c98]' : 'bg-gray-200')
                   "
                 >
-                  Todas las Citas
-                </h3>
-                <p class="text-gray-500 text-sm mt-1">
-                  Ver todas las citas registradas
-                </p>
+                  <lucide-angular
+                    [img]="Calendar"
+                    [size]="28"
+                    [class]="
+                      viewMode() === 'all' ? 'text-white' : 'text-gray-600'
+                    "
+                  >
+                  </lucide-angular>
+                </div>
+                <div>
+                  <h3
+                    [class]="
+                      'text-xl font-bold ' +
+                      (viewMode() === 'all'
+                        ? 'text-[#163c63]'
+                        : 'text-gray-700')
+                    "
+                  >
+                    Todas las Citas
+                  </h3>
+                  <p class="text-gray-500 text-sm mt-1">
+                    Ver todas las citas registradas
+                  </p>
+                </div>
               </div>
+              @if (viewMode() === 'all') {
+                <div
+                  class="bg-[#215c98] text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold"
+                >
+                  ✓
+                </div>
+              }
             </div>
-            @if (viewMode() === "all") {
-              <div
-                class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold"
+            <div class="flex items-baseline gap-2">
+              <span
+                [class]="
+                  'text-3xl font-bold ' +
+                  (viewMode() === 'all' ? 'text-[#215c98]' : 'text-gray-600')
+                "
               >
-                ✓
-              </div>
-            }
-          </div>
-          <div class="flex items-baseline gap-2">
-            <span
-              [class]="
-                'text-3xl font-bold ' +
-                (viewMode() === 'all' ? 'text-blue-700' : 'text-gray-600')
-              "
-              >{{ allActiveCount() }}</span
+                {{ allActiveCount() }}
+              </span>
+              <span class="text-gray-500 text-sm">citas activas</span>
+            </div>
+          </button>
+
+          @if (hoveredView() === 'all' && viewMode() !== 'all') {
+            <div
+              class="absolute left-1/2 -translate-x-1/2 top-full mt-1 whitespace-nowrap bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg animate-fade-in pointer-events-none z-10"
             >
-            <span class="text-gray-500 text-sm">citas activas</span>
-          </div>
-        </button>
+              Ver todas las citas registradas
+              <div
+                class="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"
+              ></div>
+            </div>
+          }
+        </div>
 
         <!-- Citas de Hoy -->
-        <button
-          (click)="setViewMode('today')"
-          [class]="
-            'p-6 rounded-xl border-2 transition-all duration-300 text-left ' +
-            (viewMode() === 'today'
-              ? 'border-amber-500 bg-amber-50 shadow-lg'
-              : 'border-gray-200 bg-white hover:border-amber-300 hover:shadow-md')
-          "
-        >
-          <div class="flex items-start justify-between mb-3">
-            <div class="flex items-center gap-3">
-              <div
-                [class]="
-                  'rounded-full p-3 ' +
-                  (viewMode() === 'today' ? 'bg-amber-500' : 'bg-gray-200')
-                "
-              >
-                <lucide-angular
-                  [img]="Clock"
-                  [size]="28"
+        <div class="relative">
+          <button
+            (click)="setViewMode('today')"
+            (mouseenter)="hoveredView.set('today')"
+            (mouseleave)="hoveredView.set(null)"
+            [class]="
+              'cursor-pointer p-6 rounded-xl border-2 transition-all duration-300 text-left w-full ' +
+              (viewMode() === 'today'
+                ? 'border-amber-500 bg-amber-50 shadow-lg'
+                : 'border-gray-200 bg-white hover:border-amber-300 hover:shadow-md')
+            "
+          >
+            <div class="flex items-start justify-between mb-3">
+              <div class="flex items-center gap-3">
+                <div
                   [class]="
-                    viewMode() === 'today' ? 'text-white' : 'text-gray-600'
-                  "
-                ></lucide-angular>
-              </div>
-              <div>
-                <h3
-                  [class]="
-                    'text-xl font-bold ' +
-                    (viewMode() === 'today'
-                      ? 'text-amber-700'
-                      : 'text-gray-700')
+                    'rounded-full p-3 ' +
+                    (viewMode() === 'today' ? 'bg-amber-500' : 'bg-gray-200')
                   "
                 >
-                  Citas de Hoy
-                </h3>
-                <p class="text-gray-500 text-sm mt-1">
-                  {{ formatDate(today) }}
-                </p>
+                  <lucide-angular
+                    [img]="Clock"
+                    [size]="28"
+                    [class]="
+                      viewMode() === 'today' ? 'text-white' : 'text-gray-600'
+                    "
+                  >
+                  </lucide-angular>
+                </div>
+                <div>
+                  <h3
+                    [class]="
+                      'text-xl font-bold ' +
+                      (viewMode() === 'today'
+                        ? 'text-amber-700'
+                        : 'text-gray-700')
+                    "
+                  >
+                    Citas de Hoy
+                  </h3>
+                  <p class="text-gray-500 text-sm mt-1">
+                    {{ formatDate(today) }}
+                  </p>
+                </div>
               </div>
+              @if (viewMode() === 'today') {
+                <div
+                  class="bg-amber-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold"
+                >
+                  ✓
+                </div>
+              }
             </div>
-            @if (viewMode() === "today") {
+            <div class="flex items-baseline gap-2">
+              <span
+                [class]="
+                  'text-3xl font-bold ' +
+                  (viewMode() === 'today' ? 'text-amber-700' : 'text-gray-600')
+                "
+              >
+                {{ todayCount() }}
+              </span>
+              <span class="text-gray-500 text-sm">citas activas</span>
+            </div>
+          </button>
+
+          @if (hoveredView() === 'today' && viewMode() !== 'today') {
+            <div
+              class="absolute left-1/2 -translate-x-1/2 top-full mt-1 whitespace-nowrap bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg animate-fade-in pointer-events-none z-10"
+            >
+              Ver citas de hoy
               <div
-                class="bg-amber-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold"
-              >
-                ✓
-              </div>
-            }
-          </div>
-          <div class="flex items-baseline gap-2">
-            <span
-              [class]="
-                'text-3xl font-bold ' +
-                (viewMode() === 'today' ? 'text-amber-700' : 'text-gray-600')
-              "
-              >{{ todayCount() }}</span
-            >
-            <span class="text-gray-500 text-sm">citas activas</span>
-          </div>
-        </button>
-      </div>
-    </div>
-
-    <!-- Filtros Avanzados -->
-    <div class="bg-white rounded-2xl shadow-md p-7">
-      <h2 class="text-blue-800 text-2xl mb-2 flex items-center gap-2">
-        <lucide-angular [img]="Search" [size]="24"></lucide-angular>
-        Filtros Avanzados
-      </h2>
-      <p class="text-gray-600 mb-5 text-base">
-        Los filtros se aplican automáticamente junto con la vista seleccionada
-      </p>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div>
-          <label class="block text-gray-700 mb-2 text-lg"
-            >Médico / Terapista</label
-          >
-          <select
-            [value]="filterDoctor()"
-            (change)="filterDoctor.set($any($event.target).value)"
-            class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-3 text-lg outline-none transition-colors"
-          >
-            <option value="">Todos los médicos</option>
-            @for (doc of doctors(); track doc.id) {
-              <option [value]="doc.name">
-                {{ doc.name }} — {{ specialtyLabel(doc.specialty) }}
-              </option>
-            }
-          </select>
-        </div>
-        <div>
-          <label class="block text-gray-700 mb-2 text-lg"
-            >Fecha Específica</label
-          >
-          <input
-            type="date"
-            [value]="filterDate()"
-            (change)="filterDate.set($any($event.target).value)"
-            class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-3 text-lg outline-none transition-colors"
-          />
-        </div>
-        <div>
-          <label class="block text-gray-700 mb-2 text-lg"
-            >Estado de la Cita</label
-          >
-          <select
-            [value]="filterStatus()"
-            (change)="filterStatus.set($any($event.target).value)"
-            class="w-full border-2 border-blue-200 focus:border-blue-500 rounded-xl px-4 py-3 text-lg outline-none transition-colors"
-          >
-            <option value="">Todos los estados</option>
-            <option value="AGENDADA">Agendada</option>
-            <option value="ATENDIDA">Atendida</option>
-            <option value="CANCELADA">Cancelada</option>
-            <option value="NO_ASISTIO">No asistió</option>
-            <option value="REPROGRAMADA">Reprogramada</option>
-          </select>
+                class="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"
+              ></div>
+            </div>
+          }
         </div>
       </div>
 
-      @if (filterDoctor() || filterDate() || filterStatus()) {
-        <div class="mt-4 flex flex-wrap gap-2 items-center">
-          <span class="text-sm text-gray-600">Filtros activos:</span>
-          @if (filterDoctor()) {
-            <span
-              class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm"
+      <!-- Filtros Avanzados -->
+      <div class="bg-white rounded-2xl shadow-md p-7 mt-6">
+        <h2 class="text-[#163c63] text-2xl mb-2 flex items-center gap-2">
+          <lucide-angular [img]="Search" [size]="24"></lucide-angular>
+          Filtros Avanzados
+        </h2>
+        <p class="text-gray-600 mb-5 text-base">
+          Los filtros se aplican automáticamente junto con la vista seleccionada
+        </p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div>
+            <label for="filterDoctor" class="block text-gray-700 mb-2 text-lg"
+              >Médico / Terapista</label
             >
-              {{ selectedDoctor()?.name }}
-              <button
-                (click)="clearDoctorFilter()"
-                class="hover:bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center ml-1"
-              >
-                ×
-              </button>
-            </span>
-          }
-          @if (filterDate()) {
-            <span
-              class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm"
+            <select
+              id="filterDoctor"
+              [value]="filterDoctor()"
+              (change)="filterDoctor.set($any($event.target).value)"
+              class="w-full border-2 border-[#a7c9ec] focus:border-[#215c98] rounded-xl px-4 py-3 text-lg outline-none transition-colors"
             >
-              {{ formatDate(filterDate()) }}
-              <button
-                (click)="clearDateFilter()"
-                class="hover:bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center ml-1"
-              >
-                ×
-              </button>
-            </span>
-          }
-          @if (filterStatus()) {
-            <span
-              class="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-sm"
+              <option value="">Todos los médicos</option>
+              @for (doc of doctors(); track doc.id) {
+                <option [value]="doc.name">
+                  {{ doc.name }} — {{ doc.specialty | formato }}
+                </option>
+              }
+            </select>
+          </div>
+          <div>
+            <label for="filterDate" class="block text-gray-700 mb-2 text-lg"
+              >Fecha Específica</label
             >
-              {{ statusLabel(filterStatus()) }}
-              <button
-                (click)="clearStatusFilter()"
-                class="hover:bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center ml-1"
-              >
-                ×
-              </button>
-            </span>
-          }
+            <input
+              type="date"
+              id="filterDate"
+              [value]="filterDate()"
+              (change)="filterDate.set($any($event.target).value)"
+              class="w-full border-2 border-[#a7c9ec] focus:border-[#215c98] rounded-xl px-4 py-3 text-lg outline-none transition-colors"
+            />
+          </div>
+          <div>
+            <label for="filterStatus" class="block text-gray-700 mb-2 text-lg"
+              >Estado de la Cita</label
+            >
+            <select
+              id="filterStatus"
+              [value]="filterStatus()"
+              (change)="filterStatus.set($any($event.target).value)"
+              class="w-full border-2 border-[#a7c9ec] focus:border-[#215c98] rounded-xl px-4 py-3 text-lg outline-none transition-colors"
+            >
+              <option value="">Todos los estados</option>
+              <option value="AGENDADA">Agendada</option>
+              <option value="ATENDIDA">Atendida</option>
+              <option value="CANCELADA">Cancelada</option>
+              <option value="NO_ASISTIO">No asistió</option>
+              <option value="REPROGRAMADA">Reprogramada</option>
+            </select>
+          </div>
         </div>
-      }
-    </div>
 
-    <!-- ── Exportar ── -->
-    @if (searched()) {
-      @if (hasTodayAppointments()) {
+        @if (filterDoctor() || filterDate() || filterStatus()) {
+          <div class="mt-4 flex flex-wrap gap-2 items-center">
+            <span class="text-sm text-gray-600">Filtros activos:</span>
+            @if (filterDoctor()) {
+              <span
+                class="inline-flex items-center gap-1 bg-[#d9e9f8] text-[#215c98] px-3 py-1 rounded-lg text-sm"
+              >
+                {{ selectedDoctor()?.name }}
+                <button
+                  (click)="clearDoctorFilter()"
+                  class="hover:bg-[#a7c9ec] rounded-full w-4 h-4 flex items-center justify-center ml-1"
+                >
+                  ×
+                </button>
+              </span>
+            }
+            @if (filterDate()) {
+              <span
+                class="inline-flex items-center gap-1 bg-[#d9e9f8] text-[#215c98] px-3 py-1 rounded-lg text-sm"
+              >
+                {{ formatDate(filterDate()) }}
+                <button
+                  (click)="clearDateFilter()"
+                  class="hover:bg-[#a7c9ec] rounded-full w-4 h-4 flex items-center justify-center ml-1"
+                >
+                  ×
+                </button>
+              </span>
+            }
+            @if (filterStatus()) {
+              <span
+                class="inline-flex items-center gap-1 bg-[#d9e9f8] text-[#215c98] px-3 py-1 rounded-lg text-sm"
+              >
+                {{ statusLabel(filterStatus()) }}
+                <button
+                  (click)="clearStatusFilter()"
+                  class="hover:bg-[#a7c9ec] rounded-full w-4 h-4 flex items-center justify-center ml-1"
+                >
+                  ×
+                </button>
+              </span>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- ── Exportar ── -->
+      @if (searched()) {
         <div
-          class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200"
+          class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200 mt-6"
         >
           <div
             class="flex flex-col sm:flex-row items-center justify-between gap-4"
           >
             <div class="flex items-center gap-3">
-              <div class="bg-green-500 rounded-full p-3">
+              <div class="bg-[#1f7a52] rounded-full p-3">
                 <lucide-angular
                   [img]="Download"
                   [size]="28"
                   class="text-white"
+                  s
                 ></lucide-angular>
               </div>
               <div>
                 <h3 class="text-green-800 text-xl font-bold">
-                  Exportar Reporte de Hoy
+                  Exportar Reporte
                 </h3>
                 <p
                   class="text-green-600 text-sm flex items-center gap-1 mt-0.5"
                 >
                   <lucide-angular [img]="Calendar" [size]="14"></lucide-angular>
-                  Solo se exportan las citas del día de hoy ({{
-                    formatDate(today)
-                  }})
-                </p>
-                <p class="text-green-700 text-base font-medium mt-1">
-                  Filtros de médico y estado aplicados al reporte
+                  Se exportarán las citas de la fecha seleccionada en los
+                  filtros
                 </p>
               </div>
             </div>
             <div class="flex flex-col items-end gap-2">
               <button
-                (click)="filterDoctor() ? showExportModal.set(true) : null"
-                [disabled]="!filterDoctor()"
+                (click)="filterDate() ? handleExportClick() : null"
+                [disabled]="!filterDate() || isCheckingAvailability()"
                 [class]="
                   'flex items-center gap-3 px-8 py-4 rounded-xl text-lg font-semibold transition-colors shadow-lg ' +
-                  (filterDoctor()
+                  (filterDate() && !isCheckingAvailability()
                     ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed')
                 "
               >
-                <lucide-angular
-                  [img]="FileSpreadsheet"
-                  [size]="24"
-                ></lucide-angular>
-                Exportar Citas
+                @if (isCheckingAvailability()) {
+                  <span
+                    class="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"
+                  ></span>
+                  Verificando...
+                } @else {
+                  <lucide-angular
+                    [img]="FileSpreadsheet"
+                    [size]="24"
+                  ></lucide-angular>
+                  Exportar Citas
+                }
               </button>
-              @if (!filterDoctor()) {
-                <p class="text-red-500 text-sm">
-                  Debe seleccionar un médico antes de exportar.
+              @if (!filterDate()) {
+                <p
+                  class="flex items-center gap-1 text-orange-700 text-base font-medium"
+                >
+                  <lucide-angular [img]="Calendar" [size]="16"></lucide-angular>
+                  Seleccione una fecha para exportar
                 </p>
               }
             </div>
           </div>
         </div>
-      } @else {
-        <div
-          class="bg-gray-50 border-2 border-gray-200 rounded-2xl p-5 text-center"
-        >
-          <p class="text-gray-500 text-base">
-            No hay citas programadas para hoy, por lo que no es posible exportar
-            un reporte.
-          </p>
-        </div>
       }
-    }
 
-    <!-- Resultados -->
-    @if (searched()) {
-      <div class="bg-white rounded-2xl shadow-md p-7">
-        <div
-          class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-3"
-        >
-          <div>
-            <h2 class="text-blue-800 text-2xl font-semibold">
-              @if (viewMode() === "all") {
-                Todas las Citas
-              }
-              @if (viewMode() === "today") {
-                Citas de Hoy
-              }
-            </h2>
-            <p class="text-gray-500 text-base mt-1">
-              @if (viewMode() === "today") {
-                {{ formatDate(today) }}
-                @if (selectedDoctor()) {
-                  — {{ selectedDoctor()?.name }}
+      <!-- Resultados -->
+      @if (searched()) {
+        <div class="bg-white rounded-2xl shadow-md p-7 mt-6">
+          <div
+            class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-3"
+          >
+            <div>
+              <h2 class="text-[#163c63] text-2xl font-semibold">
+                @if (viewMode() === 'all') {
+                  Todas las Citas
                 }
-              }
-              @if (viewMode() === "all") {
-                @if (!filterDoctor() && !filterDate()) {
-                  Mostrando todas las citas de todos los médicos
+                @if (viewMode() === 'today') {
+                  Citas de Hoy
                 }
-                @if (filterDoctor() && !filterDate()) {
-                  Mostrando todas las citas de {{ selectedDoctor()?.name }}
-                }
-                @if (!filterDoctor() && filterDate()) {
-                  Mostrando citas del {{ formatDate(filterDate()) }}
-                }
-                @if (filterDoctor() && filterDate()) {
-                  {{ selectedDoctor()?.name }} — {{ formatDate(filterDate()) }}
-                }
-              }
-            </p>
-          </div>
-          <div class="flex gap-4">
-            <div class="text-center bg-blue-50 rounded-xl px-5 py-3">
-              <p class="text-2xl font-bold text-blue-700">
-                {{ activeResults().length }}
-              </p>
-              <p class="text-sm text-gray-500">Citas activas</p>
-            </div>
-            <div class="text-center bg-gray-50 rounded-xl px-5 py-3">
-              <p class="text-2xl font-bold text-gray-600">
-                {{ results().length }}
-              </p>
-              <p class="text-sm text-gray-500">Total</p>
-            </div>
-          </div>
-        </div>
-
-        @if (results().length === 0) {
-          <div class="text-center py-12">
-            <lucide-angular
-              [img]="Calendar"
-              [size]="64"
-              class="text-blue-200 mx-auto mb-4"
-            ></lucide-angular>
-            <p class="text-gray-500 text-xl">
-              No se encontraron citas para los criterios seleccionados
-            </p>
-          </div>
-        } @else {
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead>
-                <tr class="bg-blue-50">
-                  @if (viewMode() !== "today") {
-                    <th
-                      class="text-left px-4 py-3 text-blue-800 text-base rounded-l-xl"
-                    >
-                      Fecha
-                    </th>
+              </h2>
+              <p class="text-gray-500 text-base mt-1">
+                @if (viewMode() === 'today') {
+                  {{ formatDate(today) }}
+                  @if (selectedDoctor()) {
+                    — {{ selectedDoctor()?.name }}
                   }
-                  <th
-                    [class]="
-                      'text-left px-4 py-3 text-blue-800 text-base ' +
-                      (viewMode() === 'today' ? 'rounded-l-xl' : '')
-                    "
-                  >
-                    Hora
-                  </th>
-                  <th class="text-left px-4 py-3 text-blue-800 text-base">
-                    Paciente
-                  </th>
-                  <th
-                    class="text-left px-4 py-3 text-blue-800 text-base hidden md:table-cell"
-                  >
-                    Médico
-                  </th>
-                  <th
-                    class="text-left px-4 py-3 text-blue-800 text-base rounded-r-xl"
-                  >
-                    Estado
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (
-                  apt of results();
-                  track apt.idAppointment;
-                  let idx = $index
-                ) {
-                  <tr
-                    class="border-b border-gray-100"
-                    [class]="
-                      (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50') +
-                      (apt.appointmentState === 'CANCELADA'
-                        ? ' opacity-60'
-                        : '')
-                    "
-                  >
-                    @if (viewMode() !== "today") {
+                }
+                @if (viewMode() === 'all') {
+                  @if (!filterDoctor() && !filterDate()) {
+                    Mostrando todas las citas de todos los médicos
+                  }
+                  @if (filterDoctor() && !filterDate()) {
+                    Mostrando todas las citas de {{ selectedDoctor()?.name }}
+                  }
+                  @if (!filterDoctor() && filterDate()) {
+                    Mostrando citas del {{ formatDate(filterDate()) }}
+                  }
+                  @if (filterDoctor() && filterDate()) {
+                    {{ selectedDoctor()?.name }} —
+                    {{ formatDate(filterDate()) }}
+                  }
+                }
+              </p>
+            </div>
+            <div class="flex gap-4">
+              <div class="text-center bg-[#d9e9f8]/40 rounded-xl px-5 py-3">
+                <p class="text-2xl font-bold text-[#215c98]">
+                  {{ activeResults().length }}
+                </p>
+                <p class="text-sm text-gray-500">Citas activas</p>
+              </div>
+              <div class="text-center bg-gray-50 rounded-xl px-5 py-3">
+                <p class="text-2xl font-bold text-gray-600">
+                  {{ results().length }}
+                </p>
+                <p class="text-sm text-gray-500">Total</p>
+              </div>
+            </div>
+          </div>
+
+          @if (results().length === 0) {
+            <div class="text-center py-12">
+              <lucide-angular
+                [img]="Calendar"
+                [size]="64"
+                class="text-[#a7c9ec] mx-auto mb-4"
+              ></lucide-angular>
+              <p class="text-gray-500 text-xl">
+                No se encontraron citas para los criterios seleccionados
+              </p>
+            </div>
+          } @else {
+            <div class="overflow-x-auto">
+              <table class="w-full">
+                <thead>
+                  <tr class="bg-[#d9e9f8]/40">
+                    @if (viewMode() !== 'today') {
+                      <th
+                        class="text-left px-4 py-3 text-[#163c63] text-base rounded-l-xl"
+                      >
+                        Fecha
+                      </th>
+                    }
+                    <th
+                      [class]="
+                        'text-left px-4 py-3 text-[#163c63] text-base ' +
+                        (viewMode() === 'today' ? 'rounded-l-xl' : '')
+                      "
+                    >
+                      Hora
+                    </th>
+                    <th class="text-left px-4 py-3 text-[#163c63] text-base">
+                      Paciente
+                    </th>
+                    <th
+                      class="text-left px-4 py-3 text-[#163c63] text-base hidden md:table-cell"
+                    >
+                      Médico
+                    </th>
+                    <th
+                      class="text-left px-4 py-3 text-[#163c63] text-base hidden md:table-cell"
+                    >
+                      Estado
+                    </th>
+                    <th
+                      class="text-left px-4 py-3 text-[#163c63] text-base rounded-r-xl"
+                    >
+                      Cancelar
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (
+                    apt of results();
+                    track apt.idAppointment;
+                    let idx = $index
+                  ) {
+                    <tr
+                      class="border-b border-gray-100"
+                      [class]="
+                        (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50') +
+                        (apt.appointmentState === 'CANCELADA'
+                          ? ' opacity-60'
+                          : '')
+                      "
+                    >
+                      @if (viewMode() !== 'today') {
+                        <td class="px-4 py-4">
+                          <div class="flex items-center gap-2">
+                            <lucide-angular
+                              [img]="Calendar"
+                              [size]="18"
+                              class="text-gray-400 shrink-0"
+                            ></lucide-angular>
+                            <span class="text-gray-700 text-base font-medium">{{
+                              formatDate(apt.date)
+                            }}</span>
+                          </div>
+                        </td>
+                      }
                       <td class="px-4 py-4">
                         <div class="flex items-center gap-2">
                           <lucide-angular
-                            [img]="Calendar"
+                            [img]="Clock"
                             [size]="18"
-                            class="text-gray-400 shrink-0"
+                            class="text-[#4e92d9] shrink-0"
                           ></lucide-angular>
-                          <span class="text-gray-700 text-base font-medium">{{
-                            formatDate(apt.date)
+                          <span class="text-[#163c63] text-lg font-semibold">{{
+                            apt.startTime
                           }}</span>
                         </div>
                       </td>
-                    }
-                    <td class="px-4 py-4">
-                      <div class="flex items-center gap-2">
-                        <lucide-angular
-                          [img]="Clock"
-                          [size]="18"
-                          class="text-blue-400 shrink-0"
-                        ></lucide-angular>
-                        <span class="text-blue-800 text-lg font-semibold">{{
-                          apt.startTime
-                        }}</span>
-                      </div>
-                    </td>
-                    <td class="px-4 py-4">
-                      <div class="flex items-center gap-3">
-                        <div
-                          class="bg-blue-100 rounded-full w-10 h-10 flex items-center justify-center shrink-0"
+                      <td class="px-4 py-4">
+                        <div class="flex items-center gap-3">
+                          <div
+                            class="bg-[#d9e9f8] rounded-full w-10 h-10 flex items-center justify-center shrink-0"
+                          >
+                            <lucide-angular
+                              [img]="User"
+                              [size]="18"
+                              class="text-[#215c98]"
+                            ></lucide-angular>
+                          </div>
+                          <div>
+                            <p class="text-gray-800 text-base font-medium">
+                              {{ apt.patientFirstName }}
+                              {{ apt.patientLastName }}
+                            </p>
+                            <p class="text-gray-500 text-sm">
+                              {{ apt.documentNumber }}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="px-4 py-4 hidden md:table-cell">
+                        <p class="text-gray-700 text-base">
+                          {{ apt.doctorName }}
+                        </p>
+                        <p class="text-gray-400 text-sm">
+                          {{ apt.specialty | formato }}
+                        </p>
+                      </td>
+                      <td class="px-4 py-4">
+                        <span
+                          class="px-3 py-1.5 rounded-lg text-sm font-medium"
+                          [class]="statusColor(apt.appointmentState)"
                         >
-                          <lucide-angular
-                            [img]="User"
-                            [size]="18"
-                            class="text-blue-600"
-                          ></lucide-angular>
+                          {{ statusLabel(apt.appointmentState) }}
+                        </span>
+                      </td>
+                      <td class="px-4 py-4 rounded-lg text-sm font-medium">
+                        <div class="px-3 py-1.5">
+                          @if (apt.appointmentState === 'AGENDADA') {
+                            <button
+                              type="button"
+                              (click)="
+                                requestCancelAppointment(apt.idAppointment)
+                              "
+                              class="bg-red-100 text-red-600 hover:text-red-800 text-sm font-semibold transition-colors rounded-lg px-3 py-1.5 hover:bg-red-200 border border-red-300 cursor-pointer inline-flex items-center gap-2"
+                            >
+                              <lucide-angular
+                                [img]="X"
+                                [size]="16"
+                              ></lucide-angular>
+                              Cancelar
+                            </button>
+                          } @else {
+                            <span class="text-gray-400">—</span>
+                          }
                         </div>
-                        <div>
-                          <p class="text-gray-800 text-base font-medium">
-                            {{ apt.patientFirstName }} {{ apt.patientLastName }}
-                          </p>
-                          <p class="text-gray-500 text-sm">
-                            {{ apt.documentNumber }}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td class="px-4 py-4 hidden md:table-cell">
-                      <p class="text-gray-700 text-base">
-                        {{ apt.doctorName }}
-                      </p>
-                      <p class="text-gray-400 text-sm">
-                        {{ specialtyLabel(apt.specialty) }}
-                      </p>
-                    </td>
-                    <td class="px-4 py-4">
-                      <span
-                        class="px-3 py-1.5 rounded-lg text-sm font-medium"
-                        [class]="statusColor(apt.appointmentState)"
-                      >
-                        {{ statusLabel(apt.appointmentState) }}
-                      </span>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        }
-      </div>
-    }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+    </div>
   </div>
-</div>
 
-<!-- Modal de Exportación -->
-@if (showExportModal()) {
-  <app-export-modal
-    [idDoctor]="selectedDoctor()?.id ?? null"
-    [filterStatus]="filterStatus()"
-    [doctorName]="selectedDoctor()?.name ?? null"
-    [todayFormatted]="formatDate(today)"
-    (closed)="showExportModal.set(false)"
-  />
-}
+  <!-- ── Modal advertencia disponibilidad ── -->
+  @if (showAvailabilityWarning()) {
+    <div
+      class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+    >
+      <div class="bg-white rounded-xl max-w-md w-full shadow-2xl">
+        <div
+          class="bg-amber-500 text-white px-8 py-5 rounded-t-xl flex items-center justify-between"
+        >
+          <div class="flex items-center gap-3">
+            <lucide-angular [img]="Calendar" [size]="28"></lucide-angular>
+            <h2 class="text-2xl font-bold">Franjas disponibles</h2>
+          </div>
+          <button
+            (click)="showAvailabilityWarning.set(false)"
+            class="text-white hover:bg-white/20 rounded-lg w-9 h-9 flex items-center justify-center text-xl transition-colors"
+          >
+            ×
+          </button>
+        </div>
+
+        <div class="px-8 py-6">
+          <div
+            class="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-xl px-5 py-4 mb-6"
+          >
+            <lucide-angular
+              [img]="Calendar"
+              [size]="22"
+              class="text-amber-600 mt-0.5 shrink-0"
+            ></lucide-angular>
+            <div>
+              <p class="text-amber-800 font-semibold text-base">
+                Aún hay franjas horarias disponibles
+              </p>
+              <p class="text-amber-700 text-sm mt-1">
+                Para el <strong>{{ formatDate(filterDate()) }}</strong> todavía
+                existen horarios disponibles para agendar citas. ¿Está seguro de
+                que desea exportar el reporte en este momento?
+              </p>
+            </div>
+          </div>
+
+          <div class="flex gap-3">
+            <button
+              (click)="showAvailabilityWarning.set(false)"
+              class="flex-1 px-6 py-3.5 border border-gray-300 text-gray-700 rounded-lg text-base font-semibold hover:bg-gray-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              (click)="confirmExportDespiteAvailability()"
+              class="flex-1 px-6 py-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2"
+            >
+              <lucide-angular [img]="Download" [size]="20"></lucide-angular>
+              Sí, continuar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ── Modal de Exportación ── -->
+  @if (showExportModal()) {
+    <div
+      class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+    >
+      <div class="bg-white rounded-xl max-w-md w-full shadow-2xl">
+        <div
+          [class]="
+            exportColors().header +
+            ' text-white px-8 py-5 rounded-t-xl flex items-center justify-between'
+          "
+        >
+          <div class="flex items-center gap-3">
+            <lucide-angular [img]="Download" [size]="28"></lucide-angular>
+            <h2 class="text-2xl font-bold">Exportar Reporte</h2>
+          </div>
+          <button
+            (click)="closeExportModal()"
+            class="text-white hover:bg-white/20 rounded-lg w-9 h-9 flex items-center justify-center text-xl transition-colors"
+          >
+            ×
+          </button>
+        </div>
+
+        <div class="px-8 py-6">
+          <div
+            class="mb-6 flex items-start gap-3 bg-[#d9e9f8]/40 border border-[#a7c9ec] rounded-xl px-5 py-4"
+          >
+            <lucide-angular
+              [img]="Calendar"
+              [size]="22"
+              class="text-[#4e92d9] mt-0.5 shrink-0"
+            ></lucide-angular>
+            <div>
+              <p class="text-[#163c63] font-semibold text-base">
+                Fecha del reporte
+              </p>
+              <p class="text-[#215c98] text-sm mt-0.5">
+                Se exportarán las citas del
+                <strong>{{ formatDate(filterDate()) }}</strong>
+              </p>
+            </div>
+          </div>
+
+          <div class="mb-6">
+            <h3 class="text-gray-700 text-lg font-semibold mb-3">
+              Formato del archivo
+            </h3>
+            <div class="grid grid-cols-3 gap-3">
+              @for (
+                fmt of [
+                  {
+                    value: 'excel',
+                    label: 'Excel',
+                    icon: FileSpreadsheet,
+                    active: 'border-green-600 bg-green-50',
+                    activeIcon: 'text-green-600',
+                    activeLabel: 'text-green-700',
+                  },
+                  {
+                    value: 'pdf',
+                    label: 'PDF',
+                    icon: FileText,
+                    active: 'border-red-600 bg-red-50',
+                    activeIcon: 'text-red-600',
+                    activeLabel: 'text-red-700',
+                  },
+                  {
+                    value: 'csv',
+                    label: 'CSV',
+                    icon: FileText,
+                    active: 'border-orange-600 bg-orange-50',
+                    activeIcon: 'text-orange-600',
+                    activeLabel: 'text-orange-700',
+                  },
+                ];
+                track fmt.value
+              ) {
+                <button
+                  (click)="exportFormat.set($any(fmt.value))"
+                  [class]="
+                    'p-4 rounded-lg border transition-all ' +
+                    (exportFormat() === fmt.value
+                      ? fmt.active + ' shadow-md'
+                      : 'border-gray-300 hover:border-gray-400 bg-white')
+                  "
+                >
+                  <div class="flex flex-col items-center gap-2">
+                    <lucide-angular
+                      [img]="fmt.icon"
+                      [size]="32"
+                      [class]="
+                        exportFormat() === fmt.value
+                          ? fmt.activeIcon
+                          : 'text-gray-500'
+                      "
+                    ></lucide-angular>
+                    <span
+                      [class]="
+                        'text-base font-semibold ' +
+                        (exportFormat() === fmt.value
+                          ? fmt.activeLabel
+                          : 'text-gray-700')
+                      "
+                    >
+                      {{ fmt.label }}
+                    </span>
+                  </div>
+                </button>
+              }
+            </div>
+          </div>
+
+          @if (exportError()) {
+            <div
+              class="mb-4 bg-red-50 border border-red-300 text-red-800 px-4 py-3 rounded-lg text-sm flex items-center gap-2"
+            >
+              <span class="font-semibold">Error:</span> {{ exportError() }}
+            </div>
+          }
+
+          <div class="flex gap-3 pt-4 border-t border-gray-200">
+            <button
+              (click)="closeExportModal()"
+              [disabled]="isExporting()"
+              class="flex-1 px-6 py-3.5 border border-gray-300 text-gray-700 rounded-lg text-base font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              (click)="handleExport()"
+              [disabled]="isExporting()"
+              [class]="
+                'flex-1 px-6 py-3.5 rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2 ' +
+                (!isExporting()
+                  ? exportColors().button + ' text-white'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed')
+              "
+            >
+              @if (isExporting()) {
+                <span
+                  class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"
+                ></span>
+                Generando reporte...
+              } @else {
+                <lucide-angular [img]="Download" [size]="20"></lucide-angular>
+                Exportar
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+  @if (showCancelModal()) {
+    <div
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4"
+      (click)="dismissCancelModal()"
+    >
+      <div
+        class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm"
+        (click)="$event.stopPropagation()"
+      >
+        <div
+          class="flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mx-auto mb-5"
+        >
+          <lucide-angular
+            [img]="X"
+            [size]="32"
+            class="text-red-500"
+          ></lucide-angular>
+        </div>
+        <h3 class="text-xl font-bold text-gray-800 text-center mb-2">
+          ¿Cancelar cita médica?
+        </h3>
+        <p class="text-gray-500 text-sm text-center mb-8">
+          Esta acción no se puede deshacer. ¿Está seguro de que desea cancelar
+          esta cita?
+        </p>
+        <div class="flex gap-3">
+          <button
+            class="flex-1 py-3 px-4 rounded-xl font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-200 transition-all duration-200 active:scale-[0.98] cursor-pointer"
+            (click)="dismissCancelModal()"
+          >
+            Volver
+          </button>
+          <button
+            class="flex-1 py-3 px-4 rounded-xl font-semibold text-white bg-gradient-to-r from-red-500 to-red-600 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer"
+            (click)="confirmCancelAppointment()"
+          >
+            Sí, cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+  @if (toastMessage()) {
+    <div
+      class="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-2xl border px-6 py-4 min-w-[320px] transition-all duration-300 animate-in slide-in-from-top-5"
+      [class.border-green-200]="toastType() === 'success'"
+      [class.border-red-200]="toastType() === 'error'"
+    >
+      <div class="flex items-center gap-3">
+        <div
+          class="rounded-full p-2"
+          [class.bg-green-100]="toastType() === 'success'"
+          [class.bg-red-100]="toastType() === 'error'"
+        >
+          @if (toastType() === 'success') {
+            <lucide-angular
+              [img]="Check"
+              [size]="20"
+              class="text-green-600"
+            ></lucide-angular>
+          } @else {
+            <lucide-angular
+              [img]="AlertCircle"
+              [size]="20"
+              class="text-red-600"
+            ></lucide-angular>
+          }
+        </div>
+        <div>
+          <p
+            class="font-semibold"
+            [class.text-green-700]="toastType() === 'success'"
+            [class.text-red-700]="toastType() === 'error'"
+          >
+            {{ toastType() === 'success' ? 'Éxito' : 'Error' }}
+          </p>
+          <p class="text-sm text-gray-600">{{ toastMessage() }}</p>
+        </div>
+      </div>
+    </div>
+  }
+</div>

@@ -1,49 +1,58 @@
 <div class="max-w-6xl mx-auto px-4 py-8">
   <!-- Header -->
   <div class="mb-8">
-    <h1 class="text-blue-800 text-3xl font-bold mb-2">Todas Mis Citas</h1>
+    <h1 class="text-[#163c63] text-3xl font-bold mb-2">Todas Mis Citas</h1>
     <p class="text-gray-600 text-lg">Historial completo de sus citas médicas</p>
   </div>
 
   <!-- Statistics Cards -->
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
     <div
-      class="bg-linear-to-br from-blue-600 to-blue-500 text-white rounded-xl shadow-lg p-6"
+      class="bg-linear-to-br from-[#215c98] to-[#4e92d9] text-white rounded-xl shadow-lg p-6"
     >
-      <p class="text-blue-100 text-sm uppercase tracking-wide mb-1">
+      <p class="text-white text-sm uppercase tracking-wide mb-1">
         Total de Citas
       </p>
-      <p class="text-4xl font-bold">{{ stats().total }}</p>
+      <p class="text-4xl font-bold text-white">
+        {{ stats().total }}
+      </p>
     </div>
+
     <div
-      class="bg-linear-to-br from-green-600 to-green-500 text-white rounded-xl shadow-lg p-6"
+      class="bg-linear-to-br from-[#1f7a52] to-[#45b884] text-white rounded-xl shadow-lg p-6"
     >
-      <p class="text-green-100 text-sm uppercase tracking-wide mb-1">
+      <p class="text-white text-sm uppercase tracking-wide mb-1">
         Próximas Citas
       </p>
-      <p class="text-4xl font-bold">{{ stats().upcoming }}</p>
-    </div>
-    <div
-      class="bg-linear-to-br from-yellow-600 to-yellow-500 text-white rounded-xl shadow-lg p-6"
-    >
-      <p class="text-yellow-100 text-sm uppercase tracking-wide mb-1">
-        Pendientes
+      <p class="text-4xl font-bold text-white">
+        {{ stats().upcoming }}
       </p>
-      <p class="text-4xl font-bold">{{ stats().pending }}</p>
+    </div>
+
+    <div
+      class="bg-linear-to-br from-[#b86a2d] to-[#e39a58] text-white rounded-xl shadow-lg p-6"
+    >
+      <p class="text-white text-sm uppercase tracking-wide mb-1">Atendidas</p>
+      <p class="text-4xl font-bold text-white">
+        {{ stats().pending }}
+      </p>
     </div>
   </div>
 
   <!-- Filters -->
   <div class="bg-white rounded-xl shadow-md border-2 border-blue-100 p-6 mb-6">
-    <div class="flex items-center gap-2 mb-4 text-blue-800">
+    <div class="flex items-center gap-2 mb-4 text-[#163c63]">
       <lucide-angular [img]="Filter" [size]="20"></lucide-angular>
       <h3 class="text-lg font-semibold">Filtros</h3>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <!-- Filtro fecha -->
       <div>
-        <label class="block text-gray-700 text-base mb-2">Por Fecha</label>
+        <label for="filterDate" class="block text-gray-700 text-base mb-2"
+          >Por Fecha</label
+        >
         <select
+          id="filterDate"
           [value]="filterDate()"
           (change)="filterDate.set($any($event.target).value)"
           class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -54,8 +63,9 @@
           <option value="past">Pasadas</option>
         </select>
 
-        @if (filterDate() === "specific") {
+        @if (filterDate() === 'specific') {
           <input
+            id="filterSpecificDate"
             type="date"
             [value]="filterSpecificDate()"
             (change)="filterSpecificDate.set($any($event.target).value)"
@@ -66,8 +76,11 @@
 
       <!-- Filtro estado -->
       <div>
-        <label class="block text-gray-700 text-base mb-2">Por Estado</label>
+        <label for="filterStatus" class="block text-gray-700 text-base mb-2"
+          >Por Estado</label
+        >
         <select
+          id="filterStatus"
           [value]="filterStatus()"
           (change)="filterStatus.set($any($event.target).value)"
           class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -93,7 +106,7 @@
           class="flex flex-col sm:flex-row items-center justify-between gap-4"
         >
           <div class="flex items-center gap-3">
-            <div class="bg-green-500 rounded-full p-3">
+            <div class="bg-[#1f7a52] rounded-full p-3">
               <lucide-angular
                 [img]="Download"
                 class="text-white"
@@ -117,7 +130,7 @@
           </div>
           <button
             (click)="showExportModal.set(true)"
-            class="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-colors shadow-lg"
+            class="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-colors shadow-lg cursor-pointer"
           >
             <lucide-angular
               [img]="FileSpreadsheet"
@@ -141,9 +154,9 @@
 
   <!-- Appointments List -->
   <div class="bg-white rounded-xl shadow-md border-2 border-blue-100 p-6">
-    <h2 class="text-blue-800 text-xl font-semibold mb-6">
+    <h2 class="text-[#163c63] text-xl font-semibold mb-6">
       {{ filteredAppointments().length }}
-      {{ filteredAppointments().length === 1 ? "Cita" : "Citas" }}
+      {{ filteredAppointments().length === 1 ? 'Cita' : 'Citas' }}
     </h2>
 
     @if (filteredAppointments().length === 0) {
@@ -179,42 +192,44 @@
                     (apt.appointmentState === 'CANCELADA'
                       ? 'bg-gray-300 text-gray-600'
                       : isPast(apt.date)
-                        ? 'bg-blue-300 text-blue-800'
-                        : 'bg-blue-600 text-white')
+                        ? 'bg-[#a7c9ec] text-blue-800'
+                        : 'bg-[#4e92d9] text-white')
                   "
                 >
                   <p class="text-2xl font-bold leading-none">
-                    {{ apt.date.split("-")[2] }}
+                    {{ apt.date.split('-')[2] }}
                   </p>
                   <p class="text-xs uppercase mt-1">
                     {{ getMonthShort(apt.date) }}
                   </p>
-                  <p class="text-xs">{{ apt.date.split("-")[0] }}</p>
+                  <p class="text-xs">{{ apt.date.split('-')[0] }}</p>
                   <div
                     class="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-current/30"
                   >
                     <lucide-angular [img]="Clock" [size]="14"></lucide-angular>
                     <span class="text-sm font-semibold">{{
-                      apt.startTime
+                      apt.startTime.slice(0, 5)
                     }}</span>
                   </div>
                 </div>
 
                 <!-- Patient Info -->
-                <div class="flex-1">
-                  <h3 class="text-blue-900 text-xl font-semibold mb-2">
+                <div class="flex flex-col gap-1">
+                  <h3 class="text-[#163c63] text-xl font-semibold mb-2">
                     {{ apt.patientFirstName }} {{ apt.patientLastName }}
                   </h3>
                   <div class="flex items-center gap-2 text-gray-700">
                     <lucide-angular
                       [img]="CreditCard"
                       [size]="16"
-                      class="text-blue-600"
+                      class="text-[#4e92d9]"
                     ></lucide-angular>
-                    <span class="text-base">Doc: {{ apt.documentNumber }}</span>
+                    <span class="text-[#163c63]"
+                      >Doc: {{ apt.documentNumber }}</span
+                    >
                   </div>
                   @if (
-                    isPast(apt.date) && apt.appointmentState !== "CANCELADA"
+                    isPast(apt.date) && apt.appointmentState !== 'CANCELADA'
                   ) {
                     <span class="inline-block mt-2 text-sm text-gray-500 italic"
                       >(Cita pasada)</span
@@ -222,9 +237,7 @@
                   }
                 </div>
               </div>
-
-              <!-- Right: Status & Action -->
-              <div class="flex flex-col gap-3 lg:items-end lg:min-w-50">
+              <div class="pt-2">
                 <span
                   [class]="
                     'px-4 py-2 rounded-lg border-2 text-base font-medium text-center ' +
@@ -233,12 +246,6 @@
                 >
                   {{ statusLabel(apt.appointmentState) }}
                 </span>
-                <button
-                  class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg transition-colors text-base"
-                >
-                  <lucide-angular [img]="FileText" [size]="18"></lucide-angular>
-                  Ver Historia Clínica
-                </button>
               </div>
             </div>
           </div>
@@ -246,15 +253,15 @@
       </div>
     }
   </div>
-</div>
 
-<!-- Export Modal -->
-@if (showExportModal()) {
-  <app-export-modal
-    [idDoctor]="currentDoctor()?.id ?? null"
-    [filterStatus]="filterStatus()"
-    [doctorName]="currentDoctor()?.name ?? null"
-    [todayFormatted]="formatDate(today)"
-    (closed)="showExportModal.set(false)"
-  />
-}
+  <!-- Export Modal -->
+  @if (showExportModal()) {
+    <app-export-modal
+      [idDoctor]="currentDoctor()?.id ?? null"
+      [filterStatus]="filterStatus()"
+      [doctorName]="currentDoctor()?.name ?? null"
+      [todayFormatted]="formatDate(today)"
+      (closed)="showExportModal.set(false)"
+    />
+  }
+</div>

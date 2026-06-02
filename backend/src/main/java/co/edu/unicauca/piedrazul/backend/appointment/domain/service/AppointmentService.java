@@ -6,112 +6,61 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTim
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 public class AppointmentService {
+
     private final BusySlotService busySlotService;
 
     public AppointmentService(BusySlotService busySlotService) {
         this.busySlotService = busySlotService;
     }
 
-    // El agendador crea la cita manualmente
-    public Appointment scheduleManual(String doctorName,
-                                      UUID idPatient,
-                                      PatientInfo patientInfo,
-                                      UUID idDoctor,
-                                      String patientName,
-                                      Specialty specialty,
-                                      LocalDate date,
-                                      AppointmentTime startTime,
-                                      int intervalMinutes,
-                                      List<Appointment> existingAppointments) {
-        return schedule(
-            doctorName,
-            idDoctor,
-            idPatient,
-            patientName,
-            patientInfo,
-            specialty,
-            date,
-            startTime,
-            intervalMinutes,
-            existingAppointments,
-            SchedulingOrigin.MANUAL
-        );
-    }
+    public Appointment scheduleManual(
+            AppointmentSchedulingRequest request,
+            int intervalMinutes,
+            List<Appointment> existingAppointments) {
 
-    // El paciente web agenda de forma autónoma
-    public Appointment scheduleAutonomous(String doctorName,
-                                          UUID idPatient,
-                                          PatientInfo patientInfo,
-                                          UUID idDoctor,
-                                          String patientName,
-                                          Specialty specialty,
-                                          LocalDate date,
-                                          AppointmentTime startTime,
-                                          int intervalMinutes,
-                                          List<Appointment> existingAppointments) {
-        return schedule(
-                doctorName,
-                idDoctor,
-                idPatient,
-                patientName,
-                patientInfo,
-                specialty,
-                date,
-                startTime,
-                intervalMinutes,
+        validateSlot(
                 existingAppointments,
-                SchedulingOrigin.AUTONOMO
+                request.startTime(),
+                intervalMinutes
         );
+
+        return Appointment.scheduleManual(request);
     }
 
-    private Appointment schedule(String doctorName,
-                                 UUID idDoctor,
-                                 UUID idPatient,
-                                 String patientName,
-                                 PatientInfo patientInfo,
-                                 Specialty specialty,
-                                 LocalDate date,
-                                 AppointmentTime startTime,
-                                 int intervalMinutes,
-                                 List<Appointment> existingAppointments,
-                                 SchedulingOrigin origin) {
+    public Appointment scheduleAutonomous(
+            AppointmentSchedulingRequest request,
+            int intervalMinutes,
+            List<Appointment> existingAppointments) {
 
-        // El dominio valida que el slot esté libre antes de crear la cita
-        if (busySlotService.isBusy(existingAppointments, startTime, intervalMinutes)) {
+        validateSlot(
+                existingAppointments,
+                request.startTime(),
+                intervalMinutes
+        );
+
+        return Appointment.scheduleAutonomous(request);
+    }
+
+    private void validateSlot(
+            List<Appointment> existingAppointments,
+            AppointmentTime startTime,
+            int intervalMinutes) {
+
+        if (busySlotService.isBusy(
+                existingAppointments,
+                startTime,
+                intervalMinutes)) {
+
             throw new SlotNotAvailableException(
-                    "El slot " + startTime + " ya está ocupado para este médico"
+                    "El slot " + startTime + " ya está ocupado"
             );
         }
-
-        if (origin == SchedulingOrigin.MANUAL) {
-            return Appointment.scheduleManual(
-                    doctorName,
-                    idDoctor,
-                    idPatient,
-                    patientName,
-                    patientInfo,
-                    specialty,
-                    date,
-                    startTime
-            );
-        }
-
-        return Appointment.scheduleAutonomous(
-                doctorName,
-                idDoctor,
-                idPatient,
-                patientName,
-                patientInfo,
-                specialty,
-                date,
-                startTime
-        );
     }
-
 }
