@@ -59,9 +59,19 @@ export class DoctorDashboardComponent implements OnInit {
   todaysAppointments = computed(() =>
     [...this.appointments()]
       .filter(
-        (a) => a.date === this.today && a.appointmentState !== 'CANCELADA',
+        (a) => a.date === this.today && a.appointmentState !== 'CANCELADA'
       )
-      .sort((a, b) => a.startTime.localeCompare(b.startTime)),
+      .sort((a, b) => {
+        const stateOrder: Record<string, number> = {
+          AGENDADA: 1,
+          ATENDIDA: 2,
+        };
+        const stateDiff =
+          (stateOrder[a.appointmentState] ?? 99) -
+          (stateOrder[b.appointmentState] ?? 99);
+        if (stateDiff !== 0) return stateDiff;
+        return a.startTime.localeCompare(b.startTime);
+      })
   );
 
   totalCount = computed(() => this.todaysAppointments().length);
