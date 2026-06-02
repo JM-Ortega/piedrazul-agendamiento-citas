@@ -78,13 +78,12 @@ export class DoctorDashboardComponent implements OnInit {
   confirmedCount = computed(
     () =>
       this.todaysAppointments().filter((a) => a.appointmentState === 'AGENDADA')
-        .length,
+        .length
   );
   pendingCount = computed(
     () =>
-      this.todaysAppointments().filter(
-        (a) => a.appointmentState === 'REPROGRAMADA',
-      ).length,
+      this.todaysAppointments().filter((a) => a.appointmentState === 'ATENDIDA')
+        .length
   );
 
   ngOnInit(): void {
@@ -106,13 +105,13 @@ export class DoctorDashboardComponent implements OnInit {
 
   toggleCardDropdown(appointmentId: string): void {
     this.openCardDropdownId.update((current) =>
-      current === appointmentId ? null : appointmentId,
+      current === appointmentId ? null : appointmentId
     );
   }
 
   selectCardOutcome(
     appointmentId: string,
-    outcome: 'ATENDIDA' | 'NO_ASISTIO',
+    outcome: 'ATENDIDA' | 'NO_ASISTIO'
   ): void {
     this.openCardDropdownId.set(null);
     this.selectedOutcome.set(outcome);
