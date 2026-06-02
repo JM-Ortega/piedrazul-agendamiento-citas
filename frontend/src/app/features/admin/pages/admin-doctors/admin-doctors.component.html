@@ -75,14 +75,14 @@
                     <div class="flex gap-2">
                       <button
                         (click)="handleCancel()"
-                        class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors"
+                        class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors cursor-pointer"
                       >
                         <lucide-angular [img]="X" [size]="18"></lucide-angular>
                       </button>
                       <button
                         (click)="handleSave(doctor)"
                         [disabled]="savingDoctorId() === doctor.id"
-                        class="px-6 py-2 bg-[#215c98] hover:bg-[#163c63] disabled:opacity-60 text-white rounded-lg transition-colors flex items-center gap-2"
+                        class="px-6 py-2 bg-[#215c98] hover:bg-[#163c63] disabled:opacity-60 text-white rounded-lg transition-colors flex items-center gap-2 cursor-pointer"
                       >
                         <lucide-angular
                           [img]="Save"
@@ -287,7 +287,7 @@
                       (click)="handleEdit(doctor)"
                       (mouseenter)="hoveredDoctorId.set(doctor.id)"
                       (mouseleave)="hoveredDoctorId.set(null)"
-                      class="px-5 py-3 bg-[#215c98] hover:bg-[#163c63] text-white rounded-lg transition-colors flex items-center gap-2 font-semibold"
+                      class="px-5 py-3 bg-[#215c98] hover:bg-[#163c63] text-white rounded-lg transition-colors flex items-center gap-2 font-semibold cursor-pointer"
                     >
                       <lucide-angular
                         [img]="Edit3"

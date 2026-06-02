@@ -43,7 +43,7 @@
         <p class="text-4xl mt-1">{{ confirmedCount() }}</p>
       </div>
       <div class="bg-white/20 backdrop-blur-sm rounded-xl p-4">
-        <p class="text-blue-100 text-base">Pendientes</p>
+        <p class="text-blue-100 text-base">Atendidas</p>
         <p class="text-4xl mt-1">{{ pendingCount() }}</p>
       </div>
     </div>
@@ -92,7 +92,9 @@
                           [img]="Clock"
                           [size]="18"
                         ></lucide-angular>
-                        <span class="text-xl">{{ apt.startTime.slice(0, 5) }}</span>
+                        <span class="text-xl">{{
+                          apt.startTime.slice(0, 5)
+                        }}</span>
                       </div>
                     </div>
                   </div>
@@ -119,7 +121,7 @@
               <!-- Lado derecho: botones según estado -->
               <div class="flex flex-col gap-3 lg:items-end">
                 <!-- Dropdown inline "Actualizar estado": solo cuando la cita está AGENDADA -->
-                @if (apt.appointmentState === "AGENDADA") {
+                @if (apt.appointmentState === 'AGENDADA') {
                   <div class="relative">
                     <button
                       (click)="toggleCardDropdown(apt.idAppointment)"
@@ -143,10 +145,19 @@
                     </button>
 
                     @if (openCardDropdownId() === apt.idAppointment) {
-                      <div class="absolute right-0 mt-2 w-44 bg-white border-2 border-blue-100 rounded-xl shadow-xl z-10 overflow-hidden">
-                        <button (click)="selectCardOutcome(apt.idAppointment, 'ATENDIDA')"
-                          class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-emerald-50 text-emerald-700 transition-colors">
-                          <lucide-angular [img]="Check" [size]="16"></lucide-angular>
+                      <div
+                        class="absolute right-0 mt-2 w-44 bg-white border-2 border-blue-100 rounded-xl shadow-xl z-10 overflow-hidden"
+                      >
+                        <button
+                          (click)="
+                            selectCardOutcome(apt.idAppointment, 'ATENDIDA')
+                          "
+                          class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-emerald-50 text-emerald-700 transition-colors"
+                        >
+                          <lucide-angular
+                            [img]="Check"
+                            [size]="16"
+                          ></lucide-angular>
                           Atender
                         </button>
 
@@ -169,7 +180,7 @@
                 }
 
                 <!-- Botón "Nueva cita": solo cuando la cita ya fue ATENDIDA -->
-                @if (apt.appointmentState === "ATENDIDA") {
+                @if (apt.appointmentState === 'ATENDIDA') {
                   <button
                     (click)="scheduleNewAppointment(apt.documentNumber)"
                     class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg transition-colors text-base"
@@ -211,7 +222,7 @@
         </h3>
       </div>
 
-      @if (selectedOutcome() === "ATENDIDA") {
+      @if (selectedOutcome() === 'ATENDIDA') {
         <div
           class="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-4 mb-6 text-sm text-gray-700"
         >
@@ -220,7 +231,7 @@
           <p>- Deberás llenar la historia clínica</p>
           <p>- Podrás agendar una nueva cita para este paciente si lo deseas</p>
         </div>
-      } @else if (selectedOutcome() === "NO_ASISTIO") {
+      } @else if (selectedOutcome() === 'NO_ASISTIO') {
         <div
           class="bg-red-50 border border-red-200 rounded-xl px-4 py-4 mb-6 text-sm text-gray-700"
         >
