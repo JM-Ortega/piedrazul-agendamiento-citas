@@ -1,27 +1,45 @@
 # Aplica a todas las rutas
 /*
-  # Fuerza HTTPS por 1 año, incluye subdominios
+  # Fuerza HTTPS por 1 año, incluye subdominios.
   # Sin 'preload' aún — requiere verificar que todos los subdominios
-  # estén estables antes de entrar a la lista HSTS preload (irreversible)
+  # estén estables antes de entrar a la lista HSTS preload (irreversible).
   Strict-Transport-Security: max-age=31536000; includeSubDomains
 
+  # Headers temporalmente deshabilitados mientras se estabiliza:
+  # - Keycloak silent SSO
+  # - Angular 19 + Beasties
+  # - Configuración CSP
+  # - Compatibilidad iframe/auth en producción
+  #
+  # Se retomarán progresivamente usando primero:
+  # Content-Security-Policy-Report-Only
+  #
   # Evita MIME type sniffing
-  X-Content-Type-Options: nosniff
-
-  # Protección contra clickjacking para browsers que no entienden CSP
-  # frame-ancestors 'none' en el CSP hace lo mismo para browsers modernos
-  X-Frame-Options: DENY
-
-  # Envía solo el origen (sin path) en requests cross-origin HTTPS→HTTPS
-  # y nada en cross-origin HTTPS→HTTP
-  Referrer-Policy: strict-origin-when-cross-origin
-
-  # Deshabilita APIs del browser que Piedrazul no necesita
-  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
-
-  # Content Security Policy — pendiente de configurar
-  # Requiere ajustes en el build de Angular (inlineCritical) y en Keycloak
-  # antes de poder activarse sin romper la app.
-  # Se retomará con el proceso correcto: primero Content-Security-Policy-Report-Only,
-  # observar violaciones, ajustar, luego activar.
+  # X-Content-Type-Options: nosniff
+  #
+  # Protección contra clickjacking
+  # frame-ancestors 'none' en CSP cubre browsers modernos
+  # X-Frame-Options: DENY
+  #
+  # Control de referrer cross-origin
+  # Referrer-Policy: strict-origin-when-cross-origin
+  #
+  # Restricción de APIs del navegador no utilizadas
+  # Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  #
+  # Content Security Policy
+  #
+  # default-src 'self'
+  # script-src 'self'
+  # style-src 'self' 'unsafe-inline' https://fonts.googleapis.com
+  # font-src 'self' https://fonts.gstatic.com
+  # img-src 'self' data:
+  # connect-src 'self' https://api.piedrazul.org https://auth.piedrazul.org
+  # frame-src 'self' https://auth.piedrazul.org
+  # frame-ancestors 'none'
+  # object-src 'none'
+  # base-uri 'self'
+  # form-action 'self'
+  # upgrade-insecure-requests
+  #
   # Content-Security-Policy: ...
