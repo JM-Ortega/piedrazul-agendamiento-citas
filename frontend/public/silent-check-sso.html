@@ -1,6 +1,8 @@
 <!doctype html>
 <html>
   <body>
-    <script src="/silent-check-sso.js"></script>
+    <script>
+      parent.postMessage(location.href, location.origin);
+    </script>
   </body>
 </html>
