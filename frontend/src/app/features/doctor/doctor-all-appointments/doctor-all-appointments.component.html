@@ -215,6 +215,13 @@
                     ></lucide-angular>
                     <span class="text-[#163c63]">Doc: {{ apt.documentNumber }}</span>
                   </div>
+                  @if (
+                    isPast(apt.date) && apt.appointmentState !== "CANCELADA"
+                  ) {
+                    <span class="inline-block mt-2 text-sm text-gray-500 italic"
+                      >(Cita pasada)</span
+                    >
+                  }
                 </div>
               </div>
 
@@ -227,14 +234,6 @@
                   >
                     {{ statusLabel(apt.appointmentState) }}
                   </span>
-                  
-                  @if (
-                    isPast(apt.date) && apt.appointmentState !== "CANCELADA"
-                  ) {
-                    <span class="inline-block mt-2 text-sm text-gray-500 italic"
-                      >(Cita pasada)</span
-                    >
-                  }
                 </div>
             </div>
           </div>
