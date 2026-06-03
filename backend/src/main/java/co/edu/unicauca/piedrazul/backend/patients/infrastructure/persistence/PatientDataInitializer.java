@@ -49,7 +49,7 @@ public class PatientDataInitializer implements ApplicationRunner {
                 "3201112233",
                 null,
                 PatientGender.MASCULINO,
-                LocalDate.of(2000 3, 10),
+                LocalDate.of(2000, 3, 10),
                 "3204445566"
         );
 
