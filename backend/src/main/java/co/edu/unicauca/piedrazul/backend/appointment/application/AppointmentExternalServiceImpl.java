@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentExternalData;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSummary;
@@ -80,6 +81,7 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
 
         return appointmentRepository.findAllByDate(date)
                 .stream()
+                .filter(a -> a.getAppointmentState() == AppointmentState.AGENDADA)
                 .map(a -> new SchedulerAppointmentSummary(
                         a.getDoctorName(),
                         a.getPatientName(),
