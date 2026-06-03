@@ -44,7 +44,6 @@ public class AppointmentEntity {
     @Column(name = "appot_state", nullable = false)
     private AppointmentState appointmentState;
 
-
     @Column(name = "date", nullable = false)
     private LocalDate date;
 
@@ -54,4 +53,6 @@ public class AppointmentEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "scheduling_origin", nullable = false)
     private SchedulingOrigin schedulingOrigin;
+
+
 }
