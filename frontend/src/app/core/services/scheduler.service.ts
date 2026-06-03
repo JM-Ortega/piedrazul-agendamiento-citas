@@ -47,10 +47,10 @@ export class SchedulerService {
   }
   checkSchedulerAvailability(date: string): Observable<boolean> {
     return this.http.get<boolean>(
-      `${this.apiUrl}/reports/scheduler/availability`,
-      { params: { date } }
+      `${this.apiUrl}/reports/scheduler/availability?date=${date}`
     );
   }
+
   getAppointmentsByDateAndDoctor(
     date: string,
     doctorId: string

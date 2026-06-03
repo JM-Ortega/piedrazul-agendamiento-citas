@@ -163,7 +163,8 @@ export class SchedulerDashboardComponent implements OnInit {
       CANCELADA: 3,
     };
     return [...filtered].sort((a, b) => {
-      const stateDiff = stateOrder[a.appointmentState] - stateOrder[b.appointmentState];
+      const stateDiff =
+        stateOrder[a.appointmentState] - stateOrder[b.appointmentState];
       if (stateDiff !== 0) return stateDiff;
       const dateTimeA = new Date(`${a.date}T${a.startTime}`);
       const dateTimeB = new Date(`${b.date}T${b.startTime}`);
@@ -267,8 +268,9 @@ export class SchedulerDashboardComponent implements OnInit {
 
     this.schedulerService.checkSchedulerAvailability(date).subscribe({
       next: (hasAvailability) => {
+        console.log('hasAvailability:', hasAvailability);
         this.isCheckingAvailability.set(false);
-        if (hasAvailability) {
+        if (!hasAvailability) {
           this.showAvailabilityWarning.set(true);
         } else {
           this.openExportModal();
