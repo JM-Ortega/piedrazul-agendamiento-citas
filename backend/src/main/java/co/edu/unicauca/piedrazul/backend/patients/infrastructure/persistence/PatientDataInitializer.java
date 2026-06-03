@@ -42,7 +42,7 @@ public class PatientDataInitializer implements ApplicationRunner {
         }
 
         patientService.createPatient(
-                PatientDocumentType.TARJETA_IDENTIDAD,
+                PatientDocumentType.CEDULA,
                 "33000003",
                 "Juan",
                 "Pérez",
