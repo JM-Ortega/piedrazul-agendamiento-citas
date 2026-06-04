@@ -4,6 +4,7 @@ import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
+import co.edu.unicauca.piedrazul.backend.user.exception.IdentityProviderException;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -25,8 +26,8 @@ public class IdentityDataInitializer {
                 return;
             }
 
-                        seedAdmin(userProvisioningApi, properties.getAdmin());
-                        seedDemoSchedulers(userProvisioningApi);
+            seedAdmin(userProvisioningApi, properties.getAdmin());
+            seedDemoSchedulers(userProvisioningApi);
         };
     }
 
@@ -39,52 +40,62 @@ public class IdentityDataInitializer {
         require(admin.getLastName(), "IDENTITY_SEED_ADMIN_LAST_NAME");
         require(admin.getPassword(), "IDENTITY_SEED_ADMIN_PASSWORD");
 
-        userProvisioningApi.createUser(new CreateSystemUserPayload(
-                new CreateSystemUserRequest(
-                        admin.getUsername(),
-                        admin.getFirstName(),
-                        admin.getLastName(),
-                        admin.getEmail(),
-                        admin.getPassword()
-                ),null, null,List.of(Role.ADMIN)
-        ));
+        createIfNotExists(
+                userProvisioningApi,
+                new CreateSystemUserPayload(
+                        new CreateSystemUserRequest(
+                                admin.getUsername(),
+                                admin.getFirstName(),
+                                admin.getLastName(),
+                                admin.getEmail(),
+                                admin.getPassword()
+                        ),
+                        null,
+                        null,
+                        List.of(Role.ADMIN)
+                )
+        );
     }
 
-        private void seedDemoSchedulers(UserProvisioningApi userProvisioningApi) {
+    private void seedDemoSchedulers(UserProvisioningApi userProvisioningApi) {
         String demoPassword = "Scheduler123!";
 
         List<DemoScheduler> schedulers = List.of(
-                new DemoScheduler(
-                        "9000001",
-                        "Laura",
-                        "Pérez",
-                        "laura.scheduler@piedrazul.local"
-                ),
-                new DemoScheduler(
-                        "9000002",
-                        "Carlos",
-                        "Rodríguez",
-                        "carlos.scheduler@piedrazul.local"
-                ),
-                new DemoScheduler(
-                        "9000003",
-                        "Valeria",
-                        "Torres",
-                        "valeria.scheduler@piedrazul.local"
-                )
+                new DemoScheduler("9000001", "Laura", "Pérez", "laura.scheduler@piedrazul.local"),
+                new DemoScheduler("9000002", "Carlos", "Rodríguez", "carlos.scheduler@piedrazul.local"),
+                new DemoScheduler("9000003", "Valeria", "Torres", "valeria.scheduler@piedrazul.local")
         );
 
         schedulers.forEach(scheduler ->
-                userProvisioningApi.createUser(new CreateSystemUserPayload(
-                        new CreateSystemUserRequest(
-                                scheduler.username(),
-                                scheduler.firstName(),
-                                scheduler.lastName(),
-                                scheduler.email(),
-                                demoPassword
-                        ),null, null,List.of(Role.SCHEDULER)
-                ))
+                createIfNotExists(
+                        userProvisioningApi,
+                        new CreateSystemUserPayload(
+                                new CreateSystemUserRequest(
+                                        scheduler.username(),
+                                        scheduler.firstName(),
+                                        scheduler.lastName(),
+                                        scheduler.email(),
+                                        demoPassword
+                                ),
+                                null,
+                                null,
+                                List.of(Role.SCHEDULER)
+                        )
+                )
         );
+    }
+
+    private void createIfNotExists(
+            UserProvisioningApi userProvisioningApi,
+            CreateSystemUserPayload payload
+    ) {
+        try {
+            userProvisioningApi.createUser(payload);
+        } catch (IdentityProviderException exception) {
+            if (!exception.getMessage().contains("Ya existe un usuario creado")) {
+                throw exception;
+            }
+        }
     }
 
     private void require(String value, String propertyName) {
