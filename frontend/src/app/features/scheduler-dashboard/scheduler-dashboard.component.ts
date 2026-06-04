@@ -267,10 +267,13 @@ export class SchedulerDashboardComponent implements OnInit {
     this.isCheckingAvailability.set(true);
 
     this.schedulerService.checkSchedulerAvailability(date).subscribe({
-      next: (hasAvailability) => {
-        console.log('hasAvailability:', hasAvailability);
+      next: (response: any) => {
+        console.log('📥 Respuesta:', response);
+        const hasAvailability = response?.hasAvailabilitySlots ?? response;
+        console.log('hasAvailabilitySlots:', hasAvailability);
+
         this.isCheckingAvailability.set(false);
-        if (!hasAvailability) {
+        if (hasAvailability) {
           this.showAvailabilityWarning.set(true);
         } else {
           this.openExportModal();
@@ -282,7 +285,6 @@ export class SchedulerDashboardComponent implements OnInit {
       },
     });
   }
-
   confirmExportDespiteAvailability(): void {
     this.showAvailabilityWarning.set(false);
     this.openExportModal();
