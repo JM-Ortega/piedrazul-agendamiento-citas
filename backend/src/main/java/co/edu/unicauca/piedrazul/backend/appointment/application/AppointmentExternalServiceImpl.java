@@ -92,6 +92,10 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
 
     @Override
     public boolean hasAvailableSlots(LocalDate date){
+        if (date.isBefore(LocalDate.now())) {
+            return false;
+        }
+
         List<UUID> idsActiveDoctors = doctorExternalService.getActiveDoctorIds();
         for (UUID id : idsActiveDoctors){
             try {
