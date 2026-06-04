@@ -43,7 +43,31 @@ public class PatientDataInitializer implements ApplicationRunner {
 
         patientService.createPatient(
                 PatientDocumentType.CEDULA,
-                "12345678",
+                "33000003",
+                "Juan",
+                "Pérez",
+                "3201112233",
+                null,
+                PatientGender.MASCULINO,
+                LocalDate.of(2000, 3, 10),
+                "3204445566"
+        );
+
+        patientService.createPatient(
+                PatientDocumentType.CEDULA,
+                "33000004",
+                "Sofia",
+                "Char",
+                "3109876543",
+                "sofia.char@email.com",
+                PatientGender.FEMENINO,
+                LocalDate.of(1985, 8, 22),
+                null
+        );
+
+        patientService.createPatient(
+                PatientDocumentType.CEDULA,
+                "33000005",
                 "María",
                 "López",
                 "3001234567",
@@ -55,31 +79,163 @@ public class PatientDataInitializer implements ApplicationRunner {
 
         patientService.createPatient(
                 PatientDocumentType.CEDULA,
-                "87654321",
+                "33000006",
                 "Carlos",
-                "Martínez",
-                "3109876543",
-                "carlos.martinez@email.com",
+                "Ramírez",
+                "3201112233",
+                "carlos.ramirez@email.com",
                 PatientGender.MASCULINO,
-                LocalDate.of(1985, 8, 22),
+                LocalDate.of(1992, 3, 10),
                 null
         );
 
         patientService.createPatient(
-                PatientDocumentType.TARJETA_IDENTIDAD,
-                "11122233",
-                "Juan",
-                "Pérez",
-                "3201112233",
-                null,
+                PatientDocumentType.CEDULA,
+                "33000007",
+                "Laura",
+                "Gómez",
+                "3212223344",
+                "laura.gomez@email.com",
+                PatientGender.FEMENINO,
+                LocalDate.of(1988, 11, 5),
+                null
+        );
+
+        patientService.createPatient(
+                PatientDocumentType.CEDULA,
+                "33000008",
+                "Andrés",
+                "Martínez",
+                "3223334455",
+                "andres.martinez@email.com",
                 PatientGender.MASCULINO,
-                LocalDate.of(2012, 3, 10),
-                "3204445566"
+                LocalDate.of(1995, 7, 18),
+                null
+        );
+
+        patientService.createPatient(
+                PatientDocumentType.CEDULA,
+                "33000009",
+                "Valentina",
+                "Torres",
+                "3234445566",
+                "valentina.torres@email.com",
+                PatientGender.FEMENINO,
+                LocalDate.of(2000, 1, 27),
+                null
+        );
+
+        patientService.createPatient(
+                PatientDocumentType.CEDULA,
+                "33000010",
+                "Juan",
+                "Herrera",
+                "3245556677",
+                "juan.herrera@email.com",
+                PatientGender.MASCULINO,
+                LocalDate.of(1983, 9, 14),
+                null
+        );
+
+        patientService.createPatient(
+                PatientDocumentType.CEDULA,
+                "33000011",
+                "Natalia",
+                "Castro",
+                "3256667788",
+                "natalia.castro@email.com",
+                PatientGender.FEMENINO,
+                LocalDate.of(1991, 4, 12),
+                null
+        );
+
+        patientService.createPatient(
+                PatientDocumentType.CEDULA,
+                "33000012",
+                "Diego",
+                "Morales",
+                "3267778899",
+                "diego.morales@email.com",
+                PatientGender.MASCULINO,
+                LocalDate.of(1987, 6, 25),
+                null
+        );
+
+        patientService.createPatient(
+                PatientDocumentType.CEDULA,
+                "33000013",
+                "Camila",
+                "Rojas",
+                "3278889900",
+                "camila.rojas@email.com",
+                PatientGender.FEMENINO,
+                LocalDate.of(1998, 2, 8),
+                null
+        );
+
+        patientService.createPatient(
+                PatientDocumentType.CEDULA,
+                "33000014",
+                "Felipe",
+                "Vargas",
+                "3289990011",
+                "felipe.vargas@email.com",
+                PatientGender.MASCULINO,
+                LocalDate.of(1993, 10, 30),
+                null
+        );
+
+        patientService.createPatient(
+                PatientDocumentType.CEDULA,
+                "33000015",
+                "Daniela",
+                "Mendoza",
+                "3290001122",
+                "daniela.mendoza@email.com",
+                PatientGender.FEMENINO,
+                LocalDate.of(1989, 12, 17),
+                null
+        );
+
+        patientService.createPatient(
+                PatientDocumentType.CEDULA,
+                "33000016",
+                "Sebastián",
+                "Ortega",
+                "3301112233",
+                "sebastian.ortega@email.com",
+                PatientGender.MASCULINO,
+                LocalDate.of(1996, 8, 21),
+                null
+        );
+
+        patientService.createPatient(
+                PatientDocumentType.CEDULA,
+                "33000017",
+                "Paula",
+                "Jiménez",
+                "3312223344",
+                "paula.jimenez@email.com",
+                PatientGender.FEMENINO,
+                LocalDate.of(1994, 6, 9),
+                null
+        );
+
+        patientService.createPatient(
+                PatientDocumentType.CEDULA,
+                "33000018",
+                "Miguel",
+                "Salazar",
+                "3323334455",
+                "miguel.salazar@email.com",
+                PatientGender.MASCULINO,
+                LocalDate.of(1986, 11, 28),
+                null
         );
 
         userProvisioningApi.createUser(new CreateSystemUserPayload(
                 new CreateSystemUserRequest(
-                        "2020202020",
+                        "33000002",
                         "José",
                         "Paz",
                         "jose@gmail.com",

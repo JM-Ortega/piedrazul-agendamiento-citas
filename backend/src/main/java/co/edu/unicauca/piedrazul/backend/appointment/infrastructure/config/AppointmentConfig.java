@@ -138,4 +138,10 @@ public class AppointmentConfig {
             AppointmentRepository appointmentRepository) {
         return new CancelAppointmentUseCaseImpl(appointmentRepository);
     }
+
+    @Bean
+    public UpdateExpiredAppointmentsUseCaseImpl  updateExpiredAppointmentsUseCase(
+            AppointmentRepository appointmentRepository){
+        return new UpdateExpiredAppointmentsUseCaseImpl(appointmentRepository);
+    }
 }

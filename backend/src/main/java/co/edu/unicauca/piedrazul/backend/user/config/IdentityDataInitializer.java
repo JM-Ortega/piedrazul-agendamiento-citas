@@ -51,23 +51,23 @@ public class IdentityDataInitializer {
     }
 
         private void seedDemoSchedulers(UserProvisioningApi userProvisioningApi) {
-        String demoPassword = "Scheduler12345";
+        String demoPassword = "Scheduler123!";
 
         List<DemoScheduler> schedulers = List.of(
                 new DemoScheduler(
-                        "900000001",
+                        "9000001",
                         "Laura",
                         "Pérez",
                         "laura.scheduler@piedrazul.local"
                 ),
                 new DemoScheduler(
-                        "900000002",
+                        "9000002",
                         "Carlos",
                         "Rodríguez",
                         "carlos.scheduler@piedrazul.local"
                 ),
                 new DemoScheduler(
-                        "900000003",
+                        "9000003",
                         "Valeria",
                         "Torres",
                         "valeria.scheduler@piedrazul.local"
