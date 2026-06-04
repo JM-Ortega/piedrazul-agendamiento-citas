@@ -1,116 +1,74 @@
 package co.edu.unicauca.piedrazul.backend.user.config;
 
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
-import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
-import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
-import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
-import co.edu.unicauca.piedrazul.backend.user.exception.IdentityProviderException;
-import org.springframework.boot.ApplicationRunner;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.util.List;
+@ConfigurationProperties(prefix = "app.seed.identity")
+public class IdentitySeedProperties {
 
-@Configuration
-@EnableConfigurationProperties(IdentitySeedProperties.class)
-public class IdentityDataInitializer {
+    private boolean enabled;
+    private SeedUser admin = new SeedUser();
 
-    @Bean
-    ApplicationRunner seedIdentityUsers(
-            UserProvisioningApi userProvisioningApi,
-            IdentitySeedProperties properties
-    ) {
-        return args -> {
-            if (!properties.isEnabled()) {
-                return;
-            }
-
-            seedAdmin(userProvisioningApi, properties.getAdmin());
-            seedDemoSchedulers(userProvisioningApi);
-        };
+    public boolean isEnabled() {
+        return enabled;
     }
 
-    private void seedAdmin(
-            UserProvisioningApi userProvisioningApi,
-            IdentitySeedProperties.SeedUser admin
-    ) {
-        require(admin.getUsername(), "IDENTITY_SEED_ADMIN_USERNAME");
-        require(admin.getFirstName(), "IDENTITY_SEED_ADMIN_FIRST_NAME");
-        require(admin.getLastName(), "IDENTITY_SEED_ADMIN_LAST_NAME");
-        require(admin.getPassword(), "IDENTITY_SEED_ADMIN_PASSWORD");
-
-        createIfNotExists(
-                userProvisioningApi,
-                new CreateSystemUserPayload(
-                        new CreateSystemUserRequest(
-                                admin.getUsername(),
-                                admin.getFirstName(),
-                                admin.getLastName(),
-                                admin.getEmail(),
-                                admin.getPassword()
-                        ),
-                        null,
-                        null,
-                        List.of(Role.ADMIN)
-                )
-        );
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 
-    private void seedDemoSchedulers(UserProvisioningApi userProvisioningApi) {
-        String demoPassword = "Scheduler123!";
-
-        List<DemoScheduler> schedulers = List.of(
-                new DemoScheduler("9000001", "Laura", "Pérez", "laura.scheduler@piedrazul.local"),
-                new DemoScheduler("9000002", "Carlos", "Rodríguez", "carlos.scheduler@piedrazul.local"),
-                new DemoScheduler("9000003", "Valeria", "Torres", "valeria.scheduler@piedrazul.local")
-        );
-
-        schedulers.forEach(scheduler ->
-                createIfNotExists(
-                        userProvisioningApi,
-                        new CreateSystemUserPayload(
-                                new CreateSystemUserRequest(
-                                        scheduler.username(),
-                                        scheduler.firstName(),
-                                        scheduler.lastName(),
-                                        scheduler.email(),
-                                        demoPassword
-                                ),
-                                null,
-                                null,
-                                List.of(Role.SCHEDULER)
-                        )
-                )
-        );
+    public SeedUser getAdmin() {
+        return admin;
     }
 
-    private void createIfNotExists(
-            UserProvisioningApi userProvisioningApi,
-            CreateSystemUserPayload payload
-    ) {
-        try {
-            userProvisioningApi.createUser(payload);
-        } catch (IdentityProviderException exception) {
-            if (!exception.getMessage().contains("Ya existe un usuario creado")) {
-                throw exception;
-            }
+    public void setAdmin(SeedUser admin) {
+        this.admin = admin;
+    }
+
+    public static class SeedUser {
+        private String username;
+        private String firstName;
+        private String lastName;
+        private String email;
+        private String password;
+
+        public String getUsername() {
+            return username;
         }
-    }
 
-    private void require(String value, String propertyName) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException(
-                    "Missing required identity seed property: " + propertyName
-            );
+        public void setUsername(String username) {
+            this.username = username;
         }
-    }
 
-    private record DemoScheduler(
-            String username,
-            String firstName,
-            String lastName,
-            String email
-    ) {
+        public String getFirstName() {
+            return firstName;
+        }
+
+        public void setFirstName(String firstName) {
+            this.firstName = firstName;
+        }
+
+        public String getLastName() {
+            return lastName;
+        }
+
+        public void setLastName(String lastName) {
+            this.lastName = lastName;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
     }
 }
