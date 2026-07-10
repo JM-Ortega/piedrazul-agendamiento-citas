@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { isHoliday } from 'colombian-holidays';
+import { isHoliday } from 'colombian-holidays/isHoliday';
 import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
 
 @Injectable({ providedIn: 'root' })
