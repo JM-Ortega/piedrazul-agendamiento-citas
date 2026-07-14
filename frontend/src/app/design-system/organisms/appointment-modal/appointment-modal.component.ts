@@ -1,4 +1,10 @@
-import { Component, EventEmitter, Output, inject } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Output,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 
 import { Router } from '@angular/router';
 import {
@@ -16,6 +22,7 @@ import { environment } from '../../../../environments/environment';
   selector: 'app-appointment-modal',
   standalone: true,
   imports: [LucideAngularModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './appointment-modal.component.html',
 })
 export class AppointmentModalComponent {

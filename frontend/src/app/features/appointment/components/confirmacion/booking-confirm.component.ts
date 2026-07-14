@@ -1,4 +1,9 @@
-import { Component, inject, output } from '@angular/core';
+import {
+  Component,
+  inject,
+  output,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import {
   CheckCircle,
   LucideAngularModule,
@@ -9,8 +14,8 @@ import { NewAppointment } from '../../models/dtos/newAppointment.dto';
 import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import {FormatoPipe} from "../../../../shared/pipes/formatoPipe";
-import {ErroresPipe} from "../../../../shared/pipes/erroresPipe";
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
 
 /**
  * Mostrar el resumen completo de la cita a confirmar
@@ -20,6 +25,7 @@ import {ErroresPipe} from "../../../../shared/pipes/erroresPipe";
   selector: 'app-booking-confirm',
   standalone: true,
   imports: [LucideAngularModule, FormatoPipe, ErroresPipe],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './booking-confirm.component.html',
 })
 export class BookingConfirmComponent {
@@ -55,7 +61,7 @@ export class BookingConfirmComponent {
 
         if (err.status === 0) {
           this.state.errorMessage.set(
-            'No se pudo conectar con el servidor. Intente más tarde.',
+            'No se pudo conectar con el servidor. Intente más tarde.'
           );
           return;
         }
@@ -69,7 +75,7 @@ export class BookingConfirmComponent {
             break;
           default:
             this.state.errorMessage.set(
-              detail || 'Error inesperado al registrar la cita.',
+              detail || 'Error inesperado al registrar la cita.'
             );
         }
       },

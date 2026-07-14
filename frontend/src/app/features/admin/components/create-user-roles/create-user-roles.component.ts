@@ -1,4 +1,10 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import {
   Calendar,
   CircleAlert,
@@ -12,6 +18,7 @@ type Role = 'doctor' | 'scheduler';
   selector: 'app-create-user-roles',
   templateUrl: './create-user-roles.component.html',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [LucideAngularModule],
 })
 export class CreateUserRolesComponent {

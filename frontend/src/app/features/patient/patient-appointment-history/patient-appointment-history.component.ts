@@ -1,5 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import {
   CalendarDays,
   ChevronRight,
@@ -12,12 +19,13 @@ import { AppService } from '../../../core/services/app.service';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { PatientAppointmentService } from '../../appointment/services/PatientApointment.service';
 import { Appointment } from '../models/interfaces/appointment.model';
-import {FormatoPipe} from "../../../shared/pipes/formatoPipe";
+import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
 @Component({
   selector: 'app-patient-appointment-history',
   templateUrl: './patient-appointment-history.component.html',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [CommonModule, LucideAngularModule, FormatoPipe],
 })
 export class PatientAppointmentHistoryComponent implements OnInit {
@@ -84,7 +92,7 @@ export class PatientAppointmentHistoryComponent implements OnInit {
       },
       error: () => {
         this.errorMessage.set(
-          'No se pudieron cargar las citas. Intente más tarde.',
+          'No se pudieron cargar las citas. Intente más tarde.'
         );
         this.isLoading.set(false);
       },

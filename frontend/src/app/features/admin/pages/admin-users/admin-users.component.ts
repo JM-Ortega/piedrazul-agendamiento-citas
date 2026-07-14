@@ -1,4 +1,11 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import {
   Calendar,
@@ -15,6 +22,7 @@ import { AdminService } from '../../service/admin.service';
   selector: 'app-admin-users',
   templateUrl: './admin-users.component.html',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [LucideAngularModule],
 })
 export class AdminUsersComponent implements OnInit {

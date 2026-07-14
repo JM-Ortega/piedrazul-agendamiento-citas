@@ -1,4 +1,10 @@
-import { Component, input, output, signal } from '@angular/core';
+import {
+  Component,
+  input,
+  output,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import {
   Calendar,
   CheckCircle,
@@ -16,6 +22,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
   selector: 'app-doctor-card',
   templateUrl: './doctor-card.component.html',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [LucideAngularModule, FormatoPipe],
 })
 export class DoctorCardComponent {

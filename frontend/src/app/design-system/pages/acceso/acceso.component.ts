@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import {
   Calendar,
   ClipboardCheck,
@@ -12,6 +12,7 @@ import Keycloak from 'keycloak-js';
   selector: 'app-acceso',
   standalone: true,
   imports: [LucideAngularModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './acceso.component.html',
 })
 export class AccesoComponent {

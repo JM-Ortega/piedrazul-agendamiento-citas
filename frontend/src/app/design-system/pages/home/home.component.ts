@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
 
 import {
@@ -15,6 +15,7 @@ import { AppointmentModalComponent } from '../../organisms/appointment-modal/app
   selector: 'app-home',
   standalone: true,
   imports: [LucideAngularModule, AppointmentModalComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './home.component.html',
 })
 export class HomeComponent {

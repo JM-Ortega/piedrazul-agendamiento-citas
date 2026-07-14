@@ -1,4 +1,9 @@
-import { Component, inject, output } from '@angular/core';
+import {
+  Component,
+  inject,
+  output,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { LucideAngularModule, Stethoscope, UserSearch } from 'lucide-angular';
 import { BookingMode } from '../../models/types/bookingMode.type';
 import { BookingStateService } from '../../services/booking-state.service';
@@ -11,6 +16,7 @@ import { BookingStateService } from '../../services/booking-state.service';
   selector: 'app-booking-mode-selector',
   standalone: true,
   imports: [LucideAngularModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './booking-mode-selector.component.html',
 })
 export class BookingModeSelectorComponent {

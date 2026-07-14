@@ -1,4 +1,11 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { LucideAngularModule, Pencil, Settings } from 'lucide-angular';
 import { forkJoin, Observable } from 'rxjs';
 import { dtoSchedule } from '../../../../shared/models/dtos/schedule.dto';
@@ -16,6 +23,7 @@ import { AdminService } from '../../service/admin.service';
   selector: 'app-admin-config',
   templateUrl: './admin-config.component.html',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [
     LucideAngularModule,
     DoctorCardComponent,

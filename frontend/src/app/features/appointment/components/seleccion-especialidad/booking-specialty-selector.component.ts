@@ -1,4 +1,10 @@
-import { Component, inject, output, computed } from '@angular/core';
+import {
+  Component,
+  inject,
+  output,
+  computed,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, UserSearch } from 'lucide-angular';
 import { BookingStateService } from '../../services/booking-state.service';
@@ -12,6 +18,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
   selector: 'app-booking-specialty-selector',
   standalone: true,
   imports: [FormsModule, LucideAngularModule, FormatoPipe],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './booking-specialty-selector.component.html',
 })
 export class BookingSpecialtySelectorComponent {

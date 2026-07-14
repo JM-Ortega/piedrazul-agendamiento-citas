@@ -1,4 +1,11 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   CalendarDays,
@@ -21,6 +28,7 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
   selector: 'app-patient-dashboard',
   templateUrl: './patient-dashboard.component.html',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [RouterLink, LucideAngularModule, FormatoPipe],
 })
 export class PatientDashboardComponent implements OnInit {

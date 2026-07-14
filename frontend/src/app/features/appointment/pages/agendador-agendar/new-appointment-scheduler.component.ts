@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
 import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
 import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
@@ -8,6 +8,7 @@ import { ArrowLeft, LucideAngularModule } from 'lucide-angular';
   selector: 'app-new-appointment-scheduler',
   standalone: true,
   imports: [LucideAngularModule, AppointmentBookingComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './new-appointment-scheduler.component.html',
 })
 export class NewAppointmentSchedulerComponent {

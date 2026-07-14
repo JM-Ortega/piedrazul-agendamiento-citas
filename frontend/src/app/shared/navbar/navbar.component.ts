@@ -1,4 +1,10 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  inject,
+  OnInit,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import {
   NavigationStart,
   Router,
@@ -32,6 +38,7 @@ import { AppService } from '../../core/services/app.service';
   selector: 'app-navbar',
   templateUrl: './navbar.component.html',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [RouterLink, RouterLinkActive, LucideAngularModule],
 })
 export class NavbarComponent implements OnInit {

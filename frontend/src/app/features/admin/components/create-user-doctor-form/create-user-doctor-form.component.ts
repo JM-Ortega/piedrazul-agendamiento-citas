@@ -1,4 +1,10 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   Activity,
@@ -40,6 +46,7 @@ export interface SpecialtyOption {
   selector: 'app-create-user-doctor-form',
   templateUrl: './create-user-doctor-form.component.html',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [FormsModule, LucideAngularModule, FormatoPipe],
 })
 export class CreateUserDoctorFormComponent {

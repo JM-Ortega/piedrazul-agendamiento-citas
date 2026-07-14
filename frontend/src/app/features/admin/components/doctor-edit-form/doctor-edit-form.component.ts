@@ -6,6 +6,7 @@ import {
   OnInit,
   output,
   signal,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import {
   Calendar,
@@ -32,6 +33,7 @@ export interface DoctorSaveEvent {
   selector: 'app-doctor-edit-form',
   templateUrl: './doctor-edit-form.component.html',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [LucideAngularModule],
 })
 export class DoctorEditFormComponent implements OnInit {

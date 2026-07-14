@@ -1,4 +1,11 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { KEYCLOAK_EVENT_SIGNAL } from 'keycloak-angular';
 import {
@@ -30,12 +37,7 @@ type ExportColumnKey =
   | 'doctorName';
 type FilterDate = 'all' | 'specific' | 'upcoming' | 'past';
 type FilterStatus =
-  | 'all'
-  | 'AGENDADA'
-  | 'REPROGRAMADA'
-  | 'CANCELADA'
-  | 'NO_ASISTIO'
-  | 'ATENDIDA';
+  'all' | 'AGENDADA' | 'REPROGRAMADA' | 'CANCELADA' | 'NO_ASISTIO' | 'ATENDIDA';
 
 interface ColumnDef {
   key: ExportColumnKey;
@@ -47,6 +49,7 @@ interface ColumnDef {
   selector: 'app-doctor-all-appointments',
   templateUrl: './doctor-all-appointments.component.html',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [LucideAngularModule, ExportModalComponent],
 })
 export class DoctorAllAppointmentsComponent {

@@ -1,4 +1,11 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { AppService } from '../../../../core/services/app.service';
 import { PatientService } from '../../../../core/services/patient.service';
@@ -12,6 +19,7 @@ import { ArrowLeft, LucideAngularModule } from 'lucide-angular';
   selector: 'app-patient-new-appointment',
   standalone: true,
   imports: [LucideAngularModule, AppointmentBookingComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './patient-new-appointment.component.html',
 })
 export class PatientNewAppointmentComponent implements OnInit {

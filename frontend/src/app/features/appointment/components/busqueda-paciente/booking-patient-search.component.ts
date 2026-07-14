@@ -1,4 +1,11 @@
-import { Component, inject, OnDestroy, output, signal } from '@angular/core';
+import {
+  Component,
+  inject,
+  OnDestroy,
+  output,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CheckCircle, LucideAngularModule, Search } from 'lucide-angular';
 import {
@@ -13,7 +20,7 @@ import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { PatientSuggestion } from '../../models/dtos/patient-suggestion.dto';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import {FormatoPipe} from "../../../../shared/pipes/formatoPipe";
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
 const MIN_CHARS = 3;
 const MAX_DOC_LENGTH = 12;
@@ -27,6 +34,7 @@ const MIN_DOC_LENGTH = 6;
   selector: 'app-booking-patient-search',
   standalone: true,
   imports: [FormsModule, LucideAngularModule, FormatoPipe],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './booking-patient-search.component.html',
 })
 export class BookingPatientSearchComponent implements OnDestroy {
@@ -67,7 +75,7 @@ export class BookingPatientSearchComponent implements OnDestroy {
 
           return this.citaService.getPatientSuggestionsByDocument(trimmed);
         }),
-        takeUntil(this.destroy$),
+        takeUntil(this.destroy$)
       )
       .subscribe({
         next: (suggestions) => {
@@ -93,7 +101,7 @@ export class BookingPatientSearchComponent implements OnDestroy {
     if (clean !== raw) {
       el.value = clean;
       this.flashWarning(
-        'Solo se permiten letras y números, sin caracteres especiales',
+        'Solo se permiten letras y números, sin caracteres especiales'
       );
     }
     if (clean.length > MAX_DOC_LENGTH) {
@@ -127,7 +135,7 @@ export class BookingPatientSearchComponent implements OnDestroy {
     const query = this.state.searchQuery().trim();
     if (query.length < MIN_DOC_LENGTH) {
       this.state.searchError.set(
-        `El documento debe tener al menos ${MIN_DOC_LENGTH} caracteres alfanuméricos.`,
+        `El documento debe tener al menos ${MIN_DOC_LENGTH} caracteres alfanuméricos.`
       );
       return;
     }
@@ -176,7 +184,7 @@ export class BookingPatientSearchComponent implements OnDestroy {
           this.handleNotFound(documentNumber);
         } else if (err.status === 0) {
           this.state.searchError.set(
-            'No se pudo conectar con el servidor. Intente más tarde.',
+            'No se pudo conectar con el servidor. Intente más tarde.'
           );
         } else {
           this.state.searchError.set('Error al buscar el paciente.');

@@ -148,7 +148,7 @@
       <div class="flex flex-wrap gap-2">
         @for (day of doctor().workdays; track day) {
           @if (day >= 1 && day <= 5) {
-            @let ds = doctor().daySchedules?.[day];
+            @let ds = $safeNavigationMigration(doctor().daySchedules?.[day]);
             @if (
               ds &&
               (ds.startTime !== doctor().startTime ||

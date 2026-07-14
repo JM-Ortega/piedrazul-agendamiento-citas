@@ -1,4 +1,11 @@
-import { Component, HostListener, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  HostListener,
+  inject,
+  OnInit,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import {
   Activity,
@@ -24,6 +31,7 @@ import { AdminService } from '../../service/admin.service';
   selector: 'app-admin-doctors',
   templateUrl: './admin-doctors.component.html',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [LucideAngularModule],
 })
 export class AdminDoctorsComponent implements OnInit {

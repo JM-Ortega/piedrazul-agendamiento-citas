@@ -1,4 +1,10 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import {
   Calendar,
   CircleAlert,
@@ -14,6 +20,7 @@ import { UserForm } from '../../../models/interfaces/UserForm';
   selector: 'app-create-user-confirm-modal',
   templateUrl: './create-user-confirm-modal.component.html',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [LucideAngularModule, FormatoPipe],
 })
 export class CreateUserConfirmModalComponent {

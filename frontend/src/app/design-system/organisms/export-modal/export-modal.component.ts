@@ -5,6 +5,7 @@ import {
   input,
   output,
   signal,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import {
   Calendar,
@@ -78,6 +79,7 @@ const EXT_MAP: Record<ExportFormat, string> = {
   selector: 'app-export-modal',
   templateUrl: './export-modal.component.html',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [LucideAngularModule],
 })
 export class ExportModalComponent {
@@ -136,13 +138,13 @@ export class ExportModalComponent {
 
   // ── Computed ───────────────────────────────────────────────────────────────
   hasSelectedColumns = computed(() =>
-    Object.values(this.exportColumns()).some((v) => v),
+    Object.values(this.exportColumns()).some((v) => v)
   );
 
   private selectedBackendColumns = computed<ExportColumnBackend[]>(() =>
     (Object.entries(this.exportColumns()) as [ExportColumnKey, boolean][])
       .filter(([, v]) => v)
-      .map(([k]) => COLUMN_MAP[k]),
+      .map(([k]) => COLUMN_MAP[k])
   );
 
   colors = computed(() => {
@@ -240,7 +242,7 @@ export class ExportModalComponent {
       },
       error: () => {
         this.exportError.set(
-          'Ocurrió un error al generar el reporte. Intente nuevamente.',
+          'Ocurrió un error al generar el reporte. Intente nuevamente.'
         );
         this.exportingInProgress.set(false);
       },

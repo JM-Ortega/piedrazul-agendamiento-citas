@@ -1,4 +1,8 @@
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import {
+  provideHttpClient,
+  withInterceptors,
+  withXhr,
+} from '@angular/common/http';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import {
   ApplicationConfig,
@@ -58,7 +62,10 @@ export const appConfig: ApplicationConfig = {
       useValue: [apiUrlCondition],
     },
 
-    provideHttpClient(withInterceptors([includeBearerTokenInterceptor])),
+    provideHttpClient(
+      withXhr(),
+      withInterceptors([includeBearerTokenInterceptor])
+    ),
     provideNativeDateAdapter(),
 
     importProvidersFrom(

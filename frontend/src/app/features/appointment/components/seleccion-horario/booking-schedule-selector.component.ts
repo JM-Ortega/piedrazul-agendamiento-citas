@@ -1,5 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, output } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  output,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
@@ -9,7 +15,7 @@ import { LucideAngularModule, UserSearch, Calendar } from 'lucide-angular';
 import { BookingStateService } from '../../services/booking-state.service';
 import { CalendarService } from '../../services/calendar.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import {FormatoPipe} from "../../../../shared/pipes/formatoPipe";
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
 /**
  * Permite al usuario elegir una fecha y hora
@@ -31,6 +37,7 @@ import {FormatoPipe} from "../../../../shared/pipes/formatoPipe";
     MatNativeDateModule,
     FormatoPipe,
   ],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './booking-schedule-selector.component.html',
 })
 export class BookingScheduleSelectorComponent {
@@ -53,14 +60,14 @@ export class BookingScheduleSelectorComponent {
     if (!doctor) return () => false;
     return this.calendarService.buildDateFilter(
       doctor,
-      this.state.isSchedulerContext() || this.state.isDoctorContext(),
+      this.state.isSchedulerContext() || this.state.isDoctorContext()
     );
   });
 
   readonly minDate = computed(() =>
     this.calendarService.getMinDate(
-      this.state.isSchedulerContext() || this.state.isDoctorContext(),
-    ),
+      this.state.isSchedulerContext() || this.state.isDoctorContext()
+    )
   );
 
   readonly maxDate = computed(() => {

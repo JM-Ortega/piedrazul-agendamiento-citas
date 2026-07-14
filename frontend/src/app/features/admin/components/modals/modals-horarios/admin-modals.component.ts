@@ -1,4 +1,9 @@
-import { Component, input, output } from '@angular/core';
+import {
+  Component,
+  input,
+  output,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { LucideAngularModule, PowerOff, Save, X } from 'lucide-angular';
 import { Doctor } from '../../../../../shared/models/interfaces/doctor.model';
 
@@ -6,6 +11,7 @@ import { Doctor } from '../../../../../shared/models/interfaces/doctor.model';
   selector: 'app-admin-modals',
   templateUrl: './admin-modals.component.html',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [LucideAngularModule],
 })
 export class AdminModalsComponent {
