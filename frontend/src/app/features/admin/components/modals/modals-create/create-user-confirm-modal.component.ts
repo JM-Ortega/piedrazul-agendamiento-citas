@@ -1,4 +1,3 @@
-import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import {
   Calendar,
@@ -15,7 +14,7 @@ import { UserForm } from '../../../models/interfaces/UserForm';
   selector: 'app-create-user-confirm-modal',
   templateUrl: './create-user-confirm-modal.component.html',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, FormatoPipe],
+  imports: [LucideAngularModule, FormatoPipe],
 })
 export class CreateUserConfirmModalComponent {
   readonly UserPlus = UserPlus;

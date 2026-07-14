@@ -1,4 +1,3 @@
-import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -46,7 +45,6 @@ const DAY_VALUE_TO_WORKDAY: Record<number, string> = {
   selector: 'app-admin-create-user',
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     LucideAngularModule,
     CreateUserRolesComponent,

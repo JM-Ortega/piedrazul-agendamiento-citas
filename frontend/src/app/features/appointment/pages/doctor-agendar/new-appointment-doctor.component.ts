@@ -1,9 +1,8 @@
-import { CommonModule } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
 import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
-import {ArrowLeft, LucideAngularModule,} from 'lucide-angular';
+import { ArrowLeft, LucideAngularModule } from 'lucide-angular';
 
 /**
  * Punto de entrada para el flujo de agendamiento desde el dashboard del médico.
@@ -13,7 +12,7 @@ import {ArrowLeft, LucideAngularModule,} from 'lucide-angular';
 @Component({
   selector: 'app-new-appointment-doctor',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, AppointmentBookingComponent],
+  imports: [LucideAngularModule, AppointmentBookingComponent],
   templateUrl: './new-appointment-doctor.component.html',
 })
 export class NewAppointmentDoctorComponent implements OnInit {

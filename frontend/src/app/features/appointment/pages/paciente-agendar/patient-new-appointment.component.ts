@@ -1,4 +1,3 @@
-import { CommonModule } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AppService } from '../../../../core/services/app.service';
@@ -7,12 +6,12 @@ import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
 import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
 import { PatientAppointmentService } from '../../services/PatientApointment.service';
-import {ArrowLeft, LucideAngularModule,} from 'lucide-angular';
+import { ArrowLeft, LucideAngularModule } from 'lucide-angular';
 
 @Component({
   selector: 'app-patient-new-appointment',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, AppointmentBookingComponent],
+  imports: [LucideAngularModule, AppointmentBookingComponent],
   templateUrl: './patient-new-appointment.component.html',
 })
 export class PatientNewAppointmentComponent implements OnInit {

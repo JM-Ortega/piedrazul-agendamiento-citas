@@ -1,20 +1,27 @@
-import { CommonModule } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { CalendarDays, ChevronRight, Clock, LucideAngularModule, PlusCircle,
-        User, X, AlertCircle, Check,
-      } from 'lucide-angular';
+import {
+  CalendarDays,
+  ChevronRight,
+  Clock,
+  LucideAngularModule,
+  PlusCircle,
+  User,
+  X,
+  AlertCircle,
+  Check,
+} from 'lucide-angular';
 import { AppService } from '../../../core/services/app.service';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { PatientAppointmentService } from '../../appointment/services/PatientApointment.service';
 import { Appointment } from '../models/interfaces/appointment.model';
-import {FormatoPipe} from "../../../shared/pipes/formatoPipe";
+import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
 @Component({
   selector: 'app-patient-dashboard',
   templateUrl: './patient-dashboard.component.html',
   standalone: true,
-  imports: [CommonModule, RouterLink, LucideAngularModule, FormatoPipe],
+  imports: [RouterLink, LucideAngularModule, FormatoPipe],
 })
 export class PatientDashboardComponent implements OnInit {
   protected appService = inject(AppService);
@@ -88,7 +95,7 @@ export class PatientDashboardComponent implements OnInit {
       },
       error: () => {
         this.errorMessage.set(
-          'No se pudieron cargar las citas. Intente más tarde.',
+          'No se pudieron cargar las citas. Intente más tarde.'
         );
         this.isLoading.set(false);
       },
@@ -116,11 +123,13 @@ export class PatientDashboardComponent implements OnInit {
       next: () => {
         this.showToast('La cita fue cancelada exitosamente', 'success');
         this.appointmentService.appointments.set(
-          this.appointmentService.appointments().map((a) =>
-            a.idAppointment === appointmentId
-              ? { ...a, appointmentState: 'CANCELADA' }
-              : a,
-          ),
+          this.appointmentService
+            .appointments()
+            .map((a) =>
+              a.idAppointment === appointmentId
+                ? { ...a, appointmentState: 'CANCELADA' }
+                : a
+            )
         );
       },
       error: () => {
@@ -138,7 +147,8 @@ export class PatientDashboardComponent implements OnInit {
     this.toastMessage.set(message);
     this.toastType.set(type);
     setTimeout(() => {
-      this.toastMessage.set(''); 
-      this.toastType.set(null);}, 3000);
+      this.toastMessage.set('');
+      this.toastType.set(null);
+    }, 3000);
   }
 }

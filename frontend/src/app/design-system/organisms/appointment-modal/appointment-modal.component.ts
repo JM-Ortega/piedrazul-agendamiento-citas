@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Output, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { Router } from '@angular/router';
 import {
   LucideAngularModule,
@@ -15,7 +15,7 @@ import { environment } from '../../../../environments/environment';
 @Component({
   selector: 'app-appointment-modal',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [LucideAngularModule],
   templateUrl: './appointment-modal.component.html',
 })
 export class AppointmentModalComponent {

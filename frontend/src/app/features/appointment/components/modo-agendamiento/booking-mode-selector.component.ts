@@ -1,4 +1,3 @@
-import { CommonModule } from '@angular/common';
 import { Component, inject, output } from '@angular/core';
 import { LucideAngularModule, Stethoscope, UserSearch } from 'lucide-angular';
 import { BookingMode } from '../../models/types/bookingMode.type';
@@ -11,7 +10,7 @@ import { BookingStateService } from '../../services/booking-state.service';
 @Component({
   selector: 'app-booking-mode-selector',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [LucideAngularModule],
   templateUrl: './booking-mode-selector.component.html',
 })
 export class BookingModeSelectorComponent {

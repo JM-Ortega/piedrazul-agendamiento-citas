@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { CommonModule } from '@angular/common';
+
 import {
   Calendar,
   Clock,
@@ -14,7 +14,7 @@ import { AppointmentModalComponent } from '../../organisms/appointment-modal/app
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [LucideAngularModule, CommonModule, AppointmentModalComponent],
+  imports: [LucideAngularModule, AppointmentModalComponent],
   templateUrl: './home.component.html',
 })
 export class HomeComponent {
