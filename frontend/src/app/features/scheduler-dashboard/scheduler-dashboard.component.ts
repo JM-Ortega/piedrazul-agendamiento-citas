@@ -1,26 +1,27 @@
-import { CommonModule } from '@angular/common';
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
-  AlertCircle,
-  Calendar,
-  Check,
-  CheckCircle,
-  Clock,
-  CreditCard,
-  Download,
-  FileSpreadsheet,
-  FileText,
-  LucideAngularModule,
-  Phone,
-  PlusCircle,
-  Search,
-  Stethoscope,
-  Tag,
-  User,
-  UserCircle,
-  X,
-} from 'lucide-angular';
+  LucideAlertCircle,
+  LucideCalendar,
+  LucideCheck,
+  LucideClock,
+  LucideDownload,
+  LucideFileSpreadsheet,
+  LucideFileText,
+  LucidePlusCircle,
+  LucideSearch,
+  LucideUser,
+  LucideX,
+  LucideDynamicIcon,
+  type LucideIcon,
+} from '@lucide/angular';
 import { SchedulerService } from '../../core/services/scheduler.service';
 import { AppointmentExportRequest } from '../../shared/models/dtos/AppointmentExportRequest.dto';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
@@ -52,29 +53,25 @@ const EXT_MAP: Record<ExportFormat, string> = {
   selector: 'app-scheduler-dashboard',
   templateUrl: './scheduler-dashboard.component.html',
   standalone: true,
-  imports: [RouterLink, LucideAngularModule, FormatoPipe, CommonModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
+  imports: [
+    LucideAlertCircle,
+    LucideCalendar,
+    LucideCheck,
+    LucideClock,
+    LucideDownload,
+    LucideFileSpreadsheet,
+    LucidePlusCircle,
+    LucideSearch,
+    LucideUser,
+    LucideX,
+    LucideDynamicIcon,
+    RouterLink,
+    FormatoPipe,
+  ],
 })
 export class SchedulerDashboardComponent implements OnInit {
   private schedulerService = inject(SchedulerService);
-
-  // ── Icons ─────────────────────────────────────────────────────────────────
-  readonly Calendar = Calendar;
-  readonly CheckCircle = CheckCircle;
-  readonly Clock = Clock;
-  readonly CreditCard = CreditCard;
-  readonly Download = Download;
-  readonly FileSpreadsheet = FileSpreadsheet;
-  readonly FileText = FileText;
-  readonly Phone = Phone;
-  readonly PlusCircle = PlusCircle;
-  readonly Search = Search;
-  readonly Stethoscope = Stethoscope;
-  readonly Tag = Tag;
-  readonly User = User;
-  readonly UserCircle = UserCircle;
-  readonly X = X;
-  readonly Check = Check;
-  readonly AlertCircle = AlertCircle;
 
   // ── Date helpers ──────────────────────────────────────────────────────────
   today = (() => {
@@ -126,6 +123,40 @@ export class SchedulerDashboardComponent implements OnInit {
   exportError = signal<string | null>(null);
   showAvailabilityWarning = signal(false);
   isCheckingAvailability = signal(false);
+
+  readonly formatOptions: {
+    value: ExportFormat;
+    label: string;
+    icon: LucideIcon;
+    active: string;
+    activeIcon: string;
+    activeLabel: string;
+  }[] = [
+    {
+      value: 'excel',
+      label: 'Excel',
+      icon: LucideFileSpreadsheet,
+      active: 'border-green-600 bg-green-50',
+      activeIcon: 'text-green-600',
+      activeLabel: 'text-green-700',
+    },
+    {
+      value: 'pdf',
+      label: 'PDF',
+      icon: LucideFileText,
+      active: 'border-red-600 bg-red-50',
+      activeIcon: 'text-red-600',
+      activeLabel: 'text-red-700',
+    },
+    {
+      value: 'csv',
+      label: 'CSV',
+      icon: LucideFileText,
+      active: 'border-orange-600 bg-orange-50',
+      activeIcon: 'text-orange-600',
+      activeLabel: 'text-orange-700',
+    },
+  ];
 
   // ── Computed ──────────────────────────────────────────────────────────────
   selectedDoctor = computed(() =>

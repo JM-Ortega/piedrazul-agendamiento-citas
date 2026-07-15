@@ -6,15 +6,15 @@ import {
   OnInit,
   output,
   signal,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import {
-  Calendar,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  LucideAngularModule,
-  Save,
-} from 'lucide-angular';
+  LucideCalendar,
+  LucideChevronDown,
+  LucideChevronUp,
+  LucideClock,
+  LucideSave,
+} from '@lucide/angular';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import {
@@ -32,16 +32,17 @@ export interface DoctorSaveEvent {
   selector: 'app-doctor-edit-form',
   templateUrl: './doctor-edit-form.component.html',
   standalone: true,
-  imports: [LucideAngularModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
+  imports: [
+    LucideCalendar,
+    LucideChevronDown,
+    LucideChevronUp,
+    LucideClock,
+    LucideSave,
+  ],
 })
 export class DoctorEditFormComponent implements OnInit {
   private validationService = inject(DoctorFormValidationService);
-
-  readonly Save = Save;
-  readonly Clock = Clock;
-  readonly Calendar = Calendar;
-  readonly ChevronDown = ChevronDown;
-  readonly ChevronUp = ChevronUp;
 
   readonly DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   readonly DAY_FULL_LABELS = [

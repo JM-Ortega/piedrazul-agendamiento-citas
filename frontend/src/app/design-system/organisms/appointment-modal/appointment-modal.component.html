@@ -20,7 +20,7 @@
         class="text-blue-200 hover:text-white transition-colors ml-4 mt-1"
         aria-label="Cerrar"
       >
-        <lucide-angular [img]="X" [size]="20" />
+        <svg lucideX [size]="20"></svg>
       </button>
     </div>
 
@@ -31,7 +31,7 @@
         class="flex items-center gap-4 w-full bg-[#215c98] hover:bg-[#1a4a7a] text-white px-5 py-4 rounded-xl transition-all active:scale-95 text-left cursor-pointer"
       >
         <div class="bg-blue-600 p-2 rounded-lg shrink-0">
-          <lucide-angular [img]="LogIn" [size]="22" color="white" />
+          <svg lucideLogIn [size]="22" color="white"></svg>
         </div>
         <div>
           <div class="font-semibold text-base">Ya tengo una cuenta</div>
@@ -46,7 +46,7 @@
         class="flex items-center gap-4 w-full bg-white border-2 border-[#215c98] hover:bg-blue-50 text-[#215c98] px-5 py-4 rounded-xl transition-all active:scale-95 text-left cursor-pointer"
       >
         <div class="bg-[#d9e9f8] p-2 rounded-lg shrink-0">
-          <lucide-angular [img]="UserPlus" [size]="22" class="text-[#215c98]" />
+          <svg lucideUserPlus [size]="22" class="text-[#215c98]"></svg>
         </div>
         <div>
           <div class="font-semibold text-base">Crear mi cuenta</div>
@@ -69,12 +69,12 @@
           rel="noopener noreferrer"
           class="flex items-center justify-center gap-2 flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-xl transition-all active:scale-95 text-left"
         >
-          <lucide-angular
-            [img]="MessageCircle"
+          <svg
+            lucideMessageCircle
             [size]="18"
             color="white"
             class="shrink-0"
-          />
+          ></svg>
           <div>
             <div class="text-sm font-medium">{{ whatsappDisplay }}</div>
             <div class="text-green-100 text-xs">Escríbenos</div>
@@ -85,7 +85,7 @@
           [href]="phoneUrl"
           class="flex items-center justify-center gap-2 flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-xl transition-all active:scale-95 text-left"
         >
-          <lucide-angular [img]="Phone" [size]="18" class="shrink-0" />
+          <svg lucidePhone [size]="18" class="shrink-0"></svg>
           <div>
             <div class="text-sm font-medium">{{ phoneDisplay }}</div>
             <div class="text-gray-400 text-xs">Llámanos</div>

@@ -17,15 +17,15 @@
     >
       <div class="flex flex-col items-center gap-3">
         <div class="relative">
-          <lucide-angular
-            [img]="Stethoscope"
+          <svg
+            lucideStethoscope
             [size]="40"
             [class]="
               selectedRoles.includes('doctor')
                 ? 'text-[#215c98]'
                 : 'text-gray-500'
             "
-          ></lucide-angular>
+          ></svg>
           @if (selectedRoles.includes('doctor')) {
             <div
               class="absolute -top-2 -right-2 bg-[#215c98] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
@@ -60,15 +60,15 @@
     >
       <div class="flex flex-col items-center gap-3">
         <div class="relative">
-          <lucide-angular
-            [img]="Calendar"
+          <svg
+            lucideCalendar
             [size]="40"
             [class]="
               selectedRoles.includes('scheduler')
                 ? 'text-green-600'
                 : 'text-gray-500'
             "
-          ></lucide-angular>
+          ></svg>
           @if (selectedRoles.includes('scheduler')) {
             <div
               class="absolute -top-2 -right-2 bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
@@ -93,7 +93,7 @@
 
   @if (errorRoles) {
     <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
-      <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+      <svg lucideCircleAlert [size]="14"></svg>
       {{ errorRoles }}
     </p>
   }

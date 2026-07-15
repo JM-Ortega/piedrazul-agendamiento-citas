@@ -8,11 +8,11 @@
         (click)="navigateBack()"
         class="flex items-center gap-2 text-white hover:text-[#a7c9ec] mb-4 text-lg cursor-pointer"
       >
-        <lucide-angular [img]="ArrowLeft" [size]="20"></lucide-angular>
+        <svg lucideArrowLeft [size]="20"></svg>
         Volver a Gestión de Usuarios
       </button>
       <div class="flex items-center gap-3">
-        <lucide-angular [img]="UserPlus" [size]="34"></lucide-angular>
+        <svg lucideUserPlus [size]="34"></svg>
         <div>
           <h1 class="text-3xl font-bold">Crear Nuevo Usuario</h1>
           <p class="text-[#a7c9ec] text-lg mt-2">
@@ -27,11 +27,7 @@
       <div
         class="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-5 py-4 flex items-start gap-3"
       >
-        <lucide-angular
-          [img]="CircleAlert"
-          [size]="20"
-          class="shrink-0 mt-0.5"
-        ></lucide-angular>
+        <svg lucideCircleAlert [size]="20" class="shrink-0 mt-0.5"></svg>
         <p class="text-base">{{ submitError }}</p>
       </div>
     }
@@ -62,12 +58,11 @@
               <span class="text-sm text-gray-500">(solo dígitos)</span>
             </label>
             <div class="relative">
-              <lucide-angular
-                [img]="CreditCard"
+              <svg
+                lucideCreditCard
                 [size]="20"
                 class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              >
-              </lucide-angular>
+              ></svg>
               <input
                 id="documentId"
                 type="text"
@@ -83,7 +78,7 @@
             </div>
             @if (hasError('documentId')) {
               <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-                <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular
+                <svg lucideCircleAlert [size]="14"></svg>
                 >{{ errors.documentId }}
               </p>
             }
@@ -97,12 +92,11 @@
               >Contraseña *</label
             >
             <div class="relative">
-              <lucide-angular
-                [img]="Lock"
+              <svg
+                lucideLock
                 [size]="20"
                 class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              >
-              </lucide-angular>
+              ></svg>
               <input
                 id="password"
                 [type]="showPassword ? 'text' : 'password'"
@@ -118,15 +112,15 @@
                 (click)="showPassword = !showPassword"
                 class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                <lucide-angular
-                  [img]="showPassword ? EyeOff : Eye"
+                <svg
+                  [lucideIcon]="showPassword ? EyeOff : Eye"
                   [size]="20"
-                ></lucide-angular>
+                ></svg>
               </button>
             </div>
             @if (hasError('password')) {
               <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-                <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular
+                <svg lucideCircleAlert [size]="14"></svg>
                 >{{ errors.password }}
               </p>
             }
@@ -140,12 +134,11 @@
               >Nombre *</label
             >
             <div class="relative">
-              <lucide-angular
-                [img]="User"
+              <svg
+                lucideUser
                 [size]="20"
                 class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              >
-              </lucide-angular>
+              ></svg>
               <input
                 id="firstName"
                 type="text"
@@ -159,7 +152,7 @@
             </div>
             @if (hasError('firstName')) {
               <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-                <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular
+                <svg lucideCircleAlert [size]="14"></svg>
                 >{{ errors.firstName }}
               </p>
             }
@@ -173,12 +166,11 @@
               >Apellido *</label
             >
             <div class="relative">
-              <lucide-angular
-                [img]="User"
+              <svg
+                lucideUser
                 [size]="20"
                 class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              >
-              </lucide-angular>
+              ></svg>
               <input
                 id="lastName"
                 type="text"
@@ -192,7 +184,7 @@
             </div>
             @if (hasError('lastName')) {
               <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-                <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular
+                <svg lucideCircleAlert [size]="14"></svg>
                 >{{ errors.lastName }}
               </p>
             }
@@ -206,12 +198,11 @@
               >Correo Electrónico *</label
             >
             <div class="relative">
-              <lucide-angular
-                [img]="Mail"
+              <svg
+                lucideMail
                 [size]="20"
                 class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              >
-              </lucide-angular>
+              ></svg>
               <input
                 id="email"
                 type="email"
@@ -225,7 +216,7 @@
             </div>
             @if (hasError('email')) {
               <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-                <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular
+                <svg lucideCircleAlert [size]="14"></svg>
                 >{{ errors.email }}
               </p>
             }
@@ -272,7 +263,7 @@
             ></span>
             Guardando...
           } @else {
-            <lucide-angular [img]="UserPlus" [size]="24"></lucide-angular>
+            <svg lucideUserPlus [size]="24"></svg>
             Crear Usuario
           }
         </button>

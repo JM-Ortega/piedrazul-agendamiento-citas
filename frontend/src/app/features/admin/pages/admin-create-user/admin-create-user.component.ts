@@ -1,25 +1,28 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
-  Activity,
-  ArrowLeft,
-  Bone,
-  Building2,
-  CircleAlert,
-  CreditCard,
-  Eye,
-  EyeOff,
-  Heart,
-  Lock,
-  LucideAngularModule,
-  LucideIconData,
-  Mail,
-  User,
-  UserPlus,
-  Zap,
-} from 'lucide-angular';
+  LucideDynamicIcon,
+  LucideActivity,
+  LucideArrowLeft,
+  LucideBone,
+  LucideBuilding2,
+  LucideCircleAlert,
+  LucideCreditCard,
+  LucideEye,
+  LucideEyeOff,
+  LucideHeart,
+  LucideLock,
+  LucideMail,
+  LucideUser,
+  LucideUserPlus,
+  LucideZap,
+} from '@lucide/angular';
 import {
   CreateUserDoctorFormComponent,
   DoctorFormData,
@@ -46,31 +49,26 @@ const DAY_VALUE_TO_WORKDAY: Record<number, string> = {
   selector: 'app-admin-create-user',
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
-    LucideAngularModule,
     CreateUserRolesComponent,
     CreateUserDoctorFormComponent,
     CreateUserConfirmModalComponent,
+    LucideDynamicIcon,
+    LucideArrowLeft,
+    LucideCircleAlert,
+    LucideCreditCard,
+    LucideLock,
+    LucideMail,
+    LucideUser,
+    LucideUserPlus,
   ],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './admin-create-user.component.html',
 })
 export class AdminCreateUserComponent implements OnInit {
-  // ── Icons ─────────────────────────────────────────────────────────────────
-  readonly ArrowLeft = ArrowLeft;
-  readonly UserPlus = UserPlus;
-  readonly CreditCard = CreditCard;
-  readonly Lock = Lock;
-  readonly Eye = Eye;
-  readonly EyeOff = EyeOff;
-  readonly User = User;
-  readonly Mail = Mail;
-  readonly CircleAlert = CircleAlert;
-  readonly Heart = Heart;
-  readonly Bone = Bone;
-  readonly Activity = Activity;
-  readonly Zap = Zap;
-  readonly Building2 = Building2;
+  // ── Dinamycs icons ─────────────────────────────────────────────────────────────────
+  readonly Eye = LucideEye;
+  readonly EyeOff = LucideEyeOff;
 
   // ── State ─────────────────────────────────────────────────────────────────
   showPassword = false;
@@ -458,16 +456,16 @@ export class AdminCreateUserComponent implements OnInit {
     return h * 60 + m;
   }
   private getSpecialtyIcon(name: string): {
-    icon: LucideIconData;
+    icon: any;
     colorClass: string;
   } {
-    const map: Record<string, { icon: LucideIconData; colorClass: string }> = {
-      MEDICINA_GENERAL: { icon: Heart, colorClass: 'text-red-700' },
-      QUIROPRAXIA: { icon: Bone, colorClass: 'text-orange-700' },
-      FISIOTERAPIA: { icon: Activity, colorClass: 'text-green-700' },
-      TERAPIA_NEURAL: { icon: Zap, colorClass: 'text-purple-700' },
+    const map: Record<string, { icon: any; colorClass: string }> = {
+      MEDICINA_GENERAL: { icon: LucideHeart, colorClass: 'text-red-700' },
+      QUIROPRAXIA: { icon: LucideBone, colorClass: 'text-orange-700' },
+      FISIOTERAPIA: { icon: LucideActivity, colorClass: 'text-green-700' },
+      TERAPIA_NEURAL: { icon: LucideZap, colorClass: 'text-purple-700' },
     };
-    return map[name] ?? { icon: Building2, colorClass: 'text-gray-400' };
+    return map[name] ?? { icon: LucideBuilding2, colorClass: 'text-gray-400' };
   }
 
   inputClass(field: keyof FormErrors, extra = ''): string {

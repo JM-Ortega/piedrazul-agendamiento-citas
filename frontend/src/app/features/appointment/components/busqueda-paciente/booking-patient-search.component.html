@@ -40,7 +40,7 @@
           class="bg-[#215c98] hover:bg-[#163c63] text-white px-5 py-3 rounded-xl
                  transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer"
         >
-          <lucide-angular [img]="Search" [size]="18"></lucide-angular>
+          <svg lucideSearch [size]="18"></svg>
           Buscar
         </button>
       </div>
@@ -83,7 +83,7 @@
   @if (state.foundPatient(); as p) {
     <div class="bg-green-50 border-2 border-green-300 rounded-xl p-5">
       <div class="flex items-center gap-3 mb-3">
-        <lucide-angular [img]="CheckCircle" class="text-green-500" [size]="28"></lucide-angular>
+        <svg lucideCheckCircle class="text-green-500" [size]="28"></svg>
         <h3 class="text-green-800 text-xl font-semibold">Paciente Encontrado</h3>
       </div>
       <div class="grid grid-cols-2 gap-3 text-gray-700">

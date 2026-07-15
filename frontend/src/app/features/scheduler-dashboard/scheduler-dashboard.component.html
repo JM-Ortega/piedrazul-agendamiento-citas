@@ -10,7 +10,7 @@
       >
         <div>
           <h1 class="text-3xl font-bold flex items-center gap-3">
-            <lucide-angular [img]="Calendar" [size]="34"></lucide-angular>
+            <svg lucideCalendar [size]="34"></svg>
             Panel del Agendador
           </h1>
           <p class="text-white/80 text-lg mt-2">
@@ -22,7 +22,7 @@
           class="flex items-center gap-2 bg-white px-6 py-3 rounded-xl text-lg font-semibold transition-colors shrink-0"
           style="color: #215c98"
         >
-          <lucide-angular [img]="PlusCircle" [size]="24"></lucide-angular>
+          <svg lucidePlusCircle [size]="24"></svg>
           Nueva Cita
         </a>
       </div>
@@ -53,14 +53,13 @@
                     (viewMode() === 'all' ? 'bg-[#215c98]' : 'bg-gray-200')
                   "
                 >
-                  <lucide-angular
-                    [img]="Calendar"
+                  <svg
+                    lucideCalendar
                     [size]="28"
                     [class]="
                       viewMode() === 'all' ? 'text-white' : 'text-gray-600'
                     "
-                  >
-                  </lucide-angular>
+                  ></svg>
                 </div>
                 <div>
                   <h3
@@ -132,14 +131,13 @@
                     (viewMode() === 'today' ? 'bg-amber-500' : 'bg-gray-200')
                   "
                 >
-                  <lucide-angular
-                    [img]="Clock"
+                  <svg
+                    lucideClock
                     [size]="28"
                     [class]="
                       viewMode() === 'today' ? 'text-white' : 'text-gray-600'
                     "
-                  >
-                  </lucide-angular>
+                  ></svg>
                 </div>
                 <div>
                   <h3
@@ -194,7 +192,7 @@
       <!-- Filtros Avanzados -->
       <div class="bg-white rounded-2xl shadow-md p-7 mt-6">
         <h2 class="text-[#163c63] text-2xl mb-2 flex items-center gap-2">
-          <lucide-angular [img]="Search" [size]="24"></lucide-angular>
+          <svg lucideSearch [size]="24"></svg>
           Filtros Avanzados
         </h2>
         <p class="text-gray-600 mb-5 text-base">
@@ -307,12 +305,7 @@
           >
             <div class="flex items-center gap-3">
               <div class="bg-[#1f7a52] rounded-full p-3">
-                <lucide-angular
-                  [img]="Download"
-                  [size]="28"
-                  class="text-white"
-                  s
-                ></lucide-angular>
+                <svg lucideDownload [size]="28" class="text-white"></svg>
               </div>
               <div>
                 <h3 class="text-green-800 text-xl font-bold">
@@ -321,7 +314,7 @@
                 <p
                   class="text-green-600 text-sm flex items-center gap-1 mt-0.5"
                 >
-                  <lucide-angular [img]="Calendar" [size]="14"></lucide-angular>
+                  <svg lucideCalendar [size]="14"></svg>
                   Se exportarán las citas de la fecha seleccionada en los
                   filtros
                 </p>
@@ -344,10 +337,7 @@
                   ></span>
                   Verificando...
                 } @else {
-                  <lucide-angular
-                    [img]="FileSpreadsheet"
-                    [size]="24"
-                  ></lucide-angular>
+                  <svg lucideFileSpreadsheet [size]="24"></svg>
                   Exportar Citas
                 }
               </button>
@@ -355,7 +345,7 @@
                 <p
                   class="flex items-center gap-1 text-orange-700 text-base font-medium"
                 >
-                  <lucide-angular [img]="Calendar" [size]="16"></lucide-angular>
+                  <svg lucideCalendar [size]="16"></svg>
                   Seleccione una fecha para exportar
                 </p>
               }
@@ -421,11 +411,11 @@
 
           @if (results().length === 0) {
             <div class="text-center py-12">
-              <lucide-angular
-                [img]="Calendar"
+              <svg
+                lucideCalendar
                 [size]="64"
                 class="text-[#a7c9ec] mx-auto mb-4"
-              ></lucide-angular>
+              ></svg>
               <p class="text-gray-500 text-xl">
                 No se encontraron citas para los criterios seleccionados
               </p>
@@ -488,11 +478,11 @@
                       @if (viewMode() !== 'today') {
                         <td class="px-4 py-4">
                           <div class="flex items-center gap-2">
-                            <lucide-angular
-                              [img]="Calendar"
+                            <svg
+                              lucideCalendar
                               [size]="18"
                               class="text-gray-400 shrink-0"
-                            ></lucide-angular>
+                            ></svg>
                             <span class="text-gray-700 text-base font-medium">{{
                               formatDate(apt.date)
                             }}</span>
@@ -501,11 +491,11 @@
                       }
                       <td class="px-4 py-4">
                         <div class="flex items-center gap-2">
-                          <lucide-angular
-                            [img]="Clock"
+                          <svg
+                            lucideClock
                             [size]="18"
                             class="text-[#4e92d9] shrink-0"
-                          ></lucide-angular>
+                          ></svg>
                           <span class="text-[#163c63] text-lg font-semibold">{{
                             apt.startTime
                           }}</span>
@@ -516,11 +506,11 @@
                           <div
                             class="bg-[#d9e9f8] rounded-full w-10 h-10 flex items-center justify-center shrink-0"
                           >
-                            <lucide-angular
-                              [img]="User"
+                            <svg
+                              lucideUser
                               [size]="18"
                               class="text-[#215c98]"
-                            ></lucide-angular>
+                            ></svg>
                           </div>
                           <div>
                             <p class="text-gray-800 text-base font-medium">
@@ -559,10 +549,7 @@
                               "
                               class="bg-red-100 text-red-600 hover:text-red-800 text-sm font-semibold transition-colors rounded-lg px-3 py-1.5 hover:bg-red-200 border border-red-300 cursor-pointer inline-flex items-center gap-2"
                             >
-                              <lucide-angular
-                                [img]="X"
-                                [size]="16"
-                              ></lucide-angular>
+                              <svg lucideX [size]="16"></svg>
                               Cancelar
                             </button>
                           } @else {
@@ -591,7 +578,7 @@
           class="bg-amber-500 text-white px-8 py-5 rounded-t-xl flex items-center justify-between"
         >
           <div class="flex items-center gap-3">
-            <lucide-angular [img]="Calendar" [size]="28"></lucide-angular>
+            <svg lucideCalendar [size]="28"></svg>
             <h2 class="text-2xl font-bold">Franjas disponibles</h2>
           </div>
           <button
@@ -606,11 +593,11 @@
           <div
             class="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-xl px-5 py-4 mb-6"
           >
-            <lucide-angular
-              [img]="Calendar"
+            <svg
+              lucideCalendar
               [size]="22"
               class="text-amber-600 mt-0.5 shrink-0"
-            ></lucide-angular>
+            ></svg>
             <div>
               <p class="text-amber-800 font-semibold text-base">
                 Aún hay franjas horarias disponibles
@@ -634,7 +621,7 @@
               (click)="confirmExportDespiteAvailability()"
               class="flex-1 px-6 py-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2"
             >
-              <lucide-angular [img]="Download" [size]="20"></lucide-angular>
+              <svg lucideDownload [size]="20"></svg>
               Sí, continuar
             </button>
           </div>
@@ -656,7 +643,7 @@
           "
         >
           <div class="flex items-center gap-3">
-            <lucide-angular [img]="Download" [size]="28"></lucide-angular>
+            <svg lucideDownload [size]="28"></svg>
             <h2 class="text-2xl font-bold">Exportar Reporte</h2>
           </div>
           <button
@@ -671,11 +658,11 @@
           <div
             class="mb-6 flex items-start gap-3 bg-[#d9e9f8]/40 border border-[#a7c9ec] rounded-xl px-5 py-4"
           >
-            <lucide-angular
-              [img]="Calendar"
+            <svg
+              lucideCalendar
               [size]="22"
               class="text-[#4e92d9] mt-0.5 shrink-0"
-            ></lucide-angular>
+            ></svg>
             <div>
               <p class="text-[#163c63] font-semibold text-base">
                 Fecha del reporte
@@ -692,35 +679,7 @@
               Formato del archivo
             </h3>
             <div class="grid grid-cols-3 gap-3">
-              @for (
-                fmt of [
-                  {
-                    value: 'excel',
-                    label: 'Excel',
-                    icon: FileSpreadsheet,
-                    active: 'border-green-600 bg-green-50',
-                    activeIcon: 'text-green-600',
-                    activeLabel: 'text-green-700',
-                  },
-                  {
-                    value: 'pdf',
-                    label: 'PDF',
-                    icon: FileText,
-                    active: 'border-red-600 bg-red-50',
-                    activeIcon: 'text-red-600',
-                    activeLabel: 'text-red-700',
-                  },
-                  {
-                    value: 'csv',
-                    label: 'CSV',
-                    icon: FileText,
-                    active: 'border-orange-600 bg-orange-50',
-                    activeIcon: 'text-orange-600',
-                    activeLabel: 'text-orange-700',
-                  },
-                ];
-                track fmt.value
-              ) {
+              @for (fmt of formatOptions; track fmt.value) {
                 <button
                   (click)="exportFormat.set($any(fmt.value))"
                   [class]="
@@ -731,15 +690,15 @@
                   "
                 >
                   <div class="flex flex-col items-center gap-2">
-                    <lucide-angular
-                      [img]="fmt.icon"
+                    <svg
+                      [lucideIcon]="fmt.icon"
                       [size]="32"
                       [class]="
                         exportFormat() === fmt.value
                           ? fmt.activeIcon
                           : 'text-gray-500'
                       "
-                    ></lucide-angular>
+                    ></svg>
                     <span
                       [class]="
                         'text-base font-semibold ' +
@@ -788,7 +747,7 @@
                 ></span>
                 Generando reporte...
               } @else {
-                <lucide-angular [img]="Download" [size]="20"></lucide-angular>
+                <svg lucideDownload [size]="20"></svg>
                 Exportar
               }
             </button>
@@ -809,11 +768,7 @@
         <div
           class="flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mx-auto mb-5"
         >
-          <lucide-angular
-            [img]="X"
-            [size]="32"
-            class="text-red-500"
-          ></lucide-angular>
+          <svg lucideX [size]="32" class="text-red-500"></svg>
         </div>
         <h3 class="text-xl font-bold text-gray-800 text-center mb-2">
           ¿Cancelar cita médica?
@@ -852,17 +807,9 @@
           [class.bg-red-100]="toastType() === 'error'"
         >
           @if (toastType() === 'success') {
-            <lucide-angular
-              [img]="Check"
-              [size]="20"
-              class="text-green-600"
-            ></lucide-angular>
+            <svg lucideCheck [size]="20" class="text-green-600"></svg>
           } @else {
-            <lucide-angular
-              [img]="AlertCircle"
-              [size]="20"
-              class="text-red-600"
-            ></lucide-angular>
+            <svg lucideAlertCircle [size]="20" class="text-red-600"></svg>
           }
         </div>
         <div>

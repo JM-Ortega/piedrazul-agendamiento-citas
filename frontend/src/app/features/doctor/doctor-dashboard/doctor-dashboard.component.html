@@ -3,27 +3,19 @@
   <div class="bg-white rounded-2xl shadow-lg p-8 mb-6 border-2 border-blue-100">
     <div class="flex items-center gap-4 mb-4">
       <div class="bg-blue-100 rounded-full p-4">
-        <lucide-angular
-          [img]="User"
-          [size]="40"
-          class="text-[#4e92d9]"
-        ></lucide-angular>
+        <svg lucideUser [size]="40" class="text-[#4e92d9]"></svg>
       </div>
       <div>
         <h1 class="text-[#215c98] text-3xl">
           Bienvenido, {{ currentDoctor()?.name }}
         </h1>
         <p class="text-gray-600 text-xl mt-1">
-          {{ currentDoctor()?.specialty | formato }}
+          {{ $safeNavigationMigration(currentDoctor()?.specialty) | formato }}
         </p>
       </div>
     </div>
     <div class="flex items-center gap-2 text-gray-700 text-lg">
-      <lucide-angular
-        [img]="Calendar"
-        [size]="20"
-        class="text-[#4e92d9]"
-      ></lucide-angular>
+      <svg lucideCalendar [size]="20" class="text-[#4e92d9]"></svg>
       <span class="capitalize">{{ formatDate(today) }}</span>
     </div>
   </div>
@@ -55,11 +47,11 @@
 
     @if (todaysAppointments().length === 0) {
       <div class="text-center py-12">
-        <lucide-angular
-          [img]="Calendar"
+        <svg
+          lucideCalendar
           [size]="64"
           class="mx-auto text-gray-300 mb-4"
-        ></lucide-angular>
+        ></svg>
         <p class="text-gray-500 text-xl">No tiene citas programadas para hoy</p>
       </div>
     } @else {
@@ -88,10 +80,7 @@
                       class="bg-[#4e92d9] text-white rounded-xl px-4 py-3 text-center min-w-20"
                     >
                       <div class="flex items-center gap-1 justify-center">
-                        <lucide-angular
-                          [img]="Clock"
-                          [size]="18"
-                        ></lucide-angular>
+                        <svg lucideClock [size]="18"></svg>
                         <span class="text-xl">{{
                           apt.startTime.slice(0, 5)
                         }}</span>
@@ -105,11 +94,7 @@
                       {{ apt.patientFirstName }} {{ apt.patientLastName }}
                     </h3>
                     <div class="flex items-center gap-2 text-gray-700">
-                      <lucide-angular
-                        [img]="User"
-                        [size]="16"
-                        class="text-[#163c63]"
-                      ></lucide-angular>
+                      <svg lucideUser [size]="16" class="text-[#163c63]"></svg>
                       <span class="text-base"
                         >Doc: {{ apt.documentNumber }}</span
                       >
@@ -127,13 +112,10 @@
                       (click)="toggleCardDropdown(apt.idAppointment)"
                       class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg transition-colors text-base"
                     >
-                      <lucide-angular
-                        [img]="ClipboardList"
-                        [size]="18"
-                      ></lucide-angular>
+                      <svg lucideClipboardList [size]="18"></svg>
                       <span>Estado</span>
-                      <lucide-angular
-                        [img]="ChevronDown"
+                      <svg
+                        lucideChevronDown
                         [size]="16"
                         class="transition-transform"
                         [style.transform]="
@@ -141,7 +123,7 @@
                             ? 'rotate(180deg)'
                             : 'rotate(0deg)'
                         "
-                      ></lucide-angular>
+                      ></svg>
                     </button>
 
                     @if (openCardDropdownId() === apt.idAppointment) {
@@ -154,10 +136,7 @@
                           "
                           class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-emerald-50 text-emerald-700 transition-colors"
                         >
-                          <lucide-angular
-                            [img]="Check"
-                            [size]="16"
-                          ></lucide-angular>
+                          <svg lucideCheck [size]="16"></svg>
                           Atender
                         </button>
 
@@ -168,10 +147,7 @@
                           "
                           class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-red-50 text-red-600 transition-colors"
                         >
-                          <lucide-angular
-                            [img]="UserX"
-                            [size]="16"
-                          ></lucide-angular>
+                          <svg lucideUserX [size]="16"></svg>
                           No asistió
                         </button>
                       </div>
@@ -185,10 +161,7 @@
                     (click)="scheduleNewAppointment(apt.documentNumber)"
                     class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg transition-colors text-base"
                   >
-                    <lucide-angular
-                      [img]="Calendar"
-                      [size]="18"
-                    ></lucide-angular>
+                    <svg lucideCalendar [size]="18"></svg>
                     Nueva cita
                   </button>
                 }
@@ -211,11 +184,7 @@
     >
       <div class="flex items-center gap-3 mb-4">
         <div class="bg-emerald-100 rounded-full p-3">
-          <lucide-angular
-            [img]="FileText"
-            [size]="28"
-            class="text-emerald-600"
-          ></lucide-angular>
+          <svg lucideFileText [size]="28" class="text-emerald-600"></svg>
         </div>
         <h3 class="text-blue-900 text-xl font-semibold">
           Actualizar estado de cita

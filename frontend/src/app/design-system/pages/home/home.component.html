@@ -33,7 +33,7 @@
       (click)="agendarCita()"
       class="flex items-center gap-4 bg-white text-[#215c98] hover:bg-blue-50 font-bold px-12 py-7 rounded-2xl text-2xl md:text-3xl shadow-2xl transition-all hover:scale-105 active:scale-95 mt-4"
     >
-      <lucide-angular [img]="Calendar" [size]="40"></lucide-angular>
+      <svg lucideCalendar [size]="40"></svg>
       Agendar mi Cita
     </button>
 
@@ -51,21 +51,21 @@
       <div
         class="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-5 py-3 rounded-xl"
       >
-        <lucide-angular [img]="Clock" color="white" size="22"></lucide-angular>
+        <svg lucideClock [size]="22" class="text-white"></svg>
         <span class="text-lg">Lun – Vie · 7:00 AM a 12:00 M</span>
       </div>
 
       <div
         class="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-5 py-3 rounded-xl"
       >
-        <lucide-angular [img]="Shield" color="white" size="22"></lucide-angular>
+        <svg lucideShield [size]="22" class="text-white"></svg>
         <span class="text-lg">Sistema seguro</span>
       </div>
 
       <div
         class="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-5 py-3 rounded-xl"
       >
-        <lucide-angular [img]="Phone" color="white" size="22"></lucide-angular>
+        <svg lucidePhone [size]="22" class="text-white"></svg>
         <span class="text-lg">Fácil de usar</span>
       </div>
     </div>

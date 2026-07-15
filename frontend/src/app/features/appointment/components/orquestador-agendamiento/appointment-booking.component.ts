@@ -1,5 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, Input, OnInit, output } from '@angular/core';
+import {
+  Component,
+  inject,
+  Input,
+  OnInit,
+  output,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { forkJoin } from 'rxjs';
 import { DoctorService } from '../../../../core/services/doctor.service';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
@@ -34,6 +41,7 @@ import { PatientAppointmentService } from '../../services/PatientApointment.serv
     BookingScheduleSelectorComponent,
     BookingConfirmComponent,
   ],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './appointment-booking.component.html',
 })
 export class AppointmentBookingComponent implements OnInit {
@@ -94,7 +102,7 @@ export class AppointmentBookingComponent implements OnInit {
 
         if (this.pendingDocumentNumber) {
           const patient$ = this.citaService.getPatientByDocument(
-            this.pendingDocumentNumber,
+            this.pendingDocumentNumber
           );
           forkJoin({ doctors: doctors$, patient: patient$ }).subscribe({
             next: ({ doctors, patient }) => {
@@ -250,17 +258,17 @@ export class AppointmentBookingComponent implements OnInit {
         switch (err.status) {
           case 409:
             this.state.errorMessageSpecialty.set(
-              'No hay médicos disponibles para ninguna especialidad. Intente más tarde.',
+              'No hay médicos disponibles para ninguna especialidad. Intente más tarde.'
             );
             break;
           case 0:
             this.state.errorMessageSpecialty.set(
-              'No se pudo conectar con el servidor. Intente más tarde.',
+              'No se pudo conectar con el servidor. Intente más tarde.'
             );
             break;
           default:
             this.state.errorMessageSpecialty.set(
-              'Error al obtener las especialidades.',
+              'Error al obtener las especialidades.'
             );
         }
       },
@@ -274,7 +282,7 @@ export class AppointmentBookingComponent implements OnInit {
       this.traerEspecialidades(null);
       return;
     }
-    this.traerEspecialidades(patientId)
+    this.traerEspecialidades(patientId);
   }
 
   private traerEspecialidades(patientId: string | null): void {
@@ -283,7 +291,7 @@ export class AppointmentBookingComponent implements OnInit {
         if (!specs || specs.length === 0) {
           this.state.noSpecialtyAvailable.set(true);
           this.state.errorMessageSpecialty.set(
-            'No hay especialidades disponibles.',
+            'No hay especialidades disponibles.'
           );
           return;
         }
@@ -294,7 +302,7 @@ export class AppointmentBookingComponent implements OnInit {
             name: '',
             laborEnd: null,
             workdays: [],
-          })),
+          }))
         );
       },
       error: (err) => {
@@ -302,7 +310,7 @@ export class AppointmentBookingComponent implements OnInit {
         this.state.errorMessageSpecialty.set(
           err.status === 0
             ? 'No se pudo conectar con el servidor. Intente más tarde.'
-            : 'Error al obtener las especialidades.',
+            : 'Error al obtener las especialidades.'
         );
       },
     });
@@ -319,7 +327,7 @@ export class AppointmentBookingComponent implements OnInit {
         this.state.noDoctorsFound.set(docs.length === 0);
         if (docs.length === 0) {
           this.state.errorMessageDoctors.set(
-            'No hay médicos disponibles para esta especialidad.',
+            'No hay médicos disponibles para esta especialidad.'
           );
         }
       },
@@ -328,12 +336,12 @@ export class AppointmentBookingComponent implements OnInit {
         switch (err.status) {
           case 404:
             this.state.errorMessageDoctors.set(
-              'No hay médicos disponibles para esta especialidad.',
+              'No hay médicos disponibles para esta especialidad.'
             );
             break;
           case 0:
             this.state.errorMessageDoctors.set(
-              'No se pudo conectar con el servidor. Intente más tarde.',
+              'No se pudo conectar con el servidor. Intente más tarde.'
             );
             break;
           default:
@@ -346,13 +354,13 @@ export class AppointmentBookingComponent implements OnInit {
   private applyDoctorsPreselection(
     docs: SpecialtyDoctor[],
     doctorId: string,
-    doctorName: string,
+    doctorName: string
   ): void {
     this.state.doctorsBySpecialty.set(docs);
     this.state.noDoctorsFound.set(docs.length === 0);
     if (docs.length === 0) {
       this.state.errorMessageDoctors.set(
-        'No hay médicos disponibles para esta especialidad.',
+        'No hay médicos disponibles para esta especialidad.'
       );
       return;
     }

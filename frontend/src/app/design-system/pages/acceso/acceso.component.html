@@ -60,32 +60,32 @@
         >
           @switch (card.type) {
             @case ('patient') {
-              <lucide-angular
-                [img]="Calendar"
+              <svg
+                lucideCalendar
                 [size]="36"
                 class="text-[#215c98] group-hover:text-white transition-colors duration-300"
-              ></lucide-angular>
+              ></svg>
             }
             @case ('scheduler') {
-              <lucide-angular
-                [img]="ClipboardCheck"
+              <svg
+                lucideClipboardCheck
                 [size]="36"
                 class="text-[#215c98] group-hover:text-white transition-colors duration-300"
-              ></lucide-angular>
+              ></svg>
             }
             @case ('doctor') {
-              <lucide-angular
-                [img]="Stethoscope"
+              <svg
+                lucideStethoscope
                 [size]="36"
                 class="text-[#215c98] group-hover:text-white transition-colors duration-300"
-              ></lucide-angular>
+              ></svg>
             }
             @case ('admin') {
-              <lucide-angular
-                [img]="Settings"
+              <svg
+                lucideSettings
                 [size]="36"
                 class="text-[#215c98] group-hover:text-white transition-colors duration-300"
-              ></lucide-angular>
+              ></svg>
             }
           }
         </div>

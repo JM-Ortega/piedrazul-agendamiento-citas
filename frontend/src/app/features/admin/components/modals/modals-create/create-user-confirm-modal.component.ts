@@ -1,12 +1,16 @@
-import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
 import {
-  Calendar,
-  CircleAlert,
-  LucideAngularModule,
-  Stethoscope,
-  UserPlus,
-} from 'lucide-angular';
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  ChangeDetectionStrategy,
+} from '@angular/core';
+import {
+  LucideCalendar,
+  LucideCircleAlert,
+  LucideStethoscope,
+  LucideUserPlus,
+} from '@lucide/angular';
 import { FormatoPipe } from '../../../../../shared/pipes/formatoPipe';
 import { FormErrors } from '../../../models/interfaces/FormErrors';
 import { UserForm } from '../../../models/interfaces/UserForm';
@@ -15,13 +19,16 @@ import { UserForm } from '../../../models/interfaces/UserForm';
   selector: 'app-create-user-confirm-modal',
   templateUrl: './create-user-confirm-modal.component.html',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, FormatoPipe],
+  changeDetection: ChangeDetectionStrategy.Eager,
+  imports: [
+    LucideCalendar,
+    LucideCircleAlert,
+    LucideStethoscope,
+    LucideUserPlus,
+    FormatoPipe,
+  ],
 })
 export class CreateUserConfirmModalComponent {
-  readonly UserPlus = UserPlus;
-  readonly CircleAlert = CircleAlert;
-  readonly Stethoscope = Stethoscope;
-  readonly Calendar = Calendar;
   @Input() userForm!: UserForm;
 
   @Input() errors: FormErrors = {};

@@ -1,21 +1,20 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
-  Activity,
-  Bone,
-  Building2,
-  Calendar,
-  CalendarRange,
-  CircleAlert,
-  CreditCard,
-  Heart,
-  Info,
-  LucideAngularModule,
-  LucideIconData,
-  Phone,
-  Stethoscope,
-  Zap,
-} from 'lucide-angular';
+  LucideCalendarRange,
+  LucideCircleAlert,
+  LucideCreditCard,
+  LucideInfo,
+  LucidePhone,
+  LucideStethoscope,
+  LucideDynamicIcon,
+} from '@lucide/angular';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
 export interface DoctorFormData {
@@ -32,7 +31,7 @@ export interface DoctorFormData {
 
 export interface SpecialtyOption {
   name: string;
-  icon: LucideIconData;
+  icon: any;
   colorClass: string;
 }
 
@@ -40,22 +39,20 @@ export interface SpecialtyOption {
   selector: 'app-create-user-doctor-form',
   templateUrl: './create-user-doctor-form.component.html',
   standalone: true,
-  imports: [FormsModule, LucideAngularModule, FormatoPipe],
+  changeDetection: ChangeDetectionStrategy.Eager,
+  imports: [
+    FormsModule,
+    LucideCalendarRange,
+    LucideCircleAlert,
+    LucideCreditCard,
+    LucideInfo,
+    LucidePhone,
+    LucideStethoscope,
+    LucideDynamicIcon,
+    FormatoPipe,
+  ],
 })
 export class CreateUserDoctorFormComponent {
-  readonly Stethoscope = Stethoscope;
-  readonly CreditCard = CreditCard;
-  readonly Phone = Phone;
-  readonly CalendarRange = CalendarRange;
-  readonly Info = Info;
-  readonly Calendar = Calendar;
-  readonly CircleAlert = CircleAlert;
-  readonly Activity = Activity;
-  readonly Bone = Bone;
-  readonly Heart = Heart;
-  readonly Zap = Zap;
-  readonly Building2 = Building2;
-
   @Input() data!: DoctorFormData;
   @Input() specialtyOptions: SpecialtyOption[] = [];
   @Input() documentTypes: string[] = [];

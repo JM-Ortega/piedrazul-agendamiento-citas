@@ -1,7 +1,14 @@
-import { Component, inject, OnInit, output, signal } from '@angular/core';
+import {
+  Component,
+  inject,
+  OnInit,
+  output,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { ArrowLeft, Calendar, LucideAngularModule } from 'lucide-angular';
+import { LucideArrowLeft, LucideCalendar } from '@lucide/angular';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { PatientService } from '../../../../core/services/patient.service';
 import { BookingStateService } from '../../services/booking-state.service';
@@ -14,14 +21,19 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 @Component({
   selector: 'app-booking-patient-register',
   standalone: true,
-  imports: [FormsModule, LucideAngularModule, MatDatepickerModule, FormatoPipe],
+  imports: [
+    FormsModule,
+    LucideArrowLeft,
+    LucideCalendar,
+    MatDatepickerModule,
+    FormatoPipe,
+  ],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './booking-patient-register.component.html',
 })
 export class BookingPatientRegisterComponent implements OnInit {
-  readonly ArrowLeft = ArrowLeft;
   protected state = inject(BookingStateService);
   protected patientService = inject(PatientService);
-  Calendar = Calendar;
 
   ngOnInit(): void {
     this.patientService.loadDocumentTypes();
@@ -63,14 +75,14 @@ export class BookingPatientRegisterComponent implements OnInit {
   private timers: Record<string, ReturnType<typeof setTimeout>> = {};
 
   getPatientField<K extends keyof Omit<Patient, 'id'>>(
-    key: K,
+    key: K
   ): Omit<Patient, 'id'>[K] {
     return this.state.patientForm()[key];
   }
 
   setPatientField<K extends keyof Omit<Patient, 'id'>>(
     key: K,
-    value: Omit<Patient, 'id'>[K],
+    value: Omit<Patient, 'id'>[K]
   ): void {
     this.state.patientForm.update((f) => ({ ...f, [key]: value }));
   }
@@ -83,15 +95,16 @@ export class BookingPatientRegisterComponent implements OnInit {
     value = value.replace(/[^a-zA-ZñÑ\s]/g, '');
     value = value.replace(/^\s+/, '');
     value = value.replace(/\s{2,}/g, ' ');
-    value = value.replace(/(\S+)/g, (word) =>
-      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    value = value.replace(
+      /(\S+)/g,
+      (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
     );
     if (value.length > this.NAME_MAX) {
       value = value.slice(0, this.NAME_MAX);
       this.flash(
         limitMsg,
         `Solo se permiten máximo ${this.NAME_MAX} caracteres`,
-        field,
+        field
       );
     } else {
       limitMsg.set('');
@@ -111,7 +124,7 @@ export class BookingPatientRegisterComponent implements OnInit {
       this.flash(
         this.phoneLimitMsg,
         `Solo se permiten máximo ${this.PHONE_MAX} dígitos`,
-        'phone',
+        'phone'
       );
     } else {
       el.value = digits;
@@ -130,7 +143,7 @@ export class BookingPatientRegisterComponent implements OnInit {
       this.flash(
         this.emailLimitMsg,
         `Solo se permiten máximo ${this.EMAIL_MAX} caracteres`,
-        'email',
+        'email'
       );
     } else {
       this.setPatientField('email', value as any);
@@ -148,7 +161,7 @@ export class BookingPatientRegisterComponent implements OnInit {
       this.flash(
         this.guardianPhoneLimitMsg,
         `Solo se permiten máximo ${this.PHONE_MAX} dígitos`,
-        'gphone',
+        'gphone'
       );
     } else {
       el.value = digits;
@@ -160,7 +173,7 @@ export class BookingPatientRegisterComponent implements OnInit {
   private flash(
     sig: ReturnType<typeof signal<string>>,
     text: string,
-    key: string,
+    key: string
   ): void {
     sig.set(text);
     if (this.timers[key]) clearTimeout(this.timers[key]);
@@ -215,7 +228,7 @@ export class BookingPatientRegisterComponent implements OnInit {
 
   private validateNameField(
     field: 'firstName' | 'lastName',
-    value: string | undefined,
+    value: string | undefined
   ): boolean {
     const errorSig =
       field === 'firstName' ? this.firstNameError : this.lastNameError;
@@ -254,7 +267,7 @@ export class BookingPatientRegisterComponent implements OnInit {
     if (!/^[0-9]{10}$/.test(trimmed)) {
       this.phoneError.set(true);
       this.phoneErrorMsg.set(
-        'Ingrese un número válido de exactamente 10 dígitos',
+        'Ingrese un número válido de exactamente 10 dígitos'
       );
       return false;
     }
@@ -265,7 +278,7 @@ export class BookingPatientRegisterComponent implements OnInit {
 
   private validateBirthDate(
     value: string | undefined,
-    documentType: string | undefined,
+    documentType: string | undefined
   ): boolean {
     if (!value) {
       this.birthDateError.set(true);
@@ -281,7 +294,7 @@ export class BookingPatientRegisterComponent implements OnInit {
     if (input >= today) {
       this.birthDateError.set(true);
       this.birthDateErrorMsg.set(
-        'La fecha de nacimiento debe ser anterior a hoy',
+        'La fecha de nacimiento debe ser anterior a hoy'
       );
       return false;
     }
@@ -292,7 +305,7 @@ export class BookingPatientRegisterComponent implements OnInit {
         this.birthDateError.set(true);
         this.birthDateErrorMsg.set(
           'La fecha ingresada indica que el paciente es menor de edad. ' +
-            'Para Cédula el paciente debe tener 18 años o más.',
+            'Para Cédula el paciente debe tener 18 años o más.'
         );
         return false;
       }
@@ -321,7 +334,7 @@ export class BookingPatientRegisterComponent implements OnInit {
     if (value.length > this.EMAIL_MAX) {
       this.emailError.set(true);
       this.emailErrorMsg.set(
-        `El correo no puede superar los ${this.EMAIL_MAX} caracteres`,
+        `El correo no puede superar los ${this.EMAIL_MAX} caracteres`
       );
       return false;
     }
@@ -329,7 +342,7 @@ export class BookingPatientRegisterComponent implements OnInit {
     if (this.INVALID_EMAIL_CHARS.test(value)) {
       this.emailError.set(true);
       this.emailErrorMsg.set(
-        'No se permiten caracteres especiales como \', ", <, >, (, ), [, ], etc.',
+        'No se permiten caracteres especiales como \', ", <, >, (, ), [, ], etc.'
       );
       return false;
     }
@@ -337,7 +350,7 @@ export class BookingPatientRegisterComponent implements OnInit {
     if (!this.VALID_EMAIL_REGEX.test(value)) {
       this.emailError.set(true);
       this.emailErrorMsg.set(
-        'La estructura del correo no es válida. Ejemplo: nombre@dominio.com',
+        'La estructura del correo no es válida. Ejemplo: nombre@dominio.com'
       );
       return false;
     }
@@ -352,7 +365,7 @@ export class BookingPatientRegisterComponent implements OnInit {
       if (!/^[0-9]{10}$/.test(f.guardianPhone)) {
         this.guardianPhoneError.set(true);
         this.guardianPhoneErrorMsg.set(
-          `Ingrese un número válido de ${this.PHONE_MAX} dígitos`,
+          `Ingrese un número válido de ${this.PHONE_MAX} dígitos`
         );
         return false;
       }
@@ -366,7 +379,7 @@ export class BookingPatientRegisterComponent implements OnInit {
     if (age < 18 && !f.guardianPhone) {
       this.guardianPhoneError.set(true);
       this.guardianPhoneErrorMsg.set(
-        'El celular del acudiente es obligatorio para menores de 18 años',
+        'El celular del acudiente es obligatorio para menores de 18 años'
       );
       return false;
     }
@@ -401,9 +414,8 @@ export class BookingPatientRegisterComponent implements OnInit {
   }
 
   onBirthDateChange(value: Date | string): void {
-    const formatted = value instanceof Date
-      ? this.state.formatLocalDate(value)
-      : value;
+    const formatted =
+      value instanceof Date ? this.state.formatLocalDate(value) : value;
     this.setPatientField('birthDate', formatted as any);
   }
 }

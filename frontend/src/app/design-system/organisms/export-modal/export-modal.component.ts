@@ -5,21 +5,23 @@ import {
   input,
   output,
   signal,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import {
-  Calendar,
-  CheckCircle,
-  Clock,
-  CreditCard,
-  Download,
-  FileSpreadsheet,
-  FileText,
-  LucideAngularModule,
-  Phone,
-  Stethoscope,
-  Tag,
-  UserCircle,
-} from 'lucide-angular';
+  LucideDynamicIcon,
+  LucideCalendar,
+  LucideCircleCheck,
+  LucideClock,
+  LucideCreditCard,
+  LucideDownload,
+  LucideFileSpreadsheet,
+  LucideFileText,
+  LucidePhone,
+  LucideStethoscope,
+  LucideTag,
+  LucideCircleUser,
+  type LucideIcon,
+} from '@lucide/angular';
 import { SchedulerService } from '../../../core/services/scheduler.service';
 import { AppointmentExportRequest } from '../../../shared/models/dtos/AppointmentExportRequest.dto';
 import { ExportColumnBackend } from '../../../shared/models/types/ExportColumnBackend.type';
@@ -42,7 +44,16 @@ type ExportColumns = Record<ExportColumnKey, boolean>;
 interface ColumnDef {
   key: ExportColumnKey;
   label: string;
-  icon: any;
+  icon: LucideIcon;
+}
+
+interface FormatDef {
+  value: ExportFormat;
+  label: string;
+  active: string;
+  icon: LucideIcon;
+  activeIcon: string;
+  activeLabel: string;
 }
 
 const COLUMN_MAP: Record<ExportColumnKey, ExportColumnBackend> = {
@@ -78,16 +89,11 @@ const EXT_MAP: Record<ExportFormat, string> = {
   selector: 'app-export-modal',
   templateUrl: './export-modal.component.html',
   standalone: true,
-  imports: [LucideAngularModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
+  imports: [LucideDynamicIcon, LucideDownload, LucideCalendar],
 })
 export class ExportModalComponent {
   private schedulerService = inject(SchedulerService);
-
-  // ── Icons ──────────────────────────────────────────────────────────────────
-  readonly Calendar = Calendar;
-  readonly Download = Download;
-  readonly FileSpreadsheet = FileSpreadsheet;
-  readonly FileText = FileText;
 
   // ── Inputs desde el padre ──────────────────────────────────────────────────
 
@@ -124,25 +130,56 @@ export class ExportModalComponent {
   });
 
   readonly columnDefs: ColumnDef[] = [
-    { key: 'date', label: 'Fecha de la Cita', icon: Calendar },
-    { key: 'time', label: 'Hora de la Cita', icon: Clock },
-    { key: 'patient', label: 'Nombre del Paciente', icon: UserCircle },
-    { key: 'documentId', label: 'Documento de Identidad', icon: CreditCard },
-    { key: 'phone', label: 'Teléfono del Paciente', icon: Phone },
-    { key: 'status', label: 'Estado de la Cita', icon: CheckCircle },
-    { key: 'specialty', label: 'Especialidad', icon: Tag },
-    { key: 'doctorName', label: 'Nombre del Médico', icon: Stethoscope },
+    { key: 'date', label: 'Fecha de la Cita', icon: LucideCalendar },
+    { key: 'time', label: 'Hora de la Cita', icon: LucideClock },
+    { key: 'patient', label: 'Nombre del Paciente', icon: LucideCircleUser },
+    {
+      key: 'documentId',
+      label: 'Documento de Identidad',
+      icon: LucideCreditCard,
+    },
+    { key: 'phone', label: 'Teléfono del Paciente', icon: LucidePhone },
+    { key: 'status', label: 'Estado de la Cita', icon: LucideCircleCheck },
+    { key: 'specialty', label: 'Especialidad', icon: LucideTag },
+    { key: 'doctorName', label: 'Nombre del Médico', icon: LucideStethoscope },
+  ];
+
+  readonly formatOptions: FormatDef[] = [
+    {
+      value: 'excel',
+      label: 'Excel',
+      active: 'border-green-600 bg-green-50',
+      icon: LucideFileSpreadsheet,
+      activeIcon: 'text-green-600',
+      activeLabel: 'text-green-700',
+    },
+    {
+      value: 'pdf',
+      label: 'PDF',
+      active: 'border-red-600 bg-red-50',
+      icon: LucideFileText,
+      activeIcon: 'text-red-600',
+      activeLabel: 'text-red-700',
+    },
+    {
+      value: 'csv',
+      label: 'CSV',
+      active: 'border-orange-600 bg-orange-50',
+      icon: LucideFileText,
+      activeIcon: 'text-orange-600',
+      activeLabel: 'text-orange-700',
+    },
   ];
 
   // ── Computed ───────────────────────────────────────────────────────────────
   hasSelectedColumns = computed(() =>
-    Object.values(this.exportColumns()).some((v) => v),
+    Object.values(this.exportColumns()).some((v) => v)
   );
 
   private selectedBackendColumns = computed<ExportColumnBackend[]>(() =>
     (Object.entries(this.exportColumns()) as [ExportColumnKey, boolean][])
       .filter(([, v]) => v)
-      .map(([k]) => COLUMN_MAP[k]),
+      .map(([k]) => COLUMN_MAP[k])
   );
 
   colors = computed(() => {
@@ -240,7 +277,7 @@ export class ExportModalComponent {
       },
       error: () => {
         this.exportError.set(
-          'Ocurrió un error al generar el reporte. Intente nuevamente.',
+          'Ocurrió un error al generar el reporte. Intente nuevamente.'
         );
         this.exportingInProgress.set(false);
       },

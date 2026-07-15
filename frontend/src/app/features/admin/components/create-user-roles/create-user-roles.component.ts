@@ -1,10 +1,15 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
 import {
-  Calendar,
-  CircleAlert,
-  LucideAngularModule,
-  Stethoscope,
-} from 'lucide-angular';
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  ChangeDetectionStrategy,
+} from '@angular/core';
+import {
+  LucideCalendar,
+  LucideCircleAlert,
+  LucideStethoscope,
+} from '@lucide/angular';
 
 type Role = 'doctor' | 'scheduler';
 
@@ -12,13 +17,10 @@ type Role = 'doctor' | 'scheduler';
   selector: 'app-create-user-roles',
   templateUrl: './create-user-roles.component.html',
   standalone: true,
-  imports: [LucideAngularModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
+  imports: [LucideCalendar, LucideCircleAlert, LucideStethoscope],
 })
 export class CreateUserRolesComponent {
-  readonly Stethoscope = Stethoscope;
-  readonly Calendar = Calendar;
-  readonly CircleAlert = CircleAlert;
-
   @Input() selectedRoles: Role[] = [];
   @Input() errorRoles?: string;
   @Output() roleToggled = new EventEmitter<Role>();

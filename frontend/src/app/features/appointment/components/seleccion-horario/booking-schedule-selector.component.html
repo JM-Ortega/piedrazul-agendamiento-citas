@@ -3,7 +3,7 @@
 
   @if (state.effectiveDoctor(); as doctor) {
     <div class="flex items-center gap-2 text-sm text-gray-500">
-      <lucide-angular [img]="UserSearch" [size]="16"></lucide-angular>
+      <svg lucideUserSearch [size]="16"></svg>
       <span>{{ doctor.name }} · {{ state.selectedSpecialty() | formato }}</span>
     </div>
   }
@@ -32,8 +32,8 @@
 
   @if (state.selectedDate()) {
     <div class="flex items-center gap-2 bg-[#e6f0fa] rounded-xl px-4 py-3 text-[#163c63] font-medium">
-      <lucide-angular [img]="Calendar" [size]="18"></lucide-angular>
-       {{ state.confirmDate() }}
+      <svg lucideCalendar [size]="18"></svg>
+      {{ state.confirmDate() }}
     </div>
   }
 

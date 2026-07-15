@@ -1,21 +1,33 @@
-import { Component, EventEmitter, Output, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import {
+  Component,
+  EventEmitter,
+  Output,
+  inject,
+  ChangeDetectionStrategy,
+} from '@angular/core';
+
 import { Router } from '@angular/router';
 import {
-  LucideAngularModule,
-  X,
-  LogIn,
-  UserPlus,
-  MessageCircle,
-  Phone,
-} from 'lucide-angular';
+  LucideX,
+  LucideLogIn,
+  LucideUserPlus,
+  LucideMessageCircle,
+  LucidePhone,
+} from '@lucide/angular';
 import Keycloak from 'keycloak-js';
 import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-appointment-modal',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [
+    LucideX,
+    LucideLogIn,
+    LucideUserPlus,
+    LucideMessageCircle,
+    LucidePhone,
+  ],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './appointment-modal.component.html',
 })
 export class AppointmentModalComponent {
@@ -23,12 +35,6 @@ export class AppointmentModalComponent {
 
   private keycloak = inject(Keycloak);
   private router = inject(Router);
-
-  readonly X = X;
-  readonly LogIn = LogIn;
-  readonly UserPlus = UserPlus;
-  readonly MessageCircle = MessageCircle;
-  readonly Phone = Phone;
 
   readonly whatsappUrl = `https://wa.me/${environment.contact.whatsapp}`;
   readonly whatsappDisplay = environment.contact.whatsappDisplay;

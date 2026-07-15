@@ -1,26 +1,54 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import Keycloak from 'keycloak-js';
-import { ArrowLeft, CheckCircle, Eye, EyeOff, KeyRound, Calendar,
-  LucideAngularModule, Search, UserPlus,} from 'lucide-angular';
-import { PatientPublicResponse, PatientService,} from '../../core/services/patient.service';
+import {
+  LucideArrowLeft,
+  LucideCheckCircle,
+  LucideEye,
+  LucideEyeOff,
+  LucideKeyRound,
+  LucideCalendar,
+  LucideSearch,
+  LucideUserPlus,
+  LucideDynamicIcon,
+} from '@lucide/angular';
+import {
+  PatientPublicResponse,
+  PatientService,
+} from '../../core/services/patient.service';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
 
 type RegistroStep = 1 | 2 | 3;
 type PatientStatus =
-  | 'idle'
-  | 'found'
-  | 'already-linked'
-  | 'not-found'
-  | 'existing-user';
+  'idle' | 'found' | 'already-linked' | 'not-found' | 'existing-user';
 
 @Component({
   selector: 'app-registro',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, MatDatepickerModule, FormatoPipe],
+  imports: [
+    LucideArrowLeft,
+    LucideCheckCircle,
+    LucideKeyRound,
+    LucideCalendar,
+    LucideSearch,
+    LucideUserPlus,
+    LucideDynamicIcon,
+    CommonModule,
+    FormsModule,
+    MatDatepickerModule,
+    FormatoPipe,
+  ],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './registro.component.html',
 })
 export class RegistroComponent implements OnInit {
@@ -31,14 +59,8 @@ export class RegistroComponent implements OnInit {
   private keycloak = inject(Keycloak);
   private router = inject(Router);
 
-  readonly Search = Search;
-  readonly CheckCircle = CheckCircle;
-  readonly ArrowLeft = ArrowLeft;
-  readonly Eye = Eye;
-  readonly EyeOff = EyeOff;
-  readonly UserPlus = UserPlus;
-  readonly KeyRound = KeyRound;
-  readonly Calendar = Calendar;
+  readonly Eye = LucideEye;
+  readonly EyeOff = LucideEyeOff;
 
   step = signal<RegistroStep>(1);
   isLoading = signal(false);
@@ -66,7 +88,7 @@ export class RegistroComponent implements OnInit {
   password = signal('');
   confirmPassword = signal('');
   verificationCode = signal('');
-  
+
   private readonly PASSWORD_MIN = 6;
   private readonly PASSWORD_MAX = 100;
   private readonly PASSWORD_ALPHANUMERIC = /^(?=.*[a-zA-Z])(?=.*[0-9]).+$/;
@@ -87,13 +109,13 @@ export class RegistroComponent implements OnInit {
     if (clean !== raw) {
       el.value = clean;
       this.flashDocWarning(
-        'Solo se permiten letras y números, sin caracteres especiales',
+        'Solo se permiten letras y números, sin caracteres especiales'
       );
     }
     if (clean.length > this.DOC_MAX) {
       el.value = clean.slice(0, this.DOC_MAX);
       this.flashDocWarning(
-        `Solo se permiten máximo ${this.DOC_MAX} caracteres`,
+        `Solo se permiten máximo ${this.DOC_MAX} caracteres`
       );
     }
     this.onDocumentChange(el.value);
@@ -125,14 +147,14 @@ export class RegistroComponent implements OnInit {
   readonly isNewPatient = computed(() => this.patientStatus() === 'not-found');
   readonly isExistingPatient = computed(() => this.patientStatus() === 'found');
   readonly isExistingSystemUser = computed(
-    () => this.patientStatus() === 'existing-user',
+    () => this.patientStatus() === 'existing-user'
   );
   readonly isAlreadyLinked = computed(
-    () => this.patientStatus() === 'already-linked',
+    () => this.patientStatus() === 'already-linked'
   );
 
   readonly requiresPassword = computed(
-    () => this.isNewPatient() || this.isExistingPatient(),
+    () => this.isNewPatient() || this.isExistingPatient()
   );
 
   readonly isMinorPatient = computed(() => {
@@ -207,11 +229,11 @@ export class RegistroComponent implements OnInit {
           this.patientStatus.set('not-found');
         } else if (err.status === 0) {
           this.errorMessage.set(
-            'No se pudo conectar con el servidor. Intenta más tarde.',
+            'No se pudo conectar con el servidor. Intenta más tarde.'
           );
         } else {
           this.errorMessage.set(
-            'Error al buscar el documento. Intenta de nuevo.',
+            'Error al buscar el documento. Intenta de nuevo.'
           );
         }
       },
@@ -287,7 +309,7 @@ export class RegistroComponent implements OnInit {
           next: () => {
             this.isLoading.set(false);
             this.successMessage.set(
-              'Se generó un código de verificación. Por ahora revísalo en la consola del backend.',
+              'Se generó un código de verificación. Por ahora revísalo en la consola del backend.'
             );
             this.step.set(3);
           },
@@ -347,15 +369,16 @@ export class RegistroComponent implements OnInit {
     value = value.replace(/[^a-zA-ZñÑ\s]/g, '');
     value = value.replace(/^\s+/, '');
     value = value.replace(/\s{2,}/g, ' ');
-    value = value.replace(/(\S+)/g, (word) =>
-      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    value = value.replace(
+      /(\S+)/g,
+      (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
     );
     if (value.length > this.NAME_MAX) {
       value = value.slice(0, this.NAME_MAX);
       this.flash(
         limitMsg,
         `Solo se permiten máximo ${this.NAME_MAX} caracteres`,
-        field,
+        field
       );
     } else {
       limitMsg.set('');
@@ -375,7 +398,7 @@ export class RegistroComponent implements OnInit {
       this.flash(
         this.phoneLimitMsg,
         `Solo se permiten máximo ${this.PHONE_MAX} dígitos`,
-        'phone',
+        'phone'
       );
     } else {
       el.value = digits;
@@ -394,7 +417,7 @@ export class RegistroComponent implements OnInit {
       this.flash(
         this.emailLimitMsg,
         `Solo se permiten máximo ${this.EMAIL_MAX} caracteres`,
-        'email',
+        'email'
       );
     } else {
       this.updateFormField('email', value);
@@ -412,7 +435,7 @@ export class RegistroComponent implements OnInit {
       this.flash(
         this.guardianPhoneLimitMsg,
         `Solo se permiten máximo ${this.PHONE_MAX} dígitos`,
-        'gphone',
+        'gphone'
       );
     } else {
       el.value = digits;
@@ -436,7 +459,7 @@ export class RegistroComponent implements OnInit {
   private flash(
     sig: ReturnType<typeof signal<string>>,
     text: string,
-    key: string,
+    key: string
   ): void {
     sig.set(text);
     if (this.timers[key]) clearTimeout(this.timers[key]);
@@ -459,7 +482,7 @@ export class RegistroComponent implements OnInit {
 
     if (err.status === 0) {
       this.errorMessage.set(
-        'No se pudo conectar con el servidor. Intenta más tarde.',
+        'No se pudo conectar con el servidor. Intenta más tarde.'
       );
       return;
     }
@@ -470,7 +493,7 @@ export class RegistroComponent implements OnInit {
         break;
       case 'USERNAME_TAKEN':
         this.errorMessage.set(
-          'Ya existe una cuenta asociada a este documento.',
+          'Ya existe una cuenta asociada a este documento.'
         );
         break;
       case 'INVALID_VERIFICATION_CODE':
@@ -481,12 +504,12 @@ export class RegistroComponent implements OnInit {
         break;
       case 'VERIFICATION_CODE_BLOCKED':
         this.errorMessage.set(
-          'El código fue bloqueado por exceso de intentos.',
+          'El código fue bloqueado por exceso de intentos.'
         );
         break;
       default:
         this.errorMessage.set(
-          detail || 'Ocurrió un error al crear la cuenta. Intenta de nuevo.',
+          detail || 'Ocurrió un error al crear la cuenta. Intenta de nuevo.'
         );
         break;
     }
@@ -523,7 +546,7 @@ export class RegistroComponent implements OnInit {
 
       const gPhoneErr = this.validateGuardianPhone(
         f.guardianPhone,
-        f.birthDate,
+        f.birthDate
       );
       if (gPhoneErr) newErrors['guardianPhone'] = gPhoneErr;
     }
@@ -536,9 +559,11 @@ export class RegistroComponent implements OnInit {
     const newErrors: Record<string, string> = {};
     if (this.requiresPassword()) {
       if (this.password().length < this.PASSWORD_MIN) {
-        newErrors['password'] = `La contraseña debe tener al menos ${this.PASSWORD_MIN} caracteres`;
+        newErrors['password'] =
+          `La contraseña debe tener al menos ${this.PASSWORD_MIN} caracteres`;
       } else if (this.password().length > this.PASSWORD_MAX) {
-        newErrors['password'] = `La contraseña no puede superar los ${this.PASSWORD_MAX} caracteres`;
+        newErrors['password'] =
+          `La contraseña no puede superar los ${this.PASSWORD_MAX} caracteres`;
       } else if (!this.PASSWORD_ALPHANUMERIC.test(this.password())) {
         newErrors['password'] = 'La contraseña debe contener letras y números';
       }
@@ -582,7 +607,7 @@ export class RegistroComponent implements OnInit {
   private validatePhone(
     value: string | undefined,
     label: string,
-    required = true,
+    required = true
   ): string {
     const trimmed = value?.trim() ?? '';
 
@@ -600,7 +625,7 @@ export class RegistroComponent implements OnInit {
 
   private validateBirthDate(
     value: string | undefined,
-    documentType: string | undefined,
+    documentType: string | undefined
   ): string {
     if (!value) {
       return 'Ingresa una fecha de nacimiento válida';
@@ -645,7 +670,7 @@ export class RegistroComponent implements OnInit {
 
   private validateGuardianPhone(
     guardianPhone: string | undefined,
-    birthDate: string | undefined,
+    birthDate: string | undefined
   ): string {
     const trimmed = guardianPhone?.trim() ?? '';
 
@@ -653,7 +678,7 @@ export class RegistroComponent implements OnInit {
       const formatErr = this.validatePhone(
         trimmed,
         'celular del acudiente',
-        false,
+        false
       );
       if (formatErr) return formatErr;
     }

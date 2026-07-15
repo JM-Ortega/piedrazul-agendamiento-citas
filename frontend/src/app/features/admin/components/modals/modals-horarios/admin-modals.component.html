@@ -14,7 +14,7 @@
           (click)="closeToggleModal.emit()"
           class="text-gray-400 hover:text-gray-600 transition-colors"
         >
-          <lucide-angular [img]="X" [size]="24"></lucide-angular>
+          <svg lucideX [size]="24"></svg>
         </button>
       </div>
       <p class="text-gray-600 text-base mb-6">
@@ -41,7 +41,7 @@
               : 'bg-red-600 hover:bg-red-700'
           "
         >
-          <lucide-angular [img]="Save" [size]="18"></lucide-angular>
+          <svg lucideSave [size]="18"></svg>
           Sí,
           {{
             doctorToToggle()!.status === false ? 'Habilitar' : 'Deshabilitar'
@@ -70,7 +70,7 @@
           (click)="cancelForceDisable.emit()"
           class="text-gray-400 hover:text-gray-600 transition-colors"
         >
-          <lucide-angular [img]="X" [size]="24"></lucide-angular>
+          <svg lucideX [size]="24"></svg>
         </button>
       </div>
       <p class="text-gray-600 text-base mb-4">{{ forceModalMessage() }}</p>
@@ -89,7 +89,7 @@
           (click)="confirmForceDisable.emit()"
           class="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl transition-colors text-base font-medium flex items-center justify-center gap-2"
         >
-          <lucide-angular [img]="PowerOff" [size]="18"></lucide-angular>
+          <svg lucidePowerOff [size]="18"></svg>
           Sí, forzar
         </button>
       </div>
@@ -118,7 +118,7 @@
           (click)="closeErrorModal.emit()"
           class="text-gray-400 hover:text-gray-600 transition-colors"
         >
-          <lucide-angular [img]="X" [size]="24"></lucide-angular>
+          <svg lucideX [size]="24"></svg>
         </button>
       </div>
       <p class="text-gray-600 text-base mb-6">{{ errorGuardado() }}</p>

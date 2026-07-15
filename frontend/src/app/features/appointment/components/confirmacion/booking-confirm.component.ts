@@ -1,16 +1,20 @@
-import { Component, inject, output } from '@angular/core';
 import {
-  CheckCircle,
-  LucideAngularModule,
-  Stethoscope,
-  UserSearch,
-} from 'lucide-angular';
+  Component,
+  inject,
+  output,
+  ChangeDetectionStrategy,
+} from '@angular/core';
+import {
+  LucideCheckCircle,
+  LucideStethoscope,
+  LucideUserSearch,
+} from '@lucide/angular';
 import { NewAppointment } from '../../models/dtos/newAppointment.dto';
 import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import {FormatoPipe} from "../../../../shared/pipes/formatoPipe";
-import {ErroresPipe} from "../../../../shared/pipes/erroresPipe";
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
 
 /**
  * Mostrar el resumen completo de la cita a confirmar
@@ -19,14 +23,17 @@ import {ErroresPipe} from "../../../../shared/pipes/erroresPipe";
 @Component({
   selector: 'app-booking-confirm',
   standalone: true,
-  imports: [LucideAngularModule, FormatoPipe, ErroresPipe],
+  imports: [
+    LucideCheckCircle,
+    LucideStethoscope,
+    LucideUserSearch,
+    FormatoPipe,
+    ErroresPipe,
+  ],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './booking-confirm.component.html',
 })
 export class BookingConfirmComponent {
-  readonly CheckCircle = CheckCircle;
-  readonly Stethoscope = Stethoscope;
-  readonly UserSearch = UserSearch;
-
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
 
@@ -55,7 +62,7 @@ export class BookingConfirmComponent {
 
         if (err.status === 0) {
           this.state.errorMessage.set(
-            'No se pudo conectar con el servidor. Intente más tarde.',
+            'No se pudo conectar con el servidor. Intente más tarde.'
           );
           return;
         }
@@ -69,7 +76,7 @@ export class BookingConfirmComponent {
             break;
           default:
             this.state.errorMessage.set(
-              detail || 'Error inesperado al registrar la cita.',
+              detail || 'Error inesperado al registrar la cita.'
             );
         }
       },

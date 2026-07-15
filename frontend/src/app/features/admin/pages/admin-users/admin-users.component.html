@@ -9,7 +9,7 @@
       >
         <div>
           <h1 class="text-3xl font-bold flex items-center gap-3">
-            <lucide-angular [img]="Users" [size]="34"></lucide-angular>
+            <svg lucideUsers [size]="34"></svg>
             Gestión de Usuarios
           </h1>
           <p class="text-[#a7c9ec] text-lg mt-2">
@@ -20,7 +20,7 @@
           (click)="navigateToCreate()"
           class="flex items-center gap-2 bg-white text-[#215c98] hover:bg-[#d9e9f8] px-6 py-3 rounded-xl text-lg font-semibold transition-colors shrink-0 cursor-pointer"
         >
-          <lucide-angular [img]="UserPlus" [size]="24"></lucide-angular>
+          <svg lucideUserPlus [size]="24"></svg>
           Crear Usuario
         </button>
       </div>
@@ -32,7 +32,7 @@
         class="bg-linear-to-br from-[#215c98] to-[#4e92d9] text-white rounded-xl shadow-lg p-6"
       >
         <div class="flex items-center gap-3 mb-2">
-          <lucide-angular [img]="Stethoscope" [size]="28"></lucide-angular>
+          <svg lucideStethoscope [size]="28"></svg>
           <p class="text-[#d9e9f8] text-base">Médicos</p>
         </div>
         <p class="text-4xl font-bold">{{ doctors().length }}</p>
@@ -41,7 +41,7 @@
         class="bg-linear-to-br from-[#1f7a52] to-[#45b884] text-white rounded-xl shadow-lg p-6"
       >
         <div class="flex items-center gap-3 mb-2">
-          <lucide-angular [img]="Calendar" [size]="28"></lucide-angular>
+          <svg lucideCalendar [size]="28"></svg>
           <p class="text-green-100 text-base">Agendadores</p>
         </div>
         <p class="text-4xl font-bold">{{ schedulers().length }}</p>
@@ -50,7 +50,7 @@
         class="bg-linear-to-br from-[#5a2992] to-[#9460d6] text-white rounded-xl shadow-lg p-6"
       >
         <div class="flex items-center gap-3 mb-2">
-          <lucide-angular [img]="Users" [size]="28"></lucide-angular>
+          <svg lucideUsers [size]="28"></svg>
           <p class="text-purple-100 text-base">Ambos Roles</p>
         </div>
         <p class="text-4xl font-bold">{{ both().length }}</p>
@@ -92,7 +92,7 @@
             <h2
               class="text-purple-800 text-2xl font-semibold mb-6 flex items-center gap-2"
             >
-              <lucide-angular [img]="Users" [size]="26"></lucide-angular>
+              <svg lucideUsers [size]="26"></svg>
               Ambos Roles ({{ both().length }})
             </h2>
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -102,11 +102,7 @@
                 >
                   <div class="flex items-center gap-3 flex-1 mb-3">
                     <div class="rounded-full p-3 bg-[#7d3fc4] shrink-0">
-                      <lucide-angular
-                        [img]="Users"
-                        class="text-white"
-                        [size]="24"
-                      ></lucide-angular>
+                      <svg lucideUsers class="text-white" [size]="24"></svg>
                     </div>
                     <div class="flex-1">
                       <h3 class="text-lg font-bold text-purple-900">
@@ -136,11 +132,11 @@
                   </div>
                   <div class="space-y-2 text-sm text-gray-700 ml-14">
                     <div class="flex items-center gap-2">
-                      <lucide-angular
-                        [img]="CreditCard"
+                      <svg
+                        lucideCreditCard
                         [size]="16"
                         class="text-purple-600"
-                      ></lucide-angular>
+                      ></svg>
                       <span class="font-medium">Doc:</span>
                       <span>{{ user.documentId }}</span>
                     </div>
@@ -157,7 +153,7 @@
             <h2
               class="text-[#163c63] text-2xl font-semibold mb-6 flex items-center gap-2"
             >
-              <lucide-angular [img]="Stethoscope" [size]="26"></lucide-angular>
+              <svg lucideStethoscope [size]="26"></svg>
               Médicos ({{ doctors().length }})
             </h2>
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -167,11 +163,11 @@
                 >
                   <div class="flex items-center gap-3 flex-1 mb-3">
                     <div class="rounded-full p-3 bg-[#215c98] shrink-0">
-                      <lucide-angular
-                        [img]="Stethoscope"
+                      <svg
+                        lucideStethoscope
                         class="text-white"
                         [size]="24"
-                      ></lucide-angular>
+                      ></svg>
                     </div>
                     <div class="flex-1">
                       <h3 class="text-lg font-bold text-[#163c63]">
@@ -188,11 +184,11 @@
                   </div>
                   <div class="space-y-2 text-sm text-gray-700 ml-14">
                     <div class="flex items-center gap-2">
-                      <lucide-angular
-                        [img]="CreditCard"
+                      <svg
+                        lucideCreditCard
                         [size]="16"
                         class="text-[#4e92d9]"
-                      ></lucide-angular>
+                      ></svg>
                       <span class="font-medium">Doc:</span>
                       <span>{{ user.documentId }}</span>
                     </div>
@@ -209,7 +205,7 @@
             <h2
               class="text-green-800 text-2xl font-semibond mb-6 flex items-center gap-2"
             >
-              <lucide-angular [img]="Calendar" [size]="26"></lucide-angular>
+              <svg lucideCalendar [size]="26"></svg>
               Agendadores ({{ schedulers().length }})
             </h2>
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -219,11 +215,7 @@
                 >
                   <div class="flex items-center gap-3 flex-1 mb-3">
                     <div class="rounded-full p-3 bg-[#1fa36a] shrink-0">
-                      <lucide-angular
-                        [img]="Calendar"
-                        class="text-white"
-                        [size]="24"
-                      ></lucide-angular>
+                      <svg lucideCalendar [size]="24" class="text-white"></svg>
                     </div>
                     <div class="flex-1">
                       <h3 class="text-lg font-bold text-green-900">
@@ -240,11 +232,11 @@
                   </div>
                   <div class="space-y-2 text-sm text-gray-700 ml-14">
                     <div class="flex items-center gap-2">
-                      <lucide-angular
-                        [img]="CreditCard"
+                      <svg
+                        lucideCreditCard
                         [size]="16"
                         class="text-green-600"
-                      ></lucide-angular>
+                      ></svg>
                       <span class="font-medium">Doc:</span>
                       <span>{{ user.documentId }}</span>
                     </div>
