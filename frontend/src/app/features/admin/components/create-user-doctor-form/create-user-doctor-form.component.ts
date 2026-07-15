@@ -1,19 +1,20 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   EventEmitter,
   Input,
   Output,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   LucideCalendarRange,
   LucideCircleAlert,
   LucideCreditCard,
+  LucideDynamicIcon,
   LucideInfo,
   LucidePhone,
   LucideStethoscope,
-  LucideDynamicIcon,
+  type LucideIcon,
 } from '@lucide/angular';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
@@ -31,7 +32,7 @@ export interface DoctorFormData {
 
 export interface SpecialtyOption {
   name: string;
-  icon: any;
+  icon: LucideIcon;
   colorClass: string;
 }
 
@@ -39,7 +40,7 @@ export interface SpecialtyOption {
   selector: 'app-create-user-doctor-form',
   templateUrl: './create-user-doctor-form.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
     LucideCalendarRange,

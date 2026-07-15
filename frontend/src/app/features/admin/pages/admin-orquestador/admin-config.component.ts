@@ -1,10 +1,10 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   computed,
   inject,
   OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { LucidePencil, LucideSettings } from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
@@ -23,7 +23,7 @@ import { AdminService } from '../../service/admin.service';
   selector: 'app-admin-config',
   templateUrl: './admin-config.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideSettings,
     LucidePencil,

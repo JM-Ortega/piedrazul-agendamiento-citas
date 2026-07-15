@@ -1,30 +1,27 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   computed,
   effect,
   inject,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { KEYCLOAK_EVENT_SIGNAL } from 'keycloak-angular';
 import {
   LucideCalendar,
-  LucideCheckCircle,
   LucideClock,
   LucideCreditCard,
   LucideDownload,
   LucideFileSpreadsheet,
-  LucideFileText,
   LucideFilter,
-  LucidePhone,
-  LucideUserCircle,
 } from '@lucide/angular';
+import { KEYCLOAK_EVENT_SIGNAL } from 'keycloak-angular';
 import { DoctorService } from '../../../core/services/doctor.service';
 import { SchedulerService } from '../../../core/services/scheduler.service';
 import { ExportModalComponent } from '../../../design-system/organisms/export-modal/export-modal.component';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
+
 type ExportColumnKey =
   | 'date'
   | 'time'
@@ -41,14 +38,13 @@ type FilterStatus =
 interface ColumnDef {
   key: ExportColumnKey;
   label: string;
-  icon: any;
 }
 
 @Component({
   selector: 'app-doctor-all-appointments',
   templateUrl: './doctor-all-appointments.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideCalendar,
     LucideClock,
@@ -98,18 +94,14 @@ export class DoctorAllAppointmentsComponent {
   ];
 
   readonly columnDefs: ColumnDef[] = [
-    { key: 'date', label: 'Fecha de la Cita', icon: LucideCalendar },
-    { key: 'time', label: 'Hora de la Cita', icon: LucideClock },
-    { key: 'patient', label: 'Nombre del Paciente', icon: LucideUserCircle },
-    {
-      key: 'documentId',
-      label: 'Documento de Identidad',
-      icon: LucideCreditCard,
-    },
-    { key: 'phone', label: 'Teléfono del Paciente', icon: LucidePhone },
-    { key: 'status', label: 'Estado de la Cita', icon: LucideCheckCircle },
-    { key: 'specialty', label: 'Especialidad', icon: LucideFileText },
-    { key: 'doctorName', label: 'Nombre del Médico', icon: LucideUserCircle },
+    { key: 'date', label: 'Fecha de la Cita' },
+    { key: 'time', label: 'Hora de la Cita' },
+    { key: 'patient', label: 'Nombre del Paciente' },
+    { key: 'documentId', label: 'Documento de Identidad' },
+    { key: 'phone', label: 'Teléfono del Paciente' },
+    { key: 'status', label: 'Estado de la Cita' },
+    { key: 'specialty', label: 'Especialidad' },
+    { key: 'doctorName', label: 'Nombre del Médico' },
   ];
 
   // ── Computed ──────────────────────────────────────────────────────────────

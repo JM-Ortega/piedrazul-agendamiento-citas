@@ -1,10 +1,10 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   computed,
   inject,
   OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
@@ -13,13 +13,13 @@ import {
   LucideCheck,
   LucideClock,
   LucideDownload,
+  LucideDynamicIcon,
   LucideFileSpreadsheet,
   LucideFileText,
   LucidePlusCircle,
   LucideSearch,
   LucideUser,
   LucideX,
-  LucideDynamicIcon,
   type LucideIcon,
 } from '@lucide/angular';
 import { SchedulerService } from '../../core/services/scheduler.service';
@@ -53,7 +53,7 @@ const EXT_MAP: Record<ExportFormat, string> = {
   selector: 'app-scheduler-dashboard',
   templateUrl: './scheduler-dashboard.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideAlertCircle,
     LucideCalendar,
@@ -298,13 +298,9 @@ export class SchedulerDashboardComponent implements OnInit {
     this.isCheckingAvailability.set(true);
 
     this.schedulerService.checkSchedulerAvailability(date).subscribe({
-      next: (response: any) => {
-        console.log('📥 Respuesta:', response);
-        const hasAvailability = response?.hasAvailabilitySlots ?? response;
-        console.log('hasAvailabilitySlots:', hasAvailability);
-
+      next: ({ hasAvailabilitySlots }) => {
         this.isCheckingAvailability.set(false);
-        if (hasAvailability) {
+        if (hasAvailabilitySlots) {
           this.showAvailabilityWarning.set(true);
         } else {
           this.openExportModal();

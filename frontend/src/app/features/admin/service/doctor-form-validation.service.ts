@@ -8,7 +8,7 @@ export interface FormErrors {
   fechaFin: string;
   intervalo: string;
   dias: string;
-  horariosDia: { [day: number]: string };
+  horariosDia: Record<number, string>;
 }
 
 @Injectable({ providedIn: 'root' })

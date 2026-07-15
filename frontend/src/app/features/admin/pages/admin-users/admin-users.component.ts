@@ -1,10 +1,10 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   computed,
   inject,
   OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { Router } from '@angular/router';
 import {
@@ -21,7 +21,7 @@ import { AdminService } from '../../service/admin.service';
   selector: 'app-admin-users',
   templateUrl: './admin-users.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideCalendar,
     LucideCreditCard,
