@@ -1,10 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.DocumentType;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.*;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
@@ -85,7 +82,7 @@ class DoctorServiceTest {
         d.setLaborStart(start);
         d.setLaborEnd(end);
         d.setStatus(status);
-        d.setSpecialty(new ArrayList<>(List.of(Specialty.MEDICINA_GENERAL)));
+        d.setSpecialty(new ArrayList<>(List.of(SpecialtyCode.MEDICINA_GENERAL)));
         d.setSchedules(new ArrayList<>());
         d.setAppointmentInterval(30);
         return d;
@@ -99,7 +96,7 @@ class DoctorServiceTest {
         return new CreateDoctorRequest(
                 DocumentType.CEDULA,
                 "3001234567",
-                List.of(Specialty.MEDICINA_GENERAL),
+                List.of(SpecialtyCode.MEDICINA_GENERAL),
                 start,
                 end,
                 30,
@@ -517,9 +514,9 @@ class DoctorServiceTest {
         void addSpecialities_validDoctor_addsSpecialties() {
             when(doctorRepository.findById(doctorId)).thenReturn(Optional.of(activeDoctorFixture));
 
-            doctorService.addSpecialities(doctorId, List.of(Specialty.FISIOTERAPIA));
+            doctorService.addSpecialities(doctorId, List.of(SpecialtyCode.FISIOTERAPIA));
 
-            assertThat(activeDoctorFixture.getSpecialty()).contains(Specialty.FISIOTERAPIA);
+            assertThat(activeDoctorFixture.getSpecialty()).contains(SpecialtyCode.FISIOTERAPIA);
         }
 
         @Test
@@ -527,9 +524,9 @@ class DoctorServiceTest {
         void removeSpecialities_validDoctor_removesSpecialties() {
             when(doctorRepository.findById(doctorId)).thenReturn(Optional.of(activeDoctorFixture));
 
-            doctorService.removeSpecialities(doctorId, List.of(Specialty.MEDICINA_GENERAL));
+            doctorService.removeSpecialities(doctorId, List.of(SpecialtyCode.MEDICINA_GENERAL));
 
-            assertThat(activeDoctorFixture.getSpecialty()).doesNotContain(Specialty.MEDICINA_GENERAL);
+            assertThat(activeDoctorFixture.getSpecialty()).doesNotContain(SpecialtyCode.MEDICINA_GENERAL);
         }
 
         @Test
@@ -537,7 +534,7 @@ class DoctorServiceTest {
         void addSpecialities_doctorNotFound_throwsNotFoundException() {
             when(doctorRepository.findById(doctorId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> doctorService.addSpecialities(doctorId, List.of(Specialty.FISIOTERAPIA)))
+            assertThatThrownBy(() -> doctorService.addSpecialities(doctorId, List.of(SpecialtyCode.FISIOTERAPIA)))
                     .isInstanceOf(DoctorNotFoundException.class);
         }
 
@@ -546,7 +543,7 @@ class DoctorServiceTest {
         void removeSpecialities_doctorNotFound_throwsNotFoundException() {
             when(doctorRepository.findById(doctorId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> doctorService.removeSpecialities(doctorId, List.of(Specialty.MEDICINA_GENERAL)))
+            assertThatThrownBy(() -> doctorService.removeSpecialities(doctorId, List.of(SpecialtyCode.MEDICINA_GENERAL)))
                     .isInstanceOf(DoctorNotFoundException.class);
         }
     }
@@ -565,11 +562,11 @@ class DoctorServiceTest {
             UUID patientId = UUID.randomUUID();
             when(appointmentExternalService.isNewPatient(patientId)).thenReturn(true);
             when(doctorRepository.findAllDistinctSpecialtiesByActiveDoctors())
-                    .thenReturn(new ArrayList<>(List.of(Specialty.MEDICINA_GENERAL, Specialty.FISIOTERAPIA)));
+                    .thenReturn(new ArrayList<>(List.of(SpecialtyCode.MEDICINA_GENERAL, SpecialtyCode.FISIOTERAPIA)));
 
-            List<Specialty> result = doctorService.getSpecialties(patientId);
+            List<SpecialtyCode> result = doctorService.getSpecialties(patientId);
 
-            assertThat(result).containsExactly(Specialty.MEDICINA_GENERAL);
+            assertThat(result).containsExactly(SpecialtyCode.MEDICINA_GENERAL);
         }
 
         @Test
@@ -578,9 +575,9 @@ class DoctorServiceTest {
             UUID patientId = UUID.randomUUID();
             when(appointmentExternalService.isNewPatient(patientId)).thenReturn(true);
             when(doctorRepository.findAllDistinctSpecialtiesByActiveDoctors())
-                    .thenReturn(List.of(Specialty.FISIOTERAPIA));
+                    .thenReturn(List.of(SpecialtyCode.FISIOTERAPIA));
 
-            List<Specialty> result = doctorService.getSpecialties(patientId);
+            List<SpecialtyCode> result = doctorService.getSpecialties(patientId);
 
             assertThat(result).isEmpty();
         }
@@ -589,11 +586,11 @@ class DoctorServiceTest {
         @DisplayName("Retorna todas las especialidades activas para paciente no nuevo")
         void getSpecialties_existingPatient_returnsAllActiveSpecialties() {
             UUID patientId = UUID.randomUUID();
-            List<Specialty> all = List.of(Specialty.MEDICINA_GENERAL, Specialty.FISIOTERAPIA);
+            List<SpecialtyCode> all = List.of(SpecialtyCode.MEDICINA_GENERAL, SpecialtyCode.FISIOTERAPIA);
             when(appointmentExternalService.isNewPatient(patientId)).thenReturn(false);
             when(doctorRepository.findAllDistinctSpecialtiesByActiveDoctors()).thenReturn(all);
 
-            List<Specialty> result = doctorService.getSpecialties(patientId);
+            List<SpecialtyCode> result = doctorService.getSpecialties(patientId);
 
             assertThat(result).containsExactlyInAnyOrderElementsOf(all);
         }
@@ -653,19 +650,19 @@ class DoctorServiceTest {
         @Test
         @DisplayName("getDoctorBySpeciality filtra correctamente por especialidad")
         void getDoctorBySpeciality_returnsFilteredList() {
-            when(doctorRepository.findBySpecialtyContaining(Specialty.FISIOTERAPIA))
+            when(doctorRepository.findBySpecialtyContaining(SpecialtyCode.FISIOTERAPIA))
                     .thenReturn(List.of(activeDoctorFixture));
 
-            List<Doctor> result = doctorService.getDoctorBySpeciality(Specialty.FISIOTERAPIA);
+            List<Doctor> result = doctorService.getDoctorBySpeciality(SpecialtyCode.FISIOTERAPIA);
 
             assertThat(result).containsExactly(activeDoctorFixture);
         }
 
         @Test
-        @DisplayName("getAllSpecialties retorna todos los valores del enum Specialty")
+        @DisplayName("getAllSpecialties retorna todos los valores del enum SpecialtyCode")
         void getAllSpecialties_returnsAllEnumValues() {
             assertThat(doctorService.getAllSpecialties())
-                    .containsExactlyInAnyOrder(Specialty.values());
+                    .containsExactlyInAnyOrder(SpecialtyCode.values());
         }
     }
 }

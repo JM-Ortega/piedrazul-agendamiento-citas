@@ -3,7 +3,7 @@ package co.edu.unicauca.piedrazul.backend.doctors.application;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
@@ -33,7 +33,7 @@ public class DoctorService implements DoctorProvisioningApi {
 
     @Transactional
     @Override
-    public void createDoctor(UUID userId, String firstName, String lastName, String identificacion, CreateDoctorRequest request) {
+    public void createDoctor(LocalDate laborStart, LocalDate laborEnd, int appointmentInterval) {
         if (doctorRepository.findByIdUser(userId) != null) {
             return;
         }
@@ -241,7 +241,7 @@ public class DoctorService implements DoctorProvisioningApi {
     }
 
     @Transactional
-    public void addSpecialities(UUID doctorId, List<Specialty> specialties) {
+    public void addSpecialities(UUID doctorId, List<SpecialtyCode> specialties) {
 
         Doctor doctor = doctorRepository.findById(doctorId)
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
@@ -250,7 +250,7 @@ public class DoctorService implements DoctorProvisioningApi {
     }
 
     @Transactional
-    public void removeSpecialities(UUID doctorId, List<Specialty> specialties) {
+    public void removeSpecialities(UUID doctorId, List<SpecialtyCode> specialties) {
 
         Doctor doctor = doctorRepository.findById(doctorId)
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
@@ -275,24 +275,29 @@ public class DoctorService implements DoctorProvisioningApi {
         return doctor;
     }
 
-    public List<Doctor> getDoctorBySpeciality(Specialty specialty) {
+    public List<Doctor> getDoctorBySpeciality(SpecialtyCode specialty) {
         return doctorRepository.findBySpecialtyContaining(specialty);
     }
 
-    public List<Specialty> getSpecialties (UUID idPatient){
-        List<Specialty> activeSpecialities = doctorRepository.findAllDistinctSpecialtiesByActiveDoctors();
-        if (appointmentExternalService.isNewPatient(idPatient)){
-            if(activeSpecialities.contains(Specialty.MEDICINA_GENERAL)){
-                return List.of(Specialty.MEDICINA_GENERAL);
-            }
-        }else {
-            return activeSpecialities;
+    public List<SpecialtyCode> getSpecialties(UUID idPatient) {
+
+        List<SpecialtyCode> activeSpecialties = doctorRepository
+                .findAllDistinctSpecialtyCodesByActiveDoctors()
+                .stream()
+                .map(SpecialtyCode::valueOf)
+                .toList();
+
+        if (appointmentExternalService.isNewPatient(idPatient)) {
+            return activeSpecialties.contains(SpecialtyCode.MEDICINA_GENERAL)
+                    ? List.of(SpecialtyCode.MEDICINA_GENERAL)
+                    : Collections.emptyList();
         }
-        return Collections.emptyList();
+
+        return activeSpecialties;
     }
 
-    public List<Specialty> getAllSpecialties (){
-        return Arrays.asList(Specialty.values());
+    public List<SpecialtyCode> getAllSpecialties (){
+        return Arrays.asList(SpecialtyCode.values());
     }
 
     private void syncUserStatus(Doctor doctor) {

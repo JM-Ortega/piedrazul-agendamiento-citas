@@ -6,19 +6,23 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @RequiredArgsConstructor
 @Setter
 @Getter
 
 @Entity
-@Table(name = "doctors")
+@Table(name = "doctor", schema = "piedrazul")
 public class Doctor {
 
     @Id
+    @Column(name = "peson_id", updatable = false, nullable = false)
+    private UUID personId;
+
+    // BORRAR I
+    //@Id
+    /*
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id_doctor", updatable = false, nullable = false)
     private UUID idDoctor;
@@ -42,17 +46,16 @@ public class Doctor {
     @Column(name = "phone", nullable = false, length = 20)
     private String phone;
 
-    @ElementCollection(targetClass = Specialty.class)
+    @ElementCollection(targetClass = SpecialtyCode.class)
     @Enumerated(EnumType.STRING)
     @CollectionTable(
             name = "doctor_specialties",
             joinColumns = @JoinColumn(name = "id_doctor", nullable = false)
     )
     @Column(name = "specialty", nullable = false)
-    private List<Specialty> specialty = new ArrayList<>();
-
-    @Column(name = "status", nullable = false)
-    private boolean status;
+    private List<SpecialtyCode> specialty = new ArrayList<>();
+     */
+    // BORRAR F
 
     @Column(name = "labor_start", nullable = false)
     private LocalDate laborStart;
@@ -60,28 +63,38 @@ public class Doctor {
     @Column(name = "labor_end")
     private LocalDate laborEnd;
 
+    @Column(name = "booking_window_weeks", nullable = false)
+    private Integer bookingWindowWeeks;
+
+    @Column(name = "status", nullable = false)
+    private boolean status;
+
     @Column(name = "appointment_interval", nullable = false)
     private int appointmentInterval;
 
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "doctor_specialty",
+            schema = "piedrazul",
+            joinColumns = @JoinColumn(name = "doctor_id"),
+            inverseJoinColumns = @JoinColumn(name = "specialty_code")
+    )
+    private Set<Specialty> specialties = new HashSet<>();
+
+
+    // BORRAR I
+    /*
     @OneToMany(mappedBy = "doctor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Schedule> schedules = new ArrayList<>();
+     */
+    // BORRAR F
 
     // Al momento de registrar/crearle una cuenta al doctor se le deben llenar todos estos campos,
     // el registro de doctores deberia hacerlo solo el administrador
-    public Doctor(UUID idUser, String firstName, String lastName, String identification, DocumentType documentType,
-                  String phone, List<Specialty> specialty, boolean status, LocalDate laborStart,
-                  LocalDate laborEnd, int appointmentInterval, List<Schedule> schedules) {
-        this.idUser = idUser;
-        this.firstName = firstName;
-        this.lastName = lastName;
-        this.identification = identification;
-        this.documentType = documentType;
-        this.phone = phone;
-        this.specialty = specialty;
+    public Doctor(boolean status, LocalDate laborStart, LocalDate laborEnd, int appointmentInterval) {
         this.status = status;
         this.laborStart = laborStart;
         this.laborEnd = laborEnd;
         this.appointmentInterval = appointmentInterval;
-        this.schedules = schedules;
     }
 }

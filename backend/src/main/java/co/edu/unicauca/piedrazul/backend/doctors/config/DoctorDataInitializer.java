@@ -3,10 +3,10 @@ package co.edu.unicauca.piedrazul.backend.doctors.config;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.DocumentType;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
@@ -17,7 +17,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.Collections;
 import java.util.List;
 
 @Component
@@ -48,7 +47,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
                         ), new CreateDoctorRequest(
                         DocumentType.CEDULA,
                         "3208337463",
-                        List.of(Specialty.TERAPIA_NEURAL),
+                        List.of(SpecialtyCode.TERAPIA_NEURAL),
                         LocalDate.of(2026, 1, 1),
                         LocalDate.of(2026, 12, 31),
                         20,
@@ -73,7 +72,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
                 new CreateDoctorRequest(
                         DocumentType.CEDULA,
                         "3147826393",
-                        List.of(Specialty.FISIOTERAPIA),
+                        List.of(SpecialtyCode.FISIOTERAPIA),
                         LocalDate.of(2026, 1, 1),
                         LocalDate.of(2026, 12, 31),
                         30,
@@ -99,7 +98,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
                 new CreateDoctorRequest(
                         DocumentType.CEDULA,
                         "314738447",
-                        List.of(Specialty.QUIROPRAXIA),
+                        List.of(SpecialtyCode.QUIROPRAXIA),
                         LocalDate.of(2026, 1, 1),
                         LocalDate.of(2026, 3,1),
                         30,
@@ -123,7 +122,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
                 new CreateDoctorRequest(
                         DocumentType.CEDULA,
                         "3147826393",
-                        List.of(Specialty.MEDICINA_GENERAL),
+                        List.of(SpecialtyCode.MEDICINA_GENERAL),
                         LocalDate.of(2026, 1, 1),
                         LocalDate.of(2026, 12, 31),
                         10,

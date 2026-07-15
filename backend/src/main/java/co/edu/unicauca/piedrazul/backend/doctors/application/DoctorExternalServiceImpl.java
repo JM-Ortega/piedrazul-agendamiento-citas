@@ -3,7 +3,7 @@ package co.edu.unicauca.piedrazul.backend.doctors.application;
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import jakarta.transaction.Transactional;
@@ -69,7 +69,7 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     public List<UUID> getActiveGeneralDoctorIds(){
         return doctorRepository.findByStatusTrue()
                 .stream()
-                .filter(doctor -> doctor.getSpecialty().contains(Specialty.MEDICINA_GENERAL))
+                .filter(doctor -> doctor.getSpecialty().contains(SpecialtyCode.MEDICINA_GENERAL))
                 .map(Doctor::getIdDoctor)
                 .toList();
     }
@@ -87,7 +87,7 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     }
 
     @Override
-    public List<Specialty> findSpecialtiesByIdentification(String identification){
+    public List<SpecialtyCode> findSpecialtiesByIdentification(String identification){
         return doctorRepository.findSpecialtiesByIdentification(identification);
     }
 

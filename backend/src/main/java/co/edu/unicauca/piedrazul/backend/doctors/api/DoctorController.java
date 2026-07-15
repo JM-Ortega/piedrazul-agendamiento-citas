@@ -5,7 +5,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorShortResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.SpecialtyCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -85,8 +85,8 @@ public class DoctorController {
      */
     @GetMapping("/patients/specialties")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<List<Specialty>> getSpecialties(@RequestParam(required = false) UUID patientId) {
-        List<Specialty> specialties = doctorService.getSpecialties(patientId);
+    public ResponseEntity<List<SpecialtyCode>> getSpecialties(@RequestParam(required = false) UUID patientId) {
+        List<SpecialtyCode> specialties = doctorService.getSpecialties(patientId);
         return ResponseEntity.ok(specialties);
     }
 
@@ -100,7 +100,7 @@ public class DoctorController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> addSpecialties(
             @PathVariable UUID doctorId,
-            @RequestBody List<Specialty> specialties) {
+            @RequestBody List<SpecialtyCode> specialties) {
 
         doctorService.addSpecialities(doctorId, specialties);
 
@@ -117,7 +117,7 @@ public class DoctorController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> removeSpecialties(
             @PathVariable UUID doctorId,
-            @RequestBody List<Specialty> specialties) {
+            @RequestBody List<SpecialtyCode> specialties) {
 
         doctorService.removeSpecialities(doctorId, specialties);
 
@@ -131,7 +131,7 @@ public class DoctorController {
     @GetMapping("/all-specialties")
     @PreAuthorize("hasAnyRole('ADMIN')")
     public ResponseEntity<?> getAllSpecialties() {
-        List<Specialty> specialties = doctorService.getAllSpecialties();
+        List<SpecialtyCode> specialties = doctorService.getAllSpecialties();
         return ResponseEntity.ok(specialties);
     }
 
@@ -142,7 +142,7 @@ public class DoctorController {
      */
     @GetMapping("/specialty/{specialty}")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<?> getDoctorsBySpecialty(@PathVariable Specialty specialty) {
+    public ResponseEntity<?> getDoctorsBySpecialty(@PathVariable SpecialtyCode specialty) {
         List<Doctor> doctors = doctorService.getDoctorBySpeciality(specialty);
         List<DoctorResponse> responses = doctors.stream()
                 .map(DoctorResponse::fromEntity)

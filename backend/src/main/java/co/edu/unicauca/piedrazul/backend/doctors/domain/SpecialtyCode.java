@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.doctors.domain;
 
-public enum Specialty {
+public enum SpecialtyCode {
     FISIOTERAPIA,
     TERAPIA_NEURAL,
     QUIROPRAXIA,
