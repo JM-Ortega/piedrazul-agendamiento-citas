@@ -44,7 +44,7 @@
                   class="bg-[#215c98] text-white rounded-xl p-3 text-center min-w-15 shrink-0"
                 >
                   <p class="text-2xl font-bold leading-none">
-                    {{ apt.date.split("-")[2] }}
+                    {{ apt.date.split('-')[2] }}
                   </p>
                   <p class="text-xs uppercase">{{ getMonthShort(apt.date) }}</p>
                 </div>
@@ -53,10 +53,14 @@
                   <p class="text-[#163c63] text-xl font-semibold">
                     Dr. {{ apt.doctorName }}
                   </p>
-                  <p class="text-gray-500 text-base">{{ apt.specialty | formato }}</p>
+                  <p class="text-gray-500 text-base">
+                    {{ apt.specialty | formato }}
+                  </p>
                   <div class="flex items-center gap-2 mt-1 text-gray-600">
                     <svg lucideClock [size]="16"></svg>
-                    <span class="text-base">{{ apt.startTime.slice(0, 5) }}</span>
+                    <span class="text-base">{{
+                      apt.startTime.slice(0, 5)
+                    }}</span>
                   </div>
                 </div>
               </div>

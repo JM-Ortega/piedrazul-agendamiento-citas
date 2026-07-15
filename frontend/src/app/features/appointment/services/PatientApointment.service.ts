@@ -12,7 +12,7 @@ export class PatientAppointmentService {
   readonly appointments = signal<AppointmentsPatient[]>([]);
 
   getAppointmentsByPatient(
-    patientId: string,
+    patientId: string
   ): Observable<AppointmentsPatient[]> {
     return this.http.get<AppointmentsPatient[]>(`${this.apiUrl}/appointments`, {
       params: { idPatient: patientId },
@@ -21,15 +21,20 @@ export class PatientAppointmentService {
 
   getMyAppointments(): Observable<AppointmentsPatient[]> {
     return this.http.get<AppointmentsPatient[]>(
-      `${this.apiUrl}/appointments/me`,
+      `${this.apiUrl}/appointments/me`
     );
   }
 
   hasAppointments(patientId: string): Observable<boolean> {
-    return this.http.get<boolean>(`${this.apiUrl}/appointments/${patientId}/is-new-patient`);
+    return this.http.get<boolean>(
+      `${this.apiUrl}/appointments/${patientId}/is-new-patient`
+    );
   }
 
   cancelAppointment(appointmentId: string): Observable<void> {
-    return this.http.put<void>(`${this.apiUrl}/appointments/${appointmentId}/cancel`, {});
+    return this.http.put<void>(
+      `${this.apiUrl}/appointments/${appointmentId}/cancel`,
+      {}
+    );
   }
 }

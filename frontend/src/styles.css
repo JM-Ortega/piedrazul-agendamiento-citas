@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @keyframes fadeInDown {
   from {
     opacity: 0;

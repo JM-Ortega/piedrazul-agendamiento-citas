@@ -1,5 +1,4 @@
 <div class="space-y-5">
-
   <div>
     <h2 class="text-[#163c63] text-2xl">Registrar Nuevo Paciente</h2>
     <p class="text-gray-500 text-sm mt-1">
@@ -7,12 +6,13 @@
     </p>
   </div>
 
-  <div class="bg-[#e6f0fa] border border-[#c2d8f0] rounded-xl px-4 py-3 flex items-center gap-2 text-[#163c63] text-sm">
+  <div
+    class="bg-[#e6f0fa] border border-[#c2d8f0] rounded-xl px-4 py-3 flex items-center gap-2 text-[#163c63] text-sm"
+  >
     📋 Documento: <strong>{{ getPatientField('documentNumber') }}</strong>
   </div>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
     <div>
       <label class="block text-gray-700 mb-1 text-sm font-medium">
         Tipo de Documento <span class="text-red-500">*</span>
@@ -24,7 +24,7 @@
       >
         <option value="">Seleccione...</option>
         @for (type of patientService.documentTypes(); track type) {
-          <option [value]="type">{{ type | formato}}</option>
+          <option [value]="type">{{ type | formato }}</option>
         }
       </select>
       @if (docTypeError()) {
@@ -127,11 +127,7 @@
         <button
           type="button"
           (click)="birthPicker.open()"
-          class="absolute right-3 top-1/2 -translate-y-1/2 
-                  text-gray-500 p-2 rounded-lg
-                  hover:bg-[#c2d8f0] hover:shadow-md
-                  hover:text-[#163c63]
-                  transition-all duration-200"
+          class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 p-2 rounded-lg hover:bg-[#c2d8f0] hover:shadow-md hover:text-[#163c63] transition-all duration-200"
         >
           <svg lucideCalendar [size]="20"></svg>
         </button>
@@ -166,7 +162,9 @@
     <div class="sm:col-span-2">
       <label class="block text-gray-700 mb-1 text-sm font-medium">
         Teléfono de familiar
-        <span class="text-gray-400 text-sm">(requerido si es menor de 18 años)</span>
+        <span class="text-gray-400 text-sm"
+          >(requerido si es menor de 18 años)</span
+        >
       </label>
       <input
         type="tel"
@@ -182,7 +180,6 @@
         <p class="text-red-500 text-sm mt-1">{{ guardianPhoneErrorMsg() }}</p>
       }
     </div>
-
   </div>
 
   <div class="flex gap-4 mt-4">
@@ -202,5 +199,4 @@
       Continuar →
     </button>
   </div>
-
 </div>

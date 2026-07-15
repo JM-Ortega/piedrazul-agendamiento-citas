@@ -24,7 +24,7 @@ export class BookingStateService {
   step = signal<number>(1);
 
   readonly patientLookupStep = computed(() =>
-    this.isSchedulerContext() ? 1 : null,
+    this.isSchedulerContext() ? 1 : null
   );
   readonly specialtyStep = computed(() => (this.isSchedulerContext() ? 2 : 1));
   readonly scheduleStep = computed(() => (this.isSchedulerContext() ? 3 : 2));
@@ -41,7 +41,7 @@ export class BookingStateService {
   readonly modeSelectionLabel = computed(() =>
     this.isSchedulerContext()
       ? '¿Cómo desea agendar la cita?'
-      : '¿Cómo desea agendar su cita?',
+      : '¿Cómo desea agendar su cita?'
   );
 
   readonly successMessage = computed(() => {
@@ -97,14 +97,14 @@ export class BookingStateService {
     if (this.isDoctorContext()) {
       return (
         this.doctorsBySpecialty().find(
-          (d) => d.id === this.selectedDoctorId(),
+          (d) => d.id === this.selectedDoctorId()
         ) ?? null
       );
     }
     return this.bookingMode() === 'specialty'
       ? this.assignedDoctor()
       : (this.doctorsBySpecialty().find(
-          (d) => d.id === this.selectedDoctorId(),
+          (d) => d.id === this.selectedDoctorId()
         ) ?? null);
   });
 
@@ -211,7 +211,7 @@ export class BookingStateService {
   });
 
   readonly canGoToConfirmStep = computed(
-    () => !!this.selectedDate() && !!this.selectedTime(),
+    () => !!this.selectedDate() && !!this.selectedTime()
   );
 
   formatLocalDate(date: Date): string {

@@ -17,9 +17,9 @@
     <div class="flex gap-2 mb-6">
       @for (
         label of [
-          "1. Verificar documento",
-          "2. Completar registro",
-          "3. Verificar código",
+          '1. Verificar documento',
+          '2. Completar registro',
+          '3. Verificar código',
         ];
         track $index
       ) {
@@ -70,14 +70,14 @@
             @if (docInputWarning()) {
               <p class="text-red-500 text-sm mt-1">{{ docInputWarning() }}</p>
             }
-            @if (errors()["documentNumber"]) {
+            @if (errors()['documentNumber']) {
               <p class="text-red-500 text-sm mt-1">
-                {{ errors()["documentNumber"] }}
+                {{ errors()['documentNumber'] }}
               </p>
             }
           </div>
 
-          @if (patientStatus() === "found" && foundPatient(); as p) {
+          @if (patientStatus() === 'found' && foundPatient(); as p) {
             <div class="bg-green-50 border-2 border-green-300 rounded-xl p-5">
               <div class="flex items-center gap-3 mb-3">
                 <svg lucideCheckCircle [size]="24" class="text-green-500"></svg>
@@ -108,7 +108,7 @@
             </div>
           }
 
-          @if (patientStatus() === "existing-user") {
+          @if (patientStatus() === 'existing-user') {
             <div class="bg-blue-50 border-2 border-blue-300 rounded-xl p-5">
               <div class="flex items-center gap-3 mb-3">
                 <svg lucideCheckCircle [size]="24" class="text-blue-500"></svg>
@@ -138,9 +138,9 @@
                     <option [value]="type">{{ type | formato }}</option>
                   }
                 </select>
-                @if (errors()["documentType"]) {
+                @if (errors()['documentType']) {
                   <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["documentType"] }}
+                    {{ errors()['documentType'] }}
                   </p>
                 }
               </div>
@@ -163,10 +163,12 @@
                   "
                 />
                 @if (firstNameLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">{{ firstNameLimitMsg() }}</p>
-                } @else if (errors()["firstName"]) {
                   <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["firstName"] }}
+                    {{ firstNameLimitMsg() }}
+                  </p>
+                } @else if (errors()['firstName']) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()['firstName'] }}
                   </p>
                 }
               </div>
@@ -189,10 +191,12 @@
                   "
                 />
                 @if (lastNameLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">{{ lastNameLimitMsg() }}</p>
-                } @else if (errors()["lastName"]) {
                   <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["lastName"] }}
+                    {{ lastNameLimitMsg() }}
+                  </p>
+                } @else if (errors()['lastName']) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()['lastName'] }}
                   </p>
                 }
               </div>
@@ -218,9 +222,9 @@
                 />
                 @if (phoneLimitMsg()) {
                   <p class="text-red-500 text-sm mt-1">{{ phoneLimitMsg() }}</p>
-                } @else if (errors()["phone"]) {
+                } @else if (errors()['phone']) {
                   <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["phone"] }}
+                    {{ errors()['phone'] }}
                   </p>
                 }
               </div>
@@ -244,9 +248,9 @@
                   <option value="FEMENINO">Femenino</option>
                   <option value="OTRO">Otro</option>
                 </select>
-                @if (errors()["gender"]) {
+                @if (errors()['gender']) {
                   <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["gender"] }}
+                    {{ errors()['gender'] }}
                   </p>
                 }
               </div>
@@ -269,15 +273,14 @@
                   <button
                     type="button"
                     (click)="birthPicker.open()"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 
-                            text-gray-500 p-2 rounded-lg
-                            hover:bg-blue-100 hover:shadow-md
-                            hover:text-blue-600
-                            transition-all duration-200"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 p-2 rounded-lg hover:bg-blue-100 hover:shadow-md hover:text-blue-600 transition-all duration-200"
                   >
                     <svg lucideCalendar [size]="20"></svg>
                   </button>
-                  <mat-datepicker #birthPicker startView="multi-year"></mat-datepicker>
+                  <mat-datepicker
+                    #birthPicker
+                    startView="multi-year"
+                  ></mat-datepicker>
                 </div>
               </div>
 
@@ -301,9 +304,9 @@
                 />
                 @if (emailLimitMsg()) {
                   <p class="text-red-500 text-sm mt-1">{{ emailLimitMsg() }}</p>
-                } @else if (errors()["email"]) {
+                } @else if (errors()['email']) {
                   <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["email"] }}
+                    {{ errors()['email'] }}
                   </p>
                 }
               </div>
@@ -335,17 +338,19 @@
                   "
                 />
                 @if (guardianPhoneLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">{{ guardianPhoneLimitMsg() }}</p>
-                } @else if (errors()["guardianPhone"]) {
                   <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["guardianPhone"] }}
+                    {{ guardianPhoneLimitMsg() }}
+                  </p>
+                } @else if (errors()['guardianPhone']) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()['guardianPhone'] }}
                   </p>
                 }
               </div>
             </div>
           }
 
-          @if (patientStatus() === "already-linked" && foundPatient(); as p) {
+          @if (patientStatus() === 'already-linked' && foundPatient(); as p) {
             <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-5">
               <h3 class="text-amber-800 text-lg font-semibold mb-3">
                 Ya existe una cuenta asociada
@@ -373,7 +378,7 @@
             </div>
           }
 
-          @if (patientStatus() === "not-found") {
+          @if (patientStatus() === 'not-found') {
             <div
               class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-yellow-800 text-sm"
             >
@@ -396,9 +401,9 @@
                     <option [value]="type">{{ type | formato }}</option>
                   }
                 </select>
-                @if (errors()["documentType"]) {
+                @if (errors()['documentType']) {
                   <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["documentType"] }}
+                    {{ errors()['documentType'] }}
                   </p>
                 }
               </div>
@@ -421,10 +426,12 @@
                   "
                 />
                 @if (firstNameLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">{{ firstNameLimitMsg() }}</p>
-                } @else if (errors()["firstName"]) {
                   <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["firstName"] }}
+                    {{ firstNameLimitMsg() }}
+                  </p>
+                } @else if (errors()['firstName']) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()['firstName'] }}
                   </p>
                 }
               </div>
@@ -447,10 +454,12 @@
                   "
                 />
                 @if (lastNameLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">{{ lastNameLimitMsg() }}</p>
-                } @else if (errors()["lastName"]) {
                   <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["lastName"] }}
+                    {{ lastNameLimitMsg() }}
+                  </p>
+                } @else if (errors()['lastName']) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()['lastName'] }}
                   </p>
                 }
               </div>
@@ -476,9 +485,9 @@
                 />
                 @if (phoneLimitMsg()) {
                   <p class="text-red-500 text-sm mt-1">{{ phoneLimitMsg() }}</p>
-                } @else if (errors()["phone"]) {
+                } @else if (errors()['phone']) {
                   <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["phone"] }}
+                    {{ errors()['phone'] }}
                   </p>
                 }
               </div>
@@ -502,9 +511,9 @@
                   <option value="FEMENINO">Femenino</option>
                   <option value="OTRO">Otro</option>
                 </select>
-                @if (errors()["gender"]) {
+                @if (errors()['gender']) {
                   <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["gender"] }}
+                    {{ errors()['gender'] }}
                   </p>
                 }
               </div>
@@ -532,19 +541,18 @@
                   <button
                     type="button"
                     (click)="birthPicker2.open()"
-                    class="absolute right-3 top-1/2 -translate-y-1/2
-                            text-gray-500 p-2 rounded-lg
-                            hover:bg-blue-100 hover:shadow-md
-                            hover:text-blue-600
-                            transition-all duration-200"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 p-2 rounded-lg hover:bg-blue-100 hover:shadow-md hover:text-blue-600 transition-all duration-200"
                   >
                     <svg lucideCalendar [size]="20"></svg>
                   </button>
-                  <mat-datepicker #birthPicker2 startView="multi-year"></mat-datepicker>
+                  <mat-datepicker
+                    #birthPicker2
+                    startView="multi-year"
+                  ></mat-datepicker>
                 </div>
-                @if (errors()["birthDate"]) {
+                @if (errors()['birthDate']) {
                   <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["birthDate"] }}
+                    {{ errors()['birthDate'] }}
                   </p>
                 }
               </div>
@@ -569,9 +577,9 @@
                 />
                 @if (emailLimitMsg()) {
                   <p class="text-red-500 text-sm mt-1">{{ emailLimitMsg() }}</p>
-                } @else if (errors()["email"]) {
+                } @else if (errors()['email']) {
                   <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["email"] }}
+                    {{ errors()['email'] }}
                   </p>
                 }
               </div>
@@ -603,10 +611,12 @@
                   "
                 />
                 @if (guardianPhoneLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">{{ guardianPhoneLimitMsg() }}</p>
-                } @else if (errors()["guardianPhone"]) {
                   <p class="text-red-500 text-sm mt-1">
-                    {{ errors()["guardianPhone"] }}
+                    {{ guardianPhoneLimitMsg() }}
+                  </p>
+                } @else if (errors()['guardianPhone']) {
+                  <p class="text-red-500 text-sm mt-1">
+                    {{ errors()['guardianPhone'] }}
                   </p>
                 }
               </div>
@@ -621,7 +631,9 @@
             </div>
           }
 
-          @if (patientStatus() !== 'idle' && patientStatus() !== 'already-linked') {
+          @if (
+            patientStatus() !== 'idle' && patientStatus() !== 'already-linked'
+          ) {
             <div class="flex justify-end mt-4">
               <button
                 (click)="goToStep2()"
@@ -702,9 +714,9 @@
                   ></svg>
                 </button>
               </div>
-              @if (errors()["password"]) {
+              @if (errors()['password']) {
                 <p class="text-red-500 text-sm mt-1">
-                  {{ errors()["password"] }}
+                  {{ errors()['password'] }}
                 </p>
               }
             </div>
@@ -737,9 +749,9 @@
                   ></svg>
                 </button>
               </div>
-              @if (errors()["confirmPassword"]) {
+              @if (errors()['confirmPassword']) {
                 <p class="text-red-500 text-sm mt-1">
-                  {{ errors()["confirmPassword"] }}
+                  {{ errors()['confirmPassword'] }}
                 </p>
               }
             </div>
@@ -817,9 +829,9 @@
                   : 'border-blue-200 focus:border-[#4e92d9]'
               "
             />
-            @if (errors()["verificationCode"]) {
+            @if (errors()['verificationCode']) {
               <p class="text-red-500 text-sm mt-1">
-                {{ errors()["verificationCode"] }}
+                {{ errors()['verificationCode'] }}
               </p>
             }
           </div>
