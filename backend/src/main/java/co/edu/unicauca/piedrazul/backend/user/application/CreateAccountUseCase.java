@@ -4,9 +4,11 @@ import co.edu.unicauca.piedrazul.backend.doctors.DoctorProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientUserRequest;
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
+import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
 import org.springframework.stereotype.Service;
 
@@ -20,15 +22,18 @@ public class CreateAccountUseCase implements UserProvisioningApi {
 
     private final DoctorProvisioningApi doctorProvisioningApi;
     private final PatientModuleApi patientModuleApi;
+    private final PersonExternalService personExternalService;
     private final KeycloakUserProvisioningService keycloakUserProvisioningService;
 
     public CreateAccountUseCase(
             DoctorProvisioningApi doctorProvisioningApi,
             PatientModuleApi patientModuleApi,
+            PersonExternalService personExternalService,
             KeycloakUserProvisioningService keycloakUserProvisioningService
     ) {
         this.doctorProvisioningApi = doctorProvisioningApi;
         this.patientModuleApi = patientModuleApi;
+        this.personExternalService = personExternalService;
         this.keycloakUserProvisioningService = keycloakUserProvisioningService;
     }
 
@@ -53,31 +58,52 @@ public class CreateAccountUseCase implements UserProvisioningApi {
         List<Role> roles = payload.roles().stream().distinct().toList();
         validateRoles(roles);
 
+        // Creación usuario Keycloak
         var user = keycloakUserProvisioningService.getOrCreateUser(payload.user(), roles);
 
+        // Creación de la persona (una sola vez, compartida entre doctor/paciente si aplica)
+        PersonSummary person = personExternalService.createPerson(
+                payload.user().identificationType(),
+                payload.user().identification(),
+                user.firstName(),
+                user.lastName(),
+                payload.user().phone(),
+                user.email(),
+                user.id()
+        );
+
         if (roles.contains(Role.DOCTOR)) {
-            createDoctor(user.id(), user.firstName(), user.lastName(), user.username(), payload.doctor());
+            createDoctor(person.id(), payload.doctor());
         }
 
         if (roles.contains(Role.PATIENT)) {
-            createPatient(user.id(), user.firstName(), user.lastName(), user.username(), user.email(), payload.patient());
+            createPatient(person.id(), payload.patient());
         }
     }
 
-    private void createDoctor(UUID userId, String firstName, String lastName, String identificacion, CreateDoctorRequest doctorRequest) {
+    private void createDoctor(UUID personId, CreateDoctorRequest doctorRequest) {
         if (doctorRequest == null) {
             throw new InvalidUserDataException("Los datos del médico son requeridos para crearlo");
         }
 
-        doctorProvisioningApi.createDoctor(userId, firstName, lastName, identificacion, doctorRequest);
+        doctorProvisioningApi.createDoctor(personId, doctorRequest.laborStart(), doctorRequest.laborEnd(), doctorRequest.appointmentInterval());
+
+        if (doctorRequest.schedules() == null || doctorRequest.schedules().isEmpty()){
+
+        }
     }
 
-    private void createPatient(UUID userId, String firstName, String lastName, String identificacion, String email, CreatePatientUserRequest patientRequest) {
+    private void createPatient(UUID personId, CreatePatientUserRequest patientRequest) {
         if (patientRequest == null) {
             throw new InvalidUserDataException("Los datos del paciente son requeridos para crearlo");
         }
 
-        patientModuleApi.createPatient(userId, firstName, lastName, identificacion, email, patientRequest);
+        patientModuleApi.createPatientForExistingPerson(
+                personId,
+                patientRequest.sex(),
+                patientRequest.birthDate(),
+                patientRequest.guardianPhone()
+        );
     }
 
     private void validateRoles(List<Role> roles) {

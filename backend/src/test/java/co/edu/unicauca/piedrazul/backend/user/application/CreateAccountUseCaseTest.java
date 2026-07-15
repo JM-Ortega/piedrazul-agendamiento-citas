@@ -3,13 +3,12 @@ package co.edu.unicauca.piedrazul.backend.user.application;
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.DocumentType;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientUserRequest;
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
-import co.edu.unicauca.piedrazul.backend.user.application.KeycloakUserProvisioningService;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
@@ -90,7 +89,7 @@ class CreateAccountUseCaseTest {
 	CreateDoctorRequest doctorRequest = new CreateDoctorRequest(
 		DocumentType.CEDULA,
 		"3001234567",
-		List.of(Specialty.MEDICINA_GENERAL),
+		List.of(SpecialtyCode.MEDICINA_GENERAL),
 		LocalDate.of(2024, 1, 1),
 		null,
 		30,
@@ -159,7 +158,7 @@ class CreateAccountUseCaseTest {
 	CreateDoctorRequest doctorRequest = new CreateDoctorRequest(
 		DocumentType.CEDULA,
 		"3001234567",
-		List.of(Specialty.MEDICINA_GENERAL),
+		List.of(SpecialtyCode.MEDICINA_GENERAL),
 		LocalDate.of(2024, 1, 1),
 		null,
 		30,

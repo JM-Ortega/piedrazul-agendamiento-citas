@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.user.api.dto.input;
 
 import co.edu.unicauca.piedrazul.backend.jackson.normalization.NormalizeName;
 import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
+import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 import jakarta.validation.constraints.*;
 
 
@@ -11,6 +12,9 @@ public record CreateSystemUserRequest(
         @Pattern(regexp = "^[A-Za-z0-9._-]{4,50}$")
         @Sanitize
         String identification,
+
+        @NotNull
+        IdentificationType identificationType,
 
         @NotBlank
         @Size(min = 2, max = 60)
@@ -30,6 +34,12 @@ public record CreateSystemUserRequest(
         @Size(max = 120)
         @Sanitize
         String email,
+
+        // Número Colombiano
+        @Pattern(regexp = "^[0-9]{10}$")
+        @NotBlank
+        @Sanitize
+        String phone,
 
         @NotBlank
         @Size(min = 6, max = 100)

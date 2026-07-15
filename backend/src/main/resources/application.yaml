@@ -56,9 +56,11 @@ app:
 
       admin:
         username: ${IDENTITY_SEED_ADMIN_USERNAME:}
+        identification-type: ${IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE:CEDULA}
         first-name: ${IDENTITY_SEED_ADMIN_FIRST_NAME:}
         last-name: ${IDENTITY_SEED_ADMIN_LAST_NAME:}
         email: ${IDENTITY_SEED_ADMIN_EMAIL:}
+        phone: ${IDENTITY_SEED_ADMIN_PHONE:}
         password: ${IDENTITY_SEED_ADMIN_PASSWORD:}
 
 keycloak:
