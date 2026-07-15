@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.audit.application;
 
-import co.edu.unicauca.piedrazul.backend.shared.events.AppointmentCreatedEvent;
+import co.edu.unicauca.piedrazul.backend.shared.events.audit.AppointmentCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditAction;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditModule;
 import org.springframework.context.event.EventListener;
