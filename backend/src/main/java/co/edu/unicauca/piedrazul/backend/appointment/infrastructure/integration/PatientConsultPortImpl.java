@@ -34,7 +34,7 @@ public class PatientConsultPortImpl implements PatientConsultPort {
     public Optional<PatientSnapshot> findByDocumentNumber(String documentNumber) {
         return patientModuleApi.findByDocumentNumber(documentNumber)
                 .map(patientData -> new PatientSnapshot(
-                        patientData.id(),
+                        patientData.personId(),
                         PatientInfoMapper.toPatientInfo(patientData)
                 ));
     }
@@ -43,7 +43,7 @@ public class PatientConsultPortImpl implements PatientConsultPort {
     public Optional<PatientSnapshot> findByUserId(UUID userId) {
         return patientModuleApi.findByUserId(userId)
                 .map(p -> new PatientSnapshot(
-                        p.id(),
+                        p.personId(),
                         PatientInfoMapper.toPatientInfo(p)
                 ));
     }
@@ -58,11 +58,12 @@ public class PatientConsultPortImpl implements PatientConsultPort {
                 data.lastName(),
                 data.phone(),
                 data.email(),
+                null,
                 PatientRegistrationMapper.mapGender(data.gender()),
                 data.birthDate(),
                 data.guardianPhone()
         );
 
-        return created.id();
+        return created.personId();
     }
 }

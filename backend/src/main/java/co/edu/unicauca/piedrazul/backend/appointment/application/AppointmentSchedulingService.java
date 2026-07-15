@@ -13,7 +13,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorCo
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentScheduledEvent;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.FirstAppointmentMustBeGeneralMedicineException;
-import co.edu.unicauca.piedrazul.backend.shared.events.AppointmentCreatedEvent;
+import co.edu.unicauca.piedrazul.backend.shared.events.audit.AppointmentCreatedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 

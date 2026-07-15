@@ -3,9 +3,9 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientSex;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
+import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 
 public final class PatientInfoMapper {
 
@@ -18,19 +18,19 @@ public final class PatientInfoMapper {
         }
 
         return PatientInfo.of(
-                mapDocumentType(source.documentType()),
-                source.documentNumber(),
+                mapDocumentType(source.identificationType()),
+                source.identification(),
                 source.firstName(),
                 source.lastName(),
                 source.phone(),
-                mapGender(source.gender()),
+                mapGender(source.sex()),
                 source.birthDate(),
                 source.email(),
                 source.guardianPhone()
         );
     }
 
-    private static DocumentType mapDocumentType(PatientDocumentType source) {
+    private static DocumentType mapDocumentType(IdentificationType source) {
         if (source == null) {
             return null;
         }
@@ -43,7 +43,7 @@ public final class PatientInfoMapper {
         };
     }
 
-    private static Gender mapGender(PatientGender source) {
+    private static Gender mapGender(PatientSex source) {
         if (source == null) {
             return null;
         }
@@ -51,7 +51,6 @@ public final class PatientInfoMapper {
         return switch (source) {
             case MASCULINO -> Gender.MASCULINO;
             case FEMENINO -> Gender.FEMENINO;
-            case OTRO -> Gender.OTRO;
         };
     }
 }

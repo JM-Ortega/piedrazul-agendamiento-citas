@@ -178,6 +178,7 @@ public class Appointment {
         return specialty;
     }
 
+    //no se está usando, revisarlo
     public PatientInfo getPatientInfo() {
         return patientInfo;
     }
