@@ -11,7 +11,7 @@ public class ConfirmLinkUserAccountRequest {
     @Size(max = 12)
     @Pattern(regexp = "^[A-Za-z0-9._-]{5,30}$")
     @Sanitize
-    private String documentNumber;
+    private String identification;
 
     @NotBlank
     @Pattern(regexp = "^[A-Za-z0-9]{4,12}$")
@@ -22,12 +22,12 @@ public class ConfirmLinkUserAccountRequest {
     @Size(min = 6, max = 100)
     private String password;
 
-    public String getDocumentNumber() {
-        return documentNumber;
+    public String getIdentification() {
+        return identification;
     }
 
-    public void setDocumentNumber(String documentNumber) {
-        this.documentNumber = documentNumber;
+    public void setIdentification(String identification) {
+        this.identification = identification;
     }
 
     public String getCode() {
