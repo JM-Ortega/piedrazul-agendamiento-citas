@@ -9,18 +9,17 @@ import {
 import { Router } from '@angular/router';
 import { KEYCLOAK_EVENT_SIGNAL } from 'keycloak-angular';
 import {
-  Calendar,
-  CheckCircle,
-  Clock,
-  CreditCard,
-  Download,
-  FileSpreadsheet,
-  FileText,
-  Filter,
-  LucideAngularModule,
-  Phone,
-  UserCircle,
-} from 'lucide-angular';
+  LucideCalendar,
+  LucideCheckCircle,
+  LucideClock,
+  LucideCreditCard,
+  LucideDownload,
+  LucideFileSpreadsheet,
+  LucideFileText,
+  LucideFilter,
+  LucidePhone,
+  LucideUserCircle,
+} from '@lucide/angular';
 import { DoctorService } from '../../../core/services/doctor.service';
 import { SchedulerService } from '../../../core/services/scheduler.service';
 import { ExportModalComponent } from '../../../design-system/organisms/export-modal/export-modal.component';
@@ -50,25 +49,21 @@ interface ColumnDef {
   templateUrl: './doctor-all-appointments.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.Eager,
-  imports: [LucideAngularModule, ExportModalComponent],
+  imports: [
+    LucideCalendar,
+    LucideClock,
+    LucideCreditCard,
+    LucideDownload,
+    LucideFileSpreadsheet,
+    LucideFilter,
+    ExportModalComponent,
+  ],
 })
 export class DoctorAllAppointmentsComponent {
   private router = inject(Router);
   private doctorService = inject(DoctorService);
   private schedulerService = inject(SchedulerService);
   private keycloakEvent = inject(KEYCLOAK_EVENT_SIGNAL);
-
-  // ── Icons ─────────────────────────────────────────────────────────────────
-  readonly Calendar = Calendar;
-  readonly Clock = Clock;
-  readonly FileText = FileText;
-  readonly Filter = Filter;
-  readonly Download = Download;
-  readonly FileSpreadsheet = FileSpreadsheet;
-  readonly CreditCard = CreditCard;
-  readonly UserCircle = UserCircle;
-  readonly CheckCircle = CheckCircle;
-  readonly Phone = Phone;
 
   // ── State ─────────────────────────────────────────────────────────────────
   today = (() => {
@@ -103,14 +98,18 @@ export class DoctorAllAppointmentsComponent {
   ];
 
   readonly columnDefs: ColumnDef[] = [
-    { key: 'date', label: 'Fecha de la Cita', icon: Calendar },
-    { key: 'time', label: 'Hora de la Cita', icon: Clock },
-    { key: 'patient', label: 'Nombre del Paciente', icon: UserCircle },
-    { key: 'documentId', label: 'Documento de Identidad', icon: CreditCard },
-    { key: 'phone', label: 'Teléfono del Paciente', icon: Phone },
-    { key: 'status', label: 'Estado de la Cita', icon: CheckCircle },
-    { key: 'specialty', label: 'Especialidad', icon: FileText },
-    { key: 'doctorName', label: 'Nombre del Médico', icon: UserCircle },
+    { key: 'date', label: 'Fecha de la Cita', icon: LucideCalendar },
+    { key: 'time', label: 'Hora de la Cita', icon: LucideClock },
+    { key: 'patient', label: 'Nombre del Paciente', icon: LucideUserCircle },
+    {
+      key: 'documentId',
+      label: 'Documento de Identidad',
+      icon: LucideCreditCard,
+    },
+    { key: 'phone', label: 'Teléfono del Paciente', icon: LucidePhone },
+    { key: 'status', label: 'Estado de la Cita', icon: LucideCheckCircle },
+    { key: 'specialty', label: 'Especialidad', icon: LucideFileText },
+    { key: 'doctorName', label: 'Nombre del Médico', icon: LucideUserCircle },
   ];
 
   // ── Computed ──────────────────────────────────────────────────────────────

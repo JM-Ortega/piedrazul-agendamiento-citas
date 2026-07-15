@@ -8,13 +8,12 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import {
-  Calendar,
-  CreditCard,
-  LucideAngularModule,
-  Stethoscope,
-  UserPlus,
-  Users,
-} from 'lucide-angular';
+  LucideCalendar,
+  LucideCreditCard,
+  LucideStethoscope,
+  LucideUserPlus,
+  LucideUsers,
+} from '@lucide/angular';
 import { SystemUser } from '../../models/interfaces/system-user.model';
 import { AdminService } from '../../service/admin.service';
 
@@ -23,17 +22,17 @@ import { AdminService } from '../../service/admin.service';
   templateUrl: './admin-users.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.Eager,
-  imports: [LucideAngularModule],
+  imports: [
+    LucideCalendar,
+    LucideCreditCard,
+    LucideStethoscope,
+    LucideUserPlus,
+    LucideUsers,
+  ],
 })
 export class AdminUsersComponent implements OnInit {
   private adminService = inject(AdminService);
   private router = inject(Router);
-
-  readonly Users = Users;
-  readonly UserPlus = UserPlus;
-  readonly Stethoscope = Stethoscope;
-  readonly Calendar = Calendar;
-  readonly CreditCard = CreditCard;
 
   // ── State ─────────────────────────────────────────────────────────────────
   systemUsers = signal<SystemUser[]>([]);

@@ -5,7 +5,7 @@
         (click)="goBack()"
         class="flex items-center gap-2 text-[#215c98] text-lg hover:text-[#4e92d9] mb-4 transition-colors cursor-pointer"
       >
-        <lucide-angular [img]="ArrowLeft" [size]="18" />
+        <svg lucideArrowLeft [size]="18"></svg>
         <span class="text-sm font-medium">Volver</span>
       </button>
       <h1 class="text-[#215c98] text-3xl font-bold">Crear cuenta</h1>
@@ -63,7 +63,7 @@
                 [disabled]="isLoading()"
                 class="bg-[#215c98] hover:bg-[#163c63] text-white px-5 py-3 rounded-xl flex items-center gap-2 disabled:opacity-50 transition-colors cursor-pointer"
               >
-                <lucide-angular [img]="Search" [size]="18" />
+                <svg lucideSearch [size]="18"></svg>
                 Buscar
               </button>
             </div>
@@ -80,11 +80,7 @@
           @if (patientStatus() === "found" && foundPatient(); as p) {
             <div class="bg-green-50 border-2 border-green-300 rounded-xl p-5">
               <div class="flex items-center gap-3 mb-3">
-                <lucide-angular
-                  [img]="CheckCircle"
-                  [size]="24"
-                  class="text-green-500"
-                />
+                <svg lucideCheckCircle [size]="24" class="text-green-500"></svg>
                 <h3 class="text-green-800 text-lg font-semibold">
                   Encontramos tus datos
                 </h3>
@@ -115,11 +111,7 @@
           @if (patientStatus() === "existing-user") {
             <div class="bg-blue-50 border-2 border-blue-300 rounded-xl p-5">
               <div class="flex items-center gap-3 mb-3">
-                <lucide-angular
-                  [img]="CheckCircle"
-                  [size]="24"
-                  class="text-blue-500"
-                />
+                <svg lucideCheckCircle [size]="24" class="text-blue-500"></svg>
                 <h3 class="text-blue-800 text-lg font-semibold">
                   Ya existe una cuenta con este documento
                 </h3>
@@ -283,7 +275,7 @@
                             hover:text-blue-600
                             transition-all duration-200"
                   >
-                    <lucide-angular [img]="Calendar" [size]="20"></lucide-angular>
+                    <svg lucideCalendar [size]="20"></svg>
                   </button>
                   <mat-datepicker #birthPicker startView="multi-year"></mat-datepicker>
                 </div>
@@ -546,7 +538,7 @@
                             hover:text-blue-600
                             transition-all duration-200"
                   >
-                    <lucide-angular [img]="Calendar" [size]="20"></lucide-angular>
+                    <svg lucideCalendar [size]="20"></svg>
                   </button>
                   <mat-datepicker #birthPicker2 startView="multi-year"></mat-datepicker>
                 </div>
@@ -704,10 +696,10 @@
                   (click)="showPassword.set(!showPassword())"
                   class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  <lucide-angular
-                    [img]="showPassword() ? EyeOff : Eye"
+                  <svg
+                    [lucideIcon]="showPassword() ? EyeOff : Eye"
                     [size]="18"
-                  />
+                  ></svg>
                 </button>
               </div>
               @if (errors()["password"]) {
@@ -739,10 +731,10 @@
                   (click)="showConfirmPassword.set(!showConfirmPassword())"
                   class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  <lucide-angular
-                    [img]="showConfirmPassword() ? EyeOff : Eye"
+                  <svg
+                    [lucideIcon]="showConfirmPassword() ? EyeOff : Eye"
                     [size]="18"
-                  />
+                  ></svg>
                 </button>
               </div>
               @if (errors()["confirmPassword"]) {
@@ -782,7 +774,7 @@
               @if (isLoading()) {
                 <span>Procesando...</span>
               } @else {
-                <lucide-angular [img]="UserPlus" [size]="18" />
+                <svg lucideUserPlus [size]="18"></svg>
                 <span>Continuar</span>
               }
             </button>
@@ -856,7 +848,7 @@
               @if (isLoading()) {
                 <span>Verificando...</span>
               } @else {
-                <lucide-angular [img]="KeyRound" [size]="18" />
+                <svg lucideKeyRound [size]="18"></svg>
                 <span>Confirmar código</span>
               }
             </button>

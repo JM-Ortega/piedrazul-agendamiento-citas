@@ -6,15 +6,13 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import {
-  Calendar,
-  CheckCircle,
-  Clock,
-  Edit3,
-  LucideAngularModule,
-  Pencil,
-  Power,
-  PowerOff,
-} from 'lucide-angular';
+  LucideCalendar,
+  LucideCheckCircle,
+  LucideClock,
+  LucidePencil,
+  LucidePower,
+  LucidePowerOff,
+} from '@lucide/angular';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
@@ -23,16 +21,17 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
   templateUrl: './doctor-card.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.Eager,
-  imports: [LucideAngularModule, FormatoPipe],
+  imports: [
+    LucideCalendar,
+    LucideCheckCircle,
+    LucideClock,
+    LucidePencil,
+    LucidePower,
+    LucidePowerOff,
+    FormatoPipe,
+  ],
 })
 export class DoctorCardComponent {
-  readonly Clock = Clock;
-  readonly Calendar = Calendar;
-  readonly Pencil = Pencil;
-  readonly Edit3 = Edit3;
-  readonly Power = Power;
-  readonly PowerOff = PowerOff;
-  readonly CheckCircle = CheckCircle;
   readonly DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
   doctor = input.required<Doctor>();

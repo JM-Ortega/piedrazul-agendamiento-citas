@@ -29,7 +29,7 @@
 
   @if (isSaved()) {
     <span class="flex items-center gap-1 text-green-600 text-base">
-      <lucide-angular [img]="CheckCircle" [size]="18"></lucide-angular>
+      <svg lucideCheckCircle [size]="18"></svg>
       Guardado
     </span>
   }
@@ -42,7 +42,7 @@
         (mouseleave)="hoveredButton.set(false)"
         class="flex items-center gap-2 px-5 py-2.5 rounded-xl transition-colors text-base bg-[#215c98] hover:bg-[#163c63] text-white cursor-pointer"
       >
-        <lucide-angular [img]="Pencil" [size]="18"></lucide-angular>
+        <svg lucidePencil [size]="18"></svg>
         Editar
       </button>
 
@@ -67,20 +67,12 @@
     <div class="flex justify-between items-center gap-3 flex-wrap">
       <div class="flex flex-wrap gap-3 text-sm text-gray-600">
         <span class="bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1">
-          <lucide-angular
-            [img]="Clock"
-            [size]="14"
-            class="text-[#163c63]"
-          ></lucide-angular>
+          <svg lucideClock [size]="14" class="text-[#163c63]"></svg>
           {{ getDisplaySchedule().startTime }} –
           {{ getDisplaySchedule().endTime }}
         </span>
         <span class="bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1">
-          <lucide-angular
-            [img]="Clock"
-            [size]="14"
-            class="text-[#163c63]"
-          ></lucide-angular>
+          <svg lucideClock [size]="14" class="text-[#163c63]"></svg>
           Intervalo: {{ doctor().appointmentInterval }} min
         </span>
         <span class="bg-blue-50 px-3 py-1.5 rounded-lg">
@@ -90,7 +82,7 @@
           <span
             class="bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg flex items-center gap-1"
           >
-            <lucide-angular [img]="Clock" [size]="14"></lucide-angular>
+            <svg lucideClock [size]="14"></svg>
             Horarios personalizados por día
           </span>
         }
@@ -110,10 +102,10 @@
           "
         >
           @if (doctor().status !== false) {
-            <lucide-angular [img]="Power" [size]="16"></lucide-angular>
+            <svg lucidePower [size]="16"></svg>
             Habilitado
           } @else {
-            <lucide-angular [img]="PowerOff" [size]="16"></lucide-angular>
+            <svg lucidePowerOff [size]="16"></svg>
             Deshabilitado
           }
         </button>
@@ -139,7 +131,7 @@
       <span
         class="bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg flex items-center gap-1"
       >
-        <lucide-angular [img]="Calendar" [size]="14"></lucide-angular>
+        <svg lucideCalendar [size]="14"></svg>
         Período laboral: {{ doctor().laborStart }} – {{ doctor().laborEnd }}
       </span>
     </div>

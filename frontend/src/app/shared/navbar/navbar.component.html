@@ -3,11 +3,7 @@
     <!-- Logo -->
     <a routerLink="/" class="flex items-center gap-3 cursor-pointer">
       <div class="bg-white rounded-full p-2">
-        <lucide-angular
-          [img]="Calendar"
-          [size]="28"
-          class="text-[#215c98]"
-        ></lucide-angular>
+        <svg lucideCalendar [size]="28" class="text-[#215c98]"></svg>
       </div>
       <div>
         <span class="text-xl font-bold tracking-wide">Piedrazul Salud</span>
@@ -30,7 +26,7 @@
               : 'text-white hover:bg-[#4e92d9]')
           "
         >
-          <lucide-angular [img]="ClipboardList" [size]="20"></lucide-angular>
+          <svg lucideClipboardList [size]="20"></svg>
           Ver Citas
         </a>
         <a
@@ -44,7 +40,7 @@
               : 'text-white hover:bg-[#4e92d9]')
           "
         >
-          <lucide-angular [img]="Calendar" [size]="20"></lucide-angular>
+          <svg lucideCalendar [size]="20"></svg>
           Nueva Cita
         </a>
       }
@@ -62,7 +58,7 @@
               : 'text-white hover:bg-[#4e92d9]')
           "
         >
-          <lucide-angular [img]="Stethoscope" [size]="20"></lucide-angular>
+          <svg lucideStethoscope [size]="20"></svg>
           Mis Citas
         </a>
         <a
@@ -77,7 +73,7 @@
               : 'text-white hover:bg-[#4e92d9]')
           "
         >
-          <lucide-angular [img]="CalendarDays" [size]="20"></lucide-angular>
+          <svg lucideCalendarDays [size]="20"></svg>
           Todas las Citas
         </a>
       }
@@ -95,7 +91,7 @@
               : 'text-white hover:bg-[#4e92d9]')
           "
         >
-          <lucide-angular [img]="Settings" [size]="20"></lucide-angular>
+          <svg lucideSettings [size]="20"></svg>
           Horarios
         </a>
         <a
@@ -109,7 +105,7 @@
               : 'text-white hover:bg-[#4e92d9]')
           "
         >
-          <lucide-angular [img]="Users" [size]="20"></lucide-angular>
+          <svg lucideUsers [size]="20"></svg>
           Gestionar Usuarios
         </a>
         <a
@@ -123,7 +119,7 @@
               : 'text-white hover:bg-[#4e92d9]')
           "
         >
-          <lucide-angular [img]="UserCog" [size]="20"></lucide-angular>
+          <svg lucideUserCog [size]="20"></svg>
           Gestión Médicos
         </a>
       }
@@ -141,7 +137,7 @@
               : 'bg-[#215c98] text-white hover:bg-[#4e92d9]')
           "
         >
-          <lucide-angular [img]="CalendarDays" [size]="20"></lucide-angular>
+          <svg lucideCalendarDays [size]="20"></svg>
           Citas pendientes
         </a>
         <a
@@ -156,7 +152,7 @@
               : 'bg-[#215c98] text-white hover:bg-[#4e92d9]')
           "
         >
-          <lucide-angular [img]="ClipboardList" [size]="20"></lucide-angular>
+          <svg lucideClipboardList [size]="20"></svg>
           Historial de Citas
         </a>
       }
@@ -173,7 +169,7 @@
                 class="flex items-center gap-2 bg-[#215c98] hover:bg-[#4e92d9] px-3 py-2 rounded-lg transition-colors"
               >
                 <div class="bg-[#4e92d9] rounded-full p-1">
-                  <lucide-angular [img]="User" [size]="16"></lucide-angular>
+                  <svg lucideUser [size]="16"></svg>
                 </div>
                 <div class="flex flex-col leading-tight text-left">
                   <span class="text-sm font-semibold">{{
@@ -183,14 +179,14 @@
                     appService.activeRoleLabel()
                   }}</span>
                 </div>
-                <lucide-angular
-                  [img]="ChevronDown"
+                <svg
+                  lucideChevronDown
                   [size]="16"
                   [class]="
                     'text-blue-200 transition-transform duration-200 ' +
                     (showRoleDropdown() ? 'rotate-180' : '')
                   "
-                ></lucide-angular>
+                ></svg>
               </button>
 
               @if (showRoleDropdown()) {
@@ -218,20 +214,20 @@
                           : 'text-gray-700 hover:bg-gray-50')
                       "
                     >
-                      <lucide-angular
-                        [img]="roleConfig[role].icon"
+                      <svg
+                        [lucideIcon]="roleConfig[role].icon"
                         [size]="20"
                         [class]="roleConfig[role].color"
-                      ></lucide-angular>
+                      ></svg>
                       <span class="flex-1 text-base font-medium">{{
                         roleConfig[role].label
                       }}</span>
                       @if (appService.currentRole() === role) {
-                        <lucide-angular
-                          [img]="Check"
+                        <svg
+                          lucideCheck
                           [size]="18"
                           class="text-blue-600"
-                        ></lucide-angular>
+                        ></svg>
                       }
                     </button>
                   }
@@ -241,7 +237,7 @@
           } @else {
             <div class="flex items-center gap-2">
               <div class="bg-[#4e92d9] rounded-full p-1.5">
-                <lucide-angular [img]="User" [size]="18"></lucide-angular>
+                <svg lucideUser [size]="18"></svg>
               </div>
               <div class="flex flex-col leading-tight">
                 <span class="text-sm font-semibold">{{
@@ -258,7 +254,7 @@
             (click)="openLogoutModal()"
             class="flex items-center gap-1 px-3 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition-colors text-sm"
           >
-            <lucide-angular [img]="LogOut" [size]="16"></lucide-angular>
+            <svg lucideLogOut [size]="16"></svg>
             Salir
           </button>
         </div>
@@ -269,7 +265,7 @@
           routerLink="/acceso"
           class="flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-white/40 hover:bg-white/10 text-white transition-all text-base"
         >
-          <lucide-angular [img]="Users" [size]="18"></lucide-angular>
+          <svg lucideUsers [size]="18"></svg>
           Otros usuarios
         </a>
       }
@@ -281,9 +277,9 @@
       (click)="menuOpen.set(!menuOpen())"
     >
       @if (menuOpen()) {
-        <lucide-angular [img]="X" [size]="28"></lucide-angular>
+        <svg lucideX [size]="28"></svg>
       } @else {
-        <lucide-angular [img]="Menu" [size]="28"></lucide-angular>
+        <svg lucideMenu [size]="28"></svg>
       }
     </button>
   </div>
@@ -299,7 +295,7 @@
           (click)="menuOpen.set(false)"
           class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
-          <lucide-angular [img]="ClipboardList" [size]="20"></lucide-angular>
+          <svg lucideClipboardList [size]="20"></svg>
           Ver Citas
         </a>
         <a
@@ -307,7 +303,7 @@
           (click)="menuOpen.set(false)"
           class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
-          <lucide-angular [img]="Calendar" [size]="20"></lucide-angular>
+          <svg lucideCalendar [size]="20"></svg>
           Nueva Cita
         </a>
       }
@@ -318,7 +314,7 @@
           (click)="menuOpen.set(false)"
           class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
-          <lucide-angular [img]="Stethoscope" [size]="20"></lucide-angular>
+          <svg lucideStethoscope [size]="20"></svg>
           Mis Citas
         </a>
         <a
@@ -326,7 +322,7 @@
           (click)="menuOpen.set(false)"
           class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
-          <lucide-angular [img]="CalendarDays" [size]="20"></lucide-angular>
+          <svg lucideCalendarDays [size]="20"></svg>
           Todas las Citas
         </a>
       }
@@ -337,7 +333,7 @@
           (click)="menuOpen.set(false)"
           class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
-          <lucide-angular [img]="Settings" [size]="20"></lucide-angular>
+          <svg lucideSettings [size]="20"></svg>
           Configuración
         </a>
         <a
@@ -345,7 +341,7 @@
           (click)="menuOpen.set(false)"
           class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
-          <lucide-angular [img]="Users" [size]="20"></lucide-angular>
+          <svg lucideUsers [size]="20"></svg>
           Usuarios
         </a>
         <a
@@ -353,7 +349,7 @@
           (click)="menuOpen.set(false)"
           class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
-          <lucide-angular [img]="UserCog" [size]="20"></lucide-angular>
+          <svg lucideUserCog [size]="20"></svg>
           Gestión Médicos
         </a>
       }
@@ -364,7 +360,7 @@
           (click)="menuOpen.set(false)"
           class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
-          <lucide-angular [img]="CalendarDays" [size]="20"></lucide-angular>
+          <svg lucideCalendarDays [size]="20"></svg>
           Citas pendientes
         </a>
         <a
@@ -372,7 +368,7 @@
           (click)="menuOpen.set(false)"
           class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
-          <lucide-angular [img]="ClipboardList" [size]="20"></lucide-angular>
+          <svg lucideClipboardList [size]="20"></svg>
           Historial de Citas
         </a>
       }
@@ -394,17 +390,10 @@
                   : 'text-blue-200 hover:bg-[#4e92d9]')
               "
             >
-              <lucide-angular
-                [img]="roleConfig[role].icon"
-                [size]="20"
-              ></lucide-angular>
+              <svg [lucideIcon]="roleConfig[role].icon" [size]="20"></svg>
               <span class="flex-1 text-base">{{ roleConfig[role].label }}</span>
               @if (appService.currentRole() === role) {
-                <lucide-angular
-                  [img]="Check"
-                  [size]="18"
-                  class="text-white"
-                ></lucide-angular>
+                <svg lucideCheck [size]="18" class="text-white"></svg>
               }
             </button>
           }
@@ -417,7 +406,7 @@
           (click)="menuOpen.set(false)"
           class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
-          <lucide-angular [img]="Users" [size]="20"></lucide-angular>
+          <svg lucideUsers [size]="20"></svg>
           Otros usuarios
         </a>
       }
@@ -427,7 +416,7 @@
           (click)="openLogoutModal()"
           class="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white"
         >
-          <lucide-angular [img]="LogOut" [size]="20"></lucide-angular>
+          <svg lucideLogOut [size]="20"></svg>
           Cerrar Sesión
         </button>
       }
@@ -464,11 +453,7 @@
     >
       <div class="flex flex-col items-center text-center">
         <div class="bg-red-100 rounded-full p-4 mb-4">
-          <lucide-angular
-            [img]="AlertCircle"
-            [size]="48"
-            class="text-red-600"
-          ></lucide-angular>
+          <svg lucideAlertCircle [size]="48" class="text-red-600"></svg>
         </div>
         <h2 class="text-2xl font-bold text-gray-800 mb-3">¿Cerrar Sesión?</h2>
         <p class="text-gray-600 text-lg mb-8">
@@ -485,7 +470,7 @@
             (click)="confirmLogout()"
             class="flex-1 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors text-lg font-medium flex items-center justify-center gap-2"
           >
-            <lucide-angular [img]="LogOut" [size]="20"></lucide-angular>
+            <svg lucideLogOut [size]="20"></svg>
             Sí, Salir
           </button>
         </div>

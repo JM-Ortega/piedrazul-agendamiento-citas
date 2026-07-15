@@ -8,17 +8,15 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import {
-  Calendar,
-  Check,
-  ChevronDown,
-  ClipboardList,
-  Clock,
-  FileText,
-  LucideAngularModule,
-  Plus,
-  User,
-  UserX,
-} from 'lucide-angular';
+  LucideCalendar,
+  LucideCheck,
+  LucideChevronDown,
+  LucideClipboardList,
+  LucideClock,
+  LucideFileText,
+  LucideUser,
+  LucideUserX,
+} from '@lucide/angular';
 import { DoctorService } from '../../../core/services/doctor.service';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
@@ -29,21 +27,21 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
   templateUrl: './doctor-dashboard.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.Eager,
-  imports: [LucideAngularModule, FormatoPipe],
+  imports: [
+    LucideCalendar,
+    LucideCheck,
+    LucideChevronDown,
+    LucideClipboardList,
+    LucideClock,
+    LucideFileText,
+    LucideUser,
+    LucideUserX,
+    FormatoPipe,
+  ],
 })
 export class DoctorDashboardComponent implements OnInit {
   private doctorService = inject(DoctorService);
   private router = inject(Router);
-
-  readonly Calendar = Calendar;
-  readonly Clock = Clock;
-  readonly FileText = FileText;
-  readonly User = User;
-  readonly Plus = Plus;
-  readonly Check = Check;
-  readonly ChevronDown = ChevronDown;
-  readonly ClipboardList = ClipboardList;
-  readonly UserX = UserX;
 
   today = (() => {
     const d = new Date();

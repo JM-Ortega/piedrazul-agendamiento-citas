@@ -4,7 +4,7 @@ import {
   output,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import { LucideAngularModule, Stethoscope, UserSearch } from 'lucide-angular';
+import { LucideStethoscope, LucideUserSearch } from '@lucide/angular';
 import { BookingMode } from '../../models/types/bookingMode.type';
 import { BookingStateService } from '../../services/booking-state.service';
 
@@ -15,14 +15,11 @@ import { BookingStateService } from '../../services/booking-state.service';
 @Component({
   selector: 'app-booking-mode-selector',
   standalone: true,
-  imports: [LucideAngularModule],
+  imports: [LucideStethoscope, LucideUserSearch],
   changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './booking-mode-selector.component.html',
 })
 export class BookingModeSelectorComponent {
-  readonly Stethoscope = Stethoscope;
-  readonly UserSearch = UserSearch;
-
   protected state = inject(BookingStateService);
 
   modeSelected = output<BookingMode>();

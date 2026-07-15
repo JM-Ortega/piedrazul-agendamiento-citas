@@ -8,20 +8,18 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import {
-  Activity,
-  ArrowLeft,
-  Bone,
-  Calendar,
-  Check,
-  CreditCard,
-  Edit3,
-  Heart,
-  LucideAngularModule,
-  Save,
-  Stethoscope,
-  X,
-  Zap,
-} from 'lucide-angular';
+  LucideActivity,
+  LucideBone,
+  LucideCalendar,
+  LucideCheck,
+  LucideEdit3,
+  LucideHeart,
+  LucideSave,
+  LucideStethoscope,
+  LucideX,
+  LucideZap,
+  LucideDynamicIcon,
+} from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
 import { AppService } from '../../../../core/services/app.service';
 import { DoctorAdminDto } from '../../models/dtos/DoctorAdminDto';
@@ -32,49 +30,44 @@ import { AdminService } from '../../service/admin.service';
   templateUrl: './admin-doctors.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.Eager,
-  imports: [LucideAngularModule],
+  imports: [
+    LucideCalendar,
+    LucideCheck,
+    LucideEdit3,
+    LucideSave,
+    LucideStethoscope,
+    LucideX,
+    LucideDynamicIcon,
+  ],
 })
 export class AdminDoctorsComponent implements OnInit {
   private adminService = inject(AdminService);
   public router = inject(Router);
   private appService = inject(AppService);
 
-  readonly ArrowLeft = ArrowLeft;
-  readonly Stethoscope = Stethoscope;
-  readonly Edit3 = Edit3;
-  readonly X = X;
-  readonly Save = Save;
-  readonly Check = Check;
-  readonly Calendar = Calendar;
-  readonly CreditCard = CreditCard;
-  readonly Heart = Heart;
-  readonly Bone = Bone;
-  readonly Activity = Activity;
-  readonly Zap = Zap;
-
   readonly specialtiesList = [
     {
       name: 'Medicina General',
       value: 'MEDICINA_GENERAL',
-      icon: Heart,
+      icon: LucideHeart,
       color: 'text-red-600',
     },
     {
       name: 'Quiropraxia',
       value: 'QUIROPRAXIA',
-      icon: Bone,
+      icon: LucideBone,
       color: 'text-orange-600',
     },
     {
       name: 'Fisioterapia',
       value: 'FISIOTERAPIA',
-      icon: Activity,
+      icon: LucideActivity,
       color: 'text-green-600',
     },
     {
       name: 'Terapia Neural',
       value: 'TERAPIA_NEURAL',
-      icon: Zap,
+      icon: LucideZap,
       color: 'text-purple-600',
     },
   ];
@@ -217,7 +210,8 @@ export class AdminDoctorsComponent implements OnInit {
 
   getSpecialtyIcon(name: string) {
     return (
-      this.specialtiesList.find((s) => s.value === name)?.icon || Stethoscope
+      this.specialtiesList.find((s) => s.value === name)?.icon ||
+      LucideStethoscope
     );
   }
 

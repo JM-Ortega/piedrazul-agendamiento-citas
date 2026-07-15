@@ -5,11 +5,10 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import {
-  CheckCircle,
-  LucideAngularModule,
-  Stethoscope,
-  UserSearch,
-} from 'lucide-angular';
+  LucideCheckCircle,
+  LucideStethoscope,
+  LucideUserSearch,
+} from '@lucide/angular';
 import { NewAppointment } from '../../models/dtos/newAppointment.dto';
 import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
 import { BookingStateService } from '../../services/booking-state.service';
@@ -24,15 +23,17 @@ import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
 @Component({
   selector: 'app-booking-confirm',
   standalone: true,
-  imports: [LucideAngularModule, FormatoPipe, ErroresPipe],
+  imports: [
+    LucideCheckCircle,
+    LucideStethoscope,
+    LucideUserSearch,
+    FormatoPipe,
+    ErroresPipe,
+  ],
   changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './booking-confirm.component.html',
 })
 export class BookingConfirmComponent {
-  readonly CheckCircle = CheckCircle;
-  readonly Stethoscope = Stethoscope;
-  readonly UserSearch = UserSearch;
-
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
 

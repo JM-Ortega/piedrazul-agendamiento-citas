@@ -6,12 +6,11 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import {
-  Calendar,
-  CircleAlert,
-  LucideAngularModule,
-  Stethoscope,
-  UserPlus,
-} from 'lucide-angular';
+  LucideCalendar,
+  LucideCircleAlert,
+  LucideStethoscope,
+  LucideUserPlus,
+} from '@lucide/angular';
 import { FormatoPipe } from '../../../../../shared/pipes/formatoPipe';
 import { FormErrors } from '../../../models/interfaces/FormErrors';
 import { UserForm } from '../../../models/interfaces/UserForm';
@@ -21,13 +20,15 @@ import { UserForm } from '../../../models/interfaces/UserForm';
   templateUrl: './create-user-confirm-modal.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.Eager,
-  imports: [LucideAngularModule, FormatoPipe],
+  imports: [
+    LucideCalendar,
+    LucideCircleAlert,
+    LucideStethoscope,
+    LucideUserPlus,
+    FormatoPipe,
+  ],
 })
 export class CreateUserConfirmModalComponent {
-  readonly UserPlus = UserPlus;
-  readonly CircleAlert = CircleAlert;
-  readonly Stethoscope = Stethoscope;
-  readonly Calendar = Calendar;
   @Input() userForm!: UserForm;
 
   @Input() errors: FormErrors = {};

@@ -133,7 +133,7 @@
                   hover:text-[#163c63]
                   transition-all duration-200"
         >
-          <lucide-angular [img]="Calendar" [size]="20"></lucide-angular>
+          <svg lucideCalendar [size]="20"></svg>
         </button>
         <mat-datepicker #birthPicker></mat-datepicker>
       </div>
@@ -191,7 +191,7 @@
       (click)="onGoBack()"
       class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-2 cursor-pointer"
     >
-      <lucide-angular [img]="ArrowLeft" [size]="16"></lucide-angular>
+      <svg lucideArrowLeft [size]="16"></svg>
       Buscar de nuevo
     </button>
     <button

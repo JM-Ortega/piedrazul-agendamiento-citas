@@ -5,7 +5,7 @@
 
     <div class="bg-blue-50 rounded-xl p-5">
       <h3 class="text-[#163c63] font-semibold mb-3 flex items-center gap-2">
-        <lucide-angular [img]="UserSearch" [size]="18"></lucide-angular>
+        <svg lucideUserSearch [size]="18"></svg>
         Paciente
       </h3>
       <p><strong>Nombre:</strong> {{ state.confirmFirstName() }} {{ state.confirmLastName() }}</p>
@@ -25,7 +25,7 @@
 
     <div class="bg-purple-50 rounded-xl p-5">
       <h3 class="text-purple-700 font-semibold mb-3 flex items-center gap-2">
-        <lucide-angular [img]="Stethoscope" [size]="18"></lucide-angular>
+        <svg lucideStethoscope [size]="18"></svg>
         Cita
       </h3>
       <p><strong>Especialidad:</strong> {{ state.selectedSpecialty() | formato }}</p>
@@ -55,7 +55,7 @@
       class="flex-1 bg-green-600 text-white py-3 rounded-xl flex items-center
              justify-center gap-2 hover:bg-green-700 transition-colors disabled:opacity-50 cursor-pointer"
     >
-      <lucide-angular [img]="CheckCircle" [size]="22"></lucide-angular>
+      <svg lucideCheckCircle [size]="22"></svg>
       Confirmar y Registrar
     </button>
   </div>

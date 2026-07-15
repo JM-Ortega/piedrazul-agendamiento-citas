@@ -5,11 +5,11 @@
     <div class="mb-6">
       <button (click)="handleBack()"
         class="flex items-center gap-2 text-[#215c98] text-lg hover:text-[#4e92d9] mb-4 transition-colors cursor-pointer">
-        <lucide-angular [img]="ArrowLeft" [size]="20"></lucide-angular>
+        <svg lucideArrowLeft [size]="20"></svg>
         volver al inicio
       </button>
       <div class="flex items-center gap-3">
-        <lucide-angular [img]="ClipboardPen" [size]="40" class="text-[#163c63]"></lucide-angular>
+        <svg lucideClipboardPen [size]="40" class="text-[#163c63]"></svg>
         <h3 class="text-2xl font-bold text-[#163c63]">Historia Clínica</h3>
       </div>
     </div>
@@ -69,7 +69,7 @@
           <!-- Nueva observación -->
           <div class="bg-white rounded-2xl shadow-md p-6">
             <h5 class="flex items-center gap-2 text-lg font-semibold text-[#163c63] mb-4">
-              <lucide-angular [img]="ClipboardPlus" [size]="30" class="text-[#163c63]"></lucide-angular>
+              <svg lucideClipboardPlus [size]="30" class="text-[#163c63]"></svg>
               Agregar Observación
             </h5>
             <textarea
@@ -94,7 +94,7 @@
               [disabled]="!newObservation().trim()"
               class="flex items-center gap-2 bg-[#215c98] hover:bg-[#163c63] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl transition-colors"
             >
-              <lucide-angular [img]="Save" [size]="30" class="text-white"></lucide-angular>
+              <svg lucideSave [size]="30" class="text-white"></svg>
               Guardar
             </button>
           </div>
@@ -104,7 +104,7 @@
         <!-- Columna derecha (más angosta): historial -->
         <div class="w-full lg:w-5/12 lg:max-h-[75vh] lg:overflow-y-auto lg:pr-1">
           <h5 class="flex items-center gap-2 text-lg font-semibold text-[#163c63] mb-4">
-            <lucide-angular [img]="FolderOpen" [size]="30" class="text-[#163c63]"></lucide-angular>
+            <svg lucideFolderOpen [size]="30" class="text-[#163c63]"></svg>
             Historial de Consultas
           </h5>
           @if (records().length === 0) {
@@ -116,7 +116,7 @@
             <div class="bg-white rounded-2xl shadow-md p-6 mb-3">
               <div class="flex flex-col gap-2 mb-1">
                 <span class="flex items-center gap-2 text-gray-700 text-sm">
-                  <lucide-angular [img]="Calendar" [size]="22" class="text-[#163c63]"></lucide-angular>
+                  <svg lucideCalendar [size]="22" class="text-[#163c63]"></svg>
                   <strong class="text-[#163c63]">Fecha:</strong>{{ r.attendedAt }}
                 </span>
                 <span class="flex items-center gap-2 text-gray-700 text-sm mt-2">

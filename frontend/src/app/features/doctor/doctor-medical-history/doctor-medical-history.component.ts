@@ -9,14 +9,13 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { DoctorService } from '../../../core/services/doctor.service';
 import {
-  LucideAngularModule,
-  ClipboardPen,
-  ArrowLeft,
-  ClipboardPlus,
-  Save,
-  FolderOpen,
-  Calendar,
-} from 'lucide-angular';
+  LucideClipboardPen,
+  LucideArrowLeft,
+  LucideClipboardPlus,
+  LucideSave,
+  LucideFolderOpen,
+  LucideCalendar,
+} from '@lucide/angular';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
 @Component({
@@ -24,19 +23,20 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
   templateUrl: './doctor-medical-history.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.Eager,
-  imports: [LucideAngularModule, FormatoPipe],
+  imports: [
+    LucideClipboardPen,
+    LucideArrowLeft,
+    LucideClipboardPlus,
+    LucideSave,
+    LucideFolderOpen,
+    LucideCalendar,
+    FormatoPipe,
+  ],
 })
 export class DoctorMedicalHistoryComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   readonly doctorService = inject(DoctorService);
-
-  readonly ClipboardPen = ClipboardPen;
-  readonly ArrowLeft = ArrowLeft;
-  readonly ClipboardPlus = ClipboardPlus;
-  readonly Save = Save;
-  readonly FolderOpen = FolderOpen;
-  readonly Calendar = Calendar;
 
   readonly mostrarInfo = signal(false);
   toggleInfo() {

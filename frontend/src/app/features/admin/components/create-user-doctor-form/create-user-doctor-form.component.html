@@ -1,6 +1,6 @@
 <div class="space-y-6 mt-8 pt-8 border-t-2 border-[#a7c9ec]">
   <h3 class="text-[#215c98] text-xl font-semibold flex items-center gap-2">
-    <lucide-angular [img]="Stethoscope" [size]="24"></lucide-angular>
+    <svg lucideStethoscope [size]="24"></svg>
     Información del Médico
   </h3>
 
@@ -25,15 +25,15 @@
                 : 'border-gray-300 bg-white text-gray-700 hover:border-[#4e92d9]')
             "
           >
-            <lucide-angular
-              [img]="sp.icon"
+            <svg
+              [lucideIcon]="sp.icon"
               [size]="22"
               [class]="
                 isSpecialtySelected(sp.name)
                   ? 'text-[#215c98] shrink-0'
                   : sp.colorClass + ' shrink-0'
               "
-            ></lucide-angular>
+            ></svg>
             <span class="flex-1 text-left">{{ sp.name | formato }}</span>
             @if (isSpecialtySelected(sp.name)) {
               <div
@@ -50,7 +50,7 @@
       }
       @if (errors['specialty']) {
         <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
-          <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+          <svg lucideCircleAlert [size]="14"></svg>
           {{ errors['specialty'] }}
         </p>
       }
@@ -65,12 +65,11 @@
         Tipo de Documento *
       </label>
       <div class="relative">
-        <lucide-angular
-          [img]="CreditCard"
+        <svg
+          lucideCreditCard
           [size]="20"
           class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-        >
-        </lucide-angular>
+        ></svg>
         <select
           id="documentType"
           [ngModel]="data.documentType"
@@ -94,7 +93,7 @@
       </div>
       @if (errors['documentType']) {
         <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-          <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+          <svg lucideCircleAlert [size]="14"></svg>
           {{ errors['documentType'] }}
         </p>
       }
@@ -106,12 +105,11 @@
         Teléfono * <span class="text-sm text-gray-500">(solo dígitos)</span>
       </label>
       <div class="relative">
-        <lucide-angular
-          [img]="Phone"
+        <svg
+          lucidePhone
           [size]="20"
           class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-        >
-        </lucide-angular>
+        ></svg>
         <input
           id="phone"
           type="text"
@@ -133,7 +131,7 @@
       </div>
       @if (errors['phone']) {
         <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-          <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+          <svg lucideCircleAlert [size]="14"></svg>
           {{ errors['phone'] }}
         </p>
       }
@@ -143,11 +141,11 @@
   <!-- Período Laboral -->
   <div>
     <p class="text-gray-700 text-base font-medium mb-1 flex items-center gap-2">
-      <lucide-angular [img]="CalendarRange" [size]="18"></lucide-angular>
+      <svg lucideCalendarRange [size]="18"></svg>
       Período Laboral *
     </p>
     <p class="text-gray-400 text-sm mb-3 flex items-center gap-1">
-      <lucide-angular [img]="Info" [size]="14"></lucide-angular>
+      <svg lucideInfo [size]="14"></svg>
       Rango de fechas en que el médico estará activo en el sistema
     </p>
     <div class="grid grid-cols-2 gap-5">
@@ -172,7 +170,7 @@
         />
         @if (errors['laborStart']) {
           <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-            <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+            <svg lucideCircleAlert [size]="14"></svg>
             {{ errors['laborStart'] }}
           </p>
         }
@@ -198,7 +196,7 @@
         />
         @if (errors['laborEnd']) {
           <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-            <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+            <svg lucideCircleAlert [size]="14"></svg>
             {{ errors['laborEnd'] }}
           </p>
         }
@@ -235,7 +233,7 @@
       </select>
       @if (errors['startTime']) {
         <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-          <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+          <svg lucideCircleAlert [size]="14"></svg>
           {{ errors['startTime'] }}
         </p>
       }
@@ -269,7 +267,7 @@
       </select>
       @if (errors['endTime']) {
         <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-          <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+          <svg lucideCircleAlert [size]="14"></svg>
           {{ errors['endTime'] }}
         </p>
       }
@@ -307,7 +305,7 @@
       />
       @if (errors['interval']) {
         <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-          <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+          <svg lucideCircleAlert [size]="14"></svg>
           {{ errors['interval'] }}
         </p>
       }
@@ -320,7 +318,7 @@
       Días de Atención
     </p>
     <p class="text-gray-400 text-sm mb-3 flex items-center gap-1">
-      <lucide-angular [img]="Info" [size]="14"></lucide-angular>
+      <svg lucideInfo [size]="14"></svg>
       Disponible de lunes a viernes
     </p>
     <div class="flex flex-wrap gap-3">
@@ -341,7 +339,7 @@
     </div>
     @if (errors['workDays']) {
       <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
-        <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular>
+        <svg lucideCircleAlert [size]="14"></svg>
         {{ errors['workDays'] }}
       </p>
     }

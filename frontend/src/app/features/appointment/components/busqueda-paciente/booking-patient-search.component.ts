@@ -7,7 +7,7 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CheckCircle, LucideAngularModule, Search } from 'lucide-angular';
+import { LucideCheckCircle, LucideSearch } from '@lucide/angular';
 import {
   debounceTime,
   distinctUntilChanged,
@@ -33,14 +33,11 @@ const MIN_DOC_LENGTH = 6;
 @Component({
   selector: 'app-booking-patient-search',
   standalone: true,
-  imports: [FormsModule, LucideAngularModule, FormatoPipe],
+  imports: [FormsModule, LucideCheckCircle, LucideSearch, FormatoPipe],
   changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './booking-patient-search.component.html',
 })
 export class BookingPatientSearchComponent implements OnDestroy {
-  readonly CheckCircle = CheckCircle;
-  readonly Search = Search;
-
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
 

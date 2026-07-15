@@ -7,14 +7,7 @@ import {
   signal,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import {
-  CalendarDays,
-  ChevronRight,
-  Clock,
-  LucideAngularModule,
-  PlusCircle,
-  User,
-} from 'lucide-angular';
+import { LucideCalendarDays, LucideClock } from '@lucide/angular';
 import { AppService } from '../../../core/services/app.service';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { PatientAppointmentService } from '../../appointment/services/PatientApointment.service';
@@ -26,17 +19,11 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
   templateUrl: './patient-appointment-history.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.Eager,
-  imports: [CommonModule, LucideAngularModule, FormatoPipe],
+  imports: [LucideCalendarDays, LucideClock, CommonModule, FormatoPipe],
 })
 export class PatientAppointmentHistoryComponent implements OnInit {
   protected appService = inject(AppService);
   private appointmentService = inject(PatientAppointmentService);
-
-  readonly User = User;
-  readonly PlusCircle = PlusCircle;
-  readonly CalendarDays = CalendarDays;
-  readonly ChevronRight = ChevronRight;
-  readonly Clock = Clock;
 
   isLoading = signal(false);
   errorMessage = signal('');

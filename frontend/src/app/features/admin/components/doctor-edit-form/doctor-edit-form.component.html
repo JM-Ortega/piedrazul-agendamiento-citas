@@ -16,7 +16,7 @@
         : 'bg-gray-200 text-gray-400 cursor-not-allowed'
     "
   >
-    <lucide-angular [img]="Save" [size]="18"></lucide-angular>
+    <svg lucideSave [size]="18"></svg>
     Guardar
   </button>
 </div>
@@ -28,11 +28,7 @@
     <p
       class="text-gray-700 font-semibold text-base mb-3 flex items-center gap-2"
     >
-      <lucide-angular
-        [img]="Calendar"
-        [size]="18"
-        class="text-purple-500"
-      ></lucide-angular>
+      <svg lucideCalendar [size]="18" class="text-purple-500"></svg>
       Período Laboral
     </p>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -85,11 +81,7 @@
     <p
       class="text-gray-700 font-semibold text-base mb-3 flex items-center gap-2"
     >
-      <lucide-angular
-        [img]="Clock"
-        [size]="18"
-        class="text-[#4e92d9]"
-      ></lucide-angular>
+      <svg lucideClock [size]="18" class="text-[#4e92d9]"></svg>
       Horario Semanal
     </p>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -195,7 +187,7 @@
         class="w-full flex items-center justify-between px-5 py-3 bg-[#d9e9f8] hover:bg-[#a7c9ec] transition-colors text-[#163c63] text-base"
       >
         <span class="flex items-center gap-2">
-          <lucide-angular [img]="Clock" [size]="18"></lucide-angular>
+          <svg lucideClock [size]="18"></svg>
           <span class="font-semibold">Horarios específicos por día</span>
           @if (getEditFormDayScheduleCount() > 0) {
             <span
@@ -208,9 +200,9 @@
           }
         </span>
         @if (showDaySchedules()) {
-          <lucide-angular [img]="ChevronUp" [size]="20"></lucide-angular>
+          <svg lucideChevronUp [size]="20"></svg>
         } @else {
-          <lucide-angular [img]="ChevronDown" [size]="20"></lucide-angular>
+          <svg lucideChevronDown [size]="20"></svg>
         }
       </button>
 

@@ -12,7 +12,7 @@
       "
     >
       <div class="flex items-center gap-3">
-        <lucide-angular [img]="Download" [size]="28"></lucide-angular>
+        <svg lucideDownload [size]="28"></svg>
         <h2 class="text-2xl font-bold">Exportar Reporte de Citas</h2>
       </div>
       <button
@@ -28,11 +28,11 @@
       <div
         class="mb-6 flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-5 py-4"
       >
-        <lucide-angular
-          [img]="Calendar"
+        <svg
+          lucideCalendar
           [size]="22"
           class="text-blue-600 mt-0.5 shrink-0"
-        ></lucide-angular>
+        ></svg>
         <div>
           <p class="text-blue-800 font-semibold text-base">
             Exportación del día de hoy
@@ -43,7 +43,7 @@
             >. El filtro de rango de fechas no afecta esta exportación.
           </p>
           <!-- Filtros que SÍ se respetan: doctor y estado -->
-          @if (doctorName() || (filterStatus() && filterStatus() !== "all")) {
+          @if (doctorName() || (filterStatus() && filterStatus() !== 'all')) {
             <div class="mt-2 pt-2 border-t border-blue-200 space-y-0.5">
               @if (doctorName()) {
                 <p class="text-blue-600 text-sm">
@@ -51,7 +51,7 @@
                   <span class="font-semibold">{{ doctorName() }}</span>
                 </p>
               }
-              @if (filterStatus() && filterStatus() !== "all") {
+              @if (filterStatus() && filterStatus() !== 'all') {
                 <p class="text-blue-600 text-sm">
                   • Estado:
                   <span class="font-semibold">{{
@@ -70,37 +70,9 @@
           Formato del archivo
         </h3>
         <div class="grid grid-cols-3 gap-3">
-          @for (
-            fmt of [
-              {
-                value: "excel",
-                label: "Excel",
-                active: "border-green-600 bg-green-50",
-                icon: FileSpreadsheet,
-                activeIcon: "text-green-600",
-                activeLabel: "text-green-700",
-              },
-              {
-                value: "pdf",
-                label: "PDF",
-                active: "border-red-600 bg-red-50",
-                icon: FileText,
-                activeIcon: "text-red-600",
-                activeLabel: "text-red-700",
-              },
-              {
-                value: "csv",
-                label: "CSV",
-                active: "border-orange-600 bg-orange-50",
-                icon: FileText,
-                activeIcon: "text-orange-600",
-                activeLabel: "text-orange-700",
-              },
-            ];
-            track fmt.value
-          ) {
+          @for (fmt of formatOptions; track fmt.value) {
             <button
-              (click)="exportFormat.set($any(fmt.value))"
+              (click)="exportFormat.set(fmt.value)"
               [class]="
                 'p-4 rounded-lg border transition-all ' +
                 (exportFormat() === fmt.value
@@ -109,15 +81,15 @@
               "
             >
               <div class="flex flex-col items-center gap-2">
-                <lucide-angular
-                  [img]="fmt.icon"
+                <svg
+                  [lucideIcon]="fmt.icon"
                   [size]="32"
                   [class]="
                     exportFormat() === fmt.value
                       ? fmt.activeIcon
                       : 'text-gray-500'
                   "
-                ></lucide-angular>
+                ></svg>
                 <span
                   [class]="
                     'text-base font-semibold ' +
@@ -156,13 +128,13 @@
                 class="w-5 h-5 cursor-pointer"
                 [style.accentColor]="accentColor()"
               />
-              <lucide-angular
-                [img]="col.icon"
+              <svg
+                [lucideIcon]="col.icon"
                 [size]="18"
                 [class]="
                   isColumnChecked(col.key) ? colors().icon : 'text-gray-400'
                 "
-              ></lucide-angular>
+              ></svg>
               <span class="text-sm text-gray-700">{{ col.label }}</span>
             </label>
           }
@@ -212,7 +184,7 @@
             ></span>
             Generando reporte...
           } @else {
-            <lucide-angular [img]="Download" [size]="20"></lucide-angular>
+            <svg lucideDownload [size]="20"></svg>
             Exportar citas de hoy
           }
         </button>

@@ -4,7 +4,7 @@ import {
   output,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import { LucideAngularModule, PowerOff, Save, X } from 'lucide-angular';
+import { LucidePowerOff, LucideSave, LucideX } from '@lucide/angular';
 import { Doctor } from '../../../../../shared/models/interfaces/doctor.model';
 
 @Component({
@@ -12,13 +12,9 @@ import { Doctor } from '../../../../../shared/models/interfaces/doctor.model';
   templateUrl: './admin-modals.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.Eager,
-  imports: [LucideAngularModule],
+  imports: [LucideX, LucideSave, LucidePowerOff],
 })
 export class AdminModalsComponent {
-  readonly X = X;
-  readonly Save = Save;
-  readonly PowerOff = PowerOff;
-
   // Modal: confirmar toggle
   showConfirmModal = input<boolean>(false);
   doctorToToggle = input<Doctor | null>(null);

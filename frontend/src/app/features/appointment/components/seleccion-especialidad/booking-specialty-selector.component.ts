@@ -6,7 +6,7 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, UserSearch } from 'lucide-angular';
+import { LucideUserSearch } from '@lucide/angular';
 import { BookingStateService } from '../../services/booking-state.service';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
@@ -17,13 +17,11 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 @Component({
   selector: 'app-booking-specialty-selector',
   standalone: true,
-  imports: [FormsModule, LucideAngularModule, FormatoPipe],
+  imports: [FormsModule, LucideUserSearch, FormatoPipe],
   changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './booking-specialty-selector.component.html',
 })
 export class BookingSpecialtySelectorComponent {
-  readonly UserSearch = UserSearch;
-
   protected state = inject(BookingStateService);
 
   advance = output<void>();

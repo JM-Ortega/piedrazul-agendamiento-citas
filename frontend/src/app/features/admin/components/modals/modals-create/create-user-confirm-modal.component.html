@@ -18,7 +18,7 @@
       class="bg-linear-to-r from-[#163c63] to-[#215c98] text-white rounded-t-2xl px-6 py-4 flex items-center justify-between"
     >
       <div class="flex items-center gap-3">
-        <lucide-angular [img]="UserPlus" [size]="24"></lucide-angular>
+        <svg lucideUserPlus [size]="24"></svg>
         <div>
           <h2 class="text-lg font-bold leading-tight">Confirmar Creación</h2>
           <p class="text-[#a7c9ec] text-xs">
@@ -31,7 +31,7 @@
         class="text-white hover:text-[#a7c9ec] transition-colors"
         aria-label="Cerrar modal"
       >
-        <lucide-angular [img]="CircleAlert" [size]="20"></lucide-angular>
+        <svg lucideCircleAlert [size]="20"></svg>
       </button>
     </div>
 
@@ -54,10 +54,7 @@
               <span
                 class="flex items-center gap-2 px-3 py-1.5 bg-[#eaf2fb] text-[#215c98] border border-[#b8d4ee] rounded-full text-sm font-semibold"
               >
-                <lucide-angular
-                  [img]="Stethoscope"
-                  [size]="14"
-                ></lucide-angular>
+                <svg lucideStethoscope [size]="14"></svg>
                 Médico
               </span>
             }
@@ -65,7 +62,7 @@
               <span
                 class="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-full text-sm font-semibold"
               >
-                <lucide-angular [img]="Calendar" [size]="14"></lucide-angular>
+                <svg lucideCalendar [size]="14"></svg>
                 Agendador
               </span>
             }
@@ -154,7 +151,7 @@
         (click)="confirmed.emit()"
         class="py-3 bg-[#215c98] hover:bg-[#163c63] text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
       >
-        <lucide-angular [img]="UserPlus" [size]="16"></lucide-angular>
+        <svg lucideUserPlus [size]="16"></svg>
         Confirmar y Crear
       </button>
     </div>

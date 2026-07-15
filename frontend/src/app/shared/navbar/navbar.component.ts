@@ -12,26 +12,22 @@ import {
   RouterLinkActive,
 } from '@angular/router';
 import {
-  AlertCircle,
-  Calendar,
-  CalendarDays,
-  Check,
-  ChevronDown,
-  ClipboardList,
-  FolderOpen,
-  Home,
-  Hospital,
-  LogOut,
-  LucideAngularModule,
-  Menu,
-  Plus,
-  Settings,
-  Stethoscope,
-  User,
-  UserCog,
-  Users,
-  X,
-} from 'lucide-angular';
+  LucideAlertCircle,
+  LucideCalendar,
+  LucideCalendarDays,
+  LucideCheck,
+  LucideChevronDown,
+  LucideClipboardList,
+  LucideDynamicIcon,
+  LucideLogOut,
+  LucideMenu,
+  LucideSettings,
+  LucideStethoscope,
+  LucideUser,
+  LucideUserCog,
+  LucideUsers,
+  LucideX,
+} from '@lucide/angular';
 import { AppService } from '../../core/services/app.service';
 
 @Component({
@@ -39,30 +35,29 @@ import { AppService } from '../../core/services/app.service';
   templateUrl: './navbar.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.Eager,
-  imports: [RouterLink, RouterLinkActive, LucideAngularModule],
+  imports: [
+    LucideAlertCircle,
+    LucideCalendar,
+    LucideCalendarDays,
+    LucideCheck,
+    LucideChevronDown,
+    LucideClipboardList,
+    LucideLogOut,
+    LucideMenu,
+    LucideSettings,
+    LucideStethoscope,
+    LucideUser,
+    LucideUserCog,
+    LucideUsers,
+    LucideX,
+    LucideDynamicIcon,
+    RouterLink,
+    RouterLinkActive,
+  ],
 })
 export class NavbarComponent implements OnInit {
   appService = inject(AppService);
   private router = inject(Router);
-
-  readonly Home = Home;
-  readonly Calendar = Calendar;
-  readonly Plus = Plus;
-  readonly ClipboardList = ClipboardList;
-  readonly Stethoscope = Stethoscope;
-  readonly Settings = Settings;
-  readonly User = User;
-  readonly Users = Users;
-  readonly LogOut = LogOut;
-  readonly Hospital = Hospital;
-  readonly Menu = Menu;
-  readonly X = X;
-  readonly AlertCircle = AlertCircle;
-  readonly CalendarDays = CalendarDays;
-  readonly ChevronDown = ChevronDown;
-  readonly UserCog = UserCog;
-  readonly Check = Check;
-  readonly FolderOpen = FolderOpen;
   readonly exactMatch = { exact: true };
 
   menuOpen = signal(false);
@@ -74,14 +69,22 @@ export class NavbarComponent implements OnInit {
     string,
     { icon: any; color: string; label: string }
   > = {
-    ADMIN: { icon: Settings, color: 'text-purple-600', label: 'Administrador' },
+    ADMIN: {
+      icon: LucideSettings,
+      color: 'text-purple-600',
+      label: 'Administrador',
+    },
     SCHEDULER: {
-      icon: ClipboardList,
+      icon: LucideClipboardList,
       color: 'text-green-600',
       label: 'Agendador',
     },
-    DOCTOR: { icon: Stethoscope, color: 'text-blue-600', label: 'Médico' },
-    PATIENT: { icon: User, color: 'text-orange-600', label: 'Paciente' },
+    DOCTOR: {
+      icon: LucideStethoscope,
+      color: 'text-blue-600',
+      label: 'Médico',
+    },
+    PATIENT: { icon: LucideUser, color: 'text-orange-600', label: 'Paciente' },
   };
 
   ngOnInit(): void {

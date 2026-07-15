@@ -11,16 +11,16 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import Keycloak from 'keycloak-js';
 import {
-  ArrowLeft,
-  CheckCircle,
-  Eye,
-  EyeOff,
-  KeyRound,
-  Calendar,
-  LucideAngularModule,
-  Search,
-  UserPlus,
-} from 'lucide-angular';
+  LucideArrowLeft,
+  LucideCheckCircle,
+  LucideEye,
+  LucideEyeOff,
+  LucideKeyRound,
+  LucideCalendar,
+  LucideSearch,
+  LucideUserPlus,
+  LucideDynamicIcon,
+} from '@lucide/angular';
 import {
   PatientPublicResponse,
   PatientService,
@@ -36,9 +36,15 @@ type PatientStatus =
   selector: 'app-registro',
   standalone: true,
   imports: [
+    LucideArrowLeft,
+    LucideCheckCircle,
+    LucideKeyRound,
+    LucideCalendar,
+    LucideSearch,
+    LucideUserPlus,
+    LucideDynamicIcon,
     CommonModule,
     FormsModule,
-    LucideAngularModule,
     MatDatepickerModule,
     FormatoPipe,
   ],
@@ -53,14 +59,8 @@ export class RegistroComponent implements OnInit {
   private keycloak = inject(Keycloak);
   private router = inject(Router);
 
-  readonly Search = Search;
-  readonly CheckCircle = CheckCircle;
-  readonly ArrowLeft = ArrowLeft;
-  readonly Eye = Eye;
-  readonly EyeOff = EyeOff;
-  readonly UserPlus = UserPlus;
-  readonly KeyRound = KeyRound;
-  readonly Calendar = Calendar;
+  readonly Eye = LucideEye;
+  readonly EyeOff = LucideEyeOff;
 
   step = signal<RegistroStep>(1);
   isLoading = signal(false);

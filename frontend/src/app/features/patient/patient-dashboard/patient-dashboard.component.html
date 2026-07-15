@@ -5,11 +5,7 @@
     >
       <div class="flex items-center gap-4">
         <div class="bg-white bg-opacity-20 rounded-full p-4">
-          <lucide-angular
-            [img]="User"
-            [size]="40"
-            class="text-[#215c98]"
-          ></lucide-angular>
+          <svg lucideUser [size]="40" class="text-[#215c98]"></svg>
         </div>
         <div>
           <h1 class="text-3xl font-bold">
@@ -38,11 +34,7 @@
         <div
           class="bg-[#ddefff] group-hover:bg-[#bdd9f6] rounded-full p-4 transition-colors shrink-0"
         >
-          <lucide-angular
-            [img]="PlusCircle"
-            [size]="36"
-            class="text-[#215c98]"
-          ></lucide-angular>
+          <svg lucidePlusCircle [size]="36" class="text-[#215c98]"></svg>
         </div>
         <div class="flex-1">
           <p class="text-[#163c63] text-xl font-semibold">Agendar Nueva Cita</p>
@@ -50,22 +42,14 @@
             Seleccione médico y horario
           </p>
         </div>
-        <lucide-angular
-          [img]="ChevronRight"
-          [size]="24"
-          class="text-[#4e92d9]"
-        ></lucide-angular>
+        <svg lucideChevronRight [size]="24" class="text-[#4e92d9]"></svg>
       </a>
     </div>
 
     <!-- Próximas Citas -->
     <div class="bg-white rounded-2xl shadow-md p-8">
       <h2 class="text-[#163c63] text-2xl mb-6 flex items-center gap-3">
-        <lucide-angular
-          [img]="Clock"
-          [size]="28"
-          class="text-[#4e92d9]"
-        ></lucide-angular>
+        <svg lucideClock [size]="28" class="text-[#4e92d9]"></svg>
         Próximas Citas
       </h2>
 
@@ -77,11 +61,11 @@
 
       @if (!isLoading() && upcomingAppointments().length === 0) {
         <div class="text-center py-10">
-          <lucide-angular
-            [img]="CalendarDays"
+          <svg
+            lucideCalendarDays
             [size]="64"
             class="text-[#a7c9ec] mx-auto mb-4"
-          ></lucide-angular>
+          ></svg>
           <p class="text-gray-500 text-xl mb-4">
             No tiene citas próximas programadas
           </p>
@@ -118,7 +102,7 @@
                     {{ apt.specialty | formato }}
                   </p>
                   <div class="flex items-center gap-2 mt-1 text-gray-600">
-                    <lucide-angular [img]="Clock" [size]="16"></lucide-angular>
+                    <svg lucideClock [size]="16"></svg>
                     <span class="text-base">{{ apt.startTime }}</span>
                   </div>
                 </div>
@@ -131,7 +115,7 @@
                   border border-red-300"
                   (click)="requestCancelAppointment(apt.idAppointment)"
                 >
-                  <lucide-angular [img]="X" [size]="16" class="inline-block"></lucide-angular>
+                  <svg lucideX [size]="16" class="inline-block"></svg>
                   Cancelar
                 </button>
               </div>
@@ -155,7 +139,7 @@
     >
       <!-- Ícono -->
       <div class="flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mx-auto mb-5">
-        <lucide-angular [img]="X" [size]="32" class="text-red-500"></lucide-angular>
+        <svg lucideX [size]="32" class="text-red-500"></svg>
       </div>
 
       <!-- Texto -->
@@ -196,9 +180,9 @@
         [class.bg-green-100]="toastType() === 'success'"
         [class.bg-red-100]="toastType() === 'error'">
         @if (toastType() === 'success') {
-          <lucide-angular [img]="Check" [size]="20" class="text-green-600"></lucide-angular>
+          <svg lucideCheck [size]="20" class="text-green-600"></svg>
         } @else {
-          <lucide-angular [img]="AlertCircle" [size]="20" class="text-red-600"></lucide-angular>
+          <svg lucideAlertCircle [size]="20" class="text-red-600"></svg>
         }
       </div>
       <div>

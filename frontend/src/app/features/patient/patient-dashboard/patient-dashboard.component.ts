@@ -8,16 +8,15 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
-  CalendarDays,
-  ChevronRight,
-  Clock,
-  LucideAngularModule,
-  PlusCircle,
-  User,
-  X,
-  AlertCircle,
-  Check,
-} from 'lucide-angular';
+  LucideCalendarDays,
+  LucideChevronRight,
+  LucideClock,
+  LucidePlusCircle,
+  LucideUser,
+  LucideX,
+  LucideAlertCircle,
+  LucideCheck,
+} from '@lucide/angular';
 import { AppService } from '../../../core/services/app.service';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { PatientAppointmentService } from '../../appointment/services/PatientApointment.service';
@@ -29,20 +28,22 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
   templateUrl: './patient-dashboard.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.Eager,
-  imports: [RouterLink, LucideAngularModule, FormatoPipe],
+  imports: [
+    LucideCalendarDays,
+    LucideChevronRight,
+    LucideClock,
+    LucidePlusCircle,
+    LucideUser,
+    LucideX,
+    LucideAlertCircle,
+    LucideCheck,
+    RouterLink,
+    FormatoPipe,
+  ],
 })
 export class PatientDashboardComponent implements OnInit {
   protected appService = inject(AppService);
   private appointmentService = inject(PatientAppointmentService);
-
-  readonly User = User;
-  readonly PlusCircle = PlusCircle;
-  readonly CalendarDays = CalendarDays;
-  readonly ChevronRight = ChevronRight;
-  readonly Clock = Clock;
-  readonly X = X;
-  readonly AlertCircle = AlertCircle;
-  readonly Check = Check;
 
   isLoading = signal(false);
   errorMessage = signal('');
