@@ -37,4 +37,8 @@ public interface PersonExternalService {
     void deactivateUser (UUID personID);
 
     void activateUser(UUID personID);
+
+    String getPersonName(UUID personID);
+
+    Map<UUID, String> getPersonNames(List<UUID> personIds);
 }

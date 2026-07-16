@@ -10,6 +10,7 @@ import co.edu.unicauca.piedrazul.backend.user.exception.PersonAlreadyLinkedUserE
 import co.edu.unicauca.piedrazul.backend.user.exception.PersonNotFoundException;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.mappers.PersonApiMapper;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.persistence.PersonRepository;
+import co.edu.unicauca.piedrazul.backend.user.infrastructure.proyections.PersonNameProjection;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -132,12 +133,31 @@ public class PersonExternalServiceImp implements PersonExternalService {
     }
 
     @Override
-    public void deactivateUser (UUID personID){
-        keycloakUserService.deactivateUser(personRepository.findUserIdById(personID));
+    public void deactivateUser (UUID personId){
+        keycloakUserService.deactivateUser(personRepository.findUserIdById(personId));
     }
 
     @Override
-    public void activateUser(UUID personID){
-        keycloakUserService.activateUser(personRepository.findUserIdById(personID));
+    public void activateUser(UUID personId){
+        keycloakUserService.activateUser(personRepository.findUserIdById(personId));
+    }
+
+    @Override
+    public String getPersonName(UUID personId) {
+        Person person = personRepository.findById(personId)
+                .orElseThrow(() -> new PersonNotFoundException(personId));
+
+        return person.getFirstName() + " " + person.getLastName();
+    }
+
+    @Override
+    public Map<UUID, String> getPersonNames(List<UUID> ids) {
+
+        return personRepository.findNamesByIds(ids)
+                .stream()
+                .collect(Collectors.toMap(
+                        PersonNameProjection::getId,
+                        PersonNameProjection::getFullName
+                ));
     }
 }
