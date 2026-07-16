@@ -86,11 +86,7 @@ public class CreateAccountUseCase implements UserProvisioningApi {
             throw new InvalidUserDataException("Los datos del médico son requeridos para crearlo");
         }
 
-        doctorProvisioningApi.createDoctor(personId, doctorRequest.laborStart(), doctorRequest.laborEnd(), doctorRequest.appointmentInterval());
-
-        if (doctorRequest.schedules() == null || doctorRequest.schedules().isEmpty()){
-
-        }
+        doctorProvisioningApi.createDoctor(personId, doctorRequest);
     }
 
     private void createPatient(UUID personId, CreatePatientUserRequest patientRequest) {

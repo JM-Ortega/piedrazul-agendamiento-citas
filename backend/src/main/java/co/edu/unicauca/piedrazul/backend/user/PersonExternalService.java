@@ -32,4 +32,9 @@ public interface PersonExternalService {
     List<PersonSummary> findByIdentificationPrefix(String identificationPrefix);
 
     Optional<PersonSummary> findByUserId(UUID userId);
+
+
+    void deactivateUser (UUID personID);
+
+    void activateUser(UUID personID);
 }

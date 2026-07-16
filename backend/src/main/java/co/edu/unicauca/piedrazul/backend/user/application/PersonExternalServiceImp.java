@@ -23,9 +23,11 @@ import java.util.stream.Collectors;
 public class PersonExternalServiceImp implements PersonExternalService {
 
     private final PersonRepository personRepository;
+    private final KeycloakUserService keycloakUserService;
 
-    public PersonExternalServiceImp(PersonRepository personRepository) {
+    public PersonExternalServiceImp(PersonRepository personRepository, KeycloakUserService keycloakUserService) {
         this.personRepository = personRepository;
+        this.keycloakUserService = keycloakUserService;
     }
 
     @Override
@@ -127,5 +129,15 @@ public class PersonExternalServiceImp implements PersonExternalService {
     @Override
     public Optional<PersonSummary> findByUserId(UUID userId) {
         return personRepository.findByUserId(userId).map(PersonApiMapper::toSummary);
+    }
+
+    @Override
+    public void deactivateUser (UUID personID){
+        keycloakUserService.deactivateUser(personRepository.findUserIdById(personID));
+    }
+
+    @Override
+    public void activateUser(UUID personID){
+        keycloakUserService.activateUser(personRepository.findUserIdById(personID));
     }
 }
