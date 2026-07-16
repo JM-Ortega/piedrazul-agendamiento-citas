@@ -85,6 +85,10 @@ public class Doctor {
     private Set<Specialty> specialties = new HashSet<>();
 
 
+    public boolean tieneEspecialidad(SpecialtyCode code) {
+        return specialties.stream().anyMatch(s -> s.getCode().equals(code));
+    }
+
     // Al momento de registrar/crearle una cuenta al doctor se le deben llenar todos estos campos,
     // el registro de doctores deberia hacerlo solo el administrador
     public Doctor(UUID personId, LocalDate laborStart, LocalDate laborEnd,
@@ -95,5 +99,17 @@ public class Doctor {
         this.bookingWindowWeeks = bookingWindowWeeks;
         this.status = status;
         this.appointmentInterval = appointmentInterval;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Doctor other)) return false;
+        return personId != null && personId.equals(other.personId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(personId);
     }
 }

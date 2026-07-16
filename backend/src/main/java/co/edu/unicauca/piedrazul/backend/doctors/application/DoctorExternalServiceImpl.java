@@ -5,6 +5,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import jakarta.transaction.Transactional;
 
@@ -25,28 +26,22 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     }
 
     @Override
-    public boolean existDoctor(UUID idDoctor) {
-        return doctorRepository.existsById(idDoctor);
-    }
-
-    @Override
-    public String doctorsName(UUID idDoctor) {
-        return doctorRepository.findByIdDoctor(idDoctor).getFirstName() + " " + doctorRepository.findByIdDoctor(idDoctor).getLastName();
-    }
-
-    @Override
     public List<LocalTime> getSlotsByDoctor(UUID idDoctor, LocalDate date) {
-        return scheduleService.getAvailableIntervalsByWorkday(doctorRepository.findByIdDoctor(idDoctor), toWorkday(date.getDayOfWeek()));
+        Doctor doctor = doctorRepository.findById(idDoctor)
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
+
+        return scheduleService.getAvailableIntervalsByWorkday(
+                doctor,
+                toWorkday(date.getDayOfWeek())
+        );
     }
 
     @Override
     public int getIntervalMinutesByDoctor(UUID idDoctor) {
-        return doctorRepository.findByIdDoctor(idDoctor).getAppointmentInterval();
-    }
+        Doctor doctor = doctorRepository.findById(idDoctor)
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
-    @Override
-    public String getDoctorName(UUID idDoctor) {
-        return doctorRepository.findByIdDoctor(idDoctor).getFirstName() + " " + doctorRepository.findByIdDoctor(idDoctor).getLastName();
+        return doctor.getAppointmentInterval();
     }
 
     @Override
@@ -61,16 +56,17 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     public List<UUID> getActiveDoctorIds() {
         return doctorRepository.findByStatusTrue()
                 .stream()
-                .map(Doctor::getIdDoctor)
+                .map(Doctor::getPersonId)
                 .toList();
     }
 
+
     @Override
-    public List<UUID> getActiveGeneralDoctorIds(){
+    public List<UUID> getActiveGeneralDoctorIds() {
         return doctorRepository.findByStatusTrue()
                 .stream()
-                .filter(doctor -> doctor.getSpecialty().contains(SpecialtyCode.MEDICINA_GENERAL))
-                .map(Doctor::getIdDoctor)
+                .filter(doctor -> doctor.tieneEspecialidad(SpecialtyCode.MEDICINA_GENERAL))
+                .map(Doctor::getPersonId)
                 .toList();
     }
 
@@ -89,11 +85,6 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     @Override
     public List<SpecialtyCode> findSpecialtiesByIdentification(String identification){
         return doctorRepository.findSpecialtiesByIdentification(identification);
-    }
-
-    @Override
-    public UUID findIdByIdentification(String identification){
-        return doctorRepository.doctorIdByIdentification(identification);
     }
 
     private static Workday toWorkday(DayOfWeek dayOfWeek) {

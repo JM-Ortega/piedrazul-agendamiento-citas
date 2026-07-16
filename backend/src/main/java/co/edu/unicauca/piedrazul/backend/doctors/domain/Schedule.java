@@ -50,4 +50,17 @@ public class Schedule {
         this.endTime = endTime;
         this.workday = workday;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Schedule other)) return false;
+        if (id == null || other.id == null) return false; // ninguno persistido -> no son iguales
+        return id.equals(other.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode(); // constante, no depende de id
+    }
 }

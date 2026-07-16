@@ -6,6 +6,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorShortResp
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.SpecialtyCode;
+import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,15 +15,18 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/doctor/doctors")
 public class DoctorController {
     private final DoctorService doctorService;
+    private final PersonExternalService personExternalService;
 
-    public DoctorController(DoctorService doctorService) {
+    public DoctorController(DoctorService doctorService, PersonExternalService personExternalService) {
         this.doctorService = doctorService;
+        this.personExternalService = personExternalService;
     }
 
     /**
@@ -34,8 +38,11 @@ public class DoctorController {
     @PreAuthorize("hasRole('DOCTOR')")
     public DoctorDetailedResponse findMe(@AuthenticationPrincipal Jwt jwt) {
         UUID keycloakId = UUID.fromString(jwt.getSubject());
-        Doctor doctor = doctorService.findByUserId(keycloakId);
-        return DoctorDetailedResponse.fromEntity(doctor);
+        Doctor doctor = doctorService.findByUserId(UUID.fromString(jwt.getSubject()));
+
+        Map<UUID, String> names = personExternalService.getPersonNames(List.of(doctor.getPersonId()));
+
+        return DoctorDetailedResponse.fromEntity(doctor, names.get(doctor.getPersonId()));
     }
 
     /**
@@ -46,9 +53,17 @@ public class DoctorController {
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<?> getAllDoctors() {
         List<Doctor> doctors = doctorService.findAllDoctors();
-        List<DoctorShortResponse> responses = doctors.stream()
-                .map(DoctorShortResponse::fromEntity)
+
+        List<UUID> ids = doctors.stream()
+                .map(Doctor::getPersonId)
                 .toList();
+
+        Map<UUID, String> names = personExternalService.getPersonNames(ids);
+
+        List<DoctorShortResponse> responses = doctors.stream()
+                .map(d -> DoctorShortResponse.fromEntity(d,names.get(d.getPersonId())))
+                .toList();
+
         return ResponseEntity.ok(responses);
     }
 
@@ -60,8 +75,15 @@ public class DoctorController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getAllDoctorsDetailed() {
         List<Doctor> doctors = doctorService.findAllDoctors();
+
+        List<UUID> ids = doctors.stream()
+                .map(Doctor::getPersonId)
+                .toList();
+
+        Map<UUID, String> names = personExternalService.getPersonNames(ids);
+
         List<DoctorDetailedResponse> responses = doctors.stream()
-                .map(DoctorDetailedResponse::fromEntity)
+                .map(d -> DoctorDetailedResponse.fromEntity(d, names.get(d.getPersonId())))
                 .toList();
         return ResponseEntity.ok(responses);
     }
@@ -75,7 +97,9 @@ public class DoctorController {
     @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<?> getDoctorById(@PathVariable UUID doctorId) {
         Doctor doctor = doctorService.getDoctorById(doctorId);
-        return ResponseEntity.ok(DoctorShortResponse.fromEntity(doctor));
+        Map<UUID, String> names = personExternalService.getPersonNames(List.of(doctorId));
+
+        return ResponseEntity.ok(DoctorShortResponse.fromEntity(doctor,names.get(doctor.getPersonId())));
     }
 
     /**
@@ -90,12 +114,14 @@ public class DoctorController {
         return ResponseEntity.ok(specialties);
     }
 
+    // FUNCINALIDADES POR REVISAR, DEPENDE DE LO QUE DIGA EL FRONT
     /**
      * Agregar especialidades de un doctor específico
      * @param specialties Especialidades a agregar para el doctor
      * @param doctorId Id del doctor
      * @return Sin contenido
      */
+    /*
     @PostMapping("/{doctorId}/specialties")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> addSpecialties(
@@ -107,12 +133,15 @@ public class DoctorController {
         return ResponseEntity.noContent().build();
     }
 
+     */
+
     /**
      * Eliminar especialidades de un doctor específico
      * @param specialties Especialidades a agregar para el doctor
      * @param doctorId Id del doctors
      * @return Sin contenido
      */
+    /*
     @DeleteMapping("/{doctorId}/specialties")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> removeSpecialties(
@@ -123,6 +152,7 @@ public class DoctorController {
 
         return ResponseEntity.noContent().build();
     }
+     */
 
     /**
      * Obtiene todas las especialidades de los medicos
@@ -144,8 +174,15 @@ public class DoctorController {
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<?> getDoctorsBySpecialty(@PathVariable SpecialtyCode specialty) {
         List<Doctor> doctors = doctorService.getDoctorBySpeciality(specialty);
+
+        List<UUID> ids = doctors.stream()
+                .map(Doctor::getPersonId)
+                .toList();
+
+        Map<UUID, String> names = personExternalService.getPersonNames(ids);
+
         List<DoctorResponse> responses = doctors.stream()
-                .map(DoctorResponse::fromEntity)
+                .map(d -> DoctorResponse.fromEntity(d, names.get(d.getPersonId())))
                 .toList();
         return ResponseEntity.ok(responses);
     }

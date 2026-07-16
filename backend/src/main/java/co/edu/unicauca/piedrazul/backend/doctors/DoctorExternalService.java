@@ -9,15 +9,9 @@ import java.util.List;
 import java.util.UUID;
 
 public interface DoctorExternalService {
-    boolean existDoctor(UUID idDoctor);
-
-    String doctorsName(UUID idDoctor);
-
     List<LocalTime> getSlotsByDoctor(UUID idDoctor, LocalDate date);
 
     int getIntervalMinutesByDoctor(UUID idDoctor);
-
-    String getDoctorName(UUID idDoctor);
 
     List<DoctorResponse> getActiveDoctors ();
 
@@ -28,6 +22,4 @@ public interface DoctorExternalService {
     List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
 
     List<SpecialtyCode> findSpecialtiesByIdentification(String identification);
-
-    UUID findIdByIdentification(String identification);
 }

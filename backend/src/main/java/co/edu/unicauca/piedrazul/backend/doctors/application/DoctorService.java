@@ -175,7 +175,7 @@ public class DoctorService implements DoctorProvisioningApi {
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
         // Evita intervalos imposibles para todos los horarios existentes.
-        List<Schedule> schedules = doctor.getSchedules() == null ? List.of() : doctor.getSchedules();
+        Set<Schedule> schedules = doctor.getSchedules() == null ? new HashSet<>() : doctor.getSchedules();
         if (!schedules.isEmpty()) {
             boolean fitsAtLeastOneSchedule = schedules.stream().anyMatch(schedule -> {
                 long duration = ChronoUnit.MINUTES.between(schedule.getStartTime(), schedule.getEndTime());
@@ -250,11 +250,23 @@ public class DoctorService implements DoctorProvisioningApi {
         doctorRepository.save(doctor);
     }
 
+    // POR VER SI SE UNIFICAN
+
+    /*
     @Transactional
-    public void addSpecialities(UUID doctorId, List<SpecialtyCode> specialties) {
+    public void addSpecialities(UUID doctorId, List<String> specialtyCodes) {
 
         Doctor doctor = doctorRepository.findById(doctorId)
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
+
+        Set<Specialty> specialties = new HashSet<Specialty>();
+        for (String code : specialtyCodes) {
+            Specialty specialty = specialtyRepository.findById(code)
+                    .orElseThrow(() -> new IllegalArgumentException("Especialidad inválida: " + code));
+            specialties.add(specialty);
+        }
+
+        doctor.getSpecialties().add(specialties);
 
         doctor.getSpecialty().addAll(specialties);
     }
@@ -267,6 +279,8 @@ public class DoctorService implements DoctorProvisioningApi {
 
         doctor.getSpecialty().removeAll(specialties);
     }
+
+     */
 
     public List<Doctor> findAllDoctors() {
         return doctorRepository.findAll();
@@ -328,5 +342,9 @@ public class DoctorService implements DoctorProvisioningApi {
         if (laborEnd.isBefore(laborStart)) {
             throw new DateConflictException("La fecha de finalización no puede ser anterior a la fecha de inicio");
         }
+    }
+
+    private void getDcotorsName (Set<UUID> doctorsId){
+
     }
 }

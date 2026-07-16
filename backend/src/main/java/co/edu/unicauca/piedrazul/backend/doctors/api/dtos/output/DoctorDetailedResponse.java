@@ -11,7 +11,7 @@ import java.util.*;
 public record   DoctorDetailedResponse(
         UUID id,
         String name,
-        String specialty,
+        List<String> specialty,
         int appointmentInterval,
         List<Integer> workdays,
         LocalDate laborStart,
@@ -19,14 +19,16 @@ public record   DoctorDetailedResponse(
         boolean status
 ) {
     // Un método estático para convertir la entidad en DTO fácilmente
-    public static DoctorDetailedResponse fromEntity(Doctor doctor) {
+    public static DoctorDetailedResponse fromEntity(Doctor doctor, String name) {
         return new DoctorDetailedResponse(
-                doctor.getIdDoctor(),
-                doctor.getFirstName() + " " + doctor.getLastName(),
-                doctor.getSpecialty().toString(),
+                doctor.getPersonId(),
+                name,
+                doctor.getSpecialties().stream()
+                        .map(s -> s.getCode().name())
+                        .toList(),
                 doctor.getAppointmentInterval(),
                 Optional.ofNullable(doctor.getSchedules())
-                        .orElse(List.of())
+                        .orElse(new HashSet<>())
                         .stream()
                         .map(Schedule::getWorkday)
                         .filter(Objects::nonNull)
