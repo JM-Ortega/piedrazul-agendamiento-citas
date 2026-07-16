@@ -23,7 +23,7 @@ public record CreateDoctorRequest(
         String phone,
 
         @NotEmpty
-        List<SpecialtyCode> specialty,
+        List<String> specialty,
 
         @NotNull
         LocalDate laborStart,
@@ -34,6 +34,10 @@ public record CreateDoctorRequest(
         @Min(5)
         @Max(240)
         int appointmentInterval,
+
+        @Positive
+        @Min(1)
+        int bookingWindowWeeks,
 
         @Valid
         List<CreateScheduleRequest> schedules

@@ -7,5 +7,6 @@ import java.util.UUID;
 
 public interface DoctorProvisioningApi {
 
-    void createDoctor(UUID personId, LocalDate laborStart, LocalDate laborEnd, int appointmentInterval);
+    void createDoctor(UUID personId, CreateDoctorRequest request);
+
 }
