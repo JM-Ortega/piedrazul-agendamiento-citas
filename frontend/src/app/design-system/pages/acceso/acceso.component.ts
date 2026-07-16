@@ -16,7 +16,7 @@ import Keycloak from 'keycloak-js';
     LucideSettings,
     LucideStethoscope,
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './acceso.component.html',
 })
 export class AccesoComponent {

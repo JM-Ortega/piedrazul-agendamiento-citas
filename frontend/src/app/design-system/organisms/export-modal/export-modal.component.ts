@@ -89,7 +89,7 @@ const EXT_MAP: Record<ExportFormat, string> = {
   selector: 'app-export-modal',
   templateUrl: './export-modal.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideDynamicIcon, LucideDownload, LucideCalendar],
 })
 export class ExportModalComponent {

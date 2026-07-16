@@ -2,7 +2,7 @@
   <h2 class="text-[#163c63] text-2xl mb-4">Datos del Paciente</h2>
 
   <div>
-    <label class="block text-gray-700 mb-2 text-lg"
+    <label for="searchDocument" class="block text-gray-700 mb-2 text-lg"
       >Buscar por Número de Documento</label
     >
 
@@ -10,6 +10,7 @@
       <div class="flex gap-3">
         <div class="relative flex-1">
           <input
+            id="searchDocument"
             type="text"
             inputmode="numeric"
             [ngModel]="state.searchQuery()"

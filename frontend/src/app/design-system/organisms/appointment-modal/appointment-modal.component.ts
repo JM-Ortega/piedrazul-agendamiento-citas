@@ -27,11 +27,11 @@ import { environment } from '../../../../environments/environment';
     LucideMessageCircle,
     LucidePhone,
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './appointment-modal.component.html',
 })
 export class AppointmentModalComponent {
-  @Output() close = new EventEmitter<void>();
+  @Output() finish = new EventEmitter<void>();
 
   private keycloak = inject(Keycloak);
   private router = inject(Router);
@@ -50,12 +50,12 @@ export class AppointmentModalComponent {
 
   register(): void {
     this.router.navigate(['/registro']);
-    this.close.emit();
+    this.finish.emit();
   }
 
   onBackdropClick(event: MouseEvent): void {
     if (event.target === event.currentTarget) {
-      this.close.emit();
+      this.finish.emit();
     }
   }
 }

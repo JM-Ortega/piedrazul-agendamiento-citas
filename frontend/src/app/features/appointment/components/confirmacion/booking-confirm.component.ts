@@ -30,7 +30,7 @@ import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
     FormatoPipe,
     ErroresPipe,
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-confirm.component.html',
 })
 export class BookingConfirmComponent {

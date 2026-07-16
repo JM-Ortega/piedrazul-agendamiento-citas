@@ -27,7 +27,7 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
   selector: 'app-patient-dashboard',
   templateUrl: './patient-dashboard.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideCalendarDays,
     LucideChevronRight,
@@ -147,9 +147,9 @@ export class PatientDashboardComponent implements OnInit {
     });
   }
 
-  dismissCancelModal(): void {
+  dismissCancelModal(event?: MouseEvent): void {
+    if (event && event.target !== event.currentTarget) return;
     this.showCancelModal.set(false);
-    this.pendingCancelId.set(null);
   }
 
   private showToast(message: string, type: 'success' | 'error'): void {

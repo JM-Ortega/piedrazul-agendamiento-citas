@@ -15,7 +15,6 @@ import { BookingScheduleSelectorComponent } from '../../../appointment/component
 import { BookingPatientSearchComponent } from '../../components/busqueda-paciente/booking-patient-search.component';
 import { BookingPatientRegisterComponent } from '../../components/registro-paciente/booking-patient-register.component';
 import { SpecialtyDoctor } from '../../models/dtos/specialty-doctor.dto';
-import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
 import { BookingContext } from '../../models/types/bookingContext.type';
 import { BookingMode } from '../../models/types/bookingMode.type';
 import { BookingStateService } from '../../services/booking-state.service';
@@ -41,7 +40,7 @@ import { PatientAppointmentService } from '../../services/PatientApointment.serv
     BookingScheduleSelectorComponent,
     BookingConfirmComponent,
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './appointment-booking.component.html',
 })
 export class AppointmentBookingComponent implements OnInit {
@@ -69,7 +68,6 @@ export class AppointmentBookingComponent implements OnInit {
   private pendingDocumentNumber = '';
 
   // Outputs
-  appointmentConfirmed = output<AppointmentConfirmedEvent>();
   goBack = output<void>();
 
   patientSubStep: 'search' | 'register' = 'search';
@@ -95,7 +93,7 @@ export class AppointmentBookingComponent implements OnInit {
     this.doctorService.getMe().subscribe({
       next: (doctor) => {
         this.state.doctorSnapshot.set(doctor);
-        const cleanSpecialty = doctor.specialty.replace(/[\[\]]/g, '');
+        const cleanSpecialty = doctor.specialty.replace(/[[\]]/g, '');
         this.state.selectedSpecialty.set(cleanSpecialty);
 
         const doctors$ = this.citaService.getDoctorsBySpecialty(cleanSpecialty);
@@ -225,8 +223,7 @@ export class AppointmentBookingComponent implements OnInit {
     this.state.step.set(this.state.scheduleStep());
   }
 
-  onConfirmed(event: AppointmentConfirmedEvent): void {
-    this.appointmentConfirmed.emit(event);
+  onConfirmed(): void {
     setTimeout(() => this.goBack.emit(), 3000);
   }
 
@@ -373,7 +370,7 @@ export class AppointmentBookingComponent implements OnInit {
     const doctor = this.state.doctorSnapshot();
     if (!doctor) return;
 
-    const cleanSpecialty = doctor.specialty.replace(/[\[\]]/g, '');
+    const cleanSpecialty = doctor.specialty.replace(/[[\]]/g, '');
 
     if (
       this.state.selectedSpecialty() === cleanSpecialty &&

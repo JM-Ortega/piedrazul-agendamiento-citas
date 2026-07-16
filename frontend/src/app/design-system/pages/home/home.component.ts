@@ -20,7 +20,7 @@ import { AppointmentModalComponent } from '../../organisms/appointment-modal/app
     LucideShield,
     AppointmentModalComponent,
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './home.component.html',
 })
 export class HomeComponent {

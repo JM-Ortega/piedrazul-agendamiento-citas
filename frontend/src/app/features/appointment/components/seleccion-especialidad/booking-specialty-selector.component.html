@@ -22,8 +22,11 @@
   }
 
   <div>
-    <label class="block text-gray-700 mb-1">Especialidad *</label>
+    <label for="specialty" class="block text-gray-700 mb-1">
+      Especialidad *
+    </label>
     <select
+      id="specialty"
       [ngModel]="state.selectedSpecialty()"
       (ngModelChange)="onSpecialtyChange($event)"
       class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
@@ -63,8 +66,9 @@
     state.doctorsBySpecialty().length > 0
   ) {
     <div>
-      <label class="block text-gray-700 mb-1">Médico *</label>
+      <label for="doctor" class="block text-gray-700 mb-1">Médico *</label>
       <select
+        id="doctor"
         [ngModel]="state.selectedDoctorId()"
         (ngModelChange)="onDoctorChange($event)"
         class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"

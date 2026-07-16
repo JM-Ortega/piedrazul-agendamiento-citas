@@ -129,11 +129,16 @@
 @if (showCancelModal()) {
   <div
     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4"
-    (click)="dismissCancelModal()"
+    role="presentation"
+    tabindex="-1"
+    (click)="dismissCancelModal($event)"
+    (keydown.escape)="dismissCancelModal()"
   >
     <div
       class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm"
-      (click)="$event.stopPropagation()"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cancelModalTitle"
     >
       <!-- Ícono -->
       <div
@@ -143,7 +148,10 @@
       </div>
 
       <!-- Texto -->
-      <h3 class="text-xl font-bold text-gray-800 text-center mb-2">
+      <h3
+        id="cancelModalTitle"
+        class="text-xl font-bold text-gray-800 text-center mb-2"
+      >
         ¿Cancelar cita médica?
       </h3>
       <p class="text-gray-500 text-sm text-center mb-8">
@@ -154,12 +162,14 @@
       <!-- Botones -->
       <div class="flex gap-3">
         <button
+          type="button"
           class="flex-1 py-3 px-4 rounded-xl font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-200 transition-all duration-200 active:scale-[0.98]"
           (click)="dismissCancelModal()"
         >
           Volver
         </button>
         <button
+          type="button"
           class="flex-1 py-3 px-4 rounded-xl font-semibold text-white bg-gradient-to-r from-red-500 to-red-600 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
           (click)="confirmCancelAppointment()"
         >

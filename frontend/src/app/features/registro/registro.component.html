@@ -45,11 +45,15 @@
           </h2>
 
           <div>
-            <label class="block text-gray-700 mb-2 font-medium">
+            <label
+              for="documentNumber"
+              class="block text-gray-700 mb-2 font-medium"
+            >
               Número de documento
             </label>
             <div class="flex flex-col sm:flex-row gap-3">
               <input
+                id="documentNumber"
                 type="text"
                 [ngModel]="documentNumber()"
                 (ngModelChange)="onDocumentChange($event)"
@@ -125,10 +129,14 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="eu-documentType"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Tipo de documento <span class="text-red-500">*</span>
                 </label>
                 <select
+                  id="eu-documentType"
                   [ngModel]="getFormField('documentType')"
                   (ngModelChange)="setFormField('documentType', $event)"
                   class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4e92d9]"
@@ -146,11 +154,15 @@
               </div>
 
               <div>
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="eu-firstName"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Nombres <span class="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  id="eu-firstName"
                   [ngModel]="getFormField('firstName')"
                   (ngModelChange)="setFormField('firstName', $event)"
                   (input)="handleNameInput($event, 'firstName')"
@@ -174,11 +186,15 @@
               </div>
 
               <div>
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="eu-lastName"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Apellidos <span class="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  id="eu-lastName"
                   [ngModel]="getFormField('lastName')"
                   (ngModelChange)="setFormField('lastName', $event)"
                   (input)="handleNameInput($event, 'lastName')"
@@ -202,10 +218,14 @@
               </div>
 
               <div>
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="eu-phone"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Teléfono <span class="text-red-500">*</span>
                 </label>
                 <input
+                  id="eu-phone"
                   type="tel"
                   inputmode="numeric"
                   pattern="[0-9]*"
@@ -230,10 +250,14 @@
               </div>
 
               <div>
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="eu-gender"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Género <span class="text-red-500">*</span>
                 </label>
                 <select
+                  id="eu-gender"
                   [ngModel]="getFormField('gender')"
                   (ngModelChange)="setFormField('gender', $event)"
                   class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
@@ -256,11 +280,15 @@
               </div>
 
               <div>
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="eu-birthDate"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Fecha de nacimiento <span class="text-red-500">*</span>
                 </label>
                 <div class="relative w-full">
                   <input
+                    id="eu-birthDate"
                     type="text"
                     [matDatepicker]="birthPicker"
                     [ngModel]="getFormField('birthDate')"
@@ -285,11 +313,15 @@
               </div>
 
               <div class="sm:col-span-2">
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="eu-email"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Correo electrónico
                   <span class="text-gray-400 text-sm">(opcional)</span>
                 </label>
                 <input
+                  id="eu-email"
                   type="email"
                   [ngModel]="getFormField('email')"
                   (ngModelChange)="setFormField('email', $event)"
@@ -312,7 +344,10 @@
               </div>
 
               <div class="sm:col-span-2">
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="eu-guardianPhone"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Teléfono de familiar
                   @if (isMinorPatient()) {
                     <span class="text-red-500">*</span>
@@ -323,6 +358,7 @@
                   }
                 </label>
                 <input
+                  id="eu-guardianPhone"
                   type="tel"
                   inputmode="numeric"
                   pattern="[0-9]*"
@@ -388,10 +424,14 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="nf-documentType"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Tipo de documento <span class="text-red-500">*</span>
                 </label>
                 <select
+                  id="nf-documentType"
                   [ngModel]="getFormField('documentType')"
                   (ngModelChange)="setFormField('documentType', $event)"
                   class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4e92d9]"
@@ -409,11 +449,15 @@
               </div>
 
               <div>
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="nf-firstName"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Nombres <span class="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  id="nf-firstName"
                   [ngModel]="getFormField('firstName')"
                   (ngModelChange)="setFormField('firstName', $event)"
                   (input)="handleNameInput($event, 'firstName')"
@@ -437,11 +481,15 @@
               </div>
 
               <div>
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="nf-lastName"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Apellidos <span class="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  id="nf-lastName"
                   [ngModel]="getFormField('lastName')"
                   (ngModelChange)="setFormField('lastName', $event)"
                   (input)="handleNameInput($event, 'lastName')"
@@ -465,10 +513,14 @@
               </div>
 
               <div>
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="nf-phone"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Teléfono <span class="text-red-500">*</span>
                 </label>
                 <input
+                  id="nf-phone"
                   type="tel"
                   inputmode="numeric"
                   pattern="[0-9]*"
@@ -493,10 +545,14 @@
               </div>
 
               <div>
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="nf-gender"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Género <span class="text-red-500">*</span>
                 </label>
                 <select
+                  id="nf-gender"
                   [ngModel]="getFormField('gender')"
                   (ngModelChange)="setFormField('gender', $event)"
                   class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
@@ -519,11 +575,15 @@
               </div>
 
               <div>
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="nf-birthDate"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Fecha de nacimiento <span class="text-red-500">*</span>
                 </label>
                 <div class="relative w-full">
                   <input
+                    id="nf-birthDate"
                     type="text"
                     [matDatepicker]="birthPicker2"
                     [ngModel]="getFormField('birthDate')"
@@ -558,11 +618,15 @@
               </div>
 
               <div class="sm:col-span-2">
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="nf-email"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Correo electrónico
                   <span class="text-gray-400 text-sm">(opcional)</span>
                 </label>
                 <input
+                  id="nf-email"
                   type="email"
                   [ngModel]="getFormField('email')"
                   (ngModelChange)="setFormField('email', $event)"
@@ -585,7 +649,10 @@
               </div>
 
               <div class="sm:col-span-2">
-                <label class="block text-gray-700 mb-1 text-sm font-medium">
+                <label
+                  for="nf-guardianPhone"
+                  class="block text-gray-700 mb-1 text-sm font-medium"
+                >
                   Teléfono de familiar
                   @if (isMinorPatient()) {
                     <span class="text-red-500">*</span>
@@ -596,6 +663,7 @@
                   }
                 </label>
                 <input
+                  id="nf-guardianPhone"
                   type="tel"
                   inputmode="numeric"
                   pattern="[0-9]*"
@@ -687,11 +755,15 @@
 
           @if (requiresPassword()) {
             <div>
-              <label class="block text-gray-700 mb-1 text-sm font-medium">
+              <label
+                for="password"
+                class="block text-gray-700 mb-1 text-sm font-medium"
+              >
                 Contraseña <span class="text-red-500">*</span>
               </label>
               <div class="relative">
                 <input
+                  id="password"
                   [type]="showPassword() ? 'text' : 'password'"
                   [ngModel]="password()"
                   (ngModelChange)="password.set($event)"
@@ -722,11 +794,15 @@
             </div>
 
             <div>
-              <label class="block text-gray-700 mb-1 text-sm font-medium">
+              <label
+                for="confirmPassword"
+                class="block text-gray-700 mb-1 text-sm font-medium"
+              >
                 Confirmar contraseña <span class="text-red-500">*</span>
               </label>
               <div class="relative">
                 <input
+                  id="confirmPassword"
                   [type]="showConfirmPassword() ? 'text' : 'password'"
                   [ngModel]="confirmPassword()"
                   (ngModelChange)="confirmPassword.set($event)"
@@ -813,12 +889,16 @@
           }
 
           <div>
-            <label class="block text-gray-700 mb-1 text-sm font-medium">
+            <label
+              for="verificationCode"
+              class="block text-gray-700 mb-1 text-sm font-medium"
+            >
               Código de verificación <span class="text-red-500">*</span>
             </label>
             <input
               type="text"
               maxlength="6"
+              id="verificationCode"
               [ngModel]="verificationCode()"
               (ngModelChange)="verificationCode.set($event)"
               placeholder="Ej. 123456"
