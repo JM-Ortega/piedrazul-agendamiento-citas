@@ -1,9 +1,9 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   EventEmitter,
   Input,
   Output,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import {
   LucideCalendar,
@@ -17,7 +17,7 @@ type Role = 'doctor' | 'scheduler';
   selector: 'app-create-user-roles',
   templateUrl: './create-user-roles.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideCalendar, LucideCircleAlert, LucideStethoscope],
 })
 export class CreateUserRolesComponent {

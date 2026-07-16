@@ -1,9 +1,9 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   inject,
   OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import {
   NavigationStart,
@@ -27,6 +27,7 @@ import {
   LucideUserCog,
   LucideUsers,
   LucideX,
+  type LucideIcon,
 } from '@lucide/angular';
 import { AppService } from '../../core/services/app.service';
 
@@ -34,7 +35,7 @@ import { AppService } from '../../core/services/app.service';
   selector: 'app-navbar',
   templateUrl: './navbar.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideAlertCircle,
     LucideCalendar,
@@ -67,7 +68,7 @@ export class NavbarComponent implements OnInit {
   // Icono y color por rol para el dropdown
   readonly roleConfig: Record<
     string,
-    { icon: any; color: string; label: string }
+    { icon: LucideIcon; color: string; label: string }
   > = {
     ADMIN: {
       icon: LucideSettings,

@@ -1,4 +1,5 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   computed,
   inject,
@@ -6,7 +7,6 @@ import {
   OnInit,
   output,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import {
   LucideCalendar,
@@ -32,7 +32,7 @@ export interface DoctorSaveEvent {
   selector: 'app-doctor-edit-form',
   templateUrl: './doctor-edit-form.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideCalendar,
     LucideChevronDown,

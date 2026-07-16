@@ -1,28 +1,28 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   inject,
   OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Patient } from '../../../shared/models/interfaces/patient.model';
-import { DoctorService } from '../../../core/services/doctor.service';
 import {
-  LucideClipboardPen,
   LucideArrowLeft,
-  LucideClipboardPlus,
-  LucideSave,
-  LucideFolderOpen,
   LucideCalendar,
+  LucideClipboardPen,
+  LucideClipboardPlus,
+  LucideFolderOpen,
+  LucideSave,
 } from '@lucide/angular';
+import { DoctorService } from '../../../core/services/doctor.service';
+import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
 @Component({
   selector: 'app-doctor-medical-history',
   templateUrl: './doctor-medical-history.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideClipboardPen,
     LucideArrowLeft,

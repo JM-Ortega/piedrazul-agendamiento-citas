@@ -1,10 +1,10 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   HostListener,
   inject,
   OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { Router } from '@angular/router';
 import {
@@ -12,13 +12,13 @@ import {
   LucideBone,
   LucideCalendar,
   LucideCheck,
+  LucideDynamicIcon,
   LucideEdit3,
   LucideHeart,
   LucideSave,
   LucideStethoscope,
   LucideX,
   LucideZap,
-  LucideDynamicIcon,
 } from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
 import { AppService } from '../../../../core/services/app.service';

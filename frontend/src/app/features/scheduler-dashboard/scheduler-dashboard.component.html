@@ -759,18 +759,28 @@
   @if (showCancelModal()) {
     <div
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4"
+      role="presentation"
       (click)="dismissCancelModal()"
+      (keydown.escape)="dismissCancelModal()"
     >
       <div
         class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cancelModalTitle"
+        tabindex="-1"
         (click)="$event.stopPropagation()"
+        (keydown)="$event.stopPropagation()"
       >
         <div
           class="flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mx-auto mb-5"
         >
           <svg lucideX [size]="32" class="text-red-500"></svg>
         </div>
-        <h3 class="text-xl font-bold text-gray-800 text-center mb-2">
+        <h3
+          id="cancelModalTitle"
+          class="text-xl font-bold text-gray-800 text-center mb-2"
+        >
           ¿Cancelar cita médica?
         </h3>
         <p class="text-gray-500 text-sm text-center mb-8">
@@ -785,7 +795,7 @@
             Volver
           </button>
           <button
-            class="flex-1 py-3 px-4 rounded-xl font-semibold text-white bg-gradient-to-r from-red-500 to-red-600 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer"
+            class="flex-1 py-3 px-4 rounded-xl font-semibold text-white bg-linear-to-r from-red-500 to-red-600 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer"
             (click)="confirmCancelAppointment()"
           >
             Sí, cancelar
