@@ -35,6 +35,10 @@ public record CreateDoctorRequest(
         @Max(240)
         int appointmentInterval,
 
+        @Positive
+        @Min(1)
+        int bookingWindowWeeks,
+
         @Valid
         List<CreateScheduleRequest> schedules
 ) {}

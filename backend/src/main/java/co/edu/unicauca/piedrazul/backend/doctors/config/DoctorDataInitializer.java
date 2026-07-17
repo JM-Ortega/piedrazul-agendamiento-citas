@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
-
+/*
 @Component
 @Order(1)
 public class DoctorDataInitializer implements ApplicationRunner {
@@ -139,3 +139,5 @@ public class DoctorDataInitializer implements ApplicationRunner {
         System.out.println("✔ Médicos de prueba insertados");
     }
 }
+
+ */

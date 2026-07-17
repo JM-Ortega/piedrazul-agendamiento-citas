@@ -64,7 +64,7 @@ public class Doctor {
     private LocalDate laborEnd;
 
     @Column(name = "booking_window_weeks", nullable = false)
-    private Integer bookingWindowWeeks;
+    private int bookingWindowWeeks;
 
     @Column(name = "status", nullable = false)
     private boolean status;
@@ -72,7 +72,10 @@ public class Doctor {
     @Column(name = "appointment_interval", nullable = false)
     private int appointmentInterval;
 
-    @ManyToMany(fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "doctor", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Schedule> schedules = new HashSet<>();
+
+    @ManyToMany
     @JoinTable(
             name = "doctor_specialty",
             schema = "piedrazul",
@@ -82,19 +85,31 @@ public class Doctor {
     private Set<Specialty> specialties = new HashSet<>();
 
 
-    // BORRAR I
-    /*
-    @OneToMany(mappedBy = "doctor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<Schedule> schedules = new ArrayList<>();
-     */
-    // BORRAR F
+    public boolean tieneEspecialidad(SpecialtyCode code) {
+        return specialties.stream().anyMatch(s -> s.getCode().equals(code));
+    }
 
     // Al momento de registrar/crearle una cuenta al doctor se le deben llenar todos estos campos,
     // el registro de doctores deberia hacerlo solo el administrador
-    public Doctor(boolean status, LocalDate laborStart, LocalDate laborEnd, int appointmentInterval) {
-        this.status = status;
+    public Doctor(UUID personId, LocalDate laborStart, LocalDate laborEnd,
+                  int bookingWindowWeeks, Boolean status, Integer appointmentInterval) {
+        this.personId = personId;
         this.laborStart = laborStart;
         this.laborEnd = laborEnd;
+        this.bookingWindowWeeks = bookingWindowWeeks;
+        this.status = status;
         this.appointmentInterval = appointmentInterval;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Doctor other)) return false;
+        return personId != null && personId.equals(other.personId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(personId);
     }
 }

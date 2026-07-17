@@ -3,78 +3,85 @@ package co.edu.unicauca.piedrazul.backend.doctors.application;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorInvalidSpecialty;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
-import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
+import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.SpecialtyRepository;
+import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import jakarta.transaction.Transactional;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class DoctorService implements DoctorProvisioningApi {
     private final DoctorRepository doctorRepository;
-    private final UserModuleApi userModuleApi;
     private final AppointmentExternalService appointmentExternalService;
+    private final PersonExternalService personExternalService;
+    private final SpecialtyRepository specialtyRepository;
 
-    public DoctorService(DoctorRepository doctorRepository, UserModuleApi userModuleApi, AppointmentExternalService appointmentExternalService) {
+    public DoctorService(DoctorRepository doctorRepository, AppointmentExternalService appointmentExternalService,
+    PersonExternalService personExternalService, SpecialtyRepository specialtyRepository)
+    {
         this.doctorRepository = doctorRepository;
-        this.userModuleApi = userModuleApi;
         this.appointmentExternalService = appointmentExternalService;
+        this.personExternalService = personExternalService;
+        this.specialtyRepository = specialtyRepository;
     }
 
     @Transactional
     @Override
-    public void createDoctor(LocalDate laborStart, LocalDate laborEnd, int appointmentInterval) {
-        if (doctorRepository.findByIdUser(userId) != null) {
-            return;
-        }
-
-        persistDoctor(userId, firstName, lastName, identificacion, request);
-    }
-
-    private void persistDoctor(UUID userId, String firstName, String lastName, String identificacion, CreateDoctorRequest request) {
+    public void createDoctor(UUID personId, CreateDoctorRequest request) {
         validateLaborDateRange(request.laborStart(), request.laborEnd());
 
-        // 1. Mapeo de DTO a Entidad
-        Doctor doctor = new Doctor();
-        doctor.setFirstName(firstName);
-        doctor.setLastName(lastName);
-        doctor.setDocumentType(request.documentType());
-        doctor.setIdentification(identificacion);
-        doctor.setPhone(request.phone());
-        doctor.setSpecialty(request.specialty());
-        doctor.setLaborStart(request.laborStart());
-        doctor.setLaborEnd(request.laborEnd());
-        doctor.setAppointmentInterval(request.appointmentInterval());
-        doctor.setStatus(calculateActiveStatus(request.laborStart(), request.laborEnd()));
-        doctor.setIdUser(userId);
+        // Lo dejamos inactivo porque no tiene horarios
+        Doctor doctor = new Doctor(personId, request.laborStart(), request.laborEnd(), request.bookingWindowWeeks(),
+                false, request.appointmentInterval());
 
-        List<Schedule> schedules = request.schedules().stream()
-                .map(s -> new Schedule(
-                        doctor,
-                        s.startTime(),
-                        s.endTime(),
-                        s.workday()
-                ))
-                .toList();
+        // Agregamos las especialidades
+        Set<Specialty> specialties = new HashSet<>();
+        for (SpecialtyCode code : request.specialty()) {
+            Specialty specialty = specialtyRepository.findById(code)
+                    .orElseThrow(() -> new DoctorInvalidSpecialty("Especialidad inválida: " + code));
+            specialties.add(specialty);
+        }
 
-        doctor.setSchedules(schedules);
+        doctor.setSpecialties(specialties);
 
-        // 3. Persistencia
+
+        // Lo dejamos inactivo porque no tiene horarios
+        personExternalService.deactivateUser(personId);
+
+
+        // Agregamos los horarios, si hay
+        if(request.schedules() != null){
+            Set<Schedule> schedules = request.schedules().stream()
+                    .map(s -> new Schedule(
+                            doctor,
+                            s.startTime(),
+                            s.endTime(),
+                            s.workday()
+                    )).collect(Collectors.toSet());
+
+            doctor.setSchedules(schedules);
+
+            // Como si hay horaios validamos si el doctor debe estar activo o no
+            doctor.setStatus(calculateActiveStatus(request.laborStart(), request.laborEnd()));
+        }
+
+        // Persistimos
         Doctor savedDoctor = doctorRepository.save(doctor);
 
-        // 4. Deshabilitar el usuario si el doctor no está activo.
-        if (!savedDoctor.isStatus()) {
-            userModuleApi.deactivateUser(savedDoctor.getIdUser());
+        // Activamos el usuario si el doctor está activo
+        if (savedDoctor.isStatus()) {
+            personExternalService.activateUser(personId);
         }
     }
 
@@ -165,7 +172,7 @@ public class DoctorService implements DoctorProvisioningApi {
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
         // Evita intervalos imposibles para todos los horarios existentes.
-        List<Schedule> schedules = doctor.getSchedules() == null ? List.of() : doctor.getSchedules();
+        Set<Schedule> schedules = doctor.getSchedules() == null ? new HashSet<>() : doctor.getSchedules();
         if (!schedules.isEmpty()) {
             boolean fitsAtLeastOneSchedule = schedules.stream().anyMatch(schedule -> {
                 long duration = ChronoUnit.MINUTES.between(schedule.getStartTime(), schedule.getEndTime());
@@ -240,24 +247,6 @@ public class DoctorService implements DoctorProvisioningApi {
         doctorRepository.save(doctor);
     }
 
-    @Transactional
-    public void addSpecialities(UUID doctorId, List<SpecialtyCode> specialties) {
-
-        Doctor doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-
-        doctor.getSpecialty().addAll(specialties);
-    }
-
-    @Transactional
-    public void removeSpecialities(UUID doctorId, List<SpecialtyCode> specialties) {
-
-        Doctor doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-
-        doctor.getSpecialty().removeAll(specialties);
-    }
-
     public List<Doctor> findAllDoctors() {
         return doctorRepository.findAll();
     }
@@ -277,6 +266,10 @@ public class DoctorService implements DoctorProvisioningApi {
 
     public List<Doctor> getDoctorBySpeciality(SpecialtyCode specialty) {
         return doctorRepository.findBySpecialtyContaining(specialty);
+    }
+
+    public List<Doctor> getDoctorsById(List<UUID> doctorIds) {
+        return doctorRepository.findByIdDoctorIn(doctorIds);
     }
 
     public List<SpecialtyCode> getSpecialties(UUID idPatient) {
@@ -302,10 +295,10 @@ public class DoctorService implements DoctorProvisioningApi {
 
     private void syncUserStatus(Doctor doctor) {
         if (doctor.isStatus()) {
-            userModuleApi.activateUser(doctor.getIdUser());
+            personExternalService.activateUser(doctor.getPersonId());
             return;
         }
-        userModuleApi.deactivateUser(doctor.getIdUser());
+        personExternalService.deactivateUser(doctor.getPersonId());
     }
 
     private void validateLaborDateRange(LocalDate laborStart, LocalDate laborEnd) {
@@ -318,5 +311,21 @@ public class DoctorService implements DoctorProvisioningApi {
         if (laborEnd.isBefore(laborStart)) {
             throw new DateConflictException("La fecha de finalización no puede ser anterior a la fecha de inicio");
         }
+    }
+
+    @Transactional
+    public void changeSpecialties(UUID doctorId, List<SpecialtyCode> codigosNuevos) {
+
+        Doctor doctor = doctorRepository.findById(doctorId)
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado: " + doctorId));
+
+        Set<Specialty> nuevas = new HashSet<>(specialtyRepository.findAllById(codigosNuevos));
+        if (nuevas.size() != new HashSet<>(codigosNuevos).size()) {
+            throw new IllegalArgumentException("Alguna especialidad enviada no existe en el catálogo");
+        }
+
+        Set<Specialty> actuales = doctor.getSpecialties();
+        actuales.removeIf(s -> !nuevas.contains(s)); // quita las que ya no vienen
+        actuales.addAll(nuevas); // agrega las nuevas
     }
 }

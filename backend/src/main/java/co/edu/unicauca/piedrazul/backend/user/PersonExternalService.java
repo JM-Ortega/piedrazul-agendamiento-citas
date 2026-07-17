@@ -32,4 +32,13 @@ public interface PersonExternalService {
     List<PersonSummary> findByIdentificationPrefix(String identificationPrefix);
 
     Optional<PersonSummary> findByUserId(UUID userId);
+
+
+    void deactivateUser (UUID personID);
+
+    void activateUser(UUID personID);
+
+    String getPersonName(UUID personID);
+
+    Map<UUID, String> getPersonNames(List<UUID> personIds);
 }

@@ -6,7 +6,6 @@ import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleValidationException;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
 import jakarta.transaction.Transactional;
 
@@ -24,8 +23,8 @@ public class ScheduleService {
     // Crear un horario para un doctor específico
     @Transactional
     public Schedule addSchedule(Doctor doctor, Schedule schedule) {
-        if (doctor == null || doctor.getIdDoctor() == null) {
-            throw new DoctorScheduleValidationException("Doctor must be provided");
+        if (doctor == null || doctor.getPersonId() == null) {
+            throw new DoctorScheduleValidationException("Se debe seleccionar un doctor");
         }
 
         boolean alreadyExistsForWorkday = scheduleRepository.findByDoctor(doctor).stream()
@@ -41,7 +40,7 @@ public class ScheduleService {
     // Modificar el horario para un doctor en un día específico (Workday)
     @Transactional
     public Schedule updateScheduleByWorkday(Doctor doctor, Workday workday, Schedule newScheduleData) {
-        if (doctor == null || doctor.getIdDoctor() == null) {
+        if (doctor == null || doctor.getPersonId() == null) {
             throw new DoctorScheduleValidationException("Se debe seleccionar un doctor");
         }
 
@@ -61,7 +60,7 @@ public class ScheduleService {
 
     @Transactional
     public void deleteScheduleByWorkday(Doctor doctor, Workday workday) {
-        if (doctor == null || doctor.getIdDoctor() == null) {
+        if (doctor == null || doctor.getPersonId() == null) {
             throw new IllegalArgumentException("Se debe seleccionar un doctor");
         }
 
@@ -69,14 +68,14 @@ public class ScheduleService {
     }
 
     public List<Schedule> getSchedulesByDoctor(Doctor doctor) {
-        if (doctor == null || doctor.getIdDoctor() == null) {
+        if (doctor == null || doctor.getPersonId() == null) {
             throw new DoctorScheduleValidationException("Se debe seleccionar un doctor");
         }
         return scheduleRepository.findByDoctor(doctor);
     }
 
     public List<LocalTime> getAvailableIntervalsByWorkday(Doctor doctor, Workday workday) {
-        if (doctor == null || doctor.getIdDoctor() == null) {
+        if (doctor == null || doctor.getPersonId() == null) {
             throw new DoctorScheduleValidationException("Se debe seleccionar un doctor");
         }
 

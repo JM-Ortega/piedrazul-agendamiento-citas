@@ -7,6 +7,7 @@ import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemDoctorRespons
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
 import co.edu.unicauca.piedrazul.backend.user.exception.DoctorRoleRequiredException;
 import co.edu.unicauca.piedrazul.backend.user.exception.UserNotFoundException;
+import co.edu.unicauca.piedrazul.backend.user.infrastructure.persistence.PersonRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -19,10 +20,13 @@ import java.util.stream.Stream;
 public class UserService {
     private final KeycloakUserService keycloakUserService;
     private final DoctorExternalService doctorExternalService;
+    private final PersonRepository personRepository;
 
-    public UserService(KeycloakUserService keycloakUserService, DoctorExternalService doctorExternalService) {
+    public UserService(KeycloakUserService keycloakUserService, DoctorExternalService doctorExternalService
+    , PersonRepository personRepository) {
         this.keycloakUserService = keycloakUserService;
         this.doctorExternalService = doctorExternalService;
+        this.personRepository = personRepository;
     }
 
     public List<SystemUserResponse> getSystemUsers() {
@@ -71,7 +75,7 @@ public class UserService {
                     .toList();
 
             result.add(new SystemDoctorResponse(
-                    doctorExternalService.findIdByIdentification(doctor.username()),
+                    personRepository.getPersonIdByUserId(doctor.id()),
                     doctor.firstName(),
                     doctor.lastName(),
                     doctor.username(),

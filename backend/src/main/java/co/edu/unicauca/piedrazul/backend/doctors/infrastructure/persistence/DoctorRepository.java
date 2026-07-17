@@ -4,12 +4,11 @@ import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.SpecialtyCode;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.UUID;
 
-@Repository
+
 public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
     // Buscar doctores por especialidad
     List<Doctor> findBySpecialtyContaining(SpecialtyCode specialty);
