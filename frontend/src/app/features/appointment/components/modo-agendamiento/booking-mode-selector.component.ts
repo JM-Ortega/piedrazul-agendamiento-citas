@@ -16,7 +16,7 @@ import { BookingStateService } from '../../services/booking-state.service';
   selector: 'app-booking-mode-selector',
   standalone: true,
   imports: [LucideStethoscope, LucideUserSearch],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-mode-selector.component.html',
 })
 export class BookingModeSelectorComponent {

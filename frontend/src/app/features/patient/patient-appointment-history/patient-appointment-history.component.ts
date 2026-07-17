@@ -18,7 +18,7 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
   selector: 'app-patient-appointment-history',
   templateUrl: './patient-appointment-history.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideCalendarDays, LucideClock, CommonModule, FormatoPipe],
 })
 export class PatientAppointmentHistoryComponent implements OnInit {

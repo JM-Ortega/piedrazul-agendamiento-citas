@@ -1,10 +1,10 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   computed,
   inject,
   OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { Router } from '@angular/router';
 import {
@@ -26,7 +26,7 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
   selector: 'app-doctor-dashboard',
   templateUrl: './doctor-dashboard.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideCalendar,
     LucideCheck,

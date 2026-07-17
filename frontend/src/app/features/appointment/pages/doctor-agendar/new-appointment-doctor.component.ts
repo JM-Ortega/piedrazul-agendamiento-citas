@@ -7,7 +7,6 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
-import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
 import { LucideArrowLeft } from '@lucide/angular';
 
 /**
@@ -19,7 +18,7 @@ import { LucideArrowLeft } from '@lucide/angular';
   selector: 'app-new-appointment-doctor',
   standalone: true,
   imports: [LucideArrowLeft, AppointmentBookingComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './new-appointment-doctor.component.html',
 })
 export class NewAppointmentDoctorComponent implements OnInit {
@@ -33,8 +32,6 @@ export class NewAppointmentDoctorComponent implements OnInit {
       this.route.snapshot.queryParamMap.get('documentNumber') ?? '';
     this.patientDocument.set(docNumber);
   }
-
-  onAppointmentConfirmed(event: AppointmentConfirmedEvent): void {}
 
   goToDashboard(): void {
     this.router.navigate(['/medico']);

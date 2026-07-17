@@ -1,22 +1,32 @@
 <div class="space-y-5">
   <h2 class="text-[#163c63] text-2xl mb-4">
-    {{ state.bookingMode() === 'specialty' ? 'Seleccionar Especialidad' : 'Seleccionar Especialidad y Médico' }}
+    {{
+      state.bookingMode() === 'specialty'
+        ? 'Seleccionar Especialidad'
+        : 'Seleccionar Especialidad y Médico'
+    }}
   </h2>
 
   <!-- Aviso para paciente nuevo -->
   @if (state.isNewPatient() && !state.isDoctorContext()) {
-    <div class="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 text-amber-800 text-sm flex items-start gap-2">
+    <div
+      class="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 text-amber-800 text-sm flex items-start gap-2"
+    >
       <span class="mt-0.5">⚠️</span>
       <span>
         Para pacientes nuevos se recomienda agendar primero con
-        <strong>Medicina General</strong>. Solo podrá seleccionar esta especialidad.
+        <strong>Medicina General</strong>. Solo podrá seleccionar esta
+        especialidad.
       </span>
     </div>
   }
 
   <div>
-    <label class="block text-gray-700 mb-1">Especialidad *</label>
+    <label for="specialty" class="block text-gray-700 mb-1">
+      Especialidad *
+    </label>
     <select
+      id="specialty"
       [ngModel]="state.selectedSpecialty()"
       (ngModelChange)="onSpecialtyChange($event)"
       class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
@@ -29,13 +39,20 @@
   </div>
 
   @if (state.noSpecialtyAvailable()) {
-    <p class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm">
+    <p
+      class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm"
+    >
       ⚠️ {{ state.errorMessageSpecialty() }}
     </p>
   }
 
-  @if (state.bookingMode() === 'specialty' && state.assignedDoctor(); as doctor) {
-    <div class="bg-[#e6f0fa] border border-[#c2d8f0] rounded-xl p-4 flex items-center gap-3">
+  @if (
+    state.bookingMode() === 'specialty' && state.assignedDoctor();
+    as doctor
+  ) {
+    <div
+      class="bg-[#e6f0fa] border border-[#c2d8f0] rounded-xl p-4 flex items-center gap-3"
+    >
       <svg lucideUserSearch [size]="22" class="text-[#215c98] shrink-0"></svg>
       <div>
         <p class="text-gray-500 text-sm">Médico asignado</p>
@@ -44,10 +61,14 @@
     </div>
   }
 
-  @if (state.bookingMode() === 'specialty-doctor' && state.doctorsBySpecialty().length > 0) {
+  @if (
+    state.bookingMode() === 'specialty-doctor' &&
+    state.doctorsBySpecialty().length > 0
+  ) {
     <div>
-      <label class="block text-gray-700 mb-1">Médico *</label>
+      <label for="doctor" class="block text-gray-700 mb-1">Médico *</label>
       <select
+        id="doctor"
         [ngModel]="state.selectedDoctorId()"
         (ngModelChange)="onDoctorChange($event)"
         class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
@@ -61,7 +82,9 @@
   }
 
   @if (state.noDoctorsFound()) {
-    <p class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm">
+    <p
+      class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm"
+    >
       ⚠️ {{ state.errorMessageDoctors() }}
     </p>
   }
@@ -78,8 +101,7 @@
     <button
       [disabled]="!state.canGoToScheduleStep()"
       (click)="goToSchedule()"
-      class="flex-1 bg-[#215c98] text-white py-3 rounded-xl disabled:opacity-50
-             hover:bg-[#163c63] transition-colors cursor-pointer"
+      class="flex-1 bg-[#215c98] text-white py-3 rounded-xl disabled:opacity-50 hover:bg-[#163c63] transition-colors cursor-pointer"
     >
       Seleccionar Horario →
     </button>

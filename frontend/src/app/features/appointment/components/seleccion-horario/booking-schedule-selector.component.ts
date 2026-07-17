@@ -38,7 +38,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
     MatNativeDateModule,
     FormatoPipe,
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-schedule-selector.component.html',
 })
 export class BookingScheduleSelectorComponent {

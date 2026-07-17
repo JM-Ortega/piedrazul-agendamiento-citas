@@ -27,6 +27,7 @@ import {
 } from '../../core/services/patient.service';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
+import { HttpErrorResponse } from '@angular/common/http';
 
 type RegistroStep = 1 | 2 | 3;
 type PatientStatus =
@@ -48,7 +49,7 @@ type PatientStatus =
     MatDatepickerModule,
     FormatoPipe,
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './registro.component.html',
 })
 export class RegistroComponent implements OnInit {
@@ -137,9 +138,9 @@ export class RegistroComponent implements OnInit {
   emailLimitMsg = signal('');
   guardianPhoneLimitMsg = signal('');
 
-  private readonly VALID_NAME_REGEX = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s\-]+$/;
+  private readonly VALID_NAME_REGEX = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s-]+$/;
   private readonly VALID_EMAIL_REGEX =
-    /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   private readonly INVALID_EMAIL_CHARS = /['"<>()[\]\\,;:{}|^~`!#$%&*=?/]/;
 
   private timers: Record<string, ReturnType<typeof setTimeout>> = {};
@@ -385,7 +386,7 @@ export class RegistroComponent implements OnInit {
     }
 
     el.value = value;
-    this.setFormField(field, value as any);
+    this.setFormField(field, value);
   }
 
   handlePhoneInput(event: Event): void {
@@ -474,12 +475,10 @@ export class RegistroComponent implements OnInit {
     });
   }
 
-  private handleError(err: any): void {
+  private handleError(err: HttpErrorResponse): void {
     this.isLoading.set(false);
-
     const detail = err.error?.detail;
     const errorCode = err.error?.errorCode;
-
     if (err.status === 0) {
       this.errorMessage.set(
         'No se pudo conectar con el servidor. Intenta más tarde.'

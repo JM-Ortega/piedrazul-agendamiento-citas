@@ -1,5 +1,4 @@
 <div class="space-y-5">
-
   <div>
     <h2 class="text-[#163c63] text-2xl">Registrar Nuevo Paciente</h2>
     <p class="text-gray-500 text-sm mt-1">
@@ -7,24 +6,29 @@
     </p>
   </div>
 
-  <div class="bg-[#e6f0fa] border border-[#c2d8f0] rounded-xl px-4 py-3 flex items-center gap-2 text-[#163c63] text-sm">
+  <div
+    class="bg-[#e6f0fa] border border-[#c2d8f0] rounded-xl px-4 py-3 flex items-center gap-2 text-[#163c63] text-sm"
+  >
     📋 Documento: <strong>{{ getPatientField('documentNumber') }}</strong>
   </div>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
     <div>
-      <label class="block text-gray-700 mb-1 text-sm font-medium">
+      <label
+        for="documentType"
+        class="block text-gray-700 mb-1 text-sm font-medium"
+      >
         Tipo de Documento <span class="text-red-500">*</span>
       </label>
       <select
+        id="documentType"
         [ngModel]="getPatientField('documentType')"
         (ngModelChange)="setPatientField('documentType', $event)"
         class="w-full border-2 border-[#c2d8f0] rounded-xl px-4 py-3"
       >
         <option value="">Seleccione...</option>
         @for (type of patientService.documentTypes(); track type) {
-          <option [value]="type">{{ type | formato}}</option>
+          <option [value]="type">{{ type | formato }}</option>
         }
       </select>
       @if (docTypeError()) {
@@ -33,10 +37,14 @@
     </div>
 
     <div>
-      <label class="block text-gray-700 mb-1 text-sm font-medium">
+      <label
+        for="firstName"
+        class="block text-gray-700 mb-1 text-sm font-medium"
+      >
         Nombres <span class="text-red-500">*</span>
       </label>
       <input
+        id="firstName"
         type="text"
         [ngModel]="getPatientField('firstName')"
         (ngModelChange)="setPatientField('firstName', $event)"
@@ -52,10 +60,14 @@
     </div>
 
     <div>
-      <label class="block text-gray-700 mb-1 text-sm font-medium">
+      <label
+        for="lastName"
+        class="block text-gray-700 mb-1 text-sm font-medium"
+      >
         Apellidos <span class="text-red-500">*</span>
       </label>
       <input
+        id="lastName"
         type="text"
         [ngModel]="getPatientField('lastName')"
         (ngModelChange)="setPatientField('lastName', $event)"
@@ -71,10 +83,11 @@
     </div>
 
     <div>
-      <label class="block text-gray-700 mb-1 text-sm font-medium">
+      <label for="phone" class="block text-gray-700 mb-1 text-sm font-medium">
         Teléfono <span class="text-red-500">*</span>
       </label>
       <input
+        id="phone"
         type="tel"
         [ngModel]="getPatientField('phone')"
         (ngModelChange)="setPatientField('phone', $event)"
@@ -90,10 +103,11 @@
     </div>
 
     <div>
-      <label class="block text-gray-700 mb-1 text-sm font-medium">
+      <label for="gender" class="block text-gray-700 mb-1 text-sm font-medium">
         Género <span class="text-red-500">*</span>
       </label>
       <select
+        id="gender"
         [ngModel]="getPatientField('gender')"
         (ngModelChange)="setPatientField('gender', $event)"
         class="w-full border-2 border-[#c2d8f0] rounded-xl px-4 py-3"
@@ -109,12 +123,16 @@
     </div>
 
     <div>
-      <label class="block text-gray-700 mb-1 text-sm font-medium">
+      <label
+        for="birthDate"
+        class="block text-gray-700 mb-1 text-sm font-medium"
+      >
         Fecha de Nacimiento <span class="text-red-500">*</span>
       </label>
 
       <div class="relative w-full">
         <input
+          id="birthDate"
           type="text"
           [matDatepicker]="birthPicker"
           [ngModel]="getPatientField('birthDate')"
@@ -127,11 +145,7 @@
         <button
           type="button"
           (click)="birthPicker.open()"
-          class="absolute right-3 top-1/2 -translate-y-1/2 
-                  text-gray-500 p-2 rounded-lg
-                  hover:bg-[#c2d8f0] hover:shadow-md
-                  hover:text-[#163c63]
-                  transition-all duration-200"
+          class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 p-2 rounded-lg hover:bg-[#c2d8f0] hover:shadow-md hover:text-[#163c63] transition-all duration-200"
         >
           <svg lucideCalendar [size]="20"></svg>
         </button>
@@ -144,11 +158,12 @@
     </div>
 
     <div class="sm:col-span-2">
-      <label class="block text-gray-700 mb-1 text-sm font-medium">
+      <label for="email" class="block text-gray-700 mb-1 text-sm font-medium">
         Correo Electrónico
         <span class="text-gray-400 text-sm">(opcional)</span>
       </label>
       <input
+        id="email"
         type="email"
         [ngModel]="getPatientField('email')"
         (ngModelChange)="setPatientField('email', $event)"
@@ -164,11 +179,17 @@
     </div>
 
     <div class="sm:col-span-2">
-      <label class="block text-gray-700 mb-1 text-sm font-medium">
+      <label
+        for="guardianPhone"
+        class="block text-gray-700 mb-1 text-sm font-medium"
+      >
         Teléfono de familiar
-        <span class="text-gray-400 text-sm">(requerido si es menor de 18 años)</span>
+        <span class="text-gray-400 text-sm"
+          >(requerido si es menor de 18 años)</span
+        >
       </label>
       <input
+        id="guardianPhone"
         type="tel"
         [ngModel]="getPatientField('guardianPhone')"
         (ngModelChange)="setPatientField('guardianPhone', $event)"
@@ -182,7 +203,6 @@
         <p class="text-red-500 text-sm mt-1">{{ guardianPhoneErrorMsg() }}</p>
       }
     </div>
-
   </div>
 
   <div class="flex gap-4 mt-4">
@@ -202,5 +222,4 @@
       Continuar →
     </button>
   </div>
-
 </div>

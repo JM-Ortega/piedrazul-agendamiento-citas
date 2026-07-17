@@ -11,7 +11,6 @@ import { AppService } from '../../../../core/services/app.service';
 import { PatientService } from '../../../../core/services/patient.service';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
-import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
 import { PatientAppointmentService } from '../../services/PatientApointment.service';
 import { LucideArrowLeft } from '@lucide/angular';
 
@@ -19,7 +18,7 @@ import { LucideArrowLeft } from '@lucide/angular';
   selector: 'app-patient-new-appointment',
   standalone: true,
   imports: [LucideArrowLeft, AppointmentBookingComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './patient-new-appointment.component.html',
 })
 export class PatientNewAppointmentComponent implements OnInit {
@@ -65,12 +64,6 @@ export class PatientNewAppointmentComponent implements OnInit {
         this.isNewPatient.set(false);
       },
     });
-  }
-
-  onAppointmentConfirmed(event: AppointmentConfirmedEvent): void {
-    this.appointmentService
-      .getAppointmentsByPatient(event.patientId)
-      .subscribe((appts) => this.appointmentService.appointments.set(appts));
   }
 
   goBack(): void {

@@ -2,20 +2,27 @@
   <h2 class="text-[#163c63] text-2xl mb-6">Confirmar Cita</h2>
 
   <div class="space-y-4">
-
     <div class="bg-blue-50 rounded-xl p-5">
       <h3 class="text-[#163c63] font-semibold mb-3 flex items-center gap-2">
         <svg lucideUserSearch [size]="18"></svg>
         Paciente
       </h3>
-      <p><strong>Nombre:</strong> {{ state.confirmFirstName() }} {{ state.confirmLastName() }}</p>
+      <p>
+        <strong>Nombre:</strong> {{ state.confirmFirstName() }}
+        {{ state.confirmLastName() }}
+      </p>
 
       @if (state.isSchedulerContext()) {
-        <p><strong>Tipo de Documento:</strong> {{ state.confirmDocumentType() | formato }}</p>
+        <p>
+          <strong>Tipo de Documento:</strong>
+          {{ state.confirmDocumentType() | formato }}
+        </p>
         <p><strong>Documento:</strong> {{ state.confirmDocument() }}</p>
         <p><strong>Celular:</strong> {{ state.confirmPhone() }}</p>
         <p><strong>Género:</strong> {{ state.confirmGender() | formato }}</p>
-        <p><strong>Fecha de Nacimiento:</strong> {{ state.confirmBirthDate() }}</p>
+        <p>
+          <strong>Fecha de Nacimiento:</strong> {{ state.confirmBirthDate() }}
+        </p>
       } @else {
         @if (state.confirmDocument()) {
           <p><strong>Documento:</strong> {{ state.confirmDocument() }}</p>
@@ -28,16 +35,19 @@
         <svg lucideStethoscope [size]="18"></svg>
         Cita
       </h3>
-      <p><strong>Especialidad:</strong> {{ state.selectedSpecialty() | formato }}</p>
+      <p>
+        <strong>Especialidad:</strong> {{ state.selectedSpecialty() | formato }}
+      </p>
       <p><strong>Médico:</strong> {{ state.confirmDoctorName() }}</p>
       <p><strong>Fecha:</strong> {{ state.confirmDate() }}</p>
       <p><strong>Hora:</strong> {{ state.selectedTime().slice(0, 5) }}</p>
     </div>
-
   </div>
 
   @if (state.errorMessage()) {
-    <div class="mt-4 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4">
+    <div
+      class="mt-4 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4"
+    >
       ⚠️ {{ state.errorMessage() | errores }}
     </div>
   }
@@ -52,8 +62,7 @@
     <button
       (click)="confirm()"
       [disabled]="state.isLoading()"
-      class="flex-1 bg-green-600 text-white py-3 rounded-xl flex items-center
-             justify-center gap-2 hover:bg-green-700 transition-colors disabled:opacity-50 cursor-pointer"
+      class="flex-1 bg-green-600 text-white py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-green-700 transition-colors disabled:opacity-50 cursor-pointer"
     >
       <svg lucideCheckCircle [size]="22"></svg>
       Confirmar y Registrar

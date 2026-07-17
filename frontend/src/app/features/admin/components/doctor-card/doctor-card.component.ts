@@ -1,9 +1,9 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   input,
   output,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import {
   LucideCalendar,
@@ -20,7 +20,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
   selector: 'app-doctor-card',
   templateUrl: './doctor-card.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideCalendar,
     LucideCheckCircle,

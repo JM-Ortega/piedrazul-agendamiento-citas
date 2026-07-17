@@ -6,7 +6,7 @@ import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
 export class CalendarService {
   buildDateFilter(
     doctor: SpecialtyDoctor,
-    allowToday = false,
+    allowToday = false
   ): (date: Date | null) => boolean {
     const today = new Date();
     today.setHours(0, 0, 0, 0);

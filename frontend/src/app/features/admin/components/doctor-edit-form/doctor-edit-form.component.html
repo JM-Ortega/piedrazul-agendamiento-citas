@@ -33,8 +33,11 @@
     </p>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
-        <label class="block text-gray-700 mb-1 text-base">Fecha Inicio</label>
+        <label for="laborStart" class="block text-gray-700 mb-1 text-base"
+          >Fecha Inicio</label
+        >
         <input
+          id="laborStart"
           type="date"
           maxlength="10"
           [value]="editForm()!.laborStart"
@@ -52,8 +55,11 @@
         }
       </div>
       <div>
-        <label class="block text-gray-700 mb-1 text-base">Fecha Fin</label>
+        <label for="laborEnd" class="block text-gray-700 mb-1 text-base"
+          >Fecha Fin</label
+        >
         <input
+          id="laborEnd"
           type="date"
           maxlength="10"
           [value]="editForm()!.laborEnd"
@@ -86,10 +92,11 @@
     </p>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <div>
-        <label class="block text-gray-700 mb-1 text-base"
+        <label for="startTime" class="block text-gray-700 mb-1 text-base"
           >Hora Inicio (por defecto)</label
         >
         <select
+          id="startTime"
           [value]="editForm()!.startTime"
           (change)="updateField('startTime', $any($event.target).value)"
           class="w-full border-2 focus:border-[#215c98] rounded-xl px-4 py-2.5 text-base outline-none transition-colors bg-white"
@@ -108,10 +115,11 @@
         </select>
       </div>
       <div>
-        <label class="block text-gray-700 mb-1 text-base"
+        <label for="endTime" class="block text-gray-700 mb-1 text-base"
           >Hora Fin (por defecto)</label
         >
         <select
+          id="endTime"
           [value]="editForm()!.endTime"
           (change)="updateField('endTime', $any($event.target).value)"
           class="w-full border-2 focus:border-[#215c98] rounded-xl px-4 py-2.5 text-base outline-none transition-colors bg-white"
@@ -130,10 +138,13 @@
         </select>
       </div>
       <div>
-        <label class="block text-gray-700 mb-1 text-base"
+        <label
+          for="appointmentInterval"
+          class="block text-gray-700 mb-1 text-base"
           >Intervalo (min)</label
         >
         <input
+          id="appointmentInterval"
           type="number"
           min="5"
           max="120"
@@ -156,7 +167,9 @@
   </div>
   <!-- Días de Atención -->
   <div>
-    <label class="block text-gray-700 mb-2 text-base font-semibold"
+    <label
+      for="workdays"
+      class="block text-gray-700 mb-2 text-base font-semibold"
       >Días de Atención</label
     >
     <div class="flex gap-2 flex-wrap">
@@ -194,7 +207,7 @@
               class="bg-amber-400 text-white text-xs px-2 py-0.5 rounded-full"
             >
               {{ getEditFormDayScheduleCount() }} personalizado{{
-                getEditFormDayScheduleCount() > 1 ? "s" : ""
+                getEditFormDayScheduleCount() > 1 ? 's' : ''
               }}
             </span>
           }
@@ -241,10 +254,13 @@
 
                   <div class="flex flex-1 flex-wrap gap-3 items-end">
                     <div class="flex-1 min-w-32.5">
-                      <label class="block text-gray-600 text-sm mb-1"
+                      <label
+                        for="startTime-{{ day }}"
+                        class="block text-gray-600 text-sm mb-1"
                         >Hora Inicio</label
                       >
                       <select
+                        id="startTime-{{ day }}"
                         [value]="getDayScheduleValue(day, 'startTime')"
                         (change)="
                           updateDaySchedule(
@@ -273,10 +289,13 @@
                       </select>
                     </div>
                     <div class="flex-1 min-w-32.5">
-                      <label class="block text-gray-600 text-sm mb-1"
+                      <label
+                        for="endTime-{{ day }}"
+                        class="block text-gray-600 text-sm mb-1"
                         >Hora Fin</label
                       >
                       <select
+                        id="endTime-{{ day }}"
                         [value]="getDayScheduleValue(day, 'endTime')"
                         (change)="
                           updateDaySchedule(

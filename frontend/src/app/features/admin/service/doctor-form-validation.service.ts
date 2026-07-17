@@ -8,7 +8,7 @@ export interface FormErrors {
   fechaFin: string;
   intervalo: string;
   dias: string;
-  horariosDia: { [day: number]: string };
+  horariosDia: Record<number, string>;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -22,7 +22,7 @@ export class DoctorFormValidationService {
   validateFranjaVsIntervalo(
     startTime: string,
     endTime: string,
-    interval: number,
+    interval: number
   ): string {
     if (!startTime || !endTime || startTime >= endTime) return '';
     const duracion =
@@ -54,7 +54,7 @@ export class DoctorFormValidationService {
       errors.horarioGlobal = this.validateFranjaVsIntervalo(
         form.startTime,
         form.endTime,
-        form.appointmentInterval,
+        form.appointmentInterval
       );
     }
 
@@ -85,7 +85,7 @@ export class DoctorFormValidationService {
         const err = this.validateFranjaVsIntervalo(
           ds.startTime,
           ds.endTime,
-          form.appointmentInterval,
+          form.appointmentInterval
         );
         if (err) errors.horariosDia[day] = err;
       }

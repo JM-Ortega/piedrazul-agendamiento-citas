@@ -34,7 +34,7 @@ const MIN_DOC_LENGTH = 6;
   selector: 'app-booking-patient-search',
   standalone: true,
   imports: [FormsModule, LucideCheckCircle, LucideSearch, FormatoPipe],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-patient-search.component.html',
 })
 export class BookingPatientSearchComponent implements OnDestroy {

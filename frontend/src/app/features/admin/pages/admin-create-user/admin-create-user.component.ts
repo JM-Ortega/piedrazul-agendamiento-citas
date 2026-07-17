@@ -1,19 +1,19 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   OnInit,
   inject,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
-  LucideDynamicIcon,
   LucideActivity,
   LucideArrowLeft,
   LucideBone,
   LucideBuilding2,
   LucideCircleAlert,
   LucideCreditCard,
+  LucideDynamicIcon,
   LucideEye,
   LucideEyeOff,
   LucideHeart,
@@ -22,6 +22,7 @@ import {
   LucideUser,
   LucideUserPlus,
   LucideZap,
+  type LucideIcon,
 } from '@lucide/angular';
 import {
   CreateUserDoctorFormComponent,
@@ -62,7 +63,7 @@ const DAY_VALUE_TO_WORKDAY: Record<number, string> = {
     LucideUser,
     LucideUserPlus,
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-create-user.component.html',
 })
 export class AdminCreateUserComponent implements OnInit {
@@ -456,10 +457,10 @@ export class AdminCreateUserComponent implements OnInit {
     return h * 60 + m;
   }
   private getSpecialtyIcon(name: string): {
-    icon: any;
+    icon: LucideIcon;
     colorClass: string;
   } {
-    const map: Record<string, { icon: any; colorClass: string }> = {
+    const map: Record<string, { icon: LucideIcon; colorClass: string }> = {
       MEDICINA_GENERAL: { icon: LucideHeart, colorClass: 'text-red-700' },
       QUIROPRAXIA: { icon: LucideBone, colorClass: 'text-orange-700' },
       FISIOTERAPIA: { icon: LucideActivity, colorClass: 'text-green-700' },
@@ -467,7 +468,6 @@ export class AdminCreateUserComponent implements OnInit {
     };
     return map[name] ?? { icon: LucideBuilding2, colorClass: 'text-gray-400' };
   }
-
   inputClass(field: keyof FormErrors, extra = ''): string {
     return (
       'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 ' +

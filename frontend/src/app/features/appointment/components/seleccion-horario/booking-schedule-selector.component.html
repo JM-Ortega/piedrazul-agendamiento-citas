@@ -9,9 +9,12 @@
   }
 
   <div>
-    <label class="block text-gray-700 mb-2 font-medium">Fecha *</label>
+    <label for="date" class="block text-gray-700 mb-2 font-medium">
+      Fecha *
+    </label>
     <mat-form-field appearance="outline" class="w-full">
       <input
+        id="date"
         matInput
         [matDatepicker]="picker"
         [matDatepickerFilter]="dateFilter()"
@@ -22,43 +25,54 @@
         placeholder="mm/dd/aaaa"
         readonly
       />
-      <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker-toggle
+        matIconSuffix
+        [for]="picker"
+      ></mat-datepicker-toggle>
       <mat-datepicker #picker></mat-datepicker>
     </mat-form-field>
     <p class="text-xs text-gray-400 -mt-4">
-      Solo se muestran días hábiles del médico, excluyendo fines de semana y festivos colombianos.
+      Solo se muestran días hábiles del médico, excluyendo fines de semana y
+      festivos colombianos.
     </p>
   </div>
 
   @if (state.selectedDate()) {
-    <div class="flex items-center gap-2 bg-[#e6f0fa] rounded-xl px-4 py-3 text-[#163c63] font-medium">
+    <div
+      class="flex items-center gap-2 bg-[#e6f0fa] rounded-xl px-4 py-3 text-[#163c63] font-medium"
+    >
       <svg lucideCalendar [size]="18"></svg>
       {{ state.confirmDate() }}
     </div>
   }
 
   @if (state.availableSlots().length > 0) {
-    <div>
-      <label class="block text-gray-700 mb-2 font-medium">Hora *</label>
+    <fieldset class="border-0 p-0 m-0 min-w-0">
+      <legend class="block text-gray-700 mb-2 font-medium">Hora *</legend>
       <div class="grid grid-cols-4 sm:grid-cols-5 gap-2">
         @for (slot of state.availableSlots(); track slot) {
           <button
+            type="button"
             (click)="state.selectedTime.set(slot)"
             class="py-3 rounded-xl border-2 text-base font-semibold transition-colors cursor-pointer"
             [ngClass]="{
-              'border-[#4e92d9] bg-[#a7c9ec] text-white': state.selectedTime() === slot,
-              'border-gray-200 hover:border-[#4e92d9] hover:bg-[#dbeafe] text-[#163c63]': state.selectedTime() !== slot
+              'border-[#4e92d9] bg-[#a7c9ec] text-white':
+                state.selectedTime() === slot,
+              'border-gray-200 hover:border-[#4e92d9] hover:bg-[#dbeafe] text-[#163c63]':
+                state.selectedTime() !== slot,
             }"
           >
             {{ slot.slice(0, 5) }}
           </button>
         }
       </div>
-    </div>
+    </fieldset>
   }
 
   @if (state.selectedDate() && noSlotsAvailable) {
-    <div class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm">
+    <div
+      class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm"
+    >
       ⚠️ {{ errorMessageSlots }}
     </div>
   }
@@ -73,8 +87,7 @@
     <button
       [disabled]="!state.canGoToConfirmStep()"
       (click)="goToConfirm()"
-      class="flex-1 bg-[#215c98] text-white py-3 rounded-xl disabled:opacity-50
-             hover:bg-[#163c63] transition-colors cursor-pointer"
+      class="flex-1 bg-[#215c98] text-white py-3 rounded-xl disabled:opacity-50 hover:bg-[#163c63] transition-colors cursor-pointer"
     >
       Revisar Cita →
     </button>

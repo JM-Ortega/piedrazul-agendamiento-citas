@@ -18,7 +18,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
   selector: 'app-booking-specialty-selector',
   standalone: true,
   imports: [FormsModule, LucideUserSearch, FormatoPipe],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-specialty-selector.component.html',
 })
 export class BookingSpecialtySelectorComponent {

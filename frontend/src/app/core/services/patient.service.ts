@@ -2,8 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Patient } from '../../shared/models/interfaces/patient.model';
 import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
+import { Patient } from '../../shared/models/interfaces/patient.model';
 
 export interface PatientPublicResponse {
   documentType: string | null;
@@ -37,31 +37,36 @@ export class PatientService {
   }
 
   loadMyMedicalRecords(patientId: string | null): void {
-    this.http.get<MedicalRecord[]>(`${this.apiUrl}/clinical-history/patient/${patientId}`)
+    this.http
+      .get<MedicalRecord[]>(
+        `${this.apiUrl}/clinical-history/patient/${patientId}`
+      )
       .subscribe({
         next: (records) => this.medicalRecords.set(records),
         error: (err) => {
           if (err.status === 0) {
             this.error.set('No se pudo conectar con el servidor.');
           } else {
-            this.error.set(err.error?.message ?? 'Error al cargar el historial.');
+            this.error.set(
+              err.error?.message ?? 'Error al cargar el historial.'
+            );
           }
-        }
+        },
       });
   }
 
   getByDocument(documentNumber: string): Observable<Patient> {
     return this.http.get<Patient>(
-      `${this.apiUrl}/patients/document/${documentNumber}`,
+      `${this.apiUrl}/patients/document/${documentNumber}`
     );
   }
 
   // consulta el estado público del documento
   getPublicByDocument(
-    documentNumber: string,
+    documentNumber: string
   ): Observable<PatientPublicResponse> {
     return this.http.get<PatientPublicResponse>(
-      `${this.apiUrl}/patients/document/${documentNumber}/public`,
+      `${this.apiUrl}/patients/document/${documentNumber}/public`
     );
   }
 
@@ -88,7 +93,7 @@ export class PatientService {
   }): Observable<void> {
     return this.http.post<void>(
       `${this.apiUrl}/patients/link-user-account/request-code`,
-      data,
+      data
     );
   }
 
@@ -100,7 +105,7 @@ export class PatientService {
   }): Observable<Patient> {
     return this.http.post<Patient>(
       `${this.apiUrl}/patients/link-user-account/confirm`,
-      data,
+      data
     );
   }
 

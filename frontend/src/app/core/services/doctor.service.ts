@@ -91,9 +91,9 @@ export class DoctorService {
 
   loadMedicalRecordsByPatient(patientId: string): void {
     this.http
-      .get<
-        MedicalRecord[]
-      >(`${this.apiUrl}/clinical-history/patient/${patientId}`)
+      .get<MedicalRecord[]>(
+        `${this.apiUrl}/clinical-history/patient/${patientId}`
+      )
       .subscribe((records) => this.medicalRecords.set(records));
   }
 
