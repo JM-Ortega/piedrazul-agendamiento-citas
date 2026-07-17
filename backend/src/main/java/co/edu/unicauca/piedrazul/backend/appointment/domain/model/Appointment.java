@@ -6,8 +6,6 @@ import java.time.LocalDate;
 import java.util.Objects;
 import java.util.UUID;
 
-import static org.hibernate.action.internal.BulkOperationCleanupAction.schedule;
-
 
 public class Appointment {
     private final UUID idAppointment;

@@ -14,7 +14,6 @@ import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.Doct
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.SpecialtyRepository;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
-import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import jakarta.transaction.Transactional;
 
 import java.time.LocalDate;

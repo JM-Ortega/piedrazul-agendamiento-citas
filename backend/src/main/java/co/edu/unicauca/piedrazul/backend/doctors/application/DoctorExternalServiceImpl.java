@@ -9,7 +9,6 @@ import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundExcepti
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import jakarta.transaction.Transactional;
-import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
 import java.time.LocalTime;

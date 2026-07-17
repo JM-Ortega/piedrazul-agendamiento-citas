@@ -37,7 +37,6 @@ public class DoctorController {
     @GetMapping("/me")
     @PreAuthorize("hasRole('DOCTOR')")
     public DoctorDetailedResponse findMe(@AuthenticationPrincipal Jwt jwt) {
-        UUID keycloakId = UUID.fromString(jwt.getSubject());
         Doctor doctor = doctorService.findByUserId(UUID.fromString(jwt.getSubject()));
 
         Map<UUID, String> names = personExternalService.getPersonNames(List.of(doctor.getPersonId()));

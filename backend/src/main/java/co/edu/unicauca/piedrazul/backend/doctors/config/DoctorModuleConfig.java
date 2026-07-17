@@ -8,7 +8,6 @@ import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.Doct
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.SpecialtyRepository;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
-import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
