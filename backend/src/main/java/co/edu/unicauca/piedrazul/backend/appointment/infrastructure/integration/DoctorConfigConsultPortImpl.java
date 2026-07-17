@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Component
@@ -46,5 +47,15 @@ public class DoctorConfigConsultPortImpl implements DoctorConfigConsultPort {
     @Override
     public List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds) {
         return doctorExternalService.getDoctorInfoByIds(doctorIds);
+    }
+
+    @Override
+    public Map<UUID, Integer> getBookingWindowWeeksByDoctorIds(List<UUID> doctorIds) {
+        return doctorExternalService.bookingWindowWeeksByDoctorIds(doctorIds);
+    }
+
+    @Override
+    public Map<UUID, Integer> getIntervalMinutesByDoctorIds(List<UUID> doctorIds) {
+        return doctorExternalService.intervalMinutesByDoctorIds(doctorIds);
     }
 }

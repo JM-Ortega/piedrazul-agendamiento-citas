@@ -6,6 +6,8 @@ import co.edu.unicauca.piedrazul.backend.doctors.application.ScheduleService;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
+import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.SpecialtyRepository;
+import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,10 +34,12 @@ public class DoctorModuleConfig {
     @Bean
     public DoctorService doctorService(
             DoctorRepository doctorRepository,
-            UserModuleApi userModuleApi,
-            AppointmentExternalService appointmentExternalService
+            AppointmentExternalService appointmentExternalService,
+            PersonExternalService personExternalService,
+            SpecialtyRepository specialtyRepository
     ) {
-        return new DoctorService(doctorRepository, userModuleApi, appointmentExternalService);
+        return new DoctorService(doctorRepository, appointmentExternalService, personExternalService,
+                specialtyRepository);
     }
 
     /**
@@ -44,9 +48,11 @@ public class DoctorModuleConfig {
     @Bean
     public DoctorExternalServiceImpl doctorExternalServiceImpl(
             DoctorRepository doctorRepository,
-            ScheduleService scheduleService
+            ScheduleService scheduleService,
+            PersonExternalService personExternalService,
+            DoctorService doctorService
     ) {
-        return new DoctorExternalServiceImpl(doctorRepository, scheduleService);
+        return new DoctorExternalServiceImpl(doctorRepository, scheduleService, personExternalService, doctorService);
     }
 }
 
