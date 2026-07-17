@@ -21,7 +21,7 @@ import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { BookingConfirmComponent } from '../confirmacion/booking-confirm.component';
 import { BookingModeSelectorComponent } from '../modo-agendamiento/booking-mode-selector.component';
-import { PatientAppointmentService } from '../../services/PatientApointment.service';
+import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
 
 /**
  * Coordina el flujo de agendamiento componiendo los

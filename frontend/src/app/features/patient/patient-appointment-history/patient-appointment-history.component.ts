@@ -10,7 +10,7 @@ import {
 import { LucideCalendarDays, LucideClock } from '@lucide/angular';
 import { AppService } from '../../../core/services/app.service';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
-import { PatientAppointmentService } from '../../appointment/services/PatientApointment.service';
+import { PatientAppointmentService } from '../../../core/services/patientAppointment.service';
 import { Appointment } from '../models/interfaces/appointment.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 

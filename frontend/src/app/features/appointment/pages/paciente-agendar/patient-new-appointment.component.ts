@@ -11,7 +11,7 @@ import { AppService } from '../../../../core/services/app.service';
 import { PatientService } from '../../../../core/services/patient.service';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
-import { PatientAppointmentService } from '../../services/PatientApointment.service';
+import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
 import { LucideArrowLeft } from '@lucide/angular';
 
 @Component({
