@@ -25,7 +25,7 @@ class IsNewPatientUseCaseImplTest {
 
     @Mock
     private AppointmentRepository appointmentRepository;
-
+    
     @Mock
     private PatientLookupApi patientLookupApi;
 
