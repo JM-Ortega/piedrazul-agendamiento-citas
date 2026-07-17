@@ -114,45 +114,21 @@ public class DoctorController {
         return ResponseEntity.ok(specialties);
     }
 
-    // FUNCINALIDADES POR REVISAR, DEPENDE DE LO QUE DIGA EL FRONT
+
     /**
-     * Agregar especialidades de un doctor específico
+     * Actualiza las especialidades de un doctor específico
      * @param specialties Especialidades a agregar para el doctor
      * @param doctorId Id del doctor
      * @return Sin contenido
      */
-    /*
-    @PostMapping("/{doctorId}/specialties")
+    @PutMapping("/{doctorId}/specialties")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> addSpecialties(
+    public ResponseEntity<Void> changeSpecialties(
             @PathVariable UUID doctorId,
             @RequestBody List<SpecialtyCode> specialties) {
-
-        doctorService.addSpecialities(doctorId, specialties);
-
+        doctorService.changeSpecialties(doctorId, specialties);
         return ResponseEntity.noContent().build();
     }
-
-     */
-
-    /**
-     * Eliminar especialidades de un doctor específico
-     * @param specialties Especialidades a agregar para el doctor
-     * @param doctorId Id del doctors
-     * @return Sin contenido
-     */
-    /*
-    @DeleteMapping("/{doctorId}/specialties")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> removeSpecialties(
-            @PathVariable UUID doctorId,
-            @RequestBody List<SpecialtyCode> specialties) {
-
-        doctorService.removeSpecialities(doctorId, specialties);
-
-        return ResponseEntity.noContent().build();
-    }
-     */
 
     /**
      * Obtiene todas las especialidades de los medicos

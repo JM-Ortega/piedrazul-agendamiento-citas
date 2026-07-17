@@ -7,22 +7,31 @@ import co.edu.unicauca.piedrazul.backend.doctors.domain.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
+import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import jakarta.transaction.Transactional;
+import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.time.DayOfWeek;
+import java.util.stream.Collectors;
 
 // Servicio para peticiones externas
 public class DoctorExternalServiceImpl implements DoctorExternalService {
     private final DoctorRepository doctorRepository;
     private final ScheduleService scheduleService;
+    private final PersonExternalService personExternalService;
+    private final DoctorService doctorService;
 
-    public DoctorExternalServiceImpl(DoctorRepository doctorRepository, ScheduleService scheduleService) {
+    public DoctorExternalServiceImpl(DoctorRepository doctorRepository, ScheduleService scheduleService,
+                                     PersonExternalService personExternalService, DoctorService doctorService) {
         this.doctorRepository = doctorRepository;
         this.scheduleService = scheduleService;
+        this.personExternalService = personExternalService;
+        this.doctorService = doctorService;
     }
 
     @Override
@@ -44,11 +53,19 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
         return doctor.getAppointmentInterval();
     }
 
+    // ELIMINAR parece que no se usa
     @Override
     public List<DoctorResponse> getActiveDoctors (){
-        return doctorRepository.findByStatusTrue()
-                .stream()
-                .map(DoctorResponse::fromEntity)
+        List<Doctor> doctors = doctorRepository.findByStatusTrue();
+
+        List<UUID> ids = doctors.stream()
+                .map(Doctor::getPersonId)
+                .toList();
+
+        Map<UUID, String> names = personExternalService.getPersonNames(ids);
+
+        return doctors.stream()
+                .map(d -> DoctorResponse.fromEntity(d, names.get(d.getPersonId())))
                 .toList();
     }
 
@@ -77,14 +94,30 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
             return List.of();
         }
 
-        return doctorRepository.findByIdDoctorIn(doctorIds).stream()
-                .map(DoctorResponse::fromEntity)
+        List<Doctor> doctors = doctorService.getDoctorsById(doctorIds);
+
+        Map<UUID, String> names = personExternalService.getPersonNames(doctorIds);
+
+        return doctors.stream()
+                .map(d -> DoctorResponse.fromEntity(d, names.get(d.getPersonId())))
                 .toList();
     }
 
     @Override
     public List<SpecialtyCode> findSpecialtiesByIdentification(String identification){
         return doctorRepository.findSpecialtiesByIdentification(identification);
+    }
+
+    @Override
+    public Map<UUID, Integer> bookingWindowWeeksByDoctorIds(List<UUID> doctorIds){
+        return doctorRepository.findAllById(doctorIds).stream()
+                .collect(Collectors.toMap(Doctor::getPersonId, Doctor::getBookingWindowWeeks));
+    }
+
+    @Override
+    public Map<UUID, Integer> intervalMinutesByDoctorIds(List<UUID> doctorIds) {
+        return doctorRepository.findAllById(doctorIds).stream()
+                .collect(Collectors.toMap(Doctor::getPersonId, Doctor::getAppointmentInterval));
     }
 
     private static Workday toWorkday(DayOfWeek dayOfWeek) {

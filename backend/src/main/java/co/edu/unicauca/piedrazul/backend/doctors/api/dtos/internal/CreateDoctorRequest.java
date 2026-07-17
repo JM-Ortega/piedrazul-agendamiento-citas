@@ -23,7 +23,7 @@ public record CreateDoctorRequest(
         String phone,
 
         @NotEmpty
-        List<String> specialty,
+        List<SpecialtyCode> specialty,
 
         @NotNull
         LocalDate laborStart,

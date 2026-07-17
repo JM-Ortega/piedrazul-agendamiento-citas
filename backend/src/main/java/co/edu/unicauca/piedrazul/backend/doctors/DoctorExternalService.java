@@ -6,6 +6,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public interface DoctorExternalService {
@@ -22,4 +23,8 @@ public interface DoctorExternalService {
     List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
 
     List<SpecialtyCode> findSpecialtiesByIdentification(String identification);
+
+    Map<UUID, Integer> bookingWindowWeeksByDoctorIds(List<UUID> doctorIds);
+
+    Map<UUID, Integer> intervalMinutesByDoctorIds(List<UUID> doctorIds);
 }

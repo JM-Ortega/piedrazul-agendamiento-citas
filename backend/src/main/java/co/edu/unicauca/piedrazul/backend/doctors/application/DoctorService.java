@@ -47,10 +47,8 @@ public class DoctorService implements DoctorProvisioningApi {
                 false, request.appointmentInterval());
 
         // Agregamos las especialidades
-        List<String> specialtyCodes = request.specialty();
-
         Set<Specialty> specialties = new HashSet<>();
-        for (String code : specialtyCodes) {
+        for (SpecialtyCode code : request.specialty()) {
             Specialty specialty = specialtyRepository.findById(code)
                     .orElseThrow(() -> new DoctorInvalidSpecialty("Especialidad inválida: " + code));
             specialties.add(specialty);
@@ -250,38 +248,6 @@ public class DoctorService implements DoctorProvisioningApi {
         doctorRepository.save(doctor);
     }
 
-    // POR VER SI SE UNIFICAN
-
-    /*
-    @Transactional
-    public void addSpecialities(UUID doctorId, List<String> specialtyCodes) {
-
-        Doctor doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-
-        Set<Specialty> specialties = new HashSet<Specialty>();
-        for (String code : specialtyCodes) {
-            Specialty specialty = specialtyRepository.findById(code)
-                    .orElseThrow(() -> new IllegalArgumentException("Especialidad inválida: " + code));
-            specialties.add(specialty);
-        }
-
-        doctor.getSpecialties().add(specialties);
-
-        doctor.getSpecialty().addAll(specialties);
-    }
-
-    @Transactional
-    public void removeSpecialities(UUID doctorId, List<SpecialtyCode> specialties) {
-
-        Doctor doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-
-        doctor.getSpecialty().removeAll(specialties);
-    }
-
-     */
-
     public List<Doctor> findAllDoctors() {
         return doctorRepository.findAll();
     }
@@ -301,6 +267,10 @@ public class DoctorService implements DoctorProvisioningApi {
 
     public List<Doctor> getDoctorBySpeciality(SpecialtyCode specialty) {
         return doctorRepository.findBySpecialtyContaining(specialty);
+    }
+
+    public List<Doctor> getDoctorsById(List<UUID> doctorIds) {
+        return doctorRepository.findByIdDoctorIn(doctorIds);
     }
 
     public List<SpecialtyCode> getSpecialties(UUID idPatient) {
@@ -344,7 +314,19 @@ public class DoctorService implements DoctorProvisioningApi {
         }
     }
 
-    private void getDcotorsName (Set<UUID> doctorsId){
+    @Transactional
+    public void changeSpecialties(UUID doctorId, List<SpecialtyCode> codigosNuevos) {
 
+        Doctor doctor = doctorRepository.findById(doctorId)
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado: " + doctorId));
+
+        Set<Specialty> nuevas = new HashSet<>(specialtyRepository.findAllById(codigosNuevos));
+        if (nuevas.size() != new HashSet<>(codigosNuevos).size()) {
+            throw new IllegalArgumentException("Alguna especialidad enviada no existe en el catálogo");
+        }
+
+        Set<Specialty> actuales = doctor.getSpecialties();
+        actuales.removeIf(s -> !nuevas.contains(s)); // quita las que ya no vienen
+        actuales.addAll(nuevas); // agrega las nuevas
     }
 }
