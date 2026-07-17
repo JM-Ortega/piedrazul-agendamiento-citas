@@ -29,7 +29,7 @@ import { AdminService } from '../../service/admin.service';
   selector: 'app-admin-doctors',
   templateUrl: './admin-doctors.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideCalendar,
     LucideCheck,

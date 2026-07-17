@@ -11,7 +11,7 @@ import { Doctor } from '../../../../../shared/models/interfaces/doctor.model';
   selector: 'app-admin-modals',
   templateUrl: './admin-modals.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideX, LucideSave, LucidePowerOff],
 })
 export class AdminModalsComponent {
