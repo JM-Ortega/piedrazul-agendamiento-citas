@@ -93,6 +93,15 @@ public class PatientService implements PatientModuleApi {
         return toData(patientRepository.save(patient), person);
     }
 
+    @Override
+    public void deletePatient(UUID personId) {
+        if (personId == null) {
+            throw new InvalidPatientDataException("personId cannot be null");
+        }
+
+        patientRepository.deleteById(personId);
+    }
+
     public PatientData createPatientWithUser(
             String username,
             String password,

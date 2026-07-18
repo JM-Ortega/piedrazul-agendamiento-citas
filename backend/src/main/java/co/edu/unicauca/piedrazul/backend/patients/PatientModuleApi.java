@@ -40,4 +40,6 @@ public interface PatientModuleApi {
             LocalDate birthDate,
             String guardianPhone
     );
+
+        void deletePatient(UUID personId);
 }
