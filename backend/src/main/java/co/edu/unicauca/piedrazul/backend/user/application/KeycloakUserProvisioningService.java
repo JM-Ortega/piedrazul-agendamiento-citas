@@ -49,7 +49,8 @@ public class KeycloakUserProvisioningService implements UserAccountProvisioningA
                 user.getUsername(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getEmail()
+                user.getEmail(),
+                user.getRealmRoles()
         );
     }
 }
