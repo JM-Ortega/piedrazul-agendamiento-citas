@@ -10,11 +10,11 @@ import {
   LucideUserSearch,
 } from '@lucide/angular';
 import { NewAppointment } from '../../models/dtos/newAppointment.dto';
-import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
+import { mapHttpError } from '../../../../shared/helpers/http-errors';
 
 /**
  * Mostrar el resumen completo de la cita a confirmar
@@ -37,7 +37,7 @@ export class BookingConfirmComponent {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
 
-  confirmed = output<AppointmentConfirmedEvent>();
+  confirmed = output<void>();
 
   back = output<void>();
 
@@ -55,30 +55,21 @@ export class BookingConfirmComponent {
       next: () => {
         this.state.isLoading.set(false);
         this.state.success.set(true);
-        this.confirmed.emit({ patientId: this.state.resolvePatientId() });
+        this.confirmed.emit();
       },
       error: (err) => {
         this.state.isLoading.set(false);
 
-        if (err.status === 0) {
-          this.state.errorMessage.set(
-            'No se pudo conectar con el servidor. Intente más tarde.'
-          );
-          return;
-        }
-
         const errorCode = err.error?.errorCode;
-        const detail = err.error?.detail;
-        switch (errorCode) {
-          case 'PATIENT_TIME_CONFLICT':
-          case 'PATIENT_SPECIALTY_CONFLICT':
-            this.state.errorMessage.set(detail);
-            break;
-          default:
-            this.state.errorMessage.set(
-              detail || 'Error inesperado al registrar la cita.'
-            );
-        }
+        const isBusinessConflict =
+          errorCode === 'PATIENT_TIME_CONFLICT' ||
+          errorCode === 'PATIENT_SPECIALTY_CONFLICT';
+
+        this.state.errorMessage.set(
+          isBusinessConflict
+            ? err.error?.detail
+            : mapHttpError(err, 'Error inesperado al registrar la cita.')
+        );
       },
     });
   }
