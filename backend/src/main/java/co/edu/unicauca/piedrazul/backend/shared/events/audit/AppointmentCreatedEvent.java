@@ -1,7 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.shared.events.audit;
 
+import java.util.UUID;
+
 public record AppointmentCreatedEvent(
-        String appointmentId,
-        String performedBy
+        UUID appointmentId,
+        UUID performedBy
 ) {
 }

@@ -119,7 +119,7 @@ public class AppointmentController {
             @AuthenticationPrincipal Jwt jwt) {
 
         request.validate();
-        String performedBy = resolvePerformedBy(jwt);
+        UUID performedBy = resolvePerformedBy(jwt);
 
         switch (request.getSchedulingOrigin()) {
             case MANUAL -> appointmentSchedulingService.scheduleManual(
@@ -187,12 +187,7 @@ public class AppointmentController {
         return ResponseEntity.noContent().build(); // 204
     }
 
-    private String resolvePerformedBy(Jwt jwt) {
-        String preferredUsername = jwt.getClaimAsString("preferred_username");
-        if (preferredUsername != null && !preferredUsername.isBlank()) {
-            return preferredUsername;
-        }
-
-        return jwt.getSubject();
+    private UUID resolvePerformedBy(Jwt jwt) {
+        return UUID.fromString(jwt.getSubject());
     }
 }

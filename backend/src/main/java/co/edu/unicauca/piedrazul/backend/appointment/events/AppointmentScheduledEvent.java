@@ -15,6 +15,6 @@ public record AppointmentScheduledEvent(
         LocalDate appointmentDate,
         LocalTime appointmentTime,
         String specialty,
-        String performedBy
+        UUID performedBy
 ) {
 }

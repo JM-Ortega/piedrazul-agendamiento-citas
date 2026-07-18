@@ -53,7 +53,7 @@ public class AppointmentSchedulingService {
             Specialty specialty,
             LocalDate date,
             AppointmentTime startTime,
-            String performedBy,
+            UUID performedBy,
             PatientResolutionStrategy patientResolutionStrategy) {
         schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, true);
     }
@@ -65,7 +65,7 @@ public class AppointmentSchedulingService {
             Specialty specialty,
             LocalDate date,
             AppointmentTime startTime,
-            String performedBy,
+            UUID performedBy,
             PatientResolutionStrategy patientResolutionStrategy) {
         schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, false);
     }
@@ -76,7 +76,7 @@ public class AppointmentSchedulingService {
             Specialty specialty,
             LocalDate date,
             AppointmentTime startTime,
-            String performedBy,
+            UUID performedBy,
             PatientResolutionStrategy patientResolutionStrategy,
             boolean manualFlow) {
 
@@ -122,7 +122,7 @@ public class AppointmentSchedulingService {
 
         Appointment saved = appointmentRepository.save(appointment);
 
-        eventPublisher.publishEvent(new AppointmentCreatedEvent(saved.getIdAppointment().toString(), performedBy));
+        eventPublisher.publishEvent(new AppointmentCreatedEvent(saved.getIdAppointment(), performedBy));
 
         eventPublisher.publishEvent(
                 new AppointmentScheduledEvent(
