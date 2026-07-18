@@ -9,6 +9,7 @@ import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -41,6 +42,18 @@ public class KeycloakUserProvisioningService implements UserAccountProvisioningA
                     roles.forEach(role -> keycloakClient.assignRoleIfMissing(createdUser.id(), role));
                     return createdUser;
                 });
+    }
+
+    public Optional<UserSummary> findUserByUsername(String username) {
+        return keycloakClient.findUserByUsername(username).map(this::toUserSummary);
+    }
+
+    public void deleteUser(UUID userId) {
+        keycloakClient.deleteUser(userId);
+    }
+
+    public void revokeRole(UUID userId, Role role) {
+        keycloakClient.revokeRoleIfPresent(userId, role);
     }
 
     private UserSummary toUserSummary(UserRepresentation user) {

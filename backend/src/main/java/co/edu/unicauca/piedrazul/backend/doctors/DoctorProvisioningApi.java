@@ -8,4 +8,6 @@ public interface DoctorProvisioningApi {
 
     void createDoctor(UUID personId, CreateDoctorRequest request);
 
+    void deleteDoctor(UUID personId);
+
 }

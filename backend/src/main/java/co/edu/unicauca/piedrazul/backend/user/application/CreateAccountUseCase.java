@@ -9,6 +9,7 @@ import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +17,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class CreateAccountUseCase implements UserProvisioningApi {
@@ -58,26 +60,39 @@ public class CreateAccountUseCase implements UserProvisioningApi {
         List<Role> roles = payload.roles().stream().distinct().toList();
         validateRoles(roles);
 
-        // Creación usuario Keycloak
+        UserSummary existingUser = keycloakUserProvisioningService
+            .findUserByUsername(payload.user().identification())
+            .orElse(null);
+
         var user = keycloakUserProvisioningService.getOrCreateUser(payload.user(), roles);
+        PersonSummary person = null;
 
-        // Creación de la persona (una sola vez, compartida entre doctor/paciente si aplica)
-        PersonSummary person = personExternalService.createPerson(
-                payload.user().identificationType(),
-                payload.user().identification(),
-                user.firstName(),
-                user.lastName(),
-                payload.user().phone(),
-                user.email(),
-                user.id()
-        );
+        try {
+            person = personExternalService.createPerson(
+                    payload.user().identificationType(),
+                    payload.user().identification(),
+                    user.firstName(),
+                    user.lastName(),
+                    payload.user().phone(),
+                    user.email(),
+                    user.id()
+            );
 
-        if (roles.contains(Role.DOCTOR)) {
-            createDoctor(person.id(), payload.doctor());
-        }
+            if (roles.contains(Role.DOCTOR)) {
+                createDoctor(person.id(), payload.doctor());
+            }
 
-        if (roles.contains(Role.PATIENT)) {
-            createPatient(person.id(), payload.patient());
+            if (roles.contains(Role.PATIENT)) {
+                createPatient(person.id(), payload.patient());
+            }
+        } catch (Exception ex) {
+            rollbackCreation(
+                    user.id(),
+                    person != null ? person.id() : null,
+                    roles,
+                    existingUser
+            );
+            throw ex;
         }
     }
 
@@ -100,6 +115,40 @@ public class CreateAccountUseCase implements UserProvisioningApi {
                 patientRequest.birthDate(),
                 patientRequest.guardianPhone()
         );
+    }
+
+    private void rollbackCreation(UUID userId, UUID personId, List<Role> roles, UserSummary existingUser) {
+        try {
+            if (personId != null) {
+                if (roles.contains(Role.PATIENT)) {
+                    patientModuleApi.deletePatient(personId);
+                }
+
+                if (roles.contains(Role.DOCTOR)) {
+                    doctorProvisioningApi.deleteDoctor(personId);
+                }
+
+                personExternalService.deletePerson(personId);
+            }
+        } catch (Exception ignored) {
+            // best effort rollback
+        }
+
+        try {
+            if (existingUser == null) {
+                keycloakUserProvisioningService.deleteUser(userId);
+            } else {
+                Set<Role> originalRoles = existingUser.roles().stream()
+                        .map(Role::valueOf)
+                        .collect(Collectors.toSet());
+
+                roles.stream()
+                        .filter(role -> !originalRoles.contains(role))
+                        .forEach(role -> keycloakUserProvisioningService.revokeRole(userId, role));
+            }
+        } catch (Exception ignored) {
+            // best effort rollback
+        }
     }
 
     private void validateRoles(List<Role> roles) {

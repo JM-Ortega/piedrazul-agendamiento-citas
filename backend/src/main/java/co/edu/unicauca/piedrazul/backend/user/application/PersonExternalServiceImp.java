@@ -13,6 +13,7 @@ import co.edu.unicauca.piedrazul.backend.user.infrastructure.persistence.PersonR
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.proyections.PersonNameProjection;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.proyections.UserPersonProjection;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -28,6 +29,7 @@ public class PersonExternalServiceImp implements PersonExternalService {
         this.keycloakUserService = keycloakUserService;
     }
 
+    @Transactional
     @Override
     public PersonSummary createPerson(
             IdentificationType identificationType,
@@ -72,6 +74,15 @@ public class PersonExternalServiceImp implements PersonExternalService {
         );
 
         return PersonApiMapper.toSummary(personRepository.save(person));
+    }
+
+    @Override
+    public void deletePerson(UUID personId) {
+        if (personId == null) {
+            throw new InvalidUserDataException("personId is required");
+        }
+
+        personRepository.deleteById(personId);
     }
 
     @Override

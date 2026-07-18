@@ -85,6 +85,23 @@ public class DoctorService implements DoctorProvisioningApi {
         }
     }
 
+    @Transactional
+    @Override
+    public void deleteDoctor(UUID personId) {
+        if (personId == null) {
+            throw new DoctorValidationException("El personId es obligatorio");
+        }
+
+        Doctor doctor = doctorRepository.findById(personId)
+                .orElse(null);
+
+        if (doctor == null) {
+            return;
+        }
+
+        doctorRepository.delete(doctor);
+    }
+
     private boolean calculateActiveStatus(LocalDate start, LocalDate end) {
         if (start == null) {
             throw new DoctorValidationException("La fecha de inicio es obligatoria");
