@@ -5,7 +5,6 @@ import { environment } from '../../../environments/environment';
 import { AppointmentExportRequest } from '../../shared/models/dtos/AppointmentExportRequest.dto';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
-import { Patient } from '../../shared/models/interfaces/patient.model';
 
 @Injectable({ providedIn: 'root' })
 export class SchedulerService {
@@ -59,17 +58,5 @@ export class SchedulerService {
     return this.http.get<AppointmentsPatient[]>(`${this.apiUrl}/appointments`, {
       params: { idDoctor: doctorId, date: date },
     });
-  }
-  getByDocument(documentNumber: string): Observable<Patient> {
-    return this.http.get<Patient>(
-      `${this.apiUrl}/patients/document/${documentNumber}`
-    );
-  }
-
-  cancelAppointment(appointmentId: string): Observable<void> {
-    return this.http.put<void>(
-      `${this.apiUrl}/appointments/${appointmentId}/cancel`,
-      {}
-    );
   }
 }

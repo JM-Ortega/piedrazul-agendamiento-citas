@@ -23,6 +23,7 @@ import {
   type LucideIcon,
 } from '@lucide/angular';
 import { SchedulerService } from '../../core/services/scheduler.service';
+import { PatientAppointmentService } from '../../core/services/patientAppointment.service';
 import { AppointmentExportRequest } from '../../shared/models/dtos/AppointmentExportRequest.dto';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
@@ -72,6 +73,7 @@ const EXT_MAP: Record<ExportFormat, string> = {
 })
 export class SchedulerDashboardComponent implements OnInit {
   private schedulerService = inject(SchedulerService);
+  private patientAppointmentService = inject(PatientAppointmentService);
 
   // ── Date helpers ──────────────────────────────────────────────────────────
   today = (() => {
@@ -366,7 +368,7 @@ export class SchedulerDashboardComponent implements OnInit {
     if (!appointmentId) return;
     this.showCancelModal.set(false);
     this.pendingCancelId.set(null);
-    this.schedulerService.cancelAppointment(appointmentId).subscribe({
+    this.patientAppointmentService.cancelAppointment(appointmentId).subscribe({
       next: () => {
         this.showToast('La cita fue cancelada exitosamente', 'success');
         this.appointments.set(
