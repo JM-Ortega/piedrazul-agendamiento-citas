@@ -32,7 +32,7 @@
       class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
     >
       <option value="">Seleccione una especialidad...</option>
-      @for (s of filteredSpecialties(); track s) {
+      @for (s of state.uniqueSpecialties(); track s) {
         <option [value]="s">{{ s | formato }}</option>
       }
     </select>

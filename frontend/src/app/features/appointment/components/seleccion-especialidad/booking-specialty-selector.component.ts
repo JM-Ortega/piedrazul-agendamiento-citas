@@ -2,7 +2,6 @@ import {
   Component,
   inject,
   output,
-  computed,
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -26,11 +25,7 @@ export class BookingSpecialtySelectorComponent {
 
   advance = output<void>();
   back = output<void>();
-
-  readonly filteredSpecialties = computed(() => {
-    const specialties = this.state.uniqueSpecialties();
-    return specialties;
-  });
+  specialtyChanged = output<string>();
 
   onSpecialtyChange(specialty: string): void {
     this.state.selectedSpecialty.set(specialty);
@@ -51,8 +46,6 @@ export class BookingSpecialtySelectorComponent {
     }
   }
 
-  specialtyChanged = output<string>();
-
   onDoctorChange(doctorId: string): void {
     this.state.selectedDoctorId.set(doctorId);
     const doc = this.state.doctorsBySpecialty().find((d) => d.id === doctorId);
@@ -65,7 +58,6 @@ export class BookingSpecialtySelectorComponent {
   }
 
   goBack(): void {
-    this.state.resetSpecialtyState();
     this.back.emit();
   }
 }
