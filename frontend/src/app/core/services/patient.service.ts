@@ -36,31 +36,6 @@ export class PatientService {
     return this.http.get<Patient>(`${this.apiUrl}/patients/me`);
   }
 
-  loadMyMedicalRecords(patientId: string | null): void {
-    this.http
-      .get<MedicalRecord[]>(
-        `${this.apiUrl}/clinical-history/patient/${patientId}`
-      )
-      .subscribe({
-        next: (records) => this.medicalRecords.set(records),
-        error: (err) => {
-          if (err.status === 0) {
-            this.error.set('No se pudo conectar con el servidor.');
-          } else {
-            this.error.set(
-              err.error?.message ?? 'Error al cargar el historial.'
-            );
-          }
-        },
-      });
-  }
-
-  getByDocument(documentNumber: string): Observable<Patient> {
-    return this.http.get<Patient>(
-      `${this.apiUrl}/patients/document/${documentNumber}`
-    );
-  }
-
   // consulta el estado público del documento
   getPublicByDocument(
     documentNumber: string
