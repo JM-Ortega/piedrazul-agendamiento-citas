@@ -1,10 +1,11 @@
 package co.edu.unicauca.piedrazul.backend.doctors;
 
-import co.edu.unicauca.piedrazul.backend.doctors.domain.SpecialtyCode;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -22,7 +23,7 @@ public interface DoctorExternalService {
 
     List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
 
-    List<SpecialtyCode> findSpecialtiesByIdentification(String identification);
+    Map<UUID, List<SpecialtyCode>> findSpecialtiesByPersonIds(Collection<UUID> personIds);
 
     Map<UUID, Integer> bookingWindowWeeksByDoctorIds(List<UUID> doctorIds);
 

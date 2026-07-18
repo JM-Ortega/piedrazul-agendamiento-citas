@@ -1,23 +1,5 @@
 package co.edu.unicauca.piedrazul.backend.doctors.config;
 
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRequest;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.DocumentType;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.SpecialtyCode;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
-import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
-import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
-import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
-import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
-import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
-import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
-
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.util.List;
 /*
 @Component
 @Order(1)

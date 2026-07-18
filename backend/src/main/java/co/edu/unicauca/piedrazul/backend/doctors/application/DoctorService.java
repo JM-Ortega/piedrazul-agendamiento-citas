@@ -4,7 +4,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorR
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.SpecialtyCode;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorInvalidSpecialty;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
@@ -257,7 +257,7 @@ public class DoctorService implements DoctorProvisioningApi {
     }
 
     public Doctor findByUserId(UUID keycloakId) {
-        Doctor doctor = doctorRepository.findByIdUser(keycloakId);
+        Doctor doctor = doctorRepository.findByPersonId(personExternalService.findPersonIdByUserId(keycloakId));
         if (doctor == null) {
             throw new DoctorNotFoundException("Doctor no encontrado para el usuario autenticado");
         }
@@ -265,11 +265,11 @@ public class DoctorService implements DoctorProvisioningApi {
     }
 
     public List<Doctor> getDoctorBySpeciality(SpecialtyCode specialty) {
-        return doctorRepository.findBySpecialtyContaining(specialty);
+        return doctorRepository.findBySpecialtiesCode(specialty);
     }
 
     public List<Doctor> getDoctorsById(List<UUID> doctorIds) {
-        return doctorRepository.findByIdDoctorIn(doctorIds);
+        return doctorRepository.findByPersonIdIn(doctorIds);
     }
 
     public List<SpecialtyCode> getSpecialties(UUID idPatient) {

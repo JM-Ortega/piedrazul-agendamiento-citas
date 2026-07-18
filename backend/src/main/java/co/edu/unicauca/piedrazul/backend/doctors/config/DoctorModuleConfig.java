@@ -48,10 +48,9 @@ public class DoctorModuleConfig {
     public DoctorExternalServiceImpl doctorExternalServiceImpl(
             DoctorRepository doctorRepository,
             ScheduleService scheduleService,
-            PersonExternalService personExternalService,
-            DoctorService doctorService
+            PersonExternalService personExternalService
     ) {
-        return new DoctorExternalServiceImpl(doctorRepository, scheduleService, personExternalService, doctorService);
+        return new DoctorExternalServiceImpl(doctorRepository, scheduleService, personExternalService);
     }
 }
 
