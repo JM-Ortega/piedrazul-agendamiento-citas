@@ -65,8 +65,6 @@ class DoctorServiceTest {
         when(doctorRepository.save(org.mockito.ArgumentMatchers.any(Doctor.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CreateDoctorRequest request = new CreateDoctorRequest(
-                null,
-                "3001234567",
                 List.of(SpecialtyCode.MEDICINA_GENERAL),
                 laborStart,
                 laborEnd,
@@ -102,8 +100,6 @@ class DoctorServiceTest {
         when(specialtyRepository.findById(SpecialtyCode.FISIOTERAPIA)).thenReturn(Optional.empty());
 
         CreateDoctorRequest request = new CreateDoctorRequest(
-                null,
-                "3007654321",
                 List.of(SpecialtyCode.FISIOTERAPIA),
                 laborStart,
                 laborEnd,
