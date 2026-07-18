@@ -3,7 +3,8 @@ package co.edu.unicauca.piedrazul.backend.doctors.application;
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.SpecialtyCode;
+import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.proyections.DoctorSpecialtyProjection;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
@@ -12,6 +13,7 @@ import jakarta.transaction.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -23,14 +25,12 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     private final DoctorRepository doctorRepository;
     private final ScheduleService scheduleService;
     private final PersonExternalService personExternalService;
-    private final DoctorService doctorService;
 
     public DoctorExternalServiceImpl(DoctorRepository doctorRepository, ScheduleService scheduleService,
-                                     PersonExternalService personExternalService, DoctorService doctorService) {
+                                     PersonExternalService personExternalService) {
         this.doctorRepository = doctorRepository;
         this.scheduleService = scheduleService;
         this.personExternalService = personExternalService;
-        this.doctorService = doctorService;
     }
 
     @Override
@@ -93,7 +93,7 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
             return List.of();
         }
 
-        List<Doctor> doctors = doctorService.getDoctorsById(doctorIds);
+        List<Doctor> doctors = doctorRepository.findByPersonIdIn(doctorIds);
 
         Map<UUID, String> names = personExternalService.getPersonNames(doctorIds);
 
@@ -103,8 +103,18 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     }
 
     @Override
-    public List<SpecialtyCode> findSpecialtiesByIdentification(String identification){
-        return doctorRepository.findSpecialtiesByIdentification(identification);
+    public Map<UUID, List<SpecialtyCode>> findSpecialtiesByPersonIds(Collection<UUID> personIds){
+
+        List<DoctorSpecialtyProjection> projections = doctorRepository.findSpecialtiesByPersonIds(personIds);
+
+        return projections.stream()
+                .collect(Collectors.groupingBy(
+                        DoctorSpecialtyProjection::personId,
+                        Collectors.mapping(
+                                DoctorSpecialtyProjection::specialty,
+                                Collectors.toList()
+                        )
+                ));
     }
 
     @Override

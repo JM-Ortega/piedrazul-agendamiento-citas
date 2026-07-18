@@ -2,16 +2,16 @@ package co.edu.unicauca.piedrazul.backend.user.infrastructure.persistence;
 
 import co.edu.unicauca.piedrazul.backend.user.domain.Person;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.proyections.PersonNameProjection;
+import co.edu.unicauca.piedrazul.backend.user.infrastructure.proyections.UserPersonProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@Repository
 public interface PersonRepository extends JpaRepository<Person, UUID> {
 
     Optional<Person> findByIdentification(String identification);
@@ -46,5 +46,16 @@ public interface PersonRepository extends JpaRepository<Person, UUID> {
         WHERE p.id IN :ids
     """)
     List<PersonNameProjection> findNamesByIds(List<UUID> ids);
+
+    @Query("""
+        SELECT new co.edu.unicauca.piedrazul.backend.user.infrastructure.proyections.UserPersonProjection(
+            p.userId,
+            p.id
+        )
+        FROM Person p
+        WHERE p.userId IN :userIds
+    """)
+    List<UserPersonProjection> findPersonIdsByUserIds(
+            @Param("userIds") Collection<UUID> userIds);
 
 }

@@ -11,13 +11,10 @@ import co.edu.unicauca.piedrazul.backend.user.exception.PersonNotFoundException;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.mappers.PersonApiMapper;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.persistence.PersonRepository;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.proyections.PersonNameProjection;
+import co.edu.unicauca.piedrazul.backend.user.infrastructure.proyections.UserPersonProjection;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -159,5 +156,21 @@ public class PersonExternalServiceImp implements PersonExternalService {
                         PersonNameProjection::getId,
                         PersonNameProjection::getFullName
                 ));
+    }
+
+    @Override
+    public Map<UUID, UUID> findPersonIdsByUserIds(Collection<UUID> userIds) {
+
+        return personRepository.findPersonIdsByUserIds(userIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        UserPersonProjection::userId,
+                        UserPersonProjection::personId
+                ));
+    }
+
+    @Override
+    public UUID findPersonIdByUserId(UUID userId){
+        return personRepository.getPersonIdByUserId(userId);
     }
 }

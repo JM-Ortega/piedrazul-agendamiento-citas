@@ -1,50 +1,46 @@
 package co.edu.unicauca.piedrazul.backend.user.application;
 
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemDoctorResponse;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
 import co.edu.unicauca.piedrazul.backend.user.exception.DoctorRoleRequiredException;
 import co.edu.unicauca.piedrazul.backend.user.exception.UserNotFoundException;
-import co.edu.unicauca.piedrazul.backend.user.infrastructure.persistence.PersonRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Stream;
 
 @Service
 public class UserService {
     private final KeycloakUserService keycloakUserService;
     private final DoctorExternalService doctorExternalService;
-    private final PersonRepository personRepository;
+    private final PersonExternalServiceImp personExternalServiceImp;
 
     public UserService(KeycloakUserService keycloakUserService, DoctorExternalService doctorExternalService
-    , PersonRepository personRepository) {
+    , PersonExternalServiceImp personExternalServiceImp) {
         this.keycloakUserService = keycloakUserService;
         this.doctorExternalService = doctorExternalService;
-        this.personRepository = personRepository;
+        this.personExternalServiceImp = personExternalServiceImp;
     }
 
     public List<SystemUserResponse> getSystemUsers() {
         List<UserSummary> doctors = keycloakUserService.findDoctors();
         List<UserSummary> schedulers = keycloakUserService.findSchedulers();
 
-        List<UserSummary> keycloakUsers = Stream.concat(
-                doctors.stream(),
-                schedulers.stream()
-        ).distinct().toList();
+        Map<UUID, UserSummary> keycloakUsers = new LinkedHashMap<>();
+
+        Stream.concat(doctors.stream(), schedulers.stream())
+                .forEach(user -> keycloakUsers.putIfAbsent(user.id(), user));
+
+        Map<UUID, List<String>> rolesByUserId = keycloakUserService.getUserRolesByIds(keycloakUsers.keySet());
 
         List<SystemUserResponse> result = new ArrayList<>();
 
-        for (UserSummary user : keycloakUsers) {
-            List<String> roles = keycloakUserService.getUserRoles(user.id())
-                    .stream()
-                    .filter(role -> role.equals(Role.DOCTOR.name()) || role.equals(Role.SCHEDULER.name()))
-                    .toList();
+        for (UserSummary user : keycloakUsers.values()) {
+            List<String> roles = resolveRoles(user, rolesByUserId);
 
             result.add(new SystemUserResponse(
                     user.id(),
@@ -61,26 +57,33 @@ public class UserService {
     public List<SystemDoctorResponse> getSystemDoctors() {
         List<UserSummary> doctors = keycloakUserService.findDoctors();
 
+        List<UUID> userIds = doctors.stream()
+                .map(UserSummary::id)
+                .toList();
+
+        Map<UUID, UUID> personIds = personExternalServiceImp.findPersonIdsByUserIds(userIds);
+
+        Map<UUID, List<SpecialtyCode>> specialties = doctorExternalService.findSpecialtiesByPersonIds(userIds);
+
         List<SystemDoctorResponse> result = new ArrayList<>();
 
         for (UserSummary doctor : doctors) {
-            List<String> roles = keycloakUserService.getUserRoles(doctor.id())
-                    .stream()
-                    .filter(role -> role.equals(Role.DOCTOR.name()) || role.equals(Role.SCHEDULER.name()))
-                    .toList();
 
-            List<String> specialties = doctorExternalService.findSpecialtiesByIdentification(doctor.username())
+            UUID personId = personIds.get(doctor.id());
+
+            List<String> doctorSpecialties = specialties
+                    .getOrDefault(personId, List.of())
                     .stream()
-                    .map(Objects::toString)
+                    .map(Enum::name)
                     .toList();
 
             result.add(new SystemDoctorResponse(
-                    personRepository.getPersonIdByUserId(doctor.id()),
+                    personId,
                     doctor.firstName(),
                     doctor.lastName(),
                     doctor.username(),
-                    roles,
-                    specialties
+                    doctor.roles(),
+                    doctorSpecialties
             ));
         }
         return result;
@@ -108,8 +111,18 @@ public class UserService {
         }
     }
 
-    private List<Role> normalizeRoles(List<Role> requestedRoles) {
-        return requestedRoles.stream().distinct().toList();
+    private List<String> resolveRoles(UserSummary user, Map<UUID, List<String>> rolesByUserId) {
+        List<String> roles = Optional.ofNullable(rolesByUserId.get(user.id()))
+                .orElseGet(() -> keycloakUserService.getUserRoles(user.id()));
+
+        if (roles == null || roles.isEmpty()) {
+            roles = user.roles();
+        }
+
+        return roles.stream()
+                .filter(role -> !Role.PATIENT.name().equals(role))
+                .distinct()
+                .toList();
     }
 
     private boolean hasRole(UUID userId, Role role) {

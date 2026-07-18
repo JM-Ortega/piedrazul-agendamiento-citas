@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.doctors.domain;
 
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;

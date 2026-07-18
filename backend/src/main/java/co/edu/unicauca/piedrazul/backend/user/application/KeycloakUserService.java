@@ -38,6 +38,11 @@ public class KeycloakUserService implements UserModuleApi {
     }
 
     @Override
+    public Map<UUID, List<String>> getUserRolesByIds(Collection<UUID> userIds) {
+        return keycloakClient.getUserRolesByIds(userIds);
+    }
+
+    @Override
     public void ensureSchedulerRole(UUID userId) {
         keycloakClient.assignRoleIfMissing(userId, Role.SCHEDULER);
     }
@@ -85,7 +90,8 @@ public class KeycloakUserService implements UserModuleApi {
                 user.getUsername(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getEmail()
+                user.getEmail(),
+                user.getRealmRoles()
         );
     }
 }

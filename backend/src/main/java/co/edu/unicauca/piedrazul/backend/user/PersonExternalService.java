@@ -3,11 +3,7 @@ package co.edu.unicauca.piedrazul.backend.user;
 import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 public interface PersonExternalService {
 
@@ -33,7 +29,6 @@ public interface PersonExternalService {
 
     Optional<PersonSummary> findByUserId(UUID userId);
 
-
     void deactivateUser (UUID personID);
 
     void activateUser(UUID personID);
@@ -41,4 +36,8 @@ public interface PersonExternalService {
     String getPersonName(UUID personID);
 
     Map<UUID, String> getPersonNames(List<UUID> personIds);
+
+    public Map<UUID, UUID> findPersonIdsByUserIds(Collection<UUID> userIds);
+
+    UUID findPersonIdByUserId(UUID userId);
 }

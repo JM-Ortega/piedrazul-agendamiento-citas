@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.doctors.domain;
 
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -19,43 +20,6 @@ public class Doctor {
     @Id
     @Column(name = "peson_id", updatable = false, nullable = false)
     private UUID personId;
-
-    // BORRAR I
-    //@Id
-    /*
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "id_doctor", updatable = false, nullable = false)
-    private UUID idDoctor;
-
-    @Column(name = "id_user", unique = true)
-    private UUID idUser;
-
-    @Column(name = "first_name", nullable = false, length = 100)
-    private String firstName;
-
-    @Column(name = "last_name", nullable = false, length = 100)
-    private String lastName;
-
-    @Column(name = "identification", nullable = false, length = 100)
-    private String identification;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "document_type", nullable = false, length = 40)
-    private DocumentType documentType;
-
-    @Column(name = "phone", nullable = false, length = 20)
-    private String phone;
-
-    @ElementCollection(targetClass = SpecialtyCode.class)
-    @Enumerated(EnumType.STRING)
-    @CollectionTable(
-            name = "doctor_specialties",
-            joinColumns = @JoinColumn(name = "id_doctor", nullable = false)
-    )
-    @Column(name = "specialty", nullable = false)
-    private List<SpecialtyCode> specialty = new ArrayList<>();
-     */
-    // BORRAR F
 
     @Column(name = "labor_start", nullable = false)
     private LocalDate laborStart;
