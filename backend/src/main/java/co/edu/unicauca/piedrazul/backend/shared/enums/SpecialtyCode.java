@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.doctors.domain;
+package co.edu.unicauca.piedrazul.backend.shared.enums;
 
 public enum SpecialtyCode {
     FISIOTERAPIA,
