@@ -4,17 +4,37 @@ import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
 
 @Injectable({ providedIn: 'root' })
 export class CalendarService {
+  private getEffectiveMinDate(
+    doctor: SpecialtyDoctor | null,
+    allowToday: boolean
+  ): Date {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let minDate = allowToday ? today : this.addDays(today, 1);
+
+    if (doctor?.laborStart) {
+      const laborStart = new Date(doctor.laborStart + 'T12:00:00');
+      laborStart.setHours(0, 0, 0, 0);
+      if (laborStart > minDate) {
+        minDate = laborStart;
+      }
+    }
+    return minDate;
+  }
+
+  private addDays(date: Date, days: number): Date {
+    const d = new Date(date);
+    d.setDate(d.getDate() + days);
+    return d;
+  }
+
   buildDateFilter(
     doctor: SpecialtyDoctor,
     allowToday = false
   ): (date: Date | null) => boolean {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const minDay = new Date(today);
-    if (!allowToday) minDay.setDate(minDay.getDate());
-
-    const max30 = new Date(today);
+    const minDate = this.getEffectiveMinDate(doctor, allowToday);
+    const max30 = new Date();
+    max30.setHours(0, 0, 0, 0);
     max30.setDate(max30.getDate() + 30);
 
     let effectiveMax = max30;
@@ -32,7 +52,7 @@ export class CalendarService {
       const dayOfWeek = d.getDay();
 
       return (
-        (allowToday ? d >= today : d > today) &&
+        d >= minDate &&
         d <= effectiveMax &&
         dayOfWeek !== 0 &&
         dayOfWeek !== 6 &&
@@ -42,15 +62,13 @@ export class CalendarService {
     };
   }
 
-  getMinDate(allowToday = false): Date {
-    if (allowToday) return new Date();
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow;
+  getMinDate(doctor: SpecialtyDoctor | null = null, allowToday = false): Date {
+    return this.getEffectiveMinDate(doctor, allowToday);
   }
 
   getMaxDate(doctor: SpecialtyDoctor): Date {
     const max30 = new Date();
+    max30.setHours(0, 0, 0, 0);
     max30.setDate(max30.getDate() + 30);
 
     if (doctor.laborEnd) {
