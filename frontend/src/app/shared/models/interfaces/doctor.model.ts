@@ -11,6 +11,6 @@ export interface Doctor {
   laborStart: string;
   laborEnd: string;
   status?: boolean;
-  daySchedules?: { [day: number]: DaySchedule };
+  daySchedules?: Record<number, DaySchedule>;
   email?: string;
 }

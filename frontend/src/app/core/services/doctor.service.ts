@@ -3,9 +3,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
-import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
 import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
-import { dtoSchedule } from '../../shared/models/dtos/schedule.dto';
 import { Doctor } from '../../shared/models/interfaces/doctor.model';
 import { Patient } from '../../shared/models/interfaces/patient.model';
 
@@ -15,6 +13,12 @@ export class DoctorService {
   private apiUrl = environment.apiUrl;
 
   medicalRecords = signal<MedicalRecord[]>([]);
+
+  /**
+   * Obtiene los datos del doctor autenticado actualmente (según el token de sesión).
+   * Mapea la respuesta cruda del backend (`DoctorMeResponse`) al modelo `Doctor`
+   * @returns Observable con los datos del doctor logueado.
+   */
   getMe(): Observable<Doctor> {
     interface DoctorMeResponse {
       id: string;
@@ -47,6 +51,7 @@ export class DoctorService {
         )
       );
   }
+  /** 
   getDoctorById(doctorId: string): Observable<dtoDoctor> {
     return this.http.get<dtoDoctor>(
       `${this.apiUrl}/doctor/doctors/${doctorId}`
@@ -58,7 +63,15 @@ export class DoctorService {
       `${this.apiUrl}/doctor/schedules/${doctorId}`
     );
   }
+*/
 
+  /**
+   * Obtiene las citas del día actual (fecha local del cliente) para un doctor específico.
+   * La fecha se calcula en formato `YYYY-MM-DD` y se envía como query param junto al `idDoctor`.
+   *
+   * @param doctorId - ID del doctor cuyas citas de hoy se quieren consultar.
+   * @returns Observable con la lista de citas del día para ese doctor.
+   */
   getTodayAppointmentsByDoctor(
     doctorId: string
   ): Observable<AppointmentsPatient[]> {
@@ -69,6 +82,13 @@ export class DoctorService {
     });
   }
 
+  /**
+   * Marca una cita como atendida.
+   *
+   * @param appointmentId - ID de la cita a actualizar.
+   * @param state - Nuevo estado a enviar en el body (ej. `'ATENDIDA'`).
+   * @returns Observable vacío que se completa al confirmar la actualización.
+   */
   updateAppointmentAsAttended(
     appointmentId: string,
     state: string
@@ -79,6 +99,13 @@ export class DoctorService {
     );
   }
 
+  /**
+   * Marca una cita como no asistida (el paciente no se presentó).
+   *
+   * @param appointmentId - ID de la cita a actualizar.
+   * @param state - Nuevo estado a enviar en el body (ej. `'NO_ASISTIO'`).
+   * @returns Observable vacío que se completa al confirmar la actualización.
+   */
   updateAppointmentAsUnassisted(
     appointmentId: string,
     state: string
@@ -89,6 +116,10 @@ export class DoctorService {
     );
   }
 
+  /**
+   * Carga el historial clínico de un paciente y lo guarda en el signal `medicalRecords`.
+   * @param patientId - ID del paciente cuyo historial se desea cargar.
+   */
   loadMedicalRecordsByPatient(patientId: string): void {
     this.http
       .get<MedicalRecord[]>(
@@ -97,6 +128,13 @@ export class DoctorService {
       .subscribe((records) => this.medicalRecords.set(records));
   }
 
+  /**
+   * Agrega un nuevo registro (observación) al historial clínico asociado a una cita.
+   *
+   * @param idAppointment - ID de la cita sobre la que se registra la observación.
+   * @param description - Texto de la observación clínica.
+   * @returns Observable con el registro clínico recién creado.
+   */
   addMedicalRecord(
     idAppointment: string,
     description: string
@@ -107,6 +145,12 @@ export class DoctorService {
     });
   }
 
+  /**
+   * Obtiene los datos del paciente asociado a una cita específica.
+   *
+   * @param appointmentId - ID de la cita de la que se quiere obtener el paciente.
+   * @returns Observable con los datos del paciente.
+   */
   getPatientByAppointment(appointmentId: string): Observable<Patient> {
     return this.http.get<Patient>(
       `${this.apiUrl}/patients/${appointmentId}/patient-attended`
