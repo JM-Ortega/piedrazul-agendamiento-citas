@@ -29,6 +29,7 @@ import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
 import { ExportFormatBackend } from '../../shared/models/types/ExportFormatBackend.type';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
+import { formatLongDateEs } from '../../shared/helpers/date-format';
 
 type ExportFormat = 'excel' | 'pdf' | 'csv';
 
@@ -83,22 +84,6 @@ export class SchedulerDashboardComponent implements OnInit {
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   })();
-
-  dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  monthNames = [
-    'enero',
-    'febrero',
-    'marzo',
-    'abril',
-    'mayo',
-    'junio',
-    'julio',
-    'agosto',
-    'septiembre',
-    'octubre',
-    'noviembre',
-    'diciembre',
-  ];
 
   readonly toastMessage = signal('');
   readonly toastType = signal<'success' | 'error' | null>(null);
@@ -381,8 +366,7 @@ export class SchedulerDashboardComponent implements OnInit {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   formatDate(dateStr: string): string {
-    const d = new Date(dateStr + 'T12:00:00');
-    return `${this.dayNames[d.getDay()]} ${d.getDate()} de ${this.monthNames[d.getMonth()]} de ${d.getFullYear()}`;
+    return formatLongDateEs(dateStr);
   }
 
   statusLabel(s: string): string {
