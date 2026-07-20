@@ -19,11 +19,6 @@ export class SchedulerService {
     return this.http.get<AppointmentsPatient[]>(`${this.apiUrl}/appointments`);
   }
 
-  getAppointmentsByDate(date: string): Observable<AppointmentsPatient[]> {
-    return this.http.get<AppointmentsPatient[]>(`${this.apiUrl}/appointments`, {
-      params: { date: date },
-    });
-  }
   getAppointmentsByDoctor(doctorId: string): Observable<AppointmentsPatient[]> {
     return this.http.get<AppointmentsPatient[]>(`${this.apiUrl}/appointments`, {
       params: { idDoctor: doctorId },
@@ -50,13 +45,5 @@ export class SchedulerService {
     return this.http.get<{ hasAvailabilitySlots: boolean }>(
       `${this.apiUrl}/reports/scheduler/availability?date=${date}`
     );
-  }
-  getAppointmentsByDateAndDoctor(
-    date: string,
-    doctorId: string
-  ): Observable<AppointmentsPatient[]> {
-    return this.http.get<AppointmentsPatient[]>(`${this.apiUrl}/appointments`, {
-      params: { idDoctor: doctorId, date: date },
-    });
   }
 }

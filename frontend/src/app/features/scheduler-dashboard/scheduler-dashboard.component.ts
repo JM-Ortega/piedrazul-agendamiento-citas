@@ -266,26 +266,6 @@ export class SchedulerDashboardComponent implements OnInit {
     this.filterStatus.set('');
   }
 
-  search(): void {
-    const date = this.filterDate();
-    const doctorId = this.filterDoctor();
-    let request$;
-    if (date && doctorId)
-      request$ = this.schedulerService.getAppointmentsByDateAndDoctor(
-        date,
-        doctorId
-      );
-    else if (date) request$ = this.schedulerService.getAppointmentsByDate(date);
-    else if (doctorId)
-      request$ = this.schedulerService.getAppointmentsByDoctor(doctorId);
-    else request$ = this.schedulerService.getAllAppointments();
-
-    request$.subscribe((data) => {
-      this.appointments.set(data);
-      this.searched.set(true);
-    });
-  }
-
   // ── Export ────────────────────────────────────────────────────────────────
   openExportModal(): void {
     this.exportError.set(null);
