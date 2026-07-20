@@ -30,6 +30,10 @@ import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
 import { ExportFormatBackend } from '../../shared/models/types/ExportFormatBackend.type';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
 import { formatLongDateEs } from '../../shared/helpers/date-format';
+import {
+  APPOINTMENT_STATUS_LABELS,
+  APPOINTMENT_STATUS_CLASSES,
+} from '../../shared/helpers/appointment-status';
 
 type ExportFormat = 'excel' | 'pdf' | 'csv';
 
@@ -370,24 +374,17 @@ export class SchedulerDashboardComponent implements OnInit {
   }
 
   statusLabel(s: string): string {
-    const map: Record<string, string> = {
-      AGENDADA: 'Agendada',
-      ATENDIDA: 'Atendida',
-      CANCELADA: 'Cancelada',
-      NO_ASISTIO: 'No asistió',
-      REPROGRAMADA: 'Reprogramada',
-    };
-    return map[s] ?? s;
+    return (
+      APPOINTMENT_STATUS_LABELS[s as AppointmentsPatient['appointmentState']] ??
+      s
+    );
   }
 
   statusColor(s: string): string {
-    const map: Record<string, string> = {
-      AGENDADA: 'bg-blue-100 text-[#163c63]',
-      ATENDIDA: 'bg-green-100 text-green-700',
-      CANCELADA: 'bg-red-100 text-red-700',
-      NO_ASISTIO: 'bg-orange-100 text-orange-700',
-      REPROGRAMADA: 'bg-yellow-100 text-yellow-700',
-    };
-    return map[s] ?? '';
+    return (
+      APPOINTMENT_STATUS_CLASSES[
+        s as AppointmentsPatient['appointmentState']
+      ] ?? ''
+    );
   }
 }
