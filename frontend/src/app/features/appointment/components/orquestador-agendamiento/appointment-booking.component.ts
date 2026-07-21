@@ -1,13 +1,15 @@
 import { CommonModule } from '@angular/common';
 import {
   Component,
+  DestroyRef,
   inject,
   Input,
   OnInit,
   output,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import { forkJoin } from 'rxjs';
+import { forkJoin, timer } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DoctorService } from '../../../../core/services/doctor.service';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { BookingSpecialtySelectorComponent } from '../../../appointment/components/seleccion-especialidad/booking-specialty-selector.component';
@@ -47,6 +49,7 @@ import { mapHttpError } from '../../../../shared/helpers/http-errors';
 export class AppointmentBookingComponent implements OnInit {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
+  private destroyRef = inject(DestroyRef);
   private doctorService = inject(DoctorService);
   private patientAppointmentService = inject(PatientAppointmentService);
 
@@ -225,7 +228,9 @@ export class AppointmentBookingComponent implements OnInit {
   }
 
   onConfirmed(): void {
-    setTimeout(() => this.goBack.emit(), 3000);
+    timer(3000)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.goBack.emit());
   }
 
   onSuccessGoBack(): void {
