@@ -81,7 +81,7 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     public List<UUID> getActiveGeneralDoctorIds() {
         return doctorRepository.findByStatusTrue()
                 .stream()
-                .filter(doctor -> doctor.tieneEspecialidad(SpecialtyCode.MEDICINA_GENERAL))
+                .filter(doctor -> doctor.hasSpecialtie(SpecialtyCode.MEDICINA_GENERAL))
                 .map(Doctor::getPersonId)
                 .toList();
     }

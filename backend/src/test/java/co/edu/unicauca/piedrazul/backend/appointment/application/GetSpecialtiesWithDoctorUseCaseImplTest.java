@@ -102,8 +102,12 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
     void getSpecialtiesWithDoctorShouldReturnDoctorWhenHasAvailableSlots() {
         UUID idDoctor = UUID.randomUUID();
         DoctorResponse doctorInfo = new DoctorResponse(
-                List.of("FISIOTERAPIA"), idDoctor, "Dr. Lopez",
-                LocalDate.now().plusMonths(6), List.of(1, 2, 3)
+                List.of("FISIOTERAPIA"),
+                idDoctor,
+                "Dr. Lopez",
+                LocalDate.now().plusMonths(6),
+                LocalDate.now(),
+                List.of(1, 2, 3)
         );
 
         when(isNewPatientUseCase.isNewPatient(anyPatient())).thenReturn(false);
@@ -160,12 +164,20 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         DoctorResponse response1 = new DoctorResponse(
-                List.of("FISIOTERAPIA"), idDoctor1, "Dr. Lopez",
-                LocalDate.now().plusMonths(6), List.of(1)
+                List.of("FISIOTERAPIA"),
+                idDoctor1,
+                "Dr. Lopez",
+                LocalDate.now().plusMonths(6),
+                LocalDate.now(),
+                List.of(1)
         );
         DoctorResponse response2 = new DoctorResponse(
-                List.of("QUIROPRAXIA"), idDoctor2, "Dr. Gomez",
-                LocalDate.now().plusMonths(6), List.of(1, 2)
+                List.of("QUIROPRAXIA"),
+                idDoctor2,
+                "Dr. Gomez",
+                LocalDate.now().plusMonths(6),
+                LocalDate.now(),
+                List.of(1, 2)
         );
 
         // El usecase ordena por slots desc antes de pedir info
@@ -202,12 +214,20 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
 
         // Ambos tienen la misma especialidad
         DoctorResponse response1 = new DoctorResponse(
-                List.of("FISIOTERAPIA"), idDoctor1, "Dr. Lopez",
-                LocalDate.now().plusMonths(6), List.of(1)
+                List.of("FISIOTERAPIA"),
+                idDoctor1,
+                "Dr. Lopez",
+                LocalDate.now().plusMonths(6),
+                LocalDate.now(),
+                List.of(1)
         );
         DoctorResponse response2 = new DoctorResponse(
-                List.of("FISIOTERAPIA"), idDoctor2, "Dr. Gomez",
-                LocalDate.now().plusMonths(6), List.of(1)
+                List.of("FISIOTERAPIA"),
+                idDoctor2,
+                "Dr. Gomez",
+                LocalDate.now().plusMonths(6),
+                LocalDate.now(),
+                List.of(1)
         );
 
         when(doctorConfigConsultPort.getDoctorInfoByIds(any()))
@@ -238,8 +258,12 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         DoctorResponse doctorInfo = new DoctorResponse(
-                List.of("MEDICINA_GENERAL"), generalDoctorId, "Dr. General",
-                LocalDate.now().plusMonths(6), List.of(1, 2, 3)
+                List.of("MEDICINA_GENERAL"),
+                generalDoctorId,
+                "Dr. General",
+                LocalDate.now().plusMonths(6),
+                LocalDate.now(),
+                List.of(1, 2, 3)
         );
 
         when(doctorConfigConsultPort.getDoctorInfoByIds(List.of(generalDoctorId)))

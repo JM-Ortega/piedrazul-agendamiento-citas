@@ -18,7 +18,7 @@ import java.util.*;
 public class Doctor {
 
     @Id
-    @Column(name = "peson_id", updatable = false, nullable = false)
+    @Column(name = "person_id", updatable = false, nullable = false)
     private UUID personId;
 
     @Column(name = "labor_start", nullable = false)
@@ -49,7 +49,7 @@ public class Doctor {
     private Set<Specialty> specialties = new HashSet<>();
 
 
-    public boolean tieneEspecialidad(SpecialtyCode code) {
+    public boolean hasSpecialtie(SpecialtyCode code) {
         return specialties.stream().anyMatch(s -> s.getCode().equals(code));
     }
 

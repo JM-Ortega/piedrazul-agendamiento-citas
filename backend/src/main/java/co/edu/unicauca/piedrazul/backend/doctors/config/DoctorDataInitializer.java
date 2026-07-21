@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.doctors.config;
 
+/*
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
@@ -143,3 +144,4 @@ public class DoctorDataInitializer implements ApplicationRunner {
         System.out.println("✔ Médicos de prueba insertados");
     }
 }
+ */
