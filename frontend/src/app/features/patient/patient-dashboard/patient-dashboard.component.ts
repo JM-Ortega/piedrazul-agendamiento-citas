@@ -20,7 +20,7 @@ import {
 import { AppService } from '../../../core/services/app.service';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { PatientAppointmentService } from '../../../core/services/patientAppointment.service';
-import { Appointment } from '../models/interfaces/appointment.model';
+import { getMonthShort } from '../../../shared/helpers/date-format';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
 @Component({
@@ -53,20 +53,6 @@ export class PatientDashboardComponent implements OnInit {
   readonly showCancelModal = signal(false);
   readonly pendingCancelId = signal<string | null>(null);
 
-  readonly monthNames = [
-    'enero',
-    'febrero',
-    'marzo',
-    'abril',
-    'mayo',
-    'junio',
-    'julio',
-    'agosto',
-    'septiembre',
-    'octubre',
-    'noviembre',
-    'diciembre',
-  ];
   readonly upcomingAppointments = computed<AppointmentsPatient[]>(() => {
     return this.appointmentService
       .appointments()
@@ -89,8 +75,7 @@ export class PatientDashboardComponent implements OnInit {
   }
 
   getMonthShort(dateStr: string): string {
-    const month = parseInt(dateStr.split('-')[1]) - 1;
-    return this.monthNames[month].slice(0, 3);
+    return getMonthShort(dateStr);
   }
 
   requestCancelAppointment(appointmentId: string): void {

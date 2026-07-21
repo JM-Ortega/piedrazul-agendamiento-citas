@@ -10,6 +10,7 @@ import {
 import { LucideCalendarDays, LucideClock } from '@lucide/angular';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { PatientAppointmentService } from '../../../core/services/patientAppointment.service';
+import { getMonthShort } from '../../../shared/helpers/date-format';
 import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_STATUS_CLASSES,
@@ -28,21 +29,6 @@ export class PatientAppointmentHistoryComponent implements OnInit {
 
   isLoading = signal(false);
   errorMessage = signal('');
-
-  readonly monthNames = [
-    'enero',
-    'febrero',
-    'marzo',
-    'abril',
-    'mayo',
-    'junio',
-    'julio',
-    'agosto',
-    'septiembre',
-    'octubre',
-    'noviembre',
-    'diciembre',
-  ];
 
   readonly statusLabels = APPOINTMENT_STATUS_LABELS;
   readonly statusClasses = APPOINTMENT_STATUS_CLASSES;
@@ -69,7 +55,6 @@ export class PatientAppointmentHistoryComponent implements OnInit {
   }
 
   getMonthShort(dateStr: string): string {
-    const month = parseInt(dateStr.split('-')[1]) - 1;
-    return this.monthNames[month].slice(0, 3);
+    return getMonthShort(dateStr);
   }
 }
