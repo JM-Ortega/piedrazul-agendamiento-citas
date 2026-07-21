@@ -13,6 +13,7 @@ public record DoctorResponse(
         UUID id,
         String name,
         LocalDate laborEnd,
+        LocalDate laborStart,
         List<Integer> workdays
 ) {
     // Un método estático para convertir la entidad en DTO fácilmente
@@ -23,6 +24,7 @@ public record DoctorResponse(
                         .toList(),
                 doctor.getPersonId(),
                 name,
+                doctor.getLaborStart(),
                 doctor.getLaborEnd(),
                 Optional.ofNullable(doctor.getSchedules())
                         .orElse(new HashSet<>())

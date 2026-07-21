@@ -151,6 +151,7 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
                             doctor.id(),
                             doctor.name(),
                             doctor.laborEnd(),
+                            doctor.laborStart(),
                             doctor.workdays()
                     );
                 })
@@ -202,6 +203,7 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
                 doctor.id(),
                 doctor.name(),
                 doctor.laborEnd(),
+                doctor.laborStart(),
                 workdays
         );
     }
