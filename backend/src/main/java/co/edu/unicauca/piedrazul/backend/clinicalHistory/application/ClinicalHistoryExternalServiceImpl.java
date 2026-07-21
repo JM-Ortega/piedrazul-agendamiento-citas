@@ -9,6 +9,7 @@ import co.edu.unicauca.piedrazul.backend.clinicalHistory.domain.ClinicalHistory;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.infrastructure.persistence.ClinicalHistoryRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,44 +28,51 @@ public class ClinicalHistoryExternalServiceImpl implements ClinicalHistoryExtern
     @Override
     public ClinicalHistoryResponse registerClinicalHistory(ClinicalHistoryRequest request) {
 
-        if (repository.existsByIdAppointment(request.idAppointment())) {
+        if (repository.existsByIdAppointment(request.appointmentId())) {
             throw new RuntimeException("Esta cita ya tiene una historia clínica registrada");
         }
 
+        // Esto ya lo valida el modulo appointment, es propio de su logica
+        /*
         AppointmentExternalData appointmentData = appointmentExternalService
                 .getAppointmentData(request.idAppointment());
 
         if (!appointmentData.state().equals("ATENDIDA")) {
             throw new IllegalStateException("Solo se puede generar una historia clínica de una cita atendida");
         }
-
-
+         */
 
         ClinicalHistory clinicalHistory = new ClinicalHistory(
-                request.idAppointment(),
-                appointmentData.idDoctor(),
-                appointmentData.idPatient(),
-                appointmentData.date(),
+                request.patientId(),
+                request.appointmentId(),
+                request.attendedAt(),
+                request.doctorName(),
                 request.description()
         );
 
         ClinicalHistory saved = repository.save(clinicalHistory);
 
-        return toResponse(saved, appointmentData.doctorName());
+        return toResponse(saved, request.doctorName());
     }
 
-
+    /*
     @Override
-    public List<ClinicalHistoryResponse> getHistoryByPatient(UUID idPatient) {
-        return repository.findByIdPatient(idPatient)
-                .stream()
-                .map(ch -> {
-                    AppointmentExternalData appointmentData = appointmentExternalService
-                            .getAppointmentData(ch.getIdAppointment());
-                    return toResponse(ch, appointmentData.doctorName());
-                })
-                .toList();
+    public void registerClinicalHistory(ClinicalHistoryRequest request) {
+
+        if (repository.existsByIdAppointment(request.appointmentId())) {
+            throw new RuntimeException("Esta cita ya tiene una historia clínica registrada");
+        }
+
+        repository.save(new ClinicalHistory(
+                request.patientId(),
+                request.appointmentId(),
+                request.attendedAt(),
+                request.doctorName(),
+                request.description()
+        ));
     }
+     */
+
 
     private ClinicalHistoryResponse toResponse(ClinicalHistory ch,
                                                String doctorName) {

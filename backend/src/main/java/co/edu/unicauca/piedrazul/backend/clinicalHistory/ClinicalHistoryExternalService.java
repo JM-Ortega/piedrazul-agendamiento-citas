@@ -14,9 +14,5 @@ public interface ClinicalHistoryExternalService {
     //Solo necesita saber qué puede pedirle
 
     ClinicalHistoryResponse registerClinicalHistory(ClinicalHistoryRequest request);
-
-    List<ClinicalHistoryResponse> getHistoryByPatient(UUID idPatient);
-
-
 }
 

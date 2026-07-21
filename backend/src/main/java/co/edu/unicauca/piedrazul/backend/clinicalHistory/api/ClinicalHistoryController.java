@@ -14,27 +14,4 @@ import java.util.UUID;
 @RequestMapping("/api/clinical-history")
 public class ClinicalHistoryController {
 
-    private final ClinicalHistoryExternalService service;
-
-    public ClinicalHistoryController(ClinicalHistoryExternalService service) {
-        this.service = service;
-    }
-
-    //Registrar una historia clínica
-    @PostMapping
-    public ResponseEntity<ClinicalHistoryResponse> register(
-            @RequestBody ClinicalHistoryRequest request) {
-
-        ClinicalHistoryResponse response = service.registerClinicalHistory(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
-
-    //Obtener historial clínico de un paciente
-    @GetMapping("/patient/{idPatient}")
-    public ResponseEntity<List<ClinicalHistoryResponse>> getByPatient(
-            @PathVariable UUID idPatient) {
-
-        List<ClinicalHistoryResponse> history = service.getHistoryByPatient(idPatient);
-        return ResponseEntity.ok(history);
-    }
 }
