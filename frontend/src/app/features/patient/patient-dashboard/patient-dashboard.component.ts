@@ -67,26 +67,6 @@ export class PatientDashboardComponent implements OnInit {
     'noviembre',
     'diciembre',
   ];
-
-  readonly statusLabels: Record<Appointment['status'], string> = {
-    AGENDADA: 'Agendada',
-    ATENDIDA: 'Atendida',
-    CANCELADA: 'Cancelada',
-    NO_ASISTIO: 'No asistió',
-    REPROGRAMADA: 'Reprogramada',
-  };
-
-  readonly statusClasses: Record<
-    AppointmentsPatient['appointmentState'],
-    string
-  > = {
-    AGENDADA: 'bg-green-100 text-green-700',
-    ATENDIDA: 'bg-blue-100 text-blue-700',
-    CANCELADA: 'bg-red-100 text-red-700',
-    NO_ASISTIO: 'bg-gray-100 text-gray-600',
-    REPROGRAMADA: 'bg-yellow-100 text-yellow-700',
-  };
-
   readonly upcomingAppointments = computed<AppointmentsPatient[]>(() => {
     return this.appointmentService
       .appointments()

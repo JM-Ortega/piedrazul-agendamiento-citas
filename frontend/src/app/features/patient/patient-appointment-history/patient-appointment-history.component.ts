@@ -8,10 +8,12 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { LucideCalendarDays, LucideClock } from '@lucide/angular';
-import { AppService } from '../../../core/services/app.service';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { PatientAppointmentService } from '../../../core/services/patientAppointment.service';
-import { Appointment } from '../models/interfaces/appointment.model';
+import {
+  APPOINTMENT_STATUS_LABELS,
+  APPOINTMENT_STATUS_CLASSES,
+} from '../../../shared/helpers/appointment-status';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
 @Component({
@@ -22,7 +24,6 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
   imports: [LucideCalendarDays, LucideClock, CommonModule, FormatoPipe],
 })
 export class PatientAppointmentHistoryComponent implements OnInit {
-  protected appService = inject(AppService);
   private appointmentService = inject(PatientAppointmentService);
 
   isLoading = signal(false);
@@ -43,24 +44,8 @@ export class PatientAppointmentHistoryComponent implements OnInit {
     'diciembre',
   ];
 
-  readonly statusLabels: Record<Appointment['status'], string> = {
-    AGENDADA: 'Agendada',
-    ATENDIDA: 'Atendida',
-    CANCELADA: 'Cancelada',
-    NO_ASISTIO: 'No asistió',
-    REPROGRAMADA: 'Reprogramada',
-  };
-
-  readonly statusClasses: Record<
-    AppointmentsPatient['appointmentState'],
-    string
-  > = {
-    AGENDADA: 'bg-green-100 text-green-700',
-    ATENDIDA: 'bg-blue-100 text-blue-700',
-    CANCELADA: 'bg-red-100 text-red-700',
-    NO_ASISTIO: 'bg-orange-100 text-orange-700',
-    REPROGRAMADA: 'bg-yellow-100 text-yellow-700',
-  };
+  readonly statusLabels = APPOINTMENT_STATUS_LABELS;
+  readonly statusClasses = APPOINTMENT_STATUS_CLASSES;
 
   readonly pastAppointments = computed<AppointmentsPatient[]>(() => {
     return this.appointmentService
