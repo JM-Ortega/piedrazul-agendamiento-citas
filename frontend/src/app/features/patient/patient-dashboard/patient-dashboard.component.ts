@@ -97,11 +97,8 @@ export class PatientDashboardComponent implements OnInit {
   ngOnInit(): void {
     this.isLoading.set(true);
 
-    this.appointmentService.getMyAppointments().subscribe({
-      next: (data) => {
-        this.appointmentService.appointments.set(data);
-        this.isLoading.set(false);
-      },
+    this.appointmentService.loadMyAppointments().subscribe({
+      next: () => this.isLoading.set(false),
       error: () => {
         this.errorMessage.set(
           'No se pudieron cargar las citas. Intente más tarde.'
@@ -131,14 +128,9 @@ export class PatientDashboardComponent implements OnInit {
     this.appointmentService.cancelAppointment(appointmentId).subscribe({
       next: () => {
         this.showToast('La cita fue cancelada exitosamente', 'success');
-        this.appointmentService.appointments.set(
-          this.appointmentService
-            .appointments()
-            .map((a) =>
-              a.idAppointment === appointmentId
-                ? { ...a, appointmentState: 'CANCELADA' }
-                : a
-            )
+        this.appointmentService.patchAppointmentStatus(
+          appointmentId,
+          'CANCELADA'
         );
       },
       error: () => {

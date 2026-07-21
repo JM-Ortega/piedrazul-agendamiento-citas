@@ -62,7 +62,7 @@ export class PatientAppointmentHistoryComponent implements OnInit {
     REPROGRAMADA: 'bg-yellow-100 text-yellow-700',
   };
 
-  readonly upcomingAppointments = computed<AppointmentsPatient[]>(() => {
+  readonly pastAppointments = computed<AppointmentsPatient[]>(() => {
     return this.appointmentService
       .appointments()
       .filter((a) => a.appointmentState !== 'AGENDADA')
@@ -72,11 +72,8 @@ export class PatientAppointmentHistoryComponent implements OnInit {
   ngOnInit(): void {
     this.isLoading.set(true);
 
-    this.appointmentService.getMyAppointments().subscribe({
-      next: (data) => {
-        this.appointmentService.appointments.set(data);
-        this.isLoading.set(false);
-      },
+    this.appointmentService.loadMyAppointments().subscribe({
+      next: () => this.isLoading.set(false),
       error: () => {
         this.errorMessage.set(
           'No se pudieron cargar las citas. Intente más tarde.'

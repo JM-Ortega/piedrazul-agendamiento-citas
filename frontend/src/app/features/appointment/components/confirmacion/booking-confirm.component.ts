@@ -12,6 +12,7 @@ import {
 import { NewAppointment } from '../../models/dtos/newAppointment.dto';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
+import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
 import { mapHttpError } from '../../../../shared/helpers/http-errors';
@@ -36,6 +37,7 @@ import { mapHttpError } from '../../../../shared/helpers/http-errors';
 export class BookingConfirmComponent {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
+  private patientAppointmentService = inject(PatientAppointmentService);
 
   confirmed = output<void>();
 
@@ -55,6 +57,10 @@ export class BookingConfirmComponent {
       next: () => {
         this.state.isLoading.set(false);
         this.state.success.set(true);
+        // se invalida el caché para que el dashboard pida datos frescos la próxima vez que se muestre.
+        if (data.schedulingOrigin === 'AUTONOMO') {
+          this.patientAppointmentService.invalidateCache();
+        }
         this.confirmed.emit();
       },
       error: (err) => {
