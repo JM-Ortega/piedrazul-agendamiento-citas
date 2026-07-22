@@ -1,7 +1,6 @@
 import {
   Component,
   inject,
-  OnDestroy,
   output,
   signal,
   ChangeDetectionStrategy,
@@ -14,8 +13,9 @@ import {
   of,
   Subject,
   switchMap,
-  takeUntil,
 } from 'rxjs';
+import { filter, tap, catchError } from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { PatientSuggestion } from '../../models/dtos/patient-suggestion.dto';
 import { BookingStateService } from '../../services/booking-state.service';
@@ -37,7 +37,7 @@ const MIN_DOC_LENGTH = 6;
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-patient-search.component.html',
 })
-export class BookingPatientSearchComponent implements OnDestroy {
+export class BookingPatientSearchComponent {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
 
@@ -50,29 +50,28 @@ export class BookingPatientSearchComponent implements OnDestroy {
   private docWarnTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly searchInput$ = new Subject<string>();
-  private readonly destroy$ = new Subject<void>();
 
   constructor() {
     this.searchInput$
       .pipe(
         debounceTime(300),
         distinctUntilChanged(),
-        switchMap((query) => {
-          const trimmed = query.trim();
-
-          if (trimmed.length < MIN_CHARS) {
-            this.state.searchSuggestions.set([]);
-            this.state.searchLoading.set(false);
-            this.showSuggestions.set(false);
-            return of([] as PatientSuggestion[]);
-          }
-
+        // si no cumple los caracteres mínimos, no pasa al switchMap
+        filter((query) => query.trim().length >= MIN_CHARS),
+        // Activar loader antes de lanzar la petición
+        tap(() => {
           this.state.searchLoading.set(true);
           this.state.searchError.set('');
-
-          return this.citaService.getPatientSuggestionsByDocument(trimmed);
         }),
-        takeUntil(this.destroy$)
+        switchMap((query) =>
+          this.citaService.getPatientSuggestionsByDocument(query.trim()).pipe(
+            catchError(() => {
+              this.state.searchError.set('Error al cargar sugerencias');
+              return of([] as PatientSuggestion[]);
+            })
+          )
+        ),
+        takeUntilDestroyed()
       )
       .subscribe({
         next: (suggestions) => {
@@ -80,52 +79,42 @@ export class BookingPatientSearchComponent implements OnDestroy {
           this.state.searchSuggestions.set(suggestions);
           this.showSuggestions.set(suggestions.length > 0);
         },
-        error: () => {
-          this.state.searchLoading.set(false);
-        },
       });
-  }
-
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
   }
 
   handleDocInput(event: Event): void {
     const el = event.target as HTMLInputElement;
     const raw = el.value;
-    const clean = raw.replace(/[^a-zA-Z0-9]/g, '');
+    // 1. Limpieza de caracteres especiales
+    let clean = raw.replace(/[^a-zA-Z0-9]/g, '');
     if (clean !== raw) {
       el.value = clean;
       this.flashWarning(
         'Solo se permiten letras y números, sin caracteres especiales'
       );
     }
+    // 2. Control de longitud máxima
     if (clean.length > MAX_DOC_LENGTH) {
-      el.value = clean.slice(0, MAX_DOC_LENGTH);
+      clean = clean.slice(0, MAX_DOC_LENGTH);
+      el.value = clean;
       this.flashWarning(`Solo se permiten máximo ${MAX_DOC_LENGTH} caracteres`);
     }
-    this.onQueryChange(el.value);
+    // 3. Actualización de Estados y Signals
+    this.state.searchQuery.set(clean);
+    this.state.searchError.set('');
+    this.clearResult();
+    // 4. Lógica de sugerencias
+    if (clean.trim().length < MIN_CHARS) {
+      this.state.searchSuggestions.set([]);
+      this.showSuggestions.set(false);
+    }
+    this.searchInput$.next(clean);
   }
 
   private flashWarning(text: string): void {
     this.docInputWarning.set(text);
     if (this.docWarnTimer) clearTimeout(this.docWarnTimer);
     this.docWarnTimer = setTimeout(() => this.docInputWarning.set(''), 3000);
-  }
-
-  onQueryChange(value: string): void {
-    const clean = value.replace(/[^a-zA-Z0-9]/g, '').slice(0, MAX_DOC_LENGTH);
-    this.state.searchQuery.set(clean);
-    this.state.searchError.set('');
-    this.clearResult();
-
-    if (clean.trim().length < MIN_CHARS) {
-      this.state.searchSuggestions.set([]);
-      this.showSuggestions.set(false);
-    }
-
-    this.searchInput$.next(clean);
   }
 
   onSearchExact(): void {

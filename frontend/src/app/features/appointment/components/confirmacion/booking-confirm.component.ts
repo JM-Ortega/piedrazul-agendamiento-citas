@@ -10,11 +10,12 @@ import {
   LucideUserSearch,
 } from '@lucide/angular';
 import { NewAppointment } from '../../models/dtos/newAppointment.dto';
-import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
+import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
+import { mapHttpError } from '../../../../shared/helpers/http-errors';
 
 /**
  * Mostrar el resumen completo de la cita a confirmar
@@ -36,8 +37,9 @@ import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
 export class BookingConfirmComponent {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
+  private patientAppointmentService = inject(PatientAppointmentService);
 
-  confirmed = output<AppointmentConfirmedEvent>();
+  confirmed = output<void>();
 
   back = output<void>();
 
@@ -55,30 +57,25 @@ export class BookingConfirmComponent {
       next: () => {
         this.state.isLoading.set(false);
         this.state.success.set(true);
-        this.confirmed.emit({ patientId: this.state.resolvePatientId() });
+        // se invalida el caché para que el dashboard pida datos frescos la próxima vez que se muestre.
+        if (data.schedulingOrigin === 'AUTONOMO') {
+          this.patientAppointmentService.invalidateCache();
+        }
+        this.confirmed.emit();
       },
       error: (err) => {
         this.state.isLoading.set(false);
 
-        if (err.status === 0) {
-          this.state.errorMessage.set(
-            'No se pudo conectar con el servidor. Intente más tarde.'
-          );
-          return;
-        }
-
         const errorCode = err.error?.errorCode;
-        const detail = err.error?.detail;
-        switch (errorCode) {
-          case 'PATIENT_TIME_CONFLICT':
-          case 'PATIENT_SPECIALTY_CONFLICT':
-            this.state.errorMessage.set(detail);
-            break;
-          default:
-            this.state.errorMessage.set(
-              detail || 'Error inesperado al registrar la cita.'
-            );
-        }
+        const isBusinessConflict =
+          errorCode === 'PATIENT_TIME_CONFLICT' ||
+          errorCode === 'PATIENT_SPECIALTY_CONFLICT';
+
+        this.state.errorMessage.set(
+          isBusinessConflict
+            ? err.error?.detail
+            : mapHttpError(err, 'Error inesperado al registrar la cita.')
+        );
       },
     });
   }

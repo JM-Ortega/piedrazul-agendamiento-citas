@@ -1,13 +1,15 @@
 import { CommonModule } from '@angular/common';
 import {
   Component,
+  DestroyRef,
   inject,
   Input,
   OnInit,
   output,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import { forkJoin } from 'rxjs';
+import { forkJoin, timer } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DoctorService } from '../../../../core/services/doctor.service';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { BookingSpecialtySelectorComponent } from '../../../appointment/components/seleccion-especialidad/booking-specialty-selector.component';
@@ -21,7 +23,8 @@ import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { BookingConfirmComponent } from '../confirmacion/booking-confirm.component';
 import { BookingModeSelectorComponent } from '../modo-agendamiento/booking-mode-selector.component';
-import { PatientAppointmentService } from '../../services/PatientApointment.service';
+import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
+import { mapHttpError } from '../../../../shared/helpers/http-errors';
 
 /**
  * Coordina el flujo de agendamiento componiendo los
@@ -46,6 +49,7 @@ import { PatientAppointmentService } from '../../services/PatientApointment.serv
 export class AppointmentBookingComponent implements OnInit {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
+  private destroyRef = inject(DestroyRef);
   private doctorService = inject(DoctorService);
   private patientAppointmentService = inject(PatientAppointmentService);
 
@@ -224,7 +228,9 @@ export class AppointmentBookingComponent implements OnInit {
   }
 
   onConfirmed(): void {
-    setTimeout(() => this.goBack.emit(), 3000);
+    timer(3000)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.goBack.emit());
   }
 
   onSuccessGoBack(): void {
@@ -252,22 +258,11 @@ export class AppointmentBookingComponent implements OnInit {
       },
       error: (err) => {
         this.state.noSpecialtyAvailable.set(true);
-        switch (err.status) {
-          case 409:
-            this.state.errorMessageSpecialty.set(
-              'No hay médicos disponibles para ninguna especialidad. Intente más tarde.'
-            );
-            break;
-          case 0:
-            this.state.errorMessageSpecialty.set(
-              'No se pudo conectar con el servidor. Intente más tarde.'
-            );
-            break;
-          default:
-            this.state.errorMessageSpecialty.set(
-              'Error al obtener las especialidades.'
-            );
-        }
+        this.state.errorMessageSpecialty.set(
+          err.status === 409
+            ? 'No hay médicos disponibles para ninguna especialidad. Intente más tarde.'
+            : mapHttpError(err, 'Error al obtener las especialidades.')
+        );
       },
     });
   }
@@ -297,6 +292,7 @@ export class AppointmentBookingComponent implements OnInit {
             specialty: s,
             id: '',
             name: '',
+            laborStart: null,
             laborEnd: null,
             workdays: [],
           }))
@@ -305,9 +301,7 @@ export class AppointmentBookingComponent implements OnInit {
       error: (err) => {
         this.state.noSpecialtyAvailable.set(true);
         this.state.errorMessageSpecialty.set(
-          err.status === 0
-            ? 'No se pudo conectar con el servidor. Intente más tarde.'
-            : 'Error al obtener las especialidades.'
+          mapHttpError(err, 'Error al obtener las especialidades.')
         );
       },
     });
@@ -330,20 +324,11 @@ export class AppointmentBookingComponent implements OnInit {
       },
       error: (err) => {
         this.state.noDoctorsFound.set(true);
-        switch (err.status) {
-          case 404:
-            this.state.errorMessageDoctors.set(
-              'No hay médicos disponibles para esta especialidad.'
-            );
-            break;
-          case 0:
-            this.state.errorMessageDoctors.set(
-              'No se pudo conectar con el servidor. Intente más tarde.'
-            );
-            break;
-          default:
-            this.state.errorMessageDoctors.set('Error al obtener los médicos.');
-        }
+        this.state.errorMessageDoctors.set(
+          err.status === 404
+            ? 'No hay médicos disponibles para esta especialidad.'
+            : mapHttpError(err, 'Error al obtener los médicos.')
+        );
       },
     });
   }

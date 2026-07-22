@@ -23,11 +23,17 @@ import {
   type LucideIcon,
 } from '@lucide/angular';
 import { SchedulerService } from '../../core/services/scheduler.service';
+import { PatientAppointmentService } from '../../core/services/patientAppointment.service';
 import { AppointmentExportRequest } from '../../shared/models/dtos/AppointmentExportRequest.dto';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
 import { ExportFormatBackend } from '../../shared/models/types/ExportFormatBackend.type';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
+import { formatLongDateEs } from '../../shared/helpers/date-format';
+import {
+  APPOINTMENT_STATUS_LABELS,
+  APPOINTMENT_STATUS_CLASSES,
+} from '../../shared/helpers/appointment-status';
 
 type ExportFormat = 'excel' | 'pdf' | 'csv';
 
@@ -72,6 +78,7 @@ const EXT_MAP: Record<ExportFormat, string> = {
 })
 export class SchedulerDashboardComponent implements OnInit {
   private schedulerService = inject(SchedulerService);
+  private patientAppointmentService = inject(PatientAppointmentService);
 
   // ── Date helpers ──────────────────────────────────────────────────────────
   today = (() => {
@@ -81,22 +88,6 @@ export class SchedulerDashboardComponent implements OnInit {
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   })();
-
-  dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  monthNames = [
-    'enero',
-    'febrero',
-    'marzo',
-    'abril',
-    'mayo',
-    'junio',
-    'julio',
-    'agosto',
-    'septiembre',
-    'octubre',
-    'noviembre',
-    'diciembre',
-  ];
 
   readonly toastMessage = signal('');
   readonly toastType = signal<'success' | 'error' | null>(null);
@@ -264,26 +255,6 @@ export class SchedulerDashboardComponent implements OnInit {
     this.filterStatus.set('');
   }
 
-  search(): void {
-    const date = this.filterDate();
-    const doctorId = this.filterDoctor();
-    let request$;
-    if (date && doctorId)
-      request$ = this.schedulerService.getAppointmentsByDateAndDoctor(
-        date,
-        doctorId
-      );
-    else if (date) request$ = this.schedulerService.getAppointmentsByDate(date);
-    else if (doctorId)
-      request$ = this.schedulerService.getAppointmentsByDoctor(doctorId);
-    else request$ = this.schedulerService.getAllAppointments();
-
-    request$.subscribe((data) => {
-      this.appointments.set(data);
-      this.searched.set(true);
-    });
-  }
-
   // ── Export ────────────────────────────────────────────────────────────────
   openExportModal(): void {
     this.exportError.set(null);
@@ -366,7 +337,7 @@ export class SchedulerDashboardComponent implements OnInit {
     if (!appointmentId) return;
     this.showCancelModal.set(false);
     this.pendingCancelId.set(null);
-    this.schedulerService.cancelAppointment(appointmentId).subscribe({
+    this.patientAppointmentService.cancelAppointment(appointmentId).subscribe({
       next: () => {
         this.showToast('La cita fue cancelada exitosamente', 'success');
         this.appointments.set(
@@ -399,29 +370,21 @@ export class SchedulerDashboardComponent implements OnInit {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   formatDate(dateStr: string): string {
-    const d = new Date(dateStr + 'T12:00:00');
-    return `${this.dayNames[d.getDay()]} ${d.getDate()} de ${this.monthNames[d.getMonth()]} de ${d.getFullYear()}`;
+    return formatLongDateEs(dateStr);
   }
 
   statusLabel(s: string): string {
-    const map: Record<string, string> = {
-      AGENDADA: 'Agendada',
-      ATENDIDA: 'Atendida',
-      CANCELADA: 'Cancelada',
-      NO_ASISTIO: 'No asistió',
-      REPROGRAMADA: 'Reprogramada',
-    };
-    return map[s] ?? s;
+    return (
+      APPOINTMENT_STATUS_LABELS[s as AppointmentsPatient['appointmentState']] ??
+      s
+    );
   }
 
   statusColor(s: string): string {
-    const map: Record<string, string> = {
-      AGENDADA: 'bg-blue-100 text-[#163c63]',
-      ATENDIDA: 'bg-green-100 text-green-700',
-      CANCELADA: 'bg-red-100 text-red-700',
-      NO_ASISTIO: 'bg-orange-100 text-orange-700',
-      REPROGRAMADA: 'bg-yellow-100 text-yellow-700',
-    };
-    return map[s] ?? '';
+    return (
+      APPOINTMENT_STATUS_CLASSES[
+        s as AppointmentsPatient['appointmentState']
+      ] ?? ''
+    );
   }
 }
