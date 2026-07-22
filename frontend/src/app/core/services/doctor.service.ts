@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
-import { map, Observable } from 'rxjs';
+
+import { map, Observable, of, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
@@ -13,13 +14,27 @@ export class DoctorService {
   private apiUrl = environment.apiUrl;
 
   medicalRecords = signal<MedicalRecord[]>([]);
+  private meCache: Doctor | null = null;
+  private meCacheTimestamp = 0;
+  private readonly ME_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 
   /**
    * Obtiene los datos del doctor autenticado actualmente (según el token de sesión).
-   * Mapea la respuesta cruda del backend (`DoctorMeResponse`) al modelo `Doctor`
+   * Usa un caché en memoria de 5 minutos para evitar llamadas repetidas al backend
+   * cuando el componente se vuelve a montar en poco tiempo.
+   *
+   * @param forceRefresh - Si es true, ignora el caché y fuerza una nueva petición
+   * (útil después de editar el perfil del doctor).
    * @returns Observable con los datos del doctor logueado.
    */
-  getMe(): Observable<Doctor> {
+  getMe(forceRefresh = false): Observable<Doctor> {
+    const isCacheValid =
+      this.meCache && Date.now() - this.meCacheTimestamp < this.ME_CACHE_TTL_MS;
+
+    if (isCacheValid && !forceRefresh) {
+      return of(this.meCache as Doctor);
+    }
+
     interface DoctorMeResponse {
       id: string;
       name: string;
@@ -48,9 +63,14 @@ export class DoctorService {
               endTime: '',
               daySchedules: {},
             }) as Doctor
-        )
+        ),
+        tap((doctor) => {
+          this.meCache = doctor;
+          this.meCacheTimestamp = Date.now();
+        })
       );
   }
+
   /** 
   getDoctorById(doctorId: string): Observable<dtoDoctor> {
     return this.http.get<dtoDoctor>(
@@ -155,5 +175,9 @@ export class DoctorService {
     return this.http.get<Patient>(
       `${this.apiUrl}/patients/${appointmentId}/patient-attended`
     );
+  }
+  clearMeCache(): void {
+    this.meCache = null;
+    this.meCacheTimestamp = 0;
   }
 }

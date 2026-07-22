@@ -1,8 +1,8 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   input,
   output,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { LucidePowerOff, LucideSave, LucideX } from '@lucide/angular';
 import { Doctor } from '../../../../../shared/models/interfaces/doctor.model';
@@ -11,7 +11,7 @@ import { Doctor } from '../../../../../shared/models/interfaces/doctor.model';
   selector: 'app-admin-modals',
   templateUrl: './admin-modals.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideX, LucideSave, LucidePowerOff],
 })
 export class AdminModalsComponent {
