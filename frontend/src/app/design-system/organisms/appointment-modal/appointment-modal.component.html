@@ -15,15 +15,19 @@
           Para agendar necesitas una cuenta en el sistema
         </p>
       </div>
-      <app-button (buttonClick)="finish.emit()" variant="link">
+      <app-button (buttonClick)="finish.emit()" variant="danger" size="sm">
         <svg lucideX [size]="20"></svg>
       </app-button>
     </div>
 
     <!-- Opciones principales -->
     <div class="p-6 flex flex-col gap-3">
-      <app-button (buttonClick)="login()" variant="primary">
-        <div class="bg-blue-600 p-2 rounded-lg shrink-0">
+      <app-button
+        (buttonClick)="login()"
+        variant="primary"
+        extraClass="gap-4 w-full text-left justify-start"
+      >
+        <div class="bg-[#4e92d9] p-2 rounded-lg shrink-0">
           <svg lucideLogIn [size]="22" color="white"></svg>
         </div>
         <div>
@@ -35,13 +39,15 @@
       </app-button>
       <app-button
         (buttonClick)="register()"
-        extraClass="flex items-center gap-4 w-full border-2 border-[#215c98] hover:bg-blue-50 text-[#215c98] px-5 py-4 rounded-xl transition-all"
+        extraClass="text-left justify-start gap-4 w-full bg-white text-[#215c98] border-2 border-[#215c98] hover:bg-blue-50 px-5 py-4 rounded-xl transition-all"
       >
         <div class="bg-[#d9e9f8] p-2 rounded-lg shrink-0">
           <svg lucideUserPlus [size]="22" class="text-[#215c98]"></svg>
         </div>
         <div>
-          <div class="font-semibold text-base">Crear mi cuenta</div>
+          <div class="text-[#215c98] font-semibold text-base">
+            Crear mi cuenta
+          </div>
           <div class="text-[#215c98] text-sm">
             Regístrate para agendar tu cita
           </div>
