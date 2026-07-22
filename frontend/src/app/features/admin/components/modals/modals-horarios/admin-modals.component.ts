@@ -1,8 +1,8 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   input,
   output,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { LucidePowerOff, LucideSave, LucideX } from '@lucide/angular';
 import { Doctor } from '../../../../../shared/models/interfaces/doctor.model';

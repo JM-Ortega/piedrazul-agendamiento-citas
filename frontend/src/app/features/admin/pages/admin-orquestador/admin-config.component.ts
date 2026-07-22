@@ -8,7 +8,6 @@ import {
 } from '@angular/core';
 import { LucidePencil, LucideSettings } from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
-import { dtoSchedule } from '../../../../shared/models/dtos/schedule.dto';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { DoctorCardComponent } from '../../components/doctor-card/doctor-card.component';
@@ -17,6 +16,7 @@ import {
   DoctorSaveEvent,
 } from '../../components/doctor-edit-form/doctor-edit-form.component';
 import { AdminModalsComponent } from '../../components/modals/modals-horarios/admin-modals.component';
+import { dtoSchedule } from '../../models/dtos/schedule.dto';
 import { AdminService } from '../../service/admin.service';
 
 @Component({

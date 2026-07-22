@@ -2,9 +2,9 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { dtoSchedule } from '../../../shared/models/dtos/schedule.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { CreateUserRequestDto } from '../models/dtos/CreateUserRequestDto';
+import { dtoSchedule } from '../models/dtos/schedule.dto';
 
 import { DoctorAdminDto } from '../models/dtos/DoctorAdminDto';
 import { SystemUser } from '../models/interfaces/system-user.model';
@@ -54,6 +54,19 @@ export class AdminService {
       { params: { laborEnd } }
     );
   }
+  /**
+updateLaborHours(
+  doctorId: string,
+  laborStart: string,
+  laborEnd: string
+): Observable<void> {
+  return this.http.put<void>(
+    `${this.apiUrl}/doctor/doctors/${doctorId}/labor-hours`,
+    null,
+    { params: { laborStart, laborEnd } }
+  );
+}
+   */
 
   enableDoctor(
     doctorId: string,
@@ -83,6 +96,26 @@ export class AdminService {
     );
   }
 
+  /**
+  private buildSchedulePayload(workday: string, startTime: string, endTime: string) {
+  return { startTime, endTime, workday };
+}
+
+createSchedule(doctorId: string, workday: string, startTime: string, endTime: string): Observable<dtoSchedule> {
+  return this.http.post<dtoSchedule>(
+    `${this.apiUrl}/doctor/schedules/${doctorId}`,
+    this.buildSchedulePayload(workday, startTime, endTime)
+  );
+}
+
+updateSchedule(doctorId: string, workday: string, startTime: string, endTime: string): Observable<dtoSchedule> {
+  return this.http.put<dtoSchedule>(
+    `${this.apiUrl}/doctor/schedules/${doctorId}/${workday}`,
+    this.buildSchedulePayload(workday, startTime, endTime)
+  );
+}
+
+   */
   createSchedule(
     doctorId: string,
     workday: string,

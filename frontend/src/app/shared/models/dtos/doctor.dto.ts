@@ -1,6 +1,3 @@
-export interface dtoDoctor {
-  id: string;
-  name: string;
-  specialty: string;
-  email?: string;
-}
+import { Doctor } from '../interfaces/doctor.model';
+
+export type dtoDoctor = Pick<Doctor, 'id' | 'name' | 'specialty' | 'email'>;
