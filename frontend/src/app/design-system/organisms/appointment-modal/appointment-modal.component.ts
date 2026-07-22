@@ -1,21 +1,21 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   EventEmitter,
   Output,
   inject,
-  ChangeDetectionStrategy,
 } from '@angular/core';
-
 import { Router } from '@angular/router';
 import {
-  LucideX,
   LucideLogIn,
-  LucideUserPlus,
   LucideMessageCircle,
   LucidePhone,
+  LucideUserPlus,
+  LucideX,
 } from '@lucide/angular';
 import Keycloak from 'keycloak-js';
 import { environment } from '../../../../environments/environment';
+import { ButtonComponent } from '../../atoms/button.component';
 
 @Component({
   selector: 'app-appointment-modal',
@@ -26,6 +26,7 @@ import { environment } from '../../../../environments/environment';
     LucideUserPlus,
     LucideMessageCircle,
     LucidePhone,
+    ButtonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './appointment-modal.component.html',
