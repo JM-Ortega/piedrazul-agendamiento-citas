@@ -61,19 +61,24 @@ public class DoctorService implements DoctorProvisioningApi {
 
 
         // Agregamos los horarios, si hay
-        if(request.schedules() != null){
+
+        if(request.schedules() != null && !request.schedules().isEmpty()){
             Set<Schedule> schedules = request.schedules().stream()
                     .map(s -> new Schedule(
                             doctor,
                             s.startTime(),
                             s.endTime(),
                             s.workday()
-                    )).collect(Collectors.toSet());
+                    ))
+                    .collect(Collectors.toSet());
 
             doctor.setSchedules(schedules);
 
             // Como si hay horaios validamos si el doctor debe estar activo o no
-            doctor.setStatus(calculateActiveStatus(request.laborStart(), request.laborEnd()));
+            doctor.setStatus(calculateActiveStatus(
+                    request.laborStart(),
+                    request.laborEnd()
+            ));
         }
 
         // Persistimos

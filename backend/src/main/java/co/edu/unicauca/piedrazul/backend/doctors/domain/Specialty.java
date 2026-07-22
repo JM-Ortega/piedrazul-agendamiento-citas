@@ -15,6 +15,7 @@ import java.util.Objects;
 public class Specialty {
 
     @Id
+    @Enumerated(EnumType.STRING)
     @Column(name = "code", length = 40)
     private SpecialtyCode code;
 
