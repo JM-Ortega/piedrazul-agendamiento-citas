@@ -139,23 +139,19 @@ export class DoctorDashboardComponent implements OnInit {
     const id = this.selectedAppointmentId();
     const outcome = this.selectedOutcome();
     if (!id || !outcome) return;
+    if (outcome === 'ATENDIDA') {
+      this.closeModal();
+      this.router.navigate(['medico/control-medico/', id]);
+      return;
+    }
 
     this.isMarkingAttended.set(true);
 
-    const request$ =
-      outcome === 'ATENDIDA'
-        ? this.doctorService.updateAppointmentAsAttended(id, outcome)
-        : this.doctorService.updateAppointmentAsUnassisted(id, outcome);
-
-    request$.subscribe({
+    this.doctorService.updateAppointmentAsUnassisted(id, outcome).subscribe({
       next: () => {
         this.closeModal();
         const doctorId = this.currentDoctor()?.id;
         if (doctorId) this.loadAppointments(doctorId);
-
-        if (outcome === 'ATENDIDA') {
-          this.router.navigate(['medico/control-medico/', id]);
-        }
       },
       error: () => {
         this.isMarkingAttended.set(false);

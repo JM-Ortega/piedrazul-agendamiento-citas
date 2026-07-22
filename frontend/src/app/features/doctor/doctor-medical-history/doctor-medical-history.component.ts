@@ -7,7 +7,6 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
-  LucideArrowLeft,
   LucideCalendar,
   LucideClipboardPen,
   LucideClipboardPlus,
@@ -25,7 +24,6 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideClipboardPen,
-    LucideArrowLeft,
     LucideClipboardPlus,
     LucideSave,
     LucideFolderOpen,
@@ -43,15 +41,12 @@ export class DoctorMedicalHistoryComponent implements OnInit {
     this.mostrarInfo.update((v) => !v);
   }
 
-  readonly hasSavedRecord = signal(false);
-  readonly showExitModal = signal(false);
-
   readonly records = this.doctorService.medicalRecords;
   readonly patient = signal<Patient | undefined>(undefined);
   readonly newObservation = signal('');
   private readonly idAppointment = signal<string>('');
   readonly saveError = signal('');
-  readonly saveSuccess = signal('');
+  readonly isSaving = signal(false);
 
   ngOnInit(): void {
     const idAppointment =
@@ -66,47 +61,28 @@ export class DoctorMedicalHistoryComponent implements OnInit {
       });
   }
 
-  handleBack(): void {
-    if (this.hasSavedRecord()) {
-      this.hasSavedRecord.set(false);
-      this.router.navigate(['/medico']);
-    } else {
-      this.showExitModal.set(true);
-    }
-  }
-
-  confirmExit(): void {
-    this.showExitModal.set(false);
-    this.router.navigate(['/medico']);
-  }
-
-  cancelExit(): void {
-    this.showExitModal.set(false);
-  }
-
-  addRecord(): void {
-    const observations = this.newObservation().trim();
+  confirmAttendanceAndExit(): void {
     const idCita = this.idAppointment();
+    if (!idCita) return;
 
-    if (!observations || !idCita) return;
+    const observation = this.newObservation().trim() || null;
+
     this.saveError.set('');
-    this.saveSuccess.set('');
-    this.doctorService.addMedicalRecord(idCita, observations).subscribe({
-      next: (saved) => {
-        this.doctorService.medicalRecords.update((current) => [
-          saved,
-          ...current,
-        ]);
-        this.newObservation.set('');
-        this.saveSuccess.set('Historia clínica guardada correctamente');
-        this.hasSavedRecord.set(true);
-      },
-      error: (err) => {
-        this.saveError.set(
-          err?.error?.message ||
-            'Ocurrió un error al guardar la historia clínica'
-        );
-      },
-    });
+    this.isSaving.set(true);
+
+    this.doctorService
+      .updateAppointmentAsAttended(idCita, observation)
+      .subscribe({
+        next: () => {
+          this.router.navigate(['/medico']);
+        },
+        error: (err) => {
+          this.isSaving.set(false);
+          this.saveError.set(
+            err?.error?.message ||
+              'Ocurrió un error al guardar la historia clínica'
+          );
+        },
+      });
   }
 }

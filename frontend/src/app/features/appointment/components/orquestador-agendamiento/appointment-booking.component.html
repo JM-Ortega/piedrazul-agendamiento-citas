@@ -55,7 +55,7 @@
 
     @if (state.step() === state.confirmStep() && !state.success()) {
       <app-booking-confirm
-        (confirmed)="onConfirmed($event)"
+        (confirmed)="onConfirmed()"
         (back)="onConfirmBack()"
       ></app-booking-confirm>
     }

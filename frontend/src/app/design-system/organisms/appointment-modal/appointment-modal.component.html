@@ -4,7 +4,7 @@
   role="button"
   tabindex="0"
   (click)="onBackdropClick($event)"
-  (keydown.escape)="close.emit()"
+  (keydown.escape)="finish.emit()"
 >
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
     <!-- Header -->
@@ -16,7 +16,7 @@
         </p>
       </div>
       <button
-        (click)="close.emit()"
+        (click)="finish.emit()"
         class="text-blue-200 hover:text-white transition-colors ml-4 mt-1"
         aria-label="Cerrar"
       >

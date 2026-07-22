@@ -14,6 +14,16 @@ import { PatientService } from '../../../../core/services/patient.service';
 import { BookingStateService } from '../../services/booking-state.service';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
+// Tipo utilitario: extrae las keys de T cuyo valor es string
+// (ignora undefined en props opcionales, y excluye uniones de literales como 'CEDULA' | 'PASAPORTE')
+type KeysMatching<T, V> = {
+  [K in keyof T]-?: [V] extends [NonNullable<T[K]>]
+    ? NonNullable<T[K]> extends V
+      ? K
+      : never
+    : never;
+}[keyof T];
+
 /**
  * Capturar y validar los datos de un paciente que no fue encontrado en el sistema para
  * que pueda ser registrado al confirmar la cita.
@@ -28,7 +38,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
     MatDatepickerModule,
     FormatoPipe,
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-patient-register.component.html',
 })
 export class BookingPatientRegisterComponent implements OnInit {
@@ -67,9 +77,9 @@ export class BookingPatientRegisterComponent implements OnInit {
   readonly EMAIL_MAX = 100;
   readonly PHONE_MAX = 10;
 
-  private readonly VALID_NAME_REGEX = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s\-]+$/;
+  private readonly VALID_NAME_REGEX = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s-]+$/;
   private readonly VALID_EMAIL_REGEX =
-    /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   private readonly INVALID_EMAIL_CHARS = /['"<>()[\]\\,;:{}|^~`!#$%&*=?/]/;
 
   private timers: Record<string, ReturnType<typeof setTimeout>> = {};
@@ -85,6 +95,17 @@ export class BookingPatientRegisterComponent implements OnInit {
     value: Omit<Patient, 'id'>[K]
   ): void {
     this.state.patientForm.update((f) => ({ ...f, [key]: value }));
+  }
+
+  /**
+   * Setter para campos de tipo string, evita el problema de TypeScript
+   * al inferir Omit<Patient, 'id'>[K] cuando K es una unión de keys.
+   */
+  private setStringField<K extends KeysMatching<Omit<Patient, 'id'>, string>>(
+    key: K,
+    value: string
+  ): void {
+    this.setPatientField(key, value as Omit<Patient, 'id'>[K]);
   }
 
   handleNameInput(event: Event, field: 'firstName' | 'lastName'): void {
@@ -111,7 +132,7 @@ export class BookingPatientRegisterComponent implements OnInit {
     }
 
     el.value = value;
-    this.setPatientField(field, value as any);
+    this.setStringField(field, value);
   }
 
   handlePhoneInput(event: Event): void {
@@ -120,7 +141,7 @@ export class BookingPatientRegisterComponent implements OnInit {
 
     if (digits.length > this.PHONE_MAX) {
       el.value = digits.slice(0, this.PHONE_MAX);
-      this.setPatientField('phone', el.value as any);
+      this.setStringField('phone', el.value);
       this.flash(
         this.phoneLimitMsg,
         `Solo se permiten máximo ${this.PHONE_MAX} dígitos`,
@@ -128,7 +149,7 @@ export class BookingPatientRegisterComponent implements OnInit {
       );
     } else {
       el.value = digits;
-      this.setPatientField('phone', digits as any);
+      this.setStringField('phone', digits);
       this.phoneLimitMsg.set('');
     }
   }
@@ -139,14 +160,14 @@ export class BookingPatientRegisterComponent implements OnInit {
 
     if (value.length > this.EMAIL_MAX) {
       el.value = value.slice(0, this.EMAIL_MAX);
-      this.setPatientField('email', el.value as any);
+      this.setStringField('email', el.value);
       this.flash(
         this.emailLimitMsg,
         `Solo se permiten máximo ${this.EMAIL_MAX} caracteres`,
         'email'
       );
     } else {
-      this.setPatientField('email', value as any);
+      this.setStringField('email', value);
       this.emailLimitMsg.set('');
     }
   }
@@ -157,7 +178,7 @@ export class BookingPatientRegisterComponent implements OnInit {
 
     if (digits.length > this.PHONE_MAX) {
       el.value = digits.slice(0, this.PHONE_MAX);
-      this.setPatientField('guardianPhone', el.value as any);
+      this.setStringField('guardianPhone', el.value);
       this.flash(
         this.guardianPhoneLimitMsg,
         `Solo se permiten máximo ${this.PHONE_MAX} dígitos`,
@@ -165,7 +186,7 @@ export class BookingPatientRegisterComponent implements OnInit {
       );
     } else {
       el.value = digits;
-      this.setPatientField('guardianPhone', digits as any);
+      this.setStringField('guardianPhone', digits);
       this.guardianPhoneLimitMsg.set('');
     }
   }
@@ -416,6 +437,6 @@ export class BookingPatientRegisterComponent implements OnInit {
   onBirthDateChange(value: Date | string): void {
     const formatted =
       value instanceof Date ? this.state.formatLocalDate(value) : value;
-    this.setPatientField('birthDate', formatted as any);
+    this.setStringField('birthDate', formatted);
   }
 }

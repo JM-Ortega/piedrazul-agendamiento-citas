@@ -38,7 +38,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
     MatNativeDateModule,
     FormatoPipe,
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-schedule-selector.component.html',
 })
 export class BookingScheduleSelectorComponent {
@@ -62,15 +62,17 @@ export class BookingScheduleSelectorComponent {
     );
   });
 
-  readonly minDate = computed(() =>
-    this.calendarService.getMinDate(
+  readonly minDate = computed(() => {
+    const doctor = this.state.effectiveDoctor();
+    return this.calendarService.getMinDate(
+      doctor,
       this.state.isSchedulerContext() || this.state.isDoctorContext()
-    )
-  );
+    );
+  });
 
   readonly maxDate = computed(() => {
     const doctor = this.state.effectiveDoctor();
-    if (!doctor) return this.calendarService.getMinDate();
+    if (!doctor) return this.calendarService.getMinDate(doctor);
     return this.calendarService.getMaxDate(doctor);
   });
 

@@ -27,6 +27,8 @@ import {
 } from '../../core/services/patient.service';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
+import { HttpErrorResponse } from '@angular/common/http';
+import { mapHttpError } from '../../shared/helpers/http-errors';
 
 type RegistroStep = 1 | 2 | 3;
 type PatientStatus =
@@ -48,7 +50,7 @@ type PatientStatus =
     MatDatepickerModule,
     FormatoPipe,
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './registro.component.html',
 })
 export class RegistroComponent implements OnInit {
@@ -97,7 +99,6 @@ export class RegistroComponent implements OnInit {
   errors = signal<Record<string, string>>({});
 
   docInputWarning = signal('');
-  private docWarnTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly DOC_MAX = 12;
   private readonly INVALID_DOC_CHARS = /[^a-zA-Z0-9]/g;
@@ -122,9 +123,7 @@ export class RegistroComponent implements OnInit {
   }
 
   private flashDocWarning(text: string): void {
-    this.docInputWarning.set(text);
-    if (this.docWarnTimer) clearTimeout(this.docWarnTimer);
-    this.docWarnTimer = setTimeout(() => this.docInputWarning.set(''), 3000);
+    this.flash(this.docInputWarning, text, 'doc');
   }
 
   readonly NAME_MAX = 30;
@@ -137,9 +136,9 @@ export class RegistroComponent implements OnInit {
   emailLimitMsg = signal('');
   guardianPhoneLimitMsg = signal('');
 
-  private readonly VALID_NAME_REGEX = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s\-]+$/;
+  private readonly VALID_NAME_REGEX = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s-]+$/;
   private readonly VALID_EMAIL_REGEX =
-    /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   private readonly INVALID_EMAIL_CHARS = /['"<>()[\]\\,;:{}|^~`!#$%&*=?/]/;
 
   private timers: Record<string, ReturnType<typeof setTimeout>> = {};
@@ -148,9 +147,6 @@ export class RegistroComponent implements OnInit {
   readonly isExistingPatient = computed(() => this.patientStatus() === 'found');
   readonly isExistingSystemUser = computed(
     () => this.patientStatus() === 'existing-user'
-  );
-  readonly isAlreadyLinked = computed(
-    () => this.patientStatus() === 'already-linked'
   );
 
   readonly requiresPassword = computed(
@@ -222,20 +218,16 @@ export class RegistroComponent implements OnInit {
         // fallback defensivo
         this.patientStatus.set('not-found');
       },
-      error: (err) => {
+      error: (err: HttpErrorResponse) => {
         this.isLoading.set(false);
 
         if (err.status === 404) {
           this.patientStatus.set('not-found');
-        } else if (err.status === 0) {
-          this.errorMessage.set(
-            'No se pudo conectar con el servidor. Intenta más tarde.'
-          );
-        } else {
-          this.errorMessage.set(
-            'Error al buscar el documento. Intenta de nuevo.'
-          );
+          return;
         }
+        this.errorMessage.set(
+          mapHttpError(err, 'Error al buscar el documento. Intenta de nuevo.')
+        );
       },
     });
   }
@@ -385,7 +377,7 @@ export class RegistroComponent implements OnInit {
     }
 
     el.value = value;
-    this.setFormField(field, value as any);
+    this.setFormField(field, value);
   }
 
   handlePhoneInput(event: Event): void {
@@ -474,18 +466,9 @@ export class RegistroComponent implements OnInit {
     });
   }
 
-  private handleError(err: any): void {
+  private handleError(err: HttpErrorResponse): void {
     this.isLoading.set(false);
-
-    const detail = err.error?.detail;
     const errorCode = err.error?.errorCode;
-
-    if (err.status === 0) {
-      this.errorMessage.set(
-        'No se pudo conectar con el servidor. Intenta más tarde.'
-      );
-      return;
-    }
 
     switch (errorCode) {
       case 'PATIENT_ALREADY_LINKED':
@@ -509,7 +492,10 @@ export class RegistroComponent implements OnInit {
         break;
       default:
         this.errorMessage.set(
-          detail || 'Ocurrió un error al crear la cuenta. Intenta de nuevo.'
+          mapHttpError(
+            err,
+            'Ocurrió un error al crear la cuenta. Intenta de nuevo.'
+          )
         );
         break;
     }

@@ -33,8 +33,6 @@ export class BookingStateService {
   readonly stepLabels = computed(() => {
     if (this.isSchedulerContext())
       return ['1. Paciente', '2. Especialidad', '3. Horario', '4. Confirmar'];
-    if (this.isDoctorContext())
-      return ['1. Especialidad', '2. Horario', '3. Confirmar'];
     return ['1. Especialidad', '2. Horario', '3. Confirmar'];
   });
 

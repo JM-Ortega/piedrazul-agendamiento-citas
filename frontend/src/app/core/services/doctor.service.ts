@@ -111,11 +111,11 @@ export class DoctorService {
    */
   updateAppointmentAsAttended(
     appointmentId: string,
-    state: string
+    observation: string | null
   ): Observable<void> {
     return this.http.put<void>(
       `${this.apiUrl}/appointments/${appointmentId}/mark-as-attended`,
-      { appointmentState: state }
+      { observation: observation }
     );
   }
 
@@ -148,29 +148,6 @@ export class DoctorService {
       .subscribe((records) => this.medicalRecords.set(records));
   }
 
-  /**
-   * Agrega un nuevo registro (observación) al historial clínico asociado a una cita.
-   *
-   * @param idAppointment - ID de la cita sobre la que se registra la observación.
-   * @param description - Texto de la observación clínica.
-   * @returns Observable con el registro clínico recién creado.
-   */
-  addMedicalRecord(
-    idAppointment: string,
-    description: string
-  ): Observable<MedicalRecord> {
-    return this.http.post<MedicalRecord>(`${this.apiUrl}/clinical-history`, {
-      idAppointment,
-      description,
-    });
-  }
-
-  /**
-   * Obtiene los datos del paciente asociado a una cita específica.
-   *
-   * @param appointmentId - ID de la cita de la que se quiere obtener el paciente.
-   * @returns Observable con los datos del paciente.
-   */
   getPatientByAppointment(appointmentId: string): Observable<Patient> {
     return this.http.get<Patient>(
       `${this.apiUrl}/patients/${appointmentId}/patient-attended`
