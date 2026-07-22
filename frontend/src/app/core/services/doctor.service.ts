@@ -71,11 +71,11 @@ export class DoctorService {
 
   updateAppointmentAsAttended(
     appointmentId: string,
-    state: string
+    observation: string | null
   ): Observable<void> {
     return this.http.put<void>(
       `${this.apiUrl}/appointments/${appointmentId}/mark-as-attended`,
-      { appointmentState: state }
+      { observation: observation }
     );
   }
 
@@ -95,16 +95,6 @@ export class DoctorService {
         `${this.apiUrl}/clinical-history/patient/${patientId}`
       )
       .subscribe((records) => this.medicalRecords.set(records));
-  }
-
-  addMedicalRecord(
-    idAppointment: string,
-    description: string
-  ): Observable<MedicalRecord> {
-    return this.http.post<MedicalRecord>(`${this.apiUrl}/clinical-history`, {
-      idAppointment,
-      description,
-    });
   }
 
   getPatientByAppointment(appointmentId: string): Observable<Patient> {
