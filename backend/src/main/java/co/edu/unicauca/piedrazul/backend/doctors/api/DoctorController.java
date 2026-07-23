@@ -7,6 +7,10 @@ import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
+import jakarta.validation.constraints.Min;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -67,24 +71,19 @@ public class DoctorController {
     }
 
     /**
-     * Listar todos los doctores con más detalle
+     * Paginación que lista siempre 5 doctores
      * @return Lista de todos los doctores
      */
     @GetMapping("/detailed")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> getAllDoctorsDetailed() {
-        List<Doctor> doctors = doctorService.findAllDoctors();
+    public ResponseEntity<?> getDoctors(
+            @RequestParam(defaultValue = "0") @Min(0) int page) {
 
-        List<UUID> ids = doctors.stream()
-                .map(Doctor::getPersonId)
-                .toList();
+        Pageable pageable = PageRequest.of(page, 5);
 
-        Map<UUID, String> names = personExternalService.getPersonNames(ids);
+        Page<DoctorDetailedResponse> response = doctorService.findAllDoctorsDetailed(pageable);
 
-        List<DoctorDetailedResponse> responses = doctors.stream()
-                .map(d -> DoctorDetailedResponse.fromEntity(d, names.get(d.getPersonId())))
-                .toList();
-        return ResponseEntity.ok(responses);
+        return ResponseEntity.ok(response);
     }
 
     /**
