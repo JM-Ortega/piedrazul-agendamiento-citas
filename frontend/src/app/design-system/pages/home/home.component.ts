@@ -1,4 +1,9 @@
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import {
+  Component,
+  inject,
+  OnInit,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { ButtonComponent } from '../../atoms/button.component';
 import {
@@ -24,11 +29,17 @@ import { AppointmentModalComponent } from '../../organisms/appointment-modal/app
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './home.component.html',
 })
-export class HomeComponent {
+export class HomeComponent implements OnInit {
   private keycloak = inject(Keycloak);
   private router = inject(Router);
 
   showModal = false;
+
+  ngOnInit(): void {
+    if (this.keycloak.authenticated) {
+      this.redirectByUserRole();
+    }
+  }
 
   agendarCita(): void {
     if (this.keycloak.authenticated) {
@@ -40,11 +51,32 @@ export class HomeComponent {
 
   goAcceso(): void {
     if (this.keycloak.authenticated) {
-      this.router.navigate(['/acceso']);
+      this.redirectByUserRole();
     } else {
       this.keycloak.login({
-        redirectUri: window.location.origin + '/acceso',
+        redirectUri: window.location.origin + '/',
       });
+    }
+  }
+
+  private redirectByUserRole(): void {
+    const realmRoles = this.keycloak.realmAccess?.roles || [];
+
+    switch (true) {
+      case realmRoles.includes('ADMIN'):
+        this.router.navigate(['/admin'], { replaceUrl: true });
+        break;
+
+      case realmRoles.includes('DOCTOR'):
+        this.router.navigate(['/medico'], { replaceUrl: true });
+        break;
+
+      case realmRoles.includes('RECEPCION'):
+        this.router.navigate(['/recepcion'], { replaceUrl: true });
+        break;
+
+      default:
+        break;
     }
   }
 }
