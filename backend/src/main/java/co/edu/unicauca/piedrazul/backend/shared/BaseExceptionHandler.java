@@ -7,6 +7,7 @@ import org.springframework.http.ProblemDetail;
 import java.net.URI;
 import java.time.Instant;
 
+// ProblemDetail, estándar definido en RFC 9457
 public abstract class BaseExceptionHandler {
 
     protected ProblemDetail buildProblem(

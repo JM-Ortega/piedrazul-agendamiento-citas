@@ -2,10 +2,14 @@ package co.edu.unicauca.piedrazul.backend.user.api.dto.input;
 
 import co.edu.unicauca.piedrazul.backend.jackson.normalization.NormalizeName;
 import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
+import co.edu.unicauca.piedrazul.backend.jackson.validation.ValidDocument;
 import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 import jakarta.validation.constraints.*;
 
-
+@ValidDocument(
+        documentField = "identification",
+        typeField = "identificationType"
+)
 public record CreateSystemUserRequest(
         @NotBlank
         @Size(min = 4, max = 50)

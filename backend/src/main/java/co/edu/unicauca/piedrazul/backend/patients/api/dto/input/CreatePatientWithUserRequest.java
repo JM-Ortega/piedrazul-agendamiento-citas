@@ -13,7 +13,10 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
-@ValidDocument(documentField = "identification", typeField = "identificationType")
+@ValidDocument(
+        documentField = "identification",
+        typeField = "identificationType"
+)
 public class CreatePatientWithUserRequest {
 
     @NotBlank
