@@ -21,6 +21,7 @@ import { PatientSuggestion } from '../../models/dtos/patient-suggestion.dto';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+import { ButtonComponent } from '../../../../design-system/atoms/button.component';
 
 const MIN_CHARS = 3;
 const MAX_DOC_LENGTH = 12;
@@ -33,7 +34,13 @@ const MIN_DOC_LENGTH = 6;
 @Component({
   selector: 'app-booking-patient-search',
   standalone: true,
-  imports: [FormsModule, LucideCheckCircle, LucideSearch, FormatoPipe],
+  imports: [
+    FormsModule,
+    LucideCheckCircle,
+    LucideSearch,
+    FormatoPipe,
+    ButtonComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-patient-search.component.html',
 })
