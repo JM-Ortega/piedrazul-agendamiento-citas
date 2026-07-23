@@ -1,6 +1,6 @@
 import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
-
+import { ButtonComponent } from '../../atoms/button.component';
 import {
   LucideCalendar,
   LucideClock,
@@ -19,6 +19,7 @@ import { AppointmentModalComponent } from '../../organisms/appointment-modal/app
     LucidePhone,
     LucideShield,
     AppointmentModalComponent,
+    ButtonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './home.component.html',

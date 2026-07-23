@@ -87,10 +87,10 @@ export class ButtonComponent {
         return `${baseClasses} bg-transparent text-gray-600 hover:bg-gray-100 w-9 h-9 p-0 rounded-lg`;
 
       case 'link':
-        return `${baseClasses} bg-transparent text-[#215c98] hover:text-[#163c63] hover:underline p-0`;
+        return `${baseClasses} bg-transparent text-white hover:text-blue-200 underline`;
 
       case 'card':
-        return `${baseClasses} bg-white rounded-lg shadow-lg p-4 text-left border border-transparent hover:border-[#4e92d9] hover:shadow-xl group`;
+        return `${baseClasses} bg-white rounded-xl shadow-lg px-12 py-7 text-left text-[#215c98] hover:scale-105 active:scale-95 mt-4`;
 
       default:
         return baseClasses;
