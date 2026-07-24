@@ -78,18 +78,17 @@
   }
 
   <div class="flex gap-4 mt-2">
-    <button
-      (click)="goBack()"
-      class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
-    >
+    <app-button variant="secondary" (buttonClick)="goBack()">
       ← Atrás
-    </button>
-    <button
+    </app-button>
+    <app-button
+      variant="primary"
       [disabled]="!state.canGoToConfirmStep()"
-      (click)="goToConfirm()"
-      class="flex-1 bg-[#215c98] text-white py-3 rounded-xl disabled:opacity-50 hover:bg-[#163c63] transition-colors cursor-pointer"
+      (buttonClick)="goToConfirm()"
+      [fullWidth]="true"
+      class="flex-1"
     >
       Revisar Cita →
-    </button>
+    </app-button>
   </div>
 </div>

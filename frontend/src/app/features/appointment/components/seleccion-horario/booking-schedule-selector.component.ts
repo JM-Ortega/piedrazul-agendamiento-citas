@@ -16,6 +16,7 @@ import { BookingStateService } from '../../services/booking-state.service';
 import { CalendarService } from '../../services/calendar.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+import { ButtonComponent } from '../../../../design-system/atoms/button.component';
 
 /**
  * Permite al usuario elegir una fecha y hora
@@ -37,6 +38,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
     MatFormFieldModule,
     MatNativeDateModule,
     FormatoPipe,
+    ButtonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-schedule-selector.component.html',

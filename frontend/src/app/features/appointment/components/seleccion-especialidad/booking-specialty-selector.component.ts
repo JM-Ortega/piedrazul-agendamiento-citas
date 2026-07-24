@@ -8,6 +8,7 @@ import { FormsModule } from '@angular/forms';
 import { LucideUserSearch } from '@lucide/angular';
 import { BookingStateService } from '../../services/booking-state.service';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+import { ButtonComponent } from '../../../../design-system/atoms/button.component';
 
 /**
  * Permite al usuario elegir una especialidad y,
@@ -16,7 +17,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 @Component({
   selector: 'app-booking-specialty-selector',
   standalone: true,
-  imports: [FormsModule, LucideUserSearch, FormatoPipe],
+  imports: [FormsModule, LucideUserSearch, FormatoPipe, ButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-specialty-selector.component.html',
 })

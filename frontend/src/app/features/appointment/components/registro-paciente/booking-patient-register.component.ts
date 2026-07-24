@@ -13,6 +13,7 @@ import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { PatientService } from '../../../../core/services/patient.service';
 import { BookingStateService } from '../../services/booking-state.service';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+import { ButtonComponent } from '../../../../design-system/atoms/button.component';
 
 // Tipo utilitario: extrae las keys de T cuyo valor es string
 // (ignora undefined en props opcionales, y excluye uniones de literales como 'CEDULA' | 'PASAPORTE')
@@ -37,6 +38,7 @@ type KeysMatching<T, V> = {
     LucideCalendar,
     MatDatepickerModule,
     FormatoPipe,
+    ButtonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-patient-register.component.html',

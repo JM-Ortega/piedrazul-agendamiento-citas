@@ -8,6 +8,7 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
 import { LucideArrowLeft } from '@lucide/angular';
+import { ButtonComponent } from '../../../../design-system/atoms/button.component';
 
 /**
  * Punto de entrada para el flujo de agendamiento desde el dashboard del médico.
@@ -17,7 +18,7 @@ import { LucideArrowLeft } from '@lucide/angular';
 @Component({
   selector: 'app-new-appointment-doctor',
   standalone: true,
-  imports: [LucideArrowLeft, AppointmentBookingComponent],
+  imports: [LucideArrowLeft, AppointmentBookingComponent, ButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './new-appointment-doctor.component.html',
 })

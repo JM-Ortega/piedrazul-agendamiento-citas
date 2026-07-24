@@ -1,13 +1,13 @@
 <div class="min-h-screen bg-blue-50 py-8 px-4">
   <div class="max-w-3xl mx-auto">
     <div class="mb-6">
-      <button
-        (click)="goToDashboard()"
-        class="flex items-center gap-2 text-[#215c98] text-lg hover:text-[#4e92d9] mb-4 transition-colors cursor-pointer"
+      <app-button
+        variant="link"
+        (buttonClick)="goToDashboard()"
+        extraClass="!px-0 !py-1"
       >
-        <svg lucideArrowLeft [size]="20"></svg>
-        Volver al inicio
-      </button>
+        <svg lucideArrowLeft [size]="20"></svg> Volver al inicio
+      </app-button>
 
       <h1 class="text-[#215c98] text-3xl font-bold">Nueva Cita</h1>
 

@@ -206,20 +206,16 @@
   </div>
 
   <div class="flex gap-4 mt-4">
-    <button
-      type="button"
-      (click)="onGoBack()"
-      class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-2 cursor-pointer"
-    >
-      <svg lucideArrowLeft [size]="16"></svg>
-      Buscar de nuevo
-    </button>
-    <button
-      type="button"
-      (click)="onContinue()"
-      class="flex-1 bg-[#215c98] hover:bg-[#163c63] text-white py-3 rounded-xl text-lg transition-colors cursor-pointer"
+    <app-button variant="secondary" (buttonClick)="onGoBack()">
+      <svg lucideArrowLeft [size]="16"></svg> Buscar de nuevo
+    </app-button>
+    <app-button
+      variant="primary"
+      (buttonClick)="onContinue()"
+      [fullWidth]="true"
+      class="flex-1"
     >
       Continuar →
-    </button>
+    </app-button>
   </div>
 </div>

@@ -37,7 +37,11 @@
 
     <p class="flex items-center text-blue-200 text-lg">
       ¿Es usted personal del centro?
-      <app-button (buttonClick)="goAcceso()" variant="link">
+      <app-button
+        (buttonClick)="goAcceso()"
+        variant="link"
+        extraClass="text-white"
+      >
         Ingrese aquí
       </app-button>
     </p>

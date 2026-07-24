@@ -91,19 +91,18 @@
 
   <div class="flex gap-4 mt-6">
     @if (!state.isDoctorContext()) {
-      <button
-        (click)="goBack()"
-        class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
-      >
+      <app-button variant="secondary" (click)="goBack()">
         ← {{ state.isSchedulerContext() ? 'Atrás' : 'Cambiar modo' }}
-      </button>
+      </app-button>
     }
-    <button
+    <app-button
+      variant="primary"
       [disabled]="!state.canGoToScheduleStep()"
       (click)="goToSchedule()"
-      class="flex-1 bg-[#215c98] text-white py-3 rounded-xl disabled:opacity-50 hover:bg-[#163c63] transition-colors cursor-pointer"
+      [fullWidth]="true"
+      class="flex-1"
     >
       Seleccionar Horario →
-    </button>
+    </app-button>
   </div>
 </div>
