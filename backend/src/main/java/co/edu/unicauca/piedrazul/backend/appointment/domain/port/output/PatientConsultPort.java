@@ -4,7 +4,9 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientRegistrationData;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientSnapshot;
 
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface PatientConsultPort {
@@ -16,4 +18,6 @@ public interface PatientConsultPort {
     Optional<PatientSnapshot> findByUserId(UUID userId);
 
     UUID createPatient(PatientRegistrationData data);
+
+    Map<UUID, PatientInfo> findByIds(Set<UUID> idPatients);
 }

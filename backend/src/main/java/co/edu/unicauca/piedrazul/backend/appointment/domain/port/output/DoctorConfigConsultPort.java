@@ -29,4 +29,7 @@ public interface DoctorConfigConsultPort {
 
     // Obtiene el intervalo de semanas asociadas al doctor
     Map<UUID, Integer> getIntervalMinutesByDoctorIds(List<UUID> doctorIds);
+
+    //obtiene el nombre de un doctor
+    String getDoctorName(UUID idDoctor);
 }

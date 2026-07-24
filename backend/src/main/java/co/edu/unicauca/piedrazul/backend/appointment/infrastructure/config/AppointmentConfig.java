@@ -64,15 +64,13 @@ public class AppointmentConfig {
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService,
             ApplicationEventPublisher eventPublisher,
-            IsNewPatientUseCase isNewPatientUseCase,
-            PersonConsultPort personConsultPort) {
+            IsNewPatientUseCase isNewPatientUseCase) {
         return new AppointmentSchedulingService(
                 appointmentRepository,
                 doctorConfigConsultPort,
                 appointmentService,
                 eventPublisher,
-                isNewPatientUseCase,
-                personConsultPort
+                isNewPatientUseCase
         );
     }
 

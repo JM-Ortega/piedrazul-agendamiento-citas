@@ -7,6 +7,7 @@ import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface PatientModuleApi {
@@ -41,5 +42,10 @@ public interface PatientModuleApi {
             String guardianPhone
     );
 
-        void deletePatient(UUID personId);
+    void deletePatient(UUID personId);
+
+    //Crear el metodo findByIds para el modulo de citas
+    List<PatientData> findByIds(Set<UUID> personIds);
+
+
 }
