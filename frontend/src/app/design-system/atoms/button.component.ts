@@ -71,8 +71,7 @@ export class ButtonComponent {
   }
 
   private getVariantClasses(): string {
-    const baseClasses =
-      'rounded-lg font-semibold flex items-center justify-center gap-2';
+    const baseClasses = 'rounded-lg flex items-center justify-center gap-2';
 
     switch (this.variant) {
       case 'primary':
