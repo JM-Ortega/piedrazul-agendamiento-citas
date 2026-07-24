@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorDetailedResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
@@ -15,6 +16,8 @@ import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.SpecialtyRepository;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -276,6 +279,24 @@ public class DoctorService implements DoctorProvisioningApi {
     public Doctor getDoctorById(UUID idDoctor) {
         return doctorRepository.findById(idDoctor)
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
+    }
+
+    public Page<DoctorDetailedResponse> findAllDoctorsDetailed(Pageable pageable) {
+
+        Page<Doctor> doctors = doctorRepository.findAll(pageable);
+
+        List<UUID> ids = doctors.getContent()
+                .stream()
+                .map(Doctor::getPersonId)
+                .toList();
+
+        Map<UUID, String> names = personExternalService.getPersonNames(ids);
+
+        return doctors.map(doctor ->
+                DoctorDetailedResponse.fromEntity(
+                        doctor,
+                        names.get(doctor.getPersonId())
+                ));
     }
 
     public Doctor findByUserId(UUID keycloakId) {
