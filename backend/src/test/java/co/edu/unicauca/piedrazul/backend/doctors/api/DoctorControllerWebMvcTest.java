@@ -45,7 +45,7 @@ class DoctorControllerWebMvcTest {
     void setUp() {
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new DoctorController(doctorService, personExternalService))
-                .setControllerAdvice(new DoctorGlobalExceptionHandler())
+                .setControllerAdvice(new DoctorExceptionHandler())
                 .build();
     }
 
