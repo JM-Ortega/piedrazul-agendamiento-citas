@@ -572,8 +572,9 @@
             <h2 class="text-2xl font-bold">Franjas disponibles</h2>
           </div>
           <app-button
-            variant="icon"
-            size="lg"
+            variant="danger"
+            size="sm"
+            extraClass="w-9 h-9"
             (buttonClick)="showAvailabilityWarning.set(false)"
           >
             ×
@@ -603,7 +604,9 @@
 
           <div class="flex gap-5">
             <app-button
-              variant="secondary"
+              variant="danger"
+              [fullWidth]="true"
+              class="flex-1"
               (buttonClick)="showAvailabilityWarning.set(false)"
             >
               Cancelar
@@ -641,8 +644,9 @@
             <h2 class="text-2xl font-bold">Exportar Reporte</h2>
           </div>
           <app-button
-            variant="icon"
-            size="lg"
+            variant="danger"
+            size="sm"
+            extraClass="w-9 h-9"
             (buttonClick)="closeExportModal()"
           >
             ×

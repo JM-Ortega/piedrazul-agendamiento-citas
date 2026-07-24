@@ -11,7 +11,6 @@ import {
   LucideMessageCircle,
   LucidePhone,
   LucideUserPlus,
-  LucideX,
 } from '@lucide/angular';
 import Keycloak from 'keycloak-js';
 import { environment } from '../../../../environments/environment';
@@ -21,7 +20,6 @@ import { ButtonComponent } from '../../atoms/button.component';
   selector: 'app-appointment-modal',
   standalone: true,
   imports: [
-    LucideX,
     LucideLogIn,
     LucideUserPlus,
     LucideMessageCircle,
