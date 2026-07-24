@@ -6,8 +6,11 @@ import jakarta.validation.constraints.NotNull;
 import java.time.LocalTime;
 
 public record CreateScheduleRequest(
-        @NotNull LocalTime startTime,
-        @NotNull LocalTime endTime,
-        @NotNull Workday workday
+        @NotNull(message = "El horario debe tener una hora incial")
+        LocalTime startTime,
+        @NotNull(message = "El horario debe tener una hora final")
+        LocalTime endTime,
+        @NotNull(message = "El horario debe tener un dia asignado")
+        Workday workday
 ) {}
 

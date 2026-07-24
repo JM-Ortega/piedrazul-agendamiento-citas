@@ -12,7 +12,7 @@ import java.util.List;
 // Se usa tanto en llamadas del front como en llamadas internas
 public record CreateSystemUserPayload(
         @Valid
-        @NotNull
+        @NotNull(message = "La informacion para crear el usuario debe ser proporcinoada")
         CreateSystemUserRequest user,
 
         @Valid
