@@ -9,6 +9,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalTime;
@@ -37,7 +38,7 @@ public class SheduleController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<?> createSchedule(
             @PathVariable UUID doctorId,
-            @RequestBody CreateScheduleRequest request
+            @RequestBody @Validated CreateScheduleRequest request
     ) {
         var doctor = doctorService.getDoctorById(doctorId);
 

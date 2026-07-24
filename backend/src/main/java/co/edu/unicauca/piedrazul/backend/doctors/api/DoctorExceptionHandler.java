@@ -13,30 +13,25 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(basePackageClasses = {DoctorController.class, SheduleController.class})
+@RestControllerAdvice(basePackageClasses = {
+        DoctorController.class,
+        SheduleController.class
+})
 @Slf4j
-public class DoctorGlobalExceptionHandler extends BaseExceptionHandler {
+public class DoctorExceptionHandler extends BaseExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(
             MethodArgumentNotValidException ex,
             HttpServletRequest request
     ) {
-        String detail = ex.getBindingResult()
-                .getFieldErrors()
-                .stream()
-                .map(error -> error.getField() + ": " + error.getDefaultMessage())
-                .findFirst()
-                .orElse("Validation error");
 
-        log.warn("Error de validacion en doctors: {}", detail);
-        return buildProblem(
-                HttpStatus.BAD_REQUEST,
-                "Validation error",
-                detail,
-                "doctors",
-                "VALIDATION_ERROR",
-                request
+        log.warn("Error de validación en doctors");
+
+        return buildValidationProblem(
+                ex,
+                request,
+                "doctors"
         );
     }
 
@@ -45,7 +40,9 @@ public class DoctorGlobalExceptionHandler extends BaseExceptionHandler {
             EntityNotFoundException ex,
             HttpServletRequest request
     ) {
+
         log.warn("Recurso no encontrado en doctors: {}", ex.getMessage());
+
         return buildProblem(
                 HttpStatus.NOT_FOUND,
                 "Not found",
@@ -61,7 +58,9 @@ public class DoctorGlobalExceptionHandler extends BaseExceptionHandler {
             IllegalArgumentException ex,
             HttpServletRequest request
     ) {
-        log.warn("Argumento invalido en doctors: {}", ex.getMessage());
+
+        log.warn("Argumento inválido en doctors: {}", ex.getMessage());
+
         return buildProblem(
                 HttpStatus.BAD_REQUEST,
                 "Bad request",
@@ -77,7 +76,12 @@ public class DoctorGlobalExceptionHandler extends BaseExceptionHandler {
             DoctorBusinessException ex,
             HttpServletRequest request
     ) {
-        log.warn("Error de negocio en doctors [{}]: {}", ex.getClass().getSimpleName(), ex.getMessage());
+
+        log.warn(
+                "Error de negocio en doctors [{}]: {}",
+                ex.getClass().getSimpleName(),
+                ex.getMessage()
+        );
 
         return buildProblem(
                 ex.getStatus(),
@@ -94,6 +98,7 @@ public class DoctorGlobalExceptionHandler extends BaseExceptionHandler {
             RuntimeException ex,
             HttpServletRequest request
     ) {
+
         if (ex instanceof AuthorizationDeniedException authorizationDeniedException) {
             throw authorizationDeniedException;
         }

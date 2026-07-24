@@ -1,5 +1,6 @@
-package co.edu.unicauca.piedrazul.backend.shared;
+package co.edu.unicauca.piedrazul.backend.config.security;
 
+import co.edu.unicauca.piedrazul.backend.shared.BaseExceptionHandler;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;

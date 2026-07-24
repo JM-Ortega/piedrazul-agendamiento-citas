@@ -18,7 +18,10 @@ import java.time.LocalTime;
 import java.util.UUID;
 
 @Getter
-@ValidDocument
+@ValidDocument(
+        documentField = "documentNumber",
+        typeField = "documentType"
+)
 public class AppointmentRequest {
     @NotNull(message = "El médico es obligatorio")
     private UUID doctorId;

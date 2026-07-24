@@ -1,10 +1,15 @@
 package co.edu.unicauca.piedrazul.backend.user.domain;
 
+import co.edu.unicauca.piedrazul.backend.jackson.validation.ValidDocument;
 import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.util.UUID;
 
+@Getter
+@Setter
 @Entity
 @Table(
         name = "person",
@@ -12,6 +17,10 @@ import java.util.UUID;
                 @UniqueConstraint(name = "uq_person_user_id", columnNames = "user_id"),
                 @UniqueConstraint(name = "uq_person_identification", columnNames = "identification")
         }
+)
+@ValidDocument(
+        documentField = "identification",
+        typeField = "identificationType"
 )
 public class Person {
 
@@ -61,70 +70,6 @@ public class Person {
         this.firstName = firstName;
         this.lastName = lastName;
         this.phone = phone;
-        this.email = email;
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public UUID getUserId() {
-        return userId;
-    }
-
-    public void setUserId(UUID userId) {
-        this.userId = userId;
-    }
-
-    public IdentificationType getIdentificationType() {
-        return identificationType;
-    }
-
-    public void setIdentificationType(IdentificationType identificationType) {
-        this.identificationType = identificationType;
-    }
-
-    public String getIdentification() {
-        return identification;
-    }
-
-    public void setIdentification(String identification) {
-        this.identification = identification;
-    }
-
-    public String getFirstName() {
-        return firstName;
-    }
-
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
-
-    public String getLastName() {
-        return lastName;
-    }
-
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
-
-    public String getPhone() {
-        return phone;
-    }
-
-    public void setPhone(String phone) {
-        this.phone = phone;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
         this.email = email;
     }
 }

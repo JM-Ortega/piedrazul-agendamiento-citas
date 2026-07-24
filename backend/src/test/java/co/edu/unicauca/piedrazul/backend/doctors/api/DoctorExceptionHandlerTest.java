@@ -10,9 +10,9 @@ import org.springframework.mock.web.MockHttpServletRequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class DoctorGlobalExceptionHandlerTest {
+class DoctorExceptionHandlerTest {
 
-    private final DoctorGlobalExceptionHandler handler = new DoctorGlobalExceptionHandler();
+    private final DoctorExceptionHandler handler = new DoctorExceptionHandler();
 
     @Test
     void handleBusinessExceptionShouldReturnDomainStatus() {

@@ -11,7 +11,6 @@ import jakarta.validation.constraints.*;
 import java.time.LocalDate;
 import java.util.List;
 
-// @ValidDocument(documentField = "identification", typeField = "documentType")
 public record CreateDoctorRequest(
      @NotEmpty
         List<SpecialtyCode> specialty,
