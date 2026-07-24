@@ -34,6 +34,7 @@ import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_STATUS_CLASSES,
 } from '../../shared/helpers/appointment-status';
+import { ButtonComponent } from '../../design-system/atoms/button.component';
 
 type ExportFormat = 'excel' | 'pdf' | 'csv';
 
@@ -74,6 +75,7 @@ const EXT_MAP: Record<ExportFormat, string> = {
     LucideDynamicIcon,
     RouterLink,
     FormatoPipe,
+    ButtonComponent,
   ],
 })
 export class SchedulerDashboardComponent implements OnInit {

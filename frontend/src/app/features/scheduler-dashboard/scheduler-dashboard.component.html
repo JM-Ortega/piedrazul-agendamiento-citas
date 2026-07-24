@@ -251,18 +251,15 @@
 
         @if (filterDoctor() || filterDate() || filterStatus()) {
           <div class="mt-4 flex flex-wrap gap-2 items-center">
-            <span class="text-sm text-gray-600">Filtros activos:</span>
+            <span class="text-md text-gray-600">Filtros activos:</span>
             @if (filterDoctor()) {
               <span
                 class="inline-flex items-center gap-1 bg-[#d9e9f8] text-[#215c98] px-3 py-1 rounded-lg text-sm"
               >
                 {{ selectedDoctor()?.name }}
-                <button
-                  (click)="clearDoctorFilter()"
-                  class="hover:bg-[#a7c9ec] rounded-full w-4 h-4 flex items-center justify-center ml-1"
-                >
+                <app-button variant="icon" (buttonClick)="clearDoctorFilter()">
                   ×
-                </button>
+                </app-button>
               </span>
             }
             @if (filterDate()) {
@@ -270,12 +267,9 @@
                 class="inline-flex items-center gap-1 bg-[#d9e9f8] text-[#215c98] px-3 py-1 rounded-lg text-sm"
               >
                 {{ formatDate(filterDate()) }}
-                <button
-                  (click)="clearDateFilter()"
-                  class="hover:bg-[#a7c9ec] rounded-full w-4 h-4 flex items-center justify-center ml-1"
-                >
+                <app-button variant="icon" (buttonClick)="clearDateFilter()">
                   ×
-                </button>
+                </app-button>
               </span>
             }
             @if (filterStatus()) {
@@ -283,12 +277,9 @@
                 class="inline-flex items-center gap-1 bg-[#d9e9f8] text-[#215c98] px-3 py-1 rounded-lg text-sm"
               >
                 {{ statusLabel(filterStatus()) }}
-                <button
-                  (click)="clearStatusFilter()"
-                  class="hover:bg-[#a7c9ec] rounded-full w-4 h-4 flex items-center justify-center ml-1"
-                >
+                <app-button variant="icon" (buttonClick)="clearStatusFilter()">
                   ×
-                </button>
+                </app-button>
               </span>
             }
           </div>
@@ -542,16 +533,15 @@
                       <td class="px-4 py-4 rounded-lg text-sm font-medium">
                         <div class="px-3 py-1.5">
                           @if (apt.appointmentState === 'AGENDADA') {
-                            <button
-                              type="button"
-                              (click)="
+                            <app-button
+                              variant="danger"
+                              size="sm"
+                              (buttonClick)="
                                 requestCancelAppointment(apt.idAppointment)
                               "
-                              class="bg-red-100 text-red-600 hover:text-red-800 text-sm font-semibold transition-colors rounded-lg px-3 py-1.5 hover:bg-red-200 border border-red-300 cursor-pointer inline-flex items-center gap-2"
                             >
-                              <svg lucideX [size]="16"></svg>
-                              Cancelar
-                            </button>
+                              <svg lucideX [size]="16"></svg> Cancelar
+                            </app-button>
                           } @else {
                             <span class="text-gray-400">—</span>
                           }
@@ -581,12 +571,13 @@
             <svg lucideCalendar [size]="28"></svg>
             <h2 class="text-2xl font-bold">Franjas disponibles</h2>
           </div>
-          <button
-            (click)="showAvailabilityWarning.set(false)"
-            class="text-white hover:bg-white/20 rounded-lg w-9 h-9 flex items-center justify-center text-xl transition-colors"
+          <app-button
+            variant="icon"
+            size="lg"
+            (buttonClick)="showAvailabilityWarning.set(false)"
           >
             ×
-          </button>
+          </app-button>
         </div>
 
         <div class="px-8 py-6">
@@ -610,20 +601,23 @@
             </div>
           </div>
 
-          <div class="flex gap-3">
-            <button
-              (click)="showAvailabilityWarning.set(false)"
-              class="flex-1 px-6 py-3.5 border border-gray-300 text-gray-700 rounded-lg text-base font-semibold hover:bg-gray-50 transition-colors"
+          <div class="flex gap-5">
+            <app-button
+              variant="secondary"
+              (buttonClick)="showAvailabilityWarning.set(false)"
             >
               Cancelar
-            </button>
-            <button
-              (click)="confirmExportDespiteAvailability()"
-              class="flex-1 px-6 py-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2"
+            </app-button>
+            <app-button
+              variant="primary"
+              [fullWidth]="true"
+              extraClass="bg-amber-500 hover:bg-amber-600"
+              class="flex-1"
+              (buttonClick)="confirmExportDespiteAvailability()"
             >
               <svg lucideDownload [size]="20"></svg>
               Sí, continuar
-            </button>
+            </app-button>
           </div>
         </div>
       </div>
@@ -646,12 +640,13 @@
             <svg lucideDownload [size]="28"></svg>
             <h2 class="text-2xl font-bold">Exportar Reporte</h2>
           </div>
-          <button
-            (click)="closeExportModal()"
-            class="text-white hover:bg-white/20 rounded-lg w-9 h-9 flex items-center justify-center text-xl transition-colors"
+          <app-button
+            variant="icon"
+            size="lg"
+            (buttonClick)="closeExportModal()"
           >
             ×
-          </button>
+          </app-button>
         </div>
 
         <div class="px-8 py-6">
@@ -724,18 +719,18 @@
           }
 
           <div class="flex gap-3 pt-4 border-t border-gray-200">
-            <button
-              (click)="closeExportModal()"
+            <app-button
+              variant="secondary"
+              (buttonClick)="closeExportModal()"
               [disabled]="isExporting()"
-              class="flex-1 px-6 py-3.5 border border-gray-300 text-gray-700 rounded-lg text-base font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
               Cancelar
-            </button>
+            </app-button>
             <button
               (click)="handleExport()"
               [disabled]="isExporting()"
               [class]="
-                'flex-1 px-6 py-3.5 rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2 ' +
+                'flex-1 px-6 py-3.5 rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer ' +
                 (!isExporting()
                   ? exportColors().button + ' text-white'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed')
@@ -787,19 +782,16 @@
           Esta acción no se puede deshacer. ¿Está seguro de que desea cancelar
           esta cita?
         </p>
-        <div class="flex gap-3">
-          <button
-            class="flex-1 py-3 px-4 rounded-xl font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-200 transition-all duration-200 active:scale-[0.98] cursor-pointer"
-            (click)="dismissCancelModal()"
-          >
+        <div class="flex gap-5 justify-center">
+          <app-button variant="secondary" (buttonClick)="dismissCancelModal()">
             Volver
-          </button>
-          <button
-            class="flex-1 py-3 px-4 rounded-xl font-semibold text-white bg-linear-to-r from-red-500 to-red-600 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer"
-            (click)="confirmCancelAppointment()"
+          </app-button>
+          <app-button
+            variant="danger"
+            (buttonClick)="confirmCancelAppointment()"
           >
             Sí, cancelar
-          </button>
+          </app-button>
         </div>
       </div>
     </div>

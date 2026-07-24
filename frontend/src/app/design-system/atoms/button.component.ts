@@ -61,10 +61,11 @@ export class ButtonComponent {
   private getSizeClasses(): string {
     switch (this.size) {
       case 'sm':
-        return 'px-3 py-2 text-sm';
-      case 'lg':
-        return 'px-6 py-3.5 text-base';
+        return 'px-3 py-2 text-md';
       case 'md':
+        return 'px-4 py-3 text-md';
+      case 'lg':
+        return 'px-5 py-4 text-lg';
       default:
         return 'px-6 py-3.5 text-base';
     }
