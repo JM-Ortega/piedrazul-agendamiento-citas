@@ -12,6 +12,7 @@ import { RouterModule } from '@angular/router';
 export type ButtonVariant =
   | 'primary' // azules de continuar, siguiente, editar...
   | 'secondary' // atras, retroceder (funcionalidad-pasos)...
+  | 'success' // confirmar, guardar...
   | 'danger' // cancelar, salir, x (cerrar ventana)
   | 'icon' // logo de piedrazul (opcional si no existen mas botones así)
   | 'card' // modo de agendamiento (opcional si no hay mas iguales)
@@ -79,6 +80,9 @@ export class ButtonComponent {
 
       case 'secondary':
         return `${baseClasses} bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg`;
+
+      case 'success':
+        return `${baseClasses} bg-green-600 text-white hover:bg-green-700 active:scale-95 rounded-lg `;
 
       case 'danger':
         return `${baseClasses} bg-red-500 text-white hover:bg-red-600 active:scale-95 rounded-lg`;
