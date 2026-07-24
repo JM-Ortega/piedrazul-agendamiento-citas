@@ -25,6 +25,7 @@ import { BookingConfirmComponent } from '../confirmacion/booking-confirm.compone
 import { BookingModeSelectorComponent } from '../modo-agendamiento/booking-mode-selector.component';
 import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
 import { mapHttpError } from '../../../../shared/helpers/http-errors';
+import { ButtonComponent } from '../../../../design-system/atoms/button.component';
 
 /**
  * Coordina el flujo de agendamiento componiendo los
@@ -42,6 +43,7 @@ import { mapHttpError } from '../../../../shared/helpers/http-errors';
     BookingSpecialtySelectorComponent,
     BookingScheduleSelectorComponent,
     BookingConfirmComponent,
+    ButtonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './appointment-booking.component.html',
