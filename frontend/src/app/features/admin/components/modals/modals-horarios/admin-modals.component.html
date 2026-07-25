@@ -20,12 +20,15 @@
         >?
       </p>
       <div class="flex flex-col-reverse sm:flex-row gap-3">
-        <button
-          (click)="closeToggleModal.emit()"
-          class="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl transition-colors text-base font-medium"
+        <app-button
+          variant="secondary"
+          class="flex-1"
+          [fullWidth]="true"
+          extraClass="!rounded-xl !bg-gray-200 hover:!bg-gray-300 !text-gray-800 !border-0 !font-medium"
+          (buttonClick)="closeToggleModal.emit()"
         >
           Cancelar
-        </button>
+        </app-button>
         <button
           (click)="confirmToggle.emit()"
           class="flex-1 px-6 py-3 text-white rounded-xl transition-colors text-base font-medium flex items-center justify-center gap-2"
