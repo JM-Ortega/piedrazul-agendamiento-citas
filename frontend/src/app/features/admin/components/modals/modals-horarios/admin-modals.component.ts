@@ -5,6 +5,7 @@ import {
   output,
 } from '@angular/core';
 import { LucidePowerOff, LucideSave, LucideX } from '@lucide/angular';
+import { ButtonComponent } from '../../../../../design-system/atoms/button.component';
 import { Doctor } from '../../../../../shared/models/interfaces/doctor.model';
 
 @Component({
@@ -12,7 +13,7 @@ import { Doctor } from '../../../../../shared/models/interfaces/doctor.model';
   templateUrl: './admin-modals.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideX, LucideSave, LucidePowerOff],
+  imports: [LucideX, LucideSave, LucidePowerOff, ButtonComponent],
 })
 export class AdminModalsComponent {
   // Modal: confirmar toggle
