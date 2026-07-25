@@ -51,7 +51,7 @@ export class ButtonComponent {
     const variantClasses = this.getVariantClasses();
     const widthClass = this.fullWidth ? 'w-full' : '';
     const disabledClass = this.disabled
-      ? 'opacity-50 cursor-not-allowed'
+      ? '!bg-gray-200 !text-gray-500 !border-gray-300 cursor-not-allowed grayscale'
       : 'cursor-pointer';
     const transitionClass = 'transition-all duration-200';
 

@@ -1,0 +1,58 @@
+<div [class]="computedWrapperClasses">
+  @if (label && !isCheckbox) {
+    <label [for]="id" [class]="labelClasses">
+      {{ label }}
+    </label>
+  }
+
+  @if (isCheckbox) {
+    <label [class]="labelClasses + ' inline-flex items-center gap-2'">
+      <input
+        [id]="id"
+        type="checkbox"
+        [checked]="!!value"
+        [disabled]="disabled"
+        [class]="computedInputClasses"
+        (change)="handleInput($event)"
+        (blur)="handleBlur($event)"
+        (focus)="handleFocus($event)"
+      />
+      <span>{{ label }}</span>
+    </label>
+  }
+
+  @if (!isCheckbox) {
+    <input
+      [id]="id"
+      [type]="type"
+      [disabled]="disabled"
+      [readOnly]="readonly"
+      [attr.aria-invalid]="errorMessage ? true : null"
+      [attr.aria-describedby]="
+        errorMessage ? id + '-error' : helperText ? id + '-helper' : null
+      "
+      [attr.placeholder]="placeholder || null"
+      [attr.autocomplete]="autocomplete || null"
+      [attr.inputmode]="inputMode || null"
+      [attr.min]="min"
+      [attr.max]="max"
+      [attr.step]="step"
+      [value]="value"
+      [class]="computedInputClasses"
+      (input)="handleInput($event)"
+      (blur)="handleBlur($event)"
+      (focus)="handleFocus($event)"
+    />
+  }
+  @if (errorMessage) {
+    <p [id]="id + '-error'" class="text-red-500 text-sm mt-1">
+      {{ errorMessage }}
+    </p>
+  }
+
+  @if (!errorMessage && helperText) {
+    <p [id]="id + '-helper'" class="text-gray-500 text-sm mt-1">
+      {{ helperText }}
+    </p>
+  }
+</div>
