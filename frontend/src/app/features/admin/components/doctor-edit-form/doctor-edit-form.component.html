@@ -6,6 +6,13 @@
   >
     Cancelar
   </button>
+  <app-button
+    variant="danger"
+    extraClass="!rounded-xl !px-4 !py-2"
+    (buttonClick)="cancelled.emit()"
+  >
+    Cancelar
+  </app-button>
   <button
     (click)="onSave()"
     [disabled]="!canSave()"
@@ -19,6 +26,15 @@
     <svg lucideSave [size]="18"></svg>
     Guardar
   </button>
+  <app-button
+    variant="success"
+    extraClass="!rounded-xl !px-5 !py-2.5"
+    [disabled]="!canSave()"
+    (buttonClick)="onSave()"
+  >
+    <svg lucideSave [size]="18"></svg>
+    Guardar
+  </app-button>
 </div>
 
 <!-- Campos del formulario -->

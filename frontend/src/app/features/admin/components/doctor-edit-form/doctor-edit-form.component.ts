@@ -15,6 +15,7 @@ import {
   LucideClock,
   LucideSave,
 } from '@lucide/angular';
+import { ButtonComponent } from '../../../../design-system/atoms/button.component';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import {
@@ -39,6 +40,7 @@ export interface DoctorSaveEvent {
     LucideChevronUp,
     LucideClock,
     LucideSave,
+    ButtonComponent,
   ],
 })
 export class DoctorEditFormComponent implements OnInit {

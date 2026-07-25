@@ -13,6 +13,7 @@ import {
   LucidePower,
   LucidePowerOff,
 } from '@lucide/angular';
+import { ButtonComponent } from '../../../../design-system/atoms/button.component';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
@@ -29,6 +30,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
     LucidePower,
     LucidePowerOff,
     FormatoPipe,
+    ButtonComponent,
   ],
 })
 export class DoctorCardComponent {
