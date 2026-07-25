@@ -25,7 +25,7 @@ import { BookingConfirmComponent } from '../confirmacion/booking-confirm.compone
 import { BookingModeSelectorComponent } from '../modo-agendamiento/booking-mode-selector.component';
 import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
 import { mapHttpError } from '../../../../shared/helpers/http-errors';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 
 /**
  * Coordina el flujo de agendamiento componiendo los

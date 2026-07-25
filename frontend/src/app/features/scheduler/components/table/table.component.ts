@@ -12,7 +12,7 @@ import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_STATUS_CLASSES,
 } from '../../../../shared/helpers/appointment-status';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 
 export type AppointmentTableView = 'today' | 'all';
 

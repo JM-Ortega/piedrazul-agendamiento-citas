@@ -21,7 +21,7 @@ import { PatientSuggestion } from '../../models/dtos/patient-suggestion.dto';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 
 const MIN_CHARS = 3;
 const MAX_DOC_LENGTH = 12;

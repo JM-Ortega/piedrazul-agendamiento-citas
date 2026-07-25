@@ -5,7 +5,7 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { ButtonComponent } from '../../atoms/button.component';
+import { ButtonComponent } from '../../atoms/button/button.component';
 import {
   LucideCalendar,
   LucideClock,

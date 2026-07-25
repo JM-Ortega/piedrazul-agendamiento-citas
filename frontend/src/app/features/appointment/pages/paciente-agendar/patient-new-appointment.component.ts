@@ -13,7 +13,7 @@ import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
 import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
 import { LucideArrowLeft } from '@lucide/angular';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 
 @Component({
   selector: 'app-patient-new-appointment',

@@ -7,7 +7,7 @@ import {
 import { LucideStethoscope, LucideUserSearch } from '@lucide/angular';
 import { BookingMode } from '../../models/types/bookingMode.type';
 import { BookingStateService } from '../../services/booking-state.service';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 
 /**
  * Mostrar las dos tarjetas de selección de modo

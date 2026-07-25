@@ -5,7 +5,7 @@ import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { formatLongDateEs } from '../../../../shared/helpers/date-format';
 import { APPOINTMENT_STATUS_LABELS } from '../../../../shared/helpers/appointment-status';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 
 export type SchedulerFilterField = 'doctor' | 'date' | 'status';
 

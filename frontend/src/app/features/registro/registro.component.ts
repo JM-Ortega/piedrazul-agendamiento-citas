@@ -29,7 +29,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
 import { HttpErrorResponse } from '@angular/common/http';
 import { mapHttpError } from '../../shared/helpers/http-errors';
-import { ButtonComponent } from '../../design-system/atoms/button.component';
+import { ButtonComponent } from '../../design-system/atoms/button/button.component';
 
 type RegistroStep = 1 | 2 | 3;
 type PatientStatus =

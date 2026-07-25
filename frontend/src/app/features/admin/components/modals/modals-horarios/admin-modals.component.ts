@@ -5,7 +5,7 @@ import {
   output,
 } from '@angular/core';
 import { LucidePowerOff, LucideSave, LucideX } from '@lucide/angular';
-import { ButtonComponent } from '../../../../../design-system/atoms/button.component';
+import { ButtonComponent } from '../../../../../design-system/atoms/button/button.component';
 import { Doctor } from '../../../../../shared/models/interfaces/doctor.model';
 
 @Component({

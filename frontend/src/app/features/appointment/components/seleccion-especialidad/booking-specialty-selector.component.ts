@@ -8,7 +8,7 @@ import { FormsModule } from '@angular/forms';
 import { LucideUserSearch } from '@lucide/angular';
 import { BookingStateService } from '../../services/booking-state.service';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 
 /**
  * Permite al usuario elegir una especialidad y,

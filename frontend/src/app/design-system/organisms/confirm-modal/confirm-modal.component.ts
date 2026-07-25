@@ -1,5 +1,8 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { ButtonComponent, ButtonVariant } from '../../atoms/button.component';
+import {
+  ButtonComponent,
+  ButtonVariant,
+} from '../../atoms/button/button.component';
 
 @Component({
   selector: 'app-confirm-modal',

@@ -22,7 +22,7 @@ import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dt
 import { PatientAppointmentService } from '../../../core/services/patientAppointment.service';
 import { getMonthShort } from '../../../shared/helpers/date-format';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
-import { ButtonComponent } from '../../../design-system/atoms/button.component';
+import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
 
 @Component({
   selector: 'app-patient-dashboard',

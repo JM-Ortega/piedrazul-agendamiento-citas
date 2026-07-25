@@ -16,7 +16,7 @@ import { PatientAppointmentService } from '../../../../core/services/patientAppo
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
 import { mapHttpError } from '../../../../shared/helpers/http-errors';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 /**
  * Mostrar el resumen completo de la cita a confirmar
  * y ejecutar la llamada al backend para registrarla.
