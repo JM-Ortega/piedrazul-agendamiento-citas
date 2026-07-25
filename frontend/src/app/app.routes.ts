@@ -14,7 +14,7 @@ import { DoctorMedicalHistoryComponent } from './features/doctor/doctor-medical-
 import { PatientAppointmentHistoryComponent } from './features/patient/patient-appointment-history/patient-appointment-history.component';
 import { PatientDashboardComponent } from './features/patient/patient-dashboard/patient-dashboard.component';
 import { RegistroComponent } from './features/registro/registro.component';
-import { SchedulerDashboardComponent } from './features/scheduler-dashboard/scheduler-dashboard.component';
+import { SchedulerDashboardComponent } from './features/scheduler/pages/scheduler-dashboard/scheduler-dashboard.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
