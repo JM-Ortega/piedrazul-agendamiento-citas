@@ -1,0 +1,31 @@
+@if (message) {
+  <div
+    class="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-2xl border px-6 py-4 min-w-[320px] transition-all duration-300 animate-in slide-in-from-top-5"
+    [class.border-green-200]="type === 'success'"
+    [class.border-red-200]="type === 'error'"
+  >
+    <div class="flex items-center gap-3">
+      <div
+        class="rounded-full p-2"
+        [class.bg-green-100]="type === 'success'"
+        [class.bg-red-100]="type === 'error'"
+      >
+        @if (type === 'success') {
+          <svg lucideCheck [size]="20" class="text-green-600"></svg>
+        } @else {
+          <svg lucideAlertCircle [size]="20" class="text-red-600"></svg>
+        }
+      </div>
+      <div>
+        <p
+          class="font-semibold"
+          [class.text-green-700]="type === 'success'"
+          [class.text-red-700]="type === 'error'"
+        >
+          {{ type === 'success' ? 'Éxito' : 'Error' }}
+        </p>
+        <p class="text-sm text-gray-600">{{ message }}</p>
+      </div>
+    </div>
+  </div>
+}
