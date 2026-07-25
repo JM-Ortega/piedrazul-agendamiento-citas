@@ -1,7 +1,5 @@
 import { Routes } from '@angular/router';
 import { AuthGuard } from './core/guards/auth.guard';
-
-import { AccesoComponent } from './design-system/pages/acceso/acceso.component';
 import { HomeComponent } from './design-system/pages/home/home.component';
 import { AdminCreateUserComponent } from './features/admin/pages/admin-create-user/admin-create-user.component';
 import { AdminDoctorsComponent } from './features/admin/pages/admin-doctors/admin-doctors.component';
@@ -20,7 +18,6 @@ import { SchedulerDashboardComponent } from './features/scheduler-dashboard/sche
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
-  { path: 'acceso', component: AccesoComponent },
 
   {
     path: 'agendador',
