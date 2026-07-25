@@ -1,8 +1,6 @@
 <div [class]="computedWrapperClasses">
   @if (label && !isCheckbox) {
-    <label [for]="id" [class]="labelClasses">
-      {{ label }}
-    </label>
+    <label [for]="id" [class]="labelClasses">{{ label }}</label>
   }
 
   @if (isCheckbox) {
@@ -22,35 +20,47 @@
   }
 
   @if (!isCheckbox) {
-    <input
-      [id]="id"
-      [type]="type"
-      [disabled]="disabled"
-      [readOnly]="readonly"
-      [attr.aria-invalid]="errorMessage ? true : null"
-      [attr.aria-describedby]="
-        errorMessage ? id + '-error' : helperText ? id + '-helper' : null
-      "
-      [attr.placeholder]="placeholder || null"
-      [attr.autocomplete]="autocomplete || null"
-      [attr.inputmode]="inputMode || null"
-      [attr.min]="min"
-      [attr.max]="max"
-      [attr.step]="step"
-      [value]="value"
-      [class]="computedInputClasses"
-      (input)="handleInput($event)"
-      (blur)="handleBlur($event)"
-      (focus)="handleFocus($event)"
-    />
+    <div class="relative">
+      <input
+        [id]="id"
+        [type]="type"
+        [disabled]="disabled"
+        [readOnly]="readonly"
+        [attr.placeholder]="placeholder || null"
+        [attr.autocomplete]="autocomplete || null"
+        [attr.inputmode]="inputMode || null"
+        [attr.min]="min"
+        [attr.max]="max"
+        [attr.step]="step"
+        [attr.maxlength]="maxLength ?? null"
+        [attr.minlength]="minLength ?? null"
+        [attr.aria-invalid]="resolvedErrorMessage ? true : null"
+        [attr.aria-describedby]="
+          resolvedErrorMessage
+            ? id + '-error'
+            : helperText
+              ? id + '-helper'
+              : null
+        "
+        [value]="value"
+        [class]="computedInputClasses"
+        (input)="handleInput($event)"
+        (blur)="handleBlur($event)"
+        (focus)="handleFocus($event)"
+      />
+      <div class="absolute right-3 top-1/2 -translate-y-1/2">
+        <ng-content select="[suffix]"></ng-content>
+      </div>
+    </div>
   }
-  @if (errorMessage) {
+
+  @if (resolvedErrorMessage) {
     <p [id]="id + '-error'" class="text-red-500 text-sm mt-1">
-      {{ errorMessage }}
+      {{ resolvedErrorMessage }}
     </p>
   }
 
-  @if (!errorMessage && helperText) {
+  @if (!resolvedErrorMessage && helperText) {
     <p [id]="id + '-helper'" class="text-gray-500 text-sm mt-1">
       {{ helperText }}
     </p>
