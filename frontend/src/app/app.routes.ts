@@ -15,6 +15,7 @@ import { PatientAppointmentHistoryComponent } from './features/patient/patient-a
 import { PatientDashboardComponent } from './features/patient/patient-dashboard/patient-dashboard.component';
 import { RegistroComponent } from './features/registro/registro.component';
 import { SchedulerDashboardComponent } from './features/scheduler/pages/scheduler-dashboard/scheduler-dashboard.component';
+import { SchedulerHistoryComponent } from './features/scheduler/pages/scheduler-history/scheduler-history.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -22,6 +23,12 @@ export const routes: Routes = [
   {
     path: 'agendador',
     component: SchedulerDashboardComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'SCHEDULER' },
+  },
+  {
+    path: 'agendador/historial-citas',
+    component: SchedulerHistoryComponent,
     canActivate: [AuthGuard],
     data: { role: 'SCHEDULER' },
   },
