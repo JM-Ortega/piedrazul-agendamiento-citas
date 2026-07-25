@@ -27,7 +27,21 @@
           "
         >
           <svg lucideClipboardList [size]="20"></svg>
-          Ver Citas
+          Citas de hoy
+        </a>
+        <a
+          routerLink="/agendador/historial-citas"
+          #rla12="routerLinkActive"
+          routerLinkActive
+          [class]="
+            'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
+            (rla12.isActive
+              ? 'bg-white text-[#215c98]'
+              : 'text-white hover:bg-[#4e92d9]')
+          "
+        >
+          <svg lucideCalendarDays [size]="20"></svg>
+          Historial de Citas
         </a>
         <a
           routerLink="/agendador/nueva"
@@ -261,13 +275,13 @@
       }
 
       @if (!appService.currentRole()) {
-        <a
-          routerLink="/acceso"
-          class="flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-white/40 hover:bg-white/10 text-white transition-all text-base"
+        <app-button
+          variant="primary"
+          (buttonClick)="goToLogin()"
+          extraClass="border-2 border-white/40"
         >
-          <svg lucideUsers [size]="18"></svg>
-          Otros usuarios
-        </a>
+          <svg lucideUsers [size]="18"></svg> Otros usuarios
+        </app-button>
       }
     </nav>
 
@@ -297,6 +311,14 @@
         >
           <svg lucideClipboardList [size]="20"></svg>
           Ver Citas
+        </a>
+        <a
+          routerLink="/agendador/historial-citas"
+          (click)="menuOpen.set(false)"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
+        >
+          <svg lucideCalendarDays [size]="20"></svg>
+          Historial de Citas
         </a>
         <a
           routerLink="/agendador/nueva"

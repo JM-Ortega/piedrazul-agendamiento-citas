@@ -1,0 +1,44 @@
+@if (visible) {
+  <div
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4"
+    role="presentation"
+    (click)="onDismiss()"
+    (keydown.escape)="onDismiss()"
+  >
+    <div
+      class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirmModalTitle"
+      tabindex="-1"
+      (click)="$event.stopPropagation()"
+      (keydown)="$event.stopPropagation()"
+    >
+      <div
+        [class]="
+          'flex items-center justify-center w-16 h-16 rounded-full mx-auto mb-5 ' +
+          iconBg
+        "
+      >
+        <ng-content select="[icon]"></ng-content>
+      </div>
+      <h3
+        id="confirmModalTitle"
+        class="text-xl font-bold text-gray-800 text-center mb-2"
+      >
+        {{ title }}
+      </h3>
+      <p class="text-gray-500 text-sm text-center mb-8">
+        {{ message }}
+      </p>
+      <div class="flex gap-5 justify-center">
+        <app-button variant="secondary" (buttonClick)="onDismiss()">
+          {{ cancelLabel }}
+        </app-button>
+        <app-button [variant]="confirmVariant" (buttonClick)="onConfirm()">
+          {{ confirmLabel }}
+        </app-button>
+      </div>
+    </div>
+  </div>
+}

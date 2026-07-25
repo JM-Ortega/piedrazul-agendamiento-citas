@@ -47,7 +47,7 @@ export class ButtonComponent {
   }
 
   getBaseClasses(): string {
-    const sizeClasses = this.getSizeClasses();
+    const sizeClasses = this.variant === 'icon' ? '' : this.getSizeClasses();
     const variantClasses = this.getVariantClasses();
     const widthClass = this.fullWidth ? 'w-full' : '';
     const disabledClass = this.disabled
@@ -88,7 +88,7 @@ export class ButtonComponent {
         return `${baseClasses} bg-red-500 text-white hover:bg-red-600 active:scale-95 rounded-lg`;
 
       case 'icon':
-        return `${baseClasses} bg-transparent text-gray-600 hover:bg-gray-100 w-9 h-9 p-0 rounded-lg`;
+        return `${baseClasses} bg-transparent text-gray-400 hover:bg-gray-100 w-9 h-9 p-0 rounded-lg`;
 
       case 'link':
         return `${baseClasses} bg-transparent text-[#215c98] hover:text-[#163c63] underline`;

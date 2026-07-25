@@ -63,16 +63,20 @@ export class HomeComponent implements OnInit {
     const realmRoles = this.keycloak.realmAccess?.roles || [];
 
     switch (true) {
-      case realmRoles.includes('ADMIN'):
-        this.router.navigate(['/admin'], { replaceUrl: true });
-        break;
-
       case realmRoles.includes('DOCTOR'):
         this.router.navigate(['/medico'], { replaceUrl: true });
         break;
 
-      case realmRoles.includes('RECEPCION'):
-        this.router.navigate(['/recepcion'], { replaceUrl: true });
+      case realmRoles.includes('SCHEDULER'):
+        this.router.navigate(['/agendador'], { replaceUrl: true });
+        break;
+
+      case realmRoles.includes('ADMIN'):
+        this.router.navigate(['/admin'], { replaceUrl: true });
+        break;
+
+      case realmRoles.includes('PATIENT'):
+        this.router.navigate(['/paciente'], { replaceUrl: true });
         break;
 
       default:

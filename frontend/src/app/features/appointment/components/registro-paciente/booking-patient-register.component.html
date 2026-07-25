@@ -142,13 +142,13 @@
           readonly
           class="w-full border-2 border-[#c2d8f0] rounded-xl px-4 py-3 pr-12"
         />
-        <button
-          type="button"
-          (click)="birthPicker.open()"
-          class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 p-2 rounded-lg hover:bg-[#c2d8f0] hover:shadow-md hover:text-[#163c63] transition-all duration-200"
+        <app-button
+          variant="icon"
+          extraClass="absolute right-3 top-1/2 -translate-y-1/2"
+          (buttonClick)="birthPicker.open()"
         >
           <svg lucideCalendar [size]="20"></svg>
-        </button>
+        </app-button>
         <mat-datepicker #birthPicker></mat-datepicker>
       </div>
 

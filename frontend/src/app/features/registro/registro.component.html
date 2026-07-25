@@ -1,13 +1,14 @@
 <div class="min-h-screen bg-blue-50 py-8 px-4">
   <div class="max-w-2xl mx-auto">
     <div class="mb-6">
-      <button
-        (click)="goBack()"
-        class="flex items-center gap-2 text-[#215c98] text-lg hover:text-[#4e92d9] mb-4 transition-colors cursor-pointer"
+      <app-button
+        variant="link"
+        (buttonClick)="goBack()"
+        extraClass="!px-0 !py-1"
       >
         <svg lucideArrowLeft [size]="18"></svg>
         <span class="text-sm font-medium">Volver</span>
-      </button>
+      </app-button>
       <h1 class="text-[#215c98] text-3xl font-bold">Crear cuenta</h1>
       <p class="text-gray-500 text-lg mt-1">
         Regístrate para agendar tus citas médicas
@@ -62,14 +63,14 @@
                 placeholder="Ingresa tu número de documento"
                 class="flex-1 border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4e92d9] transition-colors"
               />
-              <button
-                (click)="searchPatient()"
+              <app-button
+                variant="primary"
+                (buttonClick)="searchPatient()"
                 [disabled]="isLoading()"
-                class="bg-[#215c98] hover:bg-[#163c63] text-white px-5 py-3 rounded-xl flex items-center gap-2 disabled:opacity-50 transition-colors cursor-pointer"
               >
                 <svg lucideSearch [size]="18"></svg>
                 Buscar
-              </button>
+              </app-button>
             </div>
             @if (docInputWarning()) {
               <p class="text-red-500 text-sm mt-1">{{ docInputWarning() }}</p>
@@ -298,13 +299,13 @@
                     readonly
                     class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 pr-12"
                   />
-                  <button
-                    type="button"
-                    (click)="birthPicker.open()"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 p-2 rounded-lg hover:bg-blue-100 hover:shadow-md hover:text-blue-600 transition-all duration-200"
+                  <app-button
+                    variant="icon"
+                    extraClass="absolute right-3 top-1/2 -translate-y-1/2"
+                    (buttonClick)="birthPicker.open()"
                   >
                     <svg lucideCalendar [size]="20"></svg>
-                  </button>
+                  </app-button>
                   <mat-datepicker
                     #birthPicker
                     startView="multi-year"
@@ -598,13 +599,13 @@
                         : 'border-blue-200 focus:border-blue-500'
                     "
                   />
-                  <button
-                    type="button"
-                    (click)="birthPicker2.open()"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 p-2 rounded-lg hover:bg-blue-100 hover:shadow-md hover:text-blue-600 transition-all duration-200"
+                  <app-button
+                    variant="icon"
+                    extraClass="absolute right-3 top-1/2 -translate-y-1/2"
+                    (buttonClick)="birthPicker2.open()"
                   >
                     <svg lucideCalendar [size]="20"></svg>
-                  </button>
+                  </app-button>
                   <mat-datepicker
                     #birthPicker2
                     startView="multi-year"
@@ -703,12 +704,9 @@
             patientStatus() !== 'idle' && patientStatus() !== 'already-linked'
           ) {
             <div class="flex justify-end mt-4">
-              <button
-                (click)="goToStep2()"
-                class="bg-[#215c98] hover:bg-[#163c63] text-white px-8 py-3 rounded-xl font-semibold transition-colors cursor-pointer"
-              >
+              <app-button variant="primary" (buttonClick)="goToStep2()">
                 Continuar
-              </button>
+              </app-button>
             </div>
           }
         </div>
@@ -775,16 +773,16 @@
                       : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 />
-                <button
-                  type="button"
-                  (click)="showPassword.set(!showPassword())"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                <app-button
+                  variant="icon"
+                  extraClass="absolute right-3 top-1/2 -translate-y-1/2"
+                  (buttonClick)="showPassword.set(!showPassword())"
                 >
                   <svg
-                    [lucideIcon]="showPassword() ? EyeOff : Eye"
+                    [lucideIcon]="showPassword() ? Eye : EyeOff"
                     [size]="18"
                   ></svg>
-                </button>
+                </app-button>
               </div>
               @if (errors()['password']) {
                 <p class="text-red-500 text-sm mt-1">
@@ -814,16 +812,18 @@
                       : 'border-blue-200 focus:border-[#4e92d9]'
                   "
                 />
-                <button
-                  type="button"
-                  (click)="showConfirmPassword.set(!showConfirmPassword())"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                <app-button
+                  variant="icon"
+                  extraClass="absolute right-3 top-1/2 -translate-y-1/2"
+                  (buttonClick)="
+                    showConfirmPassword.set(!showConfirmPassword())
+                  "
                 >
                   <svg
-                    [lucideIcon]="showConfirmPassword() ? EyeOff : Eye"
+                    [lucideIcon]="showConfirmPassword() ? Eye : EyeOff"
                     [size]="18"
                   ></svg>
-                </button>
+                </app-button>
               </div>
               @if (errors()['confirmPassword']) {
                 <p class="text-red-500 text-sm mt-1">
@@ -848,16 +848,15 @@
           }
 
           <div class="flex gap-4 mt-4">
-            <button
-              (click)="goBack()"
-              class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
-            >
+            <app-button variant="secondary" (buttonClick)="goBack()">
               Atrás
-            </button>
-            <button
-              (click)="submit()"
+            </app-button>
+            <app-button
+              variant="primary"
+              (buttonClick)="submit()"
               [disabled]="isLoading()"
-              class="flex-1 bg-[#215c98] hover:bg-[#163c63] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors cursor-pointer"
+              [fullWidth]="true"
+              class="flex-1"
             >
               @if (isLoading()) {
                 <span>Procesando...</span>
@@ -865,7 +864,7 @@
                 <svg lucideUserPlus [size]="18"></svg>
                 <span>Continuar</span>
               }
-            </button>
+            </app-button>
           </div>
         </div>
       }
@@ -925,17 +924,16 @@
           }
 
           <div class="flex gap-4 mt-4">
-            <button
-              (click)="goBack()"
-              class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
-            >
+            <app-button variant="secondary" (buttonClick)="goBack()">
               Atrás
-            </button>
+            </app-button>
 
-            <button
-              (click)="confirmCode()"
+            <app-button
+              variant="primary"
+              (buttonClick)="confirmCode()"
               [disabled]="isLoading()"
-              class="flex-1 bg-[#215c98] hover:bg-[#163c63] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors cursor-pointer"
+              [fullWidth]="true"
+              class="flex-1"
             >
               @if (isLoading()) {
                 <span>Verificando...</span>
@@ -943,7 +941,7 @@
                 <svg lucideKeyRound [size]="18"></svg>
                 <span>Confirmar código</span>
               }
-            </button>
+            </app-button>
           </div>
         </div>
       }

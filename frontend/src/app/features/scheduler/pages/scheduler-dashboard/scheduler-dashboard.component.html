@@ -1,0 +1,63 @@
+<div class="min-h-screen bg-blue-50 py-8 px-4">
+  <div class="max-w-5xl mx-auto">
+    <app-filter
+      [fields]="['doctor', 'status']"
+      [doctors]="doctors()"
+      title="Filtros"
+      [description]="'Citas del ' + formatDate(today)"
+      [(filterDoctor)]="filterDoctor"
+      [(filterStatus)]="filterStatus"
+    ></app-filter>
+
+    @if (searched()) {
+      <div class="bg-white rounded-2xl shadow-md p-7 mt-8">
+        <div
+          class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-3"
+        >
+          <div>
+            <h2 class="text-[#163c63] text-2xl font-semibold">Citas de Hoy</h2>
+            <p class="text-gray-500 text-base mt-1">
+              {{ formatDate(today) }}
+              @if (selectedDoctor()) {
+                — {{ selectedDoctor()?.name }}
+              }
+            </p>
+          </div>
+          <div class="flex gap-4">
+            <div class="text-center bg-[#d9e9f8]/40 rounded-xl px-5 py-3">
+              <p class="text-2xl font-bold text-[#215c98]">
+                {{ activeResults().length }}
+              </p>
+              <p class="text-sm text-gray-500">Citas activas</p>
+            </div>
+            <div class="text-center bg-gray-50 rounded-xl px-5 py-3">
+              <p class="text-2xl font-bold text-gray-600">
+                {{ results().length }}
+              </p>
+              <p class="text-sm text-gray-500">Total</p>
+            </div>
+          </div>
+        </div>
+        <app-appointment-table
+          view="today"
+          [results]="results()"
+          (cancelRequested)="requestCancelAppointment($event)"
+        ></app-appointment-table>
+      </div>
+    }
+  </div>
+</div>
+
+<app-confirm-modal
+  [visible]="showCancelModal()"
+  title="¿Cancelar cita médica?"
+  message="Esta acción no se puede deshacer. ¿Está seguro de que desea cancelar esta cita?"
+  confirmLabel="Sí, cancelar"
+  cancelLabel="Volver"
+  (dismissed)="dismissCancelModal()"
+  (confirmed)="confirmCancelAppointment()"
+>
+  <svg icon lucideX [size]="32" class="text-red-500"></svg>
+</app-confirm-modal>
+
+<app-toast [message]="toastMessage()" [type]="toastType()"></app-toast>
