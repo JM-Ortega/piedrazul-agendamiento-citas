@@ -46,7 +46,6 @@ export type SanitizeRule =
 export class InputComponent implements ControlValueAccessor {
   @Input() id = `app-input-${Math.random().toString(36).slice(2, 10)}`;
   @Input() type: InputType = 'text';
-  @Input() label?: string;
   @Input() placeholder?: string;
   @Input() helperText?: string;
   @Input() errorMessage?: string;
@@ -61,12 +60,10 @@ export class InputComponent implements ControlValueAccessor {
   @Input() size: InputSize = 'md';
   @Input() fullWidth = true;
   @Input() inputClass = '';
-  @Input() labelClass = '';
   @Input() wrapperClass = '';
 
   // ── Reglas de sanitización ─────────────────────────────
   @Input() sanitize: SanitizeRule = 'none';
-  /** Regex de caracteres NO permitidos (se eliminan). Solo si sanitize === 'custom'. */
   @Input() customPattern?: RegExp;
   @Input() maxLength?: number;
   @Input() minLength?: number;
@@ -74,7 +71,6 @@ export class InputComponent implements ControlValueAccessor {
   @Input() trimLeadingSpaces = false;
   @Input() collapseSpaces = false;
   @Input() stripAccents = false;
-  /** Valida formato de correo en (blur). */
   @Input() validateEmailFormat?: boolean;
 
   @Input() maxLengthMessage?: string;
@@ -86,7 +82,6 @@ export class InputComponent implements ControlValueAccessor {
   @Output() inputChange = new EventEmitter<Event>();
   @Output() inputBlur = new EventEmitter<FocusEvent>();
   @Output() inputFocus = new EventEmitter<FocusEvent>();
-  /** Mensaje generado internamente (límite excedido / formato inválido). */
   @Output() internalErrorChange = new EventEmitter<string>();
 
   value: string | number | boolean | null = '';
@@ -174,12 +169,6 @@ export class InputComponent implements ControlValueAccessor {
     return baseClasses.filter(Boolean).join(' ');
   }
 
-  get labelClasses(): string {
-    return ['block', 'text-gray-700', 'text-sm', 'font-medium', this.labelClass]
-      .filter(Boolean)
-      .join(' ');
-  }
-
   handleInput(event: Event): void {
     const target = event.target as HTMLInputElement;
 
@@ -200,7 +189,6 @@ export class InputComponent implements ControlValueAccessor {
       return;
     }
 
-    // Sanitización de texto
     const sanitized = this.applySanitization(target.value);
     target.value = sanitized;
     this.value = sanitized;
@@ -254,9 +242,7 @@ export class InputComponent implements ControlValueAccessor {
     if (this.stripAccents) {
       value = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     }
-
     value = this.filterByPattern(value);
-
     if (this.trimLeadingSpaces) value = value.replace(/^\s+/, '');
     if (this.collapseSpaces) value = value.replace(/\s{2,}/g, ' ');
     if (this.titleCase) {
