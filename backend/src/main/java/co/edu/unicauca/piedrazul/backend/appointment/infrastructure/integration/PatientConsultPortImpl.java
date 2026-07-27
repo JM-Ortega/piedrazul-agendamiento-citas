@@ -76,4 +76,9 @@ public class PatientConsultPortImpl implements PatientConsultPort {
         return patientModuleApi.findByIds(patientIds).stream()
                 .collect(Collectors.toMap(PatientData::personId, PatientInfoMapper::toPatientInfo));
     }
+
+    @Override
+    public boolean existsById(UUID idPatient){
+        return patientModuleApi.existsById(idPatient);
+    }
 }

@@ -16,7 +16,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.Appo
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.application.ListMyAppointmentsUseCaseImpl;
-import co.edu.unicauca.piedrazul.backend.patients.PatientLookupApi;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.CancelAppointmentUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.application.CancelAppointmentUseCaseImpl;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
@@ -131,8 +130,8 @@ public class AppointmentConfig {
     @Bean
     public IsNewPatientUseCase isNewPatientUseCase(
             AppointmentRepository appointmentRepository,
-            PatientLookupApi patientLookupApi) {
-        return new IsNewPatientUseCaseImpl(appointmentRepository, patientLookupApi);
+            PatientConsultPort patientConsultPort) {
+        return new IsNewPatientUseCaseImpl(appointmentRepository, patientConsultPort);
     }
 
     @Bean

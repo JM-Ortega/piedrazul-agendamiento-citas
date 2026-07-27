@@ -20,4 +20,6 @@ public interface PatientConsultPort {
     UUID createPatient(PatientRegistrationData data);
 
     Map<UUID, PatientInfo> findByIds(Set<UUID> idPatients);
+
+    boolean existsById(UUID idPatient);
 }
