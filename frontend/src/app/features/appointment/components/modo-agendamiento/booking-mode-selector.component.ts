@@ -1,13 +1,13 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   inject,
   output,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { LucideStethoscope, LucideUserSearch } from '@lucide/angular';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { BookingMode } from '../../models/types/bookingMode.type';
 import { BookingStateService } from '../../services/booking-state.service';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
 
 /**
  * Mostrar las dos tarjetas de selección de modo

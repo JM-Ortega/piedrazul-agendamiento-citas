@@ -1,14 +1,14 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   inject,
   OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
 import { LucideArrowLeft } from '@lucide/angular';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
 
 /**
  * Punto de entrada para el flujo de agendamiento desde el dashboard del médico.

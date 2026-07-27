@@ -26,7 +26,7 @@ import { SchedulerService } from '../../../core/services/scheduler.service';
 import { AppointmentExportRequest } from '../../../shared/models/dtos/AppointmentExportRequest.dto';
 import { ExportColumnBackend } from '../../../shared/models/types/ExportColumnBackend.type';
 import { ExportFormatBackend } from '../../../shared/models/types/ExportFormatBackend.type';
-import { ButtonComponent } from '../../atoms/button.component';
+import { ButtonComponent } from '../../atoms/button/button.component';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 export type ExportColumnKey =

@@ -1,22 +1,22 @@
 import { CommonModule } from '@angular/common';
 import {
+  ChangeDetectionStrategy,
   Component,
   computed,
   inject,
   output,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { LucideUserSearch, LucideCalendar } from '@lucide/angular';
+import { LucideCalendar, LucideUserSearch } from '@lucide/angular';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { BookingStateService } from '../../services/booking-state.service';
 import { CalendarService } from '../../services/calendar.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
 
 /**
  * Permite al usuario elegir una fecha y hora

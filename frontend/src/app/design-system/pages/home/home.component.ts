@@ -1,11 +1,10 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   inject,
   OnInit,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { ButtonComponent } from '../../atoms/button.component';
 import {
   LucideCalendar,
   LucideClock,
@@ -13,6 +12,7 @@ import {
   LucideShield,
 } from '@lucide/angular';
 import Keycloak from 'keycloak-js';
+import { ButtonComponent } from '../../atoms/button/button.component';
 import { AppointmentModalComponent } from '../../organisms/appointment-modal/appointment-modal.component';
 
 @Component({

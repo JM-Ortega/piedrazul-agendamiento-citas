@@ -1,28 +1,28 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   computed,
   inject,
   OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
+  LucideAlertCircle,
   LucideCalendarDays,
+  LucideCheck,
   LucideChevronRight,
   LucideClock,
   LucidePlusCircle,
   LucideUser,
   LucideX,
-  LucideAlertCircle,
-  LucideCheck,
 } from '@lucide/angular';
 import { AppService } from '../../../core/services/app.service';
-import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { PatientAppointmentService } from '../../../core/services/patientAppointment.service';
+import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
 import { getMonthShort } from '../../../shared/helpers/date-format';
+import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
-import { ButtonComponent } from '../../../design-system/atoms/button.component';
 
 @Component({
   selector: 'app-patient-dashboard',

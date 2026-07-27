@@ -1,35 +1,35 @@
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import {
+  ChangeDetectionStrategy,
   Component,
   computed,
   inject,
   OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { Router } from '@angular/router';
-import Keycloak from 'keycloak-js';
 import {
   LucideArrowLeft,
+  LucideCalendar,
   LucideCheckCircle,
+  LucideDynamicIcon,
   LucideEye,
   LucideEyeOff,
   LucideKeyRound,
-  LucideCalendar,
   LucideSearch,
   LucideUserPlus,
-  LucideDynamicIcon,
 } from '@lucide/angular';
+import Keycloak from 'keycloak-js';
+import { ButtonComponent } from '../..//design-system/atoms/button/button.component';
 import {
   PatientPublicResponse,
   PatientService,
 } from '../../core/services/patient.service';
-import { MatDatepickerModule } from '@angular/material/datepicker';
-import { FormatoPipe } from '../../shared/pipes/formatoPipe';
-import { HttpErrorResponse } from '@angular/common/http';
 import { mapHttpError } from '../../shared/helpers/http-errors';
-import { ButtonComponent } from '../../design-system/atoms/button.component';
+import { FormatoPipe } from '../../shared/pipes/formatoPipe';
 
 type RegistroStep = 1 | 2 | 3;
 type PatientStatus =

@@ -1,11 +1,11 @@
 import { Component, Input, model } from '@angular/core';
 import { LucideSearch } from '@lucide/angular';
-import { dtoDoctor } from '../../../../shared/models/dtos/doctor.dto';
-import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
-import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
-import { formatLongDateEs } from '../../../../shared/helpers/date-format';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { APPOINTMENT_STATUS_LABELS } from '../../../../shared/helpers/appointment-status';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
+import { formatLongDateEs } from '../../../../shared/helpers/date-format';
+import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
+import { dtoDoctor } from '../../../../shared/models/dtos/doctor.dto';
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
 export type SchedulerFilterField = 'doctor' | 'date' | 'status';
 

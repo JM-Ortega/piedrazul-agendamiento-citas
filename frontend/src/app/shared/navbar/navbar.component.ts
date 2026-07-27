@@ -29,9 +29,9 @@ import {
   LucideX,
   type LucideIcon,
 } from '@lucide/angular';
-import { AppService } from '../../core/services/app.service';
 import Keycloak from 'keycloak-js';
-import { ButtonComponent } from '../../design-system/atoms/button.component';
+import { AppService } from '../../core/services/app.service';
+import { ButtonComponent } from '../../design-system/atoms/button/button.component';
 
 @Component({
   selector: 'app-navbar',

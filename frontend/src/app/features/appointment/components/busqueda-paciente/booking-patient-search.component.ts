@@ -1,10 +1,11 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   inject,
   output,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { LucideCheckCircle, LucideSearch } from '@lucide/angular';
 import {
@@ -14,14 +15,13 @@ import {
   Subject,
   switchMap,
 } from 'rxjs';
-import { filter, tap, catchError } from 'rxjs/operators';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { catchError, filter, tap } from 'rxjs/operators';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { PatientSuggestion } from '../../models/dtos/patient-suggestion.dto';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
 
 const MIN_CHARS = 3;
 const MAX_DOC_LENGTH = 12;

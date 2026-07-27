@@ -1,19 +1,19 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   inject,
   OnInit,
   output,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { LucideArrowLeft, LucideCalendar } from '@lucide/angular';
-import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { PatientService } from '../../../../core/services/patient.service';
-import { BookingStateService } from '../../services/booking-state.service';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
+import { BookingStateService } from '../../services/booking-state.service';
 
 // Tipo utilitario: extrae las keys de T cuyo valor es string
 // (ignora undefined en props opcionales, y excluye uniones de literales como 'CEDULA' | 'PASAPORTE')

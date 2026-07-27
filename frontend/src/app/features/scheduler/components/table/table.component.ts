@@ -5,14 +5,14 @@ import {
   LucideUser,
   LucideX,
 } from '@lucide/angular';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import {
+  APPOINTMENT_STATUS_CLASSES,
+  APPOINTMENT_STATUS_LABELS,
+} from '../../../../shared/helpers/appointment-status';
+import { formatLongDateEs } from '../../../../shared/helpers/date-format';
 import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
-import { formatLongDateEs } from '../../../../shared/helpers/date-format';
-import {
-  APPOINTMENT_STATUS_LABELS,
-  APPOINTMENT_STATUS_CLASSES,
-} from '../../../../shared/helpers/appointment-status';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
 
 export type AppointmentTableView = 'today' | 'all';
 

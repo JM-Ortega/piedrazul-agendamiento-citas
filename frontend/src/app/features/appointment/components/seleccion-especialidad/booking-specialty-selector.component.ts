@@ -1,14 +1,14 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   inject,
   output,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideUserSearch } from '@lucide/angular';
-import { BookingStateService } from '../../services/booking-state.service';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
+import { BookingStateService } from '../../services/booking-state.service';
 
 /**
  * Permite al usuario elegir una especialidad y,

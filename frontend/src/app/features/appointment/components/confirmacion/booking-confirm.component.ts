@@ -1,22 +1,22 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   inject,
   output,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import {
   LucideCheckCircle,
   LucideStethoscope,
   LucideUserSearch,
 } from '@lucide/angular';
+import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { mapHttpError } from '../../../../shared/helpers/http-errors';
+import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { NewAppointment } from '../../models/dtos/newAppointment.dto';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
-import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
-import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
-import { mapHttpError } from '../../../../shared/helpers/http-errors';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
 /**
  * Mostrar el resumen completo de la cita a confirmar
  * y ejecutar la llamada al backend para registrarla.

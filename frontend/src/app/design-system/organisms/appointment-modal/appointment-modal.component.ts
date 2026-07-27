@@ -14,7 +14,7 @@ import {
 } from '@lucide/angular';
 import Keycloak from 'keycloak-js';
 import { environment } from '../../../../environments/environment';
-import { ButtonComponent } from '../../atoms/button.component';
+import { ButtonComponent } from '../../atoms/button/button.component';
 
 @Component({
   selector: 'app-appointment-modal',
