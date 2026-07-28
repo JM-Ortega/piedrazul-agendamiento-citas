@@ -32,7 +32,7 @@
             Fecha del reporte <span class="text-red-500">*</span>
           </label>
           <app-datepicker
-            id="exportDate"
+            [id]="'exportDate'"
             [ngModel]="selectedDate()"
             (valueChange)="selectedDate.set($event)"
             [errorMessage]="

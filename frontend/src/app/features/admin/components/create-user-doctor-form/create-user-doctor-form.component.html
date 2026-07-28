@@ -103,7 +103,7 @@
         Teléfono * <span class="text-sm text-gray-500">(solo dígitos)</span>
       </label>
       <app-input
-        id="phone"
+        [id]="'phone'"
         type="text"
         [inputMode]="'numeric'"
         [(ngModel)]="data.phone"
@@ -140,7 +140,7 @@
           Fecha de Inicio
         </label>
         <app-input
-          id="laborStart"
+          [id]="'laborStart'"
           type="date"
           [(ngModel)]="data.laborStart"
           (ngModelChange)="emit('laborStart', $event)"
@@ -157,7 +157,7 @@
           Fecha de Fin
         </label>
         <app-input
-          id="laborEnd"
+          [id]="'laborEnd'"
           type="date"
           [(ngModel)]="data.laborEnd"
           (ngModelChange)="emit('laborEnd', $event)"
@@ -252,7 +252,7 @@
         </span>
       </label>
       <app-input
-        id="interval"
+        [id]="'interval'"
         type="number"
         [(ngModel)]="data.interval"
         (ngModelChange)="emit('interval', $event)"

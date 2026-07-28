@@ -44,7 +44,7 @@
         Nombres <span class="text-red-500">*</span>
       </label>
       <app-input
-        id="firstName"
+        [id]="'firstName'"
         placeholder="Nombres del paciente"
         sanitize="alphaSpaces"
         [stripAccents]="true"
@@ -67,7 +67,7 @@
         Apellidos <span class="text-red-500">*</span>
       </label>
       <app-input
-        id="lastName"
+        [id]="'lastName'"
         placeholder="Apellidos del paciente"
         sanitize="alphaSpaces"
         [stripAccents]="true"
@@ -87,7 +87,7 @@
         Teléfono <span class="text-red-500">*</span>
       </label>
       <app-input
-        id="phone"
+        [id]="'phone'"
         type="tel"
         placeholder="Ej: 3001234567"
         sanitize="numeric"
@@ -126,7 +126,7 @@
         Fecha de Nacimiento <span class="text-red-500">*</span>
       </label>
       <app-datepicker
-        id="birthDate"
+        [id]="'birthDate'"
         [max]="maxBirthDate"
         [ngModel]="getPatientField('birthDate')"
         (valueChange)="onBirthDateChange($event)"
@@ -139,7 +139,7 @@
         Correo Electrónico <span class="text-gray-400 text-sm">(opcional)</span>
       </label>
       <app-input
-        id="email"
+        [id]="'email'"
         type="email"
         placeholder="correo@ejemplo.com"
         [maxLength]="EMAIL_MAX"
@@ -160,7 +160,7 @@
         >
       </label>
       <app-input
-        id="guardianPhone"
+        [id]="'guardianPhone'"
         type="tel"
         placeholder="Ej: 3001234567"
         sanitize="numeric"
