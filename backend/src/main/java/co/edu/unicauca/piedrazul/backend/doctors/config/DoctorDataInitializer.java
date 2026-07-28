@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.doctors.config;
 
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.ScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
@@ -52,10 +52,10 @@ public class DoctorDataInitializer implements ApplicationRunner {
                         LocalDate.of(2026, 12, 31),
                         20,
                         8,
-                        List.of(new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.LUNES),
-                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.MARTES),
-                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.JUEVES),
-                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.VIERNES))
+                        List.of(new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.LUNES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.MARTES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.JUEVES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.VIERNES))
                 ),
                         null,
                         List.of(Role.DOCTOR))
@@ -79,10 +79,10 @@ public class DoctorDataInitializer implements ApplicationRunner {
                         30,
                         4,
                         List.of(
-                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.LUNES),
-                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.MARTES),
-                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.MIERCOLES),
-                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(10, 0, 0), Workday.VIERNES)
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.LUNES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.MARTES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.MIERCOLES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(10, 0, 0), Workday.VIERNES)
                         )
                 ),
                 null,
@@ -106,8 +106,8 @@ public class DoctorDataInitializer implements ApplicationRunner {
                         30,
                         8,
                         List.of(
-                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(11, 0, 0), Workday.JUEVES),
-                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(10, 0, 0), Workday.VIERNES)
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(11, 0, 0), Workday.JUEVES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(10, 0, 0), Workday.VIERNES)
                         )
                 ),
                 null,
@@ -131,9 +131,9 @@ public class DoctorDataInitializer implements ApplicationRunner {
                         10,
                         4,
                         List.of(
-                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.MIERCOLES),
-                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.JUEVES),
-                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.VIERNES)
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.MIERCOLES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.JUEVES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.VIERNES)
                         )
                 ),
                 null,
