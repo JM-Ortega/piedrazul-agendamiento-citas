@@ -15,15 +15,12 @@
       </p>
       <div class="grid grid-cols-2 gap-3 mt-2">
         @for (sp of specialtyOptions; track sp.name) {
-          <button
-            type="button"
-            (click)="toggleSpecialty(sp.name)"
-            [class]="
-              'flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-base font-medium ' +
-              (isSpecialtySelected(sp.name)
-                ? 'border-[#215c98] bg-[#d9e9f8] text-[#215c98] shadow-md'
-                : 'border-gray-300 bg-white text-gray-700 hover:border-[#4e92d9]')
-            "
+          <app-button
+            variant="chip"
+            [active]="isSpecialtySelected(sp.name)"
+            activeChipClasses="border-[#215c98] bg-[#d9e9f8] text-[#215c98] shadow-md"
+            extraClass="!flex !items-center !gap-3 !px-4 !text-left !font-medium"
+            (buttonClick)="toggleSpecialty(sp.name)"
           >
             <svg
               [lucideIcon]="sp.icon"
@@ -42,9 +39,10 @@
                 ✓
               </div>
             }
-          </button>
+          </app-button>
         }
       </div>
+
       @if (loadingSpecialties) {
         <p class="mt-2 text-sm text-gray-400">Cargando especialidades...</p>
       }
@@ -110,16 +108,23 @@
           [size]="20"
           class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
         ></svg>
-        <app-input
+        <input
           id="phone"
           type="text"
-          [inputMode]="'numeric'"
-          [(ngModel)]="data.phone"
+          inputmode="numeric"
+          [ngModel]="data.phone"
+          (ngModelChange)="emit('phone', $event)"
           name="phone"
+          (blur)="fieldBlurred.emit('phone')"
+          [class]="
+            'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 pl-12 pr-4 ' +
+            (errors['phone']
+              ? 'border-red-400 focus:ring-red-400 bg-red-50'
+              : 'border-gray-300 focus:ring-blue-500')
+          "
           placeholder="3001234567"
+          maxlength="10"
           autocomplete="off"
-          [errorMessage]="errors['phone'] ? ' ' : undefined"
-          (inputBlur)="fieldBlurred.emit('phone')"
         />
       </div>
       @if (errors['phone']) {
@@ -316,18 +321,15 @@
     </p>
     <div class="flex flex-wrap gap-3">
       @for (day of daysOfWeek; track day.value) {
-        <button
-          type="button"
-          (click)="toggleWorkDay(day.value)"
-          [class]="
-            'px-5 py-3 rounded-xl border-2 transition-all text-base font-medium ' +
-            (isWorkDaySelected(day.value)
-              ? 'border-[#215c98] bg-[#d9e9f8] text-[#215c98]'
-              : 'border-gray-300 bg-white text-gray-600 hover:border-[#4e92d9]')
-          "
+        <app-button
+          variant="chip"
+          [active]="isWorkDaySelected(day.value)"
+          activeChipClasses="border-[#215c98] bg-[#d9e9f8] text-[#215c98]"
+          extraClass="!px-5"
+          (buttonClick)="toggleWorkDay(day.value)"
         >
           {{ day.label }}
-        </button>
+        </app-button>
       }
     </div>
     @if (errors['workDays']) {

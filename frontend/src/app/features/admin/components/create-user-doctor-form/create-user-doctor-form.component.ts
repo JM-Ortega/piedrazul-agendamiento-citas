@@ -16,6 +16,7 @@ import {
   LucideStethoscope,
   type LucideIcon,
 } from '@lucide/angular';
+import { ButtonComponent } from "../../../../design-system/atoms/button/button.component";
 import { InputComponent } from '../../../../design-system/atoms/input/input.component';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
@@ -53,6 +54,7 @@ export interface SpecialtyOption {
     LucideDynamicIcon,
     FormatoPipe,
     InputComponent,
+    ButtonComponent,
   ],
 })
 export class CreateUserDoctorFormComponent {
