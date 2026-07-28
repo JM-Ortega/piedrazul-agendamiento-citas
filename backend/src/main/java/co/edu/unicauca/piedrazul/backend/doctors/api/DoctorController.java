@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/doctor/doctors")
+@RequestMapping("/api/doctor")
 public class DoctorController {
     private final DoctorService doctorService;
     private final PersonExternalService personExternalService;
@@ -121,7 +121,7 @@ public class DoctorController {
      */
     @PutMapping("/{doctorId}/specialties")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> changeSpecialties(
+    public ResponseEntity<?> changeSpecialties(
             @PathVariable UUID doctorId,
             @RequestBody List<SpecialtyCode> specialties) {
         doctorService.changeSpecialties(doctorId, specialties);
@@ -164,50 +164,32 @@ public class DoctorController {
     /**
      * Habilitar un doctor (reactivar después de estar deshabilitado)
      * @param doctorId ID del doctor
-     * @param laborStart Nueva fecha de inicio de labores
-     * @param laborEnd Nueva fecha de fin de labores
      * @return Sin contenido
      */
     @PutMapping("/{doctorId}/enable")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> enableDoctor(
+            @PathVariable UUID doctorId
+    ) {
+        doctorService.enableDoctor(doctorId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     *
+     * @param doctorId
+     * @param laborStart
+     * @param laborEnd
+     * @return
+     */
+    @PutMapping("/{doctorId}/labor-date")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateDoctorLaborDate(
             @PathVariable UUID doctorId,
             @RequestParam LocalDate laborStart,
             @RequestParam LocalDate laborEnd
     ) {
-        doctorService.enableDoctor(doctorId, laborStart, laborEnd);
-        return ResponseEntity.noContent().build();
-    }
-
-    /**
-     * Actualizar la fecha de inicio laboral de un doctor
-     * @param doctorId ID del doctor
-     * @param laborStart Nueva fecha de inicio
-     * @return Sin contenido
-     */
-    @PutMapping("/{doctorId}/labor-start")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateDoctorLaborStart(
-            @PathVariable UUID doctorId,
-            @RequestParam LocalDate laborStart
-    ) {
-        doctorService.updateDoctorLaborStart(doctorId, laborStart);
-        return ResponseEntity.noContent().build();
-    }
-
-    /**
-     * Actualizar la fecha de finalización laboral de un doctor
-     * @param doctorId ID del doctor
-     * @param laborEnd Nueva fecha de finalización
-     * @return Sin contenido
-     */
-    @PutMapping("/{doctorId}/labor-end")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateDoctorLaborEnd(
-            @PathVariable UUID doctorId,
-            @RequestParam LocalDate laborEnd
-    ) {
-        doctorService.updateDoctorLaborEnd(doctorId, laborEnd);
+        doctorService.updateDoctorLaborDate(doctorId, laborStart, laborEnd);
         return ResponseEntity.noContent().build();
     }
 
@@ -255,6 +237,4 @@ public class DoctorController {
         doctorService.updateDoctorStatus(doctorId);
         return ResponseEntity.noContent().build();
     }
-
-
 }

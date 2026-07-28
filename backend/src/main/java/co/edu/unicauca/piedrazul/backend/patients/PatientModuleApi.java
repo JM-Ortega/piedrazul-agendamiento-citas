@@ -41,5 +41,5 @@ public interface PatientModuleApi {
             String guardianPhone
     );
 
-        void deletePatient(UUID personId);
+    void deletePatient(UUID personId);
 }

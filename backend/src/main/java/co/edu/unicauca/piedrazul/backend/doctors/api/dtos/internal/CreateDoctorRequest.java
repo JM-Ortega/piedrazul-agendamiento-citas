@@ -1,9 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal;
 
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRequest;
-import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.ScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
-import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
 // import co.edu.unicauca.piedrazul.backend.jackson.validation.ValidDocument;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -30,5 +28,5 @@ public record CreateDoctorRequest(
         int bookingWindowWeeks,
 
         @Valid
-        List<CreateScheduleRequest> schedules
+        List<ScheduleRequest> schedules
 ) {}
