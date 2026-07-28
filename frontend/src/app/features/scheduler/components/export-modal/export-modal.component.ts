@@ -19,7 +19,7 @@ import { SchedulerService } from '../../../../core/services/scheduler.service';
 import { AppointmentExportRequest } from '../../../../shared/models/dtos/AppointmentExportRequest.dto';
 import { ExportFormatBackend } from '../../../../shared/models/types/ExportFormatBackend.type';
 import { formatLongDateEs } from '../../../../shared/helpers/date-format';
-import { ButtonComponent } from '../../../../design-system/atoms/button.component';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 
 type ExportFormat = 'excel' | 'pdf' | 'csv';
 
