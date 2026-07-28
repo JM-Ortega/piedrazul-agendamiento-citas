@@ -7,14 +7,14 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatDatepickerModule } from '@angular/material/datepicker';
-import { LucideArrowLeft, LucideCalendar } from '@lucide/angular';
+import { LucideArrowLeft } from '@lucide/angular';
 import { PatientService } from '../../../../core/services/patient.service';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { InputComponent } from '../../../../design-system/atoms/input/input.component';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { BookingStateService } from '../../services/booking-state.service';
+import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
 
 // Tipo utilitario: extrae las keys de T cuyo valor es string
 // (ignora undefined en props opcionales, y excluye uniones de literales como 'CEDULA' | 'PASAPORTE')
@@ -36,11 +36,10 @@ type KeysMatching<T, V> = {
   imports: [
     FormsModule,
     LucideArrowLeft,
-    LucideCalendar,
-    MatDatepickerModule,
     FormatoPipe,
     ButtonComponent,
     InputComponent,
+    DatepickerComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-patient-register.component.html',
@@ -348,9 +347,8 @@ export class BookingPatientRegisterComponent implements OnInit {
     this.birthDateErrorMsg.set('Ingrese una fecha de nacimiento válida');
   }
 
-  onBirthDateChange(value: Date | string): void {
-    const formatted =
-      value instanceof Date ? this.state.formatLocalDate(value) : value;
+  onBirthDateChange(value: Date | null): void {
+    const formatted = value ? this.state.formatLocalDate(value) : '';
     this.setStringField('birthDate', formatted);
   }
 }
