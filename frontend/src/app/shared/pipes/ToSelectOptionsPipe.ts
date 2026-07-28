@@ -1,3 +1,4 @@
+// to-select-options.pipe.ts
 import { Pipe, PipeTransform } from '@angular/core';
 import { SelectOption } from '../../design-system/atoms/select/select.component';
 import { FormatoPipe } from './formatoPipe';
@@ -7,12 +8,15 @@ import { FormatoPipe } from './formatoPipe';
   standalone: true,
 })
 export class ToSelectOptionsPipe implements PipeTransform {
-  private formatoPipe = new FormatoPipe(); // 👈 vuelve a 'new'
+  private formatoPipe = new FormatoPipe();
 
-  transform(values: string[] | null | undefined): SelectOption[] {
+  transform(
+    values: string[] | null | undefined,
+    useFormato = true
+  ): SelectOption[] {
     return (values ?? []).map((v) => ({
       value: v,
-      label: this.formatoPipe.transform(v),
+      label: useFormato ? this.formatoPipe.transform(v) : v,
     }));
   }
 }
