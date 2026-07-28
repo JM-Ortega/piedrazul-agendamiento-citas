@@ -97,10 +97,8 @@ class DoctorControllerWebMvcTest {
         specialty.setCode(specialtyCode);
         specialty.setName(specialtyCode.name());
 
-        doctor.setSpecialties(Set.of(specialty));
-
-        Schedule schedule = new Schedule(doctor, LocalTime.of(8, 0), LocalTime.of(12, 0), Workday.LUNES);
-        doctor.setSchedules(new HashSet<>(Set.of(schedule)));
+        doctor.addSpecialty(specialty);
+        doctor.updateSchedule(Workday.LUNES, LocalTime.of(8, 0), LocalTime.of(12, 0));
 
         return doctor;
     }

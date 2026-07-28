@@ -1,14 +1,13 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.ScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleNotFoundException;
-import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
+import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -16,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,80 +28,204 @@ import static org.mockito.Mockito.when;
 class ScheduleServiceTest {
 
     @Mock
-    private ScheduleRepository scheduleRepository;
+    private DoctorRepository doctorRepository;
 
     @InjectMocks
     private ScheduleService scheduleService;
 
     @Test
-    void addScheduleShouldPersistScheduleWhenWorkdayIsFree() {
-        Doctor doctor = new Doctor(UUID.fromString("66666666-6666-6666-6666-666666666666"), LocalDate.now().minusDays(5), LocalDate.now().plusDays(5), 4, true, 20);
-        Schedule schedule = new Schedule(null, LocalTime.of(8, 0), LocalTime.of(12, 0), Workday.LUNES);
+    void updateScheduleShouldCreateScheduleWhenWorkdayDoesNotExist() {
 
-        when(scheduleRepository.findByDoctor(doctor)).thenReturn(List.of());
-        when(scheduleRepository.save(org.mockito.ArgumentMatchers.any(Schedule.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        UUID doctorId = UUID.randomUUID();
 
-        Schedule result = scheduleService.addSchedule(doctor, schedule);
+        Doctor doctor = new Doctor(
+                doctorId,
+                LocalDate.now().minusDays(5),
+                LocalDate.now().plusDays(5),
+                4,
+                true,
+                20
+        );
 
-        ArgumentCaptor<Schedule> scheduleCaptor = ArgumentCaptor.forClass(Schedule.class);
-        verify(scheduleRepository).save(scheduleCaptor.capture());
+        ScheduleRequest request = new ScheduleRequest(
+                LocalTime.of(8, 0),
+                LocalTime.of(12, 0),
+                Workday.LUNES
+        );
 
-        assertThat(result).isSameAs(schedule);
-        assertThat(scheduleCaptor.getValue().getDoctor()).isSameAs(doctor);
-        assertThat(schedule.getDoctor()).isSameAs(doctor);
+        when(doctorRepository.findById(doctorId))
+                .thenReturn(Optional.of(doctor));
+
+        scheduleService.updateSchedule(doctorId, request);
+
+        assertThat(doctor.getSchedules())
+                .hasSize(1);
+
+        Schedule schedule = doctor.getSchedules().iterator().next();
+
+        assertThat(schedule.getWorkday()).isEqualTo(Workday.LUNES);
+        assertThat(schedule.getStartTime()).isEqualTo(LocalTime.of(8,0));
+        assertThat(schedule.getEndTime()).isEqualTo(LocalTime.of(12,0));
+
+        verify(doctorRepository).save(doctor);
     }
 
     @Test
-    void addScheduleShouldRejectDuplicatedWorkday() {
-        Doctor doctor = new Doctor(UUID.fromString("77777777-7777-7777-7777-777777777777"), LocalDate.now().minusDays(5), LocalDate.now().plusDays(5), 4, true, 20);
-        Schedule existing = new Schedule(doctor, LocalTime.of(8, 0), LocalTime.of(12, 0), Workday.LUNES);
-        Schedule incoming = new Schedule(null, LocalTime.of(13, 0), LocalTime.of(15, 0), Workday.LUNES);
+    void updateScheduleShouldModifyExistingSchedule() {
 
-        when(scheduleRepository.findByDoctor(doctor)).thenReturn(List.of(existing));
+        UUID doctorId = UUID.randomUUID();
 
-        assertThrows(DoctorScheduleConflictException.class, () -> scheduleService.addSchedule(doctor, incoming));
+        Doctor doctor = new Doctor(
+                doctorId,
+                LocalDate.now().minusDays(5),
+                LocalDate.now().plusDays(5),
+                4,
+                true,
+                20
+        );
 
-        verify(scheduleRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        doctor.updateSchedule(
+                Workday.MARTES,
+                LocalTime.of(8,0),
+                LocalTime.of(12,0)
+        );
+
+        ScheduleRequest request = new ScheduleRequest(
+                LocalTime.of(9,0),
+                LocalTime.of(11,0),
+                Workday.MARTES
+        );
+
+        when(doctorRepository.findById(doctorId))
+                .thenReturn(Optional.of(doctor));
+
+        scheduleService.updateSchedule(doctorId, request);
+
+        Schedule updated = doctor.getSchedules()
+                .stream()
+                .filter(s -> s.getWorkday() == Workday.MARTES)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(updated.getStartTime()).isEqualTo(LocalTime.of(9,0));
+        assertThat(updated.getEndTime()).isEqualTo(LocalTime.of(11,0));
+
+        verify(doctorRepository).save(doctor);
     }
 
     @Test
-    void updateScheduleByWorkdayShouldUpdateExistingSchedule() {
-        Doctor doctor = new Doctor(UUID.fromString("88888888-8888-8888-8888-888888888888"), LocalDate.now().minusDays(5), LocalDate.now().plusDays(5), 4, true, 20);
-        Schedule existing = new Schedule(doctor, LocalTime.of(8, 0), LocalTime.of(12, 0), Workday.MARTES);
-        Schedule replacement = new Schedule(null, LocalTime.of(9, 0), LocalTime.of(11, 0), Workday.MARTES);
+    void deleteScheduleShouldRemoveSchedule() {
 
-        when(scheduleRepository.findByDoctor(doctor)).thenReturn(List.of(existing));
-        when(scheduleRepository.save(org.mockito.ArgumentMatchers.any(Schedule.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Doctor doctor = new Doctor(
+                UUID.randomUUID(),
+                LocalDate.now().minusDays(5),
+                LocalDate.now().plusDays(5),
+                4,
+                true,
+                20
+        );
 
-        Schedule result = scheduleService.updateScheduleByWorkday(doctor, Workday.MARTES, replacement);
+        doctor.updateSchedule(
+                Workday.LUNES,
+                LocalTime.of(8,0),
+                LocalTime.of(12,0)
+        );
 
-        assertThat(result.getStartTime()).isEqualTo(LocalTime.of(9, 0));
-        assertThat(result.getEndTime()).isEqualTo(LocalTime.of(11, 0));
-        verify(scheduleRepository).save(existing);
+        when(doctorRepository.findById(doctor.getPersonId()))
+                .thenReturn(Optional.of(doctor));
+
+        scheduleService.deleteScheduleByWorkday(
+                doctor.getPersonId(),
+                Workday.LUNES
+        );
+
+        assertThat(doctor.getSchedules()).isEmpty();
+
+        verify(doctorRepository).save(doctor);
+    }
+
+    @Test
+    void getSchedulesShouldReturnDoctorSchedules() {
+
+        Doctor doctor = new Doctor(
+                UUID.randomUUID(),
+                LocalDate.now().minusDays(5),
+                LocalDate.now().plusDays(5),
+                4,
+                true,
+                20
+        );
+
+        doctor.updateSchedule(
+                Workday.LUNES,
+                LocalTime.of(8,0),
+                LocalTime.of(12,0)
+        );
+
+        when(doctorRepository.findById(doctor.getPersonId()))
+                .thenReturn(Optional.of(doctor));
+
+        List<Schedule> schedules =
+                scheduleService.getSchedulesByDoctor(doctor.getPersonId());
+
+        assertThat(schedules).hasSize(1);
     }
 
     @Test
     void getAvailableIntervalsByWorkdayShouldReturnCompleteSlotList() {
-        Doctor doctor = new Doctor(UUID.fromString("99999999-9999-9999-9999-999999999999"), LocalDate.now().minusDays(5), LocalDate.now().plusDays(5), 4, true, 20);
-        Schedule schedule = new Schedule(doctor, LocalTime.of(8, 0), LocalTime.of(9, 0), Workday.MIERCOLES);
 
-        when(scheduleRepository.findByDoctor(doctor)).thenReturn(List.of(schedule));
+        Doctor doctor = new Doctor(
+                UUID.randomUUID(),
+                LocalDate.now().minusDays(5),
+                LocalDate.now().plusDays(5),
+                4,
+                true,
+                20
+        );
 
-        List<LocalTime> result = scheduleService.getAvailableIntervalsByWorkday(doctor, Workday.MIERCOLES);
+        doctor.updateSchedule(
+                Workday.MIERCOLES,
+                LocalTime.of(8,0),
+                LocalTime.of(9,0)
+        );
+
+        when(doctorRepository.findById(doctor.getPersonId()))
+                .thenReturn(Optional.of(doctor));
+
+        List<LocalTime> result =
+                scheduleService.getAvailableIntervalsByWorkday(
+                        doctor.getPersonId(),
+                        Workday.MIERCOLES
+                );
 
         assertThat(result).containsExactly(
-                LocalTime.of(8, 0),
-                LocalTime.of(8, 20),
-                LocalTime.of(8, 40)
+                LocalTime.of(8,0),
+                LocalTime.of(8,20),
+                LocalTime.of(8,40)
         );
     }
 
     @Test
-    void getAvailableIntervalsByWorkdayShouldFailWhenDoctorHasNoScheduleForThatDay() {
-        Doctor doctor = new Doctor(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), LocalDate.now().minusDays(5), LocalDate.now().plusDays(5), 4, true, 20);
+    void getAvailableIntervalsShouldFailWhenDoctorHasNoSchedule() {
 
-        when(scheduleRepository.findByDoctor(doctor)).thenReturn(List.of());
+        Doctor doctor = new Doctor(
+                UUID.randomUUID(),
+                LocalDate.now().minusDays(5),
+                LocalDate.now().plusDays(5),
+                4,
+                true,
+                20
+        );
 
-        assertThrows(DoctorScheduleNotFoundException.class, () -> scheduleService.getAvailableIntervalsByWorkday(doctor, Workday.JUEVES));
+        when(doctorRepository.findById(doctor.getPersonId()))
+                .thenReturn(Optional.of(doctor));
+
+        assertThrows(
+                DoctorScheduleNotFoundException.class,
+                () -> scheduleService.getAvailableIntervalsByWorkday(
+                        doctor.getPersonId(),
+                        Workday.JUEVES
+                )
+        );
     }
 }
