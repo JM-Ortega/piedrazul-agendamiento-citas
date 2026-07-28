@@ -119,14 +119,13 @@
         >
           Fecha de Inicio
         </label>
-        <app-input
+        <app-datepicker
           id="laborStart"
-          type="date"
-          [(ngModel)]="data.laborStart"
-          (ngModelChange)="emit('laborStart', $event)"
+          [ngModel]="data.laborStart"
+          (valueChange)="onDateChange('laborStart', $event)"
           name="laborStart"
           [errorMessage]="errors['laborStart']"
-          (inputBlur)="fieldBlurred.emit('laborStart')"
+          (dateBlur)="fieldBlurred.emit('laborStart')"
         />
       </div>
       <div>
@@ -136,14 +135,13 @@
         >
           Fecha de Fin
         </label>
-        <app-input
+        <app-datepicker
           id="laborEnd"
-          type="date"
-          [(ngModel)]="data.laborEnd"
-          (ngModelChange)="emit('laborEnd', $event)"
+          [ngModel]="data.laborEnd"
+          (valueChange)="onDateChange('laborEnd', $event)"
           name="laborEnd"
           [errorMessage]="errors['laborEnd']"
-          (inputBlur)="fieldBlurred.emit('laborEnd')"
+          (dateBlur)="fieldBlurred.emit('laborEnd')"
         />
       </div>
     </div>
@@ -160,18 +158,16 @@
       <app-select
         id="startTime"
         [(ngModel)]="data.startTime"
-        (ngModelChange)="fieldBlurred.emit('startTime')"
+        (ngModelChange)="
+          emit('startTime', $event);
+          fieldBlurred.emit('startTime');
+          fieldBlurred.emit('endTime')
+        "
         name="startTime"
         [options]="timeOptions | toSelectOptions: false"
         placeholder="-- Seleccionar --"
         [errorMessage]="errors['startTime']"
       ></app-select>
-      @if (errors['startTime']) {
-        <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-          <svg lucideCircleAlert [size]="14"></svg>
-          {{ errors['startTime'] }}
-        </p>
-      }
     </div>
     <div>
       <label
@@ -186,18 +182,16 @@
       <app-select
         id="endTime"
         [(ngModel)]="data.endTime"
-        (ngModelChange)="fieldBlurred.emit('endTime')"
+        (ngModelChange)="
+          emit('endTime', $event);
+          fieldBlurred.emit('endTime');
+          fieldBlurred.emit('startTime')
+        "
         name="endTime"
         [options]="timeOptions | toSelectOptions: false"
         placeholder="-- Seleccionar --"
         [errorMessage]="errors['endTime']"
       ></app-select>
-      @if (errors['endTime']) {
-        <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-          <svg lucideCircleAlert [size]="14"></svg>
-          {{ errors['endTime'] }}
-        </p>
-      }
     </div>
   </div>
 
