@@ -3,12 +3,9 @@ package co.edu.unicauca.piedrazul.backend.appointment.application;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -201,15 +198,8 @@ class ListAppointmentsUseCaseImplTest {
         return Appointment.reconstruct(
                 UUID.randomUUID(),
                 idDoctor,
-                "Dr. Lopez",
                 idPatient,
-                "Carlos Gomez",
-                PatientInfo.of(
-                        DocumentType.CEDULA, "12345678", "Carlos", "Gomez",
-                        "3001234567", Gender.MASCULINO,
-                        LocalDate.of(1990, 6, 15), null, null
-                ),
-                Specialty.FISIOTERAPIA,
+                SpecialtyCode.FISIOTERAPIA,
                 AppointmentState.AGENDADA,
                 date,
                 new AppointmentTime(LocalTime.of(9, 0)),

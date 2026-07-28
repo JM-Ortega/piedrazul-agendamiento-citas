@@ -4,7 +4,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentSta
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
-import co.edu.unicauca.piedrazul.backend.patients.PatientLookupApi;
 
 import java.util.EnumSet;
 import java.util.UUID;

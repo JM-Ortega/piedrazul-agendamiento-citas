@@ -3,7 +3,6 @@ package co.edu.unicauca.piedrazul.backend.appointment.application;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
-import co.edu.unicauca.piedrazul.backend.patients.PatientLookupApi;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
