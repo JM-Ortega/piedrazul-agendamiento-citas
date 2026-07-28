@@ -18,7 +18,9 @@ import {
 } from '@lucide/angular';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { InputComponent } from '../../../../design-system/atoms/input/input.component';
+import { SelectComponent } from '../../../../design-system/atoms/select/select.component';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 
 export interface DoctorFormData {
   documentType: string;
@@ -55,6 +57,8 @@ export interface SpecialtyOption {
     FormatoPipe,
     InputComponent,
     ButtonComponent,
+    SelectComponent,
+    ToSelectOptionsPipe,
   ],
 })
 export class CreateUserDoctorFormComponent {
