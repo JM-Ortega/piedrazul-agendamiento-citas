@@ -102,37 +102,22 @@
       <label for="phone" class="block text-gray-700 text-base font-medium mb-2">
         Teléfono * <span class="text-sm text-gray-500">(solo dígitos)</span>
       </label>
-      <div class="relative">
-        <svg
-          lucidePhone
-          [size]="20"
-          class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-        ></svg>
-        <input
-          id="phone"
-          type="text"
-          inputmode="numeric"
-          [ngModel]="data.phone"
-          (ngModelChange)="emit('phone', $event)"
-          name="phone"
-          (blur)="fieldBlurred.emit('phone')"
-          [class]="
-            'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 pl-12 pr-4 ' +
-            (errors['phone']
-              ? 'border-red-400 focus:ring-red-400 bg-red-50'
-              : 'border-gray-300 focus:ring-blue-500')
-          "
-          placeholder="3001234567"
-          maxlength="10"
-          autocomplete="off"
-        />
-      </div>
-      @if (errors['phone']) {
-        <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-          <svg lucideCircleAlert [size]="14"></svg>
-          {{ errors['phone'] }}
-        </p>
-      }
+      <app-input
+        id="phone"
+        type="text"
+        [inputMode]="'numeric'"
+        [(ngModel)]="data.phone"
+        (ngModelChange)="emit('phone', $event)"
+        name="phone"
+        sanitize="numeric"
+        [maxLength]="10"
+        placeholder="3001234567"
+        autocomplete="off"
+        [errorMessage]="errors['phone']"
+        (inputBlur)="fieldBlurred.emit('phone')"
+      >
+        <svg lucidePhone [size]="20" suffix class="text-gray-400"></svg>
+      </app-input>
     </div>
   </div>
 
@@ -151,53 +136,35 @@
         <label
           for="laborStart"
           class="block text-gray-600 text-sm font-medium mb-2"
-          >Fecha de Inicio</label
         >
-        <input
+          Fecha de Inicio
+        </label>
+        <app-input
           id="laborStart"
           type="date"
-          [value]="data.laborStart"
-          (change)="emit('laborStart', $any($event.target).value)"
-          (blur)="fieldBlurred.emit('laborStart')"
-          [class]="
-            'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 px-4 ' +
-            (errors['laborStart']
-              ? 'border-red-400 focus:ring-red-400 bg-red-50'
-              : 'border-gray-300 focus:ring-blue-500')
-          "
+          [(ngModel)]="data.laborStart"
+          (ngModelChange)="emit('laborStart', $event)"
+          name="laborStart"
+          [errorMessage]="errors['laborStart']"
+          (inputBlur)="fieldBlurred.emit('laborStart')"
         />
-        @if (errors['laborStart']) {
-          <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-            <svg lucideCircleAlert [size]="14"></svg>
-            {{ errors['laborStart'] }}
-          </p>
-        }
       </div>
       <div>
         <label
           for="laborEnd"
           class="block text-gray-600 text-sm font-medium mb-2"
-          >Fecha de Fin</label
         >
-        <input
+          Fecha de Fin
+        </label>
+        <app-input
           id="laborEnd"
           type="date"
-          [value]="data.laborEnd"
-          (change)="emit('laborEnd', $any($event.target).value)"
-          (blur)="fieldBlurred.emit('laborEnd')"
-          [class]="
-            'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 px-4 ' +
-            (errors['laborEnd']
-              ? 'border-red-400 focus:ring-red-400 bg-red-50'
-              : 'border-gray-300 focus:ring-blue-500')
-          "
+          [(ngModel)]="data.laborEnd"
+          (ngModelChange)="emit('laborEnd', $event)"
+          name="laborEnd"
+          [errorMessage]="errors['laborEnd']"
+          (inputBlur)="fieldBlurred.emit('laborEnd')"
         />
-        @if (errors['laborEnd']) {
-          <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-            <svg lucideCircleAlert [size]="14"></svg>
-            {{ errors['laborEnd'] }}
-          </p>
-        }
       </div>
     </div>
   </div>
@@ -280,33 +247,22 @@
         class="block text-gray-700 text-base font-medium mb-2"
       >
         Intervalo entre citas (min)
-        <span class="text-sm text-gray-500 font-normal ml-1"
-          >máx. {{ maxInterval }} min</span
-        >
+        <span class="text-sm text-gray-500 font-normal ml-1">
+          máx. {{ maxInterval }} min
+        </span>
       </label>
-      <input
+      <app-input
         id="interval"
         type="number"
-        [ngModel]="data.interval"
-        (ngModelChange)="emit('interval', +$event)"
+        [(ngModel)]="data.interval"
+        (ngModelChange)="emit('interval', $event)"
         name="interval"
-        (blur)="fieldBlurred.emit('interval')"
-        [class]="
-          'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 px-4 ' +
-          (errors['interval']
-            ? 'border-red-400 focus:ring-red-400 bg-red-50'
-            : 'border-gray-300 focus:ring-blue-500')
-        "
         [min]="10"
         [max]="maxInterval"
-        step="5"
+        [step]="5"
+        [errorMessage]="errors['interval']"
+        (inputBlur)="fieldBlurred.emit('interval')"
       />
-      @if (errors['interval']) {
-        <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-          <svg lucideCircleAlert [size]="14"></svg>
-          {{ errors['interval'] }}
-        </p>
-      }
     </div>
   </div>
 
