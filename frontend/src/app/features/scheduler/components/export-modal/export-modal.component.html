@@ -1,71 +1,3 @@
-@if (showAvailabilityWarning()) {
-  <div
-    class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
-  >
-    <div class="bg-white rounded-xl max-w-md w-full shadow-2xl">
-      <div
-        class="bg-amber-500 text-white px-8 py-5 rounded-t-xl flex items-center justify-between"
-      >
-        <div class="flex items-center gap-3">
-          <svg lucideCalendar [size]="28"></svg>
-          <h2 class="text-2xl font-bold">Franjas disponibles</h2>
-        </div>
-        <app-button
-          variant="danger"
-          size="sm"
-          extraClass="w-9 h-9"
-          (buttonClick)="showAvailabilityWarning.set(false)"
-        >
-          ×
-        </app-button>
-      </div>
-
-      <div class="px-8 py-6">
-        <div
-          class="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-xl px-5 py-4 mb-6"
-        >
-          <svg
-            lucideCalendar
-            [size]="22"
-            class="text-amber-600 mt-0.5 shrink-0"
-          ></svg>
-          <div>
-            <p class="text-amber-800 font-semibold text-base">
-              Aún hay franjas horarias disponibles
-            </p>
-            <p class="text-amber-700 text-sm mt-1">
-              Para el <strong>{{ formatDate(date) }}</strong> todavía existen
-              horarios disponibles para agendar citas. ¿Está seguro de que desea
-              exportar el reporte en este momento?
-            </p>
-          </div>
-        </div>
-
-        <div class="flex gap-5">
-          <app-button
-            variant="secondary"
-            [fullWidth]="true"
-            class="flex-1"
-            (buttonClick)="showAvailabilityWarning.set(false)"
-          >
-            Cancelar
-          </app-button>
-          <app-button
-            variant="primary"
-            [fullWidth]="true"
-            extraClass="bg-amber-500 hover:bg-amber-600"
-            class="flex-1"
-            (buttonClick)="confirmExportDespiteAvailability()"
-          >
-            <svg lucideDownload [size]="20"></svg>
-            Sí, continuar
-          </app-button>
-        </div>
-      </div>
-    </div>
-  </div>
-}
-
 @if (showExportModal()) {
   <div
     class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
@@ -92,23 +24,21 @@
       </div>
 
       <div class="px-8 py-6">
-        <div
-          class="mb-6 flex items-start gap-3 bg-[#d9e9f8]/40 border border-[#a7c9ec] rounded-xl px-5 py-4"
-        >
-          <svg
-            lucideCalendar
-            [size]="22"
-            class="text-[#4e92d9] mt-0.5 shrink-0"
-          ></svg>
-          <div>
-            <p class="text-[#163c63] font-semibold text-base">
-              Fecha del reporte
-            </p>
-            <p class="text-[#215c98] text-sm mt-0.5">
-              Se exportarán las citas del
-              <strong>{{ formatDate(date) }}</strong>
-            </p>
-          </div>
+        <div class="mb-6">
+          <label
+            for="exportDate"
+            class="block text-gray-700 mb-2 text-sm font-medium"
+          >
+            Fecha del reporte <span class="text-red-500">*</span>
+          </label>
+          <app-datepicker
+            id="exportDate"
+            [ngModel]="selectedDate()"
+            (valueChange)="selectedDate.set($event)"
+            [errorMessage]="
+              dateRequiredError() ? 'Debe seleccionar una fecha' : undefined
+            "
+          ></app-datepicker>
         </div>
 
         <div class="mb-6">
@@ -164,25 +94,29 @@
           <app-button
             variant="secondary"
             (buttonClick)="closeExportModal()"
-            [disabled]="isExporting()"
+            [disabled]="isExporting() || isCheckingAvailability()"
           >
             Cancelar
           </app-button>
           <button
-            (click)="handleExport()"
-            [disabled]="isExporting()"
+            (click)="handleExportClick()"
+            [disabled]="isExporting() || isCheckingAvailability()"
             [class]="
               'flex-1 px-6 py-3.5 rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer ' +
-              (!isExporting()
+              (!isExporting() && !isCheckingAvailability()
                 ? exportColors().button + ' text-white'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed')
             "
           >
-            @if (isExporting()) {
+            @if (isExporting() || isCheckingAvailability()) {
               <span
                 class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"
               ></span>
-              Generando reporte...
+              {{
+                isCheckingAvailability()
+                  ? 'Verificando disponibilidad...'
+                  : 'Generando reporte...'
+              }}
             } @else {
               <svg lucideDownload [size]="20"></svg>
               Exportar
@@ -193,3 +127,22 @@
     </div>
   </div>
 }
+
+<app-confirm-modal
+  [visible]="showAvailabilityWarning()"
+  title="Franjas disponibles"
+  [message]="
+    'Para el ' +
+    formatSelectedDate() +
+    ' todavía existen horarios disponibles para agendar citas. ' +
+    '¿Está seguro de que desea exportar el reporte en este momento?'
+  "
+  confirmLabel="Sí, continuar"
+  cancelLabel="Cancelar"
+  confirmVariant="primary"
+  iconBg="bg-amber-100"
+  (dismissed)="dismissAvailabilityWarning()"
+  (confirmed)="confirmExportDespiteAvailability()"
+>
+  <svg icon lucideAlertTriangle [size]="32" class="text-amber-500"></svg>
+</app-confirm-modal>
