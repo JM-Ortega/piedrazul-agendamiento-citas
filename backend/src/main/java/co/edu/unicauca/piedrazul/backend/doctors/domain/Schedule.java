@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.doctors.domain;
 
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -8,9 +9,7 @@ import lombok.Setter;
 import java.time.LocalTime;
 import java.util.UUID;
 
-// Lombok
 @RequiredArgsConstructor
-@Setter
 @Getter
 
 @Entity
@@ -49,6 +48,17 @@ public class Schedule {
         this.startTime = startTime;
         this.endTime = endTime;
         this.workday = workday;
+    }
+
+    public void updateHours(LocalTime start, LocalTime end) {
+
+        if (!end.isAfter(start)) {
+            throw new DoctorValidationException(
+                    "La hora final debe ser posterior a la inicial");
+        }
+
+        this.startTime = start;
+        this.endTime = end;
     }
 
     @Override

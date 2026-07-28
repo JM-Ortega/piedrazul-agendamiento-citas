@@ -35,11 +35,8 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
 
     @Override
     public List<LocalTime> getSlotsByDoctor(UUID idDoctor, LocalDate date) {
-        Doctor doctor = doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-
         return scheduleService.getAvailableIntervalsByWorkday(
-                doctor,
+                idDoctor,
                 toWorkday(date.getDayOfWeek())
         );
     }

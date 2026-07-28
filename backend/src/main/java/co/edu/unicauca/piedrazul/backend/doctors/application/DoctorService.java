@@ -42,54 +42,46 @@ public class DoctorService implements DoctorProvisioningApi {
     @Transactional
     @Override
     public void createDoctor(UUID personId, CreateDoctorRequest request) {
+
         validateLaborDateRange(request.laborStart(), request.laborEnd());
 
         // Lo dejamos inactivo porque no tiene horarios
-        Doctor doctor = new Doctor(personId, request.laborStart(), request.laborEnd(), request.bookingWindowWeeks(),
-                false, request.appointmentInterval());
+        Doctor doctor = new Doctor(
+                personId,
+                request.laborStart(),
+                request.laborEnd(),
+                request.bookingWindowWeeks(),
+                false,
+                request.appointmentInterval()
+        );
 
         // Agregamos las especialidades
-        Set<Specialty> specialties = new HashSet<>();
         for (SpecialtyCode code : request.specialty()) {
             Specialty specialty = specialtyRepository.findById(code)
                     .orElseThrow(() -> new DoctorInvalidSpecialty("Especialidad inválida: " + code));
-            specialties.add(specialty);
+
+            doctor.addSpecialty(specialty);
         }
 
-        doctor.setSpecialties(specialties);
-
-
-        // Lo dejamos inactivo porque no tiene horarios
-        personExternalService.deactivateUser(personId);
-
-
-        // Agregamos los horarios, si hay
-
-        if(request.schedules() != null && !request.schedules().isEmpty()){
-            Set<Schedule> schedules = request.schedules().stream()
-                    .map(s -> new Schedule(
-                            doctor,
-                            s.startTime(),
-                            s.endTime(),
-                            s.workday()
-                    ))
-                    .collect(Collectors.toSet());
-
-            doctor.setSchedules(schedules);
-
-            // Como si hay horaios validamos si el doctor debe estar activo o no
-            doctor.setStatus(calculateActiveStatus(
-                    request.laborStart(),
-                    request.laborEnd()
-            ));
+        // Agregamos horarios si hay
+        if (request.schedules() != null) {
+            request.schedules().forEach(schedule ->
+                    doctor.updateSchedule(
+                            schedule.workday(),
+                            schedule.startTime(),
+                            schedule.endTime()
+                    )
+            );
+            doctor.activateIfPossible();
         }
 
-        // Persistimos
-        Doctor savedDoctor = doctorRepository.save(doctor);
+        doctorRepository.save(doctor);
 
-        // Activamos el usuario si el doctor está activo
-        if (savedDoctor.isStatus()) {
+
+        if (doctor.isStatus()) {
             personExternalService.activateUser(personId);
+        } else {
+            personExternalService.deactivateUser(personId);
         }
     }
 
@@ -110,129 +102,52 @@ public class DoctorService implements DoctorProvisioningApi {
         doctorRepository.delete(doctor);
     }
 
-    private boolean calculateActiveStatus(LocalDate start, LocalDate end) {
-        if (start == null) {
-            throw new DoctorValidationException("La fecha de inicio es obligatoria");
-        }
-
-        LocalDate today = LocalDate.now();
-        if (end == null) {
-            return !today.isBefore(start);
-        }
-
-        return !today.isBefore(start) && !today.isAfter(end);
-    }
-
-    @Transactional
     //Metodo para validar si el medico esta activo o no usarlo cada vez que ingrese el medico
+    @Transactional
     public void updateDoctorStatus(UUID idDoctor) {
         Doctor doctor = doctorRepository.findById(idDoctor)
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
-        boolean isActive = calculateActiveStatus(doctor.getLaborStart(), doctor.getLaborEnd());
+        doctor.activateIfPossible();
 
-        // Solo guardamos si el estado cambió (optimización de JPA)
-        if (doctor.isStatus() != isActive) {
-            doctor.setStatus(isActive);
-            doctorRepository.save(doctor);
-        }
+        doctorRepository.save(doctor);
 
         syncUserStatus(doctor);
     }
 
-    // Actualizar la fecha de inicio laboral de un doctor
     @Transactional
-    public void updateDoctorLaborStart(UUID idDoctor, LocalDate newLaborStart) {
-        if (newLaborStart == null) {
-            throw new DoctorValidationException("La fecha de inicio es obligatoria");
-        }
-
+    public void updateDoctorLaborDate(UUID idDoctor, LocalDate laborStart, LocalDate laborEnd) {
         Doctor doctor = doctorRepository.findById(idDoctor)
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
-        if (doctor.getLaborEnd() != null && newLaborStart.isAfter(doctor.getLaborEnd())) {
-            throw new DateConflictException("La fecha de inicio no puede ser posterior a la fecha de finalización");
-        }
-
-        doctor.setLaborStart(newLaborStart);
-        doctor.setStatus(calculateActiveStatus(doctor.getLaborStart(), doctor.getLaborEnd()));
-        syncUserStatus(doctor);
+        doctor.updateLaborPeriod(laborStart, laborEnd);
 
         doctorRepository.save(doctor);
     }
 
-    // Actualizar la fecha de finalización laboral de un doctor
-    @Transactional
-    public void updateDoctorLaborEnd(UUID idDoctor, LocalDate newLaborEnd) {
-        if (newLaborEnd == null) {
-            throw new DoctorValidationException("La fecha de finalización es obligatoria");
-        }
-
-        Doctor doctor = doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-
-        if (doctor.getLaborStart() == null) {
-            throw new DateConflictException("No se puede actualizar la fecha de finalización porque el médico no tiene fecha de inicio registrada");
-        }
-
-        if (newLaborEnd.isBefore(doctor.getLaborStart())) {
-            throw new DateConflictException("La fecha de finalización no puede ser anterior a la fecha de inicio");
-        }
-
-        doctor.setLaborEnd(newLaborEnd);
-        doctor.setStatus(calculateActiveStatus(doctor.getLaborStart(), doctor.getLaborEnd()));
-        syncUserStatus(doctor);
-
-        doctorRepository.save(doctor);
-    }
 
     // Actualizar el intervalo de atención de un doctor, valida que al menos un horario del doctor pueda acomodar el nuevo intervalo
     @Transactional
     public void updateDoctorAppointmentInterval(UUID idDoctor, int newAppointmentInterval) {
-        if (newAppointmentInterval <= 0) {
-            throw new DoctorValidationException("El intervalo de atención debe ser mayor a 0");
-        }
-
         Doctor doctor = doctorRepository.findById(idDoctor)
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
-        // Evita intervalos imposibles para todos los horarios existentes.
-        Set<Schedule> schedules = doctor.getSchedules() == null ? new HashSet<>() : doctor.getSchedules();
-        if (!schedules.isEmpty()) {
-            boolean fitsAtLeastOneSchedule = schedules.stream().anyMatch(schedule -> {
-                long duration = ChronoUnit.MINUTES.between(schedule.getStartTime(), schedule.getEndTime());
-                return duration >= newAppointmentInterval;
-            });
+        doctor.updateAppointmentInterval(newAppointmentInterval);
 
-            if (!fitsAtLeastOneSchedule) {
-                throw new IllegalArgumentException("El nuevo intervalo es mayor a la duración de todos los horarios del médico");
-            }
-        }
-
-        doctor.setAppointmentInterval(newAppointmentInterval);
         doctorRepository.save(doctor);
     }
 
     // Habilitar medico
     @Transactional
-    public void enableDoctor(UUID idDoctor, LocalDate newStart, LocalDate newEnd) {
-        validateLaborDateRange(newStart, newEnd);
-
+    public void enableDoctor(UUID idDoctor) {
         Doctor doctor = doctorRepository.findById(idDoctor)
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
-        // 1. Actualizamos el periodo laboral
-        doctor.setLaborStart(newStart);
-        doctor.setLaborEnd(newEnd);
+        doctor.activate();
 
-        // 2. Cambiamos el estado (aquí forzamos true porque es la acción de habilitar)
-        doctor.setStatus(true);
-
-        // 3. Reactivamos el usuario para que pueda loguearse
-        syncUserStatus(doctor);
-
-        // 4. Guardamos y retornamos el DTO actualizado
         doctorRepository.save(doctor);
+
+        syncUserStatus(doctor);
     }
 
     //Deshabilitar medico
@@ -246,6 +161,7 @@ public class DoctorService implements DoctorProvisioningApi {
 
         // 2. Validación
         // Si hoy es antes de que siquiera empiece a trabajar, lanzamos la advertencia
+        // Si da qeu si el front debe volver a enviar la peticino pero ahora con force true
         if (today.isBefore(doctor.getLaborStart()) && !force) {
             throw new DateConflictException(
                     "El doctor aún no ha iniciado labores (Inicia: " + doctor.getLaborStart() +
@@ -257,13 +173,13 @@ public class DoctorService implements DoctorProvisioningApi {
         // Si hoy es antes del inicio (por el force), igualamos fin al inicio.
         // De lo contrario, el fin es hoy.
         if (today.isBefore(doctor.getLaborStart())) {
-            doctor.setLaborEnd(doctor.getLaborStart());
+            doctor.updateLaborPeriod(doctor.getLaborStart(), doctor.getLaborStart());
         } else {
-            doctor.setLaborEnd(today);
+            doctor.updateLaborPeriod(doctor.getLaborStart(), today);
         }
 
         // 4. Cambiar el estado del Doctor
-        doctor.setStatus(false);
+        doctor.deactivate();
 
         // 5. Desactivamos el usuario para que no pueda loguearse
         syncUserStatus(doctor);
@@ -370,5 +286,7 @@ public class DoctorService implements DoctorProvisioningApi {
         Set<Specialty> actuales = doctor.getSpecialties();
         actuales.removeIf(s -> !nuevas.contains(s)); // quita las que ya no vienen
         actuales.addAll(nuevas); // agrega las nuevas
+
+        doctorRepository.save(doctor);
     }
 }
