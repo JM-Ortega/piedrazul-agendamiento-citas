@@ -1,0 +1,39 @@
+<div [class]="computedWrapperClasses">
+  <div class="relative">
+    @if (hasPrefix) {
+      <div
+        class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"
+      >
+        <ng-content select="[prefix]"></ng-content>
+      </div>
+    }
+    <select
+      [id]="id"
+      [disabled]="disabled"
+      [class]="computedSelectClasses"
+      [value]="value"
+      (change)="handleChange($event)"
+      (blur)="handleBlur($event)"
+      (focus)="handleFocus($event)"
+    >
+      <option value="">{{ loading ? loadingText : placeholder }}</option>
+      @for (opt of options; track opt.value) {
+        <option [value]="opt.value">{{ opt.label }}</option>
+      }
+    </select>
+    @if (hasSuffix) {
+      <div
+        class="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"
+      >
+        <ng-content select="[suffix]"></ng-content>
+      </div>
+    }
+  </div>
+
+  @if (errorMessage) {
+    <p class="text-red-500 text-sm mt-1">{{ errorMessage }}</p>
+  }
+  @if (!errorMessage && helperText) {
+    <p class="text-gray-500 text-sm mt-1">{{ helperText }}</p>
+  }
+</div>
