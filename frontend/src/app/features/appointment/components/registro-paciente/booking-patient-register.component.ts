@@ -11,6 +11,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { LucideArrowLeft, LucideCalendar } from '@lucide/angular';
 import { PatientService } from '../../../../core/services/patient.service';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { InputComponent } from '../../../../design-system/atoms/input/input.component';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { BookingStateService } from '../../services/booking-state.service';
