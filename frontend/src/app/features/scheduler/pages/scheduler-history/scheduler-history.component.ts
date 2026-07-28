@@ -6,16 +6,18 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
-import { LucideX } from '@lucide/angular';
+import { LucideX, LucideDownload, LucideCalendar } from '@lucide/angular';
 import { SchedulerService } from '../../../../core/services/scheduler.service';
 import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
 import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../../../shared/models/dtos/doctor.dto';
 import { formatLongDateEs } from '../../../../shared/helpers/date-format';
 import { ConfirmModalComponent } from '../../../../design-system/organisms/confirm-modal/confirm-modal.component';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { ToastComponent } from '../../../../design-system/molecules/toast-message/toast.component';
 import { AppointmentTableComponent } from '../../components/table/table.component';
 import { SchedulerFiltersComponent } from '../../components/filters/filter.component';
+import { SchedulerExportModalComponent } from '../../components/export-modal/export-modal.component';
 
 @Component({
   selector: 'app-scheduler-history',
@@ -23,10 +25,14 @@ import { SchedulerFiltersComponent } from '../../components/filters/filter.compo
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideX,
+    LucideDownload,
+    LucideCalendar,
     ConfirmModalComponent,
     ToastComponent,
     AppointmentTableComponent,
     SchedulerFiltersComponent,
+    SchedulerExportModalComponent,
+    ButtonComponent,
   ],
   templateUrl: './scheduler-history.component.html',
 })
