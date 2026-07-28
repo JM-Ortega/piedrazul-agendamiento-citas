@@ -40,7 +40,6 @@ export class SchedulerHistoryComponent implements OnInit {
   filterDoctor = signal('');
   filterDate = signal('');
   filterStatus = signal('');
-  searched = signal(false);
 
   showCancelModal = signal(false);
   pendingCancelId = signal<string | null>(null);
@@ -83,13 +82,21 @@ export class SchedulerHistoryComponent implements OnInit {
     this.results().filter((a) => a.appointmentState !== 'CANCELADA')
   );
 
+  errorMessage = signal('');
+
   ngOnInit(): void {
     this.schedulerService
       .getDoctors()
       .subscribe((data) => this.doctors.set(data));
-    this.schedulerService.getAllAppointments().subscribe((data) => {
-      this.appointments.set(data);
-      this.searched.set(true);
+    this.schedulerService.getAllAppointments().subscribe({
+      next: (data) => {
+        this.appointments.set(data);
+      },
+      error: () => {
+        this.errorMessage.set(
+          'No se pudieron cargar las citas. Intente más tarde.'
+        );
+      },
     });
   }
 

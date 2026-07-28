@@ -1,0 +1,47 @@
+<div [class]="computedWrapperClasses">
+  <div class="relative w-full">
+    <input
+      [id]="id"
+      type="text"
+      inputmode="numeric"
+      [matDatepicker]="picker"
+      [disabled]="disabled"
+      [min]="min ?? null"
+      [max]="max ?? null"
+      [attr.placeholder]="resolvedPlaceholder"
+      [attr.aria-invalid]="resolvedErrorMessage ? true : null"
+      [attr.aria-describedby]="
+        resolvedErrorMessage
+          ? id + '-error'
+          : helperText
+            ? id + '-helper'
+            : null
+      "
+      [ngModel]="value"
+      (ngModelChange)="handleDateChange($event)"
+      (input)="onRawInput($event)"
+      (blur)="handleBlur($event)"
+      [class]="computedInputClasses"
+    />
+    <app-button
+      variant="icon"
+      extraClass="absolute right-3 top-1/2 -translate-y-1/2"
+      [disabled]="disabled"
+      (buttonClick)="picker.open()"
+    >
+      <svg lucideCalendar [size]="20"></svg>
+    </app-button>
+    <mat-datepicker #picker></mat-datepicker>
+  </div>
+
+  @if (resolvedErrorMessage) {
+    <p [id]="id + '-error'" class="text-red-500 text-sm mt-1">
+      {{ resolvedErrorMessage }}
+    </p>
+  }
+  @if (!resolvedErrorMessage && helperText) {
+    <p [id]="id + '-helper'" class="text-gray-500 text-sm mt-1">
+      {{ helperText }}
+    </p>
+  }
+</div>

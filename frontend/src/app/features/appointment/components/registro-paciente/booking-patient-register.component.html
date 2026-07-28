@@ -125,32 +125,13 @@
       >
         Fecha de Nacimiento <span class="text-red-500">*</span>
       </label>
-
-      <div class="relative w-full">
-        <input
-          id="birthDate"
-          type="text"
-          [matDatepicker]="birthPicker"
-          [ngModel]="getPatientField('birthDate')"
-          (ngModelChange)="onBirthDateChange($event)"
-          [max]="maxBirthDate"
-          placeholder="mm/dd/aaaa"
-          readonly
-          class="w-full border-2 border-[#c2d8f0] rounded-xl px-4 py-3 pr-12"
-        />
-        <app-button
-          variant="icon"
-          extraClass="absolute right-3 top-1/2 -translate-y-1/2"
-          (buttonClick)="birthPicker.open()"
-        >
-          <svg lucideCalendar [size]="20"></svg>
-        </app-button>
-        <mat-datepicker #birthPicker></mat-datepicker>
-      </div>
-
-      @if (birthDateError()) {
-        <p class="text-red-500 text-sm mt-1">{{ birthDateErrorMsg() }}</p>
-      }
+      <app-datepicker
+        id="birthDate"
+        [max]="maxBirthDate"
+        [ngModel]="getPatientField('birthDate')"
+        (valueChange)="onBirthDateChange($event)"
+        [errorMessage]="birthDateError() ? birthDateErrorMsg() : undefined"
+      ></app-datepicker>
     </div>
 
     <div class="sm:col-span-2">
