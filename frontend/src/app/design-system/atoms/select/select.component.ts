@@ -6,6 +6,7 @@ import {
   Output,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { LucideCircleAlert } from '@lucide/angular';
 
 export interface SelectOption {
   value: string;
@@ -18,7 +19,7 @@ export type SelectSize = 'sm' | 'md' | 'lg';
 @Component({
   selector: 'app-select',
   standalone: true,
-  imports: [],
+  imports: [LucideCircleAlert],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,
