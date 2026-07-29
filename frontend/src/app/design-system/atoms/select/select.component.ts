@@ -69,6 +69,7 @@ export class SelectComponent implements ControlValueAccessor {
       'shadow-sm',
       'transition',
       'focus:outline-none',
+      'bg-white',
       this.hasPrefix ? 'pl-12' : 'px-4',
       this.hasSuffix ? 'pr-12' : 'pr-4',
       'py-3',

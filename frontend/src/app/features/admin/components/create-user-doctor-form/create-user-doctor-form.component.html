@@ -153,8 +153,9 @@
       <label
         for="startTime"
         class="block text-gray-700 text-base font-medium mb-2"
-        >Hora de Inicio</label
       >
+        Hora de Inicio
+      </label>
       <app-select
         id="startTime"
         [(ngModel)]="data.startTime"
@@ -167,7 +168,10 @@
         [options]="timeOptions | toSelectOptions: false"
         placeholder="-- Seleccionar --"
         [errorMessage]="errors['startTime']"
-      ></app-select>
+        [hasSuffix]="true"
+      >
+        <svg lucideClock [size]="18" suffix></svg>
+      </app-select>
     </div>
     <div>
       <label
@@ -191,7 +195,10 @@
         [options]="timeOptions | toSelectOptions: false"
         placeholder="-- Seleccionar --"
         [errorMessage]="errors['endTime']"
-      ></app-select>
+        [hasSuffix]="true"
+      >
+        <svg lucideClock [size]="18" suffix></svg>
+      </app-select>
     </div>
   </div>
 
@@ -218,7 +225,9 @@
         [step]="5"
         [errorMessage]="errors['interval']"
         (inputBlur)="fieldBlurred.emit('interval')"
-      />
+      >
+        <svg lucideClock [size]="18" suffix></svg>
+      </app-input>
     </div>
   </div>
 

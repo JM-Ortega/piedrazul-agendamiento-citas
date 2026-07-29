@@ -11,6 +11,7 @@ import { FormsModule } from '@angular/forms';
 import {
   LucideCalendarRange,
   LucideCircleAlert,
+  LucideClock,
   LucideCreditCard,
   LucideDynamicIcon,
   LucideInfo,
@@ -57,6 +58,7 @@ export interface SpecialtyOption {
     LucidePhone,
     LucideStethoscope,
     LucideDynamicIcon,
+    LucideClock,
     FormatoPipe,
     InputComponent,
     ButtonComponent,

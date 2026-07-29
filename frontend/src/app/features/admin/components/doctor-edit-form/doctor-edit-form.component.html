@@ -1,11 +1,5 @@
 <!-- Botones Cancelar / Guardar -->
 <div class="flex justify-end gap-2 px-5 py-3 border-t border-[#a7c9ec]">
-  <button
-    (click)="cancelled.emit()"
-    class="border-2 border-gray-300 text-gray-600 px-4 py-2 rounded-xl text-base hover:bg-gray-50"
-  >
-    Cancelar
-  </button>
   <app-button
     variant="danger"
     extraClass="!rounded-xl !px-4 !py-2"
@@ -13,19 +7,6 @@
   >
     Cancelar
   </app-button>
-  <button
-    (click)="onSave()"
-    [disabled]="!canSave()"
-    class="flex items-center gap-2 px-5 py-2.5 rounded-xl transition-colors text-base"
-    [class]="
-      canSave()
-        ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
-        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-    "
-  >
-    <svg lucideSave [size]="18"></svg>
-    Guardar
-  </button>
   <app-button
     variant="success"
     extraClass="!rounded-xl !px-5 !py-2.5"
@@ -49,53 +30,32 @@
     </p>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
-        <label for="laborStart" class="block text-gray-700 mb-1 text-base"
-          >Fecha Inicio</label
-        >
-        <input
+        <label for="laborStart" class="block text-gray-700 mb-1 text-base">
+          Fecha Inicio
+        </label>
+        <app-datepicker
           id="laborStart"
-          type="date"
-          maxlength="10"
-          [value]="editForm()!.laborStart"
-          (input)="onLaborStartInput($event)"
-          (change)="updateField('laborStart', $any($event.target).value)"
-          class="w-full border-2 focus:border-purple-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
-          [class]="
-            errors().fechas || errors().fechaInicio
-              ? 'border-red-400'
-              : 'border-purple-200'
-          "
+          variant="purple"
+          format="yyyy-mm-dd"
+          [(ngModel)]="editForm()!.laborStart"
+          (ngModelChange)="updateField('laborStart', toDateString($event))"
+          [errorMessage]="errors().fechaInicio || errors().fechas || undefined"
         />
-        @if (errors().fechaInicio) {
-          <p class="text-red-500 text-sm mt-1">⚠️ {{ errors().fechaInicio }}</p>
-        }
       </div>
       <div>
-        <label for="laborEnd" class="block text-gray-700 mb-1 text-base"
-          >Fecha Fin</label
-        >
-        <input
+        <label for="laborEnd" class="block text-gray-700 mb-1 text-base">
+          Fecha Fin
+        </label>
+        <app-datepicker
           id="laborEnd"
-          type="date"
-          maxlength="10"
-          [value]="editForm()!.laborEnd"
-          (input)="onLaborEndInput($event)"
-          (change)="updateField('laborEnd', $any($event.target).value)"
-          class="w-full border-2 focus:border-purple-500 rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
-          [class]="
-            errors().fechas || errors().fechaFin
-              ? 'border-red-400'
-              : 'border-purple-200'
-          "
+          variant="purple"
+          format="yyyy-mm-dd"
+          [(ngModel)]="editForm()!.laborEnd"
+          (ngModelChange)="updateField('laborEnd', toDateString($event))"
+          [errorMessage]="errors().fechaFin || errors().fechas || undefined"
         />
-        @if (errors().fechaFin) {
-          <p class="text-red-500 text-sm mt-1">⚠️ {{ errors().fechaFin }}</p>
-        }
       </div>
     </div>
-    @if (errors().fechas) {
-      <p class="text-red-500 text-sm mt-2">⚠️ {{ errors().fechas }}</p>
-    }
   </div>
 
   <!-- Horario Semanal -->
@@ -108,78 +68,53 @@
     </p>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <div>
-        <label for="startTime" class="block text-gray-700 mb-1 text-base"
-          >Hora Inicio (por defecto)</label
-        >
-        <select
+        <label for="startTime" class="block text-gray-700 mb-1 text-base">
+          Hora Inicio (por defecto)
+        </label>
+        <app-select
           id="startTime"
-          [value]="editForm()!.startTime"
-          (change)="updateField('startTime', $any($event.target).value)"
-          class="w-full border-2 focus:border-[#215c98] rounded-xl px-4 py-2.5 text-base outline-none transition-colors bg-white"
-          [class]="
-            errors().horarioGlobal ? 'border-red-400' : 'border-[#a7c9ec]'
-          "
-        >
-          <option value="" disabled [selected]="!editForm()!.startTime">
-            -- Seleccionar --
-          </option>
-          @for (t of timeOptions; track t) {
-            <option [value]="t" [selected]="editForm()!.startTime === t">
-              {{ t }}
-            </option>
-          }
-        </select>
+          [(ngModel)]="editForm()!.startTime"
+          (ngModelChange)="updateField('startTime', $event)"
+          name="startTime"
+          [options]="timeOptions | toSelectOptions: false"
+          placeholder="-- Seleccionar --"
+          [errorMessage]="errors().horarioGlobal"
+        />
       </div>
       <div>
-        <label for="endTime" class="block text-gray-700 mb-1 text-base"
-          >Hora Fin (por defecto)</label
-        >
-        <select
+        <label for="endTime" class="block text-gray-700 mb-1 text-base">
+          Hora Fin (por defecto)
+        </label>
+        <app-select
           id="endTime"
-          [value]="editForm()!.endTime"
-          (change)="updateField('endTime', $any($event.target).value)"
-          class="w-full border-2 focus:border-[#215c98] rounded-xl px-4 py-2.5 text-base outline-none transition-colors bg-white"
-          [class]="
-            errors().horarioGlobal ? 'border-red-400' : 'border-[#a7c9ec]'
-          "
-        >
-          <option value="" disabled [selected]="!editForm()!.endTime">
-            -- Seleccionar --
-          </option>
-          @for (t of timeOptions; track t) {
-            <option [value]="t" [selected]="editForm()!.endTime === t">
-              {{ t }}
-            </option>
-          }
-        </select>
+          [(ngModel)]="editForm()!.endTime"
+          (ngModelChange)="updateField('endTime', $event)"
+          name="endTime"
+          [options]="timeOptions | toSelectOptions: false"
+          placeholder="-- Seleccionar --"
+          [errorMessage]="errors().horarioGlobal"
+        />
       </div>
       <div>
         <label
           for="appointmentInterval"
           class="block text-gray-700 mb-1 text-base"
-          >Intervalo (min)</label
         >
-        <input
+          Intervalo (min)
+        </label>
+        <app-input
           id="appointmentInterval"
           type="number"
-          min="5"
-          max="120"
-          step="5"
-          [value]="editForm()!.appointmentInterval"
-          (input)="
-            updateField('appointmentInterval', +$any($event.target).value)
-          "
-          class="w-full border-2 focus:border-[#215c98] rounded-xl px-4 py-2.5 text-base outline-none transition-colors"
-          [class]="errors().intervalo ? 'border-red-400' : 'border-[#a7c9ec]'"
+          [(ngModel)]="editForm()!.appointmentInterval"
+          (ngModelChange)="updateField('appointmentInterval', $event)"
+          name="appointmentInterval"
+          [min]="5"
+          [max]="120"
+          [step]="5"
+          [errorMessage]="errors().intervalo"
         />
-        @if (errors().intervalo) {
-          <p class="text-red-500 text-sm mt-1">⚠️ {{ errors().intervalo }}</p>
-        }
       </div>
     </div>
-    @if (errors().horarioGlobal) {
-      <p class="text-red-500 text-sm mt-2">⚠️ {{ errors().horarioGlobal }}</p>
-    }
   </div>
   <!-- Días de Atención -->
   <div>
@@ -190,17 +125,16 @@
     >
     <div class="flex gap-2 flex-wrap">
       @for (day of weekDays; track day) {
-        <button
-          (click)="toggleDay(day)"
-          class="w-14 py-3 rounded-xl text-base font-semibold border-2 transition-all"
-          [class]="
-            editForm()!.workdays.includes(day)
-              ? 'bg-[#215c98] text-white border-[#215c98]'
-              : 'bg-white text-gray-500 border-gray-200 hover:border-[#4e92d9]'
-          "
+        <app-button
+          variant="chip"
+          extraClass="!w-14"
+          [active]="editForm()!.workdays.includes(day)"
+          activeChipClasses="bg-[#215c98] text-white border-[#215c98]"
+          inactiveChipClasses="bg-white text-gray-500 border-gray-200 hover:border-[#4e92d9]"
+          (buttonClick)="toggleDay(day)"
         >
           {{ DAY_LABELS[day] }}
-        </button>
+        </app-button>
       }
     </div>
     @if (errors().dias) {
@@ -273,87 +207,50 @@
                       <label
                         for="startTime-{{ day }}"
                         class="block text-gray-600 text-sm mb-1"
-                        >Hora Inicio</label
                       >
-                      <select
+                        Hora Inicio
+                      </label>
+                      <app-select
                         id="startTime-{{ day }}"
-                        [value]="getDayScheduleValue(day, 'startTime')"
-                        (change)="
-                          updateDaySchedule(
-                            day,
-                            'startTime',
-                            $any($event.target).value
-                          )
+                        [ngModel]="getDayScheduleValue(day, 'startTime')"
+                        (ngModelChange)="
+                          updateDaySchedule(day, 'startTime', $event)
                         "
-                        class="w-full border-2 focus:border-[#215c98] rounded-xl px-3 py-2 text-base outline-none transition-colors bg-white"
-                        [class]="
-                          errors().horariosDia[day]
-                            ? 'border-red-400'
-                            : 'border-[#a7c9ec]'
-                        "
-                      >
-                        @for (t of timeOptions; track t) {
-                          <option
-                            [value]="t"
-                            [selected]="
-                              getDayScheduleValue(day, 'startTime') === t
-                            "
-                          >
-                            {{ t }}
-                          </option>
-                        }
-                      </select>
+                        name="startTime-{{ day }}"
+                        [options]="timeOptions | toSelectOptions: false"
+                        [errorMessage]="errors().horariosDia[day]"
+                      />
                     </div>
                     <div class="flex-1 min-w-32.5">
                       <label
                         for="endTime-{{ day }}"
                         class="block text-gray-600 text-sm mb-1"
-                        >Hora Fin</label
                       >
-                      <select
+                        Hora Fin
+                      </label>
+                      <app-select
                         id="endTime-{{ day }}"
-                        [value]="getDayScheduleValue(day, 'endTime')"
-                        (change)="
-                          updateDaySchedule(
-                            day,
-                            'endTime',
-                            $any($event.target).value
-                          )
+                        [ngModel]="getDayScheduleValue(day, 'endTime')"
+                        (ngModelChange)="
+                          updateDaySchedule(day, 'endTime', $event)
                         "
-                        class="w-full border-2 focus:border-[#215c98] rounded-xl px-3 py-2 text-base outline-none transition-colors bg-white"
-                        [class]="
-                          errors().horariosDia[day]
-                            ? 'border-red-400'
-                            : 'border-[#a7c9ec]'
-                        "
-                      >
-                        @for (t of timeOptions; track t) {
-                          <option
-                            [value]="t"
-                            [selected]="
-                              getDayScheduleValue(day, 'endTime') === t
-                            "
-                          >
-                            {{ t }}
-                          </option>
-                        }
-                      </select>
+                        name="endTime-{{ day }}"
+                        [options]="timeOptions | toSelectOptions: false"
+                        [errorMessage]="errors().horariosDia[day]"
+                      />
                     </div>
                     @if (hasDayOverride(day)) {
-                      <button
-                        (click)="resetDaySchedule(day)"
-                        class="text-sm text-gray-400 hover:text-red-500 underline transition-colors pb-2 shrink-0"
+                      <app-button
+                        variant="link"
+                        extraClass="!text-sm !text-gray-400 hover:!text-red-500 !pb-2 shrink-0"
+                        (buttonClick)="resetDaySchedule(day)"
                       >
                         Usar por defecto
-                      </button>
+                      </app-button>
                     }
                   </div>
                 </div>
-                @if (errors().horariosDia[day]) {
-                  <p class="text-red-500 text-xs mt-2 sm:ml-13">
-                    ⚠️ {{ errors().horariosDia[day] }}
-                  </p>
-                } @else if (!hasDayOverride(day)) {
+                @if (!hasDayOverride(day)) {
                   <p class="text-xs text-gray-400 mt-2 sm:ml-13">
                     Usando horario por defecto: {{ editForm()!.startTime }} –
                     {{ editForm()!.endTime }}
