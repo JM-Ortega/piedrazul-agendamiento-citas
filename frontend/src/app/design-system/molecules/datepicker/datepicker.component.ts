@@ -8,21 +8,21 @@ import {
 } from '@angular/core';
 import {
   ControlValueAccessor,
-  NG_VALUE_ACCESSOR,
   FormsModule,
+  NG_VALUE_ACCESSOR,
 } from '@angular/forms';
-import { MatDatepickerModule } from '@angular/material/datepicker';
 import {
   DateAdapter,
   MAT_DATE_FORMATS,
   MAT_DATE_LOCALE,
 } from '@angular/material/core';
-import { LucideCalendar } from '@lucide/angular';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { LucideCalendar, LucideCircleAlert } from '@lucide/angular';
 import { ButtonComponent } from '../../atoms/button/button.component';
 import {
   CustomDateAdapter,
-  DateFormatPreset,
   DATE_INPUT_FORMAT_MARKER,
+  DateFormatPreset,
   parseLocalDateString,
 } from './customDateAdapter';
 
@@ -35,7 +35,7 @@ const APP_DATE_FORMATS = {
     monthYearA11yLabel: { year: 'numeric', month: 'long' },
   },
 };
-
+export type DatepickerVariant = 'default' | 'purple';
 const DEFAULT_PLACEHOLDERS: Record<DateFormatPreset, string> = {
   'dd/mm/yyyy': 'dd/mm/aaaa',
   'mm/dd/yyyy': 'mm/dd/aaaa',
@@ -55,7 +55,13 @@ const MASK_CONFIG: Record<
 @Component({
   selector: 'app-datepicker',
   standalone: true,
-  imports: [FormsModule, MatDatepickerModule, LucideCalendar, ButtonComponent],
+  imports: [
+    FormsModule,
+    MatDatepickerModule,
+    LucideCalendar,
+    ButtonComponent,
+    LucideCircleAlert,
+  ],
   providers: [
     { provide: MAT_DATE_LOCALE, useValue: 'es-CO' },
     { provide: DateAdapter, useClass: CustomDateAdapter },
@@ -92,6 +98,7 @@ export class DatepickerComponent implements ControlValueAccessor {
   @Input() wrapperClass = '';
   @Input() inputClass = '';
   @Input() invalidDateMessage = 'La fecha ingresada no es válida';
+  @Input() variant: DatepickerVariant = 'default';
 
   @Output() valueChange = new EventEmitter<Date | null>();
   @Output() dateBlur = new EventEmitter<FocusEvent>();
@@ -130,12 +137,17 @@ export class DatepickerComponent implements ControlValueAccessor {
       'bg-white',
       'placeholder:text-gray-400',
       'focus:outline-none',
-      'border-[#c2d8f0]',
-      'focus:border-[#4e92d9]',
       'px-4',
       'py-3',
       'pr-12',
     ];
+
+    base.push(
+      this.variant === 'purple'
+        ? 'border-purple-200 focus:border-purple-500'
+        : 'border-[#c2d8f0] focus:border-[#4e92d9]'
+    );
+
     if (this.resolvedErrorMessage)
       base.push('border-red-400', 'focus:border-red-500');
     if (this.disabled)
