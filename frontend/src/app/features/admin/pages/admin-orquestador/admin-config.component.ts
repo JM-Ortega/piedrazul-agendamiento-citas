@@ -271,7 +271,7 @@ export class AdminConfigComponent implements OnInit {
 
   // ── Helpers de template ───────────────────────────────────────────────────
   containerClass(doctor: Doctor): string {
-    if (doctor.status === false) return 'border-gray-200 bg-gray-50 opacity-60';
+    if (doctor.status === false) return 'border-gray-200 bg-gray-50';
     if (this.editingId() === doctor.id) return 'border-blue-400 bg-blue-50';
     return 'border-gray-100 bg-white hover:shadow-lg transition-shadow';
   }
