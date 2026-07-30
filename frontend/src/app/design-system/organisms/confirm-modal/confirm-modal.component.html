@@ -6,7 +6,7 @@
     (keydown.escape)="onDismiss()"
   >
     <div
-      class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm"
+      [class]="'bg-white rounded-2xl shadow-2xl p-8 w-full ' + maxWidth"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirmModalTitle"
@@ -28,14 +28,32 @@
       >
         {{ title }}
       </h3>
-      <p class="text-gray-500 text-sm text-center mb-8">
-        {{ message }}
-      </p>
-      <div class="flex gap-5 justify-center">
-        <app-button variant="secondary" (buttonClick)="onDismiss()">
+      @if (richMessage) {
+        <p class="text-gray-500 text-base text-center mb-8">
+          <ng-content select="[message]"></ng-content>
+        </p>
+      } @else {
+        <p class="text-gray-500 text-base text-center mb-8">
+          {{ message }}
+        </p>
+      }
+      <div
+        [class]="fullWidthButtons ? 'flex gap-5' : 'flex gap-5 justify-center'"
+      >
+        <app-button
+          variant="secondary"
+          [class]="fullWidthButtons ? 'flex-1' : ''"
+          [fullWidth]="fullWidthButtons"
+          (buttonClick)="onDismiss()"
+        >
           {{ cancelLabel }}
         </app-button>
-        <app-button [variant]="confirmVariant" (buttonClick)="onConfirm()">
+        <app-button
+          [variant]="confirmVariant"
+          [class]="fullWidthButtons ? 'flex-1' : ''"
+          [fullWidth]="fullWidthButtons"
+          (buttonClick)="onConfirm()"
+        >
           {{ confirmLabel }}
         </app-button>
       </div>

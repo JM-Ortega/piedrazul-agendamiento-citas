@@ -18,6 +18,9 @@ export class ConfirmModalComponent {
   @Input() cancelLabel = 'Volver';
   @Input() confirmVariant: ButtonVariant = 'danger';
   @Input() iconBg = 'bg-red-100';
+  @Input() richMessage = false;
+  @Input() maxWidth = 'max-w-sm';
+  @Input() fullWidthButtons = false;
 
   @Output() confirmed = new EventEmitter<void>();
   @Output() dismissed = new EventEmitter<void>();
