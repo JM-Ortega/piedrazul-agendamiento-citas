@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { LucidePencil, LucideSettings } from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { DoctorCardComponent } from '../../components/doctor-card/doctor-card.component';
@@ -15,7 +16,7 @@ import {
   DoctorEditFormComponent,
   DoctorSaveEvent,
 } from '../../components/doctor-edit-form/doctor-edit-form.component';
-import { AdminModalsComponent } from '../../components/modals/modals-horarios/admin-modals.component';
+import { AdminModalsComponent } from '../../components/modals/modal-horarios/admin-modals.component';
 import { dtoSchedule } from '../../models/dtos/schedule.dto';
 import { AdminService } from '../../service/admin.service';
 
@@ -30,6 +31,7 @@ import { AdminService } from '../../service/admin.service';
     DoctorCardComponent,
     DoctorEditFormComponent,
     AdminModalsComponent,
+    ButtonComponent,
   ],
 })
 export class AdminConfigComponent implements OnInit {

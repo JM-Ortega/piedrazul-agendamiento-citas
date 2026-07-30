@@ -31,7 +31,7 @@ import {
   SpecialtyOption,
 } from '../../components/create-user-doctor-form/create-user-doctor-form.component';
 import { CreateUserRolesComponent } from '../../components/create-user-roles/create-user-roles.component';
-import { CreateUserConfirmModalComponent } from '../../components/modals/modals-create/create-user-confirm-modal.component';
+import { CreateUserConfirmModalComponent } from '../../components/modals/modal-create/create-user-confirm-modal.component';
 import { CreateUserRequestDto } from '../../models/dtos/CreateUserRequestDto';
 import { FormErrors } from '../../models/interfaces/FormErrors';
 import { UserForm } from '../../models/interfaces/UserForm';
