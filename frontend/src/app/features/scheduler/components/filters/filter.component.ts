@@ -1,6 +1,11 @@
-import { Component, Input, model } from '@angular/core';
+import { Component, computed, input, model } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { LucideSearch } from '@lucide/angular';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import {
+  SelectComponent,
+  SelectOption,
+} from '../../../../design-system/atoms/select/select.component';
 import { APPOINTMENT_STATUS_LABELS } from '../../../../shared/helpers/appointment-status';
 import { formatLongDateEs } from '../../../../shared/helpers/date-format';
 import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
@@ -9,32 +14,51 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
 export type SchedulerFilterField = 'doctor' | 'date' | 'status';
 
+const STATUS_OPTIONS: SelectOption[] = [
+  { value: 'AGENDADA', label: 'Agendada' },
+  { value: 'ATENDIDA', label: 'Atendida' },
+  { value: 'CANCELADA', label: 'Cancelada' },
+  { value: 'NO_ASISTIO', label: 'No asistió' },
+  { value: 'REPROGRAMADA', label: 'Reprogramada' },
+];
+
 @Component({
   selector: 'app-filter',
   standalone: true,
-  imports: [LucideSearch, FormatoPipe, ButtonComponent],
+  imports: [FormsModule, LucideSearch, ButtonComponent, SelectComponent],
   templateUrl: './filter.component.html',
 })
 export class SchedulerFiltersComponent {
-  @Input() fields: SchedulerFilterField[] = ['doctor', 'status'];
-  @Input() doctors: dtoDoctor[] = [];
-  @Input() title = 'Filtros';
-  @Input() description = '';
+  fields = input<SchedulerFilterField[]>(['doctor', 'status']);
+  doctors = input<dtoDoctor[]>([]);
+  title = input('Filtros');
+  description = input('');
+
+  private formatoPipe = new FormatoPipe();
 
   filterDoctor = model('');
   filterDate = model('');
   filterStatus = model('');
 
+  readonly statusOptions = STATUS_OPTIONS;
+
+  doctorOptions = computed<SelectOption[]>(() =>
+    this.doctors().map((d) => ({
+      value: d.id,
+      label: `${d.name} — ${this.formatoPipe.transform(d.specialty)}`,
+    }))
+  );
+
   hasField(field: SchedulerFilterField): boolean {
-    return this.fields.includes(field);
+    return this.fields().includes(field);
   }
 
   get gridColsClass(): string {
-    return this.fields.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2';
+    return this.fields().length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2';
   }
 
   get selectedDoctor(): dtoDoctor | undefined {
-    return this.doctors.find((d) => d.id === this.filterDoctor());
+    return this.doctors().find((d) => d.id === this.filterDoctor());
   }
 
   formatDate(dateStr: string): string {
