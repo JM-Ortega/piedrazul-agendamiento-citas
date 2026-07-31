@@ -141,13 +141,13 @@ public class PersonExternalServiceImp implements PersonExternalService {
     }
 
     @Override
-    public void deactivateUser (UUID personId){
-        keycloakUserService.deactivateUser(personRepository.findUserIdById(personId));
+    public void revokeDoctorRole(UUID personId){
+        keycloakUserService.revokeDoctorRole(personRepository.findUserIdById(personId));
     }
 
     @Override
-    public void activateUser(UUID personId){
-        keycloakUserService.activateUser(personRepository.findUserIdById(personId));
+    public void ensureDoctorRole(UUID personId){
+        keycloakUserService.ensureDoctorRole(personRepository.findUserIdById(personId));
     }
 
     @Override

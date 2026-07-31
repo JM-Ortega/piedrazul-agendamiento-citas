@@ -58,13 +58,13 @@ public class KeycloakUserService implements UserModuleApi {
     }
 
     @Override
-    public void activateUser(UUID id) {
-        keycloakClient.activateUser(id);
+    public void ensureDoctorRole(UUID userId) {
+        keycloakClient.assignRoleIfMissing(userId, Role.DOCTOR);
     }
 
     @Override
-    public void deactivateUser(UUID id) {
-        keycloakClient.deactivateUser(id);
+    public void revokeDoctorRole(UUID userId) {
+        keycloakClient.revokeRoleIfPresent(userId, Role.DOCTOR);
     }
 
     @Override

@@ -130,7 +130,7 @@ public class DoctorController {
     }
 
     /**
-     * Obtiene la información básica de un doctor a partir de su identificador.
+     * Obtiene la información básica de un doctor a partir de su identificador de cuenta (Keycloak).
      *
      * <p>
      * Requiere que el usuario autenticado posea el rol {@code DOCTOR}.

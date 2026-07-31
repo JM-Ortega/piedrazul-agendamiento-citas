@@ -22,10 +22,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -78,8 +76,8 @@ class DoctorServiceTest {
         doctorService.createDoctor(personId, request);
 
         ArgumentCaptor<Doctor> doctorCaptor = ArgumentCaptor.forClass(Doctor.class);
-        verify(personExternalService).activateUser(personId);
-        verify(personExternalService, never()).deactivateUser(personId);
+        verify(personExternalService).ensureDoctorRole(personId);
+        verify(personExternalService, never()).revokeDoctorRole(personId);
         verify(doctorRepository).save(doctorCaptor.capture());
 
         Doctor savedDoctor = doctorCaptor.getValue();
@@ -121,7 +119,7 @@ class DoctorServiceTest {
 
         assertThrows(DoctorInvalidSpecialty.class, () -> doctorService.createDoctor(personId, request));
 
-        verify(personExternalService, never()).deactivateUser(personId);
+        verify(personExternalService, never()).revokeDoctorRole(personId);
         verify(doctorRepository, never()).save(any());
     }
 
@@ -225,7 +223,7 @@ class DoctorServiceTest {
 
         assertThat(doctor.isStatus()).isFalse();
 
-        verify(personExternalService).deactivateUser(personId);
-        verify(personExternalService, never()).activateUser(personId);
+        verify(personExternalService).revokeDoctorRole(personId);
+        verify(personExternalService, never()).ensureDoctorRole(personId);
     }
 }

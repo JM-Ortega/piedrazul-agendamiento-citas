@@ -263,6 +263,9 @@ class KeycloakUserClientTest {
         verify(userResource).toRepresentation();
     }
 
+    /*
+    Metodos proximos a eliminar
+
     @Test
     void activateUserShouldUpdateUserAsEnabled() {
         UUID userId = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
@@ -290,6 +293,7 @@ class KeycloakUserClientTest {
         verify(userResource).update(captor.capture());
         assertFalse(captor.getValue().isEnabled());
     }
+     */
 
     @Test
     void deleteUserShouldDelegateToKeycloak() {

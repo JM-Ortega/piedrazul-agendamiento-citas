@@ -27,9 +27,9 @@ public interface UserModuleApi {
 
     boolean existsById(UUID id);
 
-    void activateUser(UUID id);
+    void ensureDoctorRole(UUID id);
 
-    void deactivateUser(UUID id);
+    void revokeDoctorRole(UUID id);
 
     void ensurePatientRole(UUID userId);
 }

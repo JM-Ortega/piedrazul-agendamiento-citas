@@ -3,7 +3,6 @@ package co.edu.unicauca.piedrazul.backend.doctors.application;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorDetailedResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
@@ -20,9 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class DoctorService implements DoctorProvisioningApi {
     private final DoctorRepository doctorRepository;
@@ -79,9 +76,9 @@ public class DoctorService implements DoctorProvisioningApi {
 
 
         if (doctor.isStatus()) {
-            personExternalService.activateUser(personId);
+            personExternalService.ensureDoctorRole(personId);
         } else {
-            personExternalService.deactivateUser(personId);
+            personExternalService.revokeDoctorRole(personId);
         }
     }
 
@@ -101,7 +98,7 @@ public class DoctorService implements DoctorProvisioningApi {
 
         doctorRepository.delete(doctor);
     }
-    
+
     @Transactional
     public void updateDoctorLaborDate(UUID idDoctor, LocalDate laborStart, LocalDate laborEnd) {
         Doctor doctor = doctorRepository.findById(idDoctor)
@@ -241,10 +238,10 @@ public class DoctorService implements DoctorProvisioningApi {
 
     private void syncUserStatus(Doctor doctor) {
         if (doctor.isStatus()) {
-            personExternalService.activateUser(doctor.getPersonId());
+            personExternalService.ensureDoctorRole(doctor.getPersonId());
             return;
         }
-        personExternalService.deactivateUser(doctor.getPersonId());
+        personExternalService.revokeDoctorRole(doctor.getPersonId());
     }
 
     private void validateLaborDateRange(LocalDate laborStart, LocalDate laborEnd) {

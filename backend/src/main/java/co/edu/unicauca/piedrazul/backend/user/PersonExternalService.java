@@ -31,9 +31,9 @@ public interface PersonExternalService {
 
     Optional<PersonSummary> findByUserId(UUID userId);
 
-    void deactivateUser (UUID personID);
+    void revokeDoctorRole(UUID personID);
 
-    void activateUser(UUID personID);
+    void ensureDoctorRole(UUID personID);
 
     String getPersonName(UUID personID);
 
