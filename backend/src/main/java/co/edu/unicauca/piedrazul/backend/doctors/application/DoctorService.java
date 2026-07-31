@@ -101,20 +101,7 @@ public class DoctorService implements DoctorProvisioningApi {
 
         doctorRepository.delete(doctor);
     }
-
-    //Metodo para validar si el medico esta activo o no usarlo cada vez que ingrese el medico
-    @Transactional
-    public void updateDoctorStatus(UUID idDoctor) {
-        Doctor doctor = doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-
-        doctor.activateIfPossible();
-
-        doctorRepository.save(doctor);
-
-        syncUserStatus(doctor);
-    }
-
+    
     @Transactional
     public void updateDoctorLaborDate(UUID idDoctor, LocalDate laborStart, LocalDate laborEnd) {
         Doctor doctor = doctorRepository.findById(idDoctor)

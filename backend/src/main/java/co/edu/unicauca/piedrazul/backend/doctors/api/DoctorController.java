@@ -367,28 +367,4 @@ public class DoctorController {
         doctorService.disableDoctor(doctorId, force);
         return ResponseEntity.noContent().build();
     }
-
-    /**
-     * Sincroniza el estado de un doctor con su período laboral.
-     * <p>
-     * Evalúa las fechas de inicio y finalización de labores para actualizar
-     * automáticamente el estado del doctor cuando corresponda.
-     * </p>
-     *
-     * <p>
-     * Requiere que el usuario autenticado posea el rol {@code ADMIN}.
-     * </p>
-     *
-     * @param doctorId identificador único (UUID) del doctor.
-     * @return un {@link ResponseEntity} con estado {@code 204 No Content} si la sincronización fue exitosa.
-     * @throws DoctorNotFoundException si no existe un doctor asociado al identificador proporcionado.
-     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
-     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
-     */
-    @PutMapping("/{doctorId}/sync-status")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateDoctorStatus(@PathVariable UUID doctorId) {
-        doctorService.updateDoctorStatus(doctorId);
-        return ResponseEntity.noContent().build();
-    }
 }
