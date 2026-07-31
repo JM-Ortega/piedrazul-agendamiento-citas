@@ -1,8 +1,9 @@
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
-  OnInit,
   inject,
+  OnInit,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -30,7 +31,7 @@ import {
   SpecialtyOption,
 } from '../../components/create-user-doctor-form/create-user-doctor-form.component';
 import { CreateUserRolesComponent } from '../../components/create-user-roles/create-user-roles.component';
-import { CreateUserConfirmModalComponent } from '../../components/modals/modals-create/create-user-confirm-modal.component';
+import { CreateUserConfirmModalComponent } from '../../components/modals/modal-create/create-user-confirm-modal.component';
 import { CreateUserRequestDto } from '../../models/dtos/CreateUserRequestDto';
 import { FormErrors } from '../../models/interfaces/FormErrors';
 import { UserForm } from '../../models/interfaces/UserForm';
@@ -123,6 +124,7 @@ export class AdminCreateUserComponent implements OnInit {
 
   private router = inject(Router);
   private adminService = inject(AdminService);
+  private cdr = inject(ChangeDetectorRef);
 
   // ── Getters ───────────────────────────────────────────────────────────────
   get hasDoctorRole() {
@@ -166,9 +168,11 @@ export class AdminCreateUserComponent implements OnInit {
           ...this.getSpecialtyIcon(name),
         }));
         this.loadingSpecialties = false;
+        this.cdr.markForCheck();
       },
       error: () => {
         this.loadingSpecialties = false;
+        this.cdr.markForCheck();
       },
     });
     this.loadingDocumentTypes = true;
@@ -176,9 +180,11 @@ export class AdminCreateUserComponent implements OnInit {
       next: (data) => {
         this.documentTypes = data;
         this.loadingDocumentTypes = false;
+        this.cdr.markForCheck();
       },
       error: () => {
         this.loadingDocumentTypes = false;
+        this.cdr.markForCheck();
       },
     });
   }

@@ -6,6 +6,7 @@ import {
   Output,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { LucideCircleAlert } from '@lucide/angular';
 
 export type InputType =
   | 'text'
@@ -33,7 +34,7 @@ export type SanitizeRule =
 @Component({
   selector: 'app-input',
   standalone: true,
-  imports: [],
+  imports: [LucideCircleAlert],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,

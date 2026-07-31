@@ -46,14 +46,18 @@
         (blur)="handleBlur($event)"
         (focus)="handleFocus($event)"
       />
-      <div class="absolute right-3 top-1/2 -translate-y-1/2">
+      <div class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
         <ng-content select="[suffix]"></ng-content>
       </div>
     </div>
   }
 
   @if (resolvedErrorMessage) {
-    <p [id]="id + '-error'" class="text-red-500 text-sm mt-1">
+    <p
+      [id]="id + '-error'"
+      class="text-red-500 text-sm mt-1 flex items-center gap-1"
+    >
+      <svg lucideCircleAlert [size]="14"></svg>
       {{ resolvedErrorMessage }}
     </p>
   }

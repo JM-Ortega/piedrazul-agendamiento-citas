@@ -62,39 +62,19 @@
       >
         Tipo de Documento *
       </label>
-      <div class="relative">
-        <svg
-          lucideCreditCard
-          [size]="20"
-          class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-        ></svg>
-        <select
-          id="documentType"
-          [ngModel]="data.documentType"
-          (ngModelChange)="emit('documentType', $event)"
-          name="documentType"
-          (blur)="fieldBlurred.emit('documentType')"
-          [class]="
-            'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 pl-12 pr-4 ' +
-            (errors['documentType']
-              ? 'border-red-400 focus:ring-red-400 bg-red-50'
-              : 'border-gray-300 focus:ring-blue-500')
-          "
-        >
-          <option value="">
-            {{ loadingDocumentTypes ? 'Cargando...' : 'Seleccione...' }}
-          </option>
-          @for (dt of documentTypes; track dt) {
-            <option [value]="dt">{{ dt | formato }}</option>
-          }
-        </select>
-      </div>
-      @if (errors['documentType']) {
-        <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-          <svg lucideCircleAlert [size]="14"></svg>
-          {{ errors['documentType'] }}
-        </p>
-      }
+      <app-select
+        id="documentType"
+        [(ngModel)]="data.documentType"
+        (ngModelChange)="emit('documentType', $event)"
+        name="documentType"
+        [options]="documentTypes | toSelectOptions"
+        [loading]="loadingDocumentTypes"
+        [hasSuffix]="true"
+        [errorMessage]="errors['documentType']"
+        (selectBlur)="fieldBlurred.emit('documentType')"
+      >
+        <svg lucideCreditCard [size]="20" suffix></svg>
+      </app-select>
     </div>
 
     <!-- Teléfono -->
@@ -139,14 +119,13 @@
         >
           Fecha de Inicio
         </label>
-        <app-input
-          [id]="'laborStart'"
-          type="date"
-          [(ngModel)]="data.laborStart"
-          (ngModelChange)="emit('laborStart', $event)"
+        <app-datepicker
+          id="laborStart"
+          [ngModel]="data.laborStart"
+          (valueChange)="onDateChange('laborStart', $event)"
           name="laborStart"
           [errorMessage]="errors['laborStart']"
-          (inputBlur)="fieldBlurred.emit('laborStart')"
+          (dateBlur)="fieldBlurred.emit('laborStart')"
         />
       </div>
       <div>
@@ -156,14 +135,13 @@
         >
           Fecha de Fin
         </label>
-        <app-input
-          [id]="'laborEnd'"
-          type="date"
-          [(ngModel)]="data.laborEnd"
-          (ngModelChange)="emit('laborEnd', $event)"
+        <app-datepicker
+          id="laborEnd"
+          [ngModel]="data.laborEnd"
+          (valueChange)="onDateChange('laborEnd', $event)"
           name="laborEnd"
           [errorMessage]="errors['laborEnd']"
-          (inputBlur)="fieldBlurred.emit('laborEnd')"
+          (dateBlur)="fieldBlurred.emit('laborEnd')"
         />
       </div>
     </div>
@@ -175,33 +153,25 @@
       <label
         for="startTime"
         class="block text-gray-700 text-base font-medium mb-2"
-        >Hora de Inicio</label
       >
-      <select
+        Hora de Inicio
+      </label>
+      <app-select
         id="startTime"
-        [ngModel]="data.startTime"
+        [(ngModel)]="data.startTime"
         (ngModelChange)="
-          emit('startTime', $event); fieldBlurred.emit('startTime')
+          emit('startTime', $event);
+          fieldBlurred.emit('startTime');
+          fieldBlurred.emit('endTime')
         "
         name="startTime"
-        [class]="
-          'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 px-4 ' +
-          (errors['startTime']
-            ? 'border-red-400 focus:ring-red-400 bg-red-50'
-            : 'border-gray-300 focus:ring-blue-500')
-        "
+        [options]="timeOptions | toSelectOptions: false"
+        placeholder="-- Seleccionar --"
+        [errorMessage]="errors['startTime']"
+        [hasSuffix]="true"
       >
-        <option value="" disabled>-- Seleccionar --</option>
-        @for (t of timeOptions; track t) {
-          <option [value]="t">{{ t }}</option>
-        }
-      </select>
-      @if (errors['startTime']) {
-        <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-          <svg lucideCircleAlert [size]="14"></svg>
-          {{ errors['startTime'] }}
-        </p>
-      }
+        <svg lucideClock [size]="18" suffix></svg>
+      </app-select>
     </div>
     <div>
       <label
@@ -213,29 +183,22 @@
           >máx. 12:00 pm</span
         >
       </label>
-      <select
+      <app-select
         id="endTime"
-        [ngModel]="data.endTime"
-        (ngModelChange)="emit('endTime', $event); fieldBlurred.emit('endTime')"
-        name="endTime"
-        [class]="
-          'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 px-4 ' +
-          (errors['endTime']
-            ? 'border-red-400 focus:ring-red-400 bg-red-50'
-            : 'border-gray-300 focus:ring-blue-500')
+        [(ngModel)]="data.endTime"
+        (ngModelChange)="
+          emit('endTime', $event);
+          fieldBlurred.emit('endTime');
+          fieldBlurred.emit('startTime')
         "
+        name="endTime"
+        [options]="timeOptions | toSelectOptions: false"
+        placeholder="-- Seleccionar --"
+        [errorMessage]="errors['endTime']"
+        [hasSuffix]="true"
       >
-        <option value="" disabled>-- Seleccionar --</option>
-        @for (t of timeOptions; track t) {
-          <option [value]="t">{{ t }}</option>
-        }
-      </select>
-      @if (errors['endTime']) {
-        <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-          <svg lucideCircleAlert [size]="14"></svg>
-          {{ errors['endTime'] }}
-        </p>
-      }
+        <svg lucideClock [size]="18" suffix></svg>
+      </app-select>
     </div>
   </div>
 
@@ -262,7 +225,9 @@
         [step]="5"
         [errorMessage]="errors['interval']"
         (inputBlur)="fieldBlurred.emit('interval')"
-      />
+      >
+        <svg lucideClock [size]="18" suffix></svg>
+      </app-input>
     </div>
   </div>
 

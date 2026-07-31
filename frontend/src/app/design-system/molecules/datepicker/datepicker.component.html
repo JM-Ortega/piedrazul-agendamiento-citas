@@ -35,7 +35,11 @@
   </div>
 
   @if (resolvedErrorMessage) {
-    <p [id]="id + '-error'" class="text-red-500 text-sm mt-1">
+    <p
+      [id]="id + '-error'"
+      class="text-red-500 text-sm mt-1 flex items-center gap-1"
+    >
+      <svg lucideCircleAlert [size]="14"></svg>
       {{ resolvedErrorMessage }}
     </p>
   }

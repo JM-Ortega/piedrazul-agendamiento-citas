@@ -23,7 +23,7 @@
     </select>
     @if (hasSuffix) {
       <div
-        class="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"
+        class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"
       >
         <ng-content select="[suffix]"></ng-content>
       </div>
@@ -31,7 +31,10 @@
   </div>
 
   @if (errorMessage) {
-    <p class="text-red-500 text-sm mt-1">{{ errorMessage }}</p>
+    <p class="text-red-500 text-sm mt-1 flex items-center gap-1">
+      <svg lucideCircleAlert [size]="14"></svg>
+      {{ errorMessage }}
+    </p>
   }
   @if (!errorMessage && helperText) {
     <p class="text-gray-500 text-sm mt-1">{{ helperText }}</p>

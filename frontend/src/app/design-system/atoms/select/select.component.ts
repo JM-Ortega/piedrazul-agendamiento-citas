@@ -6,6 +6,7 @@ import {
   Output,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { LucideCircleAlert } from '@lucide/angular';
 
 export interface SelectOption {
   value: string;
@@ -18,7 +19,7 @@ export type SelectSize = 'sm' | 'md' | 'lg';
 @Component({
   selector: 'app-select',
   standalone: true,
-  imports: [],
+  imports: [LucideCircleAlert],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,
@@ -64,11 +65,11 @@ export class SelectComponent implements ControlValueAccessor {
     const baseClasses = [
       this.fullWidth ? 'w-full' : '',
       'rounded-xl',
-      'border-2',
+      'border',
       'shadow-sm',
       'transition',
       'focus:outline-none',
-      'focus:ring-2',
+      'bg-white',
       this.hasPrefix ? 'pl-12' : 'px-4',
       this.hasSuffix ? 'pr-12' : 'pr-4',
       'py-3',
@@ -77,8 +78,8 @@ export class SelectComponent implements ControlValueAccessor {
 
     baseClasses.push(
       this.errorMessage
-        ? 'border-red-400 focus:ring-red-400 bg-red-50'
-        : 'border-gray-300 focus:ring-blue-500'
+        ? 'border-red-400 focus:border-red-500'
+        : 'border-[#c2d8f0] focus:border-[#4e92d9]'
     );
 
     if (this.disabled) {

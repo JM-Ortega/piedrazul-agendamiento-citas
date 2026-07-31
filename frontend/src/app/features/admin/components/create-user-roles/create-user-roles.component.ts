@@ -10,6 +10,7 @@ import {
   LucideCircleAlert,
   LucideStethoscope,
 } from '@lucide/angular';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 
 type Role = 'doctor' | 'scheduler';
 
@@ -18,7 +19,12 @@ type Role = 'doctor' | 'scheduler';
   templateUrl: './create-user-roles.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideCalendar, LucideCircleAlert, LucideStethoscope],
+  imports: [
+    LucideCalendar,
+    LucideCircleAlert,
+    LucideStethoscope,
+    ButtonComponent,
+  ],
 })
 export class CreateUserRolesComponent {
   @Input() selectedRoles: Role[] = [];

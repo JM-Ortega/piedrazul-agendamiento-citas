@@ -38,6 +38,8 @@ export class ButtonComponent {
   @Output() buttonClick = new EventEmitter<void>();
   //por defecto, el chip activo tiene un estilo distinto al resto de variantes, pero se puede personalizar con este input.
   @Input() activeChipClasses = 'border-[#4e92d9] bg-[#a7c9ec] text-white';
+  @Input() inactiveChipClasses =
+    'border-gray-200 hover:border-[#4e92d9] hover:bg-[#dbeafe] text-[#163c63]';
 
   // loading pasa a ser un signal input: se sincroniza solo con el @Input,
   // sin necesidad de OnInit/OnChanges ni riesgo de quedar "atascado".
@@ -109,10 +111,9 @@ export class ButtonComponent {
   getChipClasses(): string {
     const base =
       'py-3 rounded-xl border-2 text-base font-semibold transition-colors cursor-pointer w-full';
-    if (this.active) {
-      return `${base} ${this.activeChipClasses}`;
-    }
-    return `${base} border-gray-200 hover:border-[#4e92d9] hover:bg-[#dbeafe] text-[#163c63]`;
+    return this.active
+      ? `${base} ${this.activeChipClasses}`
+      : `${base} ${this.inactiveChipClasses}`; // 👈 ahora usa el input en vez del hardcode
   }
   onClick(): void {
     if (!this.disabled && !this.isLoading()) {
