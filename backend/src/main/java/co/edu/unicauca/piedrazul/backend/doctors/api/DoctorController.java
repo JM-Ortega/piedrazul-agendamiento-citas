@@ -5,6 +5,9 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorShortResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import jakarta.validation.constraints.Min;
@@ -12,7 +15,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -34,9 +39,22 @@ public class DoctorController {
     }
 
     /**
-     * Obtener los datos del doctor autenticado (basado en el JWT)
-     * @param jwt
-     * @return
+     * Obtiene la información del doctor asociado al usuario autenticado.
+     * <p>
+     * El doctor se identifica a partir del identificador del usuario contenido
+     * en el token JWT de autenticación.
+     * </p>
+     *
+     * <p>
+     * Requiere que el usuario autenticado posea el rol {@code DOCTOR}.
+     * </p>
+     *
+     * @param jwt token JWT del usuario autenticado.
+     * @return un {@link DoctorDetailedResponse} con la información detallada
+     * del doctor autenticado.
+     * @throws DoctorNotFoundException si el usuario autenticado no tiene un doctor asociado.
+     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
+     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @GetMapping("/me")
     @PreAuthorize("hasRole('DOCTOR')")
@@ -49,8 +67,20 @@ public class DoctorController {
     }
 
     /**
-     * Listar todos los doctores
-     * @return Lista de todos los doctores
+     * Obtiene todos los doctores registrados en el sistema.
+     * <p>
+     * La respuesta incluye las especialidades y el nombre del doctor.
+     *
+     * <p>
+     * Requiere que el usuario autenticado posea alguno de los roles
+     * {@code SCHEDULER}, {@code PATIENT} o {@code DOCTOR}.
+     * </p>
+     *
+     * @return un {@link ResponseEntity} con estado {@code 200 OK} que contiene
+     * una lista de {@link DoctorShortResponse}. La lista puede estar vacía si
+     * no existen doctores registrados.
+     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
+     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
@@ -71,8 +101,21 @@ public class DoctorController {
     }
 
     /**
-     * Paginación que lista siempre 5 doctores
-     * @return Lista de todos los doctores
+     * Obtiene una página de doctores con información detallada.
+     * <p>
+     * Los resultados se encuentran paginados con un tamaño fijo de cinco doctores
+     * por página.
+     * </p>
+     *
+     * <p>
+     * Requiere que el usuario autenticado posea el rol {@code ADMIN}.
+     * </p>
+     *
+     * @param page índice de la página a consultar. Debe ser mayor o igual a cero.
+     * @return un {@link ResponseEntity} con estado {@code 200 OK} que contiene
+     * un {@link Page} de {@link DoctorDetailedResponse}.
+     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
+     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @GetMapping("/detailed")
     @PreAuthorize("hasRole('ADMIN')")
@@ -87,9 +130,18 @@ public class DoctorController {
     }
 
     /**
-     * Obtener un doctor por su ID
-     * @param doctorId ID del doctor
-     * @return Los datos del doctor
+     * Obtiene la información básica de un doctor a partir de su identificador.
+     *
+     * <p>
+     * Requiere que el usuario autenticado posea el rol {@code DOCTOR}.
+     * </p>
+     *
+     * @param doctorId identificador único (UUID) del doctor a consultar.
+     * @return un {@link ResponseEntity} con estado {@code 200 OK} que contiene
+     * un {@link DoctorShortResponse} con la información del doctor.
+     * @throws DoctorNotFoundException si no existe un doctor asociado al identificador proporcionado.
+     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
+     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @GetMapping("/{doctorId}")
     @PreAuthorize("hasRole('DOCTOR')")
@@ -101,9 +153,23 @@ public class DoctorController {
     }
 
     /**
-     * Obtiene las especialidades disponibles para un paciente
-     * @param patientId Id del paciente (opcional)
-     * @return Lista de especialidades
+     * Obtiene las especialidades disponibles para la asignación de citas.
+     * <p>
+     * Si se proporciona un paciente, la lista podrá filtrarse de acuerdo con las
+     * reglas de negocio aplicables para dicho paciente.
+     * </p>
+     *
+     * <p>
+     * Requiere que el usuario autenticado posea alguno de los roles
+     * {@code SCHEDULER}, {@code PATIENT} o {@code DOCTOR}.
+     * </p>
+     *
+     * @param patientId identificador del paciente para filtrar las especialidades.
+     * Puede ser {@code null}.
+     * @return un {@link ResponseEntity} con estado {@code 200 OK} que contiene
+     * una lista de {@link SpecialtyCode}.
+     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
+     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @GetMapping("/patients/specialties")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
@@ -114,10 +180,22 @@ public class DoctorController {
 
 
     /**
-     * Actualiza las especialidades de un doctor específico
-     * @param specialties Especialidades a agregar para el doctor
-     * @param doctorId Id del doctor
-     * @return Sin contenido
+     * Actualiza las especialidades asociadas a un doctor.
+     * <p>
+     * Las especialidades actuales serán reemplazadas por las proporcionadas en la
+     * solicitud.
+     * </p>
+     *
+     * <p>
+     * Requiere que el usuario autenticado posea el rol {@code ADMIN}.
+     * </p>
+     *
+     * @param doctorId identificador único (UUID) del doctor.
+     * @param specialties lista de especialidades que tendrá el doctor.
+     * @return un {@link ResponseEntity} con estado {@code 204 No Content} si la actualización fue exitosa.
+     * @throws DoctorNotFoundException si no existe un doctor asociado al identificador proporcionado.
+     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
+     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @PutMapping("/{doctorId}/specialties")
     @PreAuthorize("hasRole('ADMIN')")
@@ -129,8 +207,16 @@ public class DoctorController {
     }
 
     /**
-     * Obtiene todas las especialidades de los medicos
-     * @return Lista de especialidades
+     * Obtiene todas las especialidades médicas registradas en el sistema.
+     *
+     * <p>
+     * Requiere que el usuario autenticado posea el rol {@code ADMIN}.
+     * </p>
+     *
+     * @return un {@link ResponseEntity} con estado {@code 200 OK} que contiene
+     * una lista de {@link SpecialtyCode}.
+     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
+     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @GetMapping("/all-specialties")
     @PreAuthorize("hasAnyRole('ADMIN')")
@@ -140,9 +226,18 @@ public class DoctorController {
     }
 
     /**
-     * Obtener doctores por especialidad
-     * @param specialty Especialidad a buscar
-     * @return Lista de doctores con esa especialidad
+     * Obtiene los doctores que atienden una especialidad determinada.
+     *
+     * <p>
+     * Requiere que el usuario autenticado posea alguno de los roles
+     * {@code SCHEDULER}, {@code PATIENT} o {@code DOCTOR}.
+     * </p>
+     *
+     * @param specialty especialidad por la cual se filtrarán los doctores.
+     * @return un {@link ResponseEntity} con estado {@code 200 OK} que contiene
+     * una lista de {@link DoctorResponse}.
+     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
+     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @GetMapping("/specialty/{specialty}")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
@@ -162,9 +257,23 @@ public class DoctorController {
     }
 
     /**
-     * Habilitar un doctor (reactivar después de estar deshabilitado)
-     * @param doctorId ID del doctor
-     * @return Sin contenido
+     * Habilita un doctor previamente deshabilitado.
+     * <p>
+     * La activación solo será posible si el doctor cumple todas las condiciones
+     * necesarias para prestar atención, según las reglas de negocio del sistema.
+     * </p>
+     *
+     * <p>
+     * Requiere que el usuario autenticado posea el rol {@code ADMIN}.
+     * </p>
+     *
+     * @param doctorId identificador único (UUID) del doctor.
+     * @return un {@link ResponseEntity} con estado {@code 204 No Content} si la operación fue exitosa.
+     * @throws DoctorNotFoundException si no existe un doctor asociado al identificador proporcionado.
+     * @throws DoctorValidationException si el doctor no cumple los requisitos para ser habilitado.
+     * @throws DateConflictException si hay conflictos con las fechas de incio y fin labor.
+     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
+     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @PutMapping("/{doctorId}/enable")
     @PreAuthorize("hasRole('ADMIN')")
@@ -176,11 +285,23 @@ public class DoctorController {
     }
 
     /**
+     * Actualiza el período laboral de un doctor.
+     * <p>
+     * Modifica la fecha de inicio y la fecha de finalización de labores del doctor.
+     * </p>
      *
-     * @param doctorId
-     * @param laborStart
-     * @param laborEnd
-     * @return
+     * <p>
+     * Requiere que el usuario autenticado posea el rol {@code ADMIN}.
+     * </p>
+     *
+     * @param doctorId identificador único (UUID) del doctor.
+     * @param laborStart nueva fecha de inicio de labores.
+     * @param laborEnd nueva fecha de finalización de labores.
+     * @return un {@link ResponseEntity} con estado {@code 204 No Content} si la actualización fue exitosa.
+     * @throws DoctorNotFoundException si no existe un doctor asociado al identificador proporcionado.
+     * @throws DateConflictException si hay conflictos con las fechas de incio y fin labor.
+     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
+     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @PutMapping("/{doctorId}/labor-date")
     @PreAuthorize("hasRole('ADMIN')")
@@ -194,10 +315,19 @@ public class DoctorController {
     }
 
     /**
-     * Actualizar el intervalo de atención de un doctor
-     * @param doctorId ID del doctor
-     * @param appointmentInterval Nuevo intervalo en minutos
-     * @return Sin contenido
+     * Actualiza la duración de las citas de un doctor.
+     *
+     * <p>
+     * Requiere que el usuario autenticado posea el rol {@code ADMIN}.
+     * </p>
+     *
+     * @param doctorId identificador único (UUID) del doctor.
+     * @param appointmentInterval nueva duración de las citas, expresada en minutos.
+     * @return un {@link ResponseEntity} con estado {@code 204 No Content} si la actualización fue exitosa.
+     * @throws DoctorNotFoundException si no existe un doctor asociado al identificador proporcionado.
+     * @throws DoctorValidationException si el intervalo proporcionado no es válido.
+     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
+     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @PutMapping("/{doctorId}/appointment-interval")
     @PreAuthorize("hasRole('ADMIN')")
@@ -210,10 +340,23 @@ public class DoctorController {
     }
 
     /**
-     * Deshabilitar un doctor
-     * @param doctorId ID del doctor
-     * @param force Forzar deshabilitación incluso si aún no ha iniciado labores
-     * @return Sin contenido
+     * Deshabilita un doctor.
+     * <p>
+     * Si el parámetro {@code force} es {@code true}, la deshabilitación se realizará
+     * ignorando las validaciones que permitan forzar la operación.
+     * </p>
+     *
+     * <p>
+     * Requiere que el usuario autenticado posea el rol {@code ADMIN}.
+     * </p>
+     *
+     * @param doctorId identificador único (UUID) del doctor.
+     * @param force indica si la deshabilitación debe forzarse.
+     * @return un {@link ResponseEntity} con estado {@code 204 No Content} si la operación fue exitosa.
+     * @throws DoctorNotFoundException si no existe un doctor asociado al identificador proporcionado.
+     * @throws DateConflictException si se quiere deshabilitar un doctor que aun no termina su periodo laboral.
+     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
+     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @PutMapping("/{doctorId}/disable")
     @PreAuthorize("hasRole('ADMIN')")
@@ -226,10 +369,21 @@ public class DoctorController {
     }
 
     /**
-     * Actualizar el estado del doctor basado en las fechas de labor
-     * (Se ejecuta automáticamente para sincronizar con la fecha actual)
-     * @param doctorId ID del doctor
-     * @return Sin contenido
+     * Sincroniza el estado de un doctor con su período laboral.
+     * <p>
+     * Evalúa las fechas de inicio y finalización de labores para actualizar
+     * automáticamente el estado del doctor cuando corresponda.
+     * </p>
+     *
+     * <p>
+     * Requiere que el usuario autenticado posea el rol {@code ADMIN}.
+     * </p>
+     *
+     * @param doctorId identificador único (UUID) del doctor.
+     * @return un {@link ResponseEntity} con estado {@code 204 No Content} si la sincronización fue exitosa.
+     * @throws DoctorNotFoundException si no existe un doctor asociado al identificador proporcionado.
+     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
+     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @PutMapping("/{doctorId}/sync-status")
     @PreAuthorize("hasRole('ADMIN')")
