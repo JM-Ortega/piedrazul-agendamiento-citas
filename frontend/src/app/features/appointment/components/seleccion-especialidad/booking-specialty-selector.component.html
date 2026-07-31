@@ -25,17 +25,13 @@
     <label for="specialty" class="block text-gray-700 mb-1">
       Especialidad *
     </label>
-    <select
-      id="specialty"
+    <app-select
+      [id]="'specialty'"
+      [options]="specialtyOptions()"
+      placeholder="Seleccione una especialidad..."
       [ngModel]="state.selectedSpecialty()"
-      (ngModelChange)="onSpecialtyChange($event)"
-      class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
-    >
-      <option value="">Seleccione una especialidad...</option>
-      @for (s of state.uniqueSpecialties(); track s) {
-        <option [value]="s">{{ s | formato }}</option>
-      }
-    </select>
+      (valueChange)="onSpecialtyChange($event)"
+    ></app-select>
   </div>
 
   @if (state.noSpecialtyAvailable()) {
@@ -67,17 +63,13 @@
   ) {
     <div>
       <label for="doctor" class="block text-gray-700 mb-1">Médico *</label>
-      <select
-        id="doctor"
+      <app-select
+        [id]="'doctor'"
+        [options]="doctorOptions()"
+        placeholder="Seleccione un médico..."
         [ngModel]="state.selectedDoctorId()"
-        (ngModelChange)="onDoctorChange($event)"
-        class="w-full border-2 border-blue-200 rounded-xl px-4 py-3"
-      >
-        <option value="">Seleccione un médico...</option>
-        @for (d of state.doctorsBySpecialty(); track d.id) {
-          <option [value]="d.id">{{ d.name }}</option>
-        }
-      </select>
+        (valueChange)="onDoctorChange($event)"
+      ></app-select>
     </div>
   }
 
