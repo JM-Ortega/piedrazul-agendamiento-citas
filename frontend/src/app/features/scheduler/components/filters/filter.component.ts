@@ -34,7 +34,7 @@ export class SchedulerFiltersComponent {
   }
 
   get selectedDoctor(): dtoDoctor | undefined {
-    return this.doctors.find((d) => d.name === this.filterDoctor());
+    return this.doctors.find((d) => d.id === this.filterDoctor());
   }
 
   formatDate(dateStr: string): string {

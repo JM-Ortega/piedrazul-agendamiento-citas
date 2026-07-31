@@ -21,7 +21,7 @@
         >
           <option value="">Todos los médicos</option>
           @for (doc of doctors; track doc.id) {
-            <option [value]="doc.name">
+            <option [value]="doc.id">
               {{ doc.name }} — {{ doc.specialty | formato }}
             </option>
           }
