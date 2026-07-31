@@ -1,6 +1,5 @@
 package co.edu.unicauca.piedrazul.backend.appointment.exception;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.AppointmentBusinessException;
 import org.springframework.http.HttpStatus;
 
 public class FirstAppointmentMustBeGeneralMedicineException extends AppointmentBusinessException {

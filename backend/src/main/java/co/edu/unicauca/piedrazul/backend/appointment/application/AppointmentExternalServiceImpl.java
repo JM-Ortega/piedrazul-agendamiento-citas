@@ -4,7 +4,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentSta
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PersonConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentExternalData;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSummary;
@@ -14,7 +13,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTim
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAvailableSlotsUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
-import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import org.springframework.stereotype.Service;
 

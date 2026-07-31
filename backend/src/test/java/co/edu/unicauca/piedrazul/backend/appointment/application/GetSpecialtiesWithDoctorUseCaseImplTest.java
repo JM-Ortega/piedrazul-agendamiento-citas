@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.NoAvailableDoctorsException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.NoAvailableDoctorsException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;

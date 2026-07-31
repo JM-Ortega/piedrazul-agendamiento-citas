@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.service;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.SlotNotAvailableException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.SlotNotAvailableException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;

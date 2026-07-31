@@ -1,13 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.model;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.GuardianRequiredException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InconsistentPatientInfoException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidBirthDateException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidDocumentException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidEmailException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidPatientInfoException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidPersonNameException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidPhoneException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.*;
 import org.jmolecules.ddd.annotation.ValueObject;
 
 import java.time.LocalDate;

@@ -1,6 +1,5 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.NoAvailableDoctorsException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetSpecialtiesWithDoctorUseCase;
@@ -9,7 +8,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.Appointm
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
-import co.edu.unicauca.piedrazul.backend.appointment.exception.DoctorConfigInconsistentException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.*;
 
 import java.time.LocalDate;
 import java.util.*;

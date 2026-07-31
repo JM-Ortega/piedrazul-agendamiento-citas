@@ -1,19 +1,16 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.PatientResolutionStrategy;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PersonConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.ResolvedPatient;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientAlreadyScheduledInSpecialtyException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientScheduleTimeConflictException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentScheduledEvent;
-import co.edu.unicauca.piedrazul.backend.appointment.exception.FirstAppointmentMustBeGeneralMedicineException;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.shared.events.audit.AppointmentCreatedEvent;
 import org.springframework.context.ApplicationEventPublisher;
@@ -145,7 +142,7 @@ public class AppointmentSchedulingService {
         boolean isNewPatient = isNewPatientUseCase.isNewPatient(idPatient);
         if (isNewPatient && specialty != SpecialtyCode.MEDICINA_GENERAL) {
             throw new FirstAppointmentMustBeGeneralMedicineException(
-                    "La primera cita de un paciente nuevo debe ser con MEDICINA_GENERAL"
+                    "La primera cita de un paciente nuevo debe ser con MEDICINA GENERAL"
             );
         }
     }
