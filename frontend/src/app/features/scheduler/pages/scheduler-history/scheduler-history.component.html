@@ -7,6 +7,28 @@
         ⚠️ {{ errorMessage() }}
       </div>
     }
+    <!-- ── Exportar ── -->
+    <div
+      class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200 mt-6"
+    >
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="bg-[#1f7a52] rounded-full p-3">
+            <svg lucideDownload [size]="28" class="text-white"></svg>
+          </div>
+          <div>
+            <h3 class="text-green-800 text-xl font-bold">Exportar Reporte</h3>
+            <p class="text-green-600 text-sm flex items-center gap-1 mt-0.5">
+              <svg lucideCalendar [size]="14"></svg>
+              Se exportarán las citas de la fecha seleccionada
+            </p>
+          </div>
+        </div>
+        <app-button variant="success" (buttonClick)="exportModal.open()">
+          <svg lucideDownload [size]="20" class="text-white"></svg> Exportar
+        </app-button>
+      </div>
+    </div>
     <div class="bg-white rounded-2xl shadow-md p-7 mt-8">
       <div class="pb-7">
         <app-filter
@@ -72,3 +94,5 @@
 </app-confirm-modal>
 
 <app-toast [message]="toastMessage()" [type]="toastType()"></app-toast>
+
+<app-scheduler-export-modal #exportModal></app-scheduler-export-modal>

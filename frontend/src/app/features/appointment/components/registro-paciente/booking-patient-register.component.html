@@ -12,167 +12,12 @@
     📋 Documento: <strong>{{ getPatientField('documentNumber') }}</strong>
   </div>
 
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-    <div>
-      <label
-        for="documentType"
-        class="block text-gray-700 mb-1 text-sm font-medium"
-      >
-        Tipo de Documento <span class="text-red-500">*</span>
-      </label>
-      <select
-        id="documentType"
-        [ngModel]="getPatientField('documentType')"
-        (ngModelChange)="setPatientField('documentType', $event)"
-        class="w-full border-2 border-[#c2d8f0] rounded-xl px-4 py-3"
-      >
-        <option value="">Seleccione...</option>
-        @for (type of patientService.documentTypes(); track type) {
-          <option [value]="type">{{ type | formato }}</option>
-        }
-      </select>
-      @if (docTypeError()) {
-        <p class="text-red-500 text-sm mt-1">Este campo es obligatorio</p>
-      }
-    </div>
-
-    <div>
-      <label
-        for="firstName"
-        class="block text-gray-700 mb-1 text-sm font-medium"
-      >
-        Nombres <span class="text-red-500">*</span>
-      </label>
-      <app-input
-        id="firstName"
-        placeholder="Nombres del paciente"
-        sanitize="alphaSpaces"
-        [stripAccents]="true"
-        [titleCase]="true"
-        [trimLeadingSpaces]="true"
-        [collapseSpaces]="true"
-        [maxLength]="NAME_MAX"
-        [minLength]="NAME_MIN"
-        [ngModel]="getPatientField('firstName')"
-        (valueChange)="onTextFieldChange('firstName', $event)"
-        [errorMessage]="firstNameError() ? firstNameErrorMsg() : undefined"
-      ></app-input>
-    </div>
-
-    <div>
-      <label
-        for="lastName"
-        class="block text-gray-700 mb-1 text-sm font-medium"
-      >
-        Apellidos <span class="text-red-500">*</span>
-      </label>
-      <app-input
-        id="lastName"
-        placeholder="Apellidos del paciente"
-        sanitize="alphaSpaces"
-        [stripAccents]="true"
-        [titleCase]="true"
-        [trimLeadingSpaces]="true"
-        [collapseSpaces]="true"
-        [maxLength]="NAME_MAX"
-        [minLength]="NAME_MIN"
-        [ngModel]="getPatientField('lastName')"
-        (valueChange)="onTextFieldChange('lastName', $event)"
-        [errorMessage]="firstNameError() ? firstNameErrorMsg() : undefined"
-      ></app-input>
-    </div>
-
-    <div>
-      <label for="phone" class="block text-gray-700 mb-1 text-sm font-medium">
-        Teléfono <span class="text-red-500">*</span>
-      </label>
-      <app-input
-        id="phone"
-        type="tel"
-        placeholder="Ej: 3001234567"
-        sanitize="numeric"
-        [maxLength]="PHONE_MAX"
-        [ngModel]="getPatientField('phone')"
-        (valueChange)="onTextFieldChange('phone', $event)"
-        [errorMessage]="phoneError() ? phoneErrorMsg() : undefined"
-      ></app-input>
-    </div>
-
-    <div>
-      <label for="gender" class="block text-gray-700 mb-1 text-sm font-medium">
-        Género <span class="text-red-500">*</span>
-      </label>
-      <select
-        id="gender"
-        [ngModel]="getPatientField('gender')"
-        (ngModelChange)="setPatientField('gender', $event)"
-        class="w-full border-2 border-[#c2d8f0] rounded-xl px-4 py-3"
-      >
-        <option value="">Seleccione...</option>
-        <option value="MASCULINO">Masculino</option>
-        <option value="FEMENINO">Femenino</option>
-        <option value="OTRO">Otro</option>
-      </select>
-      @if (genderError()) {
-        <p class="text-red-500 text-sm mt-1">Este campo es obligatorio</p>
-      }
-    </div>
-
-    <div>
-      <label
-        for="birthDate"
-        class="block text-gray-700 mb-1 text-sm font-medium"
-      >
-        Fecha de Nacimiento <span class="text-red-500">*</span>
-      </label>
-      <app-datepicker
-        id="birthDate"
-        [max]="maxBirthDate"
-        [ngModel]="getPatientField('birthDate')"
-        (valueChange)="onBirthDateChange($event)"
-        [errorMessage]="birthDateError() ? birthDateErrorMsg() : undefined"
-      ></app-datepicker>
-    </div>
-
-    <div class="sm:col-span-2">
-      <label for="email" class="block text-gray-700 mb-1 text-sm font-medium">
-        Correo Electrónico <span class="text-gray-400 text-sm">(opcional)</span>
-      </label>
-      <app-input
-        id="email"
-        type="email"
-        placeholder="correo@ejemplo.com"
-        [maxLength]="EMAIL_MAX"
-        [ngModel]="getPatientField('email')"
-        (valueChange)="onTextFieldChange('email', $event)"
-        [errorMessage]="emailError() ? emailErrorMsg() : undefined"
-      ></app-input>
-    </div>
-
-    <div class="sm:col-span-2">
-      <label
-        for="guardianPhone"
-        class="block text-gray-700 mb-1 text-sm font-medium"
-      >
-        Teléfono de familiar
-        <span class="text-gray-400 text-sm"
-          >(requerido si es menor de 18 años)</span
-        >
-      </label>
-      <app-input
-        id="guardianPhone"
-        type="tel"
-        placeholder="Ej: 3001234567"
-        sanitize="numeric"
-        [maxLength]="PHONE_MAX"
-        [ngModel]="getPatientField('guardianPhone')"
-        (valueChange)="onTextFieldChange('guardianPhone', $event)"
-        [errorMessage]="
-          guardianPhoneError() ? guardianPhoneErrorMsg() : undefined
-        "
-      ></app-input>
-    </div>
-  </div>
+  <app-patient-data-form
+    #patientForm
+    [maxBirthDate]="maxBirthDate"
+    [ngModel]="patientFormValue()"
+    (valueChange)="onPatientFormChange($event)"
+  ></app-patient-data-form>
 
   <div class="flex gap-4 mt-4">
     <app-button variant="secondary" (buttonClick)="onGoBack()">
@@ -180,7 +25,7 @@
     </app-button>
     <app-button
       variant="primary"
-      (buttonClick)="onContinue()"
+      (buttonClick)="onContinue(patientForm)"
       [fullWidth]="true"
       class="flex-1"
     >

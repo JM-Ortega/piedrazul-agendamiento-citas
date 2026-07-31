@@ -1,17 +1,17 @@
 import {
   Component,
   EventEmitter,
-  Input,
   Output,
   computed,
   inject,
   signal,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import {
-  LucideCalendar,
   LucideDownload,
   LucideFileSpreadsheet,
   LucideFileText,
+  LucideAlertTriangle,
   LucideDynamicIcon,
   type LucideIcon,
 } from '@lucide/angular';
@@ -20,6 +20,8 @@ import { AppointmentExportRequest } from '../../../../shared/models/dtos/Appoint
 import { ExportFormatBackend } from '../../../../shared/models/types/ExportFormatBackend.type';
 import { formatLongDateEs } from '../../../../shared/helpers/date-format';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
+import { ConfirmModalComponent } from '../../../../design-system/organisms/confirm-modal/confirm-modal.component';
 
 type ExportFormat = 'excel' | 'pdf' | 'csv';
 
@@ -44,22 +46,30 @@ const EXT_MAP: Record<ExportFormat, string> = {
 @Component({
   selector: 'app-scheduler-export-modal',
   standalone: true,
-  imports: [LucideCalendar, LucideDownload, LucideDynamicIcon, ButtonComponent],
+  imports: [
+    FormsModule,
+    LucideDownload,
+    LucideAlertTriangle,
+    LucideDynamicIcon,
+    ButtonComponent,
+    DatepickerComponent,
+    ConfirmModalComponent,
+  ],
   templateUrl: './export-modal.component.html',
 })
 export class SchedulerExportModalComponent {
   private schedulerService = inject(SchedulerService);
 
-  @Input({ required: true }) date!: string;
-
   @Output() exported = new EventEmitter<void>();
 
   showExportModal = signal(false);
+  selectedDate = signal<Date | null>(null);
+  dateRequiredError = signal(false);
   exportFormat = signal<ExportFormat>('excel');
   isExporting = signal(false);
+  isCheckingAvailability = signal(false);
   exportError = signal<string | null>(null);
   showAvailabilityWarning = signal(false);
-  isCheckingAvailability = signal(false);
 
   readonly formatOptions: {
     value: ExportFormat;
@@ -124,37 +134,16 @@ export class SchedulerExportModalComponent {
     }
   });
 
-  formatDate(dateStr: string): string {
-    return formatLongDateEs(dateStr);
+  formatSelectedDate(): string {
+    const date = this.selectedDate();
+    return date ? formatLongDateEs(this.toIsoString(date)) : '';
   }
 
   open(): void {
-    if (!this.date) return;
-    this.isCheckingAvailability.set(true);
-    this.schedulerService.checkSchedulerAvailability(this.date).subscribe({
-      next: ({ hasAvailabilitySlots }) => {
-        this.isCheckingAvailability.set(false);
-        if (hasAvailabilitySlots) {
-          this.showAvailabilityWarning.set(true);
-        } else {
-          this.openExportModal();
-        }
-      },
-      error: () => {
-        this.isCheckingAvailability.set(false);
-        this.openExportModal();
-      },
-    });
-  }
-
-  confirmExportDespiteAvailability(): void {
-    this.showAvailabilityWarning.set(false);
-    this.openExportModal();
-  }
-
-  private openExportModal(): void {
-    this.exportError.set(null);
+    this.selectedDate.set(null);
+    this.dateRequiredError.set(false);
     this.exportFormat.set('excel');
+    this.exportError.set(null);
     this.showExportModal.set(true);
   }
 
@@ -163,14 +152,53 @@ export class SchedulerExportModalComponent {
     this.exportError.set(null);
   }
 
-  handleExport(): void {
-    if (!this.date) return;
+  handleExportClick(): void {
+    const date = this.selectedDate();
+    if (!date) {
+      this.dateRequiredError.set(true);
+      return;
+    }
+    this.dateRequiredError.set(false);
+
+    const isoDate = this.toIsoString(date);
+    this.isCheckingAvailability.set(true);
+
+    this.schedulerService.checkSchedulerAvailability(isoDate).subscribe({
+      next: ({ hasAvailabilitySlots }) => {
+        this.isCheckingAvailability.set(false);
+        if (hasAvailabilitySlots) {
+          this.showAvailabilityWarning.set(true);
+        } else {
+          this.doExport();
+        }
+      },
+      error: () => {
+        this.isCheckingAvailability.set(false);
+        this.doExport();
+      },
+    });
+  }
+
+  confirmExportDespiteAvailability(): void {
+    this.showAvailabilityWarning.set(false);
+    this.doExport();
+  }
+
+  dismissAvailabilityWarning(): void {
+    this.showAvailabilityWarning.set(false);
+  }
+
+  private doExport(): void {
+    const date = this.selectedDate();
+    if (!date) return;
+
     this.isExporting.set(true);
     this.exportError.set(null);
 
+    const isoDate = this.toIsoString(date);
     const fmt = this.exportFormat();
     const payload: AppointmentExportRequest = {
-      date: this.date,
+      date: isoDate,
       format: FORMAT_MAP[fmt],
     };
 
@@ -180,7 +208,7 @@ export class SchedulerExportModalComponent {
         const url = URL.createObjectURL(typedBlob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `agenda-${this.date}.${EXT_MAP[fmt]}`;
+        link.download = `agenda-${isoDate}.${EXT_MAP[fmt]}`;
         link.click();
         URL.revokeObjectURL(url);
         this.isExporting.set(false);
@@ -194,5 +222,12 @@ export class SchedulerExportModalComponent {
         this.isExporting.set(false);
       },
     });
+  }
+
+  private toIsoString(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
 }

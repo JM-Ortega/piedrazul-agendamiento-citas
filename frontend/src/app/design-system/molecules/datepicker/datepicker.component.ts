@@ -189,13 +189,20 @@ export class DatepickerComponent implements ControlValueAccessor {
   }
 
   writeValue(value: Date | string | null): void {
-    if (!value) {
-      this.value = null;
-    } else if (value instanceof Date) {
-      this.value = value;
-    } else {
-      this.value = parseLocalDateString(value);
-    }
+    const next = !value
+      ? null
+      : value instanceof Date
+        ? value
+        : parseLocalDateString(value);
+
+    const sameDate =
+      (this.value === null && next === null) ||
+      (this.value !== null &&
+        next !== null &&
+        this.value.getTime() === next.getTime());
+
+    if (sameDate) return;
+    this.value = next;
   }
 
   registerOnChange(fn: (value: Date | null) => void): void {

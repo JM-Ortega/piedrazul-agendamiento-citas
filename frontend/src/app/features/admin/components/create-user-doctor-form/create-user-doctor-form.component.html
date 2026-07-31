@@ -83,7 +83,7 @@
         Teléfono * <span class="text-sm text-gray-500">(solo dígitos)</span>
       </label>
       <app-input
-        id="phone"
+        [id]="'phone'"
         type="text"
         [inputMode]="'numeric'"
         [(ngModel)]="data.phone"
@@ -215,7 +215,7 @@
         </span>
       </label>
       <app-input
-        id="interval"
+        [id]="'interval'"
         type="number"
         [(ngModel)]="data.interval"
         (ngModelChange)="emit('interval', $event)"
