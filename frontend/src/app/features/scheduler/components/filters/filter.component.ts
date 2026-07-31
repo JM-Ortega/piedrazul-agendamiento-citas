@@ -6,6 +6,7 @@ import {
   SelectComponent,
   SelectOption,
 } from '../../../../design-system/atoms/select/select.component';
+import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
 import { APPOINTMENT_STATUS_LABELS } from '../../../../shared/helpers/appointment-status';
 import { formatLongDateEs } from '../../../../shared/helpers/date-format';
 import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
@@ -25,7 +26,13 @@ const STATUS_OPTIONS: SelectOption[] = [
 @Component({
   selector: 'app-filter',
   standalone: true,
-  imports: [FormsModule, LucideSearch, ButtonComponent, SelectComponent],
+  imports: [
+    FormsModule,
+    LucideSearch,
+    ButtonComponent,
+    SelectComponent,
+    DatepickerComponent,
+  ],
   templateUrl: './filter.component.html',
 })
 export class SchedulerFiltersComponent {
@@ -48,6 +55,12 @@ export class SchedulerFiltersComponent {
       label: `${d.name} — ${this.formatoPipe.transform(d.specialty)}`,
     }))
   );
+
+  /** Convierte el string 'yyyy-mm-dd' del filtro a Date para el datepicker. */
+  filterDateValue = computed<Date | null>(() => {
+    const raw = this.filterDate();
+    return raw ? this.parseLocalDateString(raw) : null;
+  });
 
   hasField(field: SchedulerFilterField): boolean {
     return this.fields().includes(field);
@@ -72,6 +85,10 @@ export class SchedulerFiltersComponent {
     );
   }
 
+  onDateChange(date: Date | null): void {
+    this.filterDate.set(date ? this.toIsoString(date) : '');
+  }
+
   clearDoctor(): void {
     this.filterDoctor.set('');
   }
@@ -82,5 +99,18 @@ export class SchedulerFiltersComponent {
 
   clearStatus(): void {
     this.filterStatus.set('');
+  }
+
+  private parseLocalDateString(value: string): Date {
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return new Date(value);
+  }
+
+  private toIsoString(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
 }

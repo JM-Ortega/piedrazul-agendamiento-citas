@@ -28,13 +28,11 @@
         <label for="filterDate" class="block text-gray-700 mb-2 text-lg"
           >Fecha Específica</label
         >
-        <input
-          type="date"
-          id="filterDate"
-          [value]="filterDate()"
-          (change)="filterDate.set($any($event.target).value)"
-          class="w-full border-2 border-[#a7c9ec] focus:border-[#215c98] rounded-xl px-4 py-3 text-lg outline-none transition-colors"
-        />
+        <app-datepicker
+          [id]="'filterDate'"
+          [ngModel]="filterDateValue()"
+          (valueChange)="onDateChange($event)"
+        ></app-datepicker>
       </div>
     }
 
