@@ -4,9 +4,12 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
 import jakarta.transaction.Transactional;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -109,5 +112,29 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
                 .toList();
     }
 
+
+    @Override
+    public List<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state) {
+        List<Specification<AppointmentEntity>> specs = new ArrayList<>();
+
+        if (idDoctor != null) {
+            specs.add((root, query, cb) -> cb.equal(root.get("idDoctor"), idDoctor));
+        }
+        if (idPatient != null) {
+            specs.add((root, query, cb) -> cb.equal(root.get("idPatient"), idPatient));
+        }
+        if (date != null) {
+            specs.add((root, query, cb) -> cb.equal(root.get("date"), date));
+        }
+        if (state != null) {
+            specs.add((root, query, cb) -> cb.equal(root.get("appointmentState"), state));
+        }
+
+        Specification<AppointmentEntity> spec = Specification.allOf(specs);
+
+        return jpaRepository.findAll(spec).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
 
 }

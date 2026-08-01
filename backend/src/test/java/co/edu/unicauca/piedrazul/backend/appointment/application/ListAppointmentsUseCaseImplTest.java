@@ -43,7 +43,7 @@ class ListAppointmentsUseCaseImplTest {
         UUID idDoctor  = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
         LocalDate date = LocalDate.now();
-        List<Appointment> expected = List.of(buildAppointment(idDoctor, idPatient, date));
+        List<Appointment> expected = List.of(buildAppointment(idDoctor, idPatient, date, ));
 
         when(appointmentRepository.findByDoctorIdAndPatientIdAndDate(idDoctor, idPatient, date))
                 .thenReturn(expected);
@@ -67,7 +67,7 @@ class ListAppointmentsUseCaseImplTest {
         when(appointmentRepository.findByDoctorIdAndPatientId(idDoctor, idPatient))
                 .thenReturn(expected);
 
-        List<Appointment> result = useCase.listBy(idDoctor, idPatient, null);
+        List<Appointment> result = useCase.listBy(idDoctor, idPatient, null, null);
 
         assertThat(result).isEqualTo(expected);
         verify(appointmentRepository).findByDoctorIdAndPatientId(idDoctor, idPatient);
