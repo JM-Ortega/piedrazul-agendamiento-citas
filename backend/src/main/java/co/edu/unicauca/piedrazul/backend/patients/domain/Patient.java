@@ -21,7 +21,7 @@ public class Patient {
     @Column(name = "birth_date", nullable = false)
     private LocalDate birthDate;
 
-    @Column(name = "guardian_phone")
+    @Column(name = "guardian_phone", length = 20)
     private String guardianPhone;
 
     protected Patient() {
