@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Optional;
 
 @Service
@@ -58,7 +58,7 @@ public class VerificationService implements VerificationModuleApi {
                 subject,
                 purpose,
                 codeHash,
-                LocalDateTime.now().plusMinutes(EXPIRATION_MINUTES),
+                Instant.now().plusSeconds(EXPIRATION_MINUTES * 60L),
                 MAX_ATTEMPTS
         );
 
@@ -75,7 +75,7 @@ public class VerificationService implements VerificationModuleApi {
                 .findLatestActive(subject, purpose)
                 .orElseThrow(() -> new VerificationCodeNotFoundException(subject));
 
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
 
         if (verificationCode.isExpired(now)) {
             throw new VerificationCodeExpiredException();

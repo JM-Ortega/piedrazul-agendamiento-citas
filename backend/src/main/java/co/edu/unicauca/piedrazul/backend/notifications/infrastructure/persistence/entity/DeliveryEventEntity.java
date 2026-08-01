@@ -23,18 +23,14 @@ import java.util.UUID;
                 @Index(
                         name = "idx_delivery_event_provider_message",
                         columnList = "provider_name, provider_message_id"
-                ),
-                @Index(
-                        name = "idx_delivery_event_provider_event",
-                        columnList = "provider_name, provider_event_id"
                 )
         }
 )
 public class DeliveryEventEntity {
 
     @Id
-    @Column(name = "id_delivery_event", nullable = false, updatable = false)
-    private UUID idDeliveryEvent;
+    @Column(name = "id", nullable = false, updatable = false)
+    private UUID id;
 
     @Column(name = "attempt_id", nullable = false)
     private UUID attemptId;
@@ -58,10 +54,10 @@ public class DeliveryEventEntity {
     @Column(name = "normalized_status", nullable = false, length = 40)
     private AttemptStatus normalizedStatus;
 
-    @Column(name = "payload_json", columnDefinition = "jsonb")
+    @Column(name = "payload_json", columnDefinition = "TEXT")
     private String payloadJson;
 
-    @Column(name = "event_timestamp")
+    @Column(name = "event_timestamp", nullable = false)
     private Instant eventTimestamp;
 
     @Column(name = "received_at", nullable = false)
