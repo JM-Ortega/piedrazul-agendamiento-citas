@@ -1,13 +1,12 @@
 package co.edu.unicauca.piedrazul.backend.notifications.infrastructure.persistence.entity;
 
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.*;
-import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.crypto.EncryptedStringConverter;
+import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.persistence.converter.ChannelPreferenceConverter;
+import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.persistence.converter.VariablesConverter;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.Map;
@@ -18,29 +17,34 @@ import java.util.UUID;
 @NoArgsConstructor
 @Entity
 @Table(
-        name = "notifications",
+        name = "notification",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_notifications_idempotency_key",
+                        name = "uq_notification_idempotency_key",
                         columnNames = "idempotency_key"
                 )
+        },
+        indexes = {
+                @Index(name = "idx_notification_type", columnList = "type_code"),
+                @Index(name = "idx_notification_recipient", columnList = "recipient_id"),
+                @Index(name = "idx_notification_aggregate", columnList = "aggregate_id, aggregate_type")
         }
 )
 public class NotificationEntity {
 
     @Id
     @Column(
-            name = "id_notification",
+            name = "id",
             nullable = false,
             updatable = false
     )
-    private UUID idNotification;
+    private UUID id;
 
     @Enumerated(EnumType.STRING)
     @Column(
-            name = "type",
+            name = "type_code",
             nullable = false,
-            length = 80
+            length = 60
     )
     private NotificationType type;
 
@@ -61,49 +65,35 @@ public class NotificationEntity {
     @Column(name = "recipient_id", nullable = false)
     private UUID recipientId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(
-            name = "recipient_type",
-            nullable = false,
-            length = 40
-    )
-    private RecipientType recipientType;
-
     @Column(
             name = "recipient_name",
             nullable = false
     )
     private String recipientName;
 
-    @Convert(converter = EncryptedStringConverter.class)
-    @Column(name = "recipient_phone_encrypted")
+    @Column(name = "recipient_phone", length = 20)
     private String recipientPhoneE164;
 
-    @Convert(converter = EncryptedStringConverter.class)
-    @Column(name = "recipient_email_encrypted")
+    @Column(name = "recipient_email", length = 255)
     private String recipientEmail;
 
     @Column(
             name = "recipient_locale",
-            nullable = false,
-            length = 20
+            length = 10
     )
     private String recipientLocale;
 
-    @Column(name = "recipient_contact_masked")
-    private String recipientContactMasked;
-
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Convert(converter = ChannelPreferenceConverter.class)
     @Column(
             name = "channel_preference_json",
-            columnDefinition = "jsonb"
+            columnDefinition = "TEXT"
     )
     private ChannelPreference channelPreference;
 
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Convert(converter = VariablesConverter.class)
     @Column(
             name = "variables_json",
-            columnDefinition = "jsonb",
+            columnDefinition = "TEXT",
             nullable = false
     )
     private Map<String, String> variables;
