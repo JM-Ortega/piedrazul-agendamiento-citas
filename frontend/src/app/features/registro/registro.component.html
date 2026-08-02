@@ -53,16 +53,18 @@
               Número de documento
             </label>
             <div class="flex flex-col sm:flex-row gap-3">
-              <input
-                id="documentNumber"
+              <app-input
+                [id]="'documentNumber'"
                 type="text"
-                [ngModel]="documentNumber()"
-                (ngModelChange)="onDocumentChange($event)"
-                (input)="handleDocInput($event)"
-                (keyup.enter)="searchPatient()"
+                sanitize="alphanumeric"
+                [maxLength]="DOC_MAX"
                 placeholder="Ingresa tu número de documento"
-                class="flex-1 border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4e92d9] transition-colors"
-              />
+                [fullWidth]="true"
+                [ngModel]="documentNumber()"
+                (valueChange)="onDocumentNumberChange($event)"
+                (enterPressed)="searchPatient()"
+                [errorMessage]="errors()['documentNumber']"
+              ></app-input>
               <app-button
                 variant="primary"
                 (buttonClick)="searchPatient()"
@@ -72,14 +74,6 @@
                 Buscar
               </app-button>
             </div>
-            @if (docInputWarning()) {
-              <p class="text-red-500 text-sm mt-1">{{ docInputWarning() }}</p>
-            }
-            @if (errors()['documentNumber']) {
-              <p class="text-red-500 text-sm mt-1">
-                {{ errors()['documentNumber'] }}
-              </p>
-            }
           </div>
 
           @if (patientStatus() === 'found' && foundPatient(); as p) {
@@ -245,23 +239,20 @@
               >
                 Contraseña <span class="text-red-500">*</span>
               </label>
-              <div class="relative">
-                <input
-                  id="password"
-                  [type]="showPassword() ? 'text' : 'password'"
-                  [ngModel]="password()"
-                  (ngModelChange)="password.set($event)"
-                  placeholder="Mínimo 6 letras y números"
-                  class="w-full border-2 rounded-xl px-4 py-3 pr-12 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['password']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                />
+              <app-input
+                [id]="'password'"
+                [type]="showPassword() ? 'text' : 'password'"
+                [maxLength]="PASSWORD_MAX"
+                autocomplete="new-password"
+                placeholder="Mínimo 6 letras y números"
+                inputClass="pr-12"
+                [ngModel]="password()"
+                (valueChange)="onPasswordChange($event)"
+                [errorMessage]="errors()['password']"
+              >
                 <app-button
+                  suffix
                   variant="icon"
-                  extraClass="absolute right-3 top-1/2 -translate-y-1/2"
                   (buttonClick)="showPassword.set(!showPassword())"
                 >
                   <svg
@@ -269,12 +260,7 @@
                     [size]="18"
                   ></svg>
                 </app-button>
-              </div>
-              @if (errors()['password']) {
-                <p class="text-red-500 text-sm mt-1">
-                  {{ errors()['password'] }}
-                </p>
-              }
+              </app-input>
             </div>
 
             <div>
@@ -284,23 +270,20 @@
               >
                 Confirmar contraseña <span class="text-red-500">*</span>
               </label>
-              <div class="relative">
-                <input
-                  id="confirmPassword"
-                  [type]="showConfirmPassword() ? 'text' : 'password'"
-                  [ngModel]="confirmPassword()"
-                  (ngModelChange)="confirmPassword.set($event)"
-                  placeholder="Repite tu contraseña"
-                  class="w-full border-2 rounded-xl px-4 py-3 pr-12 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['confirmPassword']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                />
+              <app-input
+                [id]="'confirmPassword'"
+                [type]="showConfirmPassword() ? 'text' : 'password'"
+                [maxLength]="PASSWORD_MAX"
+                autocomplete="new-password"
+                placeholder="Repite tu contraseña"
+                inputClass="pr-12"
+                [ngModel]="confirmPassword()"
+                (valueChange)="onConfirmPasswordChange($event)"
+                [errorMessage]="errors()['confirmPassword']"
+              >
                 <app-button
+                  suffix
                   variant="icon"
-                  extraClass="absolute right-3 top-1/2 -translate-y-1/2"
                   (buttonClick)="
                     showConfirmPassword.set(!showConfirmPassword())
                   "
@@ -310,12 +293,7 @@
                     [size]="18"
                   ></svg>
                 </app-button>
-              </div>
-              @if (errors()['confirmPassword']) {
-                <p class="text-red-500 text-sm mt-1">
-                  {{ errors()['confirmPassword'] }}
-                </p>
-              }
+              </app-input>
             </div>
           } @else {
             <div
@@ -380,25 +358,18 @@
             >
               Código de verificación <span class="text-red-500">*</span>
             </label>
-            <input
+            <app-input
+              [id]="'verificationCode'"
               type="text"
-              maxlength="6"
-              id="verificationCode"
-              [ngModel]="verificationCode()"
-              (ngModelChange)="verificationCode.set($event)"
+              inputMode="numeric"
+              sanitize="numeric"
+              [maxLength]="6"
+              maxLengthMessage="Solo se permiten máximo 6 dígitos"
               placeholder="Ej. 123456"
-              class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-              [ngClass]="
-                errors()['verificationCode']
-                  ? 'border-red-400 bg-red-50'
-                  : 'border-blue-200 focus:border-[#4e92d9]'
-              "
-            />
-            @if (errors()['verificationCode']) {
-              <p class="text-red-500 text-sm mt-1">
-                {{ errors()['verificationCode'] }}
-              </p>
-            }
+              [ngModel]="verificationCode()"
+              (valueChange)="onVerificationCodeChange($event)"
+              [errorMessage]="errors()['verificationCode']"
+            ></app-input>
           </div>
 
           @if (errorMessage()) {

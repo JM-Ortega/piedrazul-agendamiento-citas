@@ -23,6 +23,7 @@ import {
 } from '@lucide/angular';
 import Keycloak from 'keycloak-js';
 import { ButtonComponent } from '../..//design-system/atoms/button/button.component';
+import { InputComponent } from '../../design-system/atoms/input/input.component';
 import {
   PatientPublicResponse,
   PatientService,
@@ -51,6 +52,7 @@ type PatientStatus =
     CommonModule,
     FormsModule,
     ButtonComponent,
+    InputComponent,
     PatientDataFormComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -75,7 +77,6 @@ export class RegistroComponent implements OnInit {
   successMessage = signal('');
   showPassword = signal(false);
   showConfirmPassword = signal(false);
-  today = signal(new Date().toISOString().split('T')[0]);
 
   documentNumber = signal('');
   patientStatus = signal<PatientStatus>('idle');
@@ -87,19 +88,14 @@ export class RegistroComponent implements OnInit {
   confirmPassword = signal('');
   verificationCode = signal('');
 
-  private readonly PASSWORD_MIN = 6;
-  private readonly PASSWORD_MAX = 100;
+  protected readonly PASSWORD_MIN = 6;
+  protected readonly PASSWORD_MAX = 100;
   private readonly PASSWORD_ALPHANUMERIC = /^(?=.*[a-zA-Z])(?=.*[0-9]).+$/;
   readonly maxBirthDate = new Date();
 
   errors = signal<Record<string, string>>({});
 
-  docInputWarning = signal('');
-
-  private readonly DOC_MAX = 12;
-  private readonly INVALID_DOC_CHARS = /[^a-zA-Z0-9]/g;
-
-  private timers: Record<string, ReturnType<typeof setTimeout>> = {};
+  protected readonly DOC_MAX = 12;
 
   readonly isNewPatient = computed(() => this.patientStatus() === 'not-found');
   readonly isExistingPatient = computed(() => this.patientStatus() === 'found');
@@ -126,27 +122,20 @@ export class RegistroComponent implements OnInit {
     return '';
   });
 
-  handleDocInput(event: Event): void {
-    const el = event.target as HTMLInputElement;
-    const raw = el.value;
-    const clean = raw.replace(this.INVALID_DOC_CHARS, '');
-    if (clean !== raw) {
-      el.value = clean;
-      this.flashDocWarning(
-        'Solo se permiten letras y números, sin caracteres especiales'
-      );
-    }
-    if (clean.length > this.DOC_MAX) {
-      el.value = clean.slice(0, this.DOC_MAX);
-      this.flashDocWarning(
-        `Solo se permiten máximo ${this.DOC_MAX} caracteres`
-      );
-    }
-    this.onDocumentChange(el.value);
+  onDocumentNumberChange(value: string | number | boolean | null): void {
+    this.onDocumentChange(String(value ?? ''));
   }
 
-  private flashDocWarning(text: string): void {
-    this.flash(this.docInputWarning, text, 'doc');
+  onPasswordChange(value: string | number | boolean | null): void {
+    this.password.set(String(value ?? ''));
+  }
+
+  onConfirmPasswordChange(value: string | number | boolean | null): void {
+    this.confirmPassword.set(String(value ?? ''));
+  }
+
+  onVerificationCodeChange(value: string | number | boolean | null): void {
+    this.verificationCode.set(String(value ?? ''));
   }
 
   searchPatient(): void {
@@ -317,16 +306,6 @@ export class RegistroComponent implements OnInit {
         next: () => this.onSuccess(),
         error: (err) => this.handleError(err),
       });
-  }
-
-  private flash(
-    sig: ReturnType<typeof signal<string>>,
-    text: string,
-    key: string
-  ): void {
-    sig.set(text);
-    if (this.timers[key]) clearTimeout(this.timers[key]);
-    this.timers[key] = setTimeout(() => sig.set(''), 3000);
   }
 
   private onSuccess(): void {
