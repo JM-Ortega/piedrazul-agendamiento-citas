@@ -2,7 +2,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -16,32 +16,26 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "appointment")
+@Table(name = "appointment", schema = "piedrazul")
 public class AppointmentEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "id_appointment", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID idAppointment;
 
-    @Column(name = "id_doctor", nullable = false)
+    @Column(name = "doctor_id", nullable = false)
     private UUID idDoctor;
 
-    @Column(name = "doctor_name", nullable = false)
-    private String doctorName;
-
-    @Column(name = "id_patient", nullable = true)
+    @Column(name = "patient_id", nullable = false)
     private UUID idPatient;
 
-    @Column(name = "patient_name", nullable = false)
-    private String patientName;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "specialty_code", nullable = false)
+    private SpecialtyCode specialty;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "specialty", nullable = false)
-    private Specialty specialty;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "appot_state", nullable = false)
+    @Column(name = "state_code", nullable = false)
     private AppointmentState appointmentState;
 
     @Column(name = "date", nullable = false)
@@ -53,6 +47,5 @@ public class AppointmentEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "scheduling_origin", nullable = false)
     private SchedulingOrigin schedulingOrigin;
-
 
 }

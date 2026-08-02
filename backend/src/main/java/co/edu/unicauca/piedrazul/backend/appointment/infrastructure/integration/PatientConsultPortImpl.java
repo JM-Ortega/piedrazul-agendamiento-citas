@@ -10,8 +10,12 @@ import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+
 import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentPatientNotFoundException;
 
 @Component
@@ -65,5 +69,16 @@ public class PatientConsultPortImpl implements PatientConsultPort {
         );
 
         return created.personId();
+    }
+
+    @Override
+    public Map<UUID, PatientInfo> findByIds(Set<UUID> patientIds) {
+        return patientModuleApi.findByIds(patientIds).stream()
+                .collect(Collectors.toMap(PatientData::personId, PatientInfoMapper::toPatientInfo));
+    }
+
+    @Override
+    public boolean existsById(UUID idPatient){
+        return patientModuleApi.existsById(idPatient);
     }
 }

@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment.domain.exception;
+package co.edu.unicauca.piedrazul.backend.appointment.exception;
 
 import org.springframework.http.HttpStatus;
 

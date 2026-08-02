@@ -1,5 +1,6 @@
-package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api;
+package co.edu.unicauca.piedrazul.backend.appointment.exception;
 
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.AppointmentController;
 import co.edu.unicauca.piedrazul.backend.shared.BaseExceptionHandler;
 import co.edu.unicauca.piedrazul.backend.shared.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,7 +15,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice(basePackageClasses = AppointmentController.class)
 @Slf4j
-public class AppointmentGlobalExceptionHandler extends BaseExceptionHandler {
+public class AppointmentExceptionHandler extends BaseExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(

@@ -1,19 +1,17 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.PatientResolutionStrategy;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PersonConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.ResolvedPatient;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientAlreadyScheduledInSpecialtyException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientScheduleTimeConflictException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentScheduledEvent;
-import co.edu.unicauca.piedrazul.backend.appointment.exception.FirstAppointmentMustBeGeneralMedicineException;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.shared.events.audit.AppointmentCreatedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,28 +27,25 @@ public class AppointmentSchedulingService {
     private final AppointmentService appointmentService;
     private final ApplicationEventPublisher eventPublisher;
     private final IsNewPatientUseCase isNewPatientUseCase;
-    private final PersonConsultPort personConsultPort;
 
     public AppointmentSchedulingService(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService,
             ApplicationEventPublisher eventPublisher,
-            IsNewPatientUseCase isNewPatientUseCase,
-            PersonConsultPort personConsultPort) {
+            IsNewPatientUseCase isNewPatientUseCase) {
         this.appointmentRepository = appointmentRepository;
         this.doctorConfigConsultPort = doctorConfigConsultPort;
         this.appointmentService = appointmentService;
         this.eventPublisher = eventPublisher;
         this.isNewPatientUseCase = isNewPatientUseCase;
-        this.personConsultPort = personConsultPort;
     }
 
     @Transactional
     public void scheduleManual(
             PatientSchedulingContext patientContext,
             UUID idDoctor,
-            Specialty specialty,
+            SpecialtyCode specialty,
             LocalDate date,
             AppointmentTime startTime,
             UUID performedBy,
@@ -62,7 +57,7 @@ public class AppointmentSchedulingService {
     public void scheduleAutonomous(
             PatientSchedulingContext patientContext,
             UUID idDoctor,
-            Specialty specialty,
+            SpecialtyCode specialty,
             LocalDate date,
             AppointmentTime startTime,
             UUID performedBy,
@@ -73,7 +68,7 @@ public class AppointmentSchedulingService {
     private Appointment schedule(
             PatientSchedulingContext patientContext,
             UUID idDoctor,
-            Specialty specialty,
+            SpecialtyCode specialty,
             LocalDate date,
             AppointmentTime startTime,
             UUID performedBy,
@@ -81,7 +76,7 @@ public class AppointmentSchedulingService {
             boolean manualFlow) {
 
         int intervalMinutes = doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor);
-        String doctorName = personConsultPort.getPersonName(idDoctor);
+        String doctorName = doctorConfigConsultPort.getDoctorName(idDoctor);
         List<Appointment> existingAppointments = appointmentRepository.findByDoctorIdAndDate(idDoctor, date);
 
         // Srategy
@@ -99,10 +94,7 @@ public class AppointmentSchedulingService {
         AppointmentSchedulingRequest request =
                 new AppointmentSchedulingRequest(
                         idDoctor,
-                        doctorName,
                         resolvedPatient.idPatient(),
-                        patientName,
-                        patientInfo,
                         specialty,
                         date,
                         startTime
@@ -146,16 +138,16 @@ public class AppointmentSchedulingService {
         return patientInfo.getFirstName() + " " + patientInfo.getLastName();
     }
 
-    private void validateNewPatientFirstAppointmentSpecialty(UUID idPatient, Specialty specialty) {
+    private void validateNewPatientFirstAppointmentSpecialty(UUID idPatient, SpecialtyCode specialty) {
         boolean isNewPatient = isNewPatientUseCase.isNewPatient(idPatient);
-        if (isNewPatient && specialty != Specialty.MEDICINA_GENERAL) {
+        if (isNewPatient && specialty != SpecialtyCode.MEDICINA_GENERAL) {
             throw new FirstAppointmentMustBeGeneralMedicineException(
-                    "La primera cita de un paciente nuevo debe ser con MEDICINA_GENERAL"
+                    "La primera cita de un paciente nuevo debe ser con MEDICINA GENERAL"
             );
         }
     }
 
-    private void validateUniqueScheduledAppointmentBySpecialty(UUID idPatient, Specialty specialty) {
+    private void validateUniqueScheduledAppointmentBySpecialty(UUID idPatient, SpecialtyCode specialty) {
         boolean hasScheduledInSameSpecialty = appointmentRepository.findByPatientId(idPatient)
                 .stream()
                 .anyMatch(appointment -> appointment.getSpecialty() == specialty

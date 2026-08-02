@@ -17,7 +17,7 @@ public interface PersonExternalService {
             UUID userId
     );
 
-        void deletePerson(UUID personId);
+    void deletePerson(UUID personId);
 
     void linkUserId(UUID personId, UUID userId);
 
