@@ -43,15 +43,16 @@ class ListAppointmentsUseCaseImplTest {
         UUID idDoctor  = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
         LocalDate date = LocalDate.now();
-        List<Appointment> expected = List.of(buildAppointment(idDoctor, idPatient, date, ));
+        AppointmentState state = AppointmentState.AGENDADA;
+        List<Appointment> expected = List.of(buildAppointment(idDoctor, idPatient, date, state));
 
-        when(appointmentRepository.findByDoctorIdAndPatientIdAndDate(idDoctor, idPatient, date))
+        when(appointmentRepository.listBy(idDoctor, idPatient, date, state))
                 .thenReturn(expected);
 
-        List<Appointment> result = useCase.listBy(idDoctor, idPatient, date);
+        List<Appointment> result = useCase.listBy(idDoctor, idPatient, date, state);
 
         assertThat(result).isEqualTo(expected);
-        verify(appointmentRepository).findByDoctorIdAndPatientIdAndDate(idDoctor, idPatient, date);
+        verify(appointmentRepository).listBy(idDoctor, idPatient, date, state);
     }
 
     // ─────────────────────────────────────────────
@@ -62,15 +63,16 @@ class ListAppointmentsUseCaseImplTest {
     void listByShouldCallFindByDoctorIdAndPatientIdWhenOnlyDoctorAndPatient() {
         UUID idDoctor  = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
-        List<Appointment> expected = List.of(buildAppointment(idDoctor, idPatient, LocalDate.now()));
+        AppointmentState state = AppointmentState.AGENDADA;
+        List<Appointment> expected = List.of(buildAppointment(idDoctor, idPatient, LocalDate.now(), state));
 
-        when(appointmentRepository.findByDoctorIdAndPatientId(idDoctor, idPatient))
+        when(appointmentRepository.listBy(idDoctor, idPatient, null, null))
                 .thenReturn(expected);
 
         List<Appointment> result = useCase.listBy(idDoctor, idPatient, null, null);
 
         assertThat(result).isEqualTo(expected);
-        verify(appointmentRepository).findByDoctorIdAndPatientId(idDoctor, idPatient);
+        verify(appointmentRepository).listBy(idDoctor, idPatient, null, null);
     }
 
     // ─────────────────────────────────────────────
@@ -82,16 +84,16 @@ class ListAppointmentsUseCaseImplTest {
         UUID idDoctor = UUID.randomUUID();
         LocalDate date = LocalDate.now();
         List<Appointment> expected = List.of(
-                buildAppointment(idDoctor, UUID.randomUUID(), date)
+                buildAppointment(idDoctor, UUID.randomUUID(), date, AppointmentState.AGENDADA)
         );
 
-        when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date))
+        when(appointmentRepository.listBy(idDoctor, null, date, null))
                 .thenReturn(expected);
 
-        List<Appointment> result = useCase.listBy(idDoctor, null, date);
+        List<Appointment> result = useCase.listBy(idDoctor, null, date, null);
 
         assertThat(result).isEqualTo(expected);
-        verify(appointmentRepository).findByDoctorIdAndDate(idDoctor, date);
+        verify(appointmentRepository).listBy(idDoctor, null, date, null);
     }
 
     // ─────────────────────────────────────────────
@@ -103,16 +105,16 @@ class ListAppointmentsUseCaseImplTest {
         UUID idPatient = UUID.randomUUID();
         LocalDate date = LocalDate.now();
         List<Appointment> expected = List.of(
-                buildAppointment(UUID.randomUUID(), idPatient, date)
+                buildAppointment(UUID.randomUUID(), idPatient, date, AppointmentState.AGENDADA)
         );
 
-        when(appointmentRepository.findByPatientIdAndDate(idPatient, date))
+        when(appointmentRepository.listBy(null, idPatient, date, null))
                 .thenReturn(expected);
 
-        List<Appointment> result = useCase.listBy(null, idPatient, date);
+        List<Appointment> result = useCase.listBy(null, idPatient, date, null);
 
         assertThat(result).isEqualTo(expected);
-        verify(appointmentRepository).findByPatientIdAndDate(idPatient, date);
+        verify(appointmentRepository).listBy(null, idPatient, date, null);
     }
 
     // ─────────────────────────────────────────────
@@ -123,15 +125,15 @@ class ListAppointmentsUseCaseImplTest {
     void listByShouldCallFindByDoctorIdWhenOnlyDoctorPresent() {
         UUID idDoctor = UUID.randomUUID();
         List<Appointment> expected = List.of(
-                buildAppointment(idDoctor, UUID.randomUUID(), LocalDate.now())
+                buildAppointment(idDoctor, UUID.randomUUID(), LocalDate.now(), AppointmentState.AGENDADA)
         );
 
-        when(appointmentRepository.findByDoctorId(idDoctor)).thenReturn(expected);
+        when(appointmentRepository.listBy(idDoctor, null, null, null)).thenReturn(expected);
 
-        List<Appointment> result = useCase.listBy(idDoctor, null, null);
+        List<Appointment> result = useCase.listBy(idDoctor, null, null, null);
 
         assertThat(result).isEqualTo(expected);
-        verify(appointmentRepository).findByDoctorId(idDoctor);
+        verify(appointmentRepository).listBy(idDoctor, null, null, null);
     }
 
     // ─────────────────────────────────────────────
@@ -142,15 +144,15 @@ class ListAppointmentsUseCaseImplTest {
     void listByShouldCallFindByPatientIdWhenOnlyPatientPresent() {
         UUID idPatient = UUID.randomUUID();
         List<Appointment> expected = List.of(
-                buildAppointment(UUID.randomUUID(), idPatient, LocalDate.now())
+                buildAppointment(UUID.randomUUID(), idPatient, LocalDate.now(), AppointmentState.AGENDADA)
         );
 
-        when(appointmentRepository.findByPatientId(idPatient)).thenReturn(expected);
+        when(appointmentRepository.listBy(null, idPatient, null, null)).thenReturn(expected);
 
-        List<Appointment> result = useCase.listBy(null, idPatient, null);
+        List<Appointment> result = useCase.listBy(null, idPatient, null, null);
 
         assertThat(result).isEqualTo(expected);
-        verify(appointmentRepository).findByPatientId(idPatient);
+        verify(appointmentRepository).listBy(null, idPatient, null, null);
     }
 
     // ─────────────────────────────────────────────
@@ -161,15 +163,15 @@ class ListAppointmentsUseCaseImplTest {
     void listByShouldCallFindByDateWhenOnlyDatePresent() {
         LocalDate date = LocalDate.now();
         List<Appointment> expected = List.of(
-                buildAppointment(UUID.randomUUID(), UUID.randomUUID(), date)
+                buildAppointment(UUID.randomUUID(), UUID.randomUUID(), date, AppointmentState.AGENDADA)
         );
 
-        when(appointmentRepository.findByDate(date)).thenReturn(expected);
+        when(appointmentRepository.listBy(null, null, date, null)).thenReturn(expected);
 
-        List<Appointment> result = useCase.listBy(null, null, date);
+        List<Appointment> result = useCase.listBy(null, null, date, null);
 
         assertThat(result).isEqualTo(expected);
-        verify(appointmentRepository).findByDate(date);
+        verify(appointmentRepository).listBy(null, null, date, null);
     }
 
     // ─────────────────────────────────────────────
@@ -179,28 +181,28 @@ class ListAppointmentsUseCaseImplTest {
     @Test
     void listByShouldCallFindAllWhenNoFiltersPresent() {
         List<Appointment> expected = List.of(
-                buildAppointment(UUID.randomUUID(), UUID.randomUUID(), LocalDate.now())
+                buildAppointment(UUID.randomUUID(), UUID.randomUUID(), LocalDate.now(), AppointmentState.AGENDADA)
         );
 
-        when(appointmentRepository.findAll()).thenReturn(expected);
+        when(appointmentRepository.listBy(null, null, null, null)).thenReturn(expected);
 
-        List<Appointment> result = useCase.listBy(null, null, null);
+        List<Appointment> result = useCase.listBy(null, null, null, null);
 
         assertThat(result).isEqualTo(expected);
-        verify(appointmentRepository).findAll();
+        verify(appointmentRepository).listBy(null, null, null, null);
     }
 
     // ─────────────────────────────────────────────
     // Fixture
     // ─────────────────────────────────────────────
 
-    private Appointment buildAppointment(UUID idDoctor, UUID idPatient, LocalDate date) {
+    private Appointment buildAppointment(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state) {
         return Appointment.reconstruct(
                 UUID.randomUUID(),
                 idDoctor,
                 idPatient,
                 SpecialtyCode.FISIOTERAPIA,
-                AppointmentState.AGENDADA,
+                state,
                 date,
                 new AppointmentTime(LocalTime.of(9, 0)),
                 SchedulingOrigin.AUTONOMO
