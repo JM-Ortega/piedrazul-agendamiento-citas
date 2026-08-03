@@ -13,12 +13,7 @@ public interface AppointmentRepository {
     // Metodos que solo hablan en terminos del dominio
     Appointment save(Appointment appointment);
 
-    //metodo para el modulo de historia clinica
-    List<Appointment> findByDoctorId(UUID idDoctor);
-
     List<Appointment> findByPatientId(UUID idPatient);
-
-    List<Appointment> findByDate(LocalDate date);
 
     List<Appointment> findByDoctorIdAndDate(UUID idDoctor, LocalDate date);
 
@@ -27,15 +22,7 @@ public interface AppointmentRepository {
     //metodo para listar y usado en algo más
     List<Appointment> findByPatientIdAndDate(UUID idPatient, LocalDate date);
 
-    //metodo para listar citas
-    List<Appointment> findByDoctorIdAndPatientId(UUID idDoctor, UUID idPatient);
-
-    //metodo para listar citas
-    List<Appointment> findByDoctorIdAndPatientIdAndDate(UUID idDoctor, UUID idPatient, LocalDate date);
-
     boolean existsByPatientIdAndStates(UUID idPatient, Collection<AppointmentState> states);
-
-    List<Appointment> findAll();
 
     Appointment findById(UUID appointmentId);
   

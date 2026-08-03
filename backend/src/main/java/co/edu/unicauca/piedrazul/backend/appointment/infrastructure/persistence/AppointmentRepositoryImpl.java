@@ -30,21 +30,9 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
         return mapper.toDomain(jpaRepository.save(mapper.toEntity(appointment)));
     }
 
-
-    @Override
-    public List<Appointment> findByDoctorId(UUID idDoctor) {
-        return jpaRepository.findByIdDoctor(idDoctor).stream().map(mapper::toDomain).toList();
-    }
-
     @Override
     public List<Appointment> findByPatientId(UUID idPatient) {
         return jpaRepository.findByIdPatient(idPatient).stream().map(mapper::toDomain).toList();
-    }
-
-
-    @Override
-    public List<Appointment> findByDate(LocalDate date) {
-        return jpaRepository.findByDate(date).stream().map(mapper::toDomain).toList();
     }
 
     @Override
@@ -67,23 +55,8 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     }
 
     @Override
-    public List<Appointment> findByDoctorIdAndPatientId(UUID idDoctor, UUID idPatient) {
-        return jpaRepository.findByIdDoctorAndIdPatient(idDoctor, idPatient).stream().map(mapper::toDomain).toList();
-    }
-
-    @Override
-    public List<Appointment> findByDoctorIdAndPatientIdAndDate(UUID idDoctor, UUID idPatient, LocalDate date) {
-        return jpaRepository.findByIdDoctorAndIdPatientAndDate(idDoctor, idPatient, date).stream().map(mapper::toDomain).toList();
-    }
-
-    @Override
     public boolean existsByPatientIdAndStates(UUID idPatient, Collection<AppointmentState> states) {
         return jpaRepository.existsByIdPatientAndAppointmentStateIn(idPatient, states);
-    }
-
-    @Override
-    public List<Appointment> findAll(){
-        return jpaRepository.findAll().stream().map(mapper::toDomain).toList();
     }
 
     @Override
