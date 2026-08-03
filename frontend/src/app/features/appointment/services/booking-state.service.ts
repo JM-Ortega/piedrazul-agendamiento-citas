@@ -5,6 +5,7 @@ import { PatientSuggestion } from '../models/dtos/patient-suggestion.dto';
 import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
 import { BookingContext } from '../models/types/bookingContext.type';
 import { BookingMode } from '../models/types/bookingMode.type';
+import { toIsoDateString } from '../../../shared/helpers/transform-date-local';
 
 /**
  * Servicio de estado compartido para el flujo de agendamiento de citas.
@@ -213,13 +214,7 @@ export class BookingStateService {
   );
 
   formatLocalDate(date: Date): string {
-    return (
-      date.getFullYear() +
-      '-' +
-      String(date.getMonth() + 1).padStart(2, '0') +
-      '-' +
-      String(date.getDate()).padStart(2, '0')
-    );
+    return toIsoDateString(date);
   }
 
   resolvePatientId(): string {

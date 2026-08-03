@@ -12,6 +12,10 @@ import { formatLongDateEs } from '../../../../shared/helpers/date-format';
 import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../../../shared/models/dtos/doctor.dto';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+import {
+  parseLocalDateString,
+  toIsoDateString,
+} from '../../../../shared/helpers/transform-date-local';
 
 export type SchedulerFilterField = 'doctor' | 'date' | 'status';
 
@@ -59,7 +63,7 @@ export class SchedulerFiltersComponent {
   /** Convierte el string 'yyyy-mm-dd' del filtro a Date para el datepicker. */
   filterDateValue = computed<Date | null>(() => {
     const raw = this.filterDate();
-    return raw ? this.parseLocalDateString(raw) : null;
+    return raw ? parseLocalDateString(raw) : null;
   });
 
   hasField(field: SchedulerFilterField): boolean {
@@ -86,7 +90,7 @@ export class SchedulerFiltersComponent {
   }
 
   onDateChange(date: Date | null): void {
-    this.filterDate.set(date ? this.toIsoString(date) : '');
+    this.filterDate.set(date ? toIsoDateString(date) : '');
   }
 
   clearDoctor(): void {
@@ -99,18 +103,5 @@ export class SchedulerFiltersComponent {
 
   clearStatus(): void {
     this.filterStatus.set('');
-  }
-
-  private parseLocalDateString(value: string): Date {
-    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-    return new Date(value);
-  }
-
-  private toIsoString(date: Date): string {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
   }
 }

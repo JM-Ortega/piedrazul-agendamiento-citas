@@ -21,6 +21,10 @@ import {
   SelectOption,
 } from '../../../design-system/atoms/select/select.component';
 import { DatepickerComponent } from '../../../design-system/molecules/datepicker/datepicker.component';
+import {
+  parseLocalDateString,
+  toIsoDateString,
+} from '../../../shared/helpers/transform-date-local';
 
 export type PatientFormData = Omit<Patient, 'id' | 'documentNumber'>;
 
@@ -128,13 +132,13 @@ export class PatientDataFormComponent implements ControlValueAccessor, OnInit {
   }
 
   onBirthDateChange(date: Date | null): void {
-    const formatted = date ? this.formatLocalDate(date) : '';
+    const formatted = date ? toIsoDateString(date) : '';
     this.set('birthDate', formatted);
   }
 
   birthDateAsDate = computed<Date | null>(() => {
     const raw = this.birthDateSignal();
-    return raw ? this.parseLocalDateString(raw) : null;
+    return raw ? parseLocalDateString(raw) : null;
   });
 
   validate(): boolean {
@@ -200,7 +204,7 @@ export class PatientDataFormComponent implements ControlValueAccessor, OnInit {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const input = this.parseLocalDateString(value);
+    const input = parseLocalDateString(value);
     input.setHours(0, 0, 0, 0);
 
     if (input >= today) return 'La fecha de nacimiento debe ser anterior a hoy';
@@ -264,20 +268,7 @@ export class PatientDataFormComponent implements ControlValueAccessor, OnInit {
 
   private isMinorByBirthDate(value: string): boolean {
     if (!value) return false;
-    return this.calcAge(this.parseLocalDateString(value)) < 18;
-  }
-
-  private parseLocalDateString(value: string): Date {
-    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-    return new Date(value);
-  }
-
-  private formatLocalDate(date: Date): string {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    return this.calcAge(parseLocalDateString(value)) < 18;
   }
 
   writeValue(value: PatientFormData | null): void {
