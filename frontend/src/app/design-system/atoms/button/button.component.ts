@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   EventEmitter,
+  HostBinding,
   Input,
   input,
   Output,
@@ -40,6 +41,10 @@ export class ButtonComponent {
   @Input() activeChipClasses = 'border-[#4e92d9] bg-[#a7c9ec] text-white';
   @Input() inactiveChipClasses =
     'border-gray-200 hover:border-[#4e92d9] hover:bg-[#dbeafe] text-[#163c63]';
+  @Input() hostDisplay: 'inline' | 'flex' | 'block' = 'inline';
+  @HostBinding('style.display') get hostDisplayStyle(): string {
+    return this.hostDisplay;
+  }
 
   // loading pasa a ser un signal input: se sincroniza solo con el @Input,
   // sin necesidad de OnInit/OnChanges ni riesgo de quedar "atascado".
