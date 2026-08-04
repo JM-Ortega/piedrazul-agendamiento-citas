@@ -7,6 +7,7 @@ import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface PatientModuleApi {

@@ -20,6 +20,7 @@ import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.verification.VerificationModuleApi;
 import co.edu.unicauca.piedrazul.backend.verification.api.VerificationPurpose;
+import org.apache.xmlbeans.impl.xb.xsdschema.Public;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -255,6 +256,29 @@ public class PatientService implements PatientModuleApi {
         validateId(id);
         return patientRepository.existsById(id);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PatientData> findByIds(Set<UUID> patientIds) {
+
+        if (patientIds == null || patientIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Patient> patients = patientRepository.findAllById(patientIds);
+
+        Map<UUID, PersonSummary> persons =
+                personExternalService.findByIds(patientIds);
+
+        return patients.stream()
+                .map(patient -> toData(
+                        patient,
+                        persons.get(patient.getPersonId())
+                ))
+                .toList();
+    }
+
+
 
     @Transactional(readOnly = true)
     public PatientPublicResponse findPublicByDocumentNumber(String identification) {

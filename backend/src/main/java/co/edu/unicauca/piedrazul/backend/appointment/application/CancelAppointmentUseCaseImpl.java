@@ -3,7 +3,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.application;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.CancelAppointmentUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
-import co.edu.unicauca.piedrazul.backend.appointment.exception.CancelAppointmentNotAllowedException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.*;
 
 import java.time.LocalDate;
 import java.util.UUID;

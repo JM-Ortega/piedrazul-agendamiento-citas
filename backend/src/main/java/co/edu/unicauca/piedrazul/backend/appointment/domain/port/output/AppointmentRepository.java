@@ -24,10 +24,13 @@ public interface AppointmentRepository {
 
     List<Appointment> findByDoctorIdAndDateAndState(UUID idDoctor, LocalDate date, String state);
 
+    //metodo para listar y usado en algo más
     List<Appointment> findByPatientIdAndDate(UUID idPatient, LocalDate date);
 
+    //metodo para listar citas
     List<Appointment> findByDoctorIdAndPatientId(UUID idDoctor, UUID idPatient);
 
+    //metodo para listar citas
     List<Appointment> findByDoctorIdAndPatientIdAndDate(UUID idDoctor, UUID idPatient, LocalDate date);
 
     boolean existsByPatientIdAndStates(UUID idPatient, Collection<AppointmentState> states);
@@ -41,5 +44,8 @@ public interface AppointmentRepository {
     List<Appointment> findScheduledAppointmentsBefore(LocalDate date);
 
     UUID getPattientIdByAppointmentId(UUID appointmentId);
+
+    //Metodo unico para el caso de uso ListAppointmentsUseCase
+    List<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state);
 
 }

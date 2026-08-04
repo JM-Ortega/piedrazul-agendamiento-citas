@@ -3,6 +3,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api;
 import co.edu.unicauca.piedrazul.backend.appointment.application.AppointmentSchedulingService;
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.AutonomousPatientResolutionStrategy;
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.ManualPatientResolutionStrategy;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
@@ -83,10 +84,11 @@ public class AppointmentController {
     public ResponseEntity<List<AppointmentResponse>> list(
             @RequestParam(required = false) UUID idDoctor,
             @RequestParam(required = false) UUID idPatient,
-            @RequestParam(required = false) LocalDate date) {
+            @RequestParam(required = false) LocalDate date,
+            @RequestParam(required = false)AppointmentState state) {
 
         // Mapper para pasar de Domain a DTO
-        return ResponseEntity.ok(listAppointmentsUseCase.listBy(idDoctor, idPatient, date).stream().map(citaDtoMapper::toResponse).toList());
+        return ResponseEntity.ok(listAppointmentsUseCase.listBy(idDoctor, idPatient, date, state).stream().map(citaDtoMapper::toResponse).toList());
     }
 
     @GetMapping("/me")

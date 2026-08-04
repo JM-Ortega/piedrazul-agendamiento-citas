@@ -2,7 +2,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
-import co.edu.unicauca.piedrazul.backend.patients.PatientLookupApi;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,13 +27,13 @@ class IsNewPatientUseCaseImplTest {
     private AppointmentRepository appointmentRepository;
     
     @Mock
-    private PatientLookupApi patientLookupApi;
+    private PatientConsultPort patientConsultPort;
 
     private IsNewPatientUseCaseImpl useCase;
 
     @BeforeEach
     void setUp() {
-        useCase = new IsNewPatientUseCaseImpl(appointmentRepository, patientLookupApi);
+        useCase = new IsNewPatientUseCaseImpl(appointmentRepository, patientConsultPort);
     }
 
     @Test
@@ -41,7 +41,7 @@ class IsNewPatientUseCaseImplTest {
         UUID patientId = UUID.randomUUID();
         Collection<AppointmentState> expectedStates = EnumSet.of(AppointmentState.AGENDADA, AppointmentState.ATENDIDA);
 
-        when(patientLookupApi.existsById(patientId)).thenReturn(true);
+        when(patientConsultPort.existsById(patientId)).thenReturn(true);
         when(appointmentRepository.existsByPatientIdAndStates(patientId, expectedStates)).thenReturn(true);
 
         boolean result = useCase.isNewPatient(patientId);
@@ -58,7 +58,7 @@ class IsNewPatientUseCaseImplTest {
         UUID patientId = UUID.randomUUID();
         Collection<AppointmentState> expectedStates = EnumSet.of(AppointmentState.AGENDADA, AppointmentState.ATENDIDA);
 
-        when(patientLookupApi.existsById(patientId)).thenReturn(true);
+        when(patientConsultPort.existsById(patientId)).thenReturn(true);
         when(appointmentRepository.existsByPatientIdAndStates(patientId, expectedStates)).thenReturn(false);
 
         boolean result = useCase.isNewPatient(patientId);
@@ -70,7 +70,7 @@ class IsNewPatientUseCaseImplTest {
     void isNewPatientShouldPropagatePatientNotFoundWhenPatientDoesNotExist() {
         UUID patientId = UUID.randomUUID();
 
-        when(patientLookupApi.existsById(patientId)).thenReturn(false);
+        when(patientConsultPort.existsById(patientId)).thenReturn(false);
 
         boolean result = useCase.isNewPatient(patientId);
         assertThat(result).isTrue();
