@@ -6,7 +6,6 @@ import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -73,6 +72,11 @@ public class Doctor {
                 .orElse(null);
 
         if (schedule == null) {
+            if (!endTime.isAfter(startTime)) {
+                throw new DoctorValidationException(
+                        "La hora final debe ser posterior a la inicial");
+            }
+
             schedules.add(new Schedule(
                     this,
                     startTime,
