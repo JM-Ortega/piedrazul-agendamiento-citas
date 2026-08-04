@@ -2,7 +2,9 @@ package co.edu.unicauca.piedrazul.backend.user;
 
 import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
+import org.springframework.data.domain.Page;
 
+import java.awt.print.Pageable;
 import java.util.*;
 
 public interface PersonExternalService {
@@ -31,15 +33,15 @@ public interface PersonExternalService {
 
     Optional<PersonSummary> findByUserId(UUID userId);
 
-    void deactivateUser (UUID personID);
+    void revokeDoctorRole(UUID personID);
 
-    void activateUser(UUID personID);
+    void ensureDoctorRole(UUID personID);
 
     String getPersonName(UUID personID);
 
     Map<UUID, String> getPersonNames(List<UUID> personIds);
 
-    public Map<UUID, UUID> findPersonIdsByUserIds(Collection<UUID> userIds);
+    Map<UUID, UUID> findPersonIdsByUserIds(Collection<UUID> userIds);
 
     UUID findPersonIdByUserId(UUID userId);
 }

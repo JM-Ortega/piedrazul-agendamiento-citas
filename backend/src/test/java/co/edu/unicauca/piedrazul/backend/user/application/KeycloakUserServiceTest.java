@@ -120,11 +120,14 @@ class KeycloakUserServiceTest {
 		verify(keycloakClient).existsUser(userId);
 	}
 
+	/*
+	Metodos proximos a eliminar
+
 	@Test
 	void deactivateUserShouldDelegateToClient() {
 		UUID userId = UUID.fromString("77777777-7777-7777-7777-777777777777");
 
-		keycloakUserService.deactivateUser(userId);
+		keycloakUserService.revokeDoctorRole(userId);
 
 		verify(keycloakClient).deactivateUser(userId);
 	}
@@ -133,10 +136,11 @@ class KeycloakUserServiceTest {
 	void activateUserShouldDelegateToClient() {
 		UUID userId = UUID.fromString("88888888-8888-8888-8888-888888888888");
 
-		keycloakUserService.activateUser(userId);
+		keycloakUserService.ensureDoctorRole(userId);
 
 		verify(keycloakClient).activateUser(userId);
 	}
+	 */
 
 	@Test
 	void deleteUserShouldDelegateToClient() {

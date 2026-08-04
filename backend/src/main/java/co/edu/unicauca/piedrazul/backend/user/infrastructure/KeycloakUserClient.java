@@ -125,6 +125,10 @@ public class KeycloakUserClient {
         }
     }
 
+    /*
+    COMENTADOS POR AHORA PERO SON PROXIMOS A BORRAR PORQUE AHORA NO SE ACTIVA O DESACTIVA EL USUARIO
+    DEL DOCTOR SOLO SE LE QUITA EL ROL DE DOCTOR
+
     public void activateUser(UUID keycloakId) {
         UserRepresentation user = new UserRepresentation();
         user.setEnabled(true);
@@ -144,6 +148,8 @@ public class KeycloakUserClient {
                 .get(keycloakId.toString())
                 .update(user);
     }
+
+     */
 
     public void deleteUser(UUID keycloakId) {
         keycloak.realm(props.getRealm())

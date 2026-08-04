@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
-public class SecurityExceptionHandler extends BaseExceptionHandler {
+class SecurityExceptionHandler extends BaseExceptionHandler {
 
     @ExceptionHandler(AuthorizationDeniedException.class)
     public ProblemDetail handleAuthorizationDenied(

@@ -1,11 +1,12 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.ScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorInvalidSpecialty;
@@ -21,14 +22,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -52,7 +52,7 @@ class DoctorServiceTest {
     private DoctorService doctorService;
 
     @Test
-    void createDoctorShouldPersistInactiveDoctorAndActivateUserWhenItIsCurrentlyActive() {
+    void createDoctorShouldCreateActiveDoctorWhenConfigurationIsComplete() {
         UUID personId = UUID.fromString("11111111-1111-1111-1111-111111111111");
         LocalDate laborStart = LocalDate.now().minusDays(1);
         LocalDate laborEnd = LocalDate.now().plusDays(1);
@@ -62,7 +62,7 @@ class DoctorServiceTest {
         specialty.setName("Medicina general");
 
         when(specialtyRepository.findById(SpecialtyCode.MEDICINA_GENERAL)).thenReturn(Optional.of(specialty));
-        when(doctorRepository.save(org.mockito.ArgumentMatchers.any(Doctor.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(doctorRepository.save(any(Doctor.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CreateDoctorRequest request = new CreateDoctorRequest(
                 List.of(SpecialtyCode.MEDICINA_GENERAL),
@@ -70,14 +70,14 @@ class DoctorServiceTest {
                 laborEnd,
                 20,
                 4,
-                List.of(new CreateScheduleRequest(LocalTime.of(8, 0), LocalTime.of(12, 0), Workday.LUNES))
+                List.of(new ScheduleRequest(LocalTime.of(8, 0), LocalTime.of(12, 0), Workday.LUNES))
         );
 
         doctorService.createDoctor(personId, request);
 
         ArgumentCaptor<Doctor> doctorCaptor = ArgumentCaptor.forClass(Doctor.class);
-        verify(personExternalService).deactivateUser(personId);
-        verify(personExternalService).activateUser(personId);
+        verify(personExternalService).ensureDoctorRole(personId);
+        verify(personExternalService, never()).revokeDoctorRole(personId);
         verify(doctorRepository).save(doctorCaptor.capture());
 
         Doctor savedDoctor = doctorCaptor.getValue();
@@ -88,7 +88,16 @@ class DoctorServiceTest {
         assertThat(savedDoctor.getBookingWindowWeeks()).isEqualTo(4);
         assertThat(savedDoctor.isStatus()).isTrue();
         assertThat(savedDoctor.getSpecialties()).containsExactly(specialty);
-        assertThat(savedDoctor.getSchedules()).hasSize(1);
+
+
+        Schedule monday = savedDoctor.getSchedules()
+                .stream()
+                .filter(s -> s.getWorkday() == Workday.LUNES)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(monday.getStartTime()).isEqualTo(LocalTime.of(8,0));
+        assertThat(monday.getEndTime()).isEqualTo(LocalTime.of(12,0));
     }
 
     @Test
@@ -110,8 +119,8 @@ class DoctorServiceTest {
 
         assertThrows(DoctorInvalidSpecialty.class, () -> doctorService.createDoctor(personId, request));
 
-        verify(personExternalService, never()).deactivateUser(personId);
-        verify(doctorRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(personExternalService, never()).revokeDoctorRole(personId);
+        verify(doctorRepository, never()).save(any());
     }
 
     @Test
@@ -130,16 +139,33 @@ class DoctorServiceTest {
     @Test
     void updateDoctorAppointmentIntervalShouldRejectIntervalLargerThanEverySchedule() {
         UUID doctorId = UUID.fromString("44444444-4444-4444-4444-444444444444");
-        Doctor doctor = new Doctor(doctorId, LocalDate.now().minusDays(10), LocalDate.now().plusDays(10), 4, true, 20);
-        doctor.setSchedules(new HashSet<>(Set.of(
-                new Schedule(doctor, LocalTime.of(8, 0), LocalTime.of(8, 30), Workday.LUNES)
-        )));
+        Doctor doctor = new Doctor(
+                doctorId,
+                LocalDate.now().minusDays(10),
+                LocalDate.now().plusDays(10),
+                4,
+                true,
+                20
+        );
 
-        when(doctorRepository.findById(doctorId)).thenReturn(Optional.of(doctor));
+        doctor.updateSchedule(
+                Workday.LUNES,
+                LocalTime.of(8,0),
+                LocalTime.of(8,30)
+        );
 
-        assertThrows(IllegalArgumentException.class, () -> doctorService.updateDoctorAppointmentInterval(doctorId, 60));
+        when(doctorRepository.findById(doctorId))
+                .thenReturn(Optional.of(doctor));
 
-        verify(doctorRepository, never()).save(doctor);
+        assertThrows(
+                DoctorValidationException.class,
+                () -> doctorService.updateDoctorAppointmentInterval(
+                        doctorId,
+                        60
+                )
+        );
+
+        verify(doctorRepository, never()).save(any());
     }
 
     @Test
@@ -155,7 +181,7 @@ class DoctorServiceTest {
         fisioterapia.setCode(SpecialtyCode.FISIOTERAPIA);
         fisioterapia.setName("Fisioterapia");
 
-        doctor.setSpecialties(new HashSet<>(Set.of(medicinaGeneral)));
+        doctor.addSpecialty(medicinaGeneral);
 
         when(doctorRepository.findById(doctorId)).thenReturn(Optional.of(doctor));
         when(specialtyRepository.findAllById(List.of(SpecialtyCode.FISIOTERAPIA)))
@@ -164,5 +190,40 @@ class DoctorServiceTest {
         doctorService.changeSpecialties(doctorId, List.of(SpecialtyCode.FISIOTERAPIA));
 
         assertThat(doctor.getSpecialties()).containsExactly(fisioterapia);
+    }
+
+    @Test
+    void createDoctorShouldCreateInactiveDoctorWhenNoSchedulesExist() {
+
+        UUID personId = UUID.randomUUID();
+
+        Specialty specialty = new Specialty();
+        specialty.setCode(SpecialtyCode.MEDICINA_GENERAL);
+
+        when(specialtyRepository.findById(SpecialtyCode.MEDICINA_GENERAL))
+                .thenReturn(Optional.of(specialty));
+
+        CreateDoctorRequest request = new CreateDoctorRequest(
+                List.of(SpecialtyCode.MEDICINA_GENERAL),
+                LocalDate.now(),
+                LocalDate.now().plusDays(10),
+                20,
+                4,
+                null
+        );
+
+        doctorService.createDoctor(personId, request);
+
+        ArgumentCaptor<Doctor> captor =
+                ArgumentCaptor.forClass(Doctor.class);
+
+        verify(doctorRepository).save(captor.capture());
+
+        Doctor doctor = captor.getValue();
+
+        assertThat(doctor.isStatus()).isFalse();
+
+        verify(personExternalService).revokeDoctorRole(personId);
+        verify(personExternalService, never()).ensureDoctorRole(personId);
     }
 }

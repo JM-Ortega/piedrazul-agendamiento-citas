@@ -23,8 +23,8 @@ public class DoctorModuleConfig {
      * Bean para ScheduleService
      */
     @Bean
-    public ScheduleService scheduleService(ScheduleRepository scheduleRepository) {
-        return new ScheduleService(scheduleRepository);
+    public ScheduleService scheduleService(DoctorRepository doctorRepository) {
+        return new ScheduleService(doctorRepository);
     }
 
     /**

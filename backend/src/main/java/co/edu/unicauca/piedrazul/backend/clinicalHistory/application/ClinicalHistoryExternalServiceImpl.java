@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.clinicalHistory.application;
 
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.ClinicalHistoryExternalService;
-import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.input.ClinicalHistoryRequest;
+import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.internal.ClinicalHistoryRequest;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.domain.ClinicalHistory;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.infrastructure.persistence.ClinicalHistoryRepository;
 import org.springframework.stereotype.Service;

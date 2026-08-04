@@ -9,11 +9,4 @@ import java.util.List;
 import java.util.UUID;
 
 public interface ScheduleRepository extends JpaRepository<Schedule, UUID> {
-    // Obtener todos los horarios de un doctor específico
-    List<Schedule> findByDoctor(Doctor doctor);
-
-    // Buscar horarios de un doctor en un día de trabajo específico (ej. LUNES)
-    List<Schedule> findByDoctorAndWorkday(Doctor doctor, Object workday);
-
-    void deleteByDoctorAndWorkday(Doctor doctor, Workday workday);
 }

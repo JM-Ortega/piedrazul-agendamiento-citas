@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice(basePackageClasses = {
         DoctorController.class,
-        SheduleController.class
+        ScheduleController.class
 })
 @Slf4j
 public class DoctorExceptionHandler extends BaseExceptionHandler {
