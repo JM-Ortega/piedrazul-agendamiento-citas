@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.clinicalHistory;
 
-import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.input.ClinicalHistoryRequest;
+import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.internal.ClinicalHistoryRequest;
 
 //Define qué puede hacer el módulo sin decir cómo lo hace
 public interface ClinicalHistoryExternalService {
