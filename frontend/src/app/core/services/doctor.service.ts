@@ -71,20 +71,6 @@ export class DoctorService {
       );
   }
 
-  /** 
-  getDoctorById(doctorId: string): Observable<dtoDoctor> {
-    return this.http.get<dtoDoctor>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}`
-    );
-  }
-
-  getSchedulesByDoctor(doctorId: string): Observable<dtoSchedule[]> {
-    return this.http.get<dtoSchedule[]>(
-      `${this.apiUrl}/doctor/schedules/${doctorId}`
-    );
-  }
-*/
-
   /**
    * Obtiene las citas del día actual (fecha local del cliente) para un doctor específico.
    * La fecha se calcula en formato `YYYY-MM-DD` y se envía como query param junto al `idDoctor`.
