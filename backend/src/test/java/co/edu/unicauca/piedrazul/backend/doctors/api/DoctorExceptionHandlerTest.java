@@ -16,7 +16,7 @@ class DoctorExceptionHandlerTest {
 
     @Test
     void handleBusinessExceptionShouldReturnDomainStatus() {
-        HttpServletRequest request = buildRequest("/api/doctor/doctors/123");
+        HttpServletRequest request = buildRequest("/api/doctor/123");
 
         ProblemDetail result = handler.handleBusinessException(
                 new DoctorNotFoundException("Doctor no encontrado"),
@@ -48,7 +48,7 @@ class DoctorExceptionHandlerTest {
 
     @Test
     void handleRuntimeShouldHideUnexpectedMessage() {
-        HttpServletRequest request = buildRequest("/api/doctor/doctors");
+        HttpServletRequest request = buildRequest("/api/doctor/");
 
         ProblemDetail result = handler.handleRuntime(new RuntimeException("Sensitive detail"), request);
 

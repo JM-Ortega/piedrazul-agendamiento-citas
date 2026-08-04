@@ -57,7 +57,7 @@ class DoctorControllerWebMvcTest {
         when(doctorService.findAllDoctors()).thenReturn(List.of(doctor));
         when(personExternalService.getPersonNames(List.of(doctorId))).thenReturn(Map.of(doctorId, "Dr. Gomez"));
 
-        mockMvc.perform(get("/api/doctor/doctors"))
+        mockMvc.perform(get("/api/doctor"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(doctorId.toString()))
                 .andExpect(jsonPath("$[0].name").value("Dr. Gomez"))
@@ -68,7 +68,7 @@ class DoctorControllerWebMvcTest {
     void updateDoctorAppointmentIntervalShouldReturnNoContent() throws Exception {
         UUID doctorId = UUID.fromString("33333333-3333-3333-3333-333333333333");
 
-        mockMvc.perform(put("/api/doctor/doctors/{doctorId}/appointment-interval", doctorId)
+        mockMvc.perform(put("/api/doctor/{doctorId}/appointment-interval", doctorId)
                         .param("appointmentInterval", "30"))
                 .andExpect(status().isNoContent());
 
