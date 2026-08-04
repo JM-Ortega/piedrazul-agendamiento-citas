@@ -159,17 +159,11 @@ updateSchedule(doctorId: string, workday: string, startTime: string, endTime: st
       `${this.apiUrl}/doctor/doctors/all-specialties`
     );
   }
-  addSpecialties(doctorId: string, specialties: string[]): Observable<void> {
-    return this.http.post<void>(
+
+  changeSpecialties(doctorId: string, specialties: string[]): Observable<void> {
+    return this.http.put<void>(
       `${this.apiUrl}/doctor/doctors/${doctorId}/specialties`,
       specialties
-    );
-  }
-
-  removeSpecialties(doctorId: string, specialties: string[]): Observable<void> {
-    return this.http.delete<void>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}/specialties`,
-      { body: specialties }
     );
   }
   // ── Document Types ────────────────────────────────────────────────────────
