@@ -16,13 +16,15 @@
             Administre médicos y agendadores del sistema
           </p>
         </div>
-        <button
-          (click)="navigateToCreate()"
-          class="flex items-center gap-2 bg-white text-[#215c98] hover:bg-[#d9e9f8] px-6 py-3 rounded-xl text-lg font-semibold transition-colors shrink-0 cursor-pointer"
+        <app-button
+          variant="secondary"
+          class="shrink-0"
+          extraClass="!border-0 !bg-white hover:!bg-[#d9e9f8] !text-[#215c98] !px-6 !py-3 !rounded-xl !text-lg"
+          (buttonClick)="navigateToCreate()"
         >
           <svg lucideUserPlus [size]="24"></svg>
           Crear Usuario
-        </button>
+        </app-button>
       </div>
     </div>
 
