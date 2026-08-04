@@ -108,9 +108,10 @@
                 <!-- Dropdown inline "Actualizar estado": solo cuando la cita está AGENDADA -->
                 @if (apt.appointmentState === 'AGENDADA') {
                   <div class="relative">
-                    <button
-                      (click)="toggleCardDropdown(apt.idAppointment)"
-                      class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg transition-colors text-base"
+                    <app-button
+                      variant="success"
+                      extraClass="!px-5 !py-2.5"
+                      (buttonClick)="toggleCardDropdown(apt.idAppointment)"
                     >
                       <svg lucideClipboardList [size]="18"></svg>
                       <span>Estado</span>
@@ -124,7 +125,7 @@
                             : 'rotate(0deg)'
                         "
                       ></svg>
-                    </button>
+                    </app-button>
 
                     @if (openCardDropdownId() === apt.idAppointment) {
                       <div
@@ -157,13 +158,14 @@
 
                 <!-- Botón "Nueva cita": solo cuando la cita ya fue ATENDIDA -->
                 @if (apt.appointmentState === 'ATENDIDA') {
-                  <button
-                    (click)="scheduleNewAppointment(apt.documentNumber)"
-                    class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg transition-colors text-base"
+                  <app-button
+                    variant="primary"
+                    extraClass="!px-5 !py-2.5"
+                    (buttonClick)="scheduleNewAppointment(apt.documentNumber)"
                   >
                     <svg lucideCalendar [size]="18"></svg>
                     Nueva cita
-                  </button>
+                  </app-button>
                 }
               </div>
             </div>
@@ -175,70 +177,39 @@
 </div>
 
 <!-- Modal de confirmación -->
-@if (showConfirmModal()) {
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-  >
-    <div
-      class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border-2 border-blue-100"
-    >
-      <div class="flex items-center gap-3 mb-4">
-        <div class="bg-emerald-100 rounded-full p-3">
-          <svg lucideFileText [size]="28" class="text-emerald-600"></svg>
-        </div>
-        <h3 class="text-blue-900 text-xl font-semibold">
-          Actualizar estado de cita
-        </h3>
+<app-confirm-modal
+  [visible]="showConfirmModal()"
+  title="Actualizar estado de cita"
+  iconPosition="inline"
+  [richMessage]="true"
+  maxWidth="max-w-md"
+  [fullWidthButtons]="true"
+  cancelLabel="Cancelar"
+  confirmLabel="Confirmar"
+  [confirmVariant]="selectedOutcome() === 'NO_ASISTIO' ? 'danger' : 'success'"
+  iconBg="bg-[#d9e9f8]"
+  (dismissed)="closeModal()"
+  (confirmed)="confirmMarkAsAttended()"
+>
+  <svg lucideFileText [size]="28" icon class="text-[#215c98]"></svg>
+  <span message>
+    @if (selectedOutcome() === 'ATENDIDA') {
+      <div
+        class="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-4 text-sm text-gray-700 text-left"
+      >
+        <p>¿Deseas atender esta cita?</p>
+        <p>
+          - A continuación, podrá registrar una observación para el seguimiento
+          de la historia clínica
+        </p>
       </div>
-
-      @if (selectedOutcome() === 'ATENDIDA') {
-        <div
-          class="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-4 mb-6 text-sm text-gray-700"
-        >
-          <p>¿Deseas atender esta cita?</p>
-          <p>
-            - A continuación, podrá registrar una observación para el
-            seguimiento de la historia clínica
-          </p>
-        </div>
-      } @else if (selectedOutcome() === 'NO_ASISTIO') {
-        <div
-          class="bg-red-50 border border-red-200 rounded-xl px-4 py-4 mb-6 text-sm text-gray-700"
-        >
-          <p>¿Deseas marcar esta cita como <strong>No asistió</strong>?</p>
-          <p class="mt-2">Se actualizará el estado de la cita.</p>
-        </div>
-      }
-
-      <div class="flex gap-3 justify-end">
-        <button
-          (click)="closeModal()"
-          [disabled]="isMarkingAttended()"
-          class="px-6 py-2.5 rounded-lg border-2 border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors text-base disabled:opacity-50"
-        >
-          Cancelar
-        </button>
-        <button
-          (click)="confirmMarkAsAttended()"
-          [disabled]="isMarkingAttended()"
-          [class]="
-            (selectedOutcome() === 'NO_ASISTIO'
-              ? 'bg-red-500 hover:bg-red-600'
-              : 'bg-emerald-600 hover:bg-emerald-700') +
-            ' flex items-center gap-2 px-6 py-2.5 rounded-lg text-white transition-colors
-              text-base disabled:opacity-50 disabled:cursor-not-allowed'
-          "
-        >
-          @if (isMarkingAttended()) {
-            <span
-              class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
-            ></span>
-            Guardando...
-          } @else {
-            Confirmar
-          }
-        </button>
+    } @else if (selectedOutcome() === 'NO_ASISTIO') {
+      <div
+        class="bg-red-50 border border-red-200 rounded-xl px-4 py-4 text-sm text-gray-700 text-left"
+      >
+        <p>¿Deseas marcar esta cita como <strong>No asistió</strong>?</p>
+        <p class="mt-2">Se actualizará el estado de la cita.</p>
       </div>
-    </div>
-  </div>
-}
+    }
+  </span>
+</app-confirm-modal>

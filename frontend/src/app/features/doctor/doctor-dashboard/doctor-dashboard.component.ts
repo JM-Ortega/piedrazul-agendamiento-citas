@@ -18,6 +18,8 @@ import {
   LucideUserX,
 } from '@lucide/angular';
 import { DoctorService } from '../../../core/services/doctor.service';
+import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
+import { ConfirmModalComponent } from '../../../design-system/organisms/confirm-modal/confirm-modal.component';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
@@ -37,6 +39,8 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
     LucideUser,
     LucideUserX,
     FormatoPipe,
+    ButtonComponent,
+    ConfirmModalComponent,
   ],
 })
 export class DoctorDashboardComponent implements OnInit {

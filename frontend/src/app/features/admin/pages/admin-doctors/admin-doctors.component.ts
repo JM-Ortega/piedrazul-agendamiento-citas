@@ -22,6 +22,7 @@ import {
 } from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
 import { AppService } from '../../../../core/services/app.service';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { DoctorAdminDto } from '../../models/dtos/DoctorAdminDto';
 import { AdminService } from '../../service/admin.service';
 
@@ -38,6 +39,7 @@ import { AdminService } from '../../service/admin.service';
     LucideStethoscope,
     LucideX,
     LucideDynamicIcon,
+    ButtonComponent,
   ],
 })
 export class AdminDoctorsComponent implements OnInit {

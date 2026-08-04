@@ -73,16 +73,10 @@
                       </p>
                     </div>
                     <div class="flex gap-2">
-                      <button
-                        (click)="handleCancel()"
-                        class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <svg lucideX [size]="18"></svg>
-                      </button>
-                      <button
-                        (click)="handleSave(doctor)"
+                      <app-button
+                        variant="primary"
                         [disabled]="savingDoctorId() === doctor.id"
-                        class="px-6 py-2 bg-[#215c98] hover:bg-[#163c63] disabled:opacity-60 text-white rounded-lg transition-colors flex items-center gap-2 cursor-pointer"
+                        (buttonClick)="handleSave(doctor)"
                       >
                         <svg lucideSave [size]="18"></svg>
                         {{
@@ -90,7 +84,13 @@
                             ? 'Guardando...'
                             : 'Guardar'
                         }}
-                      </button>
+                      </app-button>
+                      <app-button
+                        variant="danger"
+                        (buttonClick)="handleCancel()"
+                      >
+                        Cancelar
+                      </app-button>
                     </div>
                   </div>
 
@@ -176,15 +176,15 @@
                         specialty of specialtiesList;
                         track specialty.name
                       ) {
-                        <button
-                          type="button"
-                          (click)="toggleSpecialty(specialty.value)"
-                          [class]="
-                            'px-5 py-4 rounded-xl border-2 transition-all text-base font-medium flex items-center gap-3 ' +
-                            (editingSpecialties().includes(specialty.value)
-                              ? 'border-[#215c98] bg-[#d9e9f8] text-[#163c63] shadow-md'
-                              : 'border-gray-300 bg-white text-gray-700 hover:border-[#4e92d9]')
+                        <app-button
+                          variant="chip"
+                          class="w-full"
+                          [active]="
+                            editingSpecialties().includes(specialty.value)
                           "
+                          activeChipClasses="border-[#215c98] bg-[#d9e9f8] text-[#163c63] shadow-md"
+                          extraClass="!flex !items-center !gap-3 !px-5 !text-left !font-medium"
+                          (buttonClick)="toggleSpecialty(specialty.value)"
                         >
                           <svg
                             [lucideIcon]="specialty.icon"
@@ -205,7 +205,7 @@
                               ✓
                             </div>
                           }
-                        </button>
+                        </app-button>
                       }
                     </div>
                   </div>
@@ -280,15 +280,15 @@
                   </div>
 
                   <div class="relative shrink-0 edit-container">
-                    <button
-                      (click)="handleEdit(doctor)"
+                    <app-button
+                      variant="primary"
                       (mouseenter)="hoveredDoctorId.set(doctor.id)"
                       (mouseleave)="hoveredDoctorId.set(null)"
-                      class="px-5 py-3 bg-[#215c98] hover:bg-[#163c63] text-white rounded-lg transition-colors flex items-center gap-2 font-semibold cursor-pointer"
+                      (buttonClick)="handleEdit(doctor)"
                     >
                       <svg lucideEdit3 [size]="18"></svg>
                       Editar
-                    </button>
+                    </app-button>
 
                     @if (hoveredDoctorId() === doctor.id) {
                       <div

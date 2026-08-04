@@ -14,6 +14,7 @@ import {
   LucideUserPlus,
   LucideUsers,
 } from '@lucide/angular';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { SystemUser } from '../../models/interfaces/system-user.model';
 import { AdminService } from '../../service/admin.service';
 
@@ -28,6 +29,7 @@ import { AdminService } from '../../service/admin.service';
     LucideStethoscope,
     LucideUserPlus,
     LucideUsers,
+    ButtonComponent,
   ],
 })
 export class AdminUsersComponent implements OnInit {
