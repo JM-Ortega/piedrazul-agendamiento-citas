@@ -111,7 +111,7 @@ public class ScheduleController {
      * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @GetMapping("/{doctorId}")
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT')")
     public ResponseEntity<?> getSchedulesByDoctor(
             @PathVariable @NotNull(message = "El id del doctor es requerido")
             UUID doctorId) {

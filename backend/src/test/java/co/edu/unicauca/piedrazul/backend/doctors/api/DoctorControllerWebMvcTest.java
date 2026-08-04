@@ -50,21 +50,6 @@ class DoctorControllerWebMvcTest {
     }
 
     @Test
-    void getDoctorByIdShouldReturnShortResponse() throws Exception {
-        UUID doctorId = UUID.fromString("11111111-1111-1111-1111-111111111111");
-        Doctor doctor = buildDoctor(doctorId, SpecialtyCode.FISIOTERAPIA);
-
-        when(doctorService.getDoctorById(doctorId)).thenReturn(doctor);
-        when(personExternalService.getPersonNames(List.of(doctorId))).thenReturn(Map.of(doctorId, "Dr. Lopez"));
-
-        mockMvc.perform(get("/api/doctor/doctors/{doctorId}", doctorId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(doctorId.toString()))
-                .andExpect(jsonPath("$.name").value("Dr. Lopez"))
-                .andExpect(jsonPath("$.specialties[0]").value("FISIOTERAPIA"));
-    }
-
-    @Test
     void getAllDoctorsShouldReturnDoctorList() throws Exception {
         UUID doctorId = UUID.fromString("22222222-2222-2222-2222-222222222222");
         Doctor doctor = buildDoctor(doctorId, SpecialtyCode.QUIROPRAXIA);

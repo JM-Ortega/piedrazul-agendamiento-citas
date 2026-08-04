@@ -176,11 +176,6 @@ public class DoctorService implements DoctorProvisioningApi {
         return doctorRepository.findAll();
     }
 
-    public Doctor getDoctorById(UUID idDoctor) {
-        return doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-    }
-
     public Page<DoctorDetailedResponse> findAllDoctorsDetailed(Pageable pageable) {
 
         Page<Doctor> doctors = doctorRepository.findAll(pageable);

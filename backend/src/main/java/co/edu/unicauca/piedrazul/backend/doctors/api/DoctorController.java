@@ -11,6 +11,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationExcep
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -120,36 +121,14 @@ public class DoctorController {
     @GetMapping("/detailed")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getDoctors(
-            @RequestParam(defaultValue = "0") @Min(0) int page) {
+            @RequestParam(defaultValue = "0") @Min(0) int page){
 
         Pageable pageable = PageRequest.of(page, 5);
 
-        Page<DoctorDetailedResponse> response = doctorService.findAllDoctorsDetailed(pageable);
+        Page<DoctorDetailedResponse> response =
+                doctorService.findAllDoctorsDetailed(pageable);
 
         return ResponseEntity.ok(response);
-    }
-
-    /**
-     * Obtiene la información básica de un doctor a partir de su identificador de cuenta (Keycloak).
-     *
-     * <p>
-     * Requiere que el usuario autenticado posea el rol {@code DOCTOR}.
-     * </p>
-     *
-     * @param doctorId identificador único (UUID) del doctor a consultar.
-     * @return un {@link ResponseEntity} con estado {@code 200 OK} que contiene
-     * un {@link DoctorShortResponse} con la información del doctor.
-     * @throws DoctorNotFoundException si no existe un doctor asociado al identificador proporcionado.
-     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
-     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
-     */
-    @GetMapping("/{doctorId}")
-    @PreAuthorize("hasRole('DOCTOR')")
-    public ResponseEntity<?> getDoctorById(@PathVariable UUID doctorId) {
-        Doctor doctor = doctorService.getDoctorById(doctorId);
-        Map<UUID, String> names = personExternalService.getPersonNames(List.of(doctorId));
-
-        return ResponseEntity.ok(DoctorShortResponse.fromEntity(doctor,names.get(doctor.getPersonId())));
     }
 
     /**
@@ -173,7 +152,8 @@ public class DoctorController {
      */
     @GetMapping("/patients/specialties")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<List<SpecialtyCode>> getSpecialties(@RequestParam(required = false) UUID patientId) {
+    public ResponseEntity<List<SpecialtyCode>> getSpecialties(@PathVariable @NotNull(message = "El id del paciente es requerido")
+                                                                  UUID patientId) {
         List<SpecialtyCode> specialties = doctorService.getSpecialties(patientId);
         return ResponseEntity.ok(specialties);
     }

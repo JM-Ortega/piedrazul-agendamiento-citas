@@ -2,7 +2,9 @@ package co.edu.unicauca.piedrazul.backend.user;
 
 import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
+import org.springframework.data.domain.Page;
 
+import java.awt.print.Pageable;
 import java.util.*;
 
 public interface PersonExternalService {
@@ -39,7 +41,7 @@ public interface PersonExternalService {
 
     Map<UUID, String> getPersonNames(List<UUID> personIds);
 
-    public Map<UUID, UUID> findPersonIdsByUserIds(Collection<UUID> userIds);
+    Map<UUID, UUID> findPersonIdsByUserIds(Collection<UUID> userIds);
 
     UUID findPersonIdByUserId(UUID userId);
 }
