@@ -182,7 +182,15 @@ export class BookingStateService {
   readonly confirmDate = computed(() => {
     const d = this.selectedDate();
     if (!d) return '';
-    const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const days = [
+      'Domingo',
+      'Lunes',
+      'Martes',
+      'Miércoles',
+      'Jueves',
+      'Viernes',
+      'Sábado',
+    ];
     const months = [
       'Enero',
       'Febrero',
