@@ -43,4 +43,7 @@ public interface PatientModuleApi {
     );
 
     void deletePatient(UUID personId);
+
+    //Crear el metodo findByIds para el modulo de citas
+    List<PatientData> findByIds(Set<UUID> personIds);
 }
