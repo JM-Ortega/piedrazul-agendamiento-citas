@@ -105,10 +105,10 @@
                 ⚠️ {{ saveError() }}
               </div>
             }
-            <button
-              (click)="confirmAttendanceAndExit()"
+            <app-button
+              variant="primary"
               [disabled]="isSaving()"
-              class="flex items-center gap-2 bg-[#215c98] hover:bg-[#163c63] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl transition-colors"
+              (buttonClick)="confirmAttendanceAndExit()"
             >
               @if (isSaving()) {
                 <span
@@ -116,10 +116,10 @@
                 ></span>
                 Guardando...
               } @else {
-                <svg lucideSave [size]="30" class="text-white"></svg>
+                <svg lucideSave [size]="25" class="text-white"></svg>
                 Guardar y salir
               }
-            </button>
+            </app-button>
           </div>
         </div>
 
