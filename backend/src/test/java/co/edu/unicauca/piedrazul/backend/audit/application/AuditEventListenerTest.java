@@ -34,7 +34,7 @@ class AuditEventListenerTest {
 
         verify(auditLogService).register(
             eq(AuditAction.APPOINTMENT_CREATED),
-            eq(AuditModule.APPOINTMENTS),
+            eq(AuditModule.APPOINTMENT),
                 entityIdCaptor.capture(),
                 performedByCaptor.capture()
         );

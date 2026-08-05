@@ -19,7 +19,7 @@ public class AuditEventListener {
     public void onAppointmentCreated(AppointmentCreatedEvent event) {
         auditLogService.register(
                 AuditAction.APPOINTMENT_CREATED,
-                AuditModule.APPOINTMENTS,
+                AuditModule.APPOINTMENT,
                 event.appointmentId(),
                 event.performedBy()
         );

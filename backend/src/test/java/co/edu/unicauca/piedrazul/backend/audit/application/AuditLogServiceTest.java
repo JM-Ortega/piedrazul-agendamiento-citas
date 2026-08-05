@@ -31,7 +31,7 @@ class AuditLogServiceTest {
 
         auditLogService.register(
                 AuditAction.APPOINTMENT_CREATED,
-                AuditModule.APPOINTMENTS,
+                AuditModule.APPOINTMENT,
                 entityId,
                 performedBy
         );
@@ -43,7 +43,7 @@ class AuditLogServiceTest {
 
         assertThat(ReflectionTestUtils.getField(saved, "id")).isInstanceOf(UUID.class);
         assertThat(ReflectionTestUtils.getField(saved, "action")).isEqualTo(AuditAction.APPOINTMENT_CREATED);
-        assertThat(ReflectionTestUtils.getField(saved, "module")).isEqualTo(AuditModule.APPOINTMENTS);
+        assertThat(ReflectionTestUtils.getField(saved, "module")).isEqualTo(AuditModule.APPOINTMENT);
         assertThat(ReflectionTestUtils.getField(saved, "entityId")).isEqualTo(entityId);
         assertThat(ReflectionTestUtils.getField(saved, "performedBy")).isEqualTo(performedBy);
         assertThat(ReflectionTestUtils.getField(saved, "performedAt")).isInstanceOf(LocalDateTime.class);
