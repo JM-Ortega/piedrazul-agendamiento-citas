@@ -6,4 +6,5 @@ export interface DoctorFormData {
   workDays: number[];
   startTime: string;
   endTime: string;
+  bookingWindowWeeks: number;
 }

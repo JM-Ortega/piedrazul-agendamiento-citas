@@ -119,6 +119,7 @@ export class AdminCreateUserComponent implements OnInit {
     workDays: [1, 2, 3, 4, 5],
     startTime: '08:00',
     endTime: '12:00',
+    bookingWindowWeeks: 0,
   };
   private readonly FIELD_ORDER: (keyof FormErrors)[] = [
     'roles',
@@ -197,6 +198,7 @@ export class AdminCreateUserComponent implements OnInit {
       workDays: this.userForm.workDays,
       startTime: this.userForm.startTime,
       endTime: this.userForm.endTime,
+      bookingWindowWeeks: this.userForm.bookingWindowWeeks,
     };
   }
 
@@ -312,6 +314,7 @@ export class AdminCreateUserComponent implements OnInit {
               startTime: `${this.userForm.startTime}:00`,
               endTime: `${this.userForm.endTime}:00`,
             })),
+            bookingWindowWeeks: this.userForm.bookingWindowWeeks,
           }
         : null,
       patient: null,
@@ -472,7 +475,10 @@ export class AdminCreateUserComponent implements OnInit {
         }
         return undefined;
       }
-
+      case 'bookingWindowWeeks':
+        return this.hasDoctorRole && !this.userForm.bookingWindowWeeks
+          ? 'Debe seleccionar la ventana de reserva en semanas.'
+          : undefined;
       case 'workDays':
         return this.hasDoctorRole && this.userForm.workDays.length === 0
           ? 'Debe seleccionar al menos un día de atención.'
@@ -501,7 +507,8 @@ export class AdminCreateUserComponent implements OnInit {
         'startTime',
         'endTime',
         'interval',
-        'workDays'
+        'workDays',
+        'bookingWindowWeeks'
       );
     }
     fields.forEach((f) => this.validateField(f));

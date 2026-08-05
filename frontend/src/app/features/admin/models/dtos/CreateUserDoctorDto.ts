@@ -6,4 +6,5 @@ export interface CreateUserDoctorDto {
   laborEnd: string;
   appointmentInterval: number;
   schedules: CreateScheduleDto[];
+  bookingWindowWeeks: number;
 }

@@ -156,7 +156,7 @@
     </div>
   </div>
 
-  <!-- Intervalo -->
+  <!-- Intervalo y Ventana de Reserva -->
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
     <div>
       <label
@@ -182,6 +182,26 @@
       >
         <svg lucideClock [size]="18" suffix></svg>
       </app-input>
+    </div>
+    <div>
+      <label
+        for="bookingWindowWeeks"
+        class="block text-gray-700 text-base font-medium mb-2"
+      >
+        Ventana de Reserva (semanas) *
+      </label>
+      <app-select
+        id="bookingWindowWeeks"
+        [ngModel]="bookingWindowWeeksValue"
+        (ngModelChange)="onBookingWindowWeeksChange($event)"
+        name="bookingWindowWeeks"
+        [options]="bookingWindowWeeksOptions | toSelectOptions: false"
+        placeholder="-- Seleccionar --"
+        [errorMessage]="errors['bookingWindowWeeks']"
+        [hasSuffix]="true"
+      >
+        <svg lucideCalendarRange [size]="18" suffix></svg>
+      </app-select>
     </div>
   </div>
 

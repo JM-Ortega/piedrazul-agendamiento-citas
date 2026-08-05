@@ -15,4 +15,5 @@ export interface FormErrors {
   endTime?: string;
   interval?: string;
   workDays?: string;
+  bookingWindowWeeks?: string;
 }

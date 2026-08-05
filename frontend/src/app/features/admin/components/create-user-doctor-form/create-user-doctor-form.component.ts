@@ -60,6 +60,10 @@ export class CreateUserDoctorFormComponent {
   @Input() maxInterval = 300;
   @Input() daysOfWeek: { value: number; label: string }[] = [];
   @Input() errors: Partial<Record<string, string>> = {};
+  @Input() bookingWindowWeeksOptions: string[] = Array.from(
+    { length: 10 },
+    (_, i) => String(i + 1)
+  );
 
   @Output() dataChange = new EventEmitter<Partial<DoctorFormData>>();
   @Output() fieldBlurred = new EventEmitter<string>();
@@ -101,5 +105,14 @@ export class CreateUserDoctorFormComponent {
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
+  }
+  onBookingWindowWeeksChange(value: string): void {
+    this.emit('bookingWindowWeeks', Number(value));
+    this.fieldBlurred.emit('bookingWindowWeeks');
+  }
+  get bookingWindowWeeksValue(): string {
+    return this.data.bookingWindowWeeks
+      ? String(this.data.bookingWindowWeeks)
+      : '';
   }
 }
