@@ -17,7 +17,6 @@ import {
   LucideHeart,
   LucideSave,
   LucideStethoscope,
-  LucideX,
   LucideZap,
 } from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
@@ -37,7 +36,6 @@ import { AdminService } from '../../service/admin.service';
     LucideEdit3,
     LucideSave,
     LucideStethoscope,
-    LucideX,
     LucideDynamicIcon,
     ButtonComponent,
   ],

@@ -8,7 +8,6 @@ import {
 } from '@angular/core';
 import { LucidePencil, LucideSettings } from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { DoctorCardComponent } from '../../components/doctor-card/doctor-card.component';
@@ -31,7 +30,6 @@ import { AdminService } from '../../service/admin.service';
     DoctorCardComponent,
     DoctorEditFormComponent,
     AdminModalsComponent,
-    ButtonComponent,
   ],
 })
 export class AdminConfigComponent implements OnInit {
@@ -122,7 +120,7 @@ export class AdminConfigComponent implements OnInit {
   }
 
   onFormSaved(event: DoctorSaveEvent): void {
-    const { form, originalDoctor, originalWorkdays, removedWorkdays } = event; // ← añadir removedWorkdays
+    const { form, originalDoctor, originalWorkdays, removedWorkdays } = event;
     const calls: Observable<unknown>[] = [];
 
     if (originalDoctor.appointmentInterval !== form.appointmentInterval)
@@ -132,10 +130,19 @@ export class AdminConfigComponent implements OnInit {
           form.appointmentInterval
         )
       );
-    if (originalDoctor.laborStart !== form.laborStart)
-      calls.push(this.adminService.updateLaborStart(form.id, form.laborStart));
-    if (originalDoctor.laborEnd !== form.laborEnd)
-      calls.push(this.adminService.updateLaborEnd(form.id, form.laborEnd));
+
+    if (
+      originalDoctor.laborStart !== form.laborStart ||
+      originalDoctor.laborEnd !== form.laborEnd
+    ) {
+      calls.push(
+        this.adminService.updateLaborDate(
+          form.id,
+          form.laborStart,
+          form.laborEnd
+        )
+      );
+    }
 
     removedWorkdays.forEach((day) => {
       const workday = this.DAY_TO_WORKDAY[day];
@@ -154,7 +161,7 @@ export class AdminConfigComponent implements OnInit {
       );
       if (!originalWorkdays.includes(day))
         calls.push(
-          this.adminService.createSchedule(form.id, workday, startTime, endTime)
+          this.adminService.updateSchedule(form.id, workday, startTime, endTime)
         );
       else
         calls.push(

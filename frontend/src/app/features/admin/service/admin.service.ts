@@ -39,19 +39,15 @@ export class AdminService {
     );
   }
 
-  updateLaborStart(doctorId: string, laborStart: string): Observable<void> {
+  updateLaborDate(
+    doctorId: string,
+    laborStart: string,
+    laborEnd: string
+  ): Observable<void> {
     return this.http.put<void>(
-      `${this.apiUrl}/doctor/${doctorId}/labor-start`,
+      `${this.apiUrl}/doctor/${doctorId}/labor-date`,
       null,
-      { params: { laborStart } }
-    );
-  }
-
-  updateLaborEnd(doctorId: string, laborEnd: string): Observable<void> {
-    return this.http.put<void>(
-      `${this.apiUrl}/doctor/${doctorId}/labor-end`,
-      null,
-      { params: { laborEnd } }
+      { params: { laborStart, laborEnd } }
     );
   }
 
