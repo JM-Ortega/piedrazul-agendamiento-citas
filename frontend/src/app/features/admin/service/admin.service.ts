@@ -20,7 +20,7 @@ export class AdminService {
     return this.http.post<void>(`${this.apiUrl}/user/users`, payload);
   }
   getDoctors(): Observable<Doctor[]> {
-    return this.http.get<Doctor[]>(`${this.apiUrl}/doctor/doctors/detailed`);
+    return this.http.get<Doctor[]>(`${this.apiUrl}/doctor/detailed`);
   }
 
   getDoctorsAdmin(): Observable<DoctorAdminDto[]> {
@@ -33,7 +33,7 @@ export class AdminService {
     appointmentInterval: number
   ): Observable<void> {
     return this.http.put<void>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}/appointment-interval`,
+      `${this.apiUrl}/doctor/${doctorId}/appointment-interval`,
       null,
       { params: { appointmentInterval } }
     );
@@ -41,7 +41,7 @@ export class AdminService {
 
   updateLaborStart(doctorId: string, laborStart: string): Observable<void> {
     return this.http.put<void>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}/labor-start`,
+      `${this.apiUrl}/doctor/${doctorId}/labor-start`,
       null,
       { params: { laborStart } }
     );
@@ -49,24 +49,11 @@ export class AdminService {
 
   updateLaborEnd(doctorId: string, laborEnd: string): Observable<void> {
     return this.http.put<void>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}/labor-end`,
+      `${this.apiUrl}/doctor/${doctorId}/labor-end`,
       null,
       { params: { laborEnd } }
     );
   }
-  /**
-updateLaborHours(
-  doctorId: string,
-  laborStart: string,
-  laborEnd: string
-): Observable<void> {
-  return this.http.put<void>(
-    `${this.apiUrl}/doctor/doctors/${doctorId}/labor-hours`,
-    null,
-    { params: { laborStart, laborEnd } }
-  );
-}
-   */
 
   enableDoctor(
     doctorId: string,
@@ -74,7 +61,7 @@ updateLaborHours(
     laborEnd: string
   ): Observable<void> {
     return this.http.put<void>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}/enable`,
+      `${this.apiUrl}/doctor/${doctorId}/enable`,
       null,
       { params: { laborStart, laborEnd } }
     );
@@ -82,7 +69,7 @@ updateLaborHours(
 
   disableDoctor(doctorId: string, force = false): Observable<void> {
     return this.http.put<void>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}/disable`,
+      `${this.apiUrl}/doctor/${doctorId}/disable`,
       null,
       { params: { force } }
     );
@@ -116,17 +103,6 @@ updateSchedule(doctorId: string, workday: string, startTime: string, endTime: st
 }
 
    */
-  createSchedule(
-    doctorId: string,
-    workday: string,
-    startTime: string,
-    endTime: string
-  ): Observable<dtoSchedule> {
-    return this.http.post<dtoSchedule>(
-      `${this.apiUrl}/doctor/schedules/${doctorId}`,
-      { startTime, endTime, workday }
-    );
-  }
 
   updateSchedule(
     doctorId: string,
@@ -135,7 +111,7 @@ updateSchedule(doctorId: string, workday: string, startTime: string, endTime: st
     endTime: string
   ): Observable<dtoSchedule> {
     return this.http.put<dtoSchedule>(
-      `${this.apiUrl}/doctor/schedules/${doctorId}/${workday}`,
+      `${this.apiUrl}/doctor/schedules/${doctorId}`,
       { startTime, endTime, workday }
     );
   }
@@ -155,14 +131,12 @@ updateSchedule(doctorId: string, workday: string, startTime: string, endTime: st
   // ── Specialties ───────────────────────────────────────────────────────────
 
   getAllSpecialties(): Observable<string[]> {
-    return this.http.get<string[]>(
-      `${this.apiUrl}/doctor/doctors/all-specialties`
-    );
+    return this.http.get<string[]>(`${this.apiUrl}/doctor/all-specialties`);
   }
 
   changeSpecialties(doctorId: string, specialties: string[]): Observable<void> {
     return this.http.put<void>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}/specialties`,
+      `${this.apiUrl}/doctor/${doctorId}/specialties`,
       specialties
     );
   }
