@@ -18,7 +18,6 @@ import {
   LucideEye,
   LucideEyeOff,
   LucideHeart,
-  LucideLock,
   LucideMail,
   LucidePhone,
   LucideUser,
@@ -64,7 +63,6 @@ const DAY_VALUE_TO_WORKDAY: Record<number, string> = {
     LucideArrowLeft,
     LucideCircleAlert,
     LucideCreditCard,
-    LucideLock,
     LucideMail,
     LucideUser,
     LucideUserPlus,
@@ -106,7 +104,7 @@ export class AdminCreateUserComponent implements OnInit {
 
   userForm: UserForm = {
     documentId: '',
-    documentType: '',
+    identificationType: '',
     password: '',
     firstName: '',
     lastName: '',
@@ -128,7 +126,7 @@ export class AdminCreateUserComponent implements OnInit {
     'firstName',
     'lastName',
     'email',
-    'documentType',
+    'identificationType',
     'phone',
     'specialty',
     'laborStart',
@@ -146,7 +144,7 @@ export class AdminCreateUserComponent implements OnInit {
     firstName: 'firstName',
     lastName: 'lastName',
     email: 'email',
-    documentType: 'documentType',
+    identificationType: 'identificationType',
     phone: 'phone',
     laborStart: 'laborStart',
     laborEnd: 'laborEnd',
@@ -296,7 +294,7 @@ export class AdminCreateUserComponent implements OnInit {
     const payload: CreateUserRequestDto = {
       user: {
         identification: this.userForm.documentId,
-        documentType: this.userForm.documentType,
+        identificationType: this.userForm.identificationType,
         phone: this.userForm.phone,
         firstName: this.userForm.firstName.trim(),
         lastName: this.userForm.lastName.trim(),
@@ -398,8 +396,8 @@ export class AdminCreateUserComponent implements OnInit {
         }
         return undefined;
 
-      case 'documentType':
-        return !this.userForm.documentType
+      case 'identificationType':
+        return !this.userForm.identificationType
           ? 'El tipo de documento es obligatorio.'
           : undefined;
 
@@ -492,7 +490,7 @@ export class AdminCreateUserComponent implements OnInit {
     const fields: (keyof FormErrors)[] = [
       'documentId',
       'password',
-      'documentType',
+      'identificationType',
       'phone',
       'firstName',
       'lastName',

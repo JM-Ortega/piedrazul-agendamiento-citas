@@ -4,7 +4,7 @@ import { CreateUserDoctorDto } from './CreateUserDoctorDto';
 export interface CreateUserRequestDto {
   user: {
     identification: string;
-    documentType: string;
+    identificationType: string;
     phone: string;
     firstName: string;
     lastName: string;

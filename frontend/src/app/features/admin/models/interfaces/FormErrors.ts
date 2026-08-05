@@ -1,7 +1,7 @@
 export interface FormErrors {
   [key: string]: string | undefined;
   documentId?: string;
-  documentType?: string;
+  identificationType?: string;
   password?: string;
   firstName?: string;
   lastName?: string;

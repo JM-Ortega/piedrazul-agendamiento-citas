@@ -1,6 +1,6 @@
 export interface UserForm {
   documentId: string;
-  documentType: string;
+  identificationType: string;
   password: string;
   firstName: string;
   lastName: string;

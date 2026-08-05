@@ -111,20 +111,20 @@
           <!-- Tipo de Documento -->
           <div>
             <label
-              for="documentType"
+              for="identificationType"
               class="block text-gray-700 text-base font-medium mb-2"
             >
               Tipo de Documento *
             </label>
             <app-select
-              id="documentType"
-              [(ngModel)]="userForm.documentType"
-              name="documentType"
+              id="identificationType"
+              [(ngModel)]="userForm.identificationType"
+              name="identificationType"
               [options]="documentTypes | toSelectOptions"
               [loading]="loadingDocumentTypes"
               [hasSuffix]="true"
-              [errorMessage]="errors['documentType']"
-              (selectBlur)="validateField('documentType')"
+              [errorMessage]="errors['identificationType']"
+              (selectBlur)="validateField('identificationType')"
             >
               <svg lucideCreditCard [size]="20" suffix></svg>
             </app-select>
