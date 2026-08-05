@@ -20,6 +20,7 @@ import {
   LucideHeart,
   LucideLock,
   LucideMail,
+  LucidePhone,
   LucideUser,
   LucideUserPlus,
   LucideZap,
@@ -27,14 +28,16 @@ import {
 } from '@lucide/angular';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { InputComponent } from '../../../../design-system/atoms/input/input.component';
+import { SelectComponent } from '../../../../design-system/atoms/select/select.component';
+import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 import {
   CreateUserDoctorFormComponent,
-  DoctorFormData,
   SpecialtyOption,
 } from '../../components/create-user-doctor-form/create-user-doctor-form.component';
 import { CreateUserRolesComponent } from '../../components/create-user-roles/create-user-roles.component';
 import { CreateUserConfirmModalComponent } from '../../components/modals/modal-create/create-user-confirm-modal.component';
 import { CreateUserRequestDto } from '../../models/dtos/CreateUserRequestDto';
+import { DoctorFormData } from '../../models/interfaces/DoctorFormData';
 import { FormErrors } from '../../models/interfaces/FormErrors';
 import { UserForm } from '../../models/interfaces/UserForm';
 import { AdminService } from '../../service/admin.service';
@@ -65,8 +68,11 @@ const DAY_VALUE_TO_WORKDAY: Record<number, string> = {
     LucideMail,
     LucideUser,
     LucideUserPlus,
+    LucidePhone,
     InputComponent,
     ButtonComponent,
+    SelectComponent,
+    ToSelectOptionsPipe,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-create-user.component.html',
@@ -184,8 +190,6 @@ export class AdminCreateUserComponent implements OnInit {
   }
   get doctorFormData(): DoctorFormData {
     return {
-      documentType: this.userForm.documentType,
-      phone: this.userForm.phone,
       specialty: this.userForm.specialty,
       laborStart: this.userForm.laborStart,
       laborEnd: this.userForm.laborEnd,
@@ -290,6 +294,8 @@ export class AdminCreateUserComponent implements OnInit {
     const payload: CreateUserRequestDto = {
       user: {
         identification: this.userForm.documentId,
+        documentType: this.userForm.documentType,
+        phone: this.userForm.phone,
         firstName: this.userForm.firstName.trim(),
         lastName: this.userForm.lastName.trim(),
         email: this.userForm.email.trim(),
@@ -297,8 +303,6 @@ export class AdminCreateUserComponent implements OnInit {
       },
       doctor: this.hasDoctorRole
         ? {
-            documentType: this.userForm.documentType,
-            phone: this.userForm.phone,
             specialty: this.userForm.specialty,
             laborStart: this.userForm.laborStart,
             laborEnd: this.userForm.laborEnd,
@@ -313,7 +317,6 @@ export class AdminCreateUserComponent implements OnInit {
       patient: null,
       roles,
     };
-
     this.adminService.createUser(payload).subscribe({
       next: () => {
         this.isSubmitting = false;
@@ -393,12 +396,11 @@ export class AdminCreateUserComponent implements OnInit {
         return undefined;
 
       case 'documentType':
-        return this.hasDoctorRole && !this.userForm.documentType
+        return !this.userForm.documentType
           ? 'El tipo de documento es obligatorio.'
           : undefined;
 
       case 'phone':
-        if (!this.hasDoctorRole) return undefined;
         if (!this.userForm.phone.trim()) {
           return 'El teléfono es obligatorio.';
         }
@@ -484,6 +486,8 @@ export class AdminCreateUserComponent implements OnInit {
     const fields: (keyof FormErrors)[] = [
       'documentId',
       'password',
+      'documentType',
+      'phone',
       'firstName',
       'lastName',
       'email',
@@ -491,8 +495,6 @@ export class AdminCreateUserComponent implements OnInit {
     ];
     if (this.hasDoctorRole) {
       fields.push(
-        'documentType',
-        'phone',
         'specialty',
         'laborStart',
         'laborEnd',

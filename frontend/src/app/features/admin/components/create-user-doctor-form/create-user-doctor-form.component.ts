@@ -12,10 +12,8 @@ import {
   LucideCalendarRange,
   LucideCircleAlert,
   LucideClock,
-  LucideCreditCard,
   LucideDynamicIcon,
   LucideInfo,
-  LucidePhone,
   LucideStethoscope,
   type LucideIcon,
 } from '@lucide/angular';
@@ -25,18 +23,7 @@ import { SelectComponent } from '../../../../design-system/atoms/select/select.c
 import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
-
-export interface DoctorFormData {
-  documentType: string;
-  phone: string;
-  specialty: string[];
-  laborStart: string;
-  laborEnd: string;
-  interval: number;
-  workDays: number[];
-  startTime: string;
-  endTime: string;
-}
+import { DoctorFormData } from '../../models/interfaces/DoctorFormData';
 
 export interface SpecialtyOption {
   name: string;
@@ -53,9 +40,7 @@ export interface SpecialtyOption {
     FormsModule,
     LucideCalendarRange,
     LucideCircleAlert,
-    LucideCreditCard,
     LucideInfo,
-    LucidePhone,
     LucideStethoscope,
     LucideDynamicIcon,
     LucideClock,
@@ -70,9 +55,7 @@ export interface SpecialtyOption {
 export class CreateUserDoctorFormComponent {
   @Input() data!: DoctorFormData;
   @Input() specialtyOptions: SpecialtyOption[] = [];
-  @Input() documentTypes: string[] = [];
   @Input() loadingSpecialties = false;
-  @Input() loadingDocumentTypes = false;
   @Input() timeOptions: string[] = [];
   @Input() maxInterval = 300;
   @Input() daysOfWeek: { value: number; label: string }[] = [];

@@ -53,52 +53,6 @@
         </p>
       }
     </div>
-
-    <!-- Tipo de Documento -->
-    <div>
-      <label
-        for="documentType"
-        class="block text-gray-700 text-base font-medium mb-2"
-      >
-        Tipo de Documento *
-      </label>
-      <app-select
-        id="documentType"
-        [(ngModel)]="data.documentType"
-        (ngModelChange)="emit('documentType', $event)"
-        name="documentType"
-        [options]="documentTypes | toSelectOptions"
-        [loading]="loadingDocumentTypes"
-        [hasSuffix]="true"
-        [errorMessage]="errors['documentType']"
-        (selectBlur)="fieldBlurred.emit('documentType')"
-      >
-        <svg lucideCreditCard [size]="20" suffix></svg>
-      </app-select>
-    </div>
-
-    <!-- Teléfono -->
-    <div>
-      <label for="phone" class="block text-gray-700 text-base font-medium mb-2">
-        Teléfono * <span class="text-sm text-gray-500">(solo dígitos)</span>
-      </label>
-      <app-input
-        [id]="'phone'"
-        type="text"
-        [inputMode]="'numeric'"
-        [(ngModel)]="data.phone"
-        (ngModelChange)="emit('phone', $event)"
-        name="phone"
-        sanitize="numeric"
-        [maxLength]="10"
-        placeholder="3001234567"
-        autocomplete="off"
-        [errorMessage]="errors['phone']"
-        (inputBlur)="fieldBlurred.emit('phone')"
-      >
-        <svg lucidePhone [size]="20" suffix class="text-gray-400"></svg>
-      </app-input>
-    </div>
   </div>
 
   <!-- Período Laboral -->
