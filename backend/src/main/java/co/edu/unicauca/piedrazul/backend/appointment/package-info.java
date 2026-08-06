@@ -11,7 +11,8 @@
         "user",
         "shared::audit-events",
         "shared::enums",
-        "jackson::validation"
+        "jackson::validation",
+        "clinicalHistory::"
 })
 package co.edu.unicauca.piedrazul.backend.appointment;
 

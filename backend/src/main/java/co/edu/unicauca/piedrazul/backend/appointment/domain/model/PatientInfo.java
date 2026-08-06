@@ -69,8 +69,8 @@ public class PatientInfo {
     }
 
     private void validate() {
-        if (!documentNumber.matches("\\d{6,12}")) {
-            throw new InvalidDocumentException("El número de documento debe tener entre 6 y 12 dígitos");
+        if (!documentNumber.matches("\\d{6,10}")) {
+            throw new InvalidDocumentException("El número de documento debe tener entre 6 y 10 dígitos");
         }
 
         if (!firstName.matches("^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$")) {

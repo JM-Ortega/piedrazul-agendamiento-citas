@@ -4,21 +4,16 @@ import co.edu.unicauca.piedrazul.backend.appointment.application.*;
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.AutonomousPatientResolutionStrategy;
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.ManualPatientResolutionStrategy;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PersonConsultPort;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.BusySlotService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration.PersonConsultPortImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.application.ListMyAppointmentsUseCaseImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.CancelAppointmentUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.application.CancelAppointmentUseCaseImpl;
-import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -52,10 +47,6 @@ public class AppointmentConfig {
         return new AppointmentService(busySlotService);
     }
 
-    @Bean
-    public PersonConsultPort personConsultPort(PersonExternalService personExternalService){
-        return new PersonConsultPortImpl(personExternalService);
-    }
 
     @Bean
     public AppointmentSchedulingService appointmentSchedulingService(
@@ -136,8 +127,10 @@ public class AppointmentConfig {
 
     @Bean
     public UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase(
-            AppointmentRepository appointmentRepository) {
-        return new UpdateAppointmentStatusUseCaseImpl(appointmentRepository);
+            AppointmentRepository appointmentRepository,
+            DoctorConfigConsultPort doctorConfigConsultPort,
+            ClinicalHistoryPort clinicalHistoryPort) {
+        return new UpdateAppointmentStatusUseCaseImpl(appointmentRepository, doctorConfigConsultPort, clinicalHistoryPort);
     }
 
     @Bean

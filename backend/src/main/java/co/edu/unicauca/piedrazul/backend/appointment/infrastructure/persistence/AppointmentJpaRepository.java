@@ -12,8 +12,6 @@ import java.util.UUID;
 
 public interface AppointmentJpaRepository extends JpaRepository<AppointmentEntity, UUID>, JpaSpecificationExecutor<AppointmentEntity> {
 
-    List<AppointmentEntity> findByIdDoctor(UUID idDoctor);
-
     List<AppointmentEntity> findByIdPatient(UUID idPatient);
 
     List<AppointmentEntity> findByDate(LocalDate date);
@@ -23,10 +21,6 @@ public interface AppointmentJpaRepository extends JpaRepository<AppointmentEntit
     List<AppointmentEntity> findByIdDoctorAndDateAndAppointmentState(UUID idDoctor, LocalDate date, AppointmentState appointmentState);
 
     List<AppointmentEntity> findByIdPatientAndDate(UUID idPatient, LocalDate date);
-
-    List<AppointmentEntity> findByIdDoctorAndIdPatient(UUID idDoctor, UUID idPatient);
-
-    List<AppointmentEntity> findByIdDoctorAndIdPatientAndDate(UUID idDoctor, UUID idPatient, LocalDate date);
 
     List<AppointmentEntity> findByAppointmentStateAndDateBefore(AppointmentState state, LocalDate date);
 

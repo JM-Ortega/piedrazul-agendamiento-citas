@@ -168,8 +168,9 @@ public class AppointmentController {
     // Actualizar el estado de una cita a atendida
     @PutMapping("/{appointmentId}/mark-as-attended")
     @PreAuthorize("hasRole('DOCTOR')")
-    public ResponseEntity<Void> markAppointmentAsAttended(@PathVariable UUID appointmentId) {
-        updateAppointmentStatusUseCase.markAsAttended(appointmentId);
+    public ResponseEntity<Void> markAppointmentAsAttended(@PathVariable UUID appointmentId
+        , @RequestParam(required = false) String clinicalHistoryDescription) {
+        updateAppointmentStatusUseCase.markAsAttended(appointmentId, clinicalHistoryDescription);
         return ResponseEntity.ok().build();
     }
 
