@@ -2,7 +2,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.ClinicalHistoryPort;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.ClinicalHistoryExternalService;
-import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.input.ClinicalHistoryRequest;
+import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.internal.ClinicalHistoryRequest;
 
 import java.time.LocalDate;
 import java.util.UUID;
