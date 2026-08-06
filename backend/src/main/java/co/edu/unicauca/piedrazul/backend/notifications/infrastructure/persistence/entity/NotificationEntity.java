@@ -52,7 +52,7 @@ public class NotificationEntity {
     @Column(
             name = "aggregate_type",
             nullable = false,
-            length = 80
+            length = 40
     )
     private AggregateType aggregateType;
 
@@ -67,7 +67,8 @@ public class NotificationEntity {
 
     @Column(
             name = "recipient_name",
-            nullable = false
+            nullable = false,
+            length = 200
     )
     private String recipientName;
 
@@ -102,7 +103,7 @@ public class NotificationEntity {
     @Column(
             name = "status",
             nullable = false,
-            length = 40
+            length = 20
     )
     private NotificationStatus status;
 

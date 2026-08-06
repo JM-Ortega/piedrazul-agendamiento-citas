@@ -31,11 +31,11 @@ public class AppointmentEntity {
     private UUID idPatient;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "specialty_code", nullable = false)
+    @Column(name = "specialty_code", nullable = false, length = 40)
     private SpecialtyCode specialty;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "state_code", nullable = false)
+    @Column(name = "state_code", nullable = false, length = 40)
     private AppointmentState appointmentState;
 
     @Column(name = "date", nullable = false)
@@ -45,7 +45,7 @@ public class AppointmentEntity {
     private LocalTime startTime;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "scheduling_origin", nullable = false)
+    @Column(name = "scheduling_origin", nullable = false, length = 20)
     private SchedulingOrigin schedulingOrigin;
 
 }

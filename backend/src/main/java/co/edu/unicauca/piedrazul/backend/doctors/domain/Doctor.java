@@ -25,7 +25,7 @@ public class Doctor {
     @Column(name = "labor_start", nullable = false)
     private LocalDate laborStart;
 
-    @Column(name = "labor_end")
+    @Column(name = "labor_end", nullable = false)
     private LocalDate laborEnd;
 
     @Column(name = "booking_window_weeks", nullable = false)

@@ -44,14 +44,14 @@ public class DeliveryEventEntity {
     @Column(name = "provider_event_id")
     private String providerEventId;
 
-    @Column(name = "event_type", nullable = false)
+    @Column(name = "event_type", nullable = false, length = 100)
     private String eventType;
 
-    @Column(name = "raw_status", nullable = false)
+    @Column(name = "raw_status", nullable = false, length = 100)
     private String rawStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "normalized_status", nullable = false, length = 40)
+    @Column(name = "normalized_status", nullable = false, length = 20)
     private AttemptStatus normalizedStatus;
 
     @Column(name = "payload_json", columnDefinition = "TEXT")

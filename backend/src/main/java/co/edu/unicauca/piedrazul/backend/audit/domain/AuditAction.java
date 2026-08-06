@@ -13,6 +13,5 @@ public enum AuditAction {
     APPOINTMENT_RESCHEDULED,
 
     // historia clínica
-    CLINICAL_RECORD_CREATED,
-    CLINICAL_RECORD_UPDATED
+    CLINICAL_RECORD_CREATED
 }

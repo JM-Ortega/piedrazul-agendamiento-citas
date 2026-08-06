@@ -27,7 +27,7 @@ public class ClinicalHistory {
     @Column(name = "date_attention", nullable = false, updatable = false)
     private LocalDate attendedAt;
 
-    @Column(name = "doctor_name", nullable = false, updatable = false)
+    @Column(name = "doctor_name", nullable = false, updatable = false, length = 200)
     private String doctor_name;
 
     @Column(name = "description", nullable = false, updatable = false, length = 500)

@@ -54,7 +54,7 @@ public class NotificationAttemptEntity {
     @Column(
             name = "channel",
             nullable = false,
-            length = 40
+            length = 20
     )
     private NotificationChannel channel;
 
@@ -71,21 +71,21 @@ public class NotificationAttemptEntity {
     @Column(
             name = "status",
             nullable = false,
-            length = 40
+            length = 20
     )
     private AttemptStatus status;
 
     @Enumerated(EnumType.STRING)
     @Column(
             name = "failure_type",
-            length = 40
+            length = 20
     )
     private FailureType failureType;
 
     @Column(name = "provider_message_id")
     private String providerMessageId;
 
-    @Column(name = "error_code")
+    @Column(name = "error_code", length = 100)
     private String errorCode;
 
     @Column(name = "error_message", length = 500)

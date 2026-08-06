@@ -35,7 +35,7 @@ public class NotificationScheduleEntity {
     private Instant scheduledAt;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 40)
+    @Column(name = "status", nullable = false, length = 20)
     private ScheduleStatus status;
 
     @Column(name = "next_retry_at")
