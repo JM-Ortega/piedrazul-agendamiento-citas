@@ -1,9 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.audit.domain;
 
 public enum AuditModule {
-    USERS,
-    APPOINTMENTS,
+    USER,
+    APPOINTMENT,
     DOCTORS,
     PATIENTS,
-    CLINICAL_RECORDS
+    CLINICAL_HISTORY
 }

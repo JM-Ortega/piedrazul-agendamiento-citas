@@ -32,6 +32,21 @@ public class UserExceptionHandler extends BaseExceptionHandler {
         return buildProblem(HttpStatus.BAD_GATEWAY, "Error del proveedor de identidad", ex.getMessage(), "user", "IDENTITY_PROVIDER_ERROR", request);
     }
 
+    @ExceptionHandler(PersonAlreadyExistsException.class)
+    public ProblemDetail handlePersonAlreadyExists(PersonAlreadyExistsException ex, HttpServletRequest request) {
+        return buildProblem(HttpStatus.CONFLICT, "Persona ya existe", ex.getMessage(), "user", "PERSON_ALREADY_EXISTS", request);
+    }
+
+    @ExceptionHandler(PersonAlreadyLinkedUserException.class)
+    public ProblemDetail handlePersonAlreadyLinkedUser(PersonAlreadyLinkedUserException ex, HttpServletRequest request) {
+        return buildProblem(HttpStatus.CONFLICT, "Persona ya vinculada", ex.getMessage(), "user", "PERSON_ALREADY_LINKED_USER", request);
+    }
+
+    @ExceptionHandler(PersonNotFoundException.class)
+    public ProblemDetail handlePersonNotFound(PersonNotFoundException ex, HttpServletRequest request) {
+        return buildProblem(HttpStatus.NOT_FOUND, "Persona no encontrada", ex.getMessage(), "user", "PERSON_NOT_FOUND", request);
+    }
+
     @ExceptionHandler(UserException.class)
     public ProblemDetail handleUserException(UserException ex, HttpServletRequest request) {
         return buildProblem(HttpStatus.BAD_REQUEST, "Error de usuario", ex.getMessage(), "user", "USER_ERROR", request);

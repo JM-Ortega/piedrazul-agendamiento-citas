@@ -1,13 +1,13 @@
 package co.edu.unicauca.piedrazul.backend.patients;
 
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientUserRequest;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientSex;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
+import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface PatientModuleApi {
@@ -23,17 +23,27 @@ public interface PatientModuleApi {
     List<PatientData> findAll();
 
     PatientData createPatient(
-            PatientDocumentType documentType,
-            String documentNumber,
+            IdentificationType identificationType,
+            String identification,
             String firstName,
             String lastName,
             String phone,
             String email,
-            PatientGender gender,
+            UUID userId,
+            PatientSex sex,
             LocalDate birthDate,
             String guardianPhone
     );
 
-    void createPatient(UUID userId, String firstName, String lastName, String identificacion,
-                               String email, CreatePatientUserRequest request);
+    PatientData createPatientForExistingPerson(
+            UUID personId,
+            PatientSex sex,
+            LocalDate birthDate,
+            String guardianPhone
+    );
+
+    void deletePatient(UUID personId);
+
+    //Crear el metodo findByIds para el modulo de citas
+    List<PatientData> findByIds(Set<UUID> personIds);
 }

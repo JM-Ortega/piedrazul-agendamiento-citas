@@ -6,6 +6,8 @@ import co.edu.unicauca.piedrazul.backend.audit.infrastructure.persistence.AuditL
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditModule;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 @Service
 public class AuditLogService {
 
@@ -15,7 +17,7 @@ public class AuditLogService {
         this.auditLogRepository = auditLogRepository;
     }
 
-    public void register(AuditAction action, AuditModule module, String entityId, String performedBy) {
+    public void register(AuditAction action, AuditModule module, UUID entityId, UUID performedBy) {
         auditLogRepository.save(new AuditLog(
                 action,
                 module,

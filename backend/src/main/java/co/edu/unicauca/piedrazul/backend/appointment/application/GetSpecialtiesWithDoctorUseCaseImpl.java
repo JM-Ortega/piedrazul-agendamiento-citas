@@ -1,6 +1,5 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.NoAvailableDoctorsException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetSpecialtiesWithDoctorUseCase;
@@ -9,6 +8,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.Appointm
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.*;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -36,17 +36,12 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
     @Override
     public List<DoctorResponse> getSpecialtiesWithDoctor(UUID patientId) {
         LocalDate from = LocalDate.now();
-        LocalDate to = from.plusMonths(1);
 
-        List<UUID> activeDoctorIds;
+        List<UUID> activeDoctorIds = isNewPatientUseCase.isNewPatient(patientId)
+                ? getActiveGeneralDoctorsOrThrow()
+                : getActiveDoctorsOrThrow();
 
-        if(isNewPatientUseCase.isNewPatient(patientId)){
-            activeDoctorIds = getActiveGeneralDoctorsOrThrow();
-        }else{
-            activeDoctorIds = getActiveDoctorsOrThrow();
-        }
-
-        Map<UUID, Integer> availability = calculateAvailability(activeDoctorIds, from, to);
+        Map<UUID, Integer> availability = calculateAvailability(activeDoctorIds, from);
 
         List<UUID> orderedDoctors = sortDoctorsByAvailability(availability);
 
@@ -75,9 +70,30 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
         return doctors;
     }
 
-    private Map<UUID, Integer> calculateAvailability(List<UUID> doctorIds, LocalDate from, LocalDate to) {
+    private Map<UUID, Integer> calculateAvailability(List<UUID> doctorIds, LocalDate from) {
+
+        Map<UUID, Integer> bookingWindowWeeks =
+                doctorConfigConsultPort.getBookingWindowWeeksByDoctorIds(doctorIds);
+        Map<UUID, Integer> intervalMinutes =
+                doctorConfigConsultPort.getIntervalMinutesByDoctorIds(doctorIds);
+
+        for (UUID doctorId : doctorIds) {
+            if (!bookingWindowWeeks.containsKey(doctorId)) {
+                throw new DoctorConfigInconsistentException(
+                        "No se encontró bookingWindowWeeks para el doctor: " + doctorId);
+            }
+            if (!intervalMinutes.containsKey(doctorId)) {
+                throw new DoctorConfigInconsistentException(
+                        "No se encontró appointmentInterval para el doctor: " + doctorId);
+            }
+        }
+
         Map<UUID, Integer> result = doctorIds.stream()
-                .map(id -> Map.entry(id, countAvailableSlotsForPeriod(id, from, to)))
+                .map(id -> {
+                    LocalDate to = from.plusWeeks(bookingWindowWeeks.get(id));
+                    int interval = intervalMinutes.get(id);
+                    return Map.entry(id, countAvailableSlotsForPeriod(id, from, to, interval));
+                })
                 .filter(entry -> entry.getValue() > 0)
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
@@ -124,25 +140,24 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
             DoctorResponse doctor,
             Set<String> usedSpecialties) {
 
-        return extractSpecialties(doctor.specialty()).stream()
+        return doctor.specialty().stream()
                 .filter(s -> !usedSpecialties.contains(s))
                 .findFirst()
                 .map(specialty -> {
                     usedSpecialties.add(specialty);
                     return new DoctorResponse(
-                            specialty,
+                            List.of(specialty),
                             doctor.id(),
                             doctor.name(),
                             doctor.laborEnd(),
+                            doctor.laborStart(),
                             doctor.workdays()
                     );
                 })
                 .orElse(null);
     }
 
-    private int countAvailableSlotsForPeriod(UUID doctorId, LocalDate from, LocalDate to) {
-        int interval = doctorConfigConsultPort.getIntervalMinutesByDoctor(doctorId);
-
+    private int countAvailableSlotsForPeriod(UUID doctorId, LocalDate from, LocalDate to, int interval) {
         return from.datesUntil(to.plusDays(1))
                 .filter(this::isWeekday)
                 .mapToInt(date -> safeCountSlotsForDay(doctorId, date, interval))
@@ -177,27 +192,18 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
                 .sorted()
                 .toList();
 
-        List<String> specialties = extractSpecialties(doctor.specialty());
-
-        String mainSpecialty = specialties.isEmpty()
-                ? "SIN_ESPECIALIDAD"
-                : specialties.getFirst();
+        List<String> specialties = Optional.ofNullable(doctor.specialty()).orElse(List.of());
+        List<String> normalizedSpecialties = specialties.isEmpty()
+                ? List.of("SIN_ESPECIALIDAD")
+                : specialties; // se conservan TODAS, no solo la primera
 
         return new DoctorResponse(
-                mainSpecialty,
+                normalizedSpecialties,
                 doctor.id(),
                 doctor.name(),
                 doctor.laborEnd(),
+                doctor.laborStart(),
                 workdays
         );
-    }
-
-    private List<String> extractSpecialties(String raw) {
-        if (raw == null || raw.isBlank()) return List.of();
-
-        return Arrays.stream(raw.replace("[", "").replace("]", "").split(","))
-                .map(String::trim)
-                .filter(s -> !s.isBlank())
-                .toList();
     }
 }

@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.user.config;
 
+import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app.seed.identity")
@@ -26,9 +27,11 @@ public class IdentitySeedProperties {
 
     public static class SeedUser {
         private String username;
+        private IdentificationType identificationType;
         private String firstName;
         private String lastName;
         private String email;
+        private String phone;
         private String password;
 
         public String getUsername() {
@@ -37,6 +40,14 @@ public class IdentitySeedProperties {
 
         public void setUsername(String username) {
             this.username = username;
+        }
+
+        public IdentificationType getIdentificationType() {
+            return identificationType;
+        }
+
+        public void setIdentificationType(IdentificationType identificationType) {
+            this.identificationType = identificationType;
         }
 
         public String getFirstName() {
@@ -61,6 +72,14 @@ public class IdentitySeedProperties {
 
         public void setEmail(String email) {
             this.email = email;
+        }
+
+        public String getPhone() {
+            return phone;
+        }
+
+        public void setPhone(String phone) {
+            this.phone = phone;
         }
 
         public String getPassword() {

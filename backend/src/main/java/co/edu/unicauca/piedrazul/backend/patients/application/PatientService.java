@@ -1,124 +1,124 @@
 package co.edu.unicauca.piedrazul.backend.patients.application;
 
-import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientUserRequest;
-import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientSex;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientPublicResponse;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
 import co.edu.unicauca.piedrazul.backend.patients.exception.InvalidPatientDataException;
-import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyExistsException;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyLinkedUserException;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.mappers.PatientApiMapper;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientRepository;
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
-import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
+import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
+import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import co.edu.unicauca.piedrazul.backend.user.UserAccountProvisioningApi;
+import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
-import co.edu.unicauca.piedrazul.backend.verification.api.VerificationPurpose;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.verification.VerificationModuleApi;
+import co.edu.unicauca.piedrazul.backend.verification.api.VerificationPurpose;
+import org.apache.xmlbeans.impl.xb.xsdschema.Public;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
 public class PatientService implements PatientModuleApi {
 
     private final PatientRepository patientRepository;
+    private final PersonExternalService personExternalService;
     private final UserModuleApi userModuleApi;
     private final UserAccountProvisioningApi userAccountProvisioningApi;
     private final VerificationModuleApi verificationModuleApi;
 
     public PatientService(
             PatientRepository patientRepository,
+            PersonExternalService personExternalService,
             UserModuleApi userModuleApi,
             UserAccountProvisioningApi userAccountProvisioningApi,
             VerificationModuleApi verificationModuleApi
     ) {
         this.patientRepository = patientRepository;
+        this.personExternalService = personExternalService;
         this.userModuleApi = userModuleApi;
         this.userAccountProvisioningApi = userAccountProvisioningApi;
         this.verificationModuleApi = verificationModuleApi;
     }
 
-
-
     @Override
     public PatientData createPatient(
-            PatientDocumentType documentType,
-            String documentNumber,
+            IdentificationType identificationType,
+            String identification,
             String firstName,
             String lastName,
             String phone,
             String email,
-            PatientGender gender,
+            UUID userId,
+            PatientSex sex,
             LocalDate birthDate,
             String guardianPhone
     ) {
-        validateDocumentNumber(documentNumber);
-        ensurePatientDoesNotExist(documentNumber);
-
-        Patient patient = buildPatient(
-                documentType,
-                documentNumber,
-                firstName,
-                lastName,
-                phone,
-                email,
-                gender,
-                birthDate,
-                guardianPhone,
-                null
+        PersonSummary person = personExternalService.createPerson(
+                identificationType, identification, firstName, lastName, phone, email, userId
         );
 
-        return toData(patientRepository.save(patient));
+        Patient patient = buildPatient(person, sex, birthDate, guardianPhone);
+
+        return toData(patientRepository.save(patient), person);
     }
 
     @Override
-    public void createPatient(UUID userId, String firstName, String lastName, String identificacion,
-                                      String email, CreatePatientUserRequest request) {
-        Patient patient = buildPatient(
-                request.documentType(),
-                identificacion,
-                firstName,
-                lastName,
-                request.phone(),
-                email,
-                request.gender(),
-                request.birthDate(),
-                request.guardianPhone(),
-                userId
-        );
+    public PatientData createPatientForExistingPerson(
+            UUID personId,
+            PatientSex sex,
+            LocalDate birthDate,
+            String guardianPhone
+    ) {
+        PersonSummary person = personExternalService.findById(personId)
+                .orElseThrow(() -> new PatientNotFoundException(personId));
 
-        patientRepository.save(patient);
+        Patient patient = buildPatient(person, sex, birthDate, guardianPhone);
+
+        return toData(patientRepository.save(patient), person);
+    }
+
+    @Override
+    public void deletePatient(UUID personId) {
+        if (personId == null) {
+            throw new InvalidPatientDataException("personId cannot be null");
+        }
+
+        patientRepository.deleteById(personId);
     }
 
     public PatientData createPatientWithUser(
             String username,
             String password,
-            PatientDocumentType documentType,
-            String documentNumber,
+            IdentificationType identificationType,
+            String identification,
             String firstName,
             String lastName,
             String phone,
             String email,
-            PatientGender gender,
+            PatientSex sex,
             LocalDate birthDate,
             String guardianPhone
     ) {
         validateUsername(username);
-        validateDocumentNumber(documentNumber);
-        validateUsernameMatchesDocumentNumber(username, documentNumber);
-        ensurePatientDoesNotExist(documentNumber);
+        validateIdentification(identification);
+        validateUsernameMatchesIdentification(username, identification);
 
         UUID userId = userModuleApi.findUserByUsername(username)
                 .map(user -> user.id())
@@ -127,10 +127,12 @@ public class PatientService implements PatientModuleApi {
 
                     return userAccountProvisioningApi.getOrCreateUser(
                             new CreateSystemUserRequest(
-                                    username,
+                                    identification,
+                                    identificationType,
                                     firstName,
                                     lastName,
                                     email,
+                                    phone,
                                     password
                             ),
                             List.of(Role.PATIENT)
@@ -141,76 +143,77 @@ public class PatientService implements PatientModuleApi {
             userModuleApi.ensurePatientRole(userId);
         }
 
-        Patient patient = buildPatient(
-                documentType,
-                documentNumber,
-                firstName,
-                lastName,
-                phone,
-                email,
-                gender,
-                birthDate,
-                guardianPhone,
-                userId
+        PersonSummary person = personExternalService.createPerson(
+                identificationType, identification, firstName, lastName, phone, email, userId
         );
 
-        return toData(patientRepository.save(patient));
+        Patient patient = buildPatient(person, sex, birthDate, guardianPhone);
+
+        return toData(patientRepository.save(patient), person);
     }
 
-    public void requestLinkUserAccountCode(String documentNumber) {
-        validateDocumentNumber(documentNumber);
+    public void requestLinkUserAccountCode(String identification) {
+        validateIdentification(identification);
 
-        Patient patient = getPatientByDocumentNumberOrThrow(documentNumber);
-        ensurePatientHasNoLinkedUser(patient);
+        PatientWithPerson found = getPatientByIdentificationOrThrow(identification);
+        ensurePersonHasNoLinkedUser(found.person());
 
         verificationModuleApi.requestCode(
-                documentNumber,
+                identification,
                 VerificationPurpose.LINK_PATIENT_ACCOUNT,
-                patient.getFirstName() + " " + patient.getLastName(),
-                patient.getPhone(),
-                patient.getEmail()
+                found.person().firstName() + " " + found.person().lastName(),
+                found.person().phone(),
+                found.person().email()
         );
     }
 
     public PatientData confirmLinkUserAccount(
-            String documentNumber,
+            String identification,
             String code,
             String password
     ) {
-        validateDocumentNumber(documentNumber);
+        validateIdentification(identification);
         validateCode(code);
 
-        Patient patient = getPatientByDocumentNumberOrThrow(documentNumber);
-        ensurePatientHasNoLinkedUser(patient);
+        PatientWithPerson found = getPatientByIdentificationOrThrow(identification);
+        ensurePersonHasNoLinkedUser(found.person());
 
         verificationModuleApi.verifyCode(
-                documentNumber,
+                identification,
                 VerificationPurpose.LINK_PATIENT_ACCOUNT,
                 code
         );
 
         validatePassword(password);
 
-        userAccountProvisioningApi.getOrCreateUser(
-            new CreateSystemUserRequest(
-                documentNumber,
-                patient.getFirstName(),
-                patient.getLastName(),
-                patient.getEmail(),
-                password
-            ),
-            java.util.List.of(co.edu.unicauca.piedrazul.backend.shared.auth.Role.PATIENT)
+        UserSummary user = userAccountProvisioningApi.getOrCreateUser(
+                new CreateSystemUserRequest(
+                        identification,
+                        found.person().identificationType(),
+                        found.person().firstName(),
+                        found.person().lastName(),
+                        found.person().email(),
+                        found.person().phone(),
+                        password
+                ),
+                List.of(Role.PATIENT)
         );
 
-        return toData(patientRepository.save(patient));
+        personExternalService.linkUserId(found.person().id(), user.id());
+
+        PersonSummary linkedPerson = personExternalService.findById(found.person().id())
+                .orElseThrow(() -> new PatientNotFoundException(identification));
+
+        return toData(found.patient(), linkedPerson);
     }
 
     public Optional<PatientData> findByUserId(UUID userId) {
         if (userId == null) {
             throw new InvalidPatientDataException("UserId cannot be null");
         }
-        return patientRepository.findByUserId(userId)
-                .map(this::toData);
+        return personExternalService.findByUserId(userId)
+                .flatMap(person -> patientRepository.findById(person.id())
+                        .map(patient -> toData(patient, person)));
     }
 
     @Override
@@ -218,23 +221,32 @@ public class PatientService implements PatientModuleApi {
     public Optional<PatientData> findById(UUID id) {
         validateId(id);
         return patientRepository.findById(id)
-                .map(this::toData);
+                .flatMap(patient -> personExternalService.findById(id)
+                        .map(person -> toData(patient, person)));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<PatientData> findByDocumentNumber(String documentNumber) {
-        validateDocumentNumber(documentNumber);
-        return patientRepository.findByDocumentNumber(documentNumber)
-                .map(this::toData);
+    public Optional<PatientData> findByDocumentNumber(String identification) {
+        validateIdentification(identification);
+        return personExternalService.findByIdentification(identification)
+                .flatMap(person -> patientRepository.findById(person.id())
+                        .map(patient -> toData(patient, person)));
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<PatientData> findAll() {
-        return patientRepository.findAll()
-                .stream()
-                .map(this::toData)
+        List<Patient> patients = patientRepository.findAll();
+
+        Set<UUID> personIds = patients.stream()
+                .map(Patient::getPersonId)
+                .collect(Collectors.toSet());
+
+        Map<UUID, PersonSummary> persons = personExternalService.findByIds(personIds);
+
+        return patients.stream()
+                .map(patient -> toData(patient, persons.get(patient.getPersonId())))
                 .toList();
     }
 
@@ -245,91 +257,96 @@ public class PatientService implements PatientModuleApi {
         return patientRepository.existsById(id);
     }
 
+    @Override
     @Transactional(readOnly = true)
-    public PatientPublicResponse findPublicByDocumentNumber(String documentNumber) {
-        validateDocumentNumber(documentNumber);
+    public List<PatientData> findByIds(Set<UUID> patientIds) {
 
-        Optional<Patient> patientOpt =
-                patientRepository.findByDocumentNumber(documentNumber);
-
-        boolean hasSystemUser =
-                userModuleApi.findUserByUsername(documentNumber).isPresent();
-
-        if (patientOpt.isPresent()) {
-            return PatientPublicResponse.from(patientOpt.get(), hasSystemUser);
+        if (patientIds == null || patientIds.isEmpty()) {
+            return List.of();
         }
 
-        if (hasSystemUser) {
-            return PatientPublicResponse.fromSystemUserOnly(documentNumber);
-        }
+        List<Patient> patients = patientRepository.findAllById(patientIds);
 
-        throw new PatientNotFoundException(documentNumber);
-    }
+        Map<UUID, PersonSummary> persons =
+                personExternalService.findByIds(patientIds);
 
-    @Transactional(readOnly = true)
-    public List<PatientData> searchByDocumentNumberPrefix(String documentNumberPrefix) {
-        if (documentNumberPrefix == null || documentNumberPrefix.isBlank()) {
-            throw new InvalidPatientDataException("Document number prefix cannot be blank");
-        }
-        return patientRepository.findByDocumentNumberStartingWith(documentNumberPrefix)
-                .stream()
-                .map(this::toData)
+        return patients.stream()
+                .map(patient -> toData(
+                        patient,
+                        persons.get(patient.getPersonId())
+                ))
                 .toList();
     }
 
-    public List<DocumentType> getAllDocumentTypes(){
-        return Arrays.asList(DocumentType.values());
+
+
+    @Transactional(readOnly = true)
+    public PatientPublicResponse findPublicByDocumentNumber(String identification) {
+        validateIdentification(identification);
+
+        Optional<PersonSummary> personOpt = personExternalService.findByIdentification(identification);
+        Optional<Patient> patientOpt = personOpt.flatMap(person -> patientRepository.findById(person.id()));
+
+        boolean hasSystemUser = userModuleApi.findUserByUsername(identification).isPresent();
+
+        if (patientOpt.isPresent()) {
+            return PatientPublicResponse.from(personOpt.get(), hasSystemUser);
+        }
+
+        if (hasSystemUser) {
+            return PatientPublicResponse.fromSystemUserOnly(identification);
+        }
+
+        throw new PatientNotFoundException(identification);
     }
 
-    private void ensurePatientDoesNotExist(String documentNumber) {
-        if (patientRepository.existsByDocumentNumber(documentNumber)) {
-            throw new PatientAlreadyExistsException(documentNumber);
+    @Transactional(readOnly = true)
+    public List<PatientData> searchByDocumentNumberPrefix(String identificationPrefix) {
+        if (identificationPrefix == null || identificationPrefix.isBlank()) {
+            throw new InvalidPatientDataException("Document number prefix cannot be blank");
+        }
+
+        return personExternalService.findByIdentificationPrefix(identificationPrefix).stream()
+                .map(person -> patientRepository.findById(person.id()).map(patient -> toData(patient, person)))
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
+    public List<IdentificationType> getAllDocumentTypes() {
+        return Arrays.asList(IdentificationType.values());
+    }
+
+    private PatientWithPerson getPatientByIdentificationOrThrow(String identification) {
+        PersonSummary person = personExternalService.findByIdentification(identification)
+                .orElseThrow(() -> new PatientNotFoundException(identification));
+
+        Patient patient = patientRepository.findById(person.id())
+                .orElseThrow(() -> new PatientNotFoundException(identification));
+
+        return new PatientWithPerson(patient, person);
+    }
+
+    private void ensurePersonHasNoLinkedUser(PersonSummary person) {
+        if (person.userId() != null) {
+            throw new PatientAlreadyLinkedUserException(person.id());
         }
     }
 
-    private Patient getPatientByDocumentNumberOrThrow(String documentNumber) {
-        return patientRepository.findByDocumentNumber(documentNumber)
-                .orElseThrow(() -> new PatientNotFoundException(documentNumber));
-    }
-
-    private void ensurePatientHasNoLinkedUser(Patient patient) {
-        if (patient.hasUserAccount()) {
-            throw new PatientAlreadyLinkedUserException(patient.getId());
-        }
-    }
-
-    private Patient buildPatient(
-            PatientDocumentType documentType,
-            String documentNumber,
-            String firstName,
-            String lastName,
-            String phone,
-            String email,
-            PatientGender gender,
-            LocalDate birthDate,
-            String guardianPhone,
-            UUID userId
-    ) {
+    private Patient buildPatient(PersonSummary person, PatientSex sex, LocalDate birthDate, String guardianPhone) {
         return new Patient(
-                PatientApiMapper.toDomainDocumentType(documentType),
-                documentNumber,
-                firstName,
-                lastName,
-                phone,
-                email,
-                PatientApiMapper.toDomainGender(gender),
+                person.id(),
+                PatientApiMapper.toDomainSex(sex),
                 birthDate,
-                guardianPhone,
-                userId
+                guardianPhone
         );
     }
 
-    private PatientData toData(Patient patient) {
-        return PatientApiMapper.toPatientData(patient);
+    private PatientData toData(Patient patient, PersonSummary person) {
+        return PatientApiMapper.toPatientData(patient, person);
     }
 
-    private void validateDocumentNumber(String documentNumber) {
-        if (documentNumber == null || documentNumber.isBlank()) {
+    private void validateIdentification(String identification) {
+        if (identification == null || identification.isBlank()) {
             throw new InvalidPatientDataException("Document number cannot be blank");
         }
     }
@@ -340,8 +357,8 @@ public class PatientService implements PatientModuleApi {
         }
     }
 
-    private void validateUsernameMatchesDocumentNumber(String username, String documentNumber) {
-        if (!username.equals(documentNumber)) {
+    private void validateUsernameMatchesIdentification(String username, String identification) {
+        if (!username.equals(identification)) {
             throw new InvalidPatientDataException("Username must match document number");
         }
     }
@@ -358,15 +375,12 @@ public class PatientService implements PatientModuleApi {
         }
     }
 
-    private void validatePhone(String phone) {
-        if (phone == null || phone.isBlank()) {
-            throw new InvalidPatientDataException("Patient phone cannot be blank");
-        }
-    }
-
     private void validateId(UUID id) {
         if (id == null) {
             throw new InvalidPatientDataException("Id cannot be null");
         }
+    }
+
+    private record PatientWithPerson(Patient patient, PersonSummary person) {
     }
 }

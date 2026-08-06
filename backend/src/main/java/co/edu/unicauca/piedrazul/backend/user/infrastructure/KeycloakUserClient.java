@@ -1,10 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.user.infrastructure;
 
 import co.edu.unicauca.piedrazul.backend.config.security.KeycloakProperties;
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.exception.IdentityProviderException;
 import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
-import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsException;
 import jakarta.ws.rs.core.Response;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
@@ -15,7 +14,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -123,6 +125,10 @@ public class KeycloakUserClient {
         }
     }
 
+    /*
+    COMENTADOS POR AHORA PERO SON PROXIMOS A BORRAR PORQUE AHORA NO SE ACTIVA O DESACTIVA EL USUARIO
+    DEL DOCTOR SOLO SE LE QUITA EL ROL DE DOCTOR
+
     public void activateUser(UUID keycloakId) {
         UserRepresentation user = new UserRepresentation();
         user.setEnabled(true);
@@ -142,6 +148,8 @@ public class KeycloakUserClient {
                 .get(keycloakId.toString())
                 .update(user);
     }
+
+     */
 
     public void deleteUser(UUID keycloakId) {
         keycloak.realm(props.getRealm())
@@ -172,6 +180,16 @@ public class KeycloakUserClient {
                 .stream()
                 .map(RoleRepresentation::getName)
                 .toList();
+    }
+
+    public Map<UUID, List<String>> getUserRolesByIds(Collection<UUID> keycloakIds) {
+        Map<UUID, List<String>> rolesByUserId = new LinkedHashMap<>();
+
+        for (UUID keycloakId : keycloakIds) {
+            rolesByUserId.put(keycloakId, getUserRoles(keycloakId));
+        }
+
+        return rolesByUserId;
     }
 
     public boolean userHasRole(UUID keycloakId, Role role) {

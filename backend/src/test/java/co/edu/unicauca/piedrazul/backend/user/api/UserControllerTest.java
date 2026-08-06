@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.user.api;
 
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
@@ -18,7 +19,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -92,9 +92,11 @@ class UserControllerTest {
 		return new CreateSystemUserPayload(
 				new CreateSystemUserRequest(
 						"1001",
+						IdentificationType.CEDULA,
 						"Ana",
 						"Perez",
 						"ana.perez@example.com",
+						"3206228173",
 						"secret123"
 				),
 				null,

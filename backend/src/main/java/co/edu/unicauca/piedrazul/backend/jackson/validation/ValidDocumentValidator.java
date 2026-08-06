@@ -4,7 +4,13 @@ import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import org.springframework.beans.BeanWrapperImpl;
 
+import java.util.Locale;
+
 public class ValidDocumentValidator implements ConstraintValidator<ValidDocument, Object> {
+
+    private static final String UNKNOWN_TYPE_MESSAGE = "El tipo de documento no es válido";
+    private static final String DOCUMENT_REQUIRED_MESSAGE = "El número de documento es obligatorio cuando se envía el tipo de documento";
+    private static final String TYPE_REQUIRED_MESSAGE = "El tipo de documento es obligatorio cuando se envía el número de documento";
 
     private String documentField;
     private String typeField;
@@ -22,44 +28,75 @@ public class ValidDocumentValidator implements ConstraintValidator<ValidDocument
         }
 
         BeanWrapperImpl bean = new BeanWrapperImpl(value);
-        Object documentRaw = bean.getPropertyValue(documentField);
-        Object typeRaw = bean.getPropertyValue(typeField);
+        String identification = normalizeValue(bean.getPropertyValue(documentField));
+        String identificationType = normalizeType(bean.getPropertyValue(typeField));
 
-        if (!(documentRaw instanceof String documentNumber) || typeRaw == null) {
+        if (identification == null && identificationType == null) {
             return true;
         }
 
-        if (documentNumber.isBlank()) {
-            return true;
+        if (identification == null) {
+            return addViolation(context, documentField, DOCUMENT_REQUIRED_MESSAGE);
         }
 
-        String documentType = resolveTypeName(typeRaw);
-        boolean valid = isValidDocument(documentNumber, documentType);
-
-        if (!valid) {
-            context.disableDefaultConstraintViolation();
-            context.buildConstraintViolationWithTemplate(context.getDefaultConstraintMessageTemplate())
-                    .addPropertyNode(documentField)
-                    .addConstraintViolation();
+        if (identificationType == null) {
+            return addViolation(context, typeField, TYPE_REQUIRED_MESSAGE);
         }
 
-        return valid;
+        ValidationResult validationResult = validateDocument(identification, identificationType);
+
+        if (!validationResult.valid()) {
+            return addViolation(context, validationResult.field(), validationResult.message());
+        }
+
+        return true;
     }
 
-    private String resolveTypeName(Object typeRaw) {
+    private String normalizeType(Object typeRaw) {
+        if (typeRaw == null) {
+            return null;
+        }
+
         if (typeRaw instanceof Enum<?> enumValue) {
-            return enumValue.name();
+            return enumValue.name().trim().toUpperCase(Locale.ROOT);
         }
-        return typeRaw.toString();
+
+        String value = typeRaw.toString().trim();
+        return value.isEmpty() ? null : value.toUpperCase(Locale.ROOT);
     }
 
-    private boolean isValidDocument(String documentNumber, String documentType) {
+    private String normalizeValue(Object rawValue) {
+        if (rawValue == null) {
+            return null;
+        }
+
+        String value = rawValue.toString().trim();
+        return value.isEmpty() ? null : value;
+    }
+
+    private ValidationResult validateDocument(String documentNumber, String documentType) {
         return switch (documentType) {
-            case "CEDULA" -> documentNumber.matches("^[0-9]{6,10}$");
-            case "TARJETA_IDENTIDAD" -> documentNumber.matches("^[0-9]{10,11}$");
-            case "REGISTRO_NACIMIENTO" -> documentNumber.matches("^[0-9]{8,20}$");
-            case "PASAPORTE" -> documentNumber.matches("^[A-Za-z0-9]{6,9}$");
-            default -> true;
+            case "CEDULA" -> new ValidationResult(documentNumber.matches("^[0-9]{6,10}$"), documentField,
+                    "La cédula debe contener entre 6 y 10 dígitos numéricos");
+
+            case "TARJETA_IDENTIDAD" -> new ValidationResult(documentNumber.matches("^[0-9]{10}$"), documentField,
+                    "La tarjeta de identidad debe contener 10 dígitos numéricos");
+
+            case "REGISTRO_NACIMIENTO" -> new ValidationResult(documentNumber.matches("^[0-9]{8,20}$"), documentField,
+                    "El registro de nacimiento debe contener entre 8 y 20 dígitos numéricos");
+
+            case "PASAPORTE" -> new ValidationResult(documentNumber.matches("^[A-Za-z0-9]{6,9}$"), documentField,
+                    "El pasaporte debe contener entre 6 y 9 caracteres alfanuméricos");
+
+            default -> new ValidationResult(false, typeField, UNKNOWN_TYPE_MESSAGE + ": " + documentType);
         };
+    }
+
+    private boolean addViolation(ConstraintValidatorContext context, String field, String message) {
+        context.disableDefaultConstraintViolation();
+        context.buildConstraintViolationWithTemplate(message)
+                .addPropertyNode(field)
+                .addConstraintViolation();
+        return false;
     }
 }

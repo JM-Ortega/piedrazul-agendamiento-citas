@@ -29,7 +29,6 @@ public class NotificationVerificationCodeSender implements VerificationCodeSende
 
         RecipientSnapshot recipient = new RecipientSnapshot(
                 subjectId,
-                RecipientType.PATIENT,
                 displayName,
                 phone,
                 email,

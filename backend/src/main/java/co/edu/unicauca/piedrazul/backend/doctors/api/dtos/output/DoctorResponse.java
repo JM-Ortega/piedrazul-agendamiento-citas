@@ -5,29 +5,29 @@ import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 
 import java.time.LocalDate;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 // Lo pidio Mar
 public record DoctorResponse(
-        String specialty,
+        List<String> specialty,
         UUID id,
         String name,
         LocalDate laborEnd,
+        LocalDate laborStart,
         List<Integer> workdays
 ) {
     // Un método estático para convertir la entidad en DTO fácilmente
-    public static DoctorResponse fromEntity(Doctor doctor) {
+    public static DoctorResponse fromEntity(Doctor doctor, String name) {
         return new DoctorResponse(
-                doctor.getSpecialty().toString(),
-                doctor.getIdDoctor(),
-                doctor.getFirstName() + " " + doctor.getLastName(),
+                doctor.getSpecialties().stream()
+                        .map(s -> s.getCode().name())
+                        .toList(),
+                doctor.getPersonId(),
+                name,
+                doctor.getLaborStart(),
                 doctor.getLaborEnd(),
                 Optional.ofNullable(doctor.getSchedules())
-                        .orElse(List.of())
+                        .orElse(new HashSet<>())
                         .stream()
                         .map(Schedule::getWorkday)
                         .filter(Objects::nonNull)

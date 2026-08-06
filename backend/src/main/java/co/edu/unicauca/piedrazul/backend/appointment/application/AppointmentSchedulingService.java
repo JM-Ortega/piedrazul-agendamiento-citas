@@ -4,16 +4,15 @@ import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.Pati
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.ResolvedPatient;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientAlreadyScheduledInSpecialtyException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientScheduleTimeConflictException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentScheduledEvent;
-import co.edu.unicauca.piedrazul.backend.appointment.exception.FirstAppointmentMustBeGeneralMedicineException;
-import co.edu.unicauca.piedrazul.backend.shared.events.AppointmentCreatedEvent;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
+import co.edu.unicauca.piedrazul.backend.shared.events.audit.AppointmentCreatedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,10 +45,10 @@ public class AppointmentSchedulingService {
     public void scheduleManual(
             PatientSchedulingContext patientContext,
             UUID idDoctor,
-            Specialty specialty,
+            SpecialtyCode specialty,
             LocalDate date,
             AppointmentTime startTime,
-            String performedBy,
+            UUID performedBy,
             PatientResolutionStrategy patientResolutionStrategy) {
         schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, true);
     }
@@ -58,10 +57,10 @@ public class AppointmentSchedulingService {
     public void scheduleAutonomous(
             PatientSchedulingContext patientContext,
             UUID idDoctor,
-            Specialty specialty,
+            SpecialtyCode specialty,
             LocalDate date,
             AppointmentTime startTime,
-            String performedBy,
+            UUID performedBy,
             PatientResolutionStrategy patientResolutionStrategy) {
         schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, false);
     }
@@ -69,10 +68,10 @@ public class AppointmentSchedulingService {
     private Appointment schedule(
             PatientSchedulingContext patientContext,
             UUID idDoctor,
-            Specialty specialty,
+            SpecialtyCode specialty,
             LocalDate date,
             AppointmentTime startTime,
-            String performedBy,
+            UUID performedBy,
             PatientResolutionStrategy patientResolutionStrategy,
             boolean manualFlow) {
 
@@ -95,10 +94,7 @@ public class AppointmentSchedulingService {
         AppointmentSchedulingRequest request =
                 new AppointmentSchedulingRequest(
                         idDoctor,
-                        doctorName,
                         resolvedPatient.idPatient(),
-                        patientName,
-                        patientInfo,
                         specialty,
                         date,
                         startTime
@@ -118,7 +114,7 @@ public class AppointmentSchedulingService {
 
         Appointment saved = appointmentRepository.save(appointment);
 
-        eventPublisher.publishEvent(new AppointmentCreatedEvent(saved.getIdAppointment().toString(), performedBy));
+        eventPublisher.publishEvent(new AppointmentCreatedEvent(saved.getIdAppointment(), performedBy));
 
         eventPublisher.publishEvent(
                 new AppointmentScheduledEvent(
@@ -142,16 +138,16 @@ public class AppointmentSchedulingService {
         return patientInfo.getFirstName() + " " + patientInfo.getLastName();
     }
 
-    private void validateNewPatientFirstAppointmentSpecialty(UUID idPatient, Specialty specialty) {
+    private void validateNewPatientFirstAppointmentSpecialty(UUID idPatient, SpecialtyCode specialty) {
         boolean isNewPatient = isNewPatientUseCase.isNewPatient(idPatient);
-        if (isNewPatient && specialty != Specialty.MEDICINA_GENERAL) {
+        if (isNewPatient && specialty != SpecialtyCode.MEDICINA_GENERAL) {
             throw new FirstAppointmentMustBeGeneralMedicineException(
-                    "La primera cita de un paciente nuevo debe ser con MEDICINA_GENERAL"
+                    "La primera cita de un paciente nuevo debe ser con MEDICINA GENERAL"
             );
         }
     }
 
-    private void validateUniqueScheduledAppointmentBySpecialty(UUID idPatient, Specialty specialty) {
+    private void validateUniqueScheduledAppointmentBySpecialty(UUID idPatient, SpecialtyCode specialty) {
         boolean hasScheduledInSameSpecialty = appointmentRepository.findByPatientId(idPatient)
                 .stream()
                 .anyMatch(appointment -> appointment.getSpecialty() == specialty

@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.user.config;
 
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
@@ -38,16 +39,25 @@ public class IdentityDataInitializer {
         require(admin.getUsername(), "IDENTITY_SEED_ADMIN_USERNAME");
         require(admin.getFirstName(), "IDENTITY_SEED_ADMIN_FIRST_NAME");
         require(admin.getLastName(), "IDENTITY_SEED_ADMIN_LAST_NAME");
+        require(admin.getPhone(), "IDENTITY_SEED_ADMIN_PHONE");
         require(admin.getPassword(), "IDENTITY_SEED_ADMIN_PASSWORD");
+
+        if (admin.getIdentificationType() == null) {
+            throw new IllegalStateException(
+                    "Missing required identity seed property: IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE"
+            );
+        }
 
         createIfNotExists(
                 userProvisioningApi,
                 new CreateSystemUserPayload(
                         new CreateSystemUserRequest(
                                 admin.getUsername(),
+                                admin.getIdentificationType(),
                                 admin.getFirstName(),
                                 admin.getLastName(),
                                 admin.getEmail(),
+                                admin.getPhone(),
                                 admin.getPassword()
                         ),
                         null,
@@ -61,9 +71,9 @@ public class IdentityDataInitializer {
         String demoPassword = "Scheduler123!";
 
         List<DemoScheduler> schedulers = List.of(
-                new DemoScheduler("9000001", "Laura", "Pérez", "laura.scheduler@piedrazul.local"),
-                new DemoScheduler("9000002", "Carlos", "Rodríguez", "carlos.scheduler@piedrazul.local"),
-                new DemoScheduler("9000003", "Valeria", "Torres", "valeria.scheduler@piedrazul.local")
+                new DemoScheduler("9000001", "Laura", "Pérez", "laura.scheduler@piedrazul.local", "3001112233"),
+                new DemoScheduler("9000002", "Carlos", "Rodríguez", "carlos.scheduler@piedrazul.local", "3001112244"),
+                new DemoScheduler("9000003", "Valeria", "Torres", "valeria.scheduler@piedrazul.local", "3001112255")
         );
 
         schedulers.forEach(scheduler ->
@@ -72,9 +82,11 @@ public class IdentityDataInitializer {
                         new CreateSystemUserPayload(
                                 new CreateSystemUserRequest(
                                         scheduler.username(),
+                                        IdentificationType.CEDULA,
                                         scheduler.firstName(),
                                         scheduler.lastName(),
                                         scheduler.email(),
+                                        scheduler.phone(),
                                         demoPassword
                                 ),
                                 null,
@@ -110,7 +122,8 @@ public class IdentityDataInitializer {
             String username,
             String firstName,
             String lastName,
-            String email
+            String email,
+            String phone
     ) {
     }
 }

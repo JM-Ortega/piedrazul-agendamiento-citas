@@ -4,9 +4,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.application.*;
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.AutonomousPatientResolutionStrategy;
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.ManualPatientResolutionStrategy;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.BusySlotService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
@@ -14,7 +12,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.Appo
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.application.ListMyAppointmentsUseCaseImpl;
-import co.edu.unicauca.piedrazul.backend.patients.PatientLookupApi;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.CancelAppointmentUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.application.CancelAppointmentUseCaseImpl;
 import org.springframework.context.ApplicationEventPublisher;
@@ -49,6 +46,7 @@ public class AppointmentConfig {
     public AppointmentService appointmentService(BusySlotService busySlotService) {
         return new AppointmentService(busySlotService);
     }
+
 
     @Bean
     public AppointmentSchedulingService appointmentSchedulingService(
@@ -123,14 +121,16 @@ public class AppointmentConfig {
     @Bean
     public IsNewPatientUseCase isNewPatientUseCase(
             AppointmentRepository appointmentRepository,
-            PatientLookupApi patientLookupApi) {
-        return new IsNewPatientUseCaseImpl(appointmentRepository, patientLookupApi);
+            PatientConsultPort patientConsultPort) {
+        return new IsNewPatientUseCaseImpl(appointmentRepository, patientConsultPort);
     }
 
     @Bean
     public UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase(
-            AppointmentRepository appointmentRepository) {
-        return new UpdateAppointmentStatusUseCaseImpl(appointmentRepository);
+            AppointmentRepository appointmentRepository,
+            DoctorConfigConsultPort doctorConfigConsultPort,
+            ClinicalHistoryPort clinicalHistoryPort) {
+        return new UpdateAppointmentStatusUseCaseImpl(appointmentRepository, doctorConfigConsultPort, clinicalHistoryPort);
     }
 
     @Bean

@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.user.application;
 
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserAccountProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
@@ -9,6 +9,7 @@ import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -43,13 +44,26 @@ public class KeycloakUserProvisioningService implements UserAccountProvisioningA
                 });
     }
 
+    public Optional<UserSummary> findUserByUsername(String username) {
+        return keycloakClient.findUserByUsername(username).map(this::toUserSummary);
+    }
+
+    public void deleteUser(UUID userId) {
+        keycloakClient.deleteUser(userId);
+    }
+
+    public void revokeRole(UUID userId, Role role) {
+        keycloakClient.revokeRoleIfPresent(userId, role);
+    }
+
     private UserSummary toUserSummary(UserRepresentation user) {
         return new UserSummary(
                 UUID.fromString(user.getId()),
                 user.getUsername(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getEmail()
+                user.getEmail(),
+                user.getRealmRoles()
         );
     }
 }

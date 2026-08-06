@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.user.application;
 
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
 import co.edu.unicauca.piedrazul.backend.user.exception.DoctorRoleRequiredException;
@@ -34,8 +34,10 @@ class UserServiceTest {
 		UUID doctorId = UUID.fromString("11111111-1111-1111-1111-111111111111");
 		UUID schedulerId = UUID.fromString("22222222-2222-2222-2222-222222222222");
 
-		UserSummary doctor = new UserSummary(doctorId, "doctor01", "Ana", "Lopez", "ana@test.com");
-		UserSummary scheduler = new UserSummary(schedulerId, "scheduler01", "Luis", "Perez", "luis@test.com");
+		UserSummary doctor = new UserSummary(doctorId, "doctor01", "Ana", "Lopez",
+				"ana@test.com", List.of("DOCTOR"));
+		UserSummary scheduler = new UserSummary(schedulerId, "scheduler01", "Luis", "Perez",
+				"luis@test.com", List.of("SCHEDULER"));
 
 		when(keycloakUserService.findDoctors()).thenReturn(List.of(doctor, scheduler));
 		when(keycloakUserService.findSchedulers()).thenReturn(List.of(scheduler));
@@ -66,7 +68,8 @@ class UserServiceTest {
 	@Test
 	void giveDoctorScheduleRoleShouldDelegateWhenUserIsDoctor() {
 		UUID doctorId = UUID.fromString("33333333-3333-3333-3333-333333333333");
-		UserSummary doctor = new UserSummary(doctorId, "doctor02", "Maria", "Gomez", "maria@test.com");
+		UserSummary doctor = new UserSummary(doctorId, "doctor02", "Maria", "Gomez",
+				"maria@test.com", List.of("DOCTOR"));
 
 		when(keycloakUserService.findUserByUsername("doctor02")).thenReturn(Optional.of(doctor));
 		when(keycloakUserService.getUserRoles(doctorId)).thenReturn(List.of(Role.DOCTOR.name()));
@@ -79,7 +82,7 @@ class UserServiceTest {
 	@Test
 	void giveDoctorScheduleRoleShouldThrowWhenUserHasNoDoctorRole() {
 		UUID userId = UUID.fromString("44444444-4444-4444-4444-444444444444");
-		UserSummary user = new UserSummary(userId, "user01", "Pedro", "Ramirez", "pedro@test.com");
+		UserSummary user = new UserSummary(userId, "user01", "Pedro", "Ramirez", "pedro@test.com", List.of("PATIENT"));
 
 		when(keycloakUserService.findUserByUsername("user01")).thenReturn(Optional.of(user));
 		when(keycloakUserService.getUserRoles(userId)).thenReturn(List.of(Role.PATIENT.name()));
@@ -90,7 +93,8 @@ class UserServiceTest {
 	@Test
 	void revokeDoctorSchedulerRoleShouldDelegateWhenUserIsDoctor() {
 		UUID doctorId = UUID.fromString("55555555-5555-5555-5555-555555555555");
-		UserSummary doctor = new UserSummary(doctorId, "doctor03", "Sofia", "Torres", "sofia@test.com");
+		UserSummary doctor = new UserSummary(doctorId, "doctor03", "Sofia", "Torres",
+				"sofia@test.com", List.of("DOCTOR","SCHEDULER"));
 
 		when(keycloakUserService.findUserByUsername("doctor03")).thenReturn(Optional.of(doctor));
 		when(keycloakUserService.getUserRoles(doctorId)).thenReturn(List.of(Role.DOCTOR.name(), Role.SCHEDULER.name()));

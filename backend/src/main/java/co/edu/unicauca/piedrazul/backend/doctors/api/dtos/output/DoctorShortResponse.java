@@ -7,14 +7,16 @@ import java.util.*;
 public record DoctorShortResponse(
         UUID id,
         String name,
-        String specialty
+        List<String> specialties
 ) {
     // Un método estático para convertir la entidad en DTO fácilmente
-    public static DoctorShortResponse fromEntity(Doctor doctor) {
+    public static DoctorShortResponse fromEntity(Doctor doctor, String name) {
         return new DoctorShortResponse(
-                doctor.getIdDoctor(),
-                doctor.getFirstName() + " " + doctor.getLastName(),
-                doctor.getSpecialty().toString()
+                doctor.getPersonId(),
+                name,
+                doctor.getSpecialties().stream()
+                        .map(s -> s.getCode().name())
+                        .toList()
         );
     }
 }

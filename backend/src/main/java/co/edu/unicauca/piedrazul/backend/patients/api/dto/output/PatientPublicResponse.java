@@ -1,9 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.patients.api.dto.output;
 
-import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 
 public record PatientPublicResponse(
-        String documentType,
+        String identificationType,
         String maskedDocument,
         String firstName,
         String lastName,
@@ -13,14 +13,14 @@ public record PatientPublicResponse(
 ) {
 
     // Caso: existe paciente en dominio
-    public static PatientPublicResponse from(Patient patient, boolean hasSystemUser) {
+    public static PatientPublicResponse from(PersonSummary person, boolean hasSystemUser) {
         return new PatientPublicResponse(
-                patient.getDocumentType().toString(),
-                maskDocument(patient.getDocumentNumber()),
-                patient.getFirstName(),
-                patient.getLastName(),
+                person.identificationType().toString(),
+                maskDocument(person.identification()),
+                person.firstName(),
+                person.lastName(),
                 true,
-                patient.hasUserAccount(),
+                person.userId() != null,
                 hasSystemUser
         );
     }

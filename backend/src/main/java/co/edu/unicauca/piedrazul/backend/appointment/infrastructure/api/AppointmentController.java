@@ -3,6 +3,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api;
 import co.edu.unicauca.piedrazul.backend.appointment.application.AppointmentSchedulingService;
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.AutonomousPatientResolutionStrategy;
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.ManualPatientResolutionStrategy;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
@@ -83,10 +84,11 @@ public class AppointmentController {
     public ResponseEntity<List<AppointmentResponse>> list(
             @RequestParam(required = false) UUID idDoctor,
             @RequestParam(required = false) UUID idPatient,
-            @RequestParam(required = false) LocalDate date) {
+            @RequestParam(required = false) LocalDate date,
+            @RequestParam(required = false)AppointmentState state) {
 
         // Mapper para pasar de Domain a DTO
-        return ResponseEntity.ok(listAppointmentsUseCase.listBy(idDoctor, idPatient, date).stream().map(citaDtoMapper::toResponse).toList());
+        return ResponseEntity.ok(listAppointmentsUseCase.listBy(idDoctor, idPatient, date, state).stream().map(citaDtoMapper::toResponse).toList());
     }
 
     @GetMapping("/me")
@@ -119,7 +121,7 @@ public class AppointmentController {
             @AuthenticationPrincipal Jwt jwt) {
 
         request.validate();
-        String performedBy = resolvePerformedBy(jwt);
+        UUID performedBy = resolvePerformedBy(jwt);
 
         switch (request.getSchedulingOrigin()) {
             case MANUAL -> appointmentSchedulingService.scheduleManual(
@@ -166,8 +168,9 @@ public class AppointmentController {
     // Actualizar el estado de una cita a atendida
     @PutMapping("/{appointmentId}/mark-as-attended")
     @PreAuthorize("hasRole('DOCTOR')")
-    public ResponseEntity<Void> markAppointmentAsAttended(@PathVariable UUID appointmentId) {
-        updateAppointmentStatusUseCase.markAsAttended(appointmentId);
+    public ResponseEntity<Void> markAppointmentAsAttended(@PathVariable UUID appointmentId
+        , @RequestParam(required = false) String clinicalHistoryDescription) {
+        updateAppointmentStatusUseCase.markAsAttended(appointmentId, clinicalHistoryDescription);
         return ResponseEntity.ok().build();
     }
 
@@ -187,12 +190,7 @@ public class AppointmentController {
         return ResponseEntity.noContent().build(); // 204
     }
 
-    private String resolvePerformedBy(Jwt jwt) {
-        String preferredUsername = jwt.getClaimAsString("preferred_username");
-        if (preferredUsername != null && !preferredUsername.isBlank()) {
-            return preferredUsername;
-        }
-
-        return jwt.getSubject();
+    private UUID resolvePerformedBy(Jwt jwt) {
+        return UUID.fromString(jwt.getSubject());
     }
 }

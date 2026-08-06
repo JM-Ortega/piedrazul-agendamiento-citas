@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.user.infrastructure;
 
 import co.edu.unicauca.piedrazul.backend.config.security.KeycloakProperties;
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -263,6 +263,9 @@ class KeycloakUserClientTest {
         verify(userResource).toRepresentation();
     }
 
+    /*
+    Metodos proximos a eliminar
+
     @Test
     void activateUserShouldUpdateUserAsEnabled() {
         UUID userId = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
@@ -290,6 +293,7 @@ class KeycloakUserClientTest {
         verify(userResource).update(captor.capture());
         assertFalse(captor.getValue().isEnabled());
     }
+     */
 
     @Test
     void deleteUserShouldDelegateToKeycloak() {

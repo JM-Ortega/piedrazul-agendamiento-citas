@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.user.application;
 
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.KeycloakUserClient;
@@ -38,6 +38,11 @@ public class KeycloakUserService implements UserModuleApi {
     }
 
     @Override
+    public Map<UUID, List<String>> getUserRolesByIds(Collection<UUID> userIds) {
+        return keycloakClient.getUserRolesByIds(userIds);
+    }
+
+    @Override
     public void ensureSchedulerRole(UUID userId) {
         keycloakClient.assignRoleIfMissing(userId, Role.SCHEDULER);
     }
@@ -53,13 +58,13 @@ public class KeycloakUserService implements UserModuleApi {
     }
 
     @Override
-    public void activateUser(UUID id) {
-        keycloakClient.activateUser(id);
+    public void ensureDoctorRole(UUID userId) {
+        keycloakClient.assignRoleIfMissing(userId, Role.DOCTOR);
     }
 
     @Override
-    public void deactivateUser(UUID id) {
-        keycloakClient.deactivateUser(id);
+    public void revokeDoctorRole(UUID userId) {
+        keycloakClient.revokeRoleIfPresent(userId, Role.DOCTOR);
     }
 
     @Override
@@ -85,7 +90,8 @@ public class KeycloakUserService implements UserModuleApi {
                 user.getUsername(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getEmail()
+                user.getEmail(),
+                user.getRealmRoles()
         );
     }
 }
