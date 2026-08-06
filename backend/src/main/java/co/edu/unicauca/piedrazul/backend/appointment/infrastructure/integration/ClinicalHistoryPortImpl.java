@@ -3,10 +3,12 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.ClinicalHistoryPort;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.ClinicalHistoryExternalService;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.internal.ClinicalHistoryRequest;
+import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.UUID;
 
+@Component
 public class ClinicalHistoryPortImpl implements ClinicalHistoryPort {
     private final ClinicalHistoryExternalService externalService;
 
