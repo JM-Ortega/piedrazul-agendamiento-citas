@@ -46,7 +46,7 @@ export class DoctorService {
     }
 
     return this.http
-      .get<DoctorMeResponse>(`${this.apiUrl}/doctor/doctors/me`)
+      .get<DoctorMeResponse>(`${this.apiUrl}/doctor/me`)
       .pipe(
         map(
           (res) =>
