@@ -1,7 +1,5 @@
 import { Routes } from '@angular/router';
 import { AuthGuard } from './core/guards/auth.guard';
-
-import { AccesoComponent } from './design-system/pages/acceso/acceso.component';
 import { HomeComponent } from './design-system/pages/home/home.component';
 import { AdminCreateUserComponent } from './features/admin/pages/admin-create-user/admin-create-user.component';
 import { AdminDoctorsComponent } from './features/admin/pages/admin-doctors/admin-doctors.component';
@@ -16,15 +14,21 @@ import { DoctorMedicalHistoryComponent } from './features/doctor/doctor-medical-
 import { PatientAppointmentHistoryComponent } from './features/patient/patient-appointment-history/patient-appointment-history.component';
 import { PatientDashboardComponent } from './features/patient/patient-dashboard/patient-dashboard.component';
 import { RegistroComponent } from './features/registro/registro.component';
-import { SchedulerDashboardComponent } from './features/scheduler-dashboard/scheduler-dashboard.component';
+import { SchedulerDashboardComponent } from './features/scheduler/pages/scheduler-dashboard/scheduler-dashboard.component';
+import { SchedulerHistoryComponent } from './features/scheduler/pages/scheduler-history/scheduler-history.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
-  { path: 'acceso', component: AccesoComponent },
 
   {
     path: 'agendador',
     component: SchedulerDashboardComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'SCHEDULER' },
+  },
+  {
+    path: 'agendador/historial-citas',
+    component: SchedulerHistoryComponent,
     canActivate: [AuthGuard],
     data: { role: 'SCHEDULER' },
   },

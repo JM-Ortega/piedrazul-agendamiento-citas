@@ -1,0 +1,92 @@
+<div class="bg-white">
+  <h2 class="text-[#163c63] text-2xl mb-2 flex items-center gap-2">
+    <svg lucideSearch [size]="24"></svg>
+    {{ title() }}
+  </h2>
+  @if (description()) {
+    <p class="text-gray-600 mb-5 text-base">{{ description() }}</p>
+  }
+
+  <div [class]="'grid grid-cols-1 gap-5 ' + gridColsClass">
+    @if (hasField('doctor')) {
+      <div>
+        <label for="filterDoctor" class="block text-gray-700 mb-2 text-lg"
+          >Médico / Terapista</label
+        >
+        <app-select
+          [id]="'filterDoctor'"
+          [options]="doctorOptions()"
+          placeholder="Todos los médicos"
+          [ngModel]="filterDoctor()"
+          (valueChange)="filterDoctor.set($event)"
+        ></app-select>
+      </div>
+    }
+
+    @if (hasField('date')) {
+      <div>
+        <label for="filterDate" class="block text-gray-700 mb-2 text-lg"
+          >Fecha Específica</label
+        >
+        <app-datepicker
+          [id]="'filterDate'"
+          [ngModel]="filterDateValue()"
+          (valueChange)="onDateChange($event)"
+        ></app-datepicker>
+      </div>
+    }
+
+    @if (hasField('status')) {
+      <div>
+        <label for="filterStatus" class="block text-gray-700 mb-2 text-lg"
+          >Estado de la Cita</label
+        >
+        <app-select
+          [id]="'filterStatus'"
+          [options]="statusOptions"
+          placeholder="Todos los estados"
+          [ngModel]="filterStatus()"
+          (valueChange)="filterStatus.set($event)"
+        ></app-select>
+      </div>
+    }
+  </div>
+
+  @if (
+    (hasField('doctor') && filterDoctor()) ||
+    (hasField('date') && filterDate()) ||
+    (hasField('status') && filterStatus())
+  ) {
+    <div class="mt-4 flex flex-wrap gap-2 items-center">
+      <span class="text-md text-gray-600">Filtros activos:</span>
+      @if (hasField('doctor') && filterDoctor()) {
+        <span
+          class="inline-flex items-center gap-1 bg-[#d9e9f8] text-[#215c98] px-3 py-1 rounded-lg text-sm"
+        >
+          {{ selectedDoctor?.name }}
+          <app-button variant="icon" (buttonClick)="clearDoctor()"
+            >×</app-button
+          >
+        </span>
+      }
+      @if (hasField('date') && filterDate()) {
+        <span
+          class="inline-flex items-center gap-1 bg-[#d9e9f8] text-[#215c98] px-3 py-1 rounded-lg text-sm"
+        >
+          {{ formatDate(filterDate()) }}
+          <app-button variant="icon" (buttonClick)="clearDate()">×</app-button>
+        </span>
+      }
+      @if (hasField('status') && filterStatus()) {
+        <span
+          class="inline-flex items-center gap-1 bg-[#d9e9f8] text-[#215c98] px-3 py-1 rounded-lg text-sm"
+        >
+          {{ statusLabel(filterStatus()) }}
+          <app-button variant="icon" (buttonClick)="clearStatus()"
+            >×</app-button
+          >
+        </span>
+      }
+    </div>
+  }
+</div>

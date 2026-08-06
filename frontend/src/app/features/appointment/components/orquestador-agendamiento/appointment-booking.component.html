@@ -87,12 +87,13 @@
         {{ state.successMessage() }}<br />
         Será redirigido en unos segundos...
       </p>
-      <button
-        (click)="onSuccessGoBack()"
-        class="w-full py-3 px-6 rounded-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 shadow-lg hover:shadow-xl hover:scale-[1.03] active:scale-[0.98] transition-all duration-200"
+      <app-button
+        variant="success"
+        [fullWidth]="true"
+        (buttonClick)="onSuccessGoBack()"
       >
         Volver al Inicio
-      </button>
+      </app-button>
     </div>
   </div>
 }

@@ -1,6 +1,10 @@
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  OnInit,
+} from '@angular/core';
 import { Router } from '@angular/router';
-
 import {
   LucideCalendar,
   LucideClock,
@@ -8,6 +12,8 @@ import {
   LucideShield,
 } from '@lucide/angular';
 import Keycloak from 'keycloak-js';
+import { ButtonComponent } from '../../atoms/button/button.component';
+
 import { AppointmentModalComponent } from '../../organisms/appointment-modal/appointment-modal.component';
 
 @Component({
@@ -19,15 +25,22 @@ import { AppointmentModalComponent } from '../../organisms/appointment-modal/app
     LucidePhone,
     LucideShield,
     AppointmentModalComponent,
+    ButtonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './home.component.html',
 })
-export class HomeComponent {
+export class HomeComponent implements OnInit {
   private keycloak = inject(Keycloak);
   private router = inject(Router);
 
   showModal = false;
+
+  ngOnInit(): void {
+    if (this.keycloak.authenticated) {
+      this.redirectByUserRole();
+    }
+  }
 
   agendarCita(): void {
     if (this.keycloak.authenticated) {
@@ -39,11 +52,36 @@ export class HomeComponent {
 
   goAcceso(): void {
     if (this.keycloak.authenticated) {
-      this.router.navigate(['/acceso']);
+      this.redirectByUserRole();
     } else {
       this.keycloak.login({
-        redirectUri: window.location.origin + '/acceso',
+        redirectUri: window.location.origin + '/',
       });
+    }
+  }
+
+  private redirectByUserRole(): void {
+    const realmRoles = this.keycloak.realmAccess?.roles || [];
+
+    switch (true) {
+      case realmRoles.includes('DOCTOR'):
+        this.router.navigate(['/medico'], { replaceUrl: true });
+        break;
+
+      case realmRoles.includes('SCHEDULER'):
+        this.router.navigate(['/agendador'], { replaceUrl: true });
+        break;
+
+      case realmRoles.includes('ADMIN'):
+        this.router.navigate(['/admin'], { replaceUrl: true });
+        break;
+
+      case realmRoles.includes('PATIENT'):
+        this.router.navigate(['/paciente'], { replaceUrl: true });
+        break;
+
+      default:
+        break;
     }
   }
 }

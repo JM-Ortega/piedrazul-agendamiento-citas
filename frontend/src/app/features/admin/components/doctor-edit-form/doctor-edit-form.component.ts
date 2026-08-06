@@ -8,6 +8,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import {
   LucideCalendar,
   LucideChevronDown,
@@ -15,12 +16,18 @@ import {
   LucideClock,
   LucideSave,
 } from '@lucide/angular';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { InputComponent } from '../../../../design-system/atoms/input/input.component';
+import { SelectComponent } from '../../../../design-system/atoms/select/select.component';
+import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
+import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 import {
   DoctorFormValidationService,
   FormErrors,
 } from '../../service/doctor-form-validation.service';
+
 export interface DoctorSaveEvent {
   form: Doctor;
   originalDoctor: Doctor;
@@ -34,11 +41,17 @@ export interface DoctorSaveEvent {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FormsModule,
     LucideCalendar,
     LucideChevronDown,
     LucideChevronUp,
     LucideClock,
     LucideSave,
+    ButtonComponent,
+    DatepickerComponent,
+    ToSelectOptionsPipe,
+    SelectComponent,
+    InputComponent,
   ],
 })
 export class DoctorEditFormComponent implements OnInit {
@@ -89,7 +102,14 @@ export class DoctorEditFormComponent implements OnInit {
 
   private originalDoctor = signal<Doctor | null>(null);
   private originalWorkdays = signal<number[]>([]);
-
+  // ── Helpers ────────────────────────────────────────────────────────
+  toDateString(date: Date | null): string {
+    if (!date) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
   // ── Computed ──────────────────────────────────────────────────────────────
   hasChanges = computed(() => {
     const form = this.editForm();

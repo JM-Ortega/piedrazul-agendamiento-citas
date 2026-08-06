@@ -29,7 +29,9 @@ import {
   LucideX,
   type LucideIcon,
 } from '@lucide/angular';
-import { AppService } from '../../core/services/app.service';
+import Keycloak from 'keycloak-js';
+import { AppService } from '../../../core/services/app.service';
+import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
 
 @Component({
   selector: 'app-navbar',
@@ -54,9 +56,11 @@ import { AppService } from '../../core/services/app.service';
     LucideDynamicIcon,
     RouterLink,
     RouterLinkActive,
+    ButtonComponent,
   ],
 })
 export class NavbarComponent implements OnInit {
+  private keycloak = inject(Keycloak);
   appService = inject(AppService);
   private router = inject(Router);
   readonly exactMatch = { exact: true };
@@ -100,6 +104,12 @@ export class NavbarComponent implements OnInit {
         history.pushState(null, '', location.href);
         this.showLogoutModal.set(true);
       }
+    });
+  }
+
+  goToLogin(): void {
+    this.keycloak.login({
+      redirectUri: window.location.origin + '/',
     });
   }
 

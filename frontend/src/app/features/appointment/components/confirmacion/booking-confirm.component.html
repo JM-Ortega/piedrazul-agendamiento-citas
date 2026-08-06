@@ -53,19 +53,17 @@
   }
 
   <div class="flex gap-4 mt-8">
-    <button
-      (click)="goBack()"
-      class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
-    >
+    <app-button variant="secondary" (buttonClick)="goBack()">
       ← Atrás
-    </button>
-    <button
+    </app-button>
+    <app-button
+      variant="success"
       (click)="confirm()"
       [disabled]="state.isLoading()"
-      class="flex-1 bg-green-600 text-white py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-green-700 transition-colors disabled:opacity-50 cursor-pointer"
+      [fullWidth]="true"
+      class="flex-1"
     >
-      <svg lucideCheckCircle [size]="22"></svg>
-      Confirmar y Registrar
-    </button>
+      <svg lucideCheckCircle [size]="22"></svg> Confirmar y Registrar
+    </app-button>
   </div>
 </div>

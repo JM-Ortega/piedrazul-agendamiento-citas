@@ -1,23 +1,24 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   computed,
   inject,
   OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { Router } from '@angular/router';
+import { LucideArrowLeft } from '@lucide/angular';
 import { AppService } from '../../../../core/services/app.service';
 import { PatientService } from '../../../../core/services/patient.service';
+import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
-import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
-import { LucideArrowLeft } from '@lucide/angular';
 
 @Component({
   selector: 'app-patient-new-appointment',
   standalone: true,
-  imports: [LucideArrowLeft, AppointmentBookingComponent],
+  imports: [LucideArrowLeft, AppointmentBookingComponent, ButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './patient-new-appointment.component.html',
 })

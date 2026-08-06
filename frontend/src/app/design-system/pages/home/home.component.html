@@ -29,22 +29,21 @@
       Sistema de Gestión de Citas Médicas
     </p>
 
-    <button
-      (click)="agendarCita()"
-      class="flex items-center gap-4 bg-white text-[#215c98] hover:bg-blue-50 font-bold px-12 py-7 rounded-2xl text-2xl md:text-3xl shadow-2xl transition-all hover:scale-105 active:scale-95 mt-4"
-    >
-      <svg lucideCalendar [size]="40"></svg>
-      Agendar mi Cita
-    </button>
+    <app-button (buttonClick)="agendarCita()" variant="card">
+      <p class="flex gap-4 font-bold text-3xl">
+        <svg lucideCalendar [size]="40"></svg> Agendar mi Cita
+      </p>
+    </app-button>
 
-    <p class="text-blue-200 text-lg">
+    <p class="flex items-center text-blue-200 text-lg">
       ¿Es usted personal del centro?
-      <button
-        (click)="goAcceso()"
-        class="underline text-white hover:text-blue-200 font-semibold transition-colors ml-1"
+      <app-button
+        (buttonClick)="goAcceso()"
+        variant="link"
+        extraClass="text-white"
       >
         Ingrese aquí
-      </button>
+      </app-button>
     </p>
 
     <div class="flex flex-wrap justify-center gap-4 text-blue-100 mt-2">
@@ -95,5 +94,5 @@
   </div>
 </section>
 @if (showModal) {
-  <app-appointment-modal (close)="showModal = false" />
+  <app-appointment-modal (finish)="showModal = false" />
 }

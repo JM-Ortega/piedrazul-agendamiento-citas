@@ -1,0 +1,98 @@
+<div class="min-h-screen bg-blue-50 py-4 px-4">
+  <div class="max-w-5xl mx-auto space-y-6">
+    @if (errorMessage()) {
+      <div
+        class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"
+      >
+        ⚠️ {{ errorMessage() }}
+      </div>
+    }
+    <!-- ── Exportar ── -->
+    <div
+      class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200 mt-6"
+    >
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="bg-[#1f7a52] rounded-full p-3">
+            <svg lucideDownload [size]="28" class="text-white"></svg>
+          </div>
+          <div>
+            <h3 class="text-green-800 text-xl font-bold">Exportar Reporte</h3>
+            <p class="text-green-600 text-sm flex items-center gap-1 mt-0.5">
+              <svg lucideCalendar [size]="14"></svg>
+              Se exportarán las citas de la fecha seleccionada
+            </p>
+          </div>
+        </div>
+        <app-button variant="success" (buttonClick)="exportModal.open()">
+          <svg lucideDownload [size]="20" class="text-white"></svg> Exportar
+        </app-button>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-md p-7 mt-8">
+      <div class="pb-7">
+        <app-filter
+          [fields]="['doctor', 'date', 'status']"
+          [doctors]="doctors()"
+          title="Filtros Avanzados"
+          description="Los filtros se aplican automáticamente"
+          [(filterDoctor)]="filterDoctor"
+          [(filterDate)]="filterDate"
+          [(filterStatus)]="filterStatus"
+        ></app-filter>
+      </div>
+      <div
+        class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-3"
+      >
+        <div>
+          <h2 class="text-[#163c63] text-2xl font-semibold">
+            Historial de Citas
+          </h2>
+          <p class="text-gray-500 text-base mt-1">
+            @if (!filterDoctor() && !filterDate()) {
+              Mostrando todas las citas de todos los médicos
+            }
+            @if (filterDoctor() && !filterDate()) {
+              Mostrando todas las citas de {{ selectedDoctor()?.name }}
+            }
+            @if (!filterDoctor() && filterDate()) {
+              Mostrando citas del {{ formatDate(filterDate()) }}
+            }
+            @if (filterDoctor() && filterDate()) {
+              {{ selectedDoctor()?.name }} — {{ formatDate(filterDate()) }}
+            }
+          </p>
+        </div>
+        <div class="flex gap-4">
+          <div class="text-center bg-[#d9e9f8]/40 rounded-xl px-5 py-3">
+            <p class="text-2xl font-bold text-[#215c98]">
+              {{ activeResults().length }}
+            </p>
+            <p class="text-sm text-gray-500">Citas activas</p>
+          </div>
+        </div>
+      </div>
+      <app-appointment-table
+        view="all"
+        [results]="results()"
+        (cancelRequested)="requestCancelAppointment($event)"
+      ></app-appointment-table>
+    </div>
+  </div>
+</div>
+
+<app-confirm-modal
+  [visible]="showCancelModal()"
+  title="¿Cancelar cita médica?"
+  message="Esta acción no se puede deshacer. ¿Está seguro de que desea cancelar esta cita?"
+  confirmLabel="Sí, cancelar"
+  cancelLabel="Volver"
+  (dismissed)="dismissCancelModal()"
+  (confirmed)="confirmCancelAppointment()"
+>
+  <svg icon lucideX [size]="32" class="text-red-500"></svg>
+</app-confirm-modal>
+
+<app-toast [message]="toastMessage()" [type]="toastType()"></app-toast>
+
+<app-scheduler-export-modal #exportModal></app-scheduler-export-modal>

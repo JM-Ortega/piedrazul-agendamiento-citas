@@ -15,7 +15,7 @@ import {
   DoctorEditFormComponent,
   DoctorSaveEvent,
 } from '../../components/doctor-edit-form/doctor-edit-form.component';
-import { AdminModalsComponent } from '../../components/modals/modals-horarios/admin-modals.component';
+import { AdminModalsComponent } from '../../components/modals/modal-horarios/admin-modals.component';
 import { dtoSchedule } from '../../models/dtos/schedule.dto';
 import { AdminService } from '../../service/admin.service';
 
@@ -120,7 +120,7 @@ export class AdminConfigComponent implements OnInit {
   }
 
   onFormSaved(event: DoctorSaveEvent): void {
-    const { form, originalDoctor, originalWorkdays, removedWorkdays } = event; // ← añadir removedWorkdays
+    const { form, originalDoctor, originalWorkdays, removedWorkdays } = event;
     const calls: Observable<unknown>[] = [];
 
     if (originalDoctor.appointmentInterval !== form.appointmentInterval)
@@ -130,10 +130,19 @@ export class AdminConfigComponent implements OnInit {
           form.appointmentInterval
         )
       );
-    if (originalDoctor.laborStart !== form.laborStart)
-      calls.push(this.adminService.updateLaborStart(form.id, form.laborStart));
-    if (originalDoctor.laborEnd !== form.laborEnd)
-      calls.push(this.adminService.updateLaborEnd(form.id, form.laborEnd));
+
+    if (
+      originalDoctor.laborStart !== form.laborStart ||
+      originalDoctor.laborEnd !== form.laborEnd
+    ) {
+      calls.push(
+        this.adminService.updateLaborDate(
+          form.id,
+          form.laborStart,
+          form.laborEnd
+        )
+      );
+    }
 
     removedWorkdays.forEach((day) => {
       const workday = this.DAY_TO_WORKDAY[day];
@@ -152,7 +161,7 @@ export class AdminConfigComponent implements OnInit {
       );
       if (!originalWorkdays.includes(day))
         calls.push(
-          this.adminService.createSchedule(form.id, workday, startTime, endTime)
+          this.adminService.updateSchedule(form.id, workday, startTime, endTime)
         );
       else
         calls.push(
@@ -271,7 +280,7 @@ export class AdminConfigComponent implements OnInit {
 
   // ── Helpers de template ───────────────────────────────────────────────────
   containerClass(doctor: Doctor): string {
-    if (doctor.status === false) return 'border-gray-200 bg-gray-50 opacity-60';
+    if (doctor.status === false) return 'border-gray-200 bg-gray-50';
     if (this.editingId() === doctor.id) return 'border-blue-400 bg-blue-50';
     return 'border-gray-100 bg-white hover:shadow-lg transition-shadow';
   }

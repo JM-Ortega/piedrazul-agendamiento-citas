@@ -1,13 +1,14 @@
 <div class="min-h-screen bg-blue-50 py-8 px-4">
   <div class="max-w-2xl mx-auto">
     <div class="mb-6">
-      <button
-        (click)="goBack()"
-        class="flex items-center gap-2 text-[#215c98] text-lg hover:text-[#4e92d9] mb-4 transition-colors cursor-pointer"
+      <app-button
+        variant="link"
+        (buttonClick)="goBack()"
+        extraClass="!px-0 !py-1"
       >
         <svg lucideArrowLeft [size]="18"></svg>
         <span class="text-sm font-medium">Volver</span>
-      </button>
+      </app-button>
       <h1 class="text-[#215c98] text-3xl font-bold">Crear cuenta</h1>
       <p class="text-gray-500 text-lg mt-1">
         Regístrate para agendar tus citas médicas
@@ -52,33 +53,27 @@
               Número de documento
             </label>
             <div class="flex flex-col sm:flex-row gap-3">
-              <input
-                id="documentNumber"
+              <app-input
+                [id]="'documentNumber'"
                 type="text"
-                [ngModel]="documentNumber()"
-                (ngModelChange)="onDocumentChange($event)"
-                (input)="handleDocInput($event)"
-                (keyup.enter)="searchPatient()"
+                sanitize="alphanumeric"
+                [maxLength]="DOC_MAX"
                 placeholder="Ingresa tu número de documento"
-                class="flex-1 border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4e92d9] transition-colors"
-              />
-              <button
-                (click)="searchPatient()"
+                [fullWidth]="true"
+                [ngModel]="documentNumber()"
+                (valueChange)="onDocumentNumberChange($event)"
+                (enterPressed)="searchPatient()"
+                [errorMessage]="errors()['documentNumber']"
+              ></app-input>
+              <app-button
+                variant="primary"
+                (buttonClick)="searchPatient()"
                 [disabled]="isLoading()"
-                class="bg-[#215c98] hover:bg-[#163c63] text-white px-5 py-3 rounded-xl flex items-center gap-2 disabled:opacity-50 transition-colors cursor-pointer"
               >
                 <svg lucideSearch [size]="18"></svg>
                 Buscar
-              </button>
+              </app-button>
             </div>
-            @if (docInputWarning()) {
-              <p class="text-red-500 text-sm mt-1">{{ docInputWarning() }}</p>
-            }
-            @if (errors()['documentNumber']) {
-              <p class="text-red-500 text-sm mt-1">
-                {{ errors()['documentNumber'] }}
-              </p>
-            }
           </div>
 
           @if (patientStatus() === 'found' && foundPatient(); as p) {
@@ -126,264 +121,27 @@
                 una nueva contraseña.
               </p>
             </div>
+          }
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label
-                  for="eu-documentType"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Tipo de documento <span class="text-red-500">*</span>
-                </label>
-                <select
-                  id="eu-documentType"
-                  [ngModel]="getFormField('documentType')"
-                  (ngModelChange)="setFormField('documentType', $event)"
-                  class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4e92d9]"
-                >
-                  <option value="">Seleccione...</option>
-                  @for (type of patientService.documentTypes(); track type) {
-                    <option [value]="type">{{ type | formato }}</option>
-                  }
-                </select>
-                @if (errors()['documentType']) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()['documentType'] }}
-                  </p>
-                }
-              </div>
-
-              <div>
-                <label
-                  for="eu-firstName"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Nombres <span class="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="eu-firstName"
-                  [ngModel]="getFormField('firstName')"
-                  (ngModelChange)="setFormField('firstName', $event)"
-                  (input)="handleNameInput($event, 'firstName')"
-                  placeholder="Nombres del paciente"
-                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['firstName']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                />
-                @if (firstNameLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ firstNameLimitMsg() }}
-                  </p>
-                } @else if (errors()['firstName']) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()['firstName'] }}
-                  </p>
-                }
-              </div>
-
-              <div>
-                <label
-                  for="eu-lastName"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Apellidos <span class="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="eu-lastName"
-                  [ngModel]="getFormField('lastName')"
-                  (ngModelChange)="setFormField('lastName', $event)"
-                  (input)="handleNameInput($event, 'lastName')"
-                  placeholder="Apellidos del paciente"
-                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['lastName']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                />
-                @if (lastNameLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ lastNameLimitMsg() }}
-                  </p>
-                } @else if (errors()['lastName']) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()['lastName'] }}
-                  </p>
-                }
-              </div>
-
-              <div>
-                <label
-                  for="eu-phone"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Teléfono <span class="text-red-500">*</span>
-                </label>
-                <input
-                  id="eu-phone"
-                  type="tel"
-                  inputmode="numeric"
-                  pattern="[0-9]*"
-                  [ngModel]="getFormField('phone')"
-                  (ngModelChange)="setFormField('phone', $event)"
-                  (input)="handlePhoneInput($event)"
-                  placeholder="Ej: 3001234567"
-                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['phone']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                />
-                @if (phoneLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">{{ phoneLimitMsg() }}</p>
-                } @else if (errors()['phone']) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()['phone'] }}
-                  </p>
-                }
-              </div>
-
-              <div>
-                <label
-                  for="eu-gender"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Género <span class="text-red-500">*</span>
-                </label>
-                <select
-                  id="eu-gender"
-                  [ngModel]="getFormField('gender')"
-                  (ngModelChange)="setFormField('gender', $event)"
-                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['gender']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                >
-                  <option value="">Seleccione...</option>
-                  <option value="MASCULINO">Masculino</option>
-                  <option value="FEMENINO">Femenino</option>
-                  <option value="OTRO">Otro</option>
-                </select>
-                @if (errors()['gender']) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()['gender'] }}
-                  </p>
-                }
-              </div>
-
-              <div>
-                <label
-                  for="eu-birthDate"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Fecha de nacimiento <span class="text-red-500">*</span>
-                </label>
-                <div class="relative w-full">
-                  <input
-                    id="eu-birthDate"
-                    type="text"
-                    [matDatepicker]="birthPicker"
-                    [ngModel]="getFormField('birthDate')"
-                    (ngModelChange)="setFormField('birthDate', $event)"
-                    [max]="maxBirthDate"
-                    placeholder="mm/dd/aaaa"
-                    readonly
-                    class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 pr-12"
-                  />
-                  <button
-                    type="button"
-                    (click)="birthPicker.open()"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 p-2 rounded-lg hover:bg-blue-100 hover:shadow-md hover:text-blue-600 transition-all duration-200"
-                  >
-                    <svg lucideCalendar [size]="20"></svg>
-                  </button>
-                  <mat-datepicker
-                    #birthPicker
-                    startView="multi-year"
-                  ></mat-datepicker>
-                </div>
-              </div>
-
-              <div class="sm:col-span-2">
-                <label
-                  for="eu-email"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Correo electrónico
-                  <span class="text-gray-400 text-sm">(opcional)</span>
-                </label>
-                <input
-                  id="eu-email"
-                  type="email"
-                  [ngModel]="getFormField('email')"
-                  (ngModelChange)="setFormField('email', $event)"
-                  (input)="handleEmailInput($event)"
-                  placeholder="tucorreo@ejemplo.com"
-                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['email']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                />
-                @if (emailLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">{{ emailLimitMsg() }}</p>
-                } @else if (errors()['email']) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()['email'] }}
-                  </p>
-                }
-              </div>
-
-              <div class="sm:col-span-2">
-                <label
-                  for="eu-guardianPhone"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Teléfono de familiar
-                  @if (isMinorPatient()) {
-                    <span class="text-red-500">*</span>
-                  } @else {
-                    <span class="text-gray-400 text-sm">
-                      (requerido para menores de edad)
-                    </span>
-                  }
-                </label>
-                <input
-                  id="eu-guardianPhone"
-                  type="tel"
-                  inputmode="numeric"
-                  pattern="[0-9]*"
-                  [ngModel]="getFormField('guardianPhone')"
-                  (ngModelChange)="setFormField('guardianPhone', $event)"
-                  (input)="handleGuardianPhoneInput($event)"
-                  placeholder="Ej: 3009876543"
-                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['guardianPhone']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                />
-                @if (guardianPhoneLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ guardianPhoneLimitMsg() }}
-                  </p>
-                } @else if (errors()['guardianPhone']) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()['guardianPhone'] }}
-                  </p>
-                }
-              </div>
+          @if (patientStatus() === 'not-found') {
+            <div
+              class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-yellow-800 text-sm"
+            >
+              No encontramos tu documento en el sistema. Completa tus datos para
+              registrarte.
             </div>
+          }
+
+          @if (
+            patientStatus() === 'existing-user' ||
+            patientStatus() === 'not-found'
+          ) {
+            <app-patient-data-form
+              #patientForm
+              [maxBirthDate]="maxBirthDate"
+              [ngModel]="form()"
+              (valueChange)="form.set($event)"
+            ></app-patient-data-form>
           }
 
           @if (patientStatus() === 'already-linked' && foundPatient(); as p) {
@@ -414,283 +172,6 @@
             </div>
           }
 
-          @if (patientStatus() === 'not-found') {
-            <div
-              class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-yellow-800 text-sm"
-            >
-              No encontramos tu documento en el sistema. Completa tus datos para
-              registrarte.
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label
-                  for="nf-documentType"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Tipo de documento <span class="text-red-500">*</span>
-                </label>
-                <select
-                  id="nf-documentType"
-                  [ngModel]="getFormField('documentType')"
-                  (ngModelChange)="setFormField('documentType', $event)"
-                  class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4e92d9]"
-                >
-                  <option value="">Seleccione...</option>
-                  @for (type of patientService.documentTypes(); track type) {
-                    <option [value]="type">{{ type | formato }}</option>
-                  }
-                </select>
-                @if (errors()['documentType']) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()['documentType'] }}
-                  </p>
-                }
-              </div>
-
-              <div>
-                <label
-                  for="nf-firstName"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Nombres <span class="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="nf-firstName"
-                  [ngModel]="getFormField('firstName')"
-                  (ngModelChange)="setFormField('firstName', $event)"
-                  (input)="handleNameInput($event, 'firstName')"
-                  placeholder="Nombres del paciente"
-                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['firstName']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                />
-                @if (firstNameLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ firstNameLimitMsg() }}
-                  </p>
-                } @else if (errors()['firstName']) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()['firstName'] }}
-                  </p>
-                }
-              </div>
-
-              <div>
-                <label
-                  for="nf-lastName"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Apellidos <span class="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="nf-lastName"
-                  [ngModel]="getFormField('lastName')"
-                  (ngModelChange)="setFormField('lastName', $event)"
-                  (input)="handleNameInput($event, 'lastName')"
-                  placeholder="Apellidos del paciente"
-                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['lastName']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                />
-                @if (lastNameLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ lastNameLimitMsg() }}
-                  </p>
-                } @else if (errors()['lastName']) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()['lastName'] }}
-                  </p>
-                }
-              </div>
-
-              <div>
-                <label
-                  for="nf-phone"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Teléfono <span class="text-red-500">*</span>
-                </label>
-                <input
-                  id="nf-phone"
-                  type="tel"
-                  inputmode="numeric"
-                  pattern="[0-9]*"
-                  [ngModel]="getFormField('phone')"
-                  (ngModelChange)="setFormField('phone', $event)"
-                  (input)="handlePhoneInput($event)"
-                  placeholder="Ej: 3001234567"
-                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['phone']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                />
-                @if (phoneLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">{{ phoneLimitMsg() }}</p>
-                } @else if (errors()['phone']) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()['phone'] }}
-                  </p>
-                }
-              </div>
-
-              <div>
-                <label
-                  for="nf-gender"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Género <span class="text-red-500">*</span>
-                </label>
-                <select
-                  id="nf-gender"
-                  [ngModel]="getFormField('gender')"
-                  (ngModelChange)="setFormField('gender', $event)"
-                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['gender']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                >
-                  <option value="">Seleccione...</option>
-                  <option value="MASCULINO">Masculino</option>
-                  <option value="FEMENINO">Femenino</option>
-                  <option value="OTRO">Otro</option>
-                </select>
-                @if (errors()['gender']) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()['gender'] }}
-                  </p>
-                }
-              </div>
-
-              <div>
-                <label
-                  for="nf-birthDate"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Fecha de nacimiento <span class="text-red-500">*</span>
-                </label>
-                <div class="relative w-full">
-                  <input
-                    id="nf-birthDate"
-                    type="text"
-                    [matDatepicker]="birthPicker2"
-                    [ngModel]="getFormField('birthDate')"
-                    (ngModelChange)="setFormField('birthDate', $event)"
-                    [max]="maxBirthDate"
-                    placeholder="mm/dd/aaaa"
-                    readonly
-                    class="w-full border-2 rounded-xl px-4 py-3 pr-12 focus:outline-none transition-colors"
-                    [ngClass]="
-                      errors()['birthDate']
-                        ? 'border-red-400 bg-red-50'
-                        : 'border-blue-200 focus:border-blue-500'
-                    "
-                  />
-                  <button
-                    type="button"
-                    (click)="birthPicker2.open()"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 p-2 rounded-lg hover:bg-blue-100 hover:shadow-md hover:text-blue-600 transition-all duration-200"
-                  >
-                    <svg lucideCalendar [size]="20"></svg>
-                  </button>
-                  <mat-datepicker
-                    #birthPicker2
-                    startView="multi-year"
-                  ></mat-datepicker>
-                </div>
-                @if (errors()['birthDate']) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()['birthDate'] }}
-                  </p>
-                }
-              </div>
-
-              <div class="sm:col-span-2">
-                <label
-                  for="nf-email"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Correo electrónico
-                  <span class="text-gray-400 text-sm">(opcional)</span>
-                </label>
-                <input
-                  id="nf-email"
-                  type="email"
-                  [ngModel]="getFormField('email')"
-                  (ngModelChange)="setFormField('email', $event)"
-                  (input)="handleEmailInput($event)"
-                  placeholder="tucorreo@ejemplo.com"
-                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['email']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                />
-                @if (emailLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">{{ emailLimitMsg() }}</p>
-                } @else if (errors()['email']) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()['email'] }}
-                  </p>
-                }
-              </div>
-
-              <div class="sm:col-span-2">
-                <label
-                  for="nf-guardianPhone"
-                  class="block text-gray-700 mb-1 text-sm font-medium"
-                >
-                  Teléfono de familiar
-                  @if (isMinorPatient()) {
-                    <span class="text-red-500">*</span>
-                  } @else {
-                    <span class="text-gray-400 text-sm">
-                      (requerido para menores de edad)
-                    </span>
-                  }
-                </label>
-                <input
-                  id="nf-guardianPhone"
-                  type="tel"
-                  inputmode="numeric"
-                  pattern="[0-9]*"
-                  [ngModel]="getFormField('guardianPhone')"
-                  (ngModelChange)="setFormField('guardianPhone', $event)"
-                  (input)="handleGuardianPhoneInput($event)"
-                  placeholder="Ej: 3009876543"
-                  class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['guardianPhone']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                />
-                @if (guardianPhoneLimitMsg()) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ guardianPhoneLimitMsg() }}
-                  </p>
-                } @else if (errors()['guardianPhone']) {
-                  <p class="text-red-500 text-sm mt-1">
-                    {{ errors()['guardianPhone'] }}
-                  </p>
-                }
-              </div>
-            </div>
-          }
-
           @if (errorMessage()) {
             <div
               class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"
@@ -703,12 +184,9 @@
             patientStatus() !== 'idle' && patientStatus() !== 'already-linked'
           ) {
             <div class="flex justify-end mt-4">
-              <button
-                (click)="goToStep2()"
-                class="bg-[#215c98] hover:bg-[#163c63] text-white px-8 py-3 rounded-xl font-semibold transition-colors cursor-pointer"
-              >
+              <app-button variant="primary" (buttonClick)="goToStep2()">
                 Continuar
-              </button>
+              </app-button>
             </div>
           }
         </div>
@@ -761,36 +239,28 @@
               >
                 Contraseña <span class="text-red-500">*</span>
               </label>
-              <div class="relative">
-                <input
-                  id="password"
-                  [type]="showPassword() ? 'text' : 'password'"
-                  [ngModel]="password()"
-                  (ngModelChange)="password.set($event)"
-                  placeholder="Mínimo 6 letras y números"
-                  class="w-full border-2 rounded-xl px-4 py-3 pr-12 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['password']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
-                  "
-                />
-                <button
-                  type="button"
-                  (click)="showPassword.set(!showPassword())"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              <app-input
+                [id]="'password'"
+                [type]="showPassword() ? 'text' : 'password'"
+                [maxLength]="PASSWORD_MAX"
+                autocomplete="new-password"
+                placeholder="Mínimo 6 letras y números"
+                inputClass="pr-12"
+                [ngModel]="password()"
+                (valueChange)="onPasswordChange($event)"
+                [errorMessage]="errors()['password']"
+              >
+                <app-button
+                  suffix
+                  variant="icon"
+                  (buttonClick)="showPassword.set(!showPassword())"
                 >
                   <svg
-                    [lucideIcon]="showPassword() ? EyeOff : Eye"
+                    [lucideIcon]="showPassword() ? Eye : EyeOff"
                     [size]="18"
                   ></svg>
-                </button>
-              </div>
-              @if (errors()['password']) {
-                <p class="text-red-500 text-sm mt-1">
-                  {{ errors()['password'] }}
-                </p>
-              }
+                </app-button>
+              </app-input>
             </div>
 
             <div>
@@ -800,36 +270,30 @@
               >
                 Confirmar contraseña <span class="text-red-500">*</span>
               </label>
-              <div class="relative">
-                <input
-                  id="confirmPassword"
-                  [type]="showConfirmPassword() ? 'text' : 'password'"
-                  [ngModel]="confirmPassword()"
-                  (ngModelChange)="confirmPassword.set($event)"
-                  placeholder="Repite tu contraseña"
-                  class="w-full border-2 rounded-xl px-4 py-3 pr-12 focus:outline-none transition-colors"
-                  [ngClass]="
-                    errors()['confirmPassword']
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-blue-200 focus:border-[#4e92d9]'
+              <app-input
+                [id]="'confirmPassword'"
+                [type]="showConfirmPassword() ? 'text' : 'password'"
+                [maxLength]="PASSWORD_MAX"
+                autocomplete="new-password"
+                placeholder="Repite tu contraseña"
+                inputClass="pr-12"
+                [ngModel]="confirmPassword()"
+                (valueChange)="onConfirmPasswordChange($event)"
+                [errorMessage]="errors()['confirmPassword']"
+              >
+                <app-button
+                  suffix
+                  variant="icon"
+                  (buttonClick)="
+                    showConfirmPassword.set(!showConfirmPassword())
                   "
-                />
-                <button
-                  type="button"
-                  (click)="showConfirmPassword.set(!showConfirmPassword())"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   <svg
-                    [lucideIcon]="showConfirmPassword() ? EyeOff : Eye"
+                    [lucideIcon]="showConfirmPassword() ? Eye : EyeOff"
                     [size]="18"
                   ></svg>
-                </button>
-              </div>
-              @if (errors()['confirmPassword']) {
-                <p class="text-red-500 text-sm mt-1">
-                  {{ errors()['confirmPassword'] }}
-                </p>
-              }
+                </app-button>
+              </app-input>
             </div>
           } @else {
             <div
@@ -848,16 +312,15 @@
           }
 
           <div class="flex gap-4 mt-4">
-            <button
-              (click)="goBack()"
-              class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
-            >
+            <app-button variant="secondary" (buttonClick)="goBack()">
               Atrás
-            </button>
-            <button
-              (click)="submit()"
+            </app-button>
+            <app-button
+              variant="primary"
+              (buttonClick)="submit()"
               [disabled]="isLoading()"
-              class="flex-1 bg-[#215c98] hover:bg-[#163c63] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors cursor-pointer"
+              [fullWidth]="true"
+              class="flex-1"
             >
               @if (isLoading()) {
                 <span>Procesando...</span>
@@ -865,7 +328,7 @@
                 <svg lucideUserPlus [size]="18"></svg>
                 <span>Continuar</span>
               }
-            </button>
+            </app-button>
           </div>
         </div>
       }
@@ -895,25 +358,18 @@
             >
               Código de verificación <span class="text-red-500">*</span>
             </label>
-            <input
+            <app-input
+              [id]="'verificationCode'"
               type="text"
-              maxlength="6"
-              id="verificationCode"
-              [ngModel]="verificationCode()"
-              (ngModelChange)="verificationCode.set($event)"
+              inputMode="numeric"
+              sanitize="numeric"
+              [maxLength]="6"
+              maxLengthMessage="Solo se permiten máximo 6 dígitos"
               placeholder="Ej. 123456"
-              class="w-full border-2 rounded-xl px-4 py-3 focus:outline-none transition-colors"
-              [ngClass]="
-                errors()['verificationCode']
-                  ? 'border-red-400 bg-red-50'
-                  : 'border-blue-200 focus:border-[#4e92d9]'
-              "
-            />
-            @if (errors()['verificationCode']) {
-              <p class="text-red-500 text-sm mt-1">
-                {{ errors()['verificationCode'] }}
-              </p>
-            }
+              [ngModel]="verificationCode()"
+              (valueChange)="onVerificationCodeChange($event)"
+              [errorMessage]="errors()['verificationCode']"
+            ></app-input>
           </div>
 
           @if (errorMessage()) {
@@ -925,17 +381,16 @@
           }
 
           <div class="flex gap-4 mt-4">
-            <button
-              (click)="goBack()"
-              class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
-            >
+            <app-button variant="secondary" (buttonClick)="goBack()">
               Atrás
-            </button>
+            </app-button>
 
-            <button
-              (click)="confirmCode()"
+            <app-button
+              variant="primary"
+              (buttonClick)="confirmCode()"
               [disabled]="isLoading()"
-              class="flex-1 bg-[#215c98] hover:bg-[#163c63] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors cursor-pointer"
+              [fullWidth]="true"
+              class="flex-1"
             >
               @if (isLoading()) {
                 <span>Verificando...</span>
@@ -943,7 +398,7 @@
                 <svg lucideKeyRound [size]="18"></svg>
                 <span>Confirmar código</span>
               }
-            </button>
+            </app-button>
           </div>
         </div>
       }

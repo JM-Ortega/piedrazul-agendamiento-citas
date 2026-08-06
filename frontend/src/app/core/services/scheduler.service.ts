@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable, of, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -34,8 +34,18 @@ export class SchedulerService {
     );
   }
 
-  getAllAppointments(): Observable<AppointmentsPatient[]> {
-    return this.http.get<AppointmentsPatient[]>(`${this.apiUrl}/appointments`);
+  getAllAppointments(params?: {
+    idDoctor?: string;
+    date?: string;
+  }): Observable<AppointmentsPatient[]> {
+    let httpParams = new HttpParams();
+    if (params?.idDoctor)
+      httpParams = httpParams.set('idDoctor', params.idDoctor);
+    if (params?.date) httpParams = httpParams.set('date', params.date);
+
+    return this.http.get<AppointmentsPatient[]>(`${this.apiUrl}/appointments`, {
+      params: httpParams,
+    });
   }
 
   getAppointmentsByDoctor(doctorId: string): Observable<AppointmentsPatient[]> {

@@ -1,16 +1,19 @@
 import { CommonModule } from '@angular/common';
 import {
+  ChangeDetectionStrategy,
   Component,
   DestroyRef,
   inject,
   Input,
   OnInit,
   output,
-  ChangeDetectionStrategy,
 } from '@angular/core';
-import { forkJoin, timer } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { forkJoin, timer } from 'rxjs';
 import { DoctorService } from '../../../../core/services/doctor.service';
+import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { mapHttpError } from '../../../../shared/helpers/http-errors';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { BookingSpecialtySelectorComponent } from '../../../appointment/components/seleccion-especialidad/booking-specialty-selector.component';
 import { BookingScheduleSelectorComponent } from '../../../appointment/components/seleccion-horario/booking-schedule-selector.component';
@@ -23,8 +26,6 @@ import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { BookingConfirmComponent } from '../confirmacion/booking-confirm.component';
 import { BookingModeSelectorComponent } from '../modo-agendamiento/booking-mode-selector.component';
-import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
-import { mapHttpError } from '../../../../shared/helpers/http-errors';
 
 /**
  * Coordina el flujo de agendamiento componiendo los
@@ -42,6 +43,7 @@ import { mapHttpError } from '../../../../shared/helpers/http-errors';
     BookingSpecialtySelectorComponent,
     BookingScheduleSelectorComponent,
     BookingConfirmComponent,
+    ButtonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './appointment-booking.component.html',

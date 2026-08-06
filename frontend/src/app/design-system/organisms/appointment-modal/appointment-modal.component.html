@@ -15,22 +15,24 @@
           Para agendar necesitas una cuenta en el sistema
         </p>
       </div>
-      <button
-        (click)="finish.emit()"
-        class="text-blue-200 hover:text-white transition-colors ml-4 mt-1"
-        aria-label="Cerrar"
+      <app-button
+        (buttonClick)="finish.emit()"
+        variant="danger"
+        size="sm"
+        extraClass="w-9 h-9"
       >
-        <svg lucideX [size]="20"></svg>
-      </button>
+        ×
+      </app-button>
     </div>
 
     <!-- Opciones principales -->
     <div class="p-6 flex flex-col gap-3">
-      <button
-        (click)="login()"
-        class="flex items-center gap-4 w-full bg-[#215c98] hover:bg-[#1a4a7a] text-white px-5 py-4 rounded-xl transition-all active:scale-95 text-left cursor-pointer"
+      <app-button
+        (buttonClick)="login()"
+        variant="primary"
+        extraClass="gap-4 w-full text-left justify-start"
       >
-        <div class="bg-blue-600 p-2 rounded-lg shrink-0">
+        <div class="bg-[#4e92d9] p-2 rounded-lg shrink-0">
           <svg lucideLogIn [size]="22" color="white"></svg>
         </div>
         <div>
@@ -39,22 +41,23 @@
             Ingresa con tu usuario y contraseña
           </div>
         </div>
-      </button>
-
-      <button
-        (click)="register()"
-        class="flex items-center gap-4 w-full bg-white border-2 border-[#215c98] hover:bg-blue-50 text-[#215c98] px-5 py-4 rounded-xl transition-all active:scale-95 text-left cursor-pointer"
+      </app-button>
+      <app-button
+        (buttonClick)="register()"
+        extraClass="text-left justify-start gap-4 w-full bg-white text-[#215c98] border-2 border-[#215c98] hover:bg-blue-50 px-5 py-4 rounded-xl transition-all"
       >
         <div class="bg-[#d9e9f8] p-2 rounded-lg shrink-0">
           <svg lucideUserPlus [size]="22" class="text-[#215c98]"></svg>
         </div>
         <div>
-          <div class="font-semibold text-base">Crear mi cuenta</div>
+          <div class="text-[#215c98] font-semibold text-base">
+            Crear mi cuenta
+          </div>
           <div class="text-[#215c98] text-sm">
             Regístrate para agendar tu cita
           </div>
         </div>
-      </button>
+      </app-button>
     </div>
 
     <!-- Contacto -->

@@ -1,6 +1,6 @@
 export interface UserForm {
   documentId: string;
-  documentType: string;
+  identificationType: string;
   password: string;
   firstName: string;
   lastName: string;
@@ -13,4 +13,5 @@ export interface UserForm {
   workDays: number[];
   startTime: string;
   endTime: string;
+  bookingWindowWeeks: number;
 }

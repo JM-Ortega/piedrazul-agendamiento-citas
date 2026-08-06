@@ -15,7 +15,7 @@
         {{ doctor().name }}
         @if (doctor().status === false) {
           <span
-            class="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full"
+            class="text-xs font-normal text-red-700 bg-red-100 px-2 py-0.5 rounded-full"
           >
             Inactivo
           </span>
@@ -36,15 +36,16 @@
 
   @if (!isEditing()) {
     <div class="relative shrink-0">
-      <button
-        (click)="handleEdit()"
+      <app-button
+        variant="primary"
+        extraClass="!rounded-xl !px-5 !py-2.5 !text-base"
         (mouseenter)="hoveredButton.set(true)"
         (mouseleave)="hoveredButton.set(false)"
-        class="flex items-center gap-2 px-5 py-2.5 rounded-xl transition-colors text-base bg-[#215c98] hover:bg-[#163c63] text-white cursor-pointer"
+        (buttonClick)="handleEdit()"
       >
         <svg lucidePencil [size]="18"></svg>
         Editar
-      </button>
+      </app-button>
 
       @if (hoveredButton()) {
         <div
@@ -90,16 +91,15 @@
 
       <!-- Botón Habilitado/Deshabilitado alineado a la derecha -->
       <div class="relative shrink-0">
-        <button
-          (click)="toggleModal.emit(doctor())"
+        <app-button
+          variant="chip"
+          [active]="doctor().status !== false"
+          activeChipClasses="bg-green-100 text-green-700 hover:bg-green-200 border-transparent"
+          inactiveChipClasses="bg-red-100 text-red-700 hover:bg-red-200 border-transparent"
+          extraClass="!w-auto !py-1.5 !px-4 !rounded-lg !flex !items-center !gap-2"
           (mouseenter)="hoveredStatus.set(true)"
           (mouseleave)="hoveredStatus.set(false)"
-          class="flex items-center gap-2 px-4 py-1.5 rounded-lg font-semibold text-base transition-all cursor-pointer"
-          [class]="
-            doctor().status !== false
-              ? 'bg-green-100 text-green-700 hover:bg-green-200'
-              : 'bg-red-100 text-red-700 hover:bg-red-200'
-          "
+          (buttonClick)="toggleModal.emit(doctor())"
         >
           @if (doctor().status !== false) {
             <svg lucidePower [size]="16"></svg>
@@ -108,7 +108,7 @@
             <svg lucidePowerOff [size]="16"></svg>
             Deshabilitado
           }
-        </button>
+        </app-button>
 
         @if (hoveredStatus()) {
           <div

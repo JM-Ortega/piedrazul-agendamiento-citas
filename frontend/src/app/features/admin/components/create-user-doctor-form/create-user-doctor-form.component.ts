@@ -1,34 +1,29 @@
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   EventEmitter,
   Input,
   Output,
+  inject,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   LucideCalendarRange,
   LucideCircleAlert,
-  LucideCreditCard,
+  LucideClock,
   LucideDynamicIcon,
   LucideInfo,
-  LucidePhone,
   LucideStethoscope,
   type LucideIcon,
 } from '@lucide/angular';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { InputComponent } from '../../../../design-system/atoms/input/input.component';
+import { SelectComponent } from '../../../../design-system/atoms/select/select.component';
+import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
-
-export interface DoctorFormData {
-  documentType: string;
-  phone: string;
-  specialty: string[];
-  laborStart: string;
-  laborEnd: string;
-  interval: number;
-  workDays: number[];
-  startTime: string;
-  endTime: string;
-}
+import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
+import { DoctorFormData } from '../../models/interfaces/DoctorFormData';
 
 export interface SpecialtyOption {
   name: string;
@@ -45,27 +40,34 @@ export interface SpecialtyOption {
     FormsModule,
     LucideCalendarRange,
     LucideCircleAlert,
-    LucideCreditCard,
     LucideInfo,
-    LucidePhone,
     LucideStethoscope,
     LucideDynamicIcon,
+    LucideClock,
     FormatoPipe,
+    InputComponent,
+    ButtonComponent,
+    SelectComponent,
+    ToSelectOptionsPipe,
+    DatepickerComponent,
   ],
 })
 export class CreateUserDoctorFormComponent {
   @Input() data!: DoctorFormData;
   @Input() specialtyOptions: SpecialtyOption[] = [];
-  @Input() documentTypes: string[] = [];
   @Input() loadingSpecialties = false;
-  @Input() loadingDocumentTypes = false;
   @Input() timeOptions: string[] = [];
   @Input() maxInterval = 300;
   @Input() daysOfWeek: { value: number; label: string }[] = [];
   @Input() errors: Partial<Record<string, string>> = {};
+  @Input() bookingWindowWeeksOptions: string[] = Array.from(
+    { length: 10 },
+    (_, i) => String(i + 1)
+  );
 
   @Output() dataChange = new EventEmitter<Partial<DoctorFormData>>();
   @Output() fieldBlurred = new EventEmitter<string>();
+  private cdr = inject(ChangeDetectorRef);
 
   isSpecialtySelected(name: string): boolean {
     return this.data.specialty.includes(name);
@@ -91,5 +93,26 @@ export class CreateUserDoctorFormComponent {
 
   emit(field: keyof DoctorFormData, value: unknown): void {
     this.dataChange.emit({ [field]: value });
+  }
+  onDateChange(field: 'laborStart' | 'laborEnd', date: Date | null): void {
+    this.emit(field, date ? this.toIsoDateString(date) : '');
+    this.fieldBlurred.emit(field);
+    this.fieldBlurred.emit(field === 'laborStart' ? 'laborEnd' : 'laborStart');
+  }
+
+  private toIsoDateString(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  onBookingWindowWeeksChange(value: string): void {
+    this.emit('bookingWindowWeeks', Number(value));
+    this.fieldBlurred.emit('bookingWindowWeeks');
+  }
+  get bookingWindowWeeksValue(): string {
+    return this.data.bookingWindowWeeks
+      ? String(this.data.bookingWindowWeeks)
+      : '';
   }
 }

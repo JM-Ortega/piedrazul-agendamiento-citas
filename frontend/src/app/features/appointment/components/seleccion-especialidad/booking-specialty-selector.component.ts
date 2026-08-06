@@ -1,13 +1,19 @@
 import {
+  ChangeDetectionStrategy,
+  computed,
   Component,
   inject,
   output,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideUserSearch } from '@lucide/angular';
-import { BookingStateService } from '../../services/booking-state.service';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+import { BookingStateService } from '../../services/booking-state.service';
+import {
+  SelectComponent,
+  SelectOption,
+} from '../../../../design-system/atoms/select/select.component';
 
 /**
  * Permite al usuario elegir una especialidad y,
@@ -16,12 +22,28 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 @Component({
   selector: 'app-booking-specialty-selector',
   standalone: true,
-  imports: [FormsModule, LucideUserSearch, FormatoPipe],
+  imports: [FormsModule, LucideUserSearch, ButtonComponent, SelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-specialty-selector.component.html',
 })
 export class BookingSpecialtySelectorComponent {
   protected state = inject(BookingStateService);
+
+  private formatoPipe = new FormatoPipe();
+
+  specialtyOptions = computed<SelectOption[]>(() =>
+    this.state.uniqueSpecialties().map((s) => ({
+      value: s,
+      label: this.formatoPipe.transform(s),
+    }))
+  );
+
+  doctorOptions = computed<SelectOption[]>(() =>
+    this.state.doctorsBySpecialty().map((d) => ({
+      value: d.id,
+      label: d.name,
+    }))
+  );
 
   advance = output<void>();
   back = output<void>();

@@ -1,31 +1,32 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   computed,
   inject,
   input,
   output,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import {
-  LucideDynamicIcon,
   LucideCalendar,
   LucideCircleCheck,
+  LucideCircleUser,
   LucideClock,
   LucideCreditCard,
   LucideDownload,
+  LucideDynamicIcon,
   LucideFileSpreadsheet,
   LucideFileText,
   LucidePhone,
   LucideStethoscope,
   LucideTag,
-  LucideCircleUser,
   type LucideIcon,
 } from '@lucide/angular';
 import { SchedulerService } from '../../../core/services/scheduler.service';
 import { AppointmentExportRequest } from '../../../shared/models/dtos/AppointmentExportRequest.dto';
 import { ExportColumnBackend } from '../../../shared/models/types/ExportColumnBackend.type';
 import { ExportFormatBackend } from '../../../shared/models/types/ExportFormatBackend.type';
+import { ButtonComponent } from '../../atoms/button/button.component';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 export type ExportColumnKey =
@@ -90,7 +91,7 @@ const EXT_MAP: Record<ExportFormat, string> = {
   templateUrl: './export-modal.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideDynamicIcon, LucideDownload, LucideCalendar],
+  imports: [LucideDynamicIcon, LucideDownload, LucideCalendar, ButtonComponent],
 })
 export class ExportModalComponent {
   private schedulerService = inject(SchedulerService);
@@ -156,10 +157,10 @@ export class ExportModalComponent {
     {
       value: 'pdf',
       label: 'PDF',
-      active: 'border-red-600 bg-red-50',
+      active: 'border-[#215c98] bg-[#eaf1f8]',
       icon: LucideFileText,
-      activeIcon: 'text-red-600',
-      activeLabel: 'text-red-700',
+      activeIcon: 'text-[#215c98]',
+      activeLabel: 'text-[#163c63]',
     },
     {
       value: 'csv',
@@ -186,27 +187,26 @@ export class ExportModalComponent {
     switch (this.exportFormat()) {
       case 'excel':
         return {
-          header: 'bg-green-700',
-          border: 'border-green-600',
-          bg: 'bg-green-50',
-          icon: 'text-green-600',
-          button: 'bg-green-600 hover:bg-green-700',
+          header: 'bg-[#1f7a52]',
+          border: 'border-[#1f7a52]',
+          bg: 'bg-[#e6f5ee]',
+          icon: 'text-[#1f7a52]',
+          button: 'bg-[#1f7a52] hover:bg-[#166345]',
         };
       case 'pdf':
         return {
-          header: 'bg-red-700',
-          border: 'border-red-600',
-          bg: 'bg-red-50',
-          icon: 'text-red-600',
-          button: 'bg-red-600 hover:bg-red-700',
+          header: 'bg-[#215c98]',
+          border: 'border-[#215c98]',
+          bg: 'bg-[#eaf1f8]',
+          button: 'bg-[#215c98] hover:bg-[#163c63]',
         };
       default:
         return {
-          header: 'bg-orange-700',
-          border: 'border-orange-600',
-          bg: 'bg-orange-50',
-          icon: 'text-orange-600',
-          button: 'bg-orange-600 hover:bg-orange-700',
+          header: 'bg-[#b86a2d]',
+          border: 'border-[#b86a2d]',
+          bg: 'bg-[#faf1e8]',
+          icon: 'text-[#b86a2d]',
+          button: 'bg-[#b86a2d] hover:bg-[#96551f]',
         };
     }
   });

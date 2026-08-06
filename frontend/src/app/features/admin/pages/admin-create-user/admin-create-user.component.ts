@@ -1,8 +1,9 @@
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
-  OnInit,
   inject,
+  OnInit,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -17,21 +18,25 @@ import {
   LucideEye,
   LucideEyeOff,
   LucideHeart,
-  LucideLock,
   LucideMail,
+  LucidePhone,
   LucideUser,
   LucideUserPlus,
   LucideZap,
   type LucideIcon,
 } from '@lucide/angular';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { InputComponent } from '../../../../design-system/atoms/input/input.component';
+import { SelectComponent } from '../../../../design-system/atoms/select/select.component';
+import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 import {
   CreateUserDoctorFormComponent,
-  DoctorFormData,
   SpecialtyOption,
 } from '../../components/create-user-doctor-form/create-user-doctor-form.component';
 import { CreateUserRolesComponent } from '../../components/create-user-roles/create-user-roles.component';
-import { CreateUserConfirmModalComponent } from '../../components/modals/modals-create/create-user-confirm-modal.component';
+import { CreateUserConfirmModalComponent } from '../../components/modals/modal-create/create-user-confirm-modal.component';
 import { CreateUserRequestDto } from '../../models/dtos/CreateUserRequestDto';
+import { DoctorFormData } from '../../models/interfaces/DoctorFormData';
 import { FormErrors } from '../../models/interfaces/FormErrors';
 import { UserForm } from '../../models/interfaces/UserForm';
 import { AdminService } from '../../service/admin.service';
@@ -58,10 +63,14 @@ const DAY_VALUE_TO_WORKDAY: Record<number, string> = {
     LucideArrowLeft,
     LucideCircleAlert,
     LucideCreditCard,
-    LucideLock,
     LucideMail,
     LucideUser,
     LucideUserPlus,
+    LucidePhone,
+    InputComponent,
+    ButtonComponent,
+    SelectComponent,
+    ToSelectOptionsPipe,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-create-user.component.html',
@@ -95,7 +104,7 @@ export class AdminCreateUserComponent implements OnInit {
 
   userForm: UserForm = {
     documentId: '',
-    documentType: '',
+    identificationType: '',
     password: '',
     firstName: '',
     lastName: '',
@@ -108,6 +117,40 @@ export class AdminCreateUserComponent implements OnInit {
     workDays: [1, 2, 3, 4, 5],
     startTime: '08:00',
     endTime: '12:00',
+    bookingWindowWeeks: 0,
+  };
+  private readonly FIELD_ORDER: (keyof FormErrors)[] = [
+    'roles',
+    'documentId',
+    'password',
+    'firstName',
+    'lastName',
+    'email',
+    'identificationType',
+    'phone',
+    'specialty',
+    'laborStart',
+    'laborEnd',
+    'startTime',
+    'endTime',
+    'interval',
+    'workDays',
+  ];
+  private readonly FIELD_TO_ELEMENT_ID: Partial<
+    Record<keyof FormErrors, string>
+  > = {
+    documentId: 'documentId',
+    password: 'password',
+    firstName: 'firstName',
+    lastName: 'lastName',
+    email: 'email',
+    identificationType: 'identificationType',
+    phone: 'phone',
+    laborStart: 'laborStart',
+    laborEnd: 'laborEnd',
+    startTime: 'startTime',
+    endTime: 'endTime',
+    interval: 'interval',
   };
   readonly timeOptions: string[] = (() => {
     const opts: string[] = [];
@@ -123,6 +166,7 @@ export class AdminCreateUserComponent implements OnInit {
 
   private router = inject(Router);
   private adminService = inject(AdminService);
+  private cdr = inject(ChangeDetectorRef);
 
   // ── Getters ───────────────────────────────────────────────────────────────
   get hasDoctorRole() {
@@ -145,8 +189,6 @@ export class AdminCreateUserComponent implements OnInit {
   }
   get doctorFormData(): DoctorFormData {
     return {
-      documentType: this.userForm.documentType,
-      phone: this.userForm.phone,
       specialty: this.userForm.specialty,
       laborStart: this.userForm.laborStart,
       laborEnd: this.userForm.laborEnd,
@@ -154,6 +196,7 @@ export class AdminCreateUserComponent implements OnInit {
       workDays: this.userForm.workDays,
       startTime: this.userForm.startTime,
       endTime: this.userForm.endTime,
+      bookingWindowWeeks: this.userForm.bookingWindowWeeks,
     };
   }
 
@@ -166,9 +209,11 @@ export class AdminCreateUserComponent implements OnInit {
           ...this.getSpecialtyIcon(name),
         }));
         this.loadingSpecialties = false;
+        this.cdr.markForCheck();
       },
       error: () => {
         this.loadingSpecialties = false;
+        this.cdr.markForCheck();
       },
     });
     this.loadingDocumentTypes = true;
@@ -176,9 +221,11 @@ export class AdminCreateUserComponent implements OnInit {
       next: (data) => {
         this.documentTypes = data;
         this.loadingDocumentTypes = false;
+        this.cdr.markForCheck();
       },
       error: () => {
         this.loadingDocumentTypes = false;
+        this.cdr.markForCheck();
       },
     });
   }
@@ -207,10 +254,30 @@ export class AdminCreateUserComponent implements OnInit {
   openConfirmModal(): void {
     this.submitted = true;
     this.submitError = null;
-    if (!this.validateAll()) return;
+    if (!this.validateAll()) {
+      this.scrollToFirstError();
+      return;
+    }
     this.showConfirmModal = true;
   }
+  private scrollToFirstError(): void {
+    const firstErrorField = this.FIELD_ORDER.find((f) => this.errors[f]);
+    if (!firstErrorField) return;
 
+    // Casos sin input con id propio (roles, specialty, workDays) -> usa data-error-anchor
+    const elementId =
+      this.FIELD_TO_ELEMENT_ID[firstErrorField] ??
+      `error-anchor-${firstErrorField}`;
+
+    const el = document.getElementById(elementId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Si es un input/select real, además le damos foco
+      if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {
+        el.focus({ preventScroll: true });
+      }
+    }
+  }
   closeConfirmModal(): void {
     this.showConfirmModal = false;
   }
@@ -227,6 +294,8 @@ export class AdminCreateUserComponent implements OnInit {
     const payload: CreateUserRequestDto = {
       user: {
         identification: this.userForm.documentId,
+        identificationType: this.userForm.identificationType,
+        phone: this.userForm.phone,
         firstName: this.userForm.firstName.trim(),
         lastName: this.userForm.lastName.trim(),
         email: this.userForm.email.trim(),
@@ -234,8 +303,6 @@ export class AdminCreateUserComponent implements OnInit {
       },
       doctor: this.hasDoctorRole
         ? {
-            documentType: this.userForm.documentType,
-            phone: this.userForm.phone,
             specialty: this.userForm.specialty,
             laborStart: this.userForm.laborStart,
             laborEnd: this.userForm.laborEnd,
@@ -245,12 +312,12 @@ export class AdminCreateUserComponent implements OnInit {
               startTime: `${this.userForm.startTime}:00`,
               endTime: `${this.userForm.endTime}:00`,
             })),
+            bookingWindowWeeks: this.userForm.bookingWindowWeeks,
           }
         : null,
       patient: null,
       roles,
     };
-
     this.adminService.createUser(payload).subscribe({
       next: () => {
         this.isSubmitting = false;
@@ -273,162 +340,158 @@ export class AdminCreateUserComponent implements OnInit {
 
   // ── Validación (sin cambios) ───────────────────────────────────────────────
   validateField(field: keyof FormErrors): void {
-    this.errors[field] = undefined;
+    const message = this.computeFieldError(field);
+    this.errors = { ...this.errors, [field]: message };
+  }
 
+  private computeFieldError(field: keyof FormErrors): string | undefined {
     switch (field) {
       case 'documentId':
         if (!this.userForm.documentId.trim()) {
-          this.errors.documentId = 'El documento de identidad es obligatorio.';
-        } else if (!/^\d{5,15}$/.test(this.userForm.documentId)) {
-          this.errors.documentId =
-            'Debe contener entre 5 y 15 dígitos numéricos.';
+          return 'El documento de identidad es obligatorio.';
         }
-        break;
+        if (!/^\d{5,15}$/.test(this.userForm.documentId)) {
+          return 'Debe contener entre 5 y 15 dígitos numéricos.';
+        }
+        return undefined;
 
       case 'password':
         if (!this.userForm.password) {
-          this.errors.password = 'La contraseña es obligatoria.';
-        } else if (this.userForm.password.length < 6) {
-          this.errors.password = 'Mínimo 6 caracteres.';
+          return 'La contraseña es obligatoria.';
         }
-        break;
+        if (this.userForm.password.length < 6) {
+          return 'Mínimo 6 caracteres.';
+        }
+        return undefined;
 
       case 'firstName':
         if (!this.userForm.firstName.trim()) {
-          this.errors.firstName = 'El nombre es obligatorio.';
-        } else if (this.userForm.firstName.trim().length < 2) {
-          this.errors.firstName = 'Mínimo 2 caracteres.';
+          return 'El nombre es obligatorio.';
         }
-        break;
+        if (this.userForm.firstName.trim().length < 2) {
+          return 'Mínimo 2 caracteres.';
+        }
+        return undefined;
 
       case 'lastName':
         if (!this.userForm.lastName.trim()) {
-          this.errors.lastName = 'El apellido es obligatorio.';
-        } else if (this.userForm.lastName.trim().length < 2) {
-          this.errors.lastName = 'Mínimo 2 caracteres.';
+          return 'El apellido es obligatorio.';
         }
-        break;
+        if (this.userForm.lastName.trim().length < 2) {
+          return 'Mínimo 2 caracteres.';
+        }
+        return undefined;
 
       case 'roles':
-        if (this.selectedRoles.length === 0) {
-          this.errors.roles = 'Debe seleccionar al menos un rol.';
-        }
-        break;
+        return this.selectedRoles.length === 0
+          ? 'Debe seleccionar al menos un rol.'
+          : undefined;
 
       case 'email':
         if (!this.userForm.email.trim()) {
-          this.errors.email = 'El correo electrónico es obligatorio.';
-        } else if (
-          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.userForm.email.trim())
-        ) {
-          this.errors.email = 'Ingrese un correo electrónico válido.';
+          return 'El correo electrónico es obligatorio.';
         }
-        break;
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.userForm.email.trim())) {
+          return 'Ingrese un correo electrónico válido.';
+        }
+        return undefined;
 
-      case 'documentType':
-        if (this.hasDoctorRole && !this.userForm.documentType) {
-          this.errors.documentType = 'El tipo de documento es obligatorio.';
-        }
-        break;
+      case 'identificationType':
+        return !this.userForm.identificationType
+          ? 'El tipo de documento es obligatorio.'
+          : undefined;
 
       case 'phone':
-        if (this.hasDoctorRole) {
-          if (!this.userForm.phone.trim()) {
-            this.errors.phone = 'El teléfono es obligatorio.';
-          } else if (!/^\d{10}$/.test(this.userForm.phone)) {
-            // ← exactamente 10
-            this.errors.phone =
-              'El teléfono debe tener exactamente 10 dígitos.';
-          }
+        if (!this.userForm.phone.trim()) {
+          return 'El teléfono es obligatorio.';
         }
-        break;
+        if (!/^\d{10}$/.test(this.userForm.phone)) {
+          return 'El teléfono debe tener exactamente 10 dígitos.';
+        }
+        return undefined;
 
       case 'specialty':
-        if (this.hasDoctorRole && this.userForm.specialty.length === 0) {
-          this.errors.specialty = 'Debe seleccionar al menos una especialidad.';
-        }
-        break;
+        return this.hasDoctorRole && this.userForm.specialty.length === 0
+          ? 'Debe seleccionar al menos una especialidad.'
+          : undefined;
 
       case 'laborStart':
-        if (this.hasDoctorRole) {
-          if (!this.userForm.laborStart) {
-            this.errors.laborStart =
-              'La fecha de inicio laboral es obligatoria.';
-          } else if (
-            parseInt(this.userForm.laborStart.split('-')[0], 10) > 9999
-          ) {
-            this.errors.laborStart = 'El año no puede tener más de 4 dígitos.';
-          } else if (
-            this.userForm.laborEnd &&
-            this.userForm.laborStart >= this.userForm.laborEnd
-          ) {
-            this.errors.laborStart =
-              'La fecha de inicio debe ser anterior a la fecha de fin.';
-          }
+        if (!this.hasDoctorRole) return undefined;
+        if (!this.userForm.laborStart) {
+          return 'La fecha de inicio laboral es obligatoria.';
         }
-        break;
+        if (parseInt(this.userForm.laborStart.split('-')[0], 10) > 9999) {
+          return 'El año no puede tener más de 4 dígitos.';
+        }
+        if (
+          this.userForm.laborEnd &&
+          this.userForm.laborStart >= this.userForm.laborEnd
+        ) {
+          return 'La fecha de inicio debe ser anterior a la fecha de fin.';
+        }
+        return undefined;
 
       case 'laborEnd':
-        if (this.hasDoctorRole) {
-          if (!this.userForm.laborEnd) {
-            this.errors.laborEnd = 'La fecha de fin laboral es obligatoria.';
-          } else if (
-            parseInt(this.userForm.laborEnd.split('-')[0], 10) > 9999
-          ) {
-            this.errors.laborEnd = 'El año no puede tener más de 4 dígitos.';
-          } else if (
-            this.userForm.laborStart &&
-            this.userForm.laborStart >= this.userForm.laborEnd
-          ) {
-            this.errors.laborEnd =
-              'La fecha de fin debe ser posterior a la fecha de inicio.';
-          }
+        if (!this.hasDoctorRole) return undefined;
+        if (!this.userForm.laborEnd) {
+          return 'La fecha de fin laboral es obligatoria.';
         }
-        break;
+        if (parseInt(this.userForm.laborEnd.split('-')[0], 10) > 9999) {
+          return 'El año no puede tener más de 4 dígitos.';
+        }
+        if (
+          this.userForm.laborStart &&
+          this.userForm.laborStart >= this.userForm.laborEnd
+        ) {
+          return 'La fecha de fin debe ser posterior a la fecha de inicio.';
+        }
+        return undefined;
 
       case 'startTime': {
         const start = this.timeToMinutes(this.userForm.startTime);
         const end = this.timeToMinutes(this.userForm.endTime);
-        if (this.userForm.endTime && start >= end) {
-          this.errors.startTime =
-            'La hora de inicio no puede ser igual o posterior a la hora de fin.';
-        }
-        break;
+        return this.userForm.endTime && start >= end
+          ? 'La hora de inicio no puede ser igual o posterior a la hora de fin.'
+          : undefined;
       }
 
       case 'endTime': {
         const end = this.timeToMinutes(this.userForm.endTime);
         const start = this.timeToMinutes(this.userForm.startTime);
-        if (this.userForm.startTime && start >= end) {
-          this.errors.endTime =
-            'La hora de fin debe ser posterior a la hora de inicio.';
-        }
-        break;
+        return this.userForm.startTime && start >= end
+          ? 'La hora de fin debe ser posterior a la hora de inicio.'
+          : undefined;
       }
 
       case 'interval': {
         const duration = this.shiftDurationMinutes;
         if (!this.userForm.interval || this.userForm.interval < 10) {
-          this.errors.interval = 'El intervalo mínimo es 10 minutos.';
-        } else if (this.userForm.interval > duration) {
-          this.errors.interval = `El intervalo no puede superar la duración del turno (${duration} min).`;
+          return 'El intervalo mínimo es 10 minutos.';
         }
-        break;
+        if (this.userForm.interval > duration) {
+          return `El intervalo no puede superar la duración del turno (${duration} min).`;
+        }
+        return undefined;
       }
-
+      case 'bookingWindowWeeks':
+        return this.hasDoctorRole && !this.userForm.bookingWindowWeeks
+          ? 'Debe seleccionar la ventana de reserva en semanas.'
+          : undefined;
       case 'workDays':
-        if (this.hasDoctorRole && this.userForm.workDays.length === 0) {
-          this.errors.workDays =
-            'Debe seleccionar al menos un día de atención.';
-        }
-        break;
+        return this.hasDoctorRole && this.userForm.workDays.length === 0
+          ? 'Debe seleccionar al menos un día de atención.'
+          : undefined;
+
+      default:
+        return undefined;
     }
   }
-
   private validateAll(): boolean {
     const fields: (keyof FormErrors)[] = [
       'documentId',
       'password',
+      'identificationType',
+      'phone',
       'firstName',
       'lastName',
       'email',
@@ -436,15 +499,14 @@ export class AdminCreateUserComponent implements OnInit {
     ];
     if (this.hasDoctorRole) {
       fields.push(
-        'documentType',
-        'phone',
         'specialty',
         'laborStart',
         'laborEnd',
         'startTime',
         'endTime',
         'interval',
-        'workDays'
+        'workDays',
+        'bookingWindowWeeks'
       );
     }
     fields.forEach((f) => this.validateField(f));

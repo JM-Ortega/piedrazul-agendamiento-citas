@@ -17,11 +17,11 @@ import {
   LucideHeart,
   LucideSave,
   LucideStethoscope,
-  LucideX,
   LucideZap,
 } from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
 import { AppService } from '../../../../core/services/app.service';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { DoctorAdminDto } from '../../models/dtos/DoctorAdminDto';
 import { AdminService } from '../../service/admin.service';
 
@@ -36,8 +36,8 @@ import { AdminService } from '../../service/admin.service';
     LucideEdit3,
     LucideSave,
     LucideStethoscope,
-    LucideX,
     LucideDynamicIcon,
+    ButtonComponent,
   ],
 })
 export class AdminDoctorsComponent implements OnInit {
@@ -134,10 +134,9 @@ export class AdminDoctorsComponent implements OnInit {
     const currentSpecialties = doctor.specialties;
     const newSpecialties = this.editingSpecialties();
 
-    const toAdd = newSpecialties.filter((s) => !currentSpecialties.includes(s));
-    const toRemove = currentSpecialties.filter(
-      (s) => !newSpecialties.includes(s)
-    );
+    const specialtiesChanged =
+      newSpecialties.length !== currentSpecialties.length ||
+      newSpecialties.some((s) => !currentSpecialties.includes(s));
 
     const hadScheduler = doctor.roles
       .map((r) => r.toUpperCase())
@@ -146,10 +145,10 @@ export class AdminDoctorsComponent implements OnInit {
 
     const calls: Observable<void>[] = [];
 
-    if (toAdd.length > 0)
-      calls.push(this.adminService.addSpecialties(doctor.id, toAdd));
-    if (toRemove.length > 0)
-      calls.push(this.adminService.removeSpecialties(doctor.id, toRemove));
+    if (specialtiesChanged)
+      calls.push(
+        this.adminService.changeSpecialties(doctor.id, newSpecialties)
+      );
     if (!hadScheduler && wantsScheduler)
       calls.push(this.adminService.giveDoctorSchedulerRole(doctor.documentId));
     if (hadScheduler && !wantsScheduler)

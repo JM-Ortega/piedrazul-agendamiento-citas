@@ -14,6 +14,7 @@ import {
   LucideSave,
 } from '@lucide/angular';
 import { DoctorService } from '../../../core/services/doctor.service';
+import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
@@ -29,6 +30,7 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
     LucideFolderOpen,
     LucideCalendar,
     FormatoPipe,
+    ButtonComponent,
   ],
 })
 export class DoctorMedicalHistoryComponent implements OnInit {

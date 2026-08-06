@@ -48,15 +48,13 @@
           }
         </div>
 
-        <button
-          type="button"
-          (click)="onSearchExact()"
+        <app-button
+          variant="primary"
+          (buttonClick)="onSearchExact()"
           [disabled]="state.searchLoading()"
-          class="bg-[#215c98] hover:bg-[#163c63] text-white px-5 py-3 rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer"
         >
-          <svg lucideSearch [size]="18"></svg>
-          Buscar
-        </button>
+          <svg lucideSearch [size]="18"></svg> Buscar
+        </app-button>
       </div>
 
       @if (showSuggestions() && state.searchSuggestions().length > 0) {
@@ -131,22 +129,19 @@
   }
 
   <div class="flex gap-4 mt-2">
-    <button
-      type="button"
-      (click)="onChangeMode()"
-      class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
-    >
+    <app-button variant="secondary" (buttonClick)="onChangeMode()">
       ← Cambiar modo
-    </button>
+    </app-button>
 
     @if (state.foundPatient()) {
-      <button
-        type="button"
-        (click)="confirmPatient()"
-        class="flex-1 bg-[#215c98] hover:bg-[#163c63] text-white py-3 rounded-xl text-lg transition-colors cursor-pointer"
+      <app-button
+        variant="primary"
+        (buttonClick)="confirmPatient()"
+        [fullWidth]="true"
+        class="flex-1"
       >
         Continuar →
-      </button>
+      </app-button>
     }
   </div>
 </div>

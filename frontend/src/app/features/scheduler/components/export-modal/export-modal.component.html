@@ -1,0 +1,148 @@
+@if (showExportModal()) {
+  <div
+    class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+  >
+    <div class="bg-white rounded-xl max-w-md w-full shadow-2xl">
+      <div
+        [class]="
+          exportColors().header +
+          ' text-white px-8 py-5 rounded-t-xl flex items-center justify-between'
+        "
+      >
+        <div class="flex items-center gap-3">
+          <svg lucideDownload [size]="28"></svg>
+          <h2 class="text-2xl font-bold">Exportar Reporte</h2>
+        </div>
+        <app-button
+          variant="danger"
+          size="sm"
+          extraClass="w-9 h-9"
+          (buttonClick)="closeExportModal()"
+        >
+          ×
+        </app-button>
+      </div>
+
+      <div class="px-8 py-6">
+        <div class="mb-6">
+          <label
+            for="exportDate"
+            class="block text-gray-700 mb-2 text-sm font-medium"
+          >
+            Fecha del reporte <span class="text-red-500">*</span>
+          </label>
+          <app-datepicker
+            [id]="'exportDate'"
+            [ngModel]="selectedDate()"
+            (valueChange)="selectedDate.set($event)"
+            [errorMessage]="
+              dateRequiredError() ? 'Debe seleccionar una fecha' : undefined
+            "
+          ></app-datepicker>
+        </div>
+
+        <div class="mb-6">
+          <h3 class="text-gray-700 text-lg font-semibold mb-3">
+            Formato del archivo
+          </h3>
+          <div class="grid grid-cols-3 gap-3">
+            @for (fmt of formatOptions; track fmt.value) {
+              <button
+                (click)="exportFormat.set($any(fmt.value))"
+                [class]="
+                  'p-4 rounded-lg border transition-all ' +
+                  (exportFormat() === fmt.value
+                    ? fmt.active + ' shadow-md'
+                    : 'border-gray-300 hover:border-gray-400 bg-white')
+                "
+              >
+                <div class="flex flex-col items-center gap-2">
+                  <svg
+                    [lucideIcon]="fmt.icon"
+                    [size]="32"
+                    [class]="
+                      exportFormat() === fmt.value
+                        ? fmt.activeIcon
+                        : 'text-gray-500'
+                    "
+                  ></svg>
+                  <span
+                    [class]="
+                      'text-base font-semibold ' +
+                      (exportFormat() === fmt.value
+                        ? fmt.activeLabel
+                        : 'text-gray-700')
+                    "
+                  >
+                    {{ fmt.label }}
+                  </span>
+                </div>
+              </button>
+            }
+          </div>
+        </div>
+
+        @if (exportError()) {
+          <div
+            class="mb-4 bg-red-50 border border-red-300 text-red-800 px-4 py-3 rounded-lg text-sm flex items-center gap-2"
+          >
+            <span class="font-semibold">Error:</span> {{ exportError() }}
+          </div>
+        }
+
+        <div class="flex gap-3 pt-4 border-t border-gray-200">
+          <app-button
+            variant="secondary"
+            (buttonClick)="closeExportModal()"
+            [disabled]="isExporting() || isCheckingAvailability()"
+          >
+            Cancelar
+          </app-button>
+          <button
+            (click)="handleExportClick()"
+            [disabled]="isExporting() || isCheckingAvailability()"
+            [class]="
+              'flex-1 px-6 py-3.5 rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer ' +
+              (!isExporting() && !isCheckingAvailability()
+                ? exportColors().button + ' text-white'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed')
+            "
+          >
+            @if (isExporting() || isCheckingAvailability()) {
+              <span
+                class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"
+              ></span>
+              {{
+                isCheckingAvailability()
+                  ? 'Verificando disponibilidad...'
+                  : 'Generando reporte...'
+              }}
+            } @else {
+              <svg lucideDownload [size]="20"></svg>
+              Exportar
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<app-confirm-modal
+  [visible]="showAvailabilityWarning()"
+  title="Franjas disponibles"
+  [message]="
+    'Para el ' +
+    formatSelectedDate() +
+    ' todavía existen horarios disponibles para agendar citas. ' +
+    '¿Está seguro de que desea exportar el reporte en este momento?'
+  "
+  confirmLabel="Sí, continuar"
+  cancelLabel="Cancelar"
+  confirmVariant="primary"
+  iconBg="bg-amber-100"
+  (dismissed)="dismissAvailabilityWarning()"
+  (confirmed)="confirmExportDespiteAvailability()"
+>
+  <svg icon lucideAlertTriangle [size]="32" class="text-amber-500"></svg>
+</app-confirm-modal>

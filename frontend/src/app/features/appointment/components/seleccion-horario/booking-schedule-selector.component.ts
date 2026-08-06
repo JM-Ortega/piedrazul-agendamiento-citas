@@ -1,21 +1,21 @@
 import { CommonModule } from '@angular/common';
 import {
+  ChangeDetectionStrategy,
   Component,
   computed,
   inject,
   output,
-  ChangeDetectionStrategy,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { MatNativeDateModule } from '@angular/material/core';
+import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
+import { DateAdapter } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { LucideUserSearch, LucideCalendar } from '@lucide/angular';
+import { LucideCalendar, LucideUserSearch } from '@lucide/angular';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { CustomDateAdapter } from '../../../../design-system/molecules/datepicker/customDateAdapter';
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { BookingStateService } from '../../services/booking-state.service';
 import { CalendarService } from '../../services/calendar.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
 /**
  * Permite al usuario elegir una fecha y hora
@@ -29,14 +29,16 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
   standalone: true,
   imports: [
     CommonModule,
-    FormsModule,
     LucideUserSearch,
     LucideCalendar,
     MatDatepickerModule,
-    MatInputModule,
-    MatFormFieldModule,
     MatNativeDateModule,
     FormatoPipe,
+    ButtonComponent,
+  ],
+  providers: [
+    { provide: MAT_DATE_LOCALE, useValue: 'es-CO' },
+    { provide: DateAdapter, useClass: CustomDateAdapter },
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-schedule-selector.component.html',
@@ -75,6 +77,8 @@ export class BookingScheduleSelectorComponent {
     if (!doctor) return this.calendarService.getMinDate(doctor);
     return this.calendarService.getMaxDate(doctor);
   });
+
+  readonly startAt = computed(() => this.state.selectedDate() ?? new Date());
 
   onDateSelected(date: Date | null): void {
     this.state.selectedDate.set(date);

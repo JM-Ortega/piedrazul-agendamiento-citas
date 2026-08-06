@@ -1,10 +1,10 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   computed,
   inject,
   OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
@@ -14,13 +14,14 @@ import {
   LucidePlusCircle,
   LucideUser,
   LucideX,
-  LucideAlertCircle,
-  LucideCheck,
 } from '@lucide/angular';
 import { AppService } from '../../../core/services/app.service';
-import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { PatientAppointmentService } from '../../../core/services/patientAppointment.service';
+import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
+import { ConfirmModalComponent } from '../../../design-system/organisms/confirm-modal/confirm-modal.component';
+import { ToastComponent } from '../../../design-system/molecules/toast-message/toast.component';
 import { getMonthShort } from '../../../shared/helpers/date-format';
+import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
 @Component({
@@ -35,10 +36,11 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
     LucidePlusCircle,
     LucideUser,
     LucideX,
-    LucideAlertCircle,
-    LucideCheck,
     RouterLink,
     FormatoPipe,
+    ButtonComponent,
+    ConfirmModalComponent,
+    ToastComponent,
   ],
 })
 export class PatientDashboardComponent implements OnInit {
@@ -104,9 +106,9 @@ export class PatientDashboardComponent implements OnInit {
     });
   }
 
-  dismissCancelModal(event?: MouseEvent): void {
-    if (event && event.target !== event.currentTarget) return;
+  dismissCancelModal(): void {
     this.showCancelModal.set(false);
+    this.pendingCancelId.set(null);
   }
 
   private showToast(message: string, type: 'success' | 'error'): void {

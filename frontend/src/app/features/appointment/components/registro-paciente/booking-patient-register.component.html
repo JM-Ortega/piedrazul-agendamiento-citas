@@ -12,214 +12,24 @@
     📋 Documento: <strong>{{ getPatientField('documentNumber') }}</strong>
   </div>
 
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-    <div>
-      <label
-        for="documentType"
-        class="block text-gray-700 mb-1 text-sm font-medium"
-      >
-        Tipo de Documento <span class="text-red-500">*</span>
-      </label>
-      <select
-        id="documentType"
-        [ngModel]="getPatientField('documentType')"
-        (ngModelChange)="setPatientField('documentType', $event)"
-        class="w-full border-2 border-[#c2d8f0] rounded-xl px-4 py-3"
-      >
-        <option value="">Seleccione...</option>
-        @for (type of patientService.documentTypes(); track type) {
-          <option [value]="type">{{ type | formato }}</option>
-        }
-      </select>
-      @if (docTypeError()) {
-        <p class="text-red-500 text-sm mt-1">Este campo es obligatorio</p>
-      }
-    </div>
-
-    <div>
-      <label
-        for="firstName"
-        class="block text-gray-700 mb-1 text-sm font-medium"
-      >
-        Nombres <span class="text-red-500">*</span>
-      </label>
-      <input
-        id="firstName"
-        type="text"
-        [ngModel]="getPatientField('firstName')"
-        (ngModelChange)="setPatientField('firstName', $event)"
-        (input)="handleNameInput($event, 'firstName')"
-        class="w-full border-2 border-[#c2d8f0] rounded-xl px-4 py-3"
-        placeholder="Nombres del paciente"
-      />
-      @if (firstNameLimitMsg()) {
-        <p class="text-red-500 text-sm mt-1">{{ firstNameLimitMsg() }}</p>
-      } @else if (firstNameError()) {
-        <p class="text-red-500 text-sm mt-1">{{ firstNameErrorMsg() }}</p>
-      }
-    </div>
-
-    <div>
-      <label
-        for="lastName"
-        class="block text-gray-700 mb-1 text-sm font-medium"
-      >
-        Apellidos <span class="text-red-500">*</span>
-      </label>
-      <input
-        id="lastName"
-        type="text"
-        [ngModel]="getPatientField('lastName')"
-        (ngModelChange)="setPatientField('lastName', $event)"
-        (input)="handleNameInput($event, 'lastName')"
-        class="w-full border-2 border-[#c2d8f0] rounded-xl px-4 py-3"
-        placeholder="Apellidos del paciente"
-      />
-      @if (lastNameLimitMsg()) {
-        <p class="text-red-500 text-sm mt-1">{{ lastNameLimitMsg() }}</p>
-      } @else if (lastNameError()) {
-        <p class="text-red-500 text-sm mt-1">{{ lastNameErrorMsg() }}</p>
-      }
-    </div>
-
-    <div>
-      <label for="phone" class="block text-gray-700 mb-1 text-sm font-medium">
-        Teléfono <span class="text-red-500">*</span>
-      </label>
-      <input
-        id="phone"
-        type="tel"
-        [ngModel]="getPatientField('phone')"
-        (ngModelChange)="setPatientField('phone', $event)"
-        (input)="handlePhoneInput($event)"
-        class="w-full border-2 border-[#c2d8f0] rounded-xl px-4 py-3"
-        placeholder="Ej: 3001234567"
-      />
-      @if (phoneLimitMsg()) {
-        <p class="text-red-500 text-sm mt-1">{{ phoneLimitMsg() }}</p>
-      } @else if (phoneError()) {
-        <p class="text-red-500 text-sm mt-1">{{ phoneErrorMsg() }}</p>
-      }
-    </div>
-
-    <div>
-      <label for="gender" class="block text-gray-700 mb-1 text-sm font-medium">
-        Género <span class="text-red-500">*</span>
-      </label>
-      <select
-        id="gender"
-        [ngModel]="getPatientField('gender')"
-        (ngModelChange)="setPatientField('gender', $event)"
-        class="w-full border-2 border-[#c2d8f0] rounded-xl px-4 py-3"
-      >
-        <option value="">Seleccione...</option>
-        <option value="MASCULINO">Masculino</option>
-        <option value="FEMENINO">Femenino</option>
-        <option value="OTRO">Otro</option>
-      </select>
-      @if (genderError()) {
-        <p class="text-red-500 text-sm mt-1">Este campo es obligatorio</p>
-      }
-    </div>
-
-    <div>
-      <label
-        for="birthDate"
-        class="block text-gray-700 mb-1 text-sm font-medium"
-      >
-        Fecha de Nacimiento <span class="text-red-500">*</span>
-      </label>
-
-      <div class="relative w-full">
-        <input
-          id="birthDate"
-          type="text"
-          [matDatepicker]="birthPicker"
-          [ngModel]="getPatientField('birthDate')"
-          (ngModelChange)="onBirthDateChange($event)"
-          [max]="maxBirthDate"
-          placeholder="mm/dd/aaaa"
-          readonly
-          class="w-full border-2 border-[#c2d8f0] rounded-xl px-4 py-3 pr-12"
-        />
-        <button
-          type="button"
-          (click)="birthPicker.open()"
-          class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 p-2 rounded-lg hover:bg-[#c2d8f0] hover:shadow-md hover:text-[#163c63] transition-all duration-200"
-        >
-          <svg lucideCalendar [size]="20"></svg>
-        </button>
-        <mat-datepicker #birthPicker></mat-datepicker>
-      </div>
-
-      @if (birthDateError()) {
-        <p class="text-red-500 text-sm mt-1">{{ birthDateErrorMsg() }}</p>
-      }
-    </div>
-
-    <div class="sm:col-span-2">
-      <label for="email" class="block text-gray-700 mb-1 text-sm font-medium">
-        Correo Electrónico
-        <span class="text-gray-400 text-sm">(opcional)</span>
-      </label>
-      <input
-        id="email"
-        type="email"
-        [ngModel]="getPatientField('email')"
-        (ngModelChange)="setPatientField('email', $event)"
-        (input)="handleEmailInput($event)"
-        class="w-full border-2 border-[#c2d8f0] rounded-xl px-4 py-3"
-        placeholder="correo@ejemplo.com"
-      />
-      @if (emailLimitMsg()) {
-        <p class="text-red-500 text-sm mt-1">{{ emailLimitMsg() }}</p>
-      } @else if (emailError()) {
-        <p class="text-red-500 text-sm mt-1">{{ emailErrorMsg() }}</p>
-      }
-    </div>
-
-    <div class="sm:col-span-2">
-      <label
-        for="guardianPhone"
-        class="block text-gray-700 mb-1 text-sm font-medium"
-      >
-        Teléfono de familiar
-        <span class="text-gray-400 text-sm"
-          >(requerido si es menor de 18 años)</span
-        >
-      </label>
-      <input
-        id="guardianPhone"
-        type="tel"
-        [ngModel]="getPatientField('guardianPhone')"
-        (ngModelChange)="setPatientField('guardianPhone', $event)"
-        (input)="handleGuardianPhoneInput($event)"
-        class="w-full border-2 border-[#c2d8f0] rounded-xl px-4 py-3"
-        placeholder="Ej: 3009876543"
-      />
-      @if (guardianPhoneLimitMsg()) {
-        <p class="text-red-500 text-sm mt-1">{{ guardianPhoneLimitMsg() }}</p>
-      } @else if (guardianPhoneError()) {
-        <p class="text-red-500 text-sm mt-1">{{ guardianPhoneErrorMsg() }}</p>
-      }
-    </div>
-  </div>
+  <app-patient-data-form
+    #patientForm
+    [maxBirthDate]="maxBirthDate"
+    [ngModel]="patientFormValue()"
+    (valueChange)="onPatientFormChange($event)"
+  ></app-patient-data-form>
 
   <div class="flex gap-4 mt-4">
-    <button
-      type="button"
-      (click)="onGoBack()"
-      class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-2 cursor-pointer"
-    >
-      <svg lucideArrowLeft [size]="16"></svg>
-      Buscar de nuevo
-    </button>
-    <button
-      type="button"
-      (click)="onContinue()"
-      class="flex-1 bg-[#215c98] hover:bg-[#163c63] text-white py-3 rounded-xl text-lg transition-colors cursor-pointer"
+    <app-button variant="secondary" (buttonClick)="onGoBack()">
+      <svg lucideArrowLeft [size]="16"></svg> Buscar de nuevo
+    </app-button>
+    <app-button
+      variant="primary"
+      (buttonClick)="onContinue(patientForm)"
+      [fullWidth]="true"
+      class="flex-1"
     >
       Continuar →
-    </button>
+    </app-button>
   </div>
 </div>
