@@ -24,12 +24,16 @@ export type InputSize = 'sm' | 'md' | 'lg';
 
 /** Reglas de sanitización. */
 export type SanitizeRule =
-  | 'none'
-  | 'numeric' // solo dígitos
-  | 'alpha' // solo letras (sin espacios)
-  | 'alphaSpaces' // letras + espacios
-  | 'alphanumeric' // letras y números
-  | 'custom'; // usa customPattern
+  'none' | 'numeric' | 'alpha' | 'alphaSpaces' | 'alphanumeric' | 'custom';
+
+const DEFAULT_INVALID_CHARS_MESSAGES: Record<SanitizeRule, string> = {
+  none: '',
+  numeric: 'Solo se permiten números',
+  alpha: 'Solo se permiten letras',
+  alphaSpaces: 'Solo se permiten letras y espacios',
+  alphanumeric: 'Solo se permiten letras y números',
+  custom: 'Hay caracteres no permitidos en este campo',
+};
 
 @Component({
   selector: 'app-input',
@@ -42,6 +46,9 @@ export type SanitizeRule =
       multi: true,
     },
   ],
+  host: {
+    '[class]': 'hostClasses',
+  },
   templateUrl: './input.component.html',
 })
 export class InputComponent implements ControlValueAccessor {
@@ -62,6 +69,7 @@ export class InputComponent implements ControlValueAccessor {
   @Input() fullWidth = true;
   @Input() inputClass = '';
   @Input() wrapperClass = '';
+  @Input() invalidCharsMessage?: string;
 
   // ── Reglas de sanitización ─────────────────────────────
   @Input() sanitize: SanitizeRule = 'none';
@@ -84,6 +92,10 @@ export class InputComponent implements ControlValueAccessor {
   @Output() inputBlur = new EventEmitter<FocusEvent>();
   @Output() inputFocus = new EventEmitter<FocusEvent>();
   @Output() internalErrorChange = new EventEmitter<string>();
+
+  get hostClasses(): string {
+    return this.fullWidth ? 'block w-full flex-1' : '';
+  }
 
   value: string | number | boolean | null = '';
   internalMessage = '';
@@ -243,7 +255,11 @@ export class InputComponent implements ControlValueAccessor {
     if (this.stripAccents) {
       value = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     }
+
+    const beforeFilter = value;
     value = this.filterByPattern(value);
+    const hadInvalidChars = value.length !== beforeFilter.length;
+
     if (this.trimLeadingSpaces) value = value.replace(/^\s+/, '');
     if (this.collapseSpaces) value = value.replace(/\s{2,}/g, ' ');
     if (this.titleCase) {
@@ -258,6 +274,11 @@ export class InputComponent implements ControlValueAccessor {
       this.flashMessage(
         this.maxLengthMessage ??
           `Solo se permiten máximo ${this.maxLength} caracteres`
+      );
+    } else if (hadInvalidChars && this.sanitize !== 'none') {
+      this.flashMessage(
+        this.invalidCharsMessage ??
+          DEFAULT_INVALID_CHARS_MESSAGES[this.sanitize]
       );
     } else {
       this.setInternalMessage('');

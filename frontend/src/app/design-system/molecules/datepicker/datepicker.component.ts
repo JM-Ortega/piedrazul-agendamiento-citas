@@ -23,8 +23,8 @@ import {
   CustomDateAdapter,
   DATE_INPUT_FORMAT_MARKER,
   DateFormatPreset,
-  parseLocalDateString,
 } from './customDateAdapter';
+import { parseLocalDateString } from '../../../shared/helpers/transform-date-local';
 
 const APP_DATE_FORMATS = {
   parse: { dateInput: DATE_INPUT_FORMAT_MARKER },

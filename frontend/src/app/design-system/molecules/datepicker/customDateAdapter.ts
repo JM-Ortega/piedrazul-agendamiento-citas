@@ -83,12 +83,3 @@ export class CustomDateAdapter extends NativeDateAdapter {
     }
   }
 }
-
-export function parseLocalDateString(value: string): Date {
-  const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (isoMatch) {
-    const [, y, m, d] = isoMatch;
-    return new Date(Number(y), Number(m) - 1, Number(d));
-  }
-  return new Date(value);
-}

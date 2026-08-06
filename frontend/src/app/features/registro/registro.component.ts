@@ -7,13 +7,12 @@ import {
   inject,
   OnInit,
   signal,
+  ViewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatDatepickerModule } from '@angular/material/datepicker';
 import { Router } from '@angular/router';
 import {
   LucideArrowLeft,
-  LucideCalendar,
   LucideCheckCircle,
   LucideDynamicIcon,
   LucideEye,
@@ -24,12 +23,17 @@ import {
 } from '@lucide/angular';
 import Keycloak from 'keycloak-js';
 import { ButtonComponent } from '../..//design-system/atoms/button/button.component';
+import { InputComponent } from '../../design-system/atoms/input/input.component';
 import {
   PatientPublicResponse,
   PatientService,
 } from '../../core/services/patient.service';
 import { mapHttpError } from '../../shared/helpers/http-errors';
-import { FormatoPipe } from '../../shared/pipes/formatoPipe';
+import {
+  PatientDataFormComponent,
+  PatientFormData,
+  EMPTY_PATIENT_FORM,
+} from '../../shared/components/form/register-form.component';
 
 type RegistroStep = 1 | 2 | 3;
 type PatientStatus =
@@ -42,15 +46,14 @@ type PatientStatus =
     LucideArrowLeft,
     LucideCheckCircle,
     LucideKeyRound,
-    LucideCalendar,
     LucideSearch,
     LucideUserPlus,
     LucideDynamicIcon,
     CommonModule,
     FormsModule,
-    MatDatepickerModule,
-    FormatoPipe,
     ButtonComponent,
+    InputComponent,
+    PatientDataFormComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './registro.component.html',
@@ -63,6 +66,8 @@ export class RegistroComponent implements OnInit {
   private keycloak = inject(Keycloak);
   private router = inject(Router);
 
+  @ViewChild('patientForm') patientFormRef?: PatientDataFormComponent;
+
   readonly Eye = LucideEye;
   readonly EyeOff = LucideEyeOff;
 
@@ -72,78 +77,25 @@ export class RegistroComponent implements OnInit {
   successMessage = signal('');
   showPassword = signal(false);
   showConfirmPassword = signal(false);
-  today = signal(new Date().toISOString().split('T')[0]);
 
   documentNumber = signal('');
   patientStatus = signal<PatientStatus>('idle');
   foundPatient = signal<PatientPublicResponse | null>(null);
 
-  form = signal({
-    documentType: '',
-    firstName: '',
-    lastName: '',
-    phone: '',
-    gender: '',
-    birthDate: '',
-    guardianPhone: '',
-    email: '',
-  });
+  form = signal<PatientFormData>({ ...EMPTY_PATIENT_FORM });
 
   password = signal('');
   confirmPassword = signal('');
   verificationCode = signal('');
 
-  private readonly PASSWORD_MIN = 6;
-  private readonly PASSWORD_MAX = 100;
+  protected readonly PASSWORD_MIN = 6;
+  protected readonly PASSWORD_MAX = 100;
   private readonly PASSWORD_ALPHANUMERIC = /^(?=.*[a-zA-Z])(?=.*[0-9]).+$/;
   readonly maxBirthDate = new Date();
 
   errors = signal<Record<string, string>>({});
 
-  docInputWarning = signal('');
-
-  private readonly DOC_MAX = 12;
-  private readonly INVALID_DOC_CHARS = /[^a-zA-Z0-9]/g;
-
-  handleDocInput(event: Event): void {
-    const el = event.target as HTMLInputElement;
-    const raw = el.value;
-    const clean = raw.replace(this.INVALID_DOC_CHARS, '');
-    if (clean !== raw) {
-      el.value = clean;
-      this.flashDocWarning(
-        'Solo se permiten letras y números, sin caracteres especiales'
-      );
-    }
-    if (clean.length > this.DOC_MAX) {
-      el.value = clean.slice(0, this.DOC_MAX);
-      this.flashDocWarning(
-        `Solo se permiten máximo ${this.DOC_MAX} caracteres`
-      );
-    }
-    this.onDocumentChange(el.value);
-  }
-
-  private flashDocWarning(text: string): void {
-    this.flash(this.docInputWarning, text, 'doc');
-  }
-
-  readonly NAME_MAX = 30;
-  readonly EMAIL_MAX = 100;
-  readonly PHONE_MAX = 10;
-
-  firstNameLimitMsg = signal('');
-  lastNameLimitMsg = signal('');
-  phoneLimitMsg = signal('');
-  emailLimitMsg = signal('');
-  guardianPhoneLimitMsg = signal('');
-
-  private readonly VALID_NAME_REGEX = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s-]+$/;
-  private readonly VALID_EMAIL_REGEX =
-    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  private readonly INVALID_EMAIL_CHARS = /['"<>()[\]\\,;:{}|^~`!#$%&*=?/]/;
-
-  private timers: Record<string, ReturnType<typeof setTimeout>> = {};
+  protected readonly DOC_MAX = 12;
 
   readonly isNewPatient = computed(() => this.patientStatus() === 'not-found');
   readonly isExistingPatient = computed(() => this.patientStatus() === 'found');
@@ -154,11 +106,6 @@ export class RegistroComponent implements OnInit {
   readonly requiresPassword = computed(
     () => this.isNewPatient() || this.isExistingPatient()
   );
-
-  readonly isMinorPatient = computed(() => {
-    if (!this.isNewPatient()) return false;
-    return this.isMinorByBirthDate(this.form().birthDate);
-  });
 
   readonly displayName = computed(() => {
     const p = this.foundPatient();
@@ -174,6 +121,22 @@ export class RegistroComponent implements OnInit {
 
     return '';
   });
+
+  onDocumentNumberChange(value: string | number | boolean | null): void {
+    this.onDocumentChange(String(value ?? ''));
+  }
+
+  onPasswordChange(value: string | number | boolean | null): void {
+    this.password.set(String(value ?? ''));
+  }
+
+  onConfirmPasswordChange(value: string | number | boolean | null): void {
+    this.confirmPassword.set(String(value ?? ''));
+  }
+
+  onVerificationCodeChange(value: string | number | boolean | null): void {
+    this.verificationCode.set(String(value ?? ''));
+  }
 
   searchPatient(): void {
     this.patientStatus.set('idle');
@@ -210,19 +173,14 @@ export class RegistroComponent implements OnInit {
           this.patientStatus.set('found');
           return;
         }
-
-        // existe usuario del sistema pero no paciente
         if (patient.hasSystemUser) {
           this.patientStatus.set('existing-user');
           return;
         }
-
-        // fallback defensivo
         this.patientStatus.set('not-found');
       },
       error: (err: HttpErrorResponse) => {
         this.isLoading.set(false);
-
         if (err.status === 404) {
           this.patientStatus.set('not-found');
           return;
@@ -251,17 +209,12 @@ export class RegistroComponent implements OnInit {
     this.errorMessage.set('');
     this.successMessage.set('');
 
-    if (this.patientStatus() === 'idle') {
-      return;
-    }
+    if (this.patientStatus() === 'idle') return;
+    if (this.patientStatus() === 'already-linked') return;
 
-    if (this.patientStatus() === 'already-linked') {
-      return;
-    }
-
-    if (!this.validateStep1()) {
-      return;
-    }
+    // El formulario compartido solo está montado en existing-user / not-found;
+    // en 'found' no hay nada que validar.
+    if (this.patientFormRef && !this.patientFormRef.validate()) return;
 
     this.step.set(2);
   }
@@ -324,10 +277,10 @@ export class RegistroComponent implements OnInit {
         firstName: f.firstName,
         lastName: f.lastName,
         phone: f.phone,
-        email: f.email.trim() || undefined,
+        email: (f.email ?? '').trim() || undefined,
         gender: f.gender,
         birthDate: f.birthDate,
-        guardianPhone: f.guardianPhone.trim() || undefined,
+        guardianPhone: (f.guardianPhone ?? '').trim() || undefined,
       })
       .subscribe({
         next: () => this.onSuccess(),
@@ -353,111 +306,6 @@ export class RegistroComponent implements OnInit {
         next: () => this.onSuccess(),
         error: (err) => this.handleError(err),
       });
-  }
-
-  handleNameInput(event: Event, field: 'firstName' | 'lastName'): void {
-    const el = event.target as HTMLInputElement;
-    const limitMsg =
-      field === 'firstName' ? this.firstNameLimitMsg : this.lastNameLimitMsg;
-    let value = el.value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    value = value.replace(/[^a-zA-ZñÑ\s]/g, '');
-    value = value.replace(/^\s+/, '');
-    value = value.replace(/\s{2,}/g, ' ');
-    value = value.replace(
-      /(\S+)/g,
-      (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-    );
-    if (value.length > this.NAME_MAX) {
-      value = value.slice(0, this.NAME_MAX);
-      this.flash(
-        limitMsg,
-        `Solo se permiten máximo ${this.NAME_MAX} caracteres`,
-        field
-      );
-    } else {
-      limitMsg.set('');
-    }
-
-    el.value = value;
-    this.setFormField(field, value);
-  }
-
-  handlePhoneInput(event: Event): void {
-    const el = event.target as HTMLInputElement;
-    const digits = el.value.replace(/\D/g, '');
-
-    if (digits.length > this.PHONE_MAX) {
-      el.value = digits.slice(0, this.PHONE_MAX);
-      this.updateFormField('phone', el.value);
-      this.flash(
-        this.phoneLimitMsg,
-        `Solo se permiten máximo ${this.PHONE_MAX} dígitos`,
-        'phone'
-      );
-    } else {
-      el.value = digits;
-      this.updateFormField('phone', digits);
-      this.phoneLimitMsg.set('');
-    }
-  }
-
-  handleEmailInput(event: Event): void {
-    const el = event.target as HTMLInputElement;
-    const value = el.value;
-
-    if (value.length > this.EMAIL_MAX) {
-      el.value = value.slice(0, this.EMAIL_MAX);
-      this.updateFormField('email', el.value);
-      this.flash(
-        this.emailLimitMsg,
-        `Solo se permiten máximo ${this.EMAIL_MAX} caracteres`,
-        'email'
-      );
-    } else {
-      this.updateFormField('email', value);
-      this.emailLimitMsg.set('');
-    }
-  }
-
-  handleGuardianPhoneInput(event: Event): void {
-    const el = event.target as HTMLInputElement;
-    const digits = el.value.replace(/\D/g, '');
-
-    if (digits.length > this.PHONE_MAX) {
-      el.value = digits.slice(0, this.PHONE_MAX);
-      this.updateFormField('guardianPhone', el.value);
-      this.flash(
-        this.guardianPhoneLimitMsg,
-        `Solo se permiten máximo ${this.PHONE_MAX} dígitos`,
-        'gphone'
-      );
-    } else {
-      el.value = digits;
-      this.updateFormField('guardianPhone', digits);
-      this.guardianPhoneLimitMsg.set('');
-    }
-  }
-
-  setFormField(key: string, value: string): void {
-    this.form.update((f) => ({ ...f, [key]: value }));
-  }
-
-  getFormField(key: string): string {
-    return (this.form() as Record<string, string>)[key] ?? '';
-  }
-
-  private updateFormField(key: string, value: string): void {
-    this.form.update((f) => ({ ...f, [key]: value }));
-  }
-
-  private flash(
-    sig: ReturnType<typeof signal<string>>,
-    text: string,
-    key: string
-  ): void {
-    sig.set(text);
-    if (this.timers[key]) clearTimeout(this.timers[key]);
-    this.timers[key] = setTimeout(() => sig.set(''), 3000);
   }
 
   private onSuccess(): void {
@@ -503,46 +351,6 @@ export class RegistroComponent implements OnInit {
     }
   }
 
-  private validateStep1(): boolean {
-    const newErrors: Record<string, string> = {};
-
-    if (this.isNewPatient() || this.isExistingSystemUser()) {
-      const f = this.form();
-
-      if (!f.documentType) {
-        newErrors['documentType'] = 'Selecciona el tipo de documento';
-      }
-
-      const firstNameErr = this.validateName(f.firstName, 'Nombres');
-      if (firstNameErr) newErrors['firstName'] = firstNameErr;
-
-      const lastNameErr = this.validateName(f.lastName, 'Apellidos');
-      if (lastNameErr) newErrors['lastName'] = lastNameErr;
-
-      const phoneErr = this.validatePhone(f.phone, 'Celular');
-      if (phoneErr) newErrors['phone'] = phoneErr;
-
-      if (!f.gender) {
-        newErrors['gender'] = 'Selecciona el género';
-      }
-
-      const birthErr = this.validateBirthDate(f.birthDate, f.documentType);
-      if (birthErr) newErrors['birthDate'] = birthErr;
-
-      const emailErr = this.validateEmail(f.email);
-      if (emailErr) newErrors['email'] = emailErr;
-
-      const gPhoneErr = this.validateGuardianPhone(
-        f.guardianPhone,
-        f.birthDate
-      );
-      if (gPhoneErr) newErrors['guardianPhone'] = gPhoneErr;
-    }
-
-    this.errors.set(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }
-
   private validateStep2(): boolean {
     const newErrors: Record<string, string> = {};
     if (this.requiresPassword()) {
@@ -577,138 +385,8 @@ export class RegistroComponent implements OnInit {
     return Object.keys(newErrors).length === 0;
   }
 
-  private validateName(value: string | undefined, label: string): string {
-    const trimmed = value?.trim() ?? '';
-
-    if (!trimmed) {
-      return `Ingresa ${label.toLowerCase()}`;
-    }
-    if (trimmed.length > this.NAME_MAX) {
-      return `Se permiten ingresar máximo ${this.NAME_MAX} caracteres`;
-    }
-    if (!this.VALID_NAME_REGEX.test(trimmed)) {
-      return 'Solo se permiten letras, espacios y guión medio (-)';
-    }
-    return '';
-  }
-
-  private validatePhone(
-    value: string | undefined,
-    label: string,
-    required = true
-  ): string {
-    const trimmed = value?.trim() ?? '';
-
-    if (!trimmed) {
-      return required ? `Ingresa el ${label.toLowerCase()}` : '';
-    }
-    if (trimmed.length < this.PHONE_MAX) {
-      return `El número debe tener al menos ${this.PHONE_MAX} dígitos`;
-    }
-    if (!/^[0-9]{10}$/.test(trimmed)) {
-      return `Ingresa un número válido de ${this.PHONE_MAX} dígitos`;
-    }
-    return '';
-  }
-
-  private validateBirthDate(
-    value: string | undefined,
-    documentType: string | undefined
-  ): string {
-    if (!value) {
-      return 'Ingresa una fecha de nacimiento válida';
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const input = new Date(value);
-    input.setHours(0, 0, 0, 0);
-
-    if (input >= today) {
-      return 'La fecha de nacimiento debe ser anterior a hoy';
-    }
-
-    if (documentType === 'CEDULA') {
-      const age = this.calcAge(input);
-      if (age < 18) {
-        return (
-          'La fecha ingresada indica que el paciente es menor de edad. ' +
-          'Para Cédula el paciente debe tener 18 años o más.'
-        );
-      }
-    }
-
-    return '';
-  }
-
-  private validateEmail(value: string | undefined): string {
-    if (!value) return '';
-
-    if (value.length > this.EMAIL_MAX) {
-      return `El correo no puede superar los ${this.EMAIL_MAX} caracteres`;
-    }
-    if (this.INVALID_EMAIL_CHARS.test(value)) {
-      return 'No se permiten caracteres especiales como \', ", <, >, (, ), [, ], etc.';
-    }
-    if (!this.VALID_EMAIL_REGEX.test(value)) {
-      return 'La estructura del correo no es válida. Ejemplo: nombre@dominio.com';
-    }
-    return '';
-  }
-
-  private validateGuardianPhone(
-    guardianPhone: string | undefined,
-    birthDate: string | undefined
-  ): string {
-    const trimmed = guardianPhone?.trim() ?? '';
-
-    if (trimmed) {
-      const formatErr = this.validatePhone(
-        trimmed,
-        'celular del acudiente',
-        false
-      );
-      if (formatErr) return formatErr;
-    }
-
-    if (!birthDate) return '';
-
-    const age = this.calcAge(new Date(birthDate));
-    if (age < 18 && !trimmed) {
-      return 'El celular del acudiente es obligatorio para menores de 18 años';
-    }
-
-    return '';
-  }
-
-  private calcAge(birthDate: Date): number {
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
-    return age;
-  }
-
-  private isMinorByBirthDate(birthDate: string): boolean {
-    if (!birthDate) return false;
-    return this.calcAge(new Date(birthDate)) < 18;
-  }
-
   private resetForm(): void {
-    this.form.set({
-      documentType: '',
-      firstName: '',
-      lastName: '',
-      phone: '',
-      gender: '',
-      birthDate: '',
-      guardianPhone: '',
-      email: '',
-    });
-    this.firstNameLimitMsg.set('');
-    this.lastNameLimitMsg.set('');
-    this.phoneLimitMsg.set('');
-    this.emailLimitMsg.set('');
-    this.guardianPhoneLimitMsg.set('');
+    this.form.set({ ...EMPTY_PATIENT_FORM });
+    this.patientFormRef?.clearErrors();
   }
 }

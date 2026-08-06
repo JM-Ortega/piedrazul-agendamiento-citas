@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   OnInit,
   signal,
@@ -54,18 +55,19 @@ export class SchedulerDashboardComponent implements OnInit {
   readonly toastMessage = signal('');
   readonly toastType = signal<'success' | 'error' | null>(null);
 
+  errorMessage = signal('');
+
   selectedDoctor = computed(() =>
-    this.doctors().find((d) => d.name === this.filterDoctor())
+    this.doctors().find((d) => d.id === this.filterDoctor())
   );
 
   results = computed(() => {
-    let filtered = this.appointments().filter((a) => a.date === this.today);
-    if (this.filterDoctor())
-      filtered = filtered.filter((a) => a.doctorName === this.filterDoctor());
-    if (this.filterStatus())
+    let filtered = this.appointments();
+    if (this.filterStatus()) {
       filtered = filtered.filter(
         (a) => a.appointmentState === this.filterStatus()
       );
+    }
 
     const stateOrder: Record<string, number> = {
       AGENDADA: 1,
@@ -87,22 +89,30 @@ export class SchedulerDashboardComponent implements OnInit {
     this.results().filter((a) => a.appointmentState !== 'CANCELADA')
   );
 
-  errorMessage = signal('');
+  constructor() {
+    effect(() => {
+      const doctorId = this.filterDoctor();
+      this.loadAppointments(doctorId);
+    });
+  }
 
   ngOnInit(): void {
     this.schedulerService
       .getDoctors()
       .subscribe((data) => this.doctors.set(data));
-    this.schedulerService.getAllAppointments().subscribe({
-      next: (data) => {
-        this.appointments.set(data);
-      },
-      error: () => {
-        this.errorMessage.set(
-          'No se pudieron cargar las citas. Intente más tarde.'
-        );
-      },
-    });
+  }
+
+  private loadAppointments(doctorId: string): void {
+    this.schedulerService
+      .getAllAppointments({ date: this.today, idDoctor: doctorId || undefined })
+      .subscribe({
+        next: (data) => this.appointments.set(data),
+        error: () => {
+          this.errorMessage.set(
+            'No se pudieron cargar las citas. Intente más tarde.'
+          );
+        },
+      });
   }
 
   requestCancelAppointment(appointmentId: string): void {

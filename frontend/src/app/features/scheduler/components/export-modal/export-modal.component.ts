@@ -22,6 +22,7 @@ import { formatLongDateEs } from '../../../../shared/helpers/date-format';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
 import { ConfirmModalComponent } from '../../../../design-system/organisms/confirm-modal/confirm-modal.component';
+import { toIsoDateString } from '../../../../shared/helpers/transform-date-local';
 
 type ExportFormat = 'excel' | 'pdf' | 'csv';
 
@@ -136,7 +137,7 @@ export class SchedulerExportModalComponent {
 
   formatSelectedDate(): string {
     const date = this.selectedDate();
-    return date ? formatLongDateEs(this.toIsoString(date)) : '';
+    return date ? formatLongDateEs(toIsoDateString(date)) : '';
   }
 
   open(): void {
@@ -160,7 +161,7 @@ export class SchedulerExportModalComponent {
     }
     this.dateRequiredError.set(false);
 
-    const isoDate = this.toIsoString(date);
+    const isoDate = toIsoDateString(date);
     this.isCheckingAvailability.set(true);
 
     this.schedulerService.checkSchedulerAvailability(isoDate).subscribe({
@@ -195,7 +196,7 @@ export class SchedulerExportModalComponent {
     this.isExporting.set(true);
     this.exportError.set(null);
 
-    const isoDate = this.toIsoString(date);
+    const isoDate = toIsoDateString(date);
     const fmt = this.exportFormat();
     const payload: AppointmentExportRequest = {
       date: isoDate,
@@ -222,12 +223,5 @@ export class SchedulerExportModalComponent {
         this.isExporting.set(false);
       },
     });
-  }
-
-  private toIsoString(date: Date): string {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
   }
 }
