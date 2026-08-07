@@ -95,4 +95,9 @@ export class AdminUsersComponent implements OnInit {
   roleLabel(role: string): string {
     return role.toUpperCase() === 'DOCTOR' ? 'Médico' : 'Agendador';
   }
+  relevantRoles(user: SystemUser): string[] {
+    return user.roles.filter((r) =>
+      ['DOCTOR', 'SCHEDULER'].includes(r.toUpperCase())
+    );
+  }
 }

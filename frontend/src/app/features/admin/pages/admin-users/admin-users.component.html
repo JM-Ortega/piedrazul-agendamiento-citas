@@ -111,7 +111,7 @@
                         {{ user.firstName }} {{ user.lastName }}
                       </h3>
                       <div class="flex flex-wrap gap-1 mt-1">
-                        @for (role of user.roles; track role) {
+                        @for (role of relevantRoles(user); track role) {
                           <span
                             class="text-xs px-2 py-1 rounded-full font-medium"
                             [class.bg-[#d9e9f8]]="
@@ -121,10 +121,10 @@
                               role.toUpperCase() === 'DOCTOR'
                             "
                             [class.bg-green-100]="
-                              role.toUpperCase() !== 'DOCTOR'
+                              role.toUpperCase() === 'SCHEDULER'
                             "
                             [class.text-green-700]="
-                              role.toUpperCase() !== 'DOCTOR'
+                              role.toUpperCase() === 'SCHEDULER'
                             "
                             >{{ roleLabel(role) }}</span
                           >
