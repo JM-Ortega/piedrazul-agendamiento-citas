@@ -1,8 +1,14 @@
 package co.edu.unicauca.piedrazul.backend.verification.exception;
 
-public class VerificationCodeBlockedException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class VerificationCodeBlockedException extends VerificationBusinessException {
 
     public VerificationCodeBlockedException() {
-        super("Verification code has no attempts remaining");
+        super(
+                "El código de verificación no tiene intentos restantes",
+                "VERIFICATION_CODE_BLOCKED",
+                HttpStatus.TOO_MANY_REQUESTS
+        );
     }
 }
