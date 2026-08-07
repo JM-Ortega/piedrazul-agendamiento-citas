@@ -157,10 +157,10 @@ export class BookingPatientSearchComponent {
     this.changeMode.emit();
   }
 
-  private loadPatientByDocument(documentNumber: string): void {
+  private loadPatientByDocument(identification: string): void {
     this.state.searchLoading.set(true);
     this.state.searchError.set('');
-    this.citaService.getPatientByDocument(documentNumber).subscribe({
+    this.citaService.getPatientByDocument(identification).subscribe({
       next: (patient: Patient | null) => {
         this.state.searchLoading.set(false);
         if (patient) {
@@ -168,13 +168,13 @@ export class BookingPatientSearchComponent {
           this.state.patientId.set(patient.id);
           this.state.notFound.set(false);
         } else {
-          this.handleNotFound(documentNumber);
+          this.handleNotFound(identification);
         }
       },
       error: (err) => {
         this.state.searchLoading.set(false);
         if (err.status === 404) {
-          this.handleNotFound(documentNumber);
+          this.handleNotFound(identification);
         } else if (err.status === 0) {
           this.state.searchError.set(
             'No se pudo conectar con el servidor. Intente más tarde.'
@@ -186,11 +186,11 @@ export class BookingPatientSearchComponent {
     });
   }
 
-  private handleNotFound(documentNumber: string): void {
+  private handleNotFound(identification: string): void {
     this.state.foundPatient.set(null);
     this.state.notFound.set(true);
     this.state.patientId.set(null);
-    this.state.patientForm.update((f) => ({ ...f, documentNumber }));
+    this.state.patientForm.update((f) => ({ ...f, identification }));
     this.patientMissing.emit();
   }
 
