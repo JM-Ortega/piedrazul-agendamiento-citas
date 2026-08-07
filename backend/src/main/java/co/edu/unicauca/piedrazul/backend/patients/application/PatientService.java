@@ -163,7 +163,8 @@ public class PatientService implements PatientModuleApi {
                 VerificationPurpose.LINK_PATIENT_ACCOUNT,
                 found.person().firstName() + " " + found.person().lastName(),
                 found.person().phone(),
-                found.person().email()
+                found.person().email(),
+                found.person().id()
         );
     }
 

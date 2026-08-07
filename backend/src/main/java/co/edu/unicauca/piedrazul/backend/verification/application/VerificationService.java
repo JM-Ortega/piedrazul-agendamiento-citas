@@ -13,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -39,9 +41,10 @@ public class VerificationService implements VerificationModuleApi {
     }
 
     @Override
-    public void requestCode(String subject, VerificationPurpose purpose, String displayName, String phone, String email) {
+    public void requestCode(String subject, VerificationPurpose purpose, String displayName, String phone, String email, UUID recipientId) {
         validateSubject(subject);
         validateAtLeastOneContact(phone, email);
+        Objects.requireNonNull(recipientId, "recipientId cannot be null");
 
         Optional<VerificationCode> existing =
                 verificationCodeStore.findLatestActive(subject, purpose);
@@ -63,7 +66,7 @@ public class VerificationService implements VerificationModuleApi {
         );
 
         verificationCodeStore.save(verificationCode);
-        sender.sendCode(subject, displayName, phone, email, rawCode, EXPIRATION_MINUTES);
+        sender.sendCode(subject, displayName, phone, email, rawCode, EXPIRATION_MINUTES, recipientId, verificationCode.getId());
     }
 
     @Override
