@@ -78,7 +78,9 @@ export class BookingScheduleSelectorComponent {
     return this.calendarService.getMaxDate(doctor);
   });
 
-  readonly startAt = computed(() => this.state.selectedDate() ?? new Date());
+  readonly startAt = computed(
+    () => this.state.selectedDate() ?? this.minDate()
+  );
 
   onDateSelected(date: Date | null): void {
     this.state.selectedDate.set(date);
