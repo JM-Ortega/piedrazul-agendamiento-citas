@@ -6,6 +6,7 @@ import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -52,5 +53,5 @@ public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
         JOIN d.specialties s
         WHERE d.personId IN :personIds
     """)
-    List<DoctorSpecialtyProjection> findSpecialtiesByPersonIds(Collection<UUID> personIds);
+    List<DoctorSpecialtyProjection> findSpecialtiesByPersonIds(@Param("personIds") Collection<UUID> personIds);
 }

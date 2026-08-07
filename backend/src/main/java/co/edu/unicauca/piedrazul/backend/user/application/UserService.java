@@ -61,15 +61,23 @@ public class UserService {
                 .map(UserSummary::id)
                 .toList();
 
-        Map<UUID, UUID> personIds = personExternalServiceImp.findPersonIdsByUserIds(userIds);
+        if(userIds.isEmpty()){
+            throw  new UserNotFoundException("No hay doctores en el sistema");
+        }
 
-        Map<UUID, List<SpecialtyCode>> specialties = doctorExternalService.findSpecialtiesByPersonIds(userIds);
+        // 1. Obtener el mapa de userId -> personId
+        Map<UUID, UUID> personIdsMap = personExternalServiceImp.findPersonIdsByUserIds(userIds);
+
+        // 2. Extraer la lista real de personIds
+        List<UUID> personIds = new ArrayList<>(personIdsMap.values());
+
+        // 3. Consultar especialidades usando personIds, NO userIds
+        Map<UUID, List<SpecialtyCode>> specialties = doctorExternalService.findSpecialtiesByPersonIds(personIds);
 
         List<SystemDoctorResponse> result = new ArrayList<>();
 
         for (UserSummary doctor : doctors) {
-
-            UUID personId = personIds.get(doctor.id());
+            UUID personId = personIdsMap.get(doctor.id());
 
             List<String> doctorSpecialties = specialties
                     .getOrDefault(personId, List.of())
@@ -86,6 +94,7 @@ public class UserService {
                     doctorSpecialties
             ));
         }
+
         return result;
     }
 
