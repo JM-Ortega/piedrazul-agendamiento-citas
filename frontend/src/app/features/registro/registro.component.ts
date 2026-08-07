@@ -299,7 +299,7 @@ export class RegistroComponent implements OnInit {
 
     this.patientService
       .confirmLinkUserAccount({
-        documentNumber: this.documentNumber(),
+        identification: this.documentNumber(),
         code: this.verificationCode(),
         // solo enviar password si aplica
         password: this.requiresPassword() ? this.password() : undefined,
