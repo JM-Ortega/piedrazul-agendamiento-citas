@@ -26,23 +26,22 @@ import {
   toIsoDateString,
 } from '../../../shared/helpers/transform-date-local';
 
-export type PatientFormData = Omit<Patient, 'id' | 'documentNumber'>;
+export type PatientFormData = Omit<Patient, 'id' | 'identification'>;
 
 export const EMPTY_PATIENT_FORM: PatientFormData = {
-  documentType: '',
+  identificationType: '',
   firstName: '',
   lastName: '',
   phone: '',
-  gender: '',
+  sex: '',
   birthDate: '',
   guardianPhone: '',
   email: '',
 };
 
-const GENDER_OPTIONS: SelectOption[] = [
+const SEX_OPTIONS: SelectOption[] = [
   { value: 'MASCULINO', label: 'Masculino' },
   { value: 'FEMENINO', label: 'Femenino' },
-  { value: 'OTRO', label: 'Otro' },
 ];
 
 const MINOR_DOCUMENT_TYPES = new Set([
@@ -80,7 +79,7 @@ export class PatientDataFormComponent implements ControlValueAccessor, OnInit {
 
   @Output() valueChange = new EventEmitter<PatientFormData>();
 
-  readonly genderOptions = GENDER_OPTIONS;
+  readonly sexOptions = SEX_OPTIONS;
   readonly nameMin = NAME_MIN;
   readonly emailMax = EMAIL_MAX;
 
@@ -119,7 +118,7 @@ export class PatientDataFormComponent implements ControlValueAccessor, OnInit {
   set<K extends keyof PatientFormData>(field: K, val: string): void {
     this.value = { ...this.value, [field]: val as PatientFormData[K] };
     if (field === 'birthDate') this.birthDateSignal.set(val);
-    if (field === 'documentType') this.documentTypeSignal.set(val);
+    if (field === 'identificationType') this.documentTypeSignal.set(val);
     this.onChange(this.value);
     this.valueChange.emit(this.value);
   }
@@ -145,8 +144,9 @@ export class PatientDataFormComponent implements ControlValueAccessor, OnInit {
     const e: Record<string, string> = {};
     const f = this.value;
 
-    if (!f.documentType) e['documentType'] = 'Este campo es obligatorio';
-    if (!f.gender) e['gender'] = 'Este campo es obligatorio';
+    if (!f.identificationType)
+      e['identificationType'] = 'Este campo es obligatorio';
+    if (!f.sex) e['sex'] = 'Este campo es obligatorio';
 
     const fn = this.validateName(f.firstName);
     if (fn) e['firstName'] = fn;
@@ -157,7 +157,7 @@ export class PatientDataFormComponent implements ControlValueAccessor, OnInit {
     const phone = this.validatePhone(f.phone, true);
     if (phone) e['phone'] = phone;
 
-    const birth = this.validateBirthDate(f.birthDate, f.documentType);
+    const birth = this.validateBirthDate(f.birthDate, f.identificationType);
     if (birth) e['birthDate'] = birth;
 
     const email = this.validateEmail(f.email ?? '');
@@ -166,7 +166,7 @@ export class PatientDataFormComponent implements ControlValueAccessor, OnInit {
     const gPhone = this.validateGuardianPhone(
       f.guardianPhone ?? '',
       f.birthDate,
-      f.documentType
+      f.identificationType
     );
     if (gPhone) e['guardianPhone'] = gPhone;
 
@@ -274,7 +274,7 @@ export class PatientDataFormComponent implements ControlValueAccessor, OnInit {
   writeValue(value: PatientFormData | null): void {
     this.value = value ? { ...value } : { ...EMPTY_PATIENT_FORM };
     this.birthDateSignal.set(this.value.birthDate ?? '');
-    this.documentTypeSignal.set(this.value.documentType ?? '');
+    this.documentTypeSignal.set(this.value.identificationType ?? '');
   }
 
   registerOnChange(fn: (value: PatientFormData) => void): void {

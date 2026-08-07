@@ -140,8 +140,8 @@ export class BookingPatientSearchComponent {
   selectSuggestion(suggestion: PatientSuggestion): void {
     this.showSuggestions.set(false);
     this.state.searchSuggestions.set([]);
-    this.state.searchQuery.set(suggestion.documentNumber);
-    this.loadPatientByDocument(suggestion.documentNumber);
+    this.state.searchQuery.set(suggestion.identification);
+    this.loadPatientByDocument(suggestion.identification);
   }
 
   closeSuggestions(): void {

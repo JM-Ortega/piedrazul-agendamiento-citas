@@ -64,12 +64,12 @@ export class BookingStateService {
 
   // Agendador: formulario para registrar paciente nuevo
   patientForm = signal<Omit<Patient, 'id'>>({
-    documentType: '',
-    documentNumber: '',
+    identificationType: '',
+    identification: '',
     firstName: '',
     lastName: '',
     phone: '',
-    gender: '',
+    sex: '',
     birthDate: '',
     email: '',
     guardianPhone: '',
@@ -135,20 +135,22 @@ export class BookingStateService {
   readonly confirmDocumentType = computed(() => {
     if (this.isSchedulerContext())
       return (
-        this.foundPatient()?.documentType ?? this.patientForm().documentType
+        this.foundPatient()?.identificationType ??
+        this.patientForm().identificationType
       );
-    if (this.isDoctorContext()) return this.foundPatient()?.documentType ?? '';
-    return this.patientSnapshot()?.documentType ?? '';
+    if (this.isDoctorContext())
+      return this.foundPatient()?.identificationType ?? '';
+    return this.patientSnapshot()?.identificationType ?? '';
   });
 
   readonly confirmDocument = computed(() => {
     if (this.isSchedulerContext())
       return (
-        this.foundPatient()?.documentNumber ?? this.patientForm().documentNumber
+        this.foundPatient()?.identification ?? this.patientForm().identification
       );
     if (this.isDoctorContext())
-      return this.foundPatient()?.documentNumber ?? '';
-    return this.patientSnapshot()?.documentNumber ?? '';
+      return this.foundPatient()?.identification ?? '';
+    return this.patientSnapshot()?.identification ?? '';
   });
 
   readonly confirmPhone = computed(() => {
@@ -160,9 +162,9 @@ export class BookingStateService {
 
   readonly confirmGender = computed(() => {
     if (this.isSchedulerContext())
-      return this.foundPatient()?.gender ?? this.patientForm().gender;
-    if (this.isDoctorContext()) return this.foundPatient()?.gender ?? '';
-    return this.patientSnapshot()?.gender ?? '';
+      return this.foundPatient()?.sex ?? this.patientForm().sex;
+    if (this.isDoctorContext()) return this.foundPatient()?.sex ?? '';
+    return this.patientSnapshot()?.sex ?? '';
   });
 
   readonly confirmBirthDate = computed(() => {
@@ -262,12 +264,12 @@ export class BookingStateService {
 
   resetPatientForm(): void {
     this.patientForm.set({
-      documentNumber: '',
-      documentType: '',
+      identification: '',
+      identificationType: '',
       firstName: '',
       lastName: '',
       phone: '',
-      gender: '',
+      sex: '',
       birthDate: '',
       email: '',
       guardianPhone: '',

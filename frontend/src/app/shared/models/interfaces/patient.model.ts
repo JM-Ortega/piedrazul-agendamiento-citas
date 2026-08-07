@@ -1,12 +1,12 @@
 export interface Patient {
   id: string;
-  documentType:
+  identificationType:
     'REGISTRO_NACIMIENTO' | 'TARJETA_IDENTIDAD' | 'CEDULA' | 'PASAPORTE' | '';
-  documentNumber: string;
+  identification: string;
   firstName: string;
   lastName: string;
   phone: string;
-  gender: 'MASCULINO' | 'FEMENINO' | 'OTRO' | '';
+  sex: 'MASCULINO' | 'FEMENINO' | '';
   birthDate: string;
   email?: string;
   guardianPhone?: string;

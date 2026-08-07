@@ -53,7 +53,7 @@ export class BookingPatientRegisterComponent implements OnInit {
 
   patientFormValue = computed<PatientFormData>(() => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { documentNumber, ...rest } = this.state.patientForm();
+    const { identification, ...rest } = this.state.patientForm();
     return rest;
   });
 

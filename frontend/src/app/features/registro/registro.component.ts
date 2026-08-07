@@ -272,13 +272,13 @@ export class RegistroComponent implements OnInit {
       .createWithUser({
         username: this.documentNumber(),
         password: this.password(),
-        documentType: f.documentType,
+        documentType: f.identificationType,
         documentNumber: this.documentNumber(),
         firstName: f.firstName,
         lastName: f.lastName,
         phone: f.phone,
         email: (f.email ?? '').trim() || undefined,
-        gender: f.gender,
+        gender: f.sex,
         birthDate: f.birthDate,
         guardianPhone: (f.guardianPhone ?? '').trim() || undefined,
       })
