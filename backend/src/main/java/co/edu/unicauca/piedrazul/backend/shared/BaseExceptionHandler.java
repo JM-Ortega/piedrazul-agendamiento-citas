@@ -41,6 +41,19 @@ public abstract class BaseExceptionHandler {
         return problem;
     }
 
+    protected static String spanishTitle(HttpStatus status) {
+        return switch (status) {
+            case BAD_REQUEST -> "Solicitud inválida";
+            case UNAUTHORIZED -> "No autorizado";
+            case FORBIDDEN -> "Prohibido";
+            case NOT_FOUND -> "No encontrado";
+            case CONFLICT -> "Conflicto";
+            case TOO_MANY_REQUESTS -> "Demasiadas solicitudes";
+            case INTERNAL_SERVER_ERROR -> "Error interno del servidor";
+            default -> status.getReasonPhrase();
+        };
+    }
+
     protected ProblemDetail buildValidationProblem(
             MethodArgumentNotValidException ex,
             HttpServletRequest request,
@@ -60,7 +73,7 @@ public abstract class BaseExceptionHandler {
 
         return buildProblem(
                 HttpStatus.BAD_REQUEST,
-                "Validation error",
+                "Error de validación",
                 detail,
                 module,
                 "VALIDATION_ERROR",

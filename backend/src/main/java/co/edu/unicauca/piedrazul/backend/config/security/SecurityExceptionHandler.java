@@ -19,7 +19,7 @@ class SecurityExceptionHandler extends BaseExceptionHandler {
     ) {
         return buildProblem(
                 HttpStatus.FORBIDDEN,
-                "Forbidden",
+                "Prohibido",
                 "No tiene permisos para acceder a este recurso.",
                 "security",
                 "ACCESS_DENIED",
@@ -34,7 +34,7 @@ class SecurityExceptionHandler extends BaseExceptionHandler {
     ) {
         return buildProblem(
                 HttpStatus.FORBIDDEN,
-                "Forbidden",
+                "Prohibido",
                 "No tiene permisos para acceder a este recurso.",
                 "security",
                 "ACCESS_DENIED",

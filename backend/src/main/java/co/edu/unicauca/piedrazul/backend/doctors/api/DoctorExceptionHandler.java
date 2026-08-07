@@ -45,7 +45,7 @@ public class DoctorExceptionHandler extends BaseExceptionHandler {
 
         return buildProblem(
                 HttpStatus.NOT_FOUND,
-                "Not found",
+                "No encontrado",
                 ex.getMessage(),
                 "doctors",
                 "DOCTOR_NOT_FOUND",
@@ -63,7 +63,7 @@ public class DoctorExceptionHandler extends BaseExceptionHandler {
 
         return buildProblem(
                 HttpStatus.BAD_REQUEST,
-                "Bad request",
+                "Solicitud inválida",
                 ex.getMessage(),
                 "doctors",
                 "INVALID_ARGUMENT",
@@ -85,7 +85,7 @@ public class DoctorExceptionHandler extends BaseExceptionHandler {
 
         return buildProblem(
                 ex.getStatus(),
-                ex.getStatus().getReasonPhrase(),
+                spanishTitle(ex.getStatus()),
                 ex.getMessage(),
                 ex.getModule(),
                 ex.getErrorCode(),
@@ -111,8 +111,8 @@ public class DoctorExceptionHandler extends BaseExceptionHandler {
 
         return buildProblem(
                 HttpStatus.INTERNAL_SERVER_ERROR,
-                HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
-                "Unexpected error in doctors module",
+                spanishTitle(HttpStatus.INTERNAL_SERVER_ERROR),
+                "Error inesperado en el módulo de médicos",
                 "doctors",
                 "INTERNAL_ERROR",
                 request

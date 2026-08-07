@@ -27,12 +27,12 @@ public class AppointmentExceptionHandler extends BaseExceptionHandler {
                 .stream()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .findFirst()
-                .orElse("Validation error");
+                .orElse("Error de validación");
 
         log.warn("Erro de validación: {}", detail);
         return buildProblem(
                 HttpStatus.BAD_REQUEST,
-                "Validation error",
+                "Error de validación",
                 detail,
                 "appointment",
                 "VALIDATION_ERROR",
@@ -60,7 +60,7 @@ public class AppointmentExceptionHandler extends BaseExceptionHandler {
         log.warn("Error de negocio en el modulo appointment [{}]: {}", ex.getClass().getSimpleName(), ex.getMessage());
         return buildProblem(
                 status,
-                status.getReasonPhrase(),
+                spanishTitle(status),
                 ex.getMessage(),
                 module,
                 errorCode,
@@ -76,7 +76,7 @@ public class AppointmentExceptionHandler extends BaseExceptionHandler {
         log.warn("Mal envio de datos en el modulo appointment [{}]: {}", ex.getClass().getSimpleName(), ex.getMessage());
         return buildProblem(
                 HttpStatus.BAD_REQUEST,
-                "Bad request",
+                "Solicitud inválida",
                 ex.getMessage(),
                 "appointment",
                 "INVALID_ARGUMENT",
@@ -100,8 +100,8 @@ public class AppointmentExceptionHandler extends BaseExceptionHandler {
         log.error("Excepción no controlada en el módulo appointment", ex);
         return buildProblem(
                 HttpStatus.INTERNAL_SERVER_ERROR,
-                "Internal server error",
-                "Internal server error",
+                "Error interno del servidor",
+                "Error interno del servidor",
                 "appointment",
                 "INTERNAL_SERVER_ERROR",
                 request
