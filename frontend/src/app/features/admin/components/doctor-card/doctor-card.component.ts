@@ -29,7 +29,6 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
     LucidePencil,
     LucidePower,
     LucidePowerOff,
-    FormatoPipe,
     ButtonComponent,
   ],
 })
@@ -45,6 +44,7 @@ export class DoctorCardComponent {
 
   hoveredButton = signal(false);
   hoveredStatus = signal(false);
+  private formatoPipe = new FormatoPipe();
 
   handleEdit(): void {
     this.edit.emit(this.doctor());
@@ -97,5 +97,8 @@ export class DoctorCardComponent {
     });
 
     return { startTime: best.startTime, endTime: best.endTime };
+  }
+  formattedSpecialties(specialties: string[]): string {
+    return specialties.map((s) => this.formatoPipe.transform(s)).join(', ');
   }
 }

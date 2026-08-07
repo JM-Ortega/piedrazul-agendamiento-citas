@@ -38,12 +38,12 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
     LucideFileText,
     LucideUser,
     LucideUserX,
-    FormatoPipe,
     ButtonComponent,
     ConfirmModalComponent,
   ],
 })
 export class DoctorDashboardComponent implements OnInit {
+  private formatoPipe = new FormatoPipe();
   private doctorService = inject(DoctorService);
   private router = inject(Router);
 
@@ -208,5 +208,10 @@ export class DoctorDashboardComponent implements OnInit {
       REPROGRAMADA: 'Pendiente',
     };
     return map[state] ?? state;
+  }
+  formattedSpecialties(specialties: string[] | undefined): string {
+    return (specialties ?? [])
+      .map((s) => this.formatoPipe.transform(s))
+      .join(', ');
   }
 }

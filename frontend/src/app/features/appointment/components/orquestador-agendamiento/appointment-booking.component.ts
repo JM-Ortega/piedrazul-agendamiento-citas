@@ -99,7 +99,8 @@ export class AppointmentBookingComponent implements OnInit {
     this.doctorService.getMe().subscribe({
       next: (doctor) => {
         this.state.doctorSnapshot.set(doctor);
-        const cleanSpecialty = doctor.specialty.replace(/[[\]]/g, '');
+        // ⚠️ PARCHE: specialty ahora es string[]; tomamos la primera especialidad ,no creo que sea solucion optima
+        const cleanSpecialty = doctor.specialty[0];
         this.state.selectedSpecialty.set(cleanSpecialty);
 
         const doctors$ = this.citaService.getDoctorsBySpecialty(cleanSpecialty);
@@ -357,7 +358,7 @@ export class AppointmentBookingComponent implements OnInit {
     const doctor = this.state.doctorSnapshot();
     if (!doctor) return;
 
-    const cleanSpecialty = doctor.specialty.replace(/[[\]]/g, '');
+    const cleanSpecialty = doctor.specialty[0]; // ⚠️ PARCHE: specialty ahora es string[]; tomamos la primera especialidad
 
     if (
       this.state.selectedSpecialty() === cleanSpecialty &&
