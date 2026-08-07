@@ -37,9 +37,10 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
     public List<DoctorResponse> getSpecialtiesWithDoctor(UUID patientId) {
         LocalDate from = LocalDate.now();
 
-        List<UUID> activeDoctorIds = isNewPatientUseCase.isNewPatient(patientId)
-                ? getActiveGeneralDoctorsOrThrow()
-                : getActiveDoctorsOrThrow();
+        List<UUID> activeDoctorIds =
+                (patientId == null || isNewPatientUseCase.isNewPatient(patientId))
+                        ? getActiveGeneralDoctorsOrThrow()
+                        : getActiveDoctorsOrThrow();
 
         Map<UUID, Integer> availability = calculateAvailability(activeDoctorIds, from);
 
