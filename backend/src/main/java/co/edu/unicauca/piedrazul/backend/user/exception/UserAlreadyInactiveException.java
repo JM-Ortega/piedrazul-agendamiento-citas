@@ -5,6 +5,6 @@ import java.util.UUID;
 public class UserAlreadyInactiveException extends UserException {
 
     public UserAlreadyInactiveException(UUID id) {
-        super("User is already inactive: " + id);
+        super("El usuario ya está inactivo: " + id);
     }
 }
