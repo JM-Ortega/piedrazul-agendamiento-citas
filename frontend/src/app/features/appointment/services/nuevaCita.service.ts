@@ -69,8 +69,8 @@ export class NuevaCitaService {
     if (cached && this.isFresh(cached.ts)) return of(cached.data);
 
     const url = patientId
-      ? `${this.apiUrl}/doctor/doctors/patients/specialties?patientId=${patientId}`
-      : `${this.apiUrl}/doctor/doctors/patients/specialties`;
+      ? `${this.apiUrl}/doctor/patients/specialties?patientId=${patientId}`
+      : `${this.apiUrl}/doctor/patients/specialties`;
     return this.http
       .get<string[]>(url)
       .pipe(
@@ -83,9 +83,7 @@ export class NuevaCitaService {
     if (cached && this.isFresh(cached.ts)) return of(cached.data);
 
     return this.http
-      .get<SpecialtyDoctor[]>(
-        `${this.apiUrl}/doctor/doctors/specialty/${specialty}`
-      )
+      .get<SpecialtyDoctor[]>(`${this.apiUrl}/doctor/specialty/${specialty}`)
       .pipe(
         tap((data) =>
           this.doctorsBySpecialtyCache.set(specialty, { data, ts: Date.now() })

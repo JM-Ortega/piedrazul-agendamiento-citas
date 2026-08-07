@@ -24,7 +24,7 @@ export class SchedulerService {
     if (cached && this.isFresh(cached.ts)) {
       return of(cached.data);
     }
-    return this.http.get<dtoDoctor[]>(`${this.apiUrl}/doctor/doctors`).pipe(
+    return this.http.get<dtoDoctor[]>(`${this.apiUrl}/doctor`).pipe(
       tap((data) =>
         this.doctorsCache.set(this.DOCTORS_CACHE_KEY, {
           data,
