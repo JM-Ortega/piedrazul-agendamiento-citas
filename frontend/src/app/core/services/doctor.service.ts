@@ -38,7 +38,7 @@ export class DoctorService {
     interface DoctorMeResponse {
       id: string;
       name: string;
-      specialty: string;
+      specialty: string[];
       appointmentInterval: number;
       laborStart: string;
       laborEnd: string;
@@ -51,7 +51,7 @@ export class DoctorService {
           ({
             id: res.id,
             name: res.name,
-            specialty: [res.specialty],
+            specialty: res.specialty,
             appointmentInterval: res.appointmentInterval,
             laborStart: res.laborStart,
             laborEnd: res.laborEnd,
