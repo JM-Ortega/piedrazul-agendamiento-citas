@@ -40,10 +40,10 @@ export class PatientNewAppointmentComponent implements OnInit {
       id: patient?.id ?? this.appService.keycloakId() ?? undefined,
       firstName: patient?.firstName ?? this.appService.firstName(),
       lastName: patient?.lastName ?? this.appService.lastName(),
-      documentNumber: patient?.identification,
-      documentType: patient?.identificationType,
+      identification: patient?.identification,
+      identificationType: patient?.identificationType,
       phone: patient?.phone,
-      gender: patient?.sex,
+      sex: patient?.sex,
       birthDate: patient?.birthDate,
       email: patient?.email,
     };
