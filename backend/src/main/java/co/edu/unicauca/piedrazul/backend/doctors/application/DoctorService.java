@@ -218,7 +218,7 @@ public class DoctorService implements DoctorProvisioningApi {
                 .map(SpecialtyCode::valueOf)
                 .toList();
 
-        if (appointmentExternalService.isNewPatient(idPatient)) {
+        if (idPatient == null || appointmentExternalService.isNewPatient(idPatient)) {
             return activeSpecialties.contains(SpecialtyCode.MEDICINA_GENERAL)
                     ? List.of(SpecialtyCode.MEDICINA_GENERAL)
                     : Collections.emptyList();
