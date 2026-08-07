@@ -56,7 +56,7 @@ export class SchedulerFiltersComponent {
   doctorOptions = computed<SelectOption[]>(() =>
     this.doctors().map((d) => ({
       value: d.id,
-      label: `${d.name} — ${this.formatoPipe.transform(d.specialty)}`,
+      label: `${d.name} — ${d.specialties.map((s) => this.formatoPipe.transform(s)).join(', ')}`,
     }))
   );
 
