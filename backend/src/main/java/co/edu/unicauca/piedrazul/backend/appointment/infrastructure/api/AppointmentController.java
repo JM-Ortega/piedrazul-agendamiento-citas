@@ -7,6 +7,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentSta
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.ClinicalHistoryDescription;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.CitaDtoMapper;
@@ -169,8 +170,9 @@ public class AppointmentController {
     @PutMapping("/{appointmentId}/mark-as-attended")
     @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<Void> markAppointmentAsAttended(@PathVariable UUID appointmentId
-        , @RequestParam(required = false) String clinicalHistoryDescription) {
-        updateAppointmentStatusUseCase.markAsAttended(appointmentId, clinicalHistoryDescription);
+        , @RequestBody(required = false) ClinicalHistoryDescription request) {
+        String description = (request != null) ? request.description() : null;
+        updateAppointmentStatusUseCase.markAsAttended(appointmentId, description);
         return ResponseEntity.ok().build();
     }
 
