@@ -9,6 +9,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorCo
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.*;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -37,18 +38,36 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
     public List<DoctorResponse> getSpecialtiesWithDoctor(UUID patientId) {
         LocalDate from = LocalDate.now();
 
-        List<UUID> activeDoctorIds =
-                (patientId == null || isNewPatientUseCase.isNewPatient(patientId))
-                        ? getActiveGeneralDoctorsOrThrow()
-                        : getActiveDoctorsOrThrow();
+        boolean generalOnly = patientId == null || isNewPatientUseCase.isNewPatient(patientId);
+
+        List<UUID> activeDoctorIds = generalOnly
+                ? getActiveGeneralDoctorsOrThrow()
+                : getActiveDoctorsOrThrow();
 
         Map<UUID, Integer> availability = calculateAvailability(activeDoctorIds, from);
-
         List<UUID> orderedDoctors = sortDoctorsByAvailability(availability);
-
         Map<UUID, DoctorResponse> doctorMap = loadAndNormalizeDoctors(orderedDoctors);
 
+        if (generalOnly) {
+            return orderedDoctors.stream()
+                    .map(doctorMap::get)
+                    .filter(Objects::nonNull)
+                    .map(this::restrictToGeneralMedicine)
+                    .toList();
+        }
+
         return selectUniqueSpecialties(orderedDoctors, doctorMap);
+    }
+
+    private DoctorResponse restrictToGeneralMedicine(DoctorResponse doctor) {
+        return new DoctorResponse(
+                List.of(SpecialtyCode.MEDICINA_GENERAL.name()),
+                doctor.id(),
+                doctor.name(),
+                doctor.laborEnd(),
+                doctor.laborStart(),
+                doctor.workdays()
+        );
     }
 
     private List<UUID> getActiveDoctorsOrThrow() {
