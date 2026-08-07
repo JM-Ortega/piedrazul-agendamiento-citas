@@ -189,7 +189,7 @@ export class AdminConfigComponent implements OnInit {
           err?.error?.detail ??
           'Error al guardar los cambios. Intente de nuevo.';
         this.errorGuardado.set(
-          raw.startsWith('User is already active')
+          raw.startsWith('El usuario ya está activo')
             ? 'El médico ya está trabajando activamente. Debe deshabilitarlo primero para poder cambiar su período laboral.'
             : raw
         );

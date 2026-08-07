@@ -23,6 +23,6 @@ public class JpaVerificationCodeStore implements VerificationCodeStore {
 
     @Override
     public VerificationCode save(VerificationCode verificationCode) {
-        return repository.save(verificationCode);
+        return repository.saveAndFlush(verificationCode);
     }
 }

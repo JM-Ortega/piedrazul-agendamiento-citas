@@ -24,7 +24,7 @@ class DoctorExceptionHandlerTest {
         );
 
         assertThat(result.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
-        assertThat(result.getTitle()).isEqualTo(HttpStatus.NOT_FOUND.getReasonPhrase());
+        assertThat(result.getTitle()).isEqualTo("No encontrado");
         assertThat(result.getDetail()).isEqualTo("Doctor no encontrado");
         assertThat(result.getProperties()).containsEntry("errorCode", "DOCTOR_NOT_FOUND");
         assertThat(result.getProperties()).containsEntry("module", "doctors");
@@ -40,7 +40,7 @@ class DoctorExceptionHandlerTest {
         );
 
         assertThat(result.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
-        assertThat(result.getTitle()).isEqualTo(HttpStatus.CONFLICT.getReasonPhrase());
+        assertThat(result.getTitle()).isEqualTo("Conflicto");
         assertThat(result.getDetail()).isEqualTo("A schedule for LUNES already exists");
         assertThat(result.getProperties()).containsEntry("errorCode", "DOCTOR_SCHEDULE_CONFLICT");
         assertThat(result.getProperties()).containsEntry("module", "doctors");
@@ -53,8 +53,8 @@ class DoctorExceptionHandlerTest {
         ProblemDetail result = handler.handleRuntime(new RuntimeException("Sensitive detail"), request);
 
         assertThat(result.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
-        assertThat(result.getTitle()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase());
-        assertThat(result.getDetail()).isEqualTo("Unexpected error in doctors module");
+        assertThat(result.getTitle()).isEqualTo("Error interno del servidor");
+        assertThat(result.getDetail()).isEqualTo("Error inesperado en el módulo de médicos");
         assertThat(result.getProperties()).containsEntry("errorCode", "INTERNAL_ERROR");
         assertThat(result.getProperties()).containsEntry("module", "doctors");
     }

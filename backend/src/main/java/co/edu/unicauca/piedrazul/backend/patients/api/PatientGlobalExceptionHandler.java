@@ -26,12 +26,12 @@ public class PatientGlobalExceptionHandler extends BaseExceptionHandler {
                 .stream()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .findFirst()
-                .orElse("Validation error");
+                .orElse("Error de validación");
 
         log.warn("Error de validacion en patients: {}", detail);
         return buildProblem(
                 HttpStatus.BAD_REQUEST,
-                "Validation error",
+                "Error de validación",
                 detail,
                 "patients",
                 "VALIDATION_ERROR",
@@ -47,7 +47,7 @@ public class PatientGlobalExceptionHandler extends BaseExceptionHandler {
         log.warn("Argumento invalido en patients: {}", ex.getMessage());
         return buildProblem(
                 HttpStatus.BAD_REQUEST,
-                "Bad request",
+                "Solicitud inválida",
                 ex.getMessage(),
                 "patients",
                 "INVALID_ARGUMENT",
@@ -63,7 +63,7 @@ public class PatientGlobalExceptionHandler extends BaseExceptionHandler {
         log.warn("Estado invalido en patients: {}", ex.getMessage());
         return buildProblem(
                 HttpStatus.CONFLICT,
-                "Conflict",
+                "Conflicto",
                 ex.getMessage(),
                 "patients",
                 "INVALID_STATE",
@@ -96,7 +96,7 @@ public class PatientGlobalExceptionHandler extends BaseExceptionHandler {
 
         return buildProblem(
                 status,
-                status.getReasonPhrase(),
+                spanishTitle(status),
                 ex.getMessage(),
                 module,
                 errorCode,

@@ -5,6 +5,6 @@ import java.util.UUID;
 public class UserAlreadyActiveException extends UserException {
 
     public UserAlreadyActiveException(UUID id) {
-        super("User is already active: " + id);
+        super("El usuario ya está activo: " + id);
     }
 }

@@ -76,7 +76,7 @@ export class PatientService {
 
   // confirma OTP y crea o vincula la cuenta según el caso
   confirmLinkUserAccount(data: {
-    documentNumber: string;
+    identification: string;
     code: string;
     password?: string;
   }): Observable<Patient> {
