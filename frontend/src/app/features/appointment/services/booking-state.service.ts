@@ -89,7 +89,14 @@ export class BookingStateService {
   errorMessageDoctors = signal<string>('');
 
   readonly uniqueSpecialties = computed(() => [
-    ...new Set(this.specialtiesWithDoctor().map((s) => s.specialty)),
+    ...new Set(
+      this.specialtiesWithDoctor()
+        .flatMap((s) => s.specialty)
+        .filter(
+          (specialty): specialty is string =>
+            typeof specialty === 'string' && specialty.trim() !== ''
+        )
+    ),
   ]);
 
   readonly effectiveDoctor = computed<SpecialtyDoctor | null>(() => {

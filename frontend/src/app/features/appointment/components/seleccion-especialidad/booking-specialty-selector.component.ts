@@ -60,7 +60,7 @@ export class BookingSpecialtySelectorComponent {
     if (this.state.bookingMode() === 'specialty') {
       const match = this.state
         .specialtiesWithDoctor()
-        .find((s) => s.specialty === specialty);
+        .find((s) => s.specialty.includes(specialty));
       this.state.assignedDoctor.set(match ?? null);
     } else {
       this.state.doctorsBySpecialty.set([]);

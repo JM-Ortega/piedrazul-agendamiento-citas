@@ -9,11 +9,12 @@ import {
   output,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { forkJoin, timer } from 'rxjs';
+import { timer } from 'rxjs';
 import { DoctorService } from '../../../../core/services/doctor.service';
 import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { mapHttpError } from '../../../../shared/helpers/http-errors';
+import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { BookingSpecialtySelectorComponent } from '../../../appointment/components/seleccion-especialidad/booking-specialty-selector.component';
 import { BookingScheduleSelectorComponent } from '../../../appointment/components/seleccion-horario/booking-schedule-selector.component';
@@ -57,7 +58,6 @@ export class AppointmentBookingComponent implements OnInit {
 
   @Input() context: BookingContext = 'patient';
 
-  //Datos del paciente autenticado
   @Input() set patientData(value: Partial<Patient> | null) {
     this.state.patientSnapshot.set(value);
   }
@@ -73,7 +73,6 @@ export class AppointmentBookingComponent implements OnInit {
   }
   private pendingDocumentNumber = '';
 
-  // Outputs
   goBack = output<void>();
 
   patientSubStep: 'search' | 'register' = 'search';
@@ -99,42 +98,49 @@ export class AppointmentBookingComponent implements OnInit {
     this.doctorService.getMe().subscribe({
       next: (doctor) => {
         this.state.doctorSnapshot.set(doctor);
-        // ⚠️ PARCHE: specialty ahora es string[]; tomamos la primera especialidad ,no creo que sea solucion optima
-        const cleanSpecialty = doctor.specialty[0];
-        this.state.selectedSpecialty.set(cleanSpecialty);
-
-        const doctors$ = this.citaService.getDoctorsBySpecialty(cleanSpecialty);
+        this.loadSpecialtiesForMode('specialty-doctor');
 
         if (this.pendingDocumentNumber) {
-          const patient$ = this.citaService.getPatientByDocument(
-            this.pendingDocumentNumber
-          );
-          forkJoin({ doctors: doctors$, patient: patient$ }).subscribe({
-            next: ({ doctors, patient }) => {
-              this.state.foundPatient.set(patient);
-              this.state.patientId.set(patient?.id ?? null);
-              this.loadSpecialtiesForMode('specialty-doctor');
-              this.applyDoctorsPreselection(doctors, doctor.id, doctor.name);
-              this.state.step.set(this.state.specialtyStep());
-            },
-            error: () => {
-              this.loadSpecialtiesForMode('specialty-doctor');
-              this.state.step.set(this.state.specialtyStep());
-            },
-          });
+          this.citaService
+            .getPatientByDocument(this.pendingDocumentNumber)
+            .subscribe({
+              next: (patient) => {
+                this.state.foundPatient.set(patient);
+                this.state.patientId.set(patient?.id ?? null);
+                this.preselectDoctorSpecialty(doctor);
+                this.state.step.set(this.state.specialtyStep());
+              },
+              error: () => {
+                this.preselectDoctorSpecialty(doctor);
+                this.state.step.set(this.state.specialtyStep());
+              },
+            });
         } else {
-          this.loadSpecialtiesForMode('specialty-doctor');
-          doctors$.subscribe({
-            next: (docs) => {
-              this.applyDoctorsPreselection(docs, doctor.id, doctor.name);
-              this.state.step.set(this.state.specialtyStep());
-            },
-            error: () => this.state.step.set(this.state.specialtyStep()),
-          });
+          this.preselectDoctorSpecialty(doctor);
+          this.state.step.set(this.state.specialtyStep());
         }
       },
       error: () => {
         this.loadSpecialtiesForMode('specialty-doctor');
+      },
+    });
+  }
+
+  private preselectDoctorSpecialty(doctor: Doctor): void {
+    const specialties = doctor.specialty ?? [];
+    if (specialties.length !== 1) return;
+
+    const specialty = specialties[0];
+    this.state.selectedSpecialty.set(specialty);
+
+    this.citaService.getDoctorsBySpecialty(specialty).subscribe({
+      next: (docs) =>
+        this.applyDoctorsPreselection(docs, doctor.id, doctor.name),
+      error: () => {
+        this.state.noDoctorsFound.set(true);
+        this.state.errorMessageDoctors.set(
+          'No hay médicos disponibles para esta especialidad.'
+        );
       },
     });
   }
@@ -292,7 +298,7 @@ export class AppointmentBookingComponent implements OnInit {
         }
         this.state.specialtiesWithDoctor.set(
           specs.map((s) => ({
-            specialty: s,
+            specialty: [s],
             id: '',
             name: '',
             laborStart: null,
@@ -358,16 +364,20 @@ export class AppointmentBookingComponent implements OnInit {
     const doctor = this.state.doctorSnapshot();
     if (!doctor) return;
 
-    const cleanSpecialty = doctor.specialty[0]; // ⚠️ PARCHE: specialty ahora es string[]; tomamos la primera especialidad
+    const specialties = doctor.specialty ?? [];
+    if (specialties.length !== 1) return;
+
+    const specialty = specialties[0];
 
     if (
-      this.state.selectedSpecialty() === cleanSpecialty &&
+      this.state.selectedSpecialty() === specialty &&
       this.state.selectedDoctorId()
-    )
+    ) {
       return;
+    }
 
-    this.state.selectedSpecialty.set(cleanSpecialty);
-    this.citaService.getDoctorsBySpecialty(cleanSpecialty).subscribe({
+    this.state.selectedSpecialty.set(specialty);
+    this.citaService.getDoctorsBySpecialty(specialty).subscribe({
       next: (docs) =>
         this.applyDoctorsPreselection(docs, doctor.id, doctor.name),
       error: () => {
