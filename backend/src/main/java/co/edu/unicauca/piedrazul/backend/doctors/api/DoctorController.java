@@ -10,6 +10,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundExcepti
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
+import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.data.domain.Pageable;
@@ -152,8 +153,8 @@ public class DoctorController {
      */
     @GetMapping("/patients/specialties")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<List<SpecialtyCode>> getSpecialties(@PathVariable @NotNull(message = "El id del paciente es requerido")
-                                                                  UUID patientId) {
+    public ResponseEntity<List<SpecialtyCode>> getSpecialties(
+            @RequestParam(required = false) UUID patientId) {
         List<SpecialtyCode> specialties = doctorService.getSpecialties(patientId);
         return ResponseEntity.ok(specialties);
     }
