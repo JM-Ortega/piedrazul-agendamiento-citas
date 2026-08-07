@@ -6,6 +6,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.UpdateApp
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.ClinicalHistoryPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
+import jakarta.transaction.Transactional;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -22,6 +23,7 @@ public class UpdateAppointmentStatusUseCaseImpl implements UpdateAppointmentStat
     }
 
     @Override
+    @Transactional
     public void markAsAttended(UUID appointmentId, String clinicalHistoryDescription) {
         // Obtener la cita por ID
         Appointment appointment = appointmentRepository.findById(appointmentId);
@@ -40,6 +42,7 @@ public class UpdateAppointmentStatusUseCaseImpl implements UpdateAppointmentStat
     }
 
     @Override
+    @Transactional
     public void markAsUnassisted(UUID appointmentId) {
         // Obtener la cita por ID
         Appointment appointment = appointmentRepository.findById(appointmentId);

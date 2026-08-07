@@ -36,6 +36,7 @@ public class AppointmentController {
     private final IsNewPatientUseCase isNewPatientUseCase;
     private final UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase;
     private final CancelAppointmentUseCase cancelAppointmentUseCase;
+    private final GetAppointmentStatesUseCase getAppointmentStatesUseCase;
 
     private final AppointmentSchedulingService appointmentSchedulingService;
     private final ManualPatientResolutionStrategy manualPatientResolutionStrategy;
@@ -49,7 +50,7 @@ public class AppointmentController {
             ListMyAppointmentsUseCase listMyAppointmentsUseCase,
             IsNewPatientUseCase isNewPatientUseCase,
             UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase,
-            CancelAppointmentUseCase cancelAppointmentUseCase,
+            CancelAppointmentUseCase cancelAppointmentUseCase, GetAppointmentStatesUseCase getAppointmentStatesUseCase,
             AppointmentSchedulingService appointmentSchedulingService,
             ManualPatientResolutionStrategy manualPatientResolutionStrategy,
             AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy) {
@@ -61,6 +62,7 @@ public class AppointmentController {
         this.isNewPatientUseCase = isNewPatientUseCase;
         this.updateAppointmentStatusUseCase = updateAppointmentStatusUseCase;
         this.cancelAppointmentUseCase = cancelAppointmentUseCase;
+        this.getAppointmentStatesUseCase = getAppointmentStatesUseCase;
         this.appointmentSchedulingService = appointmentSchedulingService;
         this.manualPatientResolutionStrategy = manualPatientResolutionStrategy;
         this.autonomousPatientResolutionStrategy = autonomousPatientResolutionStrategy;
@@ -190,6 +192,14 @@ public class AppointmentController {
     public ResponseEntity<Void> cancelAppointment(@PathVariable UUID appointmentId) {
         cancelAppointmentUseCase.cancel(appointmentId);
         return ResponseEntity.noContent().build(); // 204
+    }
+
+    // Listar los estados de las citas
+    @GetMapping("/list-all-states")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR')")
+    public ResponseEntity<List<AppointmentState>> listAppointmentStates() {
+        List<AppointmentState> states = getAppointmentStatesUseCase.getAppointmentStates();
+        return ResponseEntity.ok(states);
     }
 
     private UUID resolvePerformedBy(Jwt jwt) {
