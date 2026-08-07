@@ -6,7 +6,7 @@ import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
 import { Patient } from '../../shared/models/interfaces/patient.model';
 
 export interface PatientPublicResponse {
-  documentType: string | null;
+  identificationType: string | null;
   maskedDocument: string;
   firstName: string | null;
   lastName: string | null;
@@ -28,7 +28,9 @@ export class PatientService {
     if (this.documentTypes().length > 0) return;
     this.getAllDocumentTypes().subscribe({
       next: (types) => this.documentTypes.set(types),
-      error: () => {},
+      error: () => {
+        console.error('Error al cargar los tipos de documento');
+      },
     });
   }
 
@@ -49,13 +51,13 @@ export class PatientService {
   createWithUser(data: {
     username: string;
     password: string;
-    documentType: string;
-    documentNumber: string;
+    identificationType: string;
+    identification: string;
     firstName: string;
     lastName: string;
     phone: string;
     email?: string;
-    gender: string;
+    sex: string;
     birthDate: string;
     guardianPhone?: string;
   }): Observable<Patient> {
@@ -64,7 +66,7 @@ export class PatientService {
 
   // solicita OTP para vincular o completar registro
   requestLinkUserAccountCode(data: {
-    documentNumber: string;
+    identification: string;
   }): Observable<void> {
     return this.http.post<void>(
       `${this.apiUrl}/patients/link-user-account/request-code`,

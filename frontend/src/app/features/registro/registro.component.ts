@@ -34,6 +34,7 @@ import {
   PatientFormData,
   EMPTY_PATIENT_FORM,
 } from '../../shared/components/form/register-form.component';
+import { FormatoPipe } from '../../shared/pipes/formatoPipe';
 
 type RegistroStep = 1 | 2 | 3;
 type PatientStatus =
@@ -54,6 +55,7 @@ type PatientStatus =
     ButtonComponent,
     InputComponent,
     PatientDataFormComponent,
+    FormatoPipe,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './registro.component.html',
@@ -251,7 +253,7 @@ export class RegistroComponent implements OnInit {
 
     if (this.isExistingPatient() || this.isExistingSystemUser()) {
       this.patientService
-        .requestLinkUserAccountCode({ documentNumber: this.documentNumber() })
+        .requestLinkUserAccountCode({ identification: this.documentNumber() })
         .subscribe({
           next: () => {
             this.isLoading.set(false);
@@ -272,13 +274,13 @@ export class RegistroComponent implements OnInit {
       .createWithUser({
         username: this.documentNumber(),
         password: this.password(),
-        documentType: f.identificationType,
-        documentNumber: this.documentNumber(),
+        identificationType: f.identificationType,
+        identification: this.documentNumber(),
         firstName: f.firstName,
         lastName: f.lastName,
         phone: f.phone,
         email: (f.email ?? '').trim() || undefined,
-        gender: f.sex,
+        sex: f.sex,
         birthDate: f.birthDate,
         guardianPhone: (f.guardianPhone ?? '').trim() || undefined,
       })

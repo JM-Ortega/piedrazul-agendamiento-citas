@@ -101,7 +101,9 @@
                 </div>
                 <div>
                   <p class="text-gray-500 text-xs">Tipo de documento</p>
-                  <p class="font-semibold">{{ p.documentType }}</p>
+                  <p class="font-semibold">
+                    {{ p.identificationType | formato }}
+                  </p>
                 </div>
               </div>
             </div>
@@ -166,7 +168,9 @@
                 </div>
                 <div>
                   <p class="text-gray-500 text-xs">Tipo de documento</p>
-                  <p class="font-semibold">{{ p.documentType }}</p>
+                  <p class="font-semibold">
+                    {{ p.identificationType | formato }}
+                  </p>
                 </div>
               </div>
             </div>
