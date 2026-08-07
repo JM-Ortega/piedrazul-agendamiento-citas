@@ -24,8 +24,8 @@ public record DoctorResponse(
                         .toList(),
                 doctor.getPersonId(),
                 name,
-                doctor.getLaborStart(),
                 doctor.getLaborEnd(),
+                doctor.getLaborStart(),
                 Optional.ofNullable(doctor.getSchedules())
                         .orElse(new HashSet<>())
                         .stream()
