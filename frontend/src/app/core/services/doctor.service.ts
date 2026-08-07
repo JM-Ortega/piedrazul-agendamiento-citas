@@ -45,30 +45,28 @@ export class DoctorService {
       status: boolean;
     }
 
-    return this.http
-      .get<DoctorMeResponse>(`${this.apiUrl}/doctor/me`)
-      .pipe(
-        map(
-          (res) =>
-            ({
-              id: res.id,
-              name: res.name,
-              specialty: res.specialty,
-              appointmentInterval: res.appointmentInterval,
-              laborStart: res.laborStart,
-              laborEnd: res.laborEnd,
-              status: res.status,
-              workdays: [],
-              startTime: '',
-              endTime: '',
-              daySchedules: {},
-            }) as Doctor
-        ),
-        tap((doctor) => {
-          this.meCache = doctor;
-          this.meCacheTimestamp = Date.now();
-        })
-      );
+    return this.http.get<DoctorMeResponse>(`${this.apiUrl}/doctor/me`).pipe(
+      map(
+        (res) =>
+          ({
+            id: res.id,
+            name: res.name,
+            specialty: [res.specialty],
+            appointmentInterval: res.appointmentInterval,
+            laborStart: res.laborStart,
+            laborEnd: res.laborEnd,
+            status: res.status,
+            workdays: [],
+            startTime: '',
+            endTime: '',
+            daySchedules: {},
+          }) as Doctor
+      ),
+      tap((doctor) => {
+        this.meCache = doctor;
+        this.meCacheTimestamp = Date.now();
+      })
+    );
   }
 
   /**

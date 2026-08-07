@@ -58,8 +58,11 @@ export class AdminConfigComponent implements OnInit {
   errorGuardado = signal('');
 
   // ── Computed ──────────────────────────────────────────────────────────────
+  // ⚠️ PARCHE: specialty ahora es string[] por doctor (antes era string único).
+  // flatMap aplana todas las especialidades de todos los doctores antes de
+  // contar valores únicos con Set.
   totalSpecialties = computed(
-    () => new Set(this.doctors().map((d) => d.specialty)).size
+    () => new Set(this.doctors().flatMap((d) => d.specialty)).size
   );
   avgInterval = computed(() => {
     const docs = this.doctors();

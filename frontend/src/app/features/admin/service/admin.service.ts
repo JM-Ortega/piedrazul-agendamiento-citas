@@ -1,10 +1,12 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { CreateUserRequestDto } from '../models/dtos/CreateUserRequestDto';
 import { dtoSchedule } from '../models/dtos/schedule.dto';
+import { PagedResponse } from '../models/interfaces/PagedResponse';
 
 import { DoctorAdminDto } from '../models/dtos/DoctorAdminDto';
 import { SystemUser } from '../models/interfaces/system-user.model';
@@ -19,8 +21,16 @@ export class AdminService {
   createUser(payload: CreateUserRequestDto): Observable<void> {
     return this.http.post<void>(`${this.apiUrl}/user/users`, payload);
   }
+  // ⚠️ PARCHE TEMPORAL: el backend ahora pagina este endpoint (default size=5).
+  // Pedimos un tamaño grande fijo para traer "todo" mientras no se implementa
+  // paginación real (botones anterior/siguiente) en el panel de admin.
+  // TODO: reemplazar por paginación real cuando la cantidad de doctores crezca.
   getDoctors(): Observable<Doctor[]> {
-    return this.http.get<Doctor[]>(`${this.apiUrl}/doctor/detailed`);
+    return this.http
+      .get<PagedResponse<Doctor>>(`${this.apiUrl}/doctor/detailed`, {
+        params: { size: 100 },
+      })
+      .pipe(map((response) => response.content));
   }
 
   getDoctorsAdmin(): Observable<DoctorAdminDto[]> {

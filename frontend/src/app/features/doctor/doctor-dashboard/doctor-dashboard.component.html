@@ -10,7 +10,7 @@
           Bienvenido, {{ currentDoctor()?.name }}
         </h1>
         <p class="text-gray-600 text-xl mt-1">
-          {{ $safeNavigationMigration(currentDoctor()?.specialty) | formato }}
+          {{ formattedSpecialties(currentDoctor()?.specialty) }}
         </p>
       </div>
     </div>
