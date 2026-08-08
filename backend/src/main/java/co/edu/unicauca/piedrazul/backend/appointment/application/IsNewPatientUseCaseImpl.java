@@ -23,7 +23,9 @@ public class IsNewPatientUseCaseImpl implements IsNewPatientUseCase {
     /**
      * Si el paciente no exite en la bd significa que nunca antes se ha registrado una cita para ese paciente
      * por lo tanto automaticamente es nuevo, por otro lado si si existe toca que ver entonces si ya ha registrado una
-     * cita antes o no
+     * cita antes o no, se pone solo el estado de atendida porque  en caso de qeu tenga medicina general esta debe estar
+     * si o si atendida para que puedan dejarle agendar citas nuevas, o sea si minimo tiene una cita atendida ya no es
+     * nuevo, no basta con tener citas agendadas
      * @param patientId
      * @return true si es nuevo y false si no lo es
      */
