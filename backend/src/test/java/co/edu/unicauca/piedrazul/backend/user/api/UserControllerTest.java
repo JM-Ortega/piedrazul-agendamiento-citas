@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.user.api;
 
 import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
+import co.edu.unicauca.piedrazul.backend.shared.pagination.PageResponse;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
@@ -13,12 +14,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,16 +46,20 @@ class UserControllerTest {
 						"Ana",
 						"Perez",
 						"1001",
-						List.of(Role.DOCTOR.name())
-				)
-		);
-		when(userService.getSystemUsers()).thenReturn(expectedUsers);
+						List.of(Role.DOCTOR.name())));
+		Pageable pageable = PageRequest.of(0, 9, Sort.by(Sort.Direction.ASC, "firstName"));
+		when(userService.getSystemUsers(pageable))
+				.thenReturn(new PageImpl<>(expectedUsers, pageable, expectedUsers.size()));
 
-		var response = userController.getSystemUsers();
+		var response = userController.getSystemUsers(pageable);
 
 		assertEquals(HttpStatus.OK, response.getStatusCode());
-		assertSame(expectedUsers, response.getBody());
-		verify(userService).getSystemUsers();
+		PageResponse<SystemUserResponse> body = response.getBody();
+		assertEquals(expectedUsers, body.content());
+		assertEquals(0, body.page());
+		assertEquals(1, body.totalPages());
+		assertEquals(expectedUsers.size(), body.totalElements());
+		verify(userService).getSystemUsers(pageable);
 	}
 
 	@Test
@@ -97,13 +105,10 @@ class UserControllerTest {
 						"Perez",
 						"ana.perez@example.com",
 						"3206228173",
-						"secret123"
-				),
+						"secret123"),
 				null,
 				null,
-				roles
-		);
+				roles);
 	}
-
 
 }

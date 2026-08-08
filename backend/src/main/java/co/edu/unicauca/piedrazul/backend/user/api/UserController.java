@@ -1,11 +1,19 @@
 package co.edu.unicauca.piedrazul.backend.user.api;
 
+import co.edu.unicauca.piedrazul.backend.shared.pagination.PageResponse;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemDoctorResponse;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
 import co.edu.unicauca.piedrazul.backend.user.application.CreateAccountUseCase;
 import co.edu.unicauca.piedrazul.backend.user.application.UserService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -25,13 +33,24 @@ public class UserController {
 
     /**
      * Obtiene todos los usuarios del sistema.
+     * <p>
+     * ¿Cómo consultará esto el Frontend/Cliente?
+     * </p>
+     * <p>
+     * Por defecto: /system-users (Page 0, Size 9, Ordenado por firstName ASC)
+     * </p>
+     * <p>
+     * Personalizado: /system-users?page=1&size=10&sort=lastName,desc
+     * </p>
      * @return Lista de usuarios registrados en el sistema
      */
     @GetMapping("/system-users")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<SystemUserResponse>> getSystemUsers() {
-        List<SystemUserResponse> users = userService.getSystemUsers();
-        return ResponseEntity.ok(users);
+    public ResponseEntity<PageResponse<SystemUserResponse>> getSystemUsers(
+            @PageableDefault(page = 0, size = 9, sort = "firstName", direction = Sort.Direction.ASC) Pageable pageable
+    ) {
+        Page<SystemUserResponse> users = userService.getSystemUsers(pageable);
+        return ResponseEntity.ok(PageResponse.from(users));
     }
 
     /**
@@ -40,9 +59,11 @@ public class UserController {
      */
     @GetMapping("/system-doctors")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<SystemDoctorResponse>> getSystemDoctors() {
-        List<SystemDoctorResponse> users = userService.getSystemDoctors();
-        return ResponseEntity.ok(users);
+    public ResponseEntity<PageResponse<SystemDoctorResponse>> getSystemDoctors(
+            @PageableDefault(page = 0, size = 5, sort = "firstName", direction = Sort.Direction.ASC) Pageable pageable
+    ) {
+        Page<SystemDoctorResponse> doctors = userService.getSystemDoctors(pageable);
+        return ResponseEntity.ok(PageResponse.from(doctors));
     }
 
     /**
