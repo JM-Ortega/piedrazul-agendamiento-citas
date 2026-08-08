@@ -10,6 +10,7 @@ import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
+import co.edu.unicauca.piedrazul.backend.user.exception.InvalidRoleAssignmentException;
 import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
 import org.springframework.stereotype.Service;
 
@@ -165,7 +166,7 @@ public class CreateAccountUseCase implements UserProvisioningApi {
         );
 
         if (!validCombinations.contains(roleSet)) {
-            throw new InvalidUserDataException("Combinación de roles no valida: " + roles);
+            throw new InvalidRoleAssignmentException("Combinación de roles no es valida: " + roles);
         }
     }
 }

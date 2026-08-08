@@ -1,22 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.user.exception;
 
-import java.util.UUID;
+import org.springframework.http.HttpStatus;
 
-public class PersonAlreadyLinkedUserException extends UserException {
-
-    private PersonAlreadyLinkedUserException(String message) {
-        super(message);
-    }
-
-    public static PersonAlreadyLinkedUserException forPerson(UUID personId) {
-        return new PersonAlreadyLinkedUserException(
-                "La persona con id " + personId + " ya tiene una cuenta de usuario vinculada"
-        );
-    }
-
-    public static PersonAlreadyLinkedUserException forUserId(UUID userId) {
-        return new PersonAlreadyLinkedUserException(
-                "La cuenta de usuario " + userId + " ya está vinculada a otra persona"
-        );
+public class PersonAlreadyLinkedUserException extends UserBusinessException {
+    public PersonAlreadyLinkedUserException(String message) {
+        super(message, "PERSON_ALREADY_LINKED", HttpStatus.CONFLICT);
     }
 }

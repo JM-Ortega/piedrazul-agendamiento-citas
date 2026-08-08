@@ -1,8 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.user.exception;
 
-public class PersonAlreadyExistsException extends UserException {
+import org.springframework.http.HttpStatus;
 
-    public PersonAlreadyExistsException(String identification) {
-        super("Ya existe una persona con identificación '" + identification + "'");
+public class PersonAlreadyExistsException extends UserBusinessException {
+
+    public PersonAlreadyExistsException(String message) {
+        super(message, "PERSON_ALREADY_EXIST", HttpStatus.CONFLICT);
     }
 }

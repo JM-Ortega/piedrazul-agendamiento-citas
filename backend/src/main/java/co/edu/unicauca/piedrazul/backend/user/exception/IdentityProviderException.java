@@ -1,8 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.user.exception;
 
-public class IdentityProviderException extends UserException {
+import org.springframework.http.HttpStatus;
+
+public class IdentityProviderException extends UserBusinessException {
 
     public IdentityProviderException(String message) {
-        super(message);
+        super("Error del proveedor de identidad: "+ message, "KEYCLOAK_EXCEPTION", HttpStatus.BAD_GATEWAY);
     }
 }
