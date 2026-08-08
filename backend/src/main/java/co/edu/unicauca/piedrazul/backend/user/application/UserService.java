@@ -11,6 +11,7 @@ import co.edu.unicauca.piedrazul.backend.user.exception.UserNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Service
@@ -30,49 +31,53 @@ public class UserService {
         List<UserSummary> doctors = keycloakUserService.findDoctors();
         List<UserSummary> schedulers = keycloakUserService.findSchedulers();
 
-        Map<UUID, UserSummary> keycloakUsers = new LinkedHashMap<>();
+        Map<UUID, UserSummary> usersById = new LinkedHashMap<>();
 
         Stream.concat(doctors.stream(), schedulers.stream())
-                .forEach(user -> keycloakUsers.putIfAbsent(user.id(), user));
+                .forEach(user -> usersById.putIfAbsent(user.id(), user));
 
-        Map<UUID, List<String>> rolesByUserId = keycloakUserService.getUserRolesByIds(keycloakUsers.keySet());
+        Map<UUID, List<String>> rolesByUserId =
+                keycloakUserService.getUserRolesByIds(usersById.keySet());
 
-        List<SystemUserResponse> result = new ArrayList<>();
-
-        for (UserSummary user : keycloakUsers.values()) {
-            List<String> roles = resolveRoles(user, rolesByUserId);
-
-            result.add(new SystemUserResponse(
-                    user.id(),
-                    user.firstName(),
-                    user.lastName(),
-                    user.username(),
-                    roles
-            ));
-        }
-
-        return result;
+        return usersById.values().stream()
+                .map(user -> new SystemUserResponse(
+                        user.id(),
+                        user.firstName(),
+                        user.lastName(),
+                        user.username(),
+                        rolesByUserId.getOrDefault(user.id(), List.of())
+                                .stream()
+                                .filter(role -> !EXCLUDED_ROLES.contains(role))
+                                .distinct()
+                                .toList()
+                ))
+                .toList();
     }
+
+    private static final Set<String> EXCLUDED_ROLES = Set.of(
+            Role.PATIENT.name(),
+            "default-roles-piedrazul"
+    );
 
     public List<SystemDoctorResponse> getSystemDoctors() {
         List<UserSummary> doctors = keycloakUserService.findDoctors();
 
-        List<UUID> userIds = doctors.stream()
-                .map(UserSummary::id)
-                .toList();
-
-        if(userIds.isEmpty()){
+        if (doctors.isEmpty()) {
             return List.of();
         }
 
-        // 1. Obtener el mapa de userId -> personId
-        Map<UUID, UUID> personIdsMap = personExternalServiceImp.findPersonIdsByUserIds(userIds);
+        Set<UUID> userIds = doctors.stream()
+                .map(UserSummary::id)
+                .collect(Collectors.toSet());
 
-        // 2. Extraer la lista real de personIds
-        List<UUID> personIds = new ArrayList<>(personIdsMap.values());
+        Map<UUID, List<String>> rolesByUserId =
+                keycloakUserService.getUserRolesByIds(userIds);
 
-        // 3. Consultar especialidades usando personIds, NO userIds
-        Map<UUID, List<SpecialtyCode>> specialties = doctorExternalService.findSpecialtiesByPersonIds(personIds);
+        Map<UUID, UUID> personIdsMap =
+                personExternalServiceImp.findPersonIdsByUserIds(userIds);
+
+        Map<UUID, List<SpecialtyCode>> specialties =
+                doctorExternalService.findSpecialtiesByPersonIds(personIdsMap.values());
 
         List<SystemDoctorResponse> result = new ArrayList<>();
 
@@ -90,7 +95,11 @@ public class UserService {
                     doctor.firstName(),
                     doctor.lastName(),
                     doctor.username(),
-                    doctor.roles(),
+                    rolesByUserId.getOrDefault(doctor.id(), List.of())
+                            .stream()
+                            .filter(role -> !EXCLUDED_ROLES.contains(role))
+                            .distinct()
+                            .toList(),
                     doctorSpecialties
             ));
         }
@@ -118,20 +127,6 @@ public class UserService {
         }else{
             throw new DoctorRoleRequiredException("Solo se puede revocar el rol de Agendador a un usuario de tipo Doctor");
         }
-    }
-
-    private List<String> resolveRoles(UserSummary user, Map<UUID, List<String>> rolesByUserId) {
-        List<String> roles = Optional.ofNullable(rolesByUserId.get(user.id()))
-                .orElseGet(() -> keycloakUserService.getUserRoles(user.id()));
-
-        if (roles == null || roles.isEmpty()) {
-            roles = user.roles();
-        }
-
-        return roles.stream()
-                .filter(role -> !Role.PATIENT.name().equals(role))
-                .distinct()
-                .toList();
     }
 
     private boolean hasRole(UUID userId, Role role) {
