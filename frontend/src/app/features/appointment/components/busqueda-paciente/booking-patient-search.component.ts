@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  Input,
   inject,
   output,
   signal,
@@ -47,6 +48,13 @@ const MIN_DOC_LENGTH = 6;
 export class BookingPatientSearchComponent {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
+
+  /** Si llega un valor, precarga el documento y dispara la búsqueda exacta automáticamente. */
+  @Input() set prefillDocument(value: string) {
+    if (!value) return;
+    this.state.searchQuery.set(value);
+    this.onSearchExact();
+  }
 
   patientConfirmed = output<void>();
   patientMissing = output<void>();

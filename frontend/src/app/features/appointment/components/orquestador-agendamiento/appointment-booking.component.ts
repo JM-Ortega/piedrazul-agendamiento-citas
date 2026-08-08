@@ -72,6 +72,7 @@ export class AppointmentBookingComponent implements OnInit {
     }
   }
   private pendingDocumentNumber = '';
+  pendingSearchDocument = '';
 
   goBack = output<void>();
 
@@ -181,8 +182,14 @@ export class AppointmentBookingComponent implements OnInit {
 
   onSearchChangeMode(): void {
     this.patientSubStep = 'search';
+    this.pendingSearchDocument = '';
     this.state.bookingMode.set(null);
     this.state.step.set(1);
+  }
+
+  onExistingDocumentConfirmed(doc: string): void {
+    this.pendingSearchDocument = doc;
+    this.patientSubStep = 'search';
   }
 
   // Eventos de BookingPatientRegister
@@ -194,6 +201,7 @@ export class AppointmentBookingComponent implements OnInit {
 
   onRegisterGoBack(): void {
     this.patientSubStep = 'search';
+    this.pendingSearchDocument = '';
     this.state.notFound.set(false);
     this.state.searchQuery.set('');
     this.state.searchSuggestions.set([]);

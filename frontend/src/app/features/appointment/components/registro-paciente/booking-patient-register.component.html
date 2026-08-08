@@ -6,10 +6,23 @@
     </p>
   </div>
 
-  <div
-    class="bg-[#e6f0fa] border border-[#c2d8f0] rounded-xl px-4 py-3 flex items-center gap-2 text-[#163c63] text-sm"
-  >
-    📋 Documento: <strong>{{ getPatientField('identification') }}</strong>
+  <div>
+    <label
+      for="documentNumber"
+      class="block text-gray-700 mb-1 text-sm font-medium"
+    >
+      Número de documento <span class="text-red-500">*</span>
+    </label>
+    <app-input
+      [id]="'documentNumber'"
+      type="text"
+      [sanitize]="documentSanitizeRule()"
+      [maxLength]="documentInputMaxLength"
+      placeholder="Ingrese el número de documento"
+      [ngModel]="documentNumber()"
+      (valueChange)="onDocumentNumberChange($event)"
+      [errorMessage]="documentError()"
+    ></app-input>
   </div>
 
   <app-patient-data-form
@@ -26,10 +39,33 @@
     <app-button
       variant="primary"
       (buttonClick)="onContinue(patientForm)"
+      [disabled]="isChecking()"
       [fullWidth]="true"
       class="flex-1"
     >
-      Continuar →
+      @if (isChecking()) {
+        Verificando...
+      } @else {
+        Continuar →
+      }
     </app-button>
   </div>
 </div>
+
+<app-confirm-modal
+  [visible]="showExistsModal()"
+  title="Este documento ya existe"
+  [message]="
+    'El documento ' +
+    existingDocument() +
+    ' ya está registrado en el sistema. ' +
+    'Se le devolverá al paso de búsqueda para confirmar su información.'
+  "
+  confirmLabel="Aceptar"
+  cancelLabel="Cancelar"
+  confirmVariant="primary"
+  (dismissed)="dismissExistsModal()"
+  (confirmed)="confirmExistingDocument()"
+>
+  <svg icon lucideAlertCircle [size]="32" class="text-amber-500"></svg>
+</app-confirm-modal>
