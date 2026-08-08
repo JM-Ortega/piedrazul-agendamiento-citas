@@ -9,6 +9,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
+import co.edu.unicauca.piedrazul.backend.shared.pagination.PageResponse;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.Min;
@@ -115,21 +116,21 @@ public class DoctorController {
      *
      * @param page índice de la página a consultar. Debe ser mayor o igual a cero.
      * @return un {@link ResponseEntity} con estado {@code 200 OK} que contiene
-     * un {@link Page} de {@link DoctorDetailedResponse}.
+     * un {@link PageResponse} de {@link DoctorDetailedResponse}.
      * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
      * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @GetMapping("/detailed")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> getDoctors(
-            @RequestParam(defaultValue = "0") @Min(0) int page){
+    public ResponseEntity<PageResponse<DoctorDetailedResponse>> getDoctors(
+            @RequestParam(defaultValue = "0") @Min(0) int page) {
 
         Pageable pageable = PageRequest.of(page, 5);
 
-        Page<DoctorDetailedResponse> response =
+        Page<DoctorDetailedResponse> doctors =
                 doctorService.findAllDoctorsDetailed(pageable);
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(PageResponse.from(doctors));
     }
 
     /**
