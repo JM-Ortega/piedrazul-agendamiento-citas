@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class UserExceptionHandlerTest {
+class UserBusinessExceptionHandlerTest {
 
     private UserExceptionHandler handler;
     private HttpServletRequest request;
@@ -26,22 +26,11 @@ class UserExceptionHandlerTest {
     }
 
     @Test
-    void handleUserAlreadyExists_shouldReturnConflict() {
-        UserAlreadyExistsException ex = new UserAlreadyExistsException("juan");
-
-        ProblemDetail result = handler.handleUserAlreadyExists(ex, request);
-
-        assertEquals(HttpStatus.CONFLICT.value(), result.getStatus());
-        assertEquals("Usuario ya existe", result.getTitle());
-        assertEquals(ex.getMessage(), result.getDetail());
-    }
-
-    @Test
     void handleUserNotFound_shouldReturnNotFound() {
         UUID id = UUID.randomUUID();
         UserNotFoundException ex = new UserNotFoundException("Usuario con id "+ id +" no encontrado");
 
-        ProblemDetail result = handler.handleUserNotFound(ex, request);
+        ProblemDetail result = handler.handleBusinessException(ex, request);
 
         assertEquals(HttpStatus.NOT_FOUND.value(), result.getStatus());
         assertEquals("Usuario no encontrado", result.getTitle());
@@ -52,7 +41,7 @@ class UserExceptionHandlerTest {
     void handleInvalidUserData_shouldReturnBadRequest() {
         InvalidUserDataException ex = new InvalidUserDataException("datos inválidos");
 
-        ProblemDetail result = handler.handleInvalidUserData(ex, request);
+        ProblemDetail result = handler.handleBusinessException(ex, request);
 
         assertEquals(HttpStatus.BAD_REQUEST.value(), result.getStatus());
         assertEquals("Datos de usuario inválidos", result.getTitle());
@@ -63,7 +52,7 @@ class UserExceptionHandlerTest {
     void handleIdentityProvider_shouldReturnBadGateway() {
         IdentityProviderException ex = new IdentityProviderException("error externo");
 
-        ProblemDetail result = handler.handleIdentityProvider(ex, request);
+        ProblemDetail result = handler.handleBusinessException(ex, request);
 
         assertEquals(HttpStatus.BAD_GATEWAY.value(), result.getStatus());
         assertEquals("Error del proveedor de identidad", result.getTitle());
@@ -72,10 +61,10 @@ class UserExceptionHandlerTest {
 
     @Test
     void handleUserException_shouldReturnBadRequest() {
-        UserException ex = new UserException("error genérico") {
+        UserBusinessException ex = new UserBusinessException("error genérico", "GENERIC_ERROR", HttpStatus.INTERNAL_SERVER_ERROR) {
         };
 
-        ProblemDetail result = handler.handleUserException(ex, request);
+        ProblemDetail result = handler.handleBusinessException(ex, request);
 
         assertEquals(HttpStatus.BAD_REQUEST.value(), result.getStatus());
         assertEquals("Error de usuario", result.getTitle());

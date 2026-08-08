@@ -16,16 +16,22 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalErrorAdvice extends BaseExceptionHandler {
 
     @ExceptionHandler(Exception.class)
-    public ProblemDetail globalHandle (Exception ex, HttpServletRequest request){
-        String detail = ex.getMessage();
+    public ProblemDetail globalHandle(
+            Exception ex,
+            HttpServletRequest request
+    ) {
 
-        log.warn("Excepcion no controlada {}", detail);
+        log.error(
+                "Excepción no controlada",
+                ex
+        );
+
         return buildProblem(
                 HttpStatus.INTERNAL_SERVER_ERROR,
+                "Error interno del servidor",
                 "Ocurrió un error inesperado en el servidor.",
-                detail,
-                "unknown module",
-                "VALIDATION_ERROR",
+                "global",
+                "INTERNAL_ERROR",
                 request
         );
     }

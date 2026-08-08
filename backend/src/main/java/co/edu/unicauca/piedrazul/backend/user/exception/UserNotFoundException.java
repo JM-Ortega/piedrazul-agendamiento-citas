@@ -1,8 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.user.exception;
 
-public class UserNotFoundException extends UserException {
+import org.springframework.http.HttpStatus;
 
+public class UserNotFoundException extends UserBusinessException {
     public UserNotFoundException(String message) {
-        super(message);
+        super(message, "USER_NOT_FOUND", HttpStatus.BAD_GATEWAY);
     }
 }

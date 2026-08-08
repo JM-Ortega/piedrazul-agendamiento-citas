@@ -56,11 +56,11 @@ public class PersonExternalServiceImp implements PersonExternalService {
             throw new InvalidUserDataException("phone is required");
 
         if (personRepository.existsByIdentification(identification)) {
-            throw new PersonAlreadyExistsException(identification);
+            throw new PersonAlreadyExistsException("Ya existe una persona con identificación '" + identification + "'");
         }
 
         if (userId != null && personRepository.existsByUserId(userId)) {
-            throw PersonAlreadyLinkedUserException.forUserId(userId);
+            throw new PersonAlreadyLinkedUserException("La cuenta de usuario " + userId + " ya está vinculada a otra persona");
         }
 
         Person person = new Person(
@@ -94,14 +94,14 @@ public class PersonExternalServiceImp implements PersonExternalService {
             throw new InvalidUserDataException("userId is required");
 
         Person person = personRepository.findById(personId)
-                .orElseThrow(() -> new PersonNotFoundException(personId));
+                .orElseThrow(() -> new PersonNotFoundException("No se encontró una persona con id: " + personId));
 
         if (person.getUserId() != null) {
-            throw PersonAlreadyLinkedUserException.forPerson(personId);
+            throw new PersonAlreadyLinkedUserException("La persona con id " + personId + " ya tiene una cuenta de usuario vinculada");
         }
 
         if (personRepository.existsByUserId(userId)) {
-            throw PersonAlreadyLinkedUserException.forUserId(userId);
+            throw new PersonAlreadyLinkedUserException("La cuenta de usuario " + userId + " ya está vinculada a otra persona");
         }
 
         person.setUserId(userId);
@@ -153,7 +153,7 @@ public class PersonExternalServiceImp implements PersonExternalService {
     @Override
     public String getPersonName(UUID personId) {
         Person person = personRepository.findById(personId)
-                .orElseThrow(() -> new PersonNotFoundException(personId));
+                .orElseThrow(() -> new PersonNotFoundException("No se encontró una persona con id: " + personId));
 
         return person.getFirstName() + " " + person.getLastName();
     }

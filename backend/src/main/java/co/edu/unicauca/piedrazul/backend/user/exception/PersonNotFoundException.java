@@ -1,10 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.user.exception;
 
-import java.util.UUID;
+import org.springframework.http.HttpStatus;
 
-public class PersonNotFoundException extends UserException {
-
-    public PersonNotFoundException(UUID id) {
-        super("No se encontró una persona con id: " + id);
+public class PersonNotFoundException extends UserBusinessException {
+    public PersonNotFoundException(String message) {
+        super(message, "PERSON_NOT_FOUND", HttpStatus.NOT_FOUND);
     }
 }

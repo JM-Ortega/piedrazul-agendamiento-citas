@@ -46,19 +46,6 @@ class DoctorExceptionHandlerTest {
         assertThat(result.getProperties()).containsEntry("module", "doctors");
     }
 
-    @Test
-    void handleRuntimeShouldHideUnexpectedMessage() {
-        HttpServletRequest request = buildRequest("/api/doctor/");
-
-        ProblemDetail result = handler.handleRuntime(new RuntimeException("Sensitive detail"), request);
-
-        assertThat(result.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
-        assertThat(result.getTitle()).isEqualTo("Error interno del servidor");
-        assertThat(result.getDetail()).isEqualTo("Error inesperado en el módulo de médicos");
-        assertThat(result.getProperties()).containsEntry("errorCode", "INTERNAL_ERROR");
-        assertThat(result.getProperties()).containsEntry("module", "doctors");
-    }
-
     private HttpServletRequest buildRequest(String uri) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI(uri);

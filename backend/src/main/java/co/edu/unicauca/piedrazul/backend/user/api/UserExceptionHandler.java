@@ -1,54 +1,99 @@
 package co.edu.unicauca.piedrazul.backend.user.api;
 
-
 import co.edu.unicauca.piedrazul.backend.shared.BaseExceptionHandler;
 import co.edu.unicauca.piedrazul.backend.user.exception.*;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice
+@RestControllerAdvice(basePackageClasses = UserController.class)
+@Order(Ordered.HIGHEST_PRECEDENCE)
+@Slf4j
 public class UserExceptionHandler extends BaseExceptionHandler {
 
-    @ExceptionHandler(UserAlreadyExistsException.class)
-    public ProblemDetail handleUserAlreadyExists(UserAlreadyExistsException ex, HttpServletRequest request) {
-        return buildProblem(HttpStatus.CONFLICT, "Usuario ya existe", ex.getMessage(), "user", "USER_ALREADY_EXISTS", request);
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ProblemDetail handleValidation(
+            MethodArgumentNotValidException ex,
+            HttpServletRequest request
+    ) {
+
+        log.warn("Error de validación en user");
+
+        return buildValidationProblem(
+                ex,
+                request,
+                "user"
+        );
     }
 
-    @ExceptionHandler(UserNotFoundException.class)
-    public ProblemDetail handleUserNotFound(UserNotFoundException ex, HttpServletRequest request) {
-        return buildProblem(HttpStatus.NOT_FOUND, "Usuario no encontrado", ex.getMessage(), "user", "USER_NOT_FOUND", request);
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ProblemDetail handleNotFound(
+            EntityNotFoundException ex,
+            HttpServletRequest request
+    ) {
+
+        log.warn(
+                "Recurso no encontrado en user: {}",
+                ex.getMessage()
+        );
+
+        return buildProblem(
+                HttpStatus.NOT_FOUND,
+                "No encontrado",
+                ex.getMessage(),
+                "user",
+                "USER_MODULE_NOT_FOUND",
+                request
+        );
     }
 
-    @ExceptionHandler(InvalidUserDataException.class)
-    public ProblemDetail handleInvalidUserData(InvalidUserDataException ex, HttpServletRequest request) {
-        return buildProblem(HttpStatus.BAD_REQUEST, "Datos de usuario inválidos", ex.getMessage(), "user", "INVALID_USER_DATA", request);
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail handleIllegalArgument(
+            IllegalArgumentException ex,
+            HttpServletRequest request
+    ) {
+
+        log.warn(
+                "Argumento inválido en user: {}",
+                ex.getMessage()
+        );
+
+        return buildProblem(
+                HttpStatus.BAD_REQUEST,
+                "Solicitud inválida",
+                ex.getMessage(),
+                "user",
+                "INVALID_ARGUMENT",
+                request
+        );
     }
 
-    @ExceptionHandler(IdentityProviderException.class)
-    public ProblemDetail handleIdentityProvider(IdentityProviderException ex, HttpServletRequest request) {
-        return buildProblem(HttpStatus.BAD_GATEWAY, "Error del proveedor de identidad", ex.getMessage(), "user", "IDENTITY_PROVIDER_ERROR", request);
-    }
+    @ExceptionHandler(UserBusinessException.class)
+    public ProblemDetail handleBusinessException(
+            UserBusinessException ex,
+            HttpServletRequest request
+    ) {
 
-    @ExceptionHandler(PersonAlreadyExistsException.class)
-    public ProblemDetail handlePersonAlreadyExists(PersonAlreadyExistsException ex, HttpServletRequest request) {
-        return buildProblem(HttpStatus.CONFLICT, "Persona ya existe", ex.getMessage(), "user", "PERSON_ALREADY_EXISTS", request);
-    }
+        log.warn(
+                "Error de negocio en user [{}]: {}",
+                ex.getClass().getSimpleName(),
+                ex.getMessage()
+        );
 
-    @ExceptionHandler(PersonAlreadyLinkedUserException.class)
-    public ProblemDetail handlePersonAlreadyLinkedUser(PersonAlreadyLinkedUserException ex, HttpServletRequest request) {
-        return buildProblem(HttpStatus.CONFLICT, "Persona ya vinculada", ex.getMessage(), "user", "PERSON_ALREADY_LINKED_USER", request);
-    }
-
-    @ExceptionHandler(PersonNotFoundException.class)
-    public ProblemDetail handlePersonNotFound(PersonNotFoundException ex, HttpServletRequest request) {
-        return buildProblem(HttpStatus.NOT_FOUND, "Persona no encontrada", ex.getMessage(), "user", "PERSON_NOT_FOUND", request);
-    }
-
-    @ExceptionHandler(UserException.class)
-    public ProblemDetail handleUserException(UserException ex, HttpServletRequest request) {
-        return buildProblem(HttpStatus.BAD_REQUEST, "Error de usuario", ex.getMessage(), "user", "USER_ERROR", request);
+        return buildProblem(
+                ex.getStatus(),
+                spanishTitle(ex.getStatus()),
+                ex.getMessage(),
+                ex.getModule(),
+                ex.getErrorCode(),
+                request
+        );
     }
 }

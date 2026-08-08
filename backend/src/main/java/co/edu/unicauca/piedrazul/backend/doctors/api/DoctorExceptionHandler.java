@@ -5,6 +5,8 @@ import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorBusinessExcepti
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
         DoctorController.class,
         ScheduleController.class
 })
+@Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j
 public class DoctorExceptionHandler extends BaseExceptionHandler {
 
@@ -48,7 +51,7 @@ public class DoctorExceptionHandler extends BaseExceptionHandler {
                 "No encontrado",
                 ex.getMessage(),
                 "doctors",
-                "DOCTOR_NOT_FOUND",
+                "DOCTOR_MODULE_NOT_FOUND",
                 request
         );
     }
@@ -89,32 +92,6 @@ public class DoctorExceptionHandler extends BaseExceptionHandler {
                 ex.getMessage(),
                 ex.getModule(),
                 ex.getErrorCode(),
-                request
-        );
-    }
-
-    @ExceptionHandler(RuntimeException.class)
-    public ProblemDetail handleRuntime(
-            RuntimeException ex,
-            HttpServletRequest request
-    ) {
-
-        if (ex instanceof AuthorizationDeniedException authorizationDeniedException) {
-            throw authorizationDeniedException;
-        }
-
-        if (ex instanceof AccessDeniedException accessDeniedException) {
-            throw accessDeniedException;
-        }
-
-        log.error("Error no controlado en doctors", ex);
-
-        return buildProblem(
-                HttpStatus.INTERNAL_SERVER_ERROR,
-                spanishTitle(HttpStatus.INTERNAL_SERVER_ERROR),
-                "Error inesperado en el módulo de médicos",
-                "doctors",
-                "INTERNAL_ERROR",
                 request
         );
     }
