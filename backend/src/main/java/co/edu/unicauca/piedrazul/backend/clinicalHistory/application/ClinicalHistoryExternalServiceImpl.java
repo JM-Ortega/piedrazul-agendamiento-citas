@@ -7,6 +7,8 @@ import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.internal.Clinic
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.output.ClinicalHistoryResponse;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.domain.ClinicalHistory;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.infrastructure.persistence.ClinicalHistoryRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -40,15 +42,18 @@ public class ClinicalHistoryExternalServiceImpl implements ClinicalHistoryExtern
     }
 
     @Override
-    public List<ClinicalHistoryResponse> getHistoryByPatient(UUID idPatient) {
-        return repository.findByIdPatient(idPatient)
-                .stream()
+    public Page<ClinicalHistoryResponse> getHistoryByPatient(
+            UUID idPatient,
+            Pageable pageable) {
+
+        return repository.findByIdPatient(idPatient, pageable)
                 .map(ch -> {
-                    AppointmentExternalData appointmentData = appointmentExternalService
-                            .getAppointmentData(ch.getIdAppointment());
+                    AppointmentExternalData appointmentData =
+                            appointmentExternalService
+                                    .getAppointmentData(ch.getIdAppointment());
+
                     return toResponse(ch, appointmentData.doctorName());
-                })
-                .toList();
+                });
     }
 
     private ClinicalHistoryResponse toResponse(ClinicalHistory ch,
