@@ -164,7 +164,7 @@ public class AppointmentSchedulingService {
         boolean hasTimeConflict = appointmentRepository.findByPatientIdAndDate(idPatient, date)
                 .stream()
                 .anyMatch(appointment -> appointment.getStartTime().equals(startTime)
-                        && appointment.getAppointmentState().isActive());
+                        && appointment.getAppointmentState().isBussy());
 
         if (hasTimeConflict) {
             throw new PatientScheduleTimeConflictException(
