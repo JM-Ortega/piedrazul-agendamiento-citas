@@ -4,10 +4,12 @@ import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.KeycloakUserClient;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+@Slf4j
 @Service
 public class KeycloakUserService implements UserModuleApi {
 
