@@ -62,7 +62,7 @@ public class UserService {
                 .toList();
 
         if(userIds.isEmpty()){
-            throw  new UserNotFoundException("No hay doctores en el sistema");
+            return List.of();
         }
 
         // 1. Obtener el mapa de userId -> personId
