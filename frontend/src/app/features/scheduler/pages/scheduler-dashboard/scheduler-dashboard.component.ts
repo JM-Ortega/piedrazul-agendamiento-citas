@@ -44,6 +44,7 @@ export class SchedulerDashboardComponent implements OnInit {
   })();
 
   doctors = signal<dtoDoctor[]>([]);
+  states = signal<string[]>([]);
   private appointments = signal<AppointmentsPatient[]>([]);
 
   filterDoctor = signal('');
@@ -62,19 +63,12 @@ export class SchedulerDashboardComponent implements OnInit {
   );
 
   results = computed(() => {
-    let filtered = this.appointments();
-    if (this.filterStatus()) {
-      filtered = filtered.filter(
-        (a) => a.appointmentState === this.filterStatus()
-      );
-    }
-
     const stateOrder: Record<string, number> = {
       AGENDADA: 1,
       ATENDIDA: 2,
       CANCELADA: 3,
     };
-    return [...filtered].sort((a, b) => {
+    return [...this.appointments()].sort((a, b) => {
       const stateDiff =
         stateOrder[a.appointmentState] - stateOrder[b.appointmentState];
       if (stateDiff !== 0) return stateDiff;
@@ -92,7 +86,8 @@ export class SchedulerDashboardComponent implements OnInit {
   constructor() {
     effect(() => {
       const doctorId = this.filterDoctor();
-      this.loadAppointments(doctorId);
+      const status = this.filterStatus();
+      this.loadAppointments(doctorId, status);
     });
   }
 
@@ -100,11 +95,18 @@ export class SchedulerDashboardComponent implements OnInit {
     this.schedulerService
       .getDoctors()
       .subscribe((data) => this.doctors.set(data));
+    this.schedulerService
+      .getStates()
+      .subscribe((data) => this.states.set(data));
   }
 
-  private loadAppointments(doctorId: string): void {
+  private loadAppointments(doctorId: string, status: string): void {
     this.schedulerService
-      .getAllAppointments({ date: this.today, idDoctor: doctorId || undefined })
+      .getAllAppointments({
+        date: this.today,
+        idDoctor: doctorId || undefined,
+        state: status || undefined,
+      })
       .subscribe({
         next: (data) => this.appointments.set(data),
         error: () => {

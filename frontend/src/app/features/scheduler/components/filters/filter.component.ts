@@ -7,9 +7,7 @@ import {
   SelectOption,
 } from '../../../../design-system/atoms/select/select.component';
 import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
-import { APPOINTMENT_STATUS_LABELS } from '../../../../shared/helpers/appointment-status';
 import { formatLongDateEs } from '../../../../shared/helpers/date-format';
-import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../../../shared/models/dtos/doctor.dto';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import {
@@ -18,14 +16,6 @@ import {
 } from '../../../../shared/helpers/transform-date-local';
 
 export type SchedulerFilterField = 'doctor' | 'date' | 'status';
-
-const STATUS_OPTIONS: SelectOption[] = [
-  { value: 'AGENDADA', label: 'Agendada' },
-  { value: 'ATENDIDA', label: 'Atendida' },
-  { value: 'CANCELADA', label: 'Cancelada' },
-  { value: 'NO_ASISTIO', label: 'No asistió' },
-  { value: 'REPROGRAMADA', label: 'Reprogramada' },
-];
 
 @Component({
   selector: 'app-filter',
@@ -42,6 +32,7 @@ const STATUS_OPTIONS: SelectOption[] = [
 export class SchedulerFiltersComponent {
   fields = input<SchedulerFilterField[]>(['doctor', 'status']);
   doctors = input<dtoDoctor[]>([]);
+  states = input<string[]>([]);
   title = input('Filtros');
   description = input('');
 
@@ -51,8 +42,6 @@ export class SchedulerFiltersComponent {
   filterDate = model('');
   filterStatus = model('');
 
-  readonly statusOptions = STATUS_OPTIONS;
-
   doctorOptions = computed<SelectOption[]>(() =>
     this.doctors().map((d) => ({
       value: d.id,
@@ -61,6 +50,13 @@ export class SchedulerFiltersComponent {
   );
 
   /** Convierte el string 'yyyy-mm-dd' del filtro a Date para el datepicker. */
+  statusOptions = computed<SelectOption[]>(() =>
+    this.states().map((s) => ({
+      value: s,
+      label: this.formatoPipe.transform(s),
+    }))
+  );
+
   filterDateValue = computed<Date | null>(() => {
     const raw = this.filterDate();
     return raw ? parseLocalDateString(raw) : null;
@@ -83,10 +79,7 @@ export class SchedulerFiltersComponent {
   }
 
   statusLabel(s: string): string {
-    return (
-      APPOINTMENT_STATUS_LABELS[s as AppointmentsPatient['appointmentState']] ??
-      s
-    );
+    return this.formatoPipe.transform(s);
   }
 
   onDateChange(date: Date | null): void {

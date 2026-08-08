@@ -42,6 +42,7 @@ export class SchedulerHistoryComponent implements OnInit {
   private patientAppointmentService = inject(PatientAppointmentService);
 
   doctors = signal<dtoDoctor[]>([]);
+  states = signal<string[]>([]);
   private appointments = signal<AppointmentsPatient[]>([]);
 
   filterDoctor = signal('');
@@ -61,19 +62,12 @@ export class SchedulerHistoryComponent implements OnInit {
   );
 
   results = computed(() => {
-    let filtered = this.appointments();
-    if (this.filterStatus()) {
-      filtered = filtered.filter(
-        (a) => a.appointmentState === this.filterStatus()
-      );
-    }
-
     const stateOrder: Record<string, number> = {
       AGENDADA: 1,
       ATENDIDA: 2,
       CANCELADA: 3,
     };
-    return [...filtered].sort((a, b) => {
+    return [...this.appointments()].sort((a, b) => {
       const stateDiff =
         stateOrder[a.appointmentState] - stateOrder[b.appointmentState];
       if (stateDiff !== 0) return stateDiff;
@@ -92,7 +86,8 @@ export class SchedulerHistoryComponent implements OnInit {
     effect(() => {
       const doctorId = this.filterDoctor();
       const date = this.filterDate();
-      this.loadAppointments(doctorId, date);
+      const status = this.filterStatus();
+      this.loadAppointments(doctorId, date, status);
     });
   }
 
@@ -100,13 +95,21 @@ export class SchedulerHistoryComponent implements OnInit {
     this.schedulerService
       .getDoctors()
       .subscribe((data) => this.doctors.set(data));
+    this.schedulerService
+      .getStates()
+      .subscribe((data) => this.states.set(data));
   }
 
-  private loadAppointments(doctorId: string, date: string): void {
+  private loadAppointments(
+    doctorId: string,
+    date: string,
+    status: string
+  ): void {
     this.schedulerService
       .getAllAppointments({
         idDoctor: doctorId || undefined,
         date: date || undefined,
+        state: status || undefined,
       })
       .subscribe({
         next: (data) => this.appointments.set(data),

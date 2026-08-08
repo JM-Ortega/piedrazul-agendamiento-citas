@@ -12,6 +12,7 @@
         <app-filter
           [fields]="['doctor', 'status']"
           [doctors]="doctors()"
+          [states]="states()"
           title="Filtros"
           [description]="'Citas del ' + formatDate(today)"
           [(filterDoctor)]="filterDoctor"

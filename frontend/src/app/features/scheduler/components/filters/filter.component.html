@@ -43,7 +43,7 @@
         >
         <app-select
           [id]="'filterStatus'"
-          [options]="statusOptions"
+          [options]="statusOptions()"
           placeholder="Todos los estados"
           [ngModel]="filterStatus()"
           (valueChange)="filterStatus.set($event)"
