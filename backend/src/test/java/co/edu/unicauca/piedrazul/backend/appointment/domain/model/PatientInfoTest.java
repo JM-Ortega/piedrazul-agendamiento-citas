@@ -211,7 +211,7 @@ class PatientInfoTest {
                 Gender.MASCULINO, LocalDate.of(1990, 6, 15), null, null
         ))
                 .isInstanceOf(InvalidDocumentException.class)
-                .hasMessageContaining("entre 6 y 12 dígitos");
+                .hasMessageContaining("entre 6 y 10 dígitos numéricos");
     }
 
     @Test
@@ -222,7 +222,7 @@ class PatientInfoTest {
                 Gender.MASCULINO, LocalDate.of(1990, 6, 15), null, null
         ))
                 .isInstanceOf(InvalidDocumentException.class)
-                .hasMessageContaining("entre 6 y 12 dígitos");
+                .hasMessageContaining("entre 6 y 10 dígitos numéricos");
     }
 
     @Test
@@ -233,6 +233,75 @@ class PatientInfoTest {
                 Gender.MASCULINO, LocalDate.of(1990, 6, 15), null, null
         ))
                 .isInstanceOf(InvalidDocumentException.class);
+    }
+
+    @Test
+    void ofShouldAcceptPasaporteWithLetters() {
+        // Antes de validar por tipo de documento, el pasaporte se validaba con un regex
+        // numérico único para todos los tipos — un pasaporte real siempre fallaba.
+        PatientInfo info = PatientInfo.of(
+                DocumentType.PASAPORTE,
+                "AB123456", "Laura", "Diaz", "3001234567",
+                Gender.FEMENINO, LocalDate.of(1990, 6, 15), null, null
+        );
+
+        assertThat(info.getDocumentType()).isEqualTo(DocumentType.PASAPORTE);
+        assertThat(info.getDocumentNumber()).isEqualTo("AB123456");
+    }
+
+    @Test
+    void ofShouldThrowWhenPasaporteHasMoreThanNineCharacters() {
+        assertThatThrownBy(() -> PatientInfo.of(
+                DocumentType.PASAPORTE,
+                "AB1234567890", "Laura", "Diaz", "3001234567",
+                Gender.FEMENINO, LocalDate.of(1990, 6, 15), null, null
+        ))
+                .isInstanceOf(InvalidDocumentException.class)
+                .hasMessageContaining("pasaporte debe contener entre 6 y 9 caracteres alfanuméricos");
+    }
+
+    @Test
+    void ofShouldAcceptTarjetaIdentidadWithElevenDigits() {
+        PatientInfo info = PatientInfo.of(
+                DocumentType.TARJETA_IDENTIDAD,
+                "12345678901", "Pedro", "Ruiz", "3001234567",
+                Gender.MASCULINO, LocalDate.now().minusYears(10), null, "3009999999"
+        );
+
+        assertThat(info.getDocumentNumber()).isEqualTo("12345678901");
+    }
+
+    @Test
+    void ofShouldThrowWhenTarjetaIdentidadHasNineDigits() {
+        assertThatThrownBy(() -> PatientInfo.of(
+                DocumentType.TARJETA_IDENTIDAD,
+                "123456789", "Pedro", "Ruiz", "3001234567",
+                Gender.MASCULINO, LocalDate.now().minusYears(10), null, "3009999999"
+        ))
+                .isInstanceOf(InvalidDocumentException.class)
+                .hasMessageContaining("tarjeta de identidad debe contener entre 10 y 11 dígitos numéricos");
+    }
+
+    @Test
+    void ofShouldAcceptRegistroNacimientoWithTwentyDigits() {
+        PatientInfo info = PatientInfo.of(
+                DocumentType.REGISTRO_NACIMIENTO,
+                "12345678901234567890", "Sofia", "Rios", "3001234567",
+                Gender.FEMENINO, LocalDate.now().minusYears(5), null, "3009999999"
+        );
+
+        assertThat(info.getDocumentNumber()).isEqualTo("12345678901234567890");
+    }
+
+    @Test
+    void ofShouldThrowWhenRegistroNacimientoHasTwentyOneDigits() {
+        assertThatThrownBy(() -> PatientInfo.of(
+                DocumentType.REGISTRO_NACIMIENTO,
+                "123456789012345678901", "Sofia", "Rios", "3001234567",
+                Gender.FEMENINO, LocalDate.now().minusYears(5), null, "3009999999"
+        ))
+                .isInstanceOf(InvalidDocumentException.class)
+                .hasMessageContaining("registro de nacimiento debe contener entre 8 y 20 dígitos numéricos");
     }
 
     // ─────────────────────────────────────────────
@@ -395,7 +464,7 @@ class PatientInfoTest {
     void ofShouldThrowWhenMinorHasNoGuardianPhone() {
         assertThatThrownBy(() -> PatientInfo.of(
                 DocumentType.TARJETA_IDENTIDAD,
-                "12345678", "Pedro", "Ruiz", "3001234567",
+                "1234567890", "Pedro", "Ruiz", "3001234567",
                 Gender.MASCULINO, LocalDate.now().minusYears(10), null, null
         ))
                 .isInstanceOf(GuardianRequiredException.class)
@@ -406,7 +475,7 @@ class PatientInfoTest {
     void ofShouldThrowWhenMinorHasBlankGuardianPhone() {
         assertThatThrownBy(() -> PatientInfo.of(
                 DocumentType.TARJETA_IDENTIDAD,
-                "12345678", "Pedro", "Ruiz", "3001234567",
+                "1234567890", "Pedro", "Ruiz", "3001234567",
                 Gender.MASCULINO, LocalDate.now().minusYears(10), null, "   "
         ))
                 .isInstanceOf(GuardianRequiredException.class)
@@ -434,7 +503,7 @@ class PatientInfoTest {
         // Un adulto no debería tener tarjeta de identidad
         assertThatThrownBy(() -> PatientInfo.of(
                 DocumentType.TARJETA_IDENTIDAD,
-                "12345678", "Carlos", "Gomez", "3001234567",
+                "1234567890", "Carlos", "Gomez", "3001234567",
                 Gender.MASCULINO, LocalDate.of(1990, 6, 15), null, null
         ))
                 .isInstanceOf(InconsistentPatientInfoException.class)
@@ -523,7 +592,7 @@ class PatientInfoTest {
     private PatientInfo buildMenor() {
         return PatientInfo.of(
                 DocumentType.TARJETA_IDENTIDAD,
-                "12345678",
+                "1234567890",
                 "Pedro",
                 "Ruiz",
                 "3001234567",
