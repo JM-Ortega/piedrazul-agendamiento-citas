@@ -2,10 +2,15 @@ package co.edu.unicauca.piedrazul.backend.clinicalHistory.api;
 
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.ClinicalHistoryExternalService;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.output.ClinicalHistoryResponse;
+import co.edu.unicauca.piedrazul.backend.shared.pagination.PageResponse;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -19,10 +24,15 @@ public class ClinicalHistoryController {
 
     //Obtener historial clínico de un paciente
     @GetMapping("/patient/{idPatient}")
-    public ResponseEntity<List<ClinicalHistoryResponse>> getByPatient(
-            @PathVariable UUID idPatient) {
+    public ResponseEntity<PageResponse<ClinicalHistoryResponse>> getByPatient(
+            @PathVariable @NotNull(message = "El id del paciente a consultar es obligatorio") UUID idPatient,
+            @RequestParam(defaultValue = "0") @Min(0) @NotNull(message = "El número de pagina es obligatorio") int page) {
 
-        List<ClinicalHistoryResponse> history = service.getHistoryByPatient(idPatient);
-        return ResponseEntity.ok(history);
+        Pageable pageable = PageRequest.of(page, 5);
+
+        Page<ClinicalHistoryResponse> history =
+                service.getHistoryByPatient(idPatient, pageable);
+
+        return ResponseEntity.ok(PageResponse.from(history));
     }
 }
