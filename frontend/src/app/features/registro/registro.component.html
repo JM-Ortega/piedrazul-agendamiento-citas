@@ -56,8 +56,8 @@
               <app-input
                 [id]="'documentNumber'"
                 type="text"
-                sanitize="alphanumeric"
-                [maxLength]="DOC_MAX"
+                [sanitize]="documentSanitizeRule()"
+                [maxLength]="DOCUMENT_INPUT_MAX_LENGTH"
                 placeholder="Ingresa tu número de documento"
                 [fullWidth]="true"
                 [ngModel]="documentNumber()"
@@ -142,7 +142,7 @@
               #patientForm
               [maxBirthDate]="maxBirthDate"
               [ngModel]="form()"
-              (valueChange)="form.set($event)"
+              (valueChange)="onFormChange($event)"
             ></app-patient-data-form>
           }
 

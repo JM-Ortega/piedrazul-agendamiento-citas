@@ -35,6 +35,12 @@ import {
   EMPTY_PATIENT_FORM,
 } from '../../shared/components/form/register-form.component';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
+import { SanitizeRule } from '../../design-system/atoms/input/input.component';
+import {
+  DOCUMENT_RULES,
+  DEFAULT_DOCUMENT_MAX_LENGTH,
+  validateDocumentForType,
+} from '../../shared/helpers/document-validation';
 
 type RegistroStep = 1 | 2 | 3;
 type PatientStatus =
@@ -124,8 +130,39 @@ export class RegistroComponent implements OnInit {
     return '';
   });
 
+  protected readonly DOCUMENT_INPUT_MAX_LENGTH = 20;
+
+  documentSanitizeRule = computed<SanitizeRule>(() => {
+    const type = this.form().identificationType;
+    if (!type) return 'alphanumeric';
+    return DOCUMENT_RULES[type]?.sanitize ?? 'alphanumeric';
+  });
+
+  documentMaxLengthDynamic = computed<number>(() => {
+    const type = this.form().identificationType;
+    return DOCUMENT_RULES[type]?.max ?? DEFAULT_DOCUMENT_MAX_LENGTH;
+  });
+
+  onFormChange(value: PatientFormData): void {
+    this.form.set(value);
+    this.revalidateDocumentNumber();
+  }
+
+  private revalidateDocumentNumber(): void {
+    const type = this.form().identificationType;
+    if (!type) return;
+    const msg = validateDocumentForType(type, this.documentNumber());
+    this.errors.update((e) => {
+      const next = { ...e };
+      if (msg) next['documentNumber'] = msg;
+      else delete next['documentNumber'];
+      return next;
+    });
+  }
+
   onDocumentNumberChange(value: string | number | boolean | null): void {
     this.onDocumentChange(String(value ?? ''));
+    this.revalidateDocumentNumber();
   }
 
   onPasswordChange(value: string | number | boolean | null): void {
@@ -214,9 +251,11 @@ export class RegistroComponent implements OnInit {
     if (this.patientStatus() === 'idle') return;
     if (this.patientStatus() === 'already-linked') return;
 
-    // El formulario compartido solo está montado en existing-user / not-found;
-    // en 'found' no hay nada que validar.
-    if (this.patientFormRef && !this.patientFormRef.validate()) return;
+    this.revalidateDocumentNumber();
+    const docErr = this.errors()['documentNumber'];
+    const formOk = this.patientFormRef ? this.patientFormRef.validate() : true;
+
+    if (docErr || !formOk) return;
 
     this.step.set(2);
   }
