@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence;
+/**package co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence;
 
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
@@ -252,4 +252,9 @@ public class PatientDataInitializer implements ApplicationRunner {
 
         System.out.println("✔ Pacientes de prueba insertados");
     }
+<<<<<<< Updated upstream
 }
+=======
+}
+*/
+>>>>>>> Stashed changes
