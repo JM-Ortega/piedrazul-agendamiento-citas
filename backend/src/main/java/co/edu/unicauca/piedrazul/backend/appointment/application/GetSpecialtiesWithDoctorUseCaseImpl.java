@@ -38,7 +38,7 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
     public List<DoctorResponse> getSpecialtiesWithDoctor(UUID patientId) {
         LocalDate from = LocalDate.now();
 
-        boolean generalOnly = patientId == null || isNewPatientUseCase.isNewPatient(patientId);
+        boolean generalOnly = isNewPatientUseCase.isNewPatient(patientId);
 
         List<UUID> activeDoctorIds = generalOnly
                 ? getActiveGeneralDoctorsOrThrow()
@@ -151,30 +151,17 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
         return orderedDoctorIds.stream()
                 .map(doctorMap::get)
                 .filter(Objects::nonNull)
-                .map(doctor -> buildDoctorWithUniqueSpecialty(doctor, usedSpecialties))
-                .filter(Objects::nonNull)
+                .flatMap(doctor -> doctor.specialty().stream()
+                        .filter(usedSpecialties::add)
+                        .map(specialty -> new DoctorResponse(
+                                List.of(specialty),
+                                doctor.id(),
+                                doctor.name(),
+                                doctor.laborEnd(),
+                                doctor.laborStart(),
+                                doctor.workdays()
+                        )))
                 .toList();
-    }
-
-    private DoctorResponse buildDoctorWithUniqueSpecialty(
-            DoctorResponse doctor,
-            Set<String> usedSpecialties) {
-
-        return doctor.specialty().stream()
-                .filter(s -> !usedSpecialties.contains(s))
-                .findFirst()
-                .map(specialty -> {
-                    usedSpecialties.add(specialty);
-                    return new DoctorResponse(
-                            List.of(specialty),
-                            doctor.id(),
-                            doctor.name(),
-                            doctor.laborEnd(),
-                            doctor.laborStart(),
-                            doctor.workdays()
-                    );
-                })
-                .orElse(null);
     }
 
     private int countAvailableSlotsForPeriod(UUID doctorId, LocalDate from, LocalDate to, int interval) {
