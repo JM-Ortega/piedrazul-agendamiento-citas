@@ -3,7 +3,6 @@ import {
   Component,
   computed,
   inject,
-  OnInit,
   output,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -32,13 +31,9 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-patient-register.component.html',
 })
-export class BookingPatientRegisterComponent implements OnInit {
+export class BookingPatientRegisterComponent {
   protected state = inject(BookingStateService);
   protected patientService = inject(PatientService);
-
-  ngOnInit(): void {
-    this.patientService.loadDocumentTypes();
-  }
 
   advance = output<void>();
   goBack = output<void>();

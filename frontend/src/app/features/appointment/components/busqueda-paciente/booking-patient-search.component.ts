@@ -24,7 +24,7 @@ import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 
 const MIN_CHARS = 3;
-const MAX_DOC_LENGTH = 12;
+const MAX_DOC_LENGTH = 20;
 const MIN_DOC_LENGTH = 6;
 
 /**
