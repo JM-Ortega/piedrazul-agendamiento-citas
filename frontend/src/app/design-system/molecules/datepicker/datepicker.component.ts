@@ -179,6 +179,9 @@ export class DatepickerComponent implements ControlValueAccessor {
 
   handleDateChange(date: Date | null): void {
     this.value = date;
+    if (date) {
+      this.setInternalMessage('');
+    }
     this.valueChange.emit(date);
     this.onChange(date);
   }
