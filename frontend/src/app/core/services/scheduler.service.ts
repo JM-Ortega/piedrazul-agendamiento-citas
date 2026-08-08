@@ -14,6 +14,7 @@ export class SchedulerService {
   private readonly DOCTORS_CACHE_TTL_MS = 20 * 60 * 1000; // 20 minutos
   private readonly DOCTORS_CACHE_KEY = 'all';
   private doctorsCache = new Map<string, { data: dtoDoctor[]; ts: number }>();
+  private statesCache: string[] | null = null;
 
   private isFresh(ts: number): boolean {
     return Date.now() - ts < this.DOCTORS_CACHE_TTL_MS;
@@ -34,14 +35,25 @@ export class SchedulerService {
     );
   }
 
+  getStates(): Observable<string[]> {
+    if (this.statesCache) {
+      return of(this.statesCache);
+    }
+    return this.http
+      .get<string[]>(`${this.apiUrl}/appointments/list-all-states`)
+      .pipe(tap((data) => (this.statesCache = data)));
+  }
+
   getAllAppointments(params?: {
     idDoctor?: string;
     date?: string;
+    state?: string;
   }): Observable<AppointmentsPatient[]> {
     let httpParams = new HttpParams();
     if (params?.idDoctor)
       httpParams = httpParams.set('idDoctor', params.idDoctor);
     if (params?.date) httpParams = httpParams.set('date', params.date);
+    if (params?.state) httpParams = httpParams.set('state', params.state);
 
     return this.http.get<AppointmentsPatient[]>(`${this.apiUrl}/appointments`, {
       params: httpParams,
