@@ -97,7 +97,7 @@ export class RegistroComponent implements OnInit {
 
   errors = signal<Record<string, string>>({});
 
-  protected readonly DOC_MAX = 12;
+  protected readonly DOC_MAX = 20;
 
   readonly isNewPatient = computed(() => this.patientStatus() === 'not-found');
   readonly isExistingPatient = computed(() => this.patientStatus() === 'found');
@@ -149,10 +149,10 @@ export class RegistroComponent implements OnInit {
 
     const doc = this.documentNumber().trim();
 
-    if (!/^[a-zA-Z0-9]{1,12}$/.test(doc)) {
+    if (!/^[a-zA-Z0-9]{1,20}$/.test(doc)) {
       this.errors.set({
         documentNumber:
-          'Ingresa un documento válido (máximo 12 caracteres alfanuméricos, sin caracteres especiales)',
+          'Ingresa un documento válido (máximo 20 caracteres alfanuméricos, sin caracteres especiales)',
       });
       return;
     }
