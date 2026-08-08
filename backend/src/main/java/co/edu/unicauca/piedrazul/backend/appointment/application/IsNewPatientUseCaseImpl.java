@@ -35,7 +35,7 @@ public class IsNewPatientUseCaseImpl implements IsNewPatientUseCase {
 
         return !appointmentRepository.existsByPatientIdAndStates(
                 patientId,
-                EnumSet.of(AppointmentState.AGENDADA, AppointmentState.ATENDIDA)
+                EnumSet.of(AppointmentState.ATENDIDA)
         );
     }
 }
