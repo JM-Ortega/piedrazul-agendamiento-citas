@@ -217,7 +217,6 @@ export class ExportModalComponent {
       ATENDIDA: 'Atendida',
       CANCELADA: 'Cancelada',
       NO_ASISTIO: 'No asistió',
-      REPROGRAMADA: 'Pendiente',
     };
     return map[s] ?? s;
   }

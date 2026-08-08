@@ -104,10 +104,10 @@ export class DoctorService {
   }
 
   /**
-   * Marca una cita como no asistida (el paciente no se presentó).
+   * Marca una cita como atendida, opcionalmente con una observación clínica.
    *
    * @param appointmentId - ID de la cita a actualizar.
-   * @param state - Nuevo estado a enviar en el body (ej. `'NO_ASISTIO'`).
+   * @param description - Observación clínica a registrar (o `null` si no aplica).
    * @returns Observable vacío que se completa al confirmar la actualización.
    */
   updateAppointmentAsUnassisted(
@@ -131,12 +131,23 @@ export class DoctorService {
       )
       .subscribe((records) => this.medicalRecords.set(records));
   }
-
+  /**
+   * Obtiene los datos del paciente asociado a una cita específica.
+   *
+   * @param appointmentId - ID de la cita de la que se quiere obtener el paciente.
+   * @returns Observable con los datos del paciente.
+   */
   getPatientByAppointment(appointmentId: string): Observable<Patient> {
     return this.http.get<Patient>(
       `${this.apiUrl}/patients/${appointmentId}/patient-attended`
     );
   }
+
+  /**
+   * Limpia el caché en memoria de `getMe()`, forzando que la próxima
+   * llamada consulte al backend en lugar de devolver el dato cacheado.
+   * Útil tras editar el perfil del doctor o al cerrar sesión.
+   */
   clearMeCache(): void {
     this.meCache = null;
     this.meCacheTimestamp = 0;
