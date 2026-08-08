@@ -194,7 +194,7 @@ export class PatientDataFormComponent implements ControlValueAccessor, OnInit {
     const trimmed = value?.trim() ?? '';
     if (!trimmed) return required ? 'Este campo es obligatorio' : '';
     if (!new RegExp(`^[0-9]{${PHONE_LENGTH}}$`).test(trimmed)) {
-      return `Ingrese un número válido de exactamente ${PHONE_LENGTH} dígitos`;
+      return `Ingrese un número válido de ${PHONE_LENGTH} dígitos`;
     }
     return '';
   }
