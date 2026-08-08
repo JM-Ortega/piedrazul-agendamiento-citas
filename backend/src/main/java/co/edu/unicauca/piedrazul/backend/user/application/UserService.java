@@ -11,6 +11,7 @@ import co.edu.unicauca.piedrazul.backend.user.exception.UserNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Service
@@ -61,22 +62,22 @@ public class UserService {
     public List<SystemDoctorResponse> getSystemDoctors() {
         List<UserSummary> doctors = keycloakUserService.findDoctors();
 
-        List<UUID> userIds = doctors.stream()
-                .map(UserSummary::id)
-                .toList();
-
-        if(userIds.isEmpty()){
+        if (doctors.isEmpty()) {
             return List.of();
         }
 
-        // 1. Obtener el mapa de userId -> personId
-        Map<UUID, UUID> personIdsMap = personExternalServiceImp.findPersonIdsByUserIds(userIds);
+        Set<UUID> userIds = doctors.stream()
+                .map(UserSummary::id)
+                .collect(Collectors.toSet());
 
-        // 2. Extraer la lista real de personIds
-        List<UUID> personIds = new ArrayList<>(personIdsMap.values());
+        Map<UUID, List<String>> rolesByUserId =
+                keycloakUserService.getUserRolesByIds(userIds);
 
-        // 3. Consultar especialidades usando personIds, NO userIds
-        Map<UUID, List<SpecialtyCode>> specialties = doctorExternalService.findSpecialtiesByPersonIds(personIds);
+        Map<UUID, UUID> personIdsMap =
+                personExternalServiceImp.findPersonIdsByUserIds(userIds);
+
+        Map<UUID, List<SpecialtyCode>> specialties =
+                doctorExternalService.findSpecialtiesByPersonIds(personIdsMap.values());
 
         List<SystemDoctorResponse> result = new ArrayList<>();
 
@@ -94,7 +95,11 @@ public class UserService {
                     doctor.firstName(),
                     doctor.lastName(),
                     doctor.username(),
-                    doctor.roles(),
+                    rolesByUserId.getOrDefault(doctor.id(), List.of())
+                            .stream()
+                            .filter(role -> !EXCLUDED_ROLES.contains(role))
+                            .distinct()
+                            .toList(),
                     doctorSpecialties
             ));
         }
