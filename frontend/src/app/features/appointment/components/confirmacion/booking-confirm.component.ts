@@ -9,7 +9,6 @@ import {
   LucideStethoscope,
   LucideUserSearch,
 } from '@lucide/angular';
-import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { mapHttpError } from '../../../../shared/helpers/http-errors';
 import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
@@ -38,10 +37,8 @@ import { NuevaCitaService } from '../../services/nuevaCita.service';
 export class BookingConfirmComponent {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
-  private patientAppointmentService = inject(PatientAppointmentService);
 
   confirmed = output<void>();
-
   back = output<void>();
 
   confirm(): void {
@@ -58,10 +55,6 @@ export class BookingConfirmComponent {
       next: () => {
         this.state.isLoading.set(false);
         this.state.success.set(true);
-        // se invalida el caché para que el dashboard pida datos frescos la próxima vez que se muestre.
-        if (data.schedulingOrigin === 'AUTONOMO') {
-          this.patientAppointmentService.invalidateCache();
-        }
         this.confirmed.emit();
       },
       error: (err) => {

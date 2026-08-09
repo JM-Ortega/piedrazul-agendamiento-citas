@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
+import { shareReplay, tap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
 import { Patient } from '../../shared/models/interfaces/patient.model';
@@ -23,6 +24,8 @@ export class PatientService {
   medicalRecords = signal<MedicalRecord[]>([]);
   error = signal<string | null>(null);
   readonly documentTypes = signal<string[]>([]);
+  readonly me = signal<Patient | null>(null);
+  private me$: Observable<Patient> | null = null;
 
   loadDocumentTypes(): void {
     if (this.documentTypes().length > 0) return;
@@ -34,8 +37,27 @@ export class PatientService {
     });
   }
 
+  /**
+   * Devuelve los datos del paciente autenticado. La primera llamada cachea
+   * el resultado en memoria para el resto de la sesión
+   */
   getMe(): Observable<Patient> {
-    return this.http.get<Patient>(`${this.apiUrl}/patients/me`);
+    const cached = this.me();
+    if (cached) return of(cached);
+
+    if (!this.me$) {
+      this.me$ = this.http.get<Patient>(`${this.apiUrl}/patients/me`).pipe(
+        tap((patient) => this.me.set(patient)),
+        shareReplay(1)
+      );
+    }
+    return this.me$;
+  }
+
+  /** Borra los datos del paciente autenticado. */
+  invalidateMeCache(): void {
+    this.me.set(null);
+    this.me$ = null;
   }
 
   // consulta el estado público del documento
