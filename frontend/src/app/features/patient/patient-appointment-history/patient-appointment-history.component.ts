@@ -10,6 +10,7 @@ import {
 import { LucideCalendarDays, LucideClock } from '@lucide/angular';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { PatientAppointmentService } from '../../../core/services/patientAppointment.service';
+import { PatientService } from '../../../core/services/patient.service';
 import { getMonthShort } from '../../../shared/helpers/date-format';
 import {
   APPOINTMENT_STATUS_LABELS,
@@ -25,6 +26,7 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
   imports: [LucideCalendarDays, LucideClock, CommonModule, FormatoPipe],
 })
 export class PatientAppointmentHistoryComponent implements OnInit {
+  private patientService = inject(PatientService);
   private appointmentService = inject(PatientAppointmentService);
 
   isLoading = signal(false);
@@ -33,21 +35,32 @@ export class PatientAppointmentHistoryComponent implements OnInit {
   readonly statusLabels = APPOINTMENT_STATUS_LABELS;
   readonly statusClasses = APPOINTMENT_STATUS_CLASSES;
 
-  readonly pastAppointments = computed<AppointmentsPatient[]>(() => {
-    return this.appointmentService
+  readonly pastAppointments = computed<AppointmentsPatient[]>(() =>
+    this.appointmentService
       .appointments()
       .filter((a) => a.appointmentState !== 'AGENDADA')
-      .sort((a, b) => (a.date + a.startTime > b.date + b.startTime ? 1 : -1));
-  });
+  );
 
   ngOnInit(): void {
     this.isLoading.set(true);
 
-    this.appointmentService.loadMyAppointments().subscribe({
-      next: () => this.isLoading.set(false),
+    this.patientService.getMe().subscribe({
+      next: (patient) => {
+        this.appointmentService
+          .loadAppointments({ idPatient: patient.id })
+          .subscribe({
+            next: () => this.isLoading.set(false),
+            error: () => {
+              this.errorMessage.set(
+                'No se pudieron cargar las citas. Intente más tarde.'
+              );
+              this.isLoading.set(false);
+            },
+          });
+      },
       error: () => {
         this.errorMessage.set(
-          'No se pudieron cargar las citas. Intente más tarde.'
+          'No se pudo obtener la información del paciente.'
         );
         this.isLoading.set(false);
       },

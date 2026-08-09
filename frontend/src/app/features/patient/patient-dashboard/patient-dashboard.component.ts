@@ -17,6 +17,7 @@ import {
 } from '@lucide/angular';
 import { AppService } from '../../../core/services/app.service';
 import { PatientAppointmentService } from '../../../core/services/patientAppointment.service';
+import { PatientService } from '../../../core/services/patient.service';
 import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
 import { ConfirmModalComponent } from '../../../design-system/organisms/confirm-modal/confirm-modal.component';
 import { ToastComponent } from '../../../design-system/molecules/toast-message/toast.component';
@@ -45,6 +46,7 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 })
 export class PatientDashboardComponent implements OnInit {
   protected appService = inject(AppService);
+  private patientService = inject(PatientService);
   private appointmentService = inject(PatientAppointmentService);
 
   isLoading = signal(false);
@@ -55,21 +57,30 @@ export class PatientDashboardComponent implements OnInit {
   readonly showCancelModal = signal(false);
   readonly pendingCancelId = signal<string | null>(null);
 
-  readonly upcomingAppointments = computed<AppointmentsPatient[]>(() => {
-    return this.appointmentService
-      .appointments()
-      .filter((a) => a.appointmentState === 'AGENDADA')
-      .sort((a, b) => (a.date + a.startTime > b.date + b.startTime ? 1 : -1));
-  });
+  readonly upcomingAppointments = computed<AppointmentsPatient[]>(() =>
+    this.appointmentService.appointments()
+  );
 
   ngOnInit(): void {
     this.isLoading.set(true);
 
-    this.appointmentService.loadMyAppointments().subscribe({
-      next: () => this.isLoading.set(false),
+    this.patientService.getMe().subscribe({
+      next: (patient) => {
+        this.appointmentService
+          .loadAppointments({ idPatient: patient.id, state: 'AGENDADA' })
+          .subscribe({
+            next: () => this.isLoading.set(false),
+            error: () => {
+              this.errorMessage.set(
+                'No se pudieron cargar las citas. Intente más tarde.'
+              );
+              this.isLoading.set(false);
+            },
+          });
+      },
       error: () => {
         this.errorMessage.set(
-          'No se pudieron cargar las citas. Intente más tarde.'
+          'No se pudo obtener la información del paciente.'
         );
         this.isLoading.set(false);
       },
@@ -95,10 +106,7 @@ export class PatientDashboardComponent implements OnInit {
     this.appointmentService.cancelAppointment(appointmentId).subscribe({
       next: () => {
         this.showToast('La cita fue cancelada exitosamente', 'success');
-        this.appointmentService.patchAppointmentStatus(
-          appointmentId,
-          'CANCELADA'
-        );
+        this.appointmentService.removeAppointment(appointmentId);
       },
       error: () => {
         this.showToast('Ocurrió un error al cancelar la cita', 'error');
