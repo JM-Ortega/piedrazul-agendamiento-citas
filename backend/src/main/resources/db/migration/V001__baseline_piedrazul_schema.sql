@@ -5,6 +5,7 @@
 -- Sigue el convenio documentado en convenio-migraciones-flyway.md.
 --
 -- Orden del archivo:
+--   0. Extensiones y funciones de soporte
 --   1. Catálogos (sin FK saliente)
 --   2. Dominio principal (en orden de dependencia)
 --   3. Relación N:M
@@ -14,6 +15,33 @@
 -- columnas (decisión de arquitectura pospuesta, no afecta esta
 -- migración).
 -- =====================================================================
+
+
+-- =====================================================================
+-- BLOQUE 0: EXTENSIONES Y FUNCIONES DE SOPORTE
+-- =====================================================================
+-- pg_trgm y unaccent son "trusted" desde PostgreSQL 13 — instalables por
+-- migration_role sin ser superusuario (CREATE ya concedido sobre la base
+-- y sobre el schema extensions, ver 01-init-databases.sh secciones 3-4).
+--
+-- unaccent(text) de un argumento viene marcada STABLE, no IMMUTABLE, así
+-- que Postgres rechaza usarla dentro de una expresión de índice.
+-- immutable_unaccent fija el diccionario explícitamente (forma de dos
+-- argumentos), lo que la vuelve determinística y sí marcable IMMUTABLE.
+-- =====================================================================
+
+CREATE EXTENSION pg_trgm SCHEMA extensions;
+CREATE EXTENSION unaccent SCHEMA extensions;
+
+CREATE FUNCTION extensions.immutable_unaccent(text)
+    RETURNS text
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    STRICT
+AS $$
+    SELECT extensions.unaccent('extensions.unaccent', $1)
+$$;
 
 
 -- =====================================================================
@@ -117,6 +145,10 @@ CREATE TABLE piedrazul.audit_module (
 -- ver notas de la sesión de diseño). identification se mantiene en
 -- texto plano a propósito para no romper el autocompletado por prefijo
 -- ya existente en el sistema.
+--
+-- idx_person_full_name_trgm: cubre toda la tabla, no un subconjunto, porque
+-- el predicado de un índice solo puede evaluar columnas de la propia fila,
+-- nunca la pertenencia de esa fila a otra tabla.
 -- ---------------------------------------------------------------------
 CREATE TABLE piedrazul.person (
     id                     UUID         NOT NULL,
@@ -135,6 +167,10 @@ CREATE TABLE piedrazul.person (
         identification_type IN ('CEDULA', 'TARJETA_IDENTIDAD', 'REGISTRO_NACIMIENTO', 'PASAPORTE')
     )
 );
+
+CREATE INDEX idx_person_full_name_trgm
+    ON piedrazul.person
+    USING gin (extensions.immutable_unaccent(lower(first_name || ' ' || last_name)) extensions.gin_trgm_ops);
 
 -- ---------------------------------------------------------------------
 -- Tabla: patient
