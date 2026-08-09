@@ -12,6 +12,8 @@ import co.edu.unicauca.piedrazul.backend.user.infrastructure.mappers.PersonApiMa
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.persistence.PersonRepository;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.proyections.PersonNameProjection;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.proyections.UserPersonProjection;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -185,5 +187,41 @@ public class PersonExternalServiceImp implements PersonExternalService {
     @Override
     public UUID findPersonIdByUserId(UUID userId){
         return personRepository.getPersonIdByUserId(userId);
+    }
+
+    @Override
+    public Page<PersonSummary> findByIdsAndNameContaining(Collection<UUID> ids, String term, Pageable pageable) {
+        if (ids == null) {
+            throw new InvalidUserDataException("ids is required");
+        }
+        if (term == null || term.isBlank()) {
+            throw new InvalidUserDataException("term is required");
+        }
+        if (pageable == null) {
+            throw new InvalidUserDataException("pageable is required");
+        }
+        if (pageable.isUnpaged()) {
+            throw new InvalidUserDataException("pageable must be paged");
+        }
+        if (pageable.getSort().isSorted()) {
+            throw new InvalidUserDataException("custom sorting is not supported for this search");
+        }
+
+        String normalized = term.trim().replaceAll("\\s+", " ");
+        if (normalized.isBlank()) {
+            throw new InvalidUserDataException("term is required");
+        }
+
+        if (ids.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        String escaped = normalized
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+
+        return personRepository.findByIdInAndFullNameContaining(ids, escaped, pageable)
+                .map(PersonApiMapper::toSummary);
     }
 }
