@@ -31,7 +31,9 @@ public class IsNewPatientUseCaseImpl implements IsNewPatientUseCase {
      */
     @Override
     public boolean isNewPatient(UUID patientId) {
-        if (!patientConsultPort.existsById(patientId) || patientId == null) {
+        if (patientId == null) {
+            return true;
+        }else if (!patientConsultPort.existsById(patientId)){
             return true;
         }
 
