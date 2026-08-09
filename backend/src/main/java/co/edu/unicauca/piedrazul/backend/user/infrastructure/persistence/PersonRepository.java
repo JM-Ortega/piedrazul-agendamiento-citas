@@ -16,7 +16,8 @@ public interface PersonRepository extends JpaRepository<Person, UUID> {
 
     Optional<Person> findByIdentification(String identification);
 
-    List<Person> findByIdentificationStartingWith(String identificationPrefix);
+    // Devuelve las 5 primeras coincidencias del prefijo
+    List<Person> findTop5ByIdentificationStartingWith(String identificationPrefix);
 
     Optional<Person> findByUserId(UUID userId);
 

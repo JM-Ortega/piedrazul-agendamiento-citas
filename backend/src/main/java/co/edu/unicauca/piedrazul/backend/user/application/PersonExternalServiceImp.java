@@ -130,7 +130,9 @@ public class PersonExternalServiceImp implements PersonExternalService {
 
     @Override
     public List<PersonSummary> findByIdentificationPrefix(String identificationPrefix) {
-        return personRepository.findByIdentificationStartingWith(identificationPrefix).stream()
+        return personRepository
+                .findTop5ByIdentificationStartingWith(identificationPrefix)
+                .stream()
                 .map(PersonApiMapper::toSummary)
                 .toList();
     }
