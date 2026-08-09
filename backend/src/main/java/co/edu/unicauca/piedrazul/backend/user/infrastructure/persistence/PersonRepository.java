@@ -3,6 +3,8 @@ package co.edu.unicauca.piedrazul.backend.user.infrastructure.persistence;
 import co.edu.unicauca.piedrazul.backend.user.domain.Person;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.proyections.PersonNameProjection;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.proyections.UserPersonProjection;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -57,5 +59,27 @@ public interface PersonRepository extends JpaRepository<Person, UUID> {
     """)
     List<UserPersonProjection> findPersonIdsByUserIds(
             @Param("userIds") Collection<UUID> userIds);
+
+    @Query(
+        value = """
+            SELECT p.*
+            FROM piedrazul.person p
+            WHERE p.id IN (:ids)
+              AND extensions.immutable_unaccent(lower(p.first_name || ' ' || p.last_name))
+                  LIKE extensions.immutable_unaccent(lower('%' || :term || '%')) ESCAPE '\\'
+            ORDER BY extensions.immutable_unaccent(lower(p.first_name || ' ' || p.last_name)), p.id
+            """,
+        countQuery = """
+            SELECT COUNT(*)
+            FROM piedrazul.person p
+            WHERE p.id IN (:ids)
+              AND extensions.immutable_unaccent(lower(p.first_name || ' ' || p.last_name))
+                  LIKE extensions.immutable_unaccent(lower('%' || :term || '%')) ESCAPE '\\'
+            """,
+        nativeQuery = true)
+    Page<Person> findByIdInAndFullNameContaining(
+            @Param("ids") Collection<UUID> ids,
+            @Param("term") String term,
+            Pageable pageable);
 
 }
