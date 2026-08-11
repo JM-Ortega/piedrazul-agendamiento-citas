@@ -40,6 +40,11 @@ import { DoctorFormData } from '../../models/interfaces/DoctorFormData';
 import { FormErrors } from '../../models/interfaces/FormErrors';
 import { UserForm } from '../../models/interfaces/UserForm';
 import { AdminService } from '../../service/admin.service';
+import {
+  getDocumentIdMaxLength,
+  getDocumentIdSanitize,
+  validateDocumentId,
+} from '../../service/document-id-validator.service';
 
 type Role = 'doctor' | 'scheduler';
 
@@ -347,13 +352,10 @@ export class AdminCreateUserComponent implements OnInit {
   private computeFieldError(field: keyof FormErrors): string | undefined {
     switch (field) {
       case 'documentId':
-        if (!this.userForm.documentId.trim()) {
-          return 'El documento de identidad es obligatorio.';
-        }
-        if (!/^\d{5,15}$/.test(this.userForm.documentId)) {
-          return 'Debe contener entre 5 y 15 dígitos numéricos.';
-        }
-        return undefined;
+        return validateDocumentId(
+          this.userForm.documentId,
+          this.userForm.identificationType
+        );
 
       case 'password':
         if (!this.userForm.password) {
@@ -547,5 +549,12 @@ export class AdminCreateUserComponent implements OnInit {
         : 'border-gray-300 focus:ring-blue-500 ') +
       extra
     );
+  }
+  getDocumentIdMaxLength(): number {
+    return getDocumentIdMaxLength(this.userForm.identificationType);
+  }
+
+  getDocumentIdSanitize(): 'numeric' | 'alphanumeric' {
+    return getDocumentIdSanitize(this.userForm.identificationType);
   }
 }

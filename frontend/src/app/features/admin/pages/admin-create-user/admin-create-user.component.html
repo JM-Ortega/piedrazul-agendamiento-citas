@@ -51,65 +51,6 @@
           Información Básica
         </h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <!-- Documento -->
-          <div>
-            <label
-              for="documentId"
-              class="block text-gray-700 text-base font-medium mb-2"
-            >
-              Documento de Identidad *
-              <span class="text-sm text-gray-500">(solo dígitos)</span>
-            </label>
-            <app-input
-              id="documentId"
-              type="text"
-              [inputMode]="'numeric'"
-              [(ngModel)]="userForm.documentId"
-              name="documentId"
-              sanitize="numeric"
-              [maxLength]="15"
-              placeholder="1234567890"
-              autocomplete="off"
-              [errorMessage]="
-                hasError('documentId') ? errors.documentId : undefined
-              "
-              (inputBlur)="validateField('documentId')"
-            >
-              <svg lucideCreditCard [size]="20" suffix></svg>
-            </app-input>
-          </div>
-          <!-- Contraseña -->
-          <div>
-            <label
-              for="password"
-              class="block text-gray-700 text-base font-medium mb-2"
-              >Contraseña *</label
-            >
-            <app-input
-              id="password"
-              [type]="showPassword ? 'text' : 'password'"
-              [(ngModel)]="userForm.password"
-              name="password"
-              placeholder="Mín. 6 caracteres"
-              autocomplete="new-password"
-              [errorMessage]="
-                hasError('password') ? errors.password : undefined
-              "
-              (inputBlur)="validateField('password')"
-            >
-              <button
-                type="button"
-                suffix
-                (click)="showPassword = !showPassword"
-                class="pointer-events-auto text-gray-400 hover:text-gray-600"
-              >
-                <svg
-                  [lucideIcon]="showPassword ? EyeOff : Eye"
-                  [size]="20"
-                ></svg>
-              </button>
-            </app-input>
-          </div>
           <!-- Tipo de Documento -->
           <div>
             <label
@@ -131,30 +72,30 @@
               <svg lucideCreditCard [size]="20" suffix></svg>
             </app-select>
           </div>
-
-          <!-- Teléfono -->
+          <!-- Documento -->
           <div>
             <label
-              for="phone"
+              for="documentId"
               class="block text-gray-700 text-base font-medium mb-2"
             >
-              Teléfono *
+              Documento de Identidad *
               <span class="text-sm text-gray-500">(solo dígitos)</span>
             </label>
             <app-input
-              [id]="'phone'"
+              id="documentId"
               type="text"
-              [inputMode]="'numeric'"
-              [(ngModel)]="userForm.phone"
-              name="phone"
-              sanitize="numeric"
-              [maxLength]="10"
-              placeholder="3001234567"
+              [(ngModel)]="userForm.documentId"
+              name="documentId"
+              [sanitize]="getDocumentIdSanitize()"
+              [maxLength]="getDocumentIdMaxLength()"
+              placeholder="1234567890"
               autocomplete="off"
-              [errorMessage]="errors['phone']"
-              (inputBlur)="validateField('phone')"
+              [errorMessage]="
+                hasError('documentId') ? errors.documentId : undefined
+              "
+              (inputBlur)="validateField('documentId')"
             >
-              <svg lucidePhone [size]="20" suffix class="text-gray-400"></svg>
+              <svg lucideCreditCard [size]="20" suffix></svg>
             </app-input>
           </div>
           <!-- Nombre -->
@@ -200,6 +141,65 @@
               (inputBlur)="validateField('lastName')"
             >
               <svg lucideUser [size]="20" suffix></svg>
+            </app-input>
+          </div>
+
+          <!-- Contraseña -->
+          <div>
+            <label
+              for="password"
+              class="block text-gray-700 text-base font-medium mb-2"
+              >Contraseña *</label
+            >
+            <app-input
+              id="password"
+              [type]="showPassword ? 'text' : 'password'"
+              [(ngModel)]="userForm.password"
+              name="password"
+              placeholder="Mín. 6 caracteres"
+              autocomplete="new-password"
+              [errorMessage]="
+                hasError('password') ? errors.password : undefined
+              "
+              (inputBlur)="validateField('password')"
+            >
+              <button
+                type="button"
+                suffix
+                (click)="showPassword = !showPassword"
+                class="pointer-events-auto text-gray-400 hover:text-gray-600"
+              >
+                <svg
+                  [lucideIcon]="showPassword ? EyeOff : Eye"
+                  [size]="20"
+                ></svg>
+              </button>
+            </app-input>
+          </div>
+
+          <!-- Teléfono -->
+          <div>
+            <label
+              for="phone"
+              class="block text-gray-700 text-base font-medium mb-2"
+            >
+              Teléfono *
+              <span class="text-sm text-gray-500">(solo dígitos)</span>
+            </label>
+            <app-input
+              [id]="'phone'"
+              type="text"
+              [inputMode]="'numeric'"
+              [(ngModel)]="userForm.phone"
+              name="phone"
+              sanitize="numeric"
+              [maxLength]="10"
+              placeholder="3001234567"
+              autocomplete="off"
+              [errorMessage]="errors['phone']"
+              (inputBlur)="validateField('phone')"
+            >
+              <svg lucidePhone [size]="20" suffix class="text-gray-400"></svg>
             </app-input>
           </div>
 
