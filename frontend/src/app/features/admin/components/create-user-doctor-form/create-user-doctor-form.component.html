@@ -190,18 +190,21 @@
       >
         Ventana de Reserva (semanas) *
       </label>
-      <app-select
+      <app-input
         id="bookingWindowWeeks"
+        type="number"
         [ngModel]="bookingWindowWeeksValue"
         (ngModelChange)="onBookingWindowWeeksChange($event)"
         name="bookingWindowWeeks"
-        [options]="bookingWindowWeeksOptions | toSelectOptions: false"
-        placeholder="-- Seleccionar --"
+        sanitize="numeric"
+        [min]="1"
+        [max]="10"
+        placeholder="Ej: 4"
         [errorMessage]="errors['bookingWindowWeeks']"
-        [hasSuffix]="true"
+        (inputBlur)="fieldBlurred.emit('bookingWindowWeeks')"
       >
         <svg lucideCalendarRange [size]="18" suffix></svg>
-      </app-select>
+      </app-input>
     </div>
   </div>
 

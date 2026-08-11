@@ -473,14 +473,23 @@ export class AdminCreateUserComponent implements OnInit {
         }
         return undefined;
       }
-      case 'bookingWindowWeeks':
-        return this.hasDoctorRole && !this.userForm.bookingWindowWeeks
-          ? 'Debe seleccionar la ventana de reserva en semanas.'
-          : undefined;
       case 'workDays':
         return this.hasDoctorRole && this.userForm.workDays.length === 0
           ? 'Debe seleccionar al menos un día de atención.'
           : undefined;
+
+      case 'bookingWindowWeeks':
+        if (!this.hasDoctorRole) return undefined;
+        if (!this.userForm.bookingWindowWeeks) {
+          return 'Debe indicar la ventana de reserva en semanas.';
+        }
+        if (
+          this.userForm.bookingWindowWeeks < 1 ||
+          this.userForm.bookingWindowWeeks > 10
+        ) {
+          return 'La ventana de reserva debe estar entre 1 y 10 semanas.';
+        }
+        return undefined;
 
       default:
         return undefined;
