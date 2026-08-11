@@ -1,5 +1,4 @@
 import { CommonModule } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -41,6 +40,7 @@ import {
   DEFAULT_DOCUMENT_MAX_LENGTH,
   validateDocumentForType,
 } from '../../shared/helpers/document-validation';
+import { AppError } from '../../shared/models/interfaces/api-error.model';
 
 type RegistroStep = 1 | 2 | 3;
 type PatientStatus =
@@ -103,7 +103,7 @@ export class RegistroComponent implements OnInit {
 
   errors = signal<Record<string, string>>({});
 
-  protected readonly DOC_MAX = 20;
+  protected readonly DOCUMENT_INPUT_MAX_LENGTH = 20;
 
   readonly isNewPatient = computed(() => this.patientStatus() === 'not-found');
   readonly isExistingPatient = computed(() => this.patientStatus() === 'found');
@@ -129,8 +129,6 @@ export class RegistroComponent implements OnInit {
 
     return '';
   });
-
-  protected readonly DOCUMENT_INPUT_MAX_LENGTH = 20;
 
   documentSanitizeRule = computed<SanitizeRule>(() => {
     const type = this.form().identificationType;
@@ -218,15 +216,13 @@ export class RegistroComponent implements OnInit {
         }
         this.patientStatus.set('not-found');
       },
-      error: (err: HttpErrorResponse) => {
+      error: (err: AppError) => {
         this.isLoading.set(false);
-        if (err.status === 404) {
+        if (err.errorCode === 'PATIENT_NOT_FOUND') {
           this.patientStatus.set('not-found');
           return;
         }
-        this.errorMessage.set(
-          mapHttpError(err, 'Error al buscar el documento. Intenta de nuevo.')
-        );
+        this.errorMessage.set(mapHttpError(err));
       },
     });
   }
@@ -301,7 +297,7 @@ export class RegistroComponent implements OnInit {
             );
             this.step.set(3);
           },
-          error: (err) => this.handleError(err),
+          error: (err: AppError) => this.handleError(err),
         });
       return;
     }
@@ -325,7 +321,7 @@ export class RegistroComponent implements OnInit {
       })
       .subscribe({
         next: () => this.onSuccess(),
-        error: (err) => this.handleError(err),
+        error: (err: AppError) => this.handleError(err),
       });
   }
 
@@ -345,7 +341,7 @@ export class RegistroComponent implements OnInit {
       })
       .subscribe({
         next: () => this.onSuccess(),
-        error: (err) => this.handleError(err),
+        error: (err: AppError) => this.handleError(err),
       });
   }
 
@@ -357,39 +353,24 @@ export class RegistroComponent implements OnInit {
     });
   }
 
-  private handleError(err: HttpErrorResponse): void {
+  /**
+   * Maneja errores de las peticiones de los pasos 2 y 3 (crear cuenta,
+   * vincular acceso, confirmar código).
+   *
+   * @param err - Error ya normalizado por el interceptor.
+   */
+  private handleError(err: AppError): void {
     this.isLoading.set(false);
-    const errorCode = err.error?.errorCode;
 
-    switch (errorCode) {
-      case 'PATIENT_ALREADY_LINKED':
-        this.errorMessage.set('Este paciente ya tiene una cuenta asociada.');
-        break;
-      case 'USERNAME_TAKEN':
-        this.errorMessage.set(
-          'Ya existe una cuenta asociada a este documento.'
-        );
-        break;
-      case 'INVALID_VERIFICATION_CODE':
-        this.errorMessage.set('El código de verificación es inválido.');
-        break;
-      case 'VERIFICATION_CODE_EXPIRED':
-        this.errorMessage.set('El código de verificación expiró.');
-        break;
-      case 'VERIFICATION_CODE_BLOCKED':
-        this.errorMessage.set(
-          'El código fue bloqueado por exceso de intentos.'
-        );
-        break;
-      default:
-        this.errorMessage.set(
-          mapHttpError(
-            err,
-            'Ocurrió un error al crear la cuenta. Intenta de nuevo.'
-          )
-        );
-        break;
+    if (
+      err.errorCode === 'INVALID_VERIFICATION_CODE' ||
+      err.errorCode === 'VERIFICATION_CODE_EXPIRED' ||
+      err.errorCode === 'VERIFICATION_CODE_BLOCKED'
+    ) {
+      this.verificationCode.set('');
     }
+
+    this.errorMessage.set(mapHttpError(err));
   }
 
   private validateStep2(): boolean {
