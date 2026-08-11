@@ -3,13 +3,14 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api;
 import co.edu.unicauca.piedrazul.backend.appointment.application.AppointmentSchedulingService;
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.AutonomousPatientResolutionStrategy;
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.ManualPatientResolutionStrategy;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.ClinicalHistoryDescription;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.ListAppointmentFiltersRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentResponse;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.PageResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.CitaDtoMapper;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import jakarta.validation.Valid;
@@ -81,18 +82,28 @@ public class AppointmentController {
         return ResponseEntity.ok(slots);
     }
 
-    // Un unico método para listar por idDoctor, idPatient, fecha o combinaciones
+    // Un unico método para listar por idDoctor, idPatient, fecha, estado o combinaciones.
     @GetMapping
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<List<AppointmentResponse>> list(
-            @RequestParam(required = false) UUID idDoctor,
-            @RequestParam(required = false) UUID idPatient,
-            @RequestParam(required = false) LocalDate date,
-            @RequestParam(required = false)AppointmentState state) {
+    public ResponseEntity<PageResponse<AppointmentResponse>> list(
+            @ModelAttribute ListAppointmentFiltersRequest request) {
 
-        // Mapper para pasar de Domain a DTO
-        return ResponseEntity.ok(listAppointmentsUseCase.listBy(idDoctor, idPatient, date, state).stream().map(citaDtoMapper::toResponse).toList());
+        PageQuery pageQuery = request.toPageQuery();
+
+        PagedResult<Appointment> appointmentPage = listAppointmentsUseCase.listBy(
+                request.getIdDoctor(),
+                request.getIdPatient(),
+                request.getDate(),
+                request.getState(),
+                pageQuery
+        );
+
+        List<AppointmentResponse> content = citaDtoMapper.toResponseList(appointmentPage.content());
+
+        PageResponse<AppointmentResponse> response = PageResponse.from(appointmentPage, content);
+        return ResponseEntity.ok(response);
     }
+
 
     @GetMapping("/me")
     @PreAuthorize("hasRole('PATIENT')")
@@ -168,7 +179,7 @@ public class AppointmentController {
         return ResponseEntity.ok(getSpecialtiesWithDoctorUseCase.getSpecialtiesWithDoctor(patientId));
     }
 
-    // Actualizar el estado de una cita a atendida
+    // Actualizar el estado de una cita a atendida y crear su HC asociada
     @PutMapping("/{appointmentId}/mark-as-attended")
     @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<Void> markAppointmentAsAttended(@PathVariable UUID appointmentId
