@@ -98,7 +98,6 @@ export class AppointmentBookingComponent implements OnInit {
     this.doctorService.getMe().subscribe({
       next: (doctor) => {
         this.state.doctorSnapshot.set(doctor);
-        this.loadSpecialtiesForMode('specialty-doctor');
 
         if (this.pendingDocumentNumber) {
           this.citaService
@@ -107,15 +106,18 @@ export class AppointmentBookingComponent implements OnInit {
               next: (patient) => {
                 this.state.foundPatient.set(patient);
                 this.state.patientId.set(patient?.id ?? null);
+                this.loadSpecialtiesForMode('specialty-doctor');
                 this.preselectDoctorSpecialty(doctor);
                 this.state.step.set(this.state.specialtyStep());
               },
               error: () => {
+                this.loadSpecialtiesForMode('specialty-doctor');
                 this.preselectDoctorSpecialty(doctor);
                 this.state.step.set(this.state.specialtyStep());
               },
             });
         } else {
+          this.loadSpecialtiesForMode('specialty-doctor');
           this.preselectDoctorSpecialty(doctor);
           this.state.step.set(this.state.specialtyStep());
         }
