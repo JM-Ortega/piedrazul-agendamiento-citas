@@ -1,6 +1,12 @@
-package co.edu.unicauca.piedrazul.backend.audit.domain;
+package co.edu.unicauca.piedrazul.backend.shared.enums;
 
 public enum AuditAction {
+
+    USUARIO_CREADO, USUARIO_MODIFICADO, USUARIO_DESACTIVADO,
+    CITA_AGENDADA, CITA_REAGENDADA,
+    HISTORIA_CLINICA_CREADA, HISTORIA_CLINICA_CONSULTADA,
+    LOGIN_EXITOSO, LOGIN_FALLIDO
+    /*
     // usuarios
     USER_CREATED,
     USER_UPDATED,
@@ -14,4 +20,5 @@ public enum AuditAction {
 
     // historia clínica
     CLINICAL_RECORD_CREATED
+     */
 }
