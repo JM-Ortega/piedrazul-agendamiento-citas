@@ -3,9 +3,12 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.CitaAgendadaEvent;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
 import jakarta.transaction.Transactional;
+import org.jboss.logging.MDC;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;

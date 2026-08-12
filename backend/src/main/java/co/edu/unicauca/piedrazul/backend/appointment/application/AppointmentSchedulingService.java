@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.PatientResolutionStrategy;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.UserConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.ResolvedPatient;
@@ -11,8 +12,11 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.Appointm
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentScheduledEvent;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.CitaAgendadaEvent;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.shared.events.audit.AppointmentCreatedEvent;
+import org.jboss.logging.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,18 +31,25 @@ public class AppointmentSchedulingService {
     private final AppointmentService appointmentService;
     private final ApplicationEventPublisher eventPublisher;
     private final IsNewPatientUseCase isNewPatientUseCase;
+    private final UserConsultPort userConsultPort;
+    private final AppointmentMapper mapper;
+
 
     public AppointmentSchedulingService(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService,
             ApplicationEventPublisher eventPublisher,
-            IsNewPatientUseCase isNewPatientUseCase) {
+            IsNewPatientUseCase isNewPatientUseCase,
+            UserConsultPort userConsultPort,
+            AppointmentMapper mapper){
         this.appointmentRepository = appointmentRepository;
         this.doctorConfigConsultPort = doctorConfigConsultPort;
         this.appointmentService = appointmentService;
         this.eventPublisher = eventPublisher;
         this.isNewPatientUseCase = isNewPatientUseCase;
+        this.userConsultPort = userConsultPort;
+        this.mapper = mapper;
     }
 
     @Transactional
@@ -113,6 +124,12 @@ public class AppointmentSchedulingService {
 
 
         Appointment saved = appointmentRepository.save(appointment);
+
+        eventPublisher.publishEvent(
+                CitaAgendadaEvent.of(mapper.toEntity(appointment), performedBy.toString(),
+                        userConsultPort.getUserRoles(performedBy).toString(), MDC.get("correlationId").toString())
+        );
+
 
         eventPublisher.publishEvent(new AppointmentCreatedEvent(saved.getIdAppointment(), performedBy));
 
