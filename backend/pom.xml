@@ -26,6 +26,12 @@
     </properties>
 
     <dependencies>
+        <!-- AOP: necesario para @Aspect, @Around (usado en AuditableAspect) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
+        </dependency>
+
         <!-- Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

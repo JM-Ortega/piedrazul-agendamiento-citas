@@ -1,8 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.audit.application;
-
-import co.edu.unicauca.piedrazul.backend.audit.domain.AuditAction;
+/*
+import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditLog;
-import co.edu.unicauca.piedrazul.backend.audit.infrastructure.persistence.AuditLogRepository;
+import co.edu.unicauca.piedrazul.backend.audit.infrastructure.AuditLogRepository;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditModule;
 import org.springframework.stereotype.Service;
 
@@ -26,3 +26,5 @@ public class AuditLogService {
         ));
     }
 }
+
+ */

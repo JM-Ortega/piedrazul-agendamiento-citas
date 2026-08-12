@@ -1,9 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.audit.application;
 
-import co.edu.unicauca.piedrazul.backend.audit.domain.AuditAction;
+import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditLog;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditModule;
-import co.edu.unicauca.piedrazul.backend.audit.infrastructure.persistence.AuditLogRepository;
+import co.edu.unicauca.piedrazul.backend.audit.infrastructure.AuditLogRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
