@@ -95,11 +95,11 @@ export class DoctorService {
    */
   updateAppointmentAsAttended(
     appointmentId: string,
-    clinicalHistoryDescription: string | null
+    description: string | null
   ): Observable<void> {
     return this.http.put<void>(
       `${this.apiUrl}/appointments/${appointmentId}/mark-as-attended`,
-      { clinicalHistoryDescription }
+      { description }
     );
   }
 
