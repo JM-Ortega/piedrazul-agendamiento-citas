@@ -23,6 +23,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { PatientSuggestion } from '../../models/dtos/patient-suggestion.dto';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
+import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 
 const MIN_CHARS = 3;
 const MAX_DOC_LENGTH = 20;
@@ -80,8 +81,8 @@ export class BookingPatientSearchComponent {
         }),
         switchMap((query) =>
           this.citaService.getPatientSuggestionsByDocument(query.trim()).pipe(
-            catchError(() => {
-              this.state.searchError.set('Error al cargar sugerencias');
+            catchError((err: AppError) => {
+              this.state.searchError.set(err.message);
               return of([] as PatientSuggestion[]);
             })
           )
@@ -97,6 +98,13 @@ export class BookingPatientSearchComponent {
       });
   }
 
+  /**
+   * Sanea el número de documento mientras se escribe: filtra caracteres
+   * no alfanuméricos y limita la longitud máxima, mostrando un aviso
+   * temporal si el usuario intentó algo fuera de esas reglas.
+   *
+   * @param event - Evento desencadenado al escribir en el input.
+   */
   handleDocInput(event: Event): void {
     const el = event.target as HTMLInputElement;
     const raw = el.value;
@@ -165,6 +173,13 @@ export class BookingPatientSearchComponent {
     this.changeMode.emit();
   }
 
+  /**
+   * Busca un paciente por documento exacto. Si no existe
+   * se emite evento para registrar al paciente.
+   * Cualquier otro error se muestra tal cual lo resuelve el interceptor.
+   *
+   * @param identification - Número de documento a buscar.
+   */
   private loadPatientByDocument(identification: string): void {
     this.state.searchLoading.set(true);
     this.state.searchError.set('');
@@ -179,17 +194,13 @@ export class BookingPatientSearchComponent {
           this.handleNotFound(identification);
         }
       },
-      error: (err) => {
+      error: (err: AppError) => {
         this.state.searchLoading.set(false);
-        if (err.status === 404) {
+        if (err.errorCode === 'PATIENT_NOT_FOUND') {
           this.handleNotFound(identification);
-        } else if (err.status === 0) {
-          this.state.searchError.set(
-            'No se pudo conectar con el servidor. Intente más tarde.'
-          );
-        } else {
-          this.state.searchError.set('Error al buscar el paciente.');
+          return;
         }
+        this.state.searchError.set(err.message);
       },
     });
   }
