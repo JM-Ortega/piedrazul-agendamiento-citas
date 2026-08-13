@@ -19,4 +19,9 @@ public record PageResponse<T>(
                 page.getTotalElements()
         );
     }
+
+    // Overload para módulos cuyo dominio no expone Page<T> de Spring Data directamente.
+    public static <T> PageResponse<T> of(List<T> content, int page, int totalPages, long totalElements) {
+        return new PageResponse<>(content, page, totalPages, totalElements);
+    }
 }
