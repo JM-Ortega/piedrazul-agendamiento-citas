@@ -35,7 +35,7 @@ export function normalizeHttpError(error: HttpErrorResponse): AppError {
     return {
       status: body.status ?? error.status,
       errorCode: body.errorCode,
-      message: body.detail ?? GLOBAL_ERROR_MESSAGES['UNKNOWN_ERROR'],
+      message: body.detail || GLOBAL_ERROR_MESSAGES['UNKNOWN_ERROR'],
       module: body.module,
     };
   }
