@@ -5,6 +5,4 @@ import java.util.UUID;
 
 public interface UserConsultPort {
     List<String> getUserRoles (UUID userId);
-
-
 }

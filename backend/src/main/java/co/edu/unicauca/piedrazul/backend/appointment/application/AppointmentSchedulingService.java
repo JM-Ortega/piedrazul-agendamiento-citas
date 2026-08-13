@@ -14,9 +14,10 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentS
 import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentScheduledEvent;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.CitaAgendadaEvent;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.shared.events.audit.AppointmentCreatedEvent;
-import org.jboss.logging.MDC;
+import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -125,9 +126,16 @@ public class AppointmentSchedulingService {
 
         Appointment saved = appointmentRepository.save(appointment);
 
+        AppointmentEntity entity = new AppointmentEntity(saved.getIdAppointment(), saved.getIdDoctor(),saved.getIdPatient(),
+                saved.getSpecialty(), saved.getAppointmentState(), saved.getDate(), saved.getStartTime().getTime(), saved.getSchedulingOrigin());
+
         eventPublisher.publishEvent(
-                CitaAgendadaEvent.of(mapper.toEntity(appointment), performedBy.toString(),
-                        userConsultPort.getUserRoles(performedBy).toString(), MDC.get("correlationId").toString())
+                CitaAgendadaEvent.of(
+                        entity,
+                        performedBy.toString(),
+                        userConsultPort.getUserRoles(performedBy).toString(),
+                        MDC.get("correlationId") // puede ser null, y eso es válido — no forzar toString()
+                )
         );
 
 
