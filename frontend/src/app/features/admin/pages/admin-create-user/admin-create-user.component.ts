@@ -118,10 +118,10 @@ export class AdminCreateUserComponent implements OnInit {
     specialty: [],
     laborStart: '',
     laborEnd: '',
-    interval: 20,
-    workDays: [1, 2, 3, 4, 5],
-    startTime: '08:00',
-    endTime: '12:00',
+    interval: null,
+    workDays: [],
+    startTime: '',
+    endTime: '',
     bookingWindowWeeks: 0,
   };
   private readonly FIELD_ORDER: (keyof FormErrors)[] = [
@@ -204,7 +204,19 @@ export class AdminCreateUserComponent implements OnInit {
       bookingWindowWeeks: this.userForm.bookingWindowWeeks,
     };
   }
-
+  get isScheduleGroupTouched(): boolean {
+    const f = this.userForm;
+    return !!(
+      f.laborStart ||
+      f.laborEnd ||
+      f.startTime ||
+      f.endTime ||
+      f.interval ||
+      (f.workDays && f.workDays.length > 0) ||
+      f.bookingWindowWeeks
+    );
+  }
+  // ── OnInit ────────────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.loadingSpecialties = true;
     this.adminService.getAllSpecialties().subscribe({
@@ -246,15 +258,29 @@ export class AdminCreateUserComponent implements OnInit {
     if (this.submitted) this.validateField('roles');
   }
 
+  private readonly SCHEDULE_GROUP_FIELDS: (keyof FormErrors)[] = [
+    'laborStart',
+    'laborEnd',
+    'startTime',
+    'endTime',
+    'interval',
+    'workDays',
+    'bookingWindowWeeks',
+  ];
+
   onDoctorFormChange(patch: Partial<DoctorFormData>): void {
     Object.assign(this.userForm, patch);
     if (this.submitted) {
-      (Object.keys(patch) as (keyof FormErrors)[]).forEach((k) =>
-        this.validateField(k)
+      const patchedKeys = Object.keys(patch) as (keyof FormErrors)[];
+      const touchesGroup = patchedKeys.some((k) =>
+        this.SCHEDULE_GROUP_FIELDS.includes(k)
       );
+      const fieldsToValidate = touchesGroup
+        ? Array.from(new Set([...patchedKeys, ...this.SCHEDULE_GROUP_FIELDS]))
+        : patchedKeys;
+      fieldsToValidate.forEach((k) => this.validateField(k));
     }
   }
-
   // ── Submit ────────────────────────────────────────────────────────────────
   openConfirmModal(): void {
     this.submitted = true;
@@ -311,7 +337,7 @@ export class AdminCreateUserComponent implements OnInit {
             specialty: this.userForm.specialty,
             laborStart: this.userForm.laborStart,
             laborEnd: this.userForm.laborEnd,
-            appointmentInterval: this.userForm.interval,
+            appointmentInterval: this.userForm.interval ?? 0,
             schedules: this.userForm.workDays.map((day) => ({
               workday: DAY_VALUE_TO_WORKDAY[day],
               startTime: `${this.userForm.startTime}:00`,
@@ -418,7 +444,8 @@ export class AdminCreateUserComponent implements OnInit {
           : undefined;
 
       case 'laborStart':
-        if (!this.hasDoctorRole) return undefined;
+        if (!this.hasDoctorRole || !this.isScheduleGroupTouched)
+          return undefined;
         if (!this.userForm.laborStart) {
           return 'La fecha de inicio laboral es obligatoria.';
         }
@@ -434,7 +461,8 @@ export class AdminCreateUserComponent implements OnInit {
         return undefined;
 
       case 'laborEnd':
-        if (!this.hasDoctorRole) return undefined;
+        if (!this.hasDoctorRole || !this.isScheduleGroupTouched)
+          return undefined;
         if (!this.userForm.laborEnd) {
           return 'La fecha de fin laboral es obligatoria.';
         }
@@ -450,6 +478,11 @@ export class AdminCreateUserComponent implements OnInit {
         return undefined;
 
       case 'startTime': {
+        if (!this.hasDoctorRole || !this.isScheduleGroupTouched)
+          return undefined;
+        if (!this.userForm.startTime) {
+          return 'La hora de inicio es obligatoria.';
+        }
         const start = this.timeToMinutes(this.userForm.startTime);
         const end = this.timeToMinutes(this.userForm.endTime);
         return this.userForm.endTime && start >= end
@@ -458,6 +491,11 @@ export class AdminCreateUserComponent implements OnInit {
       }
 
       case 'endTime': {
+        if (!this.hasDoctorRole || !this.isScheduleGroupTouched)
+          return undefined;
+        if (!this.userForm.endTime) {
+          return 'La hora de fin es obligatoria.';
+        }
         const end = this.timeToMinutes(this.userForm.endTime);
         const start = this.timeToMinutes(this.userForm.startTime);
         return this.userForm.startTime && start >= end
@@ -466,22 +504,28 @@ export class AdminCreateUserComponent implements OnInit {
       }
 
       case 'interval': {
-        const duration = this.shiftDurationMinutes;
+        if (!this.hasDoctorRole || !this.isScheduleGroupTouched)
+          return undefined;
         if (!this.userForm.interval || this.userForm.interval < 10) {
           return 'El intervalo mínimo es 10 minutos.';
         }
-        if (this.userForm.interval > duration) {
+        const duration = this.shiftDurationMinutes;
+        if (duration > 0 && this.userForm.interval > duration) {
           return `El intervalo no puede superar la duración del turno (${duration} min).`;
         }
         return undefined;
       }
+
       case 'workDays':
-        return this.hasDoctorRole && this.userForm.workDays.length === 0
+        if (!this.hasDoctorRole || !this.isScheduleGroupTouched)
+          return undefined;
+        return this.userForm.workDays.length === 0
           ? 'Debe seleccionar al menos un día de atención.'
           : undefined;
 
       case 'bookingWindowWeeks':
-        if (!this.hasDoctorRole) return undefined;
+        if (!this.hasDoctorRole || !this.isScheduleGroupTouched)
+          return undefined;
         if (!this.userForm.bookingWindowWeeks) {
           return 'Debe indicar la ventana de reserva en semanas.';
         }

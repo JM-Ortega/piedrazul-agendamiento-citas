@@ -110,4 +110,15 @@ export class CreateUserDoctorFormComponent {
   get bookingWindowWeeksValue(): number | null {
     return this.data.bookingWindowWeeks || null;
   }
+  onIntervalChange(value: string | number | boolean | null): void {
+    this.emit(
+      'interval',
+      value === null || value === '' ? null : Number(value)
+    );
+    this.fieldBlurred.emit('interval');
+  }
+
+  get intervalValue(): number | null {
+    return this.data.interval ?? null;
+  }
 }
