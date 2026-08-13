@@ -10,10 +10,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -41,17 +43,26 @@ class UserServiceTest {
 
 		when(keycloakUserService.findDoctors()).thenReturn(List.of(doctor, scheduler));
 		when(keycloakUserService.findSchedulers()).thenReturn(List.of(scheduler));
-		when(keycloakUserService.getUserRoles(doctorId)).thenReturn(List.of(Role.DOCTOR.name(), Role.PATIENT.name()));
-		when(keycloakUserService.getUserRoles(schedulerId)).thenReturn(List.of(Role.SCHEDULER.name(), Role.DOCTOR.name()));
 
-		List<SystemUserResponse> result = userService.getSystemUsers();
+		when(keycloakUserService.getUserRolesByIds(Set.of(doctorId, schedulerId)))
+				.thenReturn(Map.of(
+						doctorId, List.of(Role.DOCTOR.name(), Role.PATIENT.name()),
+						schedulerId, List.of(Role.SCHEDULER.name(), Role.DOCTOR.name())
+				));
 
+		Pageable pageable = PageRequest.of(0, 10, Sort.by("firstName").ascending());
+		Page<SystemUserResponse> resultPage = userService.getSystemUsers(pageable);
+
+		List<SystemUserResponse> result = resultPage.getContent();
+
+		assertEquals(2, resultPage.getTotalElements());
 		assertEquals(2, result.size());
+
 		assertEquals(doctorId, result.get(0).id());
 		assertEquals("Ana", result.get(0).firstName());
 		assertEquals("Lopez", result.get(0).lastName());
-		assertEquals("doctor01", result.get(0).documentId());
-		assertEquals(List.of(Role.DOCTOR.name()), result.get(0).roles());
+		assertEquals("doctor01", result.get(0).documentId()); // Ajusta a username() o documentId() según tu DTO
+		assertEquals(List.of(Role.DOCTOR.name()), result.get(0).roles()); // EXCLUDED_ROLES filtra PATIENT
 
 		assertEquals(schedulerId, result.get(1).id());
 		assertEquals("Luis", result.get(1).firstName());
@@ -61,8 +72,7 @@ class UserServiceTest {
 
 		verify(keycloakUserService).findDoctors();
 		verify(keycloakUserService).findSchedulers();
-		verify(keycloakUserService).getUserRoles(doctorId);
-		verify(keycloakUserService).getUserRoles(schedulerId);
+		verify(keycloakUserService).getUserRolesByIds(Set.of(doctorId, schedulerId));
 	}
 
 	@Test
