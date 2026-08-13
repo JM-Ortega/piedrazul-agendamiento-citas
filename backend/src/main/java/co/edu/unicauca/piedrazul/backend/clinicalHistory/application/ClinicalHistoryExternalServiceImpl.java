@@ -2,6 +2,8 @@ package co.edu.unicauca.piedrazul.backend.clinicalHistory.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentExternalData;
+import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
+import co.edu.unicauca.piedrazul.backend.audit.infrastructure.aop.Auditable;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.ClinicalHistoryExternalService;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.internal.ClinicalHistoryRequest;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.output.ClinicalHistoryResponse;
@@ -11,7 +13,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -42,6 +43,11 @@ public class ClinicalHistoryExternalServiceImpl implements ClinicalHistoryExtern
     }
 
     @Override
+    @Auditable(
+            action = AuditAction.HISTORIA_CLINICA_CONSULTADA,
+            targetEntityType = "ClinicalHistory",
+            targetIdExpression = "#idPatient"
+    )
     public Page<ClinicalHistoryResponse> getHistoryByPatient(
             UUID idPatient,
             Pageable pageable) {
