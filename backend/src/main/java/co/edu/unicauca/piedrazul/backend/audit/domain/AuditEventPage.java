@@ -4,7 +4,7 @@ package co.edu.unicauca.piedrazul.backend.audit.domain;
 import java.util.List;
 
 /**
- * Resultado paginado, propio del dominio — no depende de Spring Data.
+ * Resultado paginado, propio del dominio, no depende de Spring Data.
  */
 public record AuditEventPage(
         List<AuditEvent> content,

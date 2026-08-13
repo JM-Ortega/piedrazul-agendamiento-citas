@@ -3,8 +3,10 @@ package co.edu.unicauca.piedrazul.backend.audit.application;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEventPage;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEventRepository;
 import org.jmolecules.ddd.annotation.Service;
+import org.springframework.stereotype.Component;
 
 @Service
+@Component
 public class AuditQueryService {
 
     private final AuditEventRepository repository;

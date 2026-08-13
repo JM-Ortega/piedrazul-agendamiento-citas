@@ -1,63 +1,59 @@
 package co.edu.unicauca.piedrazul.backend.audit.infrastructure.persistence;
 
-import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditOutcome;
+import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import jakarta.persistence.*;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "audit_event", indexes = {
-        @Index(name = "idx_audit_actor_ts", columnList = "actorUsername, timestamp"),
-        @Index(name = "idx_audit_target", columnList = "targetEntityType, targetEntityId"),
-        @Index(name = "idx_audit_timestamp", columnList = "timestamp")
-})
+@Table(name = "audit_event", schema = "piedrazul")
 public class AuditEventJpaEntity {
 
     @Id
     private UUID id;
 
-    @Column(nullable = false)
-    private Instant timestamp;
+    @Column(name = "occurred_at", nullable = false)
+    private Instant occurredAt;
 
-    @Column(nullable = false, length = 100)
+    @Column(name = "actor_username", nullable = false, length = 100)
     private String actorUsername;
 
-    @Column(length = 50)
+    @Column(name = "actor_role", length = 50)
     private String actorRole;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 50)
+    @Column(name = "action_code", nullable = false, length = 50)
     private AuditAction action;
 
-    @Column(length = 100)
+    @Column(name = "target_entity_type", length = 100)
     private String targetEntityType;
 
-    @Column(length = 100)
+    @Column(name = "target_entity_id", length = 100)
     private String targetEntityId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private AuditOutcome outcome;
 
-    @Column(length = 100)
+    @Column(name = "correlation_id", length = 100)
     private String correlationId;
 
-    @Lob
+    @Column(name = "before_state", columnDefinition = "text")
     private String beforeState;
 
-    @Lob
+    @Column(name = "after_state", columnDefinition = "text")
     private String afterState;
 
-    protected AuditEventJpaEntity() { } // JPA
+    protected AuditEventJpaEntity() { }
 
-    public AuditEventJpaEntity(UUID id, Instant timestamp, String actorUsername, String actorRole,
+    public AuditEventJpaEntity(UUID id, Instant occurredAt, String actorUsername, String actorRole,
                                AuditAction action, String targetEntityType, String targetEntityId,
                                AuditOutcome outcome, String correlationId,
                                String beforeState, String afterState) {
         this.id = id;
-        this.timestamp = timestamp;
+        this.occurredAt = occurredAt;
         this.actorUsername = actorUsername;
         this.actorRole = actorRole;
         this.action = action;
@@ -71,7 +67,7 @@ public class AuditEventJpaEntity {
 
     // Solo getters. Sin setters: refuerza inmutabilidad también a nivel JPA.
     public UUID getId() { return id; }
-    public Instant getTimestamp() { return timestamp; }
+    public Instant getOccurredAt() { return occurredAt; }
     public String getActorUsername() { return actorUsername; }
     public String getActorRole() { return actorRole; }
     public AuditAction getAction() { return action; }

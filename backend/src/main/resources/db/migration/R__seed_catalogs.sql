@@ -53,32 +53,27 @@ INSERT INTO piedrazul.verification_purpose (code, name) VALUES
     ('LINK_PATIENT_ACCOUNT', 'Vincular Cuenta de Paciente')
 ON CONFLICT (code) DO NOTHING;
 
-
--- ---------------------------------------------------------------------
--- audit_action
--- ---------------------------------------------------------------------
-INSERT INTO piedrazul.audit_action (code, name) VALUES
-    ('USER_CREATED', 'Usuario Creado'),
-    ('USER_UPDATED', 'Usuario Actualizado'),
-    ('USER_DEACTIVATED', 'Usuario Desactivado'),
-    ('LOGIN_SUCCESS', 'Inicio de Sesión Exitoso'),
-    ('LOGIN_FAILED', 'Inicio de Sesión Fallido'),
-    ('APPOINTMENT_CREATED', 'Cita Creada'),
-    ('APPOINTMENT_RESCHEDULED', 'Cita Reprogramada'),
-    ('CLINICAL_RECORD_CREATED', 'Registro Clínico Creado')
-ON CONFLICT (code) DO NOTHING;
-
-
 -- ---------------------------------------------------------------------
 -- audit_module
 -- ---------------------------------------------------------------------
 INSERT INTO piedrazul.audit_module (code, name) VALUES
-    ('USER', 'Usuarios'),
-    ('APPOINTMENT', 'Citas'),
-    ('DOCTORS', 'Doctores'),
-    ('PATIENTS', 'Pacientes'),
-    ('CLINICAL_HISTORY', 'Historia Clínica'),
-    ('NOTIFICATIONS', 'Notificaciones'),
-    ('VERIFICATION', 'Verificación'),
-    ('REPORT', 'Reportes')
+    ('CITAS', 'Citas'),
+    ('USUARIOS', 'Usuarios'),
+    ('HISTORIAS_CLINICAS', 'Historias Clínicas'),
+    ('SEGURIDAD', 'Seguridad')
+ON CONFLICT (code) DO NOTHING;
+
+-- ---------------------------------------------------------------------
+-- audit_action
+-- ---------------------------------------------------------------------
+INSERT INTO piedrazul.audit_action (code, name, audit_module_code) VALUES
+    ('CITA_AGENDADA',              'Cita agendada',                       'CITAS'),
+    ('CITA_REAGENDADA',            'Cita reagendada',                     'CITAS'),
+    ('USUARIO_CREADO',             'Usuario creado',                      'USUARIOS'),
+    ('USUARIO_MODIFICADO',         'Usuario modificado',                  'USUARIOS'),
+    ('USUARIO_DESACTIVADO',        'Usuario desactivado',                 'USUARIOS'),
+    ('HISTORIA_CLINICA_CREADA',    'Historia clínica creada',             'HISTORIAS_CLINICAS'),
+    ('HISTORIA_CLINICA_CONSULTADA','Historia clínica consultada',         'HISTORIAS_CLINICAS'),
+    ('LOGIN_EXITOSO',              'Inicio de sesión exitoso',            'SEGURIDAD'),
+    ('LOGIN_FALLIDO',              'Intento de inicio de sesión fallido', 'SEGURIDAD')
 ON CONFLICT (code) DO NOTHING;

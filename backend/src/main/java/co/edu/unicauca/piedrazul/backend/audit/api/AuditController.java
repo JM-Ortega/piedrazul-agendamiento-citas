@@ -40,17 +40,9 @@ public class AuditController {
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        var criteria = new AuditEventCriteria(
-                actorUsername, action, targetEntityType, targetEntityId, from, to, page, size);
-
+        var criteria = new AuditEventCriteria(actorUsername, action, targetEntityType, targetEntityId, from, to, page, size);
         var result = queryService.search(criteria);
-
-        var content = result.content().stream()
-                .map(mapper::toResponse)
-                .toList();
-
-        return ResponseEntity.ok(
-                PageResponse.of(content, result.page(), result.totalPages(), result.totalElements())
-        );
+        var content = result.content().stream().map(mapper::toResponse).toList();
+        return ResponseEntity.ok(PageResponse.of(content, result.page(), result.totalPages(), result.totalElements()));
     }
 }

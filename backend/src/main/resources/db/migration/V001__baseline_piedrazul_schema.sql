@@ -96,6 +96,7 @@ CREATE TABLE piedrazul.verification_purpose (
     CONSTRAINT pk_verification_purpose PRIMARY KEY (code)
 );
 
+/*
 -- ---------------------------------------------------------------------
 -- Catálogo: audit_action
 -- Acción registrada en la bitácora de auditoría. Catálogo porque puede
@@ -119,7 +120,41 @@ CREATE TABLE piedrazul.audit_module (
 
     CONSTRAINT pk_audit_module PRIMARY KEY (code)
 );
+ */
 
+-- =====================================================================
+-- Tabla: audit_module
+-- Catálogo de módulos de negocio que pueden generar eventos de auditoría
+-- (Citas, Usuarios, Historias Clínicas, Seguridad, etc.). Se usa para
+-- agrupar audit_action por módulo, principalmente para que el frontend
+-- pueda armar el filtro de auditoría organizado por sección del sistema.
+-- =====================================================================
+CREATE TABLE piedrazul.audit_module (
+    code    VARCHAR(50)  NOT NULL,
+    name    VARCHAR(100) NOT NULL,
+
+    CONSTRAINT pk_audit_module PRIMARY KEY (code)
+);
+
+-- =====================================================================
+-- Tabla: audit_action
+-- Catálogo de acciones auditables del sistema. Modelado como catálogo
+-- (no CHECK) porque la lista crece con cada nuevo caso de uso que se
+-- audita — cada módulo de negocio (citas, usuarios, historias clínicas,
+-- seguridad) puede aportar nuevas acciones a futuro.
+-- =====================================================================
+CREATE TABLE piedrazul.audit_action (
+    code             VARCHAR(50)  NOT NULL,
+    name             VARCHAR(200) NOT NULL,
+    audit_module_code VARCHAR(50) NOT NULL,
+
+    CONSTRAINT pk_audit_action PRIMARY KEY (code),
+    CONSTRAINT fk_audit_action_audit_module FOREIGN KEY (audit_module_code)
+    REFERENCES piedrazul.audit_module(code)
+);
+
+CREATE INDEX idx_audit_action_audit_module_code
+    ON piedrazul.audit_action (audit_module_code);
 
 -- =====================================================================
 -- BLOQUE 2: DOMINIO PRINCIPAL
@@ -478,28 +513,72 @@ CREATE UNIQUE INDEX uq_verification_code_active
     ON piedrazul.verification_code (subject, purpose_code)
     WHERE used = false;
 
--- ---------------------------------------------------------------------
--- Tabla: audit_log
--- ---------------------------------------------------------------------
-CREATE TABLE piedrazul.audit_log (
-    id              UUID        NOT NULL,
-    action_code     VARCHAR(60) NOT NULL,
-    module_code     VARCHAR(40) NOT NULL,
-    entity_id       UUID        NOT NULL,
-    performed_by    UUID        NOT NULL,
-    performed_at    TIMESTAMPTZ NOT NULL,
+-- =====================================================================
+-- Tabla: audit_event
+-- Registro de auditoría append-only del sistema.
+-- =====================================================================
+CREATE TABLE piedrazul.audit_event (
+    id                  UUID                     NOT NULL,
+    occurred_at         TIMESTAMPTZ               NOT NULL,
+    actor_username      VARCHAR(100)              NOT NULL,
+    actor_role          VARCHAR(50),
+    action_code         VARCHAR(50)               NOT NULL,
+    target_entity_type  VARCHAR(100),
+    target_entity_id    VARCHAR(100),
+    outcome             VARCHAR(20)               NOT NULL,
+    correlation_id      VARCHAR(100),
+    before_state        TEXT,
+    after_state         TEXT,
 
-    CONSTRAINT pk_audit_log PRIMARY KEY (id),
-    CONSTRAINT fk_audit_log_action FOREIGN KEY (action_code) REFERENCES piedrazul.audit_action(code),
-    CONSTRAINT fk_audit_log_module FOREIGN KEY (module_code) REFERENCES piedrazul.audit_module(code),
-    CONSTRAINT fk_audit_log_person FOREIGN KEY (performed_by) REFERENCES piedrazul.person(user_id)
+    CONSTRAINT pk_audit_event PRIMARY KEY (id),
+    CONSTRAINT fk_audit_event_audit_action FOREIGN KEY (action_code)
+        REFERENCES piedrazul.audit_action(code),
+    CONSTRAINT ck_audit_event_outcome CHECK (
+    outcome IN ('EXITOSO', 'FALLIDO', 'DENEGADO')
+    )
 );
 
-CREATE INDEX idx_audit_log_action ON piedrazul.audit_log (action_code);
-CREATE INDEX idx_audit_log_module ON piedrazul.audit_log (module_code);
-CREATE INDEX idx_audit_log_performed_by ON piedrazul.audit_log (performed_by);
-CREATE INDEX idx_audit_log_entity ON piedrazul.audit_log (entity_id);
+CREATE INDEX idx_audit_event_action_code
+    ON piedrazul.audit_event (action_code);
 
+CREATE INDEX idx_audit_event_actor_username
+    ON piedrazul.audit_event (actor_username, occurred_at DESC);
+
+CREATE INDEX idx_audit_event_target
+    ON piedrazul.audit_event (target_entity_type, target_entity_id);
+
+CREATE INDEX idx_audit_event_occurred_at
+    ON piedrazul.audit_event (occurred_at DESC);
+
+CREATE INDEX idx_audit_event_correlation_id
+    ON piedrazul.audit_event (correlation_id)
+    WHERE correlation_id IS NOT NULL;
+
+-- =====================================================================
+-- Refuerzo de integridad sobre piedrazul.audit_event: prohíbe UPDATE y
+-- DELETE tanto a nivel de permisos de rol como con un trigger de
+-- defensa en profundidad (por si algún día se conecta con un rol de
+-- mayores privilegios por error de configuración).
+-- =====================================================================
+REVOKE UPDATE, DELETE ON piedrazul.audit_event FROM piedrazul_app;
+GRANT SELECT, INSERT ON piedrazul.audit_event TO piedrazul_app;
+
+CREATE FUNCTION piedrazul.prevent_audit_event_mutation()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+AS $$
+BEGIN
+    RAISE EXCEPTION 'audit_event es append-only: % no está permitido', TG_OP;
+END;
+$$;
+
+CREATE TRIGGER trg_audit_event_no_update
+    BEFORE UPDATE ON piedrazul.audit_event
+    FOR EACH ROW EXECUTE FUNCTION piedrazul.prevent_audit_event_mutation();
+
+CREATE TRIGGER trg_audit_event_no_delete
+    BEFORE DELETE ON piedrazul.audit_event
+    FOR EACH ROW EXECUTE FUNCTION piedrazul.prevent_audit_event_mutation();
 
 -- =====================================================================
 -- BLOQUE 3: RELACIÓN N:M

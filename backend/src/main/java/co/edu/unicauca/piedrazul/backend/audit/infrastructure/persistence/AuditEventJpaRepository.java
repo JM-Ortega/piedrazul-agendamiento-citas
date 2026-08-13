@@ -13,15 +13,15 @@ import java.util.UUID;
 public interface AuditEventJpaRepository extends JpaRepository<AuditEventJpaEntity, UUID> {
 
     // Con Pageable, Spring Data genera AUTOMÁTICAMENTE la consulta de conteo
-    // (COUNT) además de la de contenido — no hay que escribirla a mano.
+    // (COUNT) además de la de contenido, no hay que escribirla a mano.
     @Query("""
         SELECT e FROM AuditEventJpaEntity e
         WHERE (:actorUsername IS NULL OR e.actorUsername = :actorUsername)
           AND (:action IS NULL OR e.action = :action)
           AND (:targetEntityType IS NULL OR e.targetEntityType = :targetEntityType)
           AND (:targetEntityId IS NULL OR e.targetEntityId = :targetEntityId)
-          AND (:from IS NULL OR e.timestamp >= :from)
-          AND (:to IS NULL OR e.timestamp <= :to)
+          AND (:from IS NULL OR e.occurredAt >= :from)
+          AND (:to IS NULL OR e.occurredAt <= :to)
         """)
     Page<AuditEventJpaEntity> search(
             @Param("actorUsername") String actorUsername,
