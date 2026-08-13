@@ -32,6 +32,12 @@
     (valueChange)="onPatientFormChange($event)"
   ></app-patient-data-form>
 
+  @if (this.globalErrorMessage()) {
+    <div class="mt-2 bg-red-100 text-red-700 p-3 rounded-lg text-sm">
+      {{ this.globalErrorMessage() }}
+    </div>
+  }
+
   <div class="flex gap-4 mt-4">
     <app-button variant="secondary" (buttonClick)="onGoBack()">
       <svg lucideArrowLeft [size]="16"></svg> Buscar de nuevo
