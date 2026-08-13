@@ -27,7 +27,6 @@ import {
   PatientPublicResponse,
   PatientService,
 } from '../../core/services/patient.service';
-import { mapHttpError } from '../../shared/helpers/http-errors';
 import {
   PatientDataFormComponent,
   PatientFormData,
@@ -222,7 +221,7 @@ export class RegistroComponent implements OnInit {
           this.patientStatus.set('not-found');
           return;
         }
-        this.errorMessage.set(mapHttpError(err));
+        this.errorMessage.set(err.message);
       },
     });
   }
@@ -370,7 +369,7 @@ export class RegistroComponent implements OnInit {
       this.verificationCode.set('');
     }
 
-    this.errorMessage.set(mapHttpError(err));
+    this.errorMessage.set(err.message);
   }
 
   private validateStep2(): boolean {
