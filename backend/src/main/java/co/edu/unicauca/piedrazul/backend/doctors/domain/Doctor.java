@@ -28,13 +28,13 @@ public class Doctor {
     @Column(name = "labor_end", nullable = false)
     private LocalDate laborEnd;
 
-    @Column(name = "booking_window_weeks", nullable = false)
+    @Column(name = "booking_window_weeks")
     private int bookingWindowWeeks;
 
     @Column(name = "status", nullable = false)
     private boolean status;
 
-    @Column(name = "appointment_interval", nullable = false)
+    @Column(name = "appointment_interval")
     private int appointmentInterval;
 
     @OneToMany(mappedBy = "doctor", cascade = CascadeType.ALL, orphanRemoval = true)

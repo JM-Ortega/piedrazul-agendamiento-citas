@@ -10,7 +10,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record CreateDoctorRequest(
-     @NotEmpty
+        @NotEmpty
         List<SpecialtyCode> specialty,
 
         @NotNull
@@ -21,11 +21,11 @@ public record CreateDoctorRequest(
         @Positive
         @Min(5)
         @Max(240)
-        int appointmentInterval,
+        Integer appointmentInterval,
 
         @Positive
         @Min(1)
-        int bookingWindowWeeks,
+        Integer bookingWindowWeeks,
 
         @Valid
         List<ScheduleRequest> schedules

@@ -44,14 +44,17 @@ public class DoctorService implements DoctorProvisioningApi {
 
         validateLaborDateRange(request.laborStart(), request.laborEnd());
 
+        int weeks = request.bookingWindowWeeks() != null ? request.bookingWindowWeeks() : 0;
+        int interval = request.appointmentInterval() != null ? request.appointmentInterval() : 0;
+
         // Lo dejamos inactivo porque no tiene horarios
         Doctor doctor = new Doctor(
                 personId,
                 request.laborStart(),
                 request.laborEnd(),
-                request.bookingWindowWeeks(),
+                weeks,
                 false,
-                request.appointmentInterval()
+                interval
         );
 
         // Agregamos las especialidades
