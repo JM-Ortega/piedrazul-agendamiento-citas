@@ -5,27 +5,37 @@ export interface DocumentRule {
   max: number;
   pattern: RegExp;
   sanitize: SanitizeRuleForDocument;
+  label: string;
 }
 
 export const DOCUMENT_RULES: Record<string, DocumentRule> = {
   TARJETA_IDENTIDAD: {
     min: 10,
+    max: 11,
+    pattern: /^\d+$/,
+    sanitize: 'numeric',
+    label: 'La tarjeta de identidad',
+  },
+  CEDULA: {
+    min: 6,
     max: 10,
     pattern: /^\d+$/,
     sanitize: 'numeric',
+    label: 'La cédula',
   },
-  CEDULA: { min: 6, max: 10, pattern: /^\d+$/, sanitize: 'numeric' },
   REGISTRO_NACIMIENTO: {
     min: 8,
     max: 20,
     pattern: /^\d+$/,
     sanitize: 'numeric',
+    label: 'El registro de nacimiento',
   },
   PASAPORTE: {
     min: 6,
     max: 9,
     pattern: /^[a-zA-Z0-9]+$/,
     sanitize: 'alphanumeric',
+    label: 'El pasaporte',
   },
 };
 
@@ -40,16 +50,33 @@ export function validateDocumentForType(
   if (!rule || !identification) return '';
 
   if (!rule.pattern.test(identification)) {
-    return type === 'PASAPORTE'
-      ? 'El pasaporte solo debe contener letras y números'
-      : 'El documento solo debe contener números';
+    return rule.sanitize === 'alphanumeric'
+      ? `${rule.label} solo debe contener letras y números`
+      : `${rule.label} solo debe contener números`;
   }
 
   if (identification.length < rule.min || identification.length > rule.max) {
     return rule.min === rule.max
-      ? `El documento debe tener exactamente ${rule.min} dígitos`
-      : `El documento debe tener entre ${rule.min} y ${rule.max} caracteres`;
+      ? `${rule.label} debe tener exactamente ${rule.min} dígitos`
+      : `${rule.label} debe tener entre ${rule.min} y ${rule.max} caracteres`;
   }
 
   return '';
+}
+
+/**
+ * Longitud máxima permitida para el documento, según el tipo seleccionado.
+ * Usado para limitar el input en tiempo real (maxLength del átomo).
+ */
+export function getDocumentIdMaxLength(documentType: string): number {
+  return DOCUMENT_RULES[documentType]?.max ?? DEFAULT_DOCUMENT_MAX_LENGTH;
+}
+
+/**
+ * Regla de sanitización a aplicar en el input, según el tipo de documento.
+ */
+export function getDocumentIdSanitize(
+  documentType: string
+): SanitizeRuleForDocument {
+  return DOCUMENT_RULES[documentType]?.sanitize ?? 'numeric';
 }

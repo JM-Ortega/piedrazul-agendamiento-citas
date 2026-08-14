@@ -8,6 +8,10 @@ import {
 } from '@angular/core';
 import { LucidePencil, LucideSettings } from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
+import {
+  ToastComponent,
+  ToastType,
+} from '../../../../design-system/molecules/toast-message/toast.component';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { DoctorCardComponent } from '../../components/doctor-card/doctor-card.component';
@@ -30,6 +34,7 @@ import { AdminService } from '../../service/admin.service';
     DoctorCardComponent,
     DoctorEditFormComponent,
     AdminModalsComponent,
+    ToastComponent,
   ],
 })
 export class AdminConfigComponent implements OnInit {
@@ -56,6 +61,8 @@ export class AdminConfigComponent implements OnInit {
   forceModalMessage = signal('');
   showErrorModal = signal(false);
   errorGuardado = signal('');
+  toastMessage = signal('');
+  toastType = signal<ToastType | null>(null);
 
   // ── Computed ──────────────────────────────────────────────────────────────
   // ⚠️ PARCHE: specialty ahora es string[] por doctor (antes era string único).
@@ -183,17 +190,18 @@ export class AdminConfigComponent implements OnInit {
         this.savedId.set(form.id);
         this.editingId.set(null);
         setTimeout(() => this.savedId.set(null), 3000);
+        this.showToast('success', 'Configuración guardada correctamente.');
       },
       error: (err) => {
         const raw: string =
           err?.error?.detail ??
           'Error al guardar los cambios. Intente de nuevo.';
-        this.errorGuardado.set(
-          raw.startsWith('El usuario ya está activo')
-            ? 'El médico ya está trabajando activamente. Debe deshabilitarlo primero para poder cambiar su período laboral.'
-            : raw
-        );
+        const message = raw.startsWith('El usuario ya está activo')
+          ? 'El médico ya está trabajando activamente. Debe deshabilitarlo primero para poder cambiar su período laboral.'
+          : raw;
+        this.errorGuardado.set(message);
         this.showErrorModal.set(true);
+        this.showToast('error', message);
       },
     });
   }
@@ -292,6 +300,14 @@ export class AdminConfigComponent implements OnInit {
   private toTimeBackend(time: string | undefined): string {
     if (!time) return '';
     return time.length === 5 ? `${time}:00` : time;
+  }
+  private showToast(type: ToastType, message: string, duration = 3000): void {
+    this.toastType.set(type);
+    this.toastMessage.set(message);
+    setTimeout(() => {
+      this.toastType.set(null);
+      this.toastMessage.set('');
+    }, duration);
   }
 
   private mapSchedulesToDoctor(schedules: dtoSchedule[]): Partial<Doctor> {
