@@ -28,6 +28,11 @@ import {
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { InputComponent } from '../../../../design-system/atoms/input/input.component';
 import { SelectComponent } from '../../../../design-system/atoms/select/select.component';
+import {
+  getDocumentIdMaxLength,
+  getDocumentIdSanitize,
+  validateDocumentForType,
+} from '../../../../shared/helpers/document-validation';
 import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 import {
   CreateUserDoctorFormComponent,
@@ -40,11 +45,6 @@ import { DoctorFormData } from '../../models/interfaces/DoctorFormData';
 import { FormErrors } from '../../models/interfaces/FormErrors';
 import { UserForm } from '../../models/interfaces/UserForm';
 import { AdminService } from '../../service/admin.service';
-import {
-  getDocumentIdMaxLength,
-  getDocumentIdSanitize,
-  validateDocumentId,
-} from '../../service/document-id-validator.service';
 
 type Role = 'doctor' | 'scheduler';
 
@@ -377,11 +377,17 @@ export class AdminCreateUserComponent implements OnInit {
 
   private computeFieldError(field: keyof FormErrors): string | undefined {
     switch (field) {
-      case 'documentId':
-        return validateDocumentId(
-          this.userForm.documentId,
-          this.userForm.identificationType
+      case 'documentId': {
+        const trimmed = this.userForm.documentId.trim();
+        if (!trimmed) {
+          return 'El documento de identidad es obligatorio.';
+        }
+        const formatError = validateDocumentForType(
+          this.userForm.identificationType,
+          trimmed
         );
+        return formatError || undefined;
+      }
 
       case 'password':
         if (!this.userForm.password) {
