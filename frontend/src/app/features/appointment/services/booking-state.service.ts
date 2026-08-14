@@ -87,6 +87,7 @@ export class BookingStateService {
   errorMessageSpecialty = signal<string>('');
   noDoctorsFound = signal<boolean>(false);
   errorMessageDoctors = signal<string>('');
+  globalErrorMessage = signal<string>('');
 
   readonly uniqueSpecialties = computed(() => [
     ...new Set(

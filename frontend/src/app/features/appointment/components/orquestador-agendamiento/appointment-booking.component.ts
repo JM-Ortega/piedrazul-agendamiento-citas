@@ -13,7 +13,6 @@ import { timer } from 'rxjs';
 import { DoctorService } from '../../../../core/services/doctor.service';
 import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
-import { mapHttpError } from '../../../../shared/helpers/http-errors';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { BookingSpecialtySelectorComponent } from '../../../appointment/components/seleccion-especialidad/booking-specialty-selector.component';
@@ -27,6 +26,7 @@ import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { BookingConfirmComponent } from '../confirmacion/booking-confirm.component';
 import { BookingModeSelectorComponent } from '../modo-agendamiento/booking-mode-selector.component';
+import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 
 /**
  * Coordina el flujo de agendamiento componiendo los
@@ -92,6 +92,12 @@ export class AppointmentBookingComponent implements OnInit {
     }
   }
 
+  /**
+   * Inicializa el flujo cuando un médico agenda una cita para sí mismo.
+   * Precarga sus datos, intenta resolver el paciente si llegó un documento
+   * precargado (`pendingDocumentNumber`), y preselecciona su especialidad
+   * si solo tiene una registrada.
+   */
   private initDoctorContext(): void {
     this.state.bookingMode.set('specialty-doctor');
     this.state.step.set(this.state.specialtyStep());
@@ -111,7 +117,8 @@ export class AppointmentBookingComponent implements OnInit {
                 this.preselectDoctorSpecialty(doctor);
                 this.state.step.set(this.state.specialtyStep());
               },
-              error: () => {
+              error: (err: AppError) => {
+                this.state.globalErrorMessage.set(err.message);
                 this.loadSpecialtiesForMode('specialty-doctor');
                 this.preselectDoctorSpecialty(doctor);
                 this.state.step.set(this.state.specialtyStep());
@@ -123,7 +130,8 @@ export class AppointmentBookingComponent implements OnInit {
           this.state.step.set(this.state.specialtyStep());
         }
       },
-      error: () => {
+      error: (err: AppError) => {
+        this.state.globalErrorMessage.set(err.message);
         this.loadSpecialtiesForMode('specialty-doctor');
       },
     });
@@ -275,12 +283,12 @@ export class AppointmentBookingComponent implements OnInit {
       next: (data) => {
         this.state.specialtiesWithDoctor.set(data);
       },
-      error: (err) => {
+      error: (err: AppError) => {
         this.state.noSpecialtyAvailable.set(true);
         this.state.errorMessageSpecialty.set(
-          err.status === 409
+          err.status === 409 //CAMBIAR esto por el código de error que devuelve el backend cuando no hay especialidades disponibles para ningún doctor
             ? 'No hay médicos disponibles para ninguna especialidad. Intente más tarde.'
-            : mapHttpError(err, 'Error al obtener las especialidades.')
+            : err.message
         );
       },
     });
@@ -317,11 +325,8 @@ export class AppointmentBookingComponent implements OnInit {
           }))
         );
       },
-      error: (err) => {
-        this.state.noSpecialtyAvailable.set(true);
-        this.state.errorMessageSpecialty.set(
-          mapHttpError(err, 'Error al obtener las especialidades.')
-        );
+      error: (err: AppError) => {
+        this.state.globalErrorMessage.set(err.message);
       },
     });
   }
@@ -341,12 +346,12 @@ export class AppointmentBookingComponent implements OnInit {
           );
         }
       },
-      error: (err) => {
+      error: (err: AppError) => {
         this.state.noDoctorsFound.set(true);
         this.state.errorMessageDoctors.set(
-          err.status === 404
+          err.status === 404 //CAMBIAR esto por el código de error que devuelve el backend cuando no hay médicos disponibles para la especialidad
             ? 'No hay médicos disponibles para esta especialidad.'
-            : mapHttpError(err, 'Error al obtener los médicos.')
+            : err.message
         );
       },
     });
