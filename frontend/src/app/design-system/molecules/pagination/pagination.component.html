@@ -1,0 +1,51 @@
+@if (pagination() && pagination()!.totalPages > 1) {
+  <div class="flex items-center justify-center gap-2 mt-8">
+    <button
+      type="button"
+      (click)="goToPrevious()"
+      [disabled]="pagination()!.first"
+      class="w-9 h-9 flex items-center justify-center rounded-lg border border-[#a7c9ec] text-[#215c98] disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-[#ddefff] transition-colors"
+      aria-label="Página anterior"
+    >
+      <svg lucideChevronLeft [size]="18"></svg>
+    </button>
+
+    @for (page of pageNumbers(); track $index) {
+      @if (page === 'ellipsis') {
+        <span class="w-9 h-9 flex items-center justify-center text-gray-400"
+          >…</span
+        >
+      } @else {
+        <button
+          type="button"
+          (click)="goToPage(page)"
+          class="w-9 h-9 flex items-center justify-center rounded-lg text-sm font-semibold transition-colors"
+          [class.bg-[#215c98]]="pagination()!.pageNumber === page"
+          [class.text-white]="pagination()!.pageNumber === page"
+          [class.border]="pagination()!.pageNumber !== page"
+          [class.border-[#a7c9ec]]="pagination()!.pageNumber !== page"
+          [class.text-[#163c63]]="pagination()!.pageNumber !== page"
+          [class.hover:bg-[#ddefff]]="pagination()!.pageNumber !== page"
+        >
+          {{ page + 1 }}
+        </button>
+      }
+    }
+
+    <button
+      type="button"
+      (click)="goToNext()"
+      [disabled]="pagination()!.last"
+      class="w-9 h-9 flex items-center justify-center rounded-lg border border-[#a7c9ec] text-[#215c98] disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-[#ddefff] transition-colors"
+      aria-label="Página siguiente"
+    >
+      <svg lucideChevronRight [size]="18"></svg>
+    </button>
+  </div>
+
+  <p class="text-center text-sm text-gray-600 mt-3">
+    Página {{ pagination()!.pageNumber + 1 }} de
+    {{ pagination()!.totalPages }} · {{ pagination()!.totalElements }} citas en
+    total
+  </p>
+}
