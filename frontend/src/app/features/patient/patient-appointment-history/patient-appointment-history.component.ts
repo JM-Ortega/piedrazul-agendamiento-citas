@@ -17,6 +17,7 @@ import {
   APPOINTMENT_STATUS_CLASSES,
 } from '../../../shared/helpers/appointment-status';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
+import { AppError } from '../../../shared/models/interfaces/api-error.model';
 
 @Component({
   selector: 'app-patient-appointment-history',
@@ -50,17 +51,17 @@ export class PatientAppointmentHistoryComponent implements OnInit {
           .loadAppointments({ idPatient: patient.id })
           .subscribe({
             next: () => this.isLoading.set(false),
-            error: () => {
+            error: (err: AppError) => {
               this.errorMessage.set(
-                'No se pudieron cargar las citas. Intente más tarde.'
+                'No se pudieron cargar las citas: ' + err.message
               );
               this.isLoading.set(false);
             },
           });
       },
-      error: () => {
+      error: (err: AppError) => {
         this.errorMessage.set(
-          'No se pudo obtener la información del paciente.'
+          'No se pudo obtener la información del paciente: ' + err.message
         );
         this.isLoading.set(false);
       },

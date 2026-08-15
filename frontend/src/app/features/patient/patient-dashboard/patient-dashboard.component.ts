@@ -24,6 +24,7 @@ import { ToastComponent } from '../../../design-system/molecules/toast-message/t
 import { getMonthShort } from '../../../shared/helpers/date-format';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
+import { AppError } from '../../../shared/models/interfaces/api-error.model';
 
 @Component({
   selector: 'app-patient-dashboard',
@@ -70,17 +71,17 @@ export class PatientDashboardComponent implements OnInit {
           .loadAppointments({ idPatient: patient.id, state: 'AGENDADA' })
           .subscribe({
             next: () => this.isLoading.set(false),
-            error: () => {
+            error: (err: AppError) => {
               this.errorMessage.set(
-                'No se pudieron cargar las citas. Intente más tarde.'
+                'No se pudieron cargar las citas: ' + err.message
               );
               this.isLoading.set(false);
             },
           });
       },
-      error: () => {
+      error: (err: AppError) => {
         this.errorMessage.set(
-          'No se pudo obtener la información del paciente.'
+          'No se pudo obtener la información del paciente: ' + err.message
         );
         this.isLoading.set(false);
       },
@@ -108,8 +109,11 @@ export class PatientDashboardComponent implements OnInit {
         this.showToast('La cita fue cancelada exitosamente', 'success');
         this.appointmentService.removeAppointment(appointmentId);
       },
-      error: () => {
-        this.showToast('Ocurrió un error al cancelar la cita', 'error');
+      error: (err: AppError) => {
+        this.showToast(
+          'Ocurrió un error al cancelar la cita: ' + err.message,
+          'error'
+        );
       },
     });
   }
