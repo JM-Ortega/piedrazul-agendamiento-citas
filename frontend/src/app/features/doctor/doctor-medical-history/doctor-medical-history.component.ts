@@ -88,6 +88,7 @@ export class DoctorMedicalHistoryComponent implements OnInit {
       .updateAppointmentAsAttended(idCita, observation)
       .subscribe({
         next: () => {
+          this.doctorService.resetMedicalRecords();
           this.router.navigate(['/medico']);
         },
         error: (err) => {
