@@ -1,9 +1,13 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PageQuery;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PagedResult;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ListAppointmentsUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -16,9 +20,8 @@ public class ListAppointmentsUseCaseImpl implements ListAppointmentsUseCase {
         this.appointmentRepository = appointmentRepository;
     }
 
-    // POLIMORFISMO
     @Override
-    public List<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state ) {
-        return appointmentRepository.listBy(idDoctor, idPatient, date, state);
+    public PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery) {
+        return appointmentRepository.listBy(idDoctor, idPatient, date, state, pageQuery);
     }
 }

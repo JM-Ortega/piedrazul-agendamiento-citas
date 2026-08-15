@@ -2,10 +2,16 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PageQuery;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PagedResult;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
@@ -87,7 +93,25 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
 
 
     @Override
-    public List<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state) {
+    public PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery) {
+        Specification<AppointmentEntity> spec = buildSpecification(idDoctor, idPatient, date, state);
+
+        Sort.Direction direction = pageQuery.ascending() ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Sort sort = Sort.by(direction, pageQuery.sortBy());
+        Pageable pageable = PageRequest.of(pageQuery.page(), pageQuery.size(), sort);
+
+        Page<AppointmentEntity> entityPage = jpaRepository.findAll(spec, pageable);
+
+        return new PagedResult<>(
+                entityPage.getContent().stream().map(mapper::toDomain).toList(),
+                entityPage.getNumber(),
+                entityPage.getSize(),
+                entityPage.getTotalElements(),
+                entityPage.getTotalPages()
+        );
+    }
+
+    private Specification<AppointmentEntity> buildSpecification(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state) {
         List<Specification<AppointmentEntity>> specs = new ArrayList<>();
 
         if (idDoctor != null) {
@@ -103,11 +127,7 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
             specs.add((root, query, cb) -> cb.equal(root.get("appointmentState"), state));
         }
 
-        Specification<AppointmentEntity> spec = Specification.allOf(specs);
-
-        return jpaRepository.findAll(spec).stream()
-                .map(mapper::toDomain)
-                .toList();
+        return Specification.allOf(specs);
     }
 
 }

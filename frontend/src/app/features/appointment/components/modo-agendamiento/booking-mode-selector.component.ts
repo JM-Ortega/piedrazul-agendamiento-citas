@@ -9,7 +9,6 @@ import { ButtonComponent } from '../../../../design-system/atoms/button/button.c
 import { BookingMode } from '../../models/types/bookingMode.type';
 import { BookingStateService } from '../../services/booking-state.service';
 
-
 /**
  * Mostrar las dos tarjetas de selección de modo
  * (Por Especialidad / Por Especialidad y Médico) y notificar la elección.
