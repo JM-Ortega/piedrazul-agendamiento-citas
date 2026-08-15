@@ -4,11 +4,8 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorR
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorDetailedResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.*;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorInvalidSpecialty;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
@@ -255,6 +252,10 @@ public class DoctorService implements DoctorProvisioningApi {
                 .stream()
                 .map(SpecialtyCode::valueOf)
                 .toList();
+
+        if (activeSpecialties.isEmpty()) {
+            throw new NoAvailableDoctorsException("No hay médicos activos disponibles");
+        }
 
         if (idPatient == null || appointmentExternalService.isNewPatient(idPatient)) {
             return activeSpecialties.contains(SpecialtyCode.MEDICINA_GENERAL)
