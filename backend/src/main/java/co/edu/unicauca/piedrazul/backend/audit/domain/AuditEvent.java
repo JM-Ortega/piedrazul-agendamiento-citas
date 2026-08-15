@@ -43,7 +43,6 @@ public final class AuditEvent {
 
     /**
      * Usar SOLO al reconstruir un AuditEvent ya existente desde persistencia
-     * (por ejemplo, en AuditEventRepositoryAdapter#toDomain).
      * NO usar al crear un evento nuevo: para eso, usa builder().
      */
     public static Builder reconstruct(java.util.UUID id, java.time.Instant timestamp) {
@@ -71,7 +70,7 @@ public final class AuditEvent {
         private AuditAction action;
         private String targetEntityType;
         private String targetEntityId;
-        private AuditOutcome outcome; // sin default: lo hacemos obligatorio (ver más abajo)
+        private AuditOutcome outcome;
         private String correlationId;
         private String beforeState;
         private String afterState;

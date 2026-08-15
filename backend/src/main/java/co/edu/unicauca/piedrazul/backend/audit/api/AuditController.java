@@ -18,7 +18,7 @@ import java.time.Instant;
 
 @RestController
 @RequestMapping("/api/audit")
-@PreAuthorize("hasRole('ADMINISTRADOR')")
+@PreAuthorize("hasRole('ADMIN')")
 public class AuditController {
 
     private final AuditQueryService queryService;

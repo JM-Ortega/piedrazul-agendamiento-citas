@@ -557,8 +557,7 @@ CREATE INDEX idx_audit_event_correlation_id
 -- =====================================================================
 -- Refuerzo de integridad sobre piedrazul.audit_event: prohíbe UPDATE y
 -- DELETE tanto a nivel de permisos de rol como con un trigger de
--- defensa en profundidad (por si algún día se conecta con un rol de
--- mayores privilegios por error de configuración).
+-- defensa en profundidad.
 -- =====================================================================
 REVOKE UPDATE, DELETE ON piedrazul.audit_event FROM piedrazul_app;
 GRANT SELECT, INSERT ON piedrazul.audit_event TO piedrazul_app;
