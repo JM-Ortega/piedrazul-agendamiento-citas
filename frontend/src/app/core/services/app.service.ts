@@ -8,12 +8,20 @@ import {
 } from 'keycloak-angular';
 import Keycloak from 'keycloak-js';
 import { filter, map } from 'rxjs';
+import { DoctorService } from './doctor.service';
+import { PatientService } from './patient.service';
+import { PatientAppointmentService } from './patientAppointment.service';
+import { SchedulerService } from './scheduler.service';
 
 @Injectable({ providedIn: 'root' })
 export class AppService {
   private keycloak = inject(Keycloak);
   private keycloakEvent = inject(KEYCLOAK_EVENT_SIGNAL);
   private router = inject(Router);
+  private doctorService = inject(DoctorService);
+  private patientService = inject(PatientService);
+  private patientAppointmentService = inject(PatientAppointmentService);
+  private schedulerService = inject(SchedulerService);
 
   private currentUrl = toSignal(
     this.router.events.pipe(
@@ -125,7 +133,23 @@ export class AppService {
     return this.roleLabelFor(this.currentRole() ?? '');
   }
 
+  /**
+   * Realiza el cierre de sesión seguro del usuario.
+   *
+   * Limpia el estado en memoria de los servicios Singleton (Signals y cachés),
+   * elimina cualquier dato persistido en el almacenamiento local del navegador
+   * y redirige al flujo de cierre de sesión unificado con Keycloak.
+   */
   logout(): void {
+    // 1. Purga de datos sensibles y estado en memoria de los servicios Singleton
+    this.doctorService.clearAllData();
+    this.patientService.clearAllData();
+    this.patientAppointmentService.clearAllData();
+    this.schedulerService.clearAllData();
+    // 2. Limpieza de storages del navegador (tokens locales, flags de sesión, etc.)
+    localStorage.clear();
+    sessionStorage.clear();
+    // 3. Redirección y destrucción de la sesión en el servidor de identidad (Keycloak)
     this.keycloak.logout({ redirectUri: window.location.origin });
   }
   async refreshRoles(): Promise<void> {

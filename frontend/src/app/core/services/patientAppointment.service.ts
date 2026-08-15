@@ -15,6 +15,13 @@ export class PatientAppointmentService {
   readonly appointments = signal<AppointmentsPatient[]>([]);
 
   /**
+   * Limpia las citas en memoria al cerrar sesión
+   */
+  clearAllData(): void {
+    this.appointments.set([]);
+  }
+
+  /**
    * Carga las citas del paciente indicado, opcionalmente filtradas por estado,
    * y actualiza el signal `appointments` con el resultado.
    */

@@ -87,4 +87,11 @@ export class SchedulerService {
       `${this.apiUrl}/reports/scheduler/availability?date=${date}`
     );
   }
+
+  /**
+   * Borra toda la caché en memoria al cerrar sesión
+   */
+  clearAllData(): void {
+    this.doctorsCache.clear();
+  }
 }

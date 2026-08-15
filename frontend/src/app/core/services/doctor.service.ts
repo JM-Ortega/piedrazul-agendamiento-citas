@@ -198,7 +198,7 @@ export class DoctorService {
    * Limpia todo el estado en memoria del doctor
    * (perfil, historial clínico, paginación).
    */
-  clearAllDoctorData(): void {
+  clearAllData(): void {
     this.clearMeCache();
     this.resetMedicalRecords();
   }
