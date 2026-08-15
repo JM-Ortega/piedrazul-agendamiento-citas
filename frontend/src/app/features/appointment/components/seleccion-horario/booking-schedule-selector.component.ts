@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  signal,
   inject,
   output,
 } from '@angular/core';
@@ -16,6 +17,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { BookingStateService } from '../../services/booking-state.service';
 import { CalendarService } from '../../services/calendar.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
+import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 
 /**
  * Permite al usuario elegir una fecha y hora
@@ -51,6 +53,7 @@ export class BookingScheduleSelectorComponent {
   // Estado local: errores y disponibilidad de slots
   noSlotsAvailable = false;
   errorMessageSlots = '';
+  globalErrorMessage = signal('');
 
   advance = output<void>();
   back = output<void>();
@@ -105,7 +108,7 @@ export class BookingScheduleSelectorComponent {
               slots = slots.filter((s) => s >= cutoffStr);
             }
           }
-
+          // TODO si en este caso no hay horarios disponibles también se envía como error? o lo debo manejar acá?
           this.state.availableSlots.set(slots);
           if (!slots || slots.length === 0) {
             this.noSlotsAvailable = true;
@@ -113,18 +116,15 @@ export class BookingScheduleSelectorComponent {
               'No hay horarios disponibles para esta fecha.';
           }
         },
-        error: (err) => {
+        error: (err: AppError) => {
           this.state.availableSlots.set([]);
-          this.noSlotsAvailable = true;
-
+          // TODO cambiar por el que indiquen en el error code cuando no haya espacios disponibles
           if (err.status === 0) {
-            this.errorMessageSlots =
-              'No se pudo conectar con el servidor. Intente más tarde.';
+            this.noSlotsAvailable = true;
+            this.errorMessageSlots = err.message;
             return;
           }
-          const detail = err.error?.detail;
-          this.errorMessageSlots =
-            detail || 'Error al cargar los horarios disponibles.';
+          this.globalErrorMessage.set(err.message);
         },
       });
   }
