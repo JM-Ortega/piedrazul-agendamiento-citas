@@ -120,6 +120,10 @@
             </div>
           }
         </div>
+        <app-pagination
+          [pagination]="pagination()"
+          (pageChange)="loadPage($event)"
+        />
       }
     </div>
   </div>
