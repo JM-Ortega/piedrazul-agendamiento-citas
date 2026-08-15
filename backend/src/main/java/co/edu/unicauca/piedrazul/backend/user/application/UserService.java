@@ -87,7 +87,9 @@ public class UserService {
     );
 
     public Page<SystemDoctorResponse> getSystemDoctors(Pageable pageable) {
-        List<UserSummary> doctors = keycloakUserService.findDoctors();
+        List<UserSummary> doctors =
+                new ArrayList<>(keycloakUserService.findDoctors());
+        
         int total = doctors.size();
 
         if (doctors.isEmpty()) {
