@@ -7,7 +7,7 @@ import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
 import { Doctor } from '../../shared/models/interfaces/doctor.model';
 import { Patient } from '../../shared/models/interfaces/patient.model';
-import { PagedResponse } from '../../shared/models/dtos/paged-response.dto';
+import { PagedResponse } from '../../shared/models/dtos/pagedResponse-clinicalHistory.dto';
 
 @Injectable({ providedIn: 'root' })
 export class DoctorService {
