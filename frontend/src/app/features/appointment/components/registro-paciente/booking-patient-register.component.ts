@@ -79,11 +79,32 @@ export class BookingPatientRegisterComponent {
     const clean = String(value ?? '');
     this.documentNumber.set(clean);
     this.state.patientForm.update((f) => ({ ...f, identification: clean }));
-    this.documentError.set('');
+    this.revalidateDocumentNumber();
   }
 
   onPatientFormChange(value: PatientFormData): void {
     this.state.patientForm.update((f) => ({ ...f, ...value }));
+    this.revalidateDocumentNumber();
+  }
+
+  /**
+   * Revalida el documento contra la regla del tipo actualmente elegido
+   * mientras el usuario escribe o cambia el tipo.
+   */
+  private revalidateDocumentNumber(): void {
+    const type = this.state.patientForm().identificationType;
+    if (!type) {
+      this.documentError.set('');
+      return;
+    }
+
+    const doc = this.documentNumber().trim();
+    if (!doc) {
+      this.documentError.set('Este campo es obligatorio');
+      return;
+    }
+
+    this.documentError.set(validateDocumentForType(type, doc));
   }
 
   onContinue(form: PatientDataFormComponent): void {
