@@ -20,6 +20,7 @@ import { ButtonComponent } from '../../../../design-system/atoms/button/button.c
 import { InputComponent } from '../../../../design-system/atoms/input/input.component';
 import { SelectComponent } from '../../../../design-system/atoms/select/select.component';
 import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
+import { toIsoDateString } from '../../../../shared/helpers/transform-date-local';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
@@ -104,11 +105,7 @@ export class DoctorEditFormComponent implements OnInit {
   private originalWorkdays = signal<number[]>([]);
   // ── Helpers ────────────────────────────────────────────────────────
   toDateString(date: Date | null): string {
-    if (!date) return '';
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return date ? toIsoDateString(date) : '';
   }
   // ── Computed ──────────────────────────────────────────────────────────────
   hasChanges = computed(() => {

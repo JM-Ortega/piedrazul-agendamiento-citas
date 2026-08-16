@@ -6,8 +6,10 @@
         <svg lucideCalendar [size]="28" class="text-[#215c98]"></svg>
       </div>
       <div>
-        <span class="text-xl font-bold tracking-wide">Piedra Azul Salud</span>
-        <p class="text-blue-200 text-sm hidden sm:block">Centro Médico</p>
+        <span class="text-xl font-bold tracking-wide">{{ panelTitle() }}</span>
+        <p class="text-blue-200 text-sm hidden sm:block">
+          {{ panelSubtitle() }}
+        </p>
       </div>
     </a>
 

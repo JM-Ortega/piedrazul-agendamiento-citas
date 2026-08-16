@@ -8,22 +8,16 @@ import {
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
-  LucideActivity,
   LucideArrowLeft,
-  LucideBone,
-  LucideBuilding2,
   LucideCircleAlert,
   LucideCreditCard,
   LucideDynamicIcon,
   LucideEye,
   LucideEyeOff,
-  LucideHeart,
   LucideMail,
   LucidePhone,
   LucideUser,
   LucideUserPlus,
-  LucideZap,
-  type LucideIcon,
 } from '@lucide/angular';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { InputComponent } from '../../../../design-system/atoms/input/input.component';
@@ -33,6 +27,8 @@ import {
   getDocumentIdSanitize,
   validateDocumentForType,
 } from '../../../../shared/helpers/document-validation';
+import { getSpecialtyMeta } from '../../../../shared/helpers/specialty-catalog';
+import { timeToMinutes } from '../../../../shared/helpers/time-utils';
 import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 import {
   CreateUserDoctorFormComponent,
@@ -182,8 +178,8 @@ export class AdminCreateUserComponent implements OnInit {
   }
   get shiftDurationMinutes() {
     return (
-      this.timeToMinutes(this.userForm.endTime) -
-      this.timeToMinutes(this.userForm.startTime)
+      timeToMinutes(this.userForm.endTime) -
+      timeToMinutes(this.userForm.startTime)
     );
   }
   get maxInterval() {
@@ -221,10 +217,10 @@ export class AdminCreateUserComponent implements OnInit {
     this.loadingSpecialties = true;
     this.adminService.getAllSpecialties().subscribe({
       next: (data) => {
-        this.specialtyOptions = data.map((name) => ({
-          name,
-          ...this.getSpecialtyIcon(name),
-        }));
+        this.specialtyOptions = data.map((name) => {
+          const meta = getSpecialtyMeta(name);
+          return { name, icon: meta.icon, colorClass: meta.color };
+        });
         this.loadingSpecialties = false;
         this.cdr.markForCheck();
       },
@@ -489,8 +485,8 @@ export class AdminCreateUserComponent implements OnInit {
         if (!this.userForm.startTime) {
           return 'La hora de inicio es obligatoria.';
         }
-        const start = this.timeToMinutes(this.userForm.startTime);
-        const end = this.timeToMinutes(this.userForm.endTime);
+        const start = timeToMinutes(this.userForm.startTime);
+        const end = timeToMinutes(this.userForm.endTime);
         return this.userForm.endTime && start >= end
           ? 'La hora de inicio no puede ser igual o posterior a la hora de fin.'
           : undefined;
@@ -502,8 +498,8 @@ export class AdminCreateUserComponent implements OnInit {
         if (!this.userForm.endTime) {
           return 'La hora de fin es obligatoria.';
         }
-        const end = this.timeToMinutes(this.userForm.endTime);
-        const start = this.timeToMinutes(this.userForm.startTime);
+        const end = timeToMinutes(this.userForm.endTime);
+        const start = timeToMinutes(this.userForm.startTime);
         return this.userForm.startTime && start >= end
           ? 'La hora de fin debe ser posterior a la hora de inicio.'
           : undefined;
@@ -574,23 +570,6 @@ export class AdminCreateUserComponent implements OnInit {
     return Object.values(this.errors).every((e) => !e);
   }
 
-  private timeToMinutes(t: string): number {
-    if (!t) return 0;
-    const [h, m] = t.split(':').map(Number);
-    return h * 60 + m;
-  }
-  private getSpecialtyIcon(name: string): {
-    icon: LucideIcon;
-    colorClass: string;
-  } {
-    const map: Record<string, { icon: LucideIcon; colorClass: string }> = {
-      MEDICINA_GENERAL: { icon: LucideHeart, colorClass: 'text-red-700' },
-      QUIROPRAXIA: { icon: LucideBone, colorClass: 'text-orange-700' },
-      FISIOTERAPIA: { icon: LucideActivity, colorClass: 'text-green-700' },
-      TERAPIA_NEURAL: { icon: LucideZap, colorClass: 'text-purple-700' },
-    };
-    return map[name] ?? { icon: LucideBuilding2, colorClass: 'text-gray-400' };
-  }
   inputClass(field: keyof FormErrors, extra = ''): string {
     return (
       'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 ' +

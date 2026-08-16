@@ -21,10 +21,11 @@ import { ButtonComponent } from '../../../../design-system/atoms/button/button.c
 import { InputComponent } from '../../../../design-system/atoms/input/input.component';
 import { SelectComponent } from '../../../../design-system/atoms/select/select.component';
 import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
+import { toggleInArray } from '../../../../shared/helpers/array-utils';
+import { toIsoDateString } from '../../../../shared/helpers/transform-date-local';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 import { DoctorFormData } from '../../models/interfaces/DoctorFormData';
-
 export interface SpecialtyOption {
   name: string;
   icon: LucideIcon;
@@ -70,10 +71,7 @@ export class CreateUserDoctorFormComponent {
   }
 
   toggleSpecialty(name: string): void {
-    const updated = this.data.specialty.includes(name)
-      ? this.data.specialty.filter((s) => s !== name)
-      : [...this.data.specialty, name];
-    this.dataChange.emit({ specialty: updated });
+    this.dataChange.emit({ specialty: toggleInArray(this.data.specialty, name) });
   }
 
   isWorkDaySelected(day: number): boolean {
@@ -91,17 +89,11 @@ export class CreateUserDoctorFormComponent {
     this.dataChange.emit({ [field]: value });
   }
   onDateChange(field: 'laborStart' | 'laborEnd', date: Date | null): void {
-    this.emit(field, date ? this.toIsoDateString(date) : '');
+    this.emit(field, date ? toIsoDateString(date) : '');
     this.fieldBlurred.emit(field);
     this.fieldBlurred.emit(field === 'laborStart' ? 'laborEnd' : 'laborStart');
   }
 
-  private toIsoDateString(date: Date): string {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
   onBookingWindowWeeksChange(value: string | number | boolean | null): void {
     this.emit('bookingWindowWeeks', value === null ? null : Number(value));
     this.fieldBlurred.emit('bookingWindowWeeks');
