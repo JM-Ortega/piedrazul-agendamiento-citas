@@ -18,7 +18,7 @@
       <div
         class="bg-white rounded-2xl shadow p-5 text-center border-2 border-[#d9e9f8]"
       >
-        <p class="text-4xl font-bold text-[#215c98]">{{ doctors().length }}</p>
+        <p class="text-4xl font-bold text-[#215c98]">{{ totalElements() }}</p>
         <p class="text-gray-500 text-base mt-1">Médicos / Terapistas</p>
       </div>
       <div
@@ -83,6 +83,58 @@
           </div>
         }
       </div>
+      @if (totalPages() > 1) {
+        <div
+          class="flex items-center justify-between px-1 pt-6 mt-2 border-t-2 border-[#215c98]"
+        >
+          <button
+            type="button"
+            [disabled]="currentPage() === 0"
+            (click)="previousPage()"
+            class="flex items-center gap-1 text-base font-semibold transition-colors"
+            [class]="
+              currentPage() > 0
+                ? 'text-[#215c98] hover:text-[#163c63] cursor-pointer'
+                : 'text-gray-300 cursor-not-allowed'
+            "
+          >
+            <svg lucideChevronLeft [size]="18"></svg>
+            Anterior
+          </button>
+
+          <div class="flex items-center gap-2">
+            @for (page of visiblePages; track page) {
+              <button
+                type="button"
+                (click)="goToPage(page)"
+                class="w-9 h-9 rounded-full text-base font-semibold transition-colors flex items-center justify-center"
+                [class]="
+                  page === currentPage()
+                    ? 'bg-[#215c98] text-white'
+                    : 'text-gray-600 hover:bg-gray-100 cursor-pointer'
+                "
+              >
+                {{ page + 1 }}
+              </button>
+            }
+          </div>
+
+          <button
+            type="button"
+            [disabled]="currentPage() >= totalPages() - 1"
+            (click)="nextPage()"
+            class="flex items-center gap-1 text-base font-semibold transition-colors"
+            [class]="
+              currentPage() < totalPages() - 1
+                ? 'text-[#215c98] hover:text-[#163c63] cursor-pointer'
+                : 'text-gray-300 cursor-not-allowed'
+            "
+          >
+            Siguiente
+            <svg lucideChevronRight [size]="18"></svg>
+          </button>
+        </div>
+      }
     </div>
 
     <!-- Guía -->

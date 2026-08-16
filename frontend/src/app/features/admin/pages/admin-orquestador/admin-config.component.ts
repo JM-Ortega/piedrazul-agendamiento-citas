@@ -6,7 +6,12 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
-import { LucidePencil, LucideSettings } from '@lucide/angular';
+import {
+  LucideChevronLeft,
+  LucideChevronRight,
+  LucidePencil,
+  LucideSettings,
+} from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
 import {
   ToastComponent,
@@ -35,6 +40,8 @@ import { AdminService } from '../../service/admin.service';
     DoctorEditFormComponent,
     AdminModalsComponent,
     ToastComponent,
+    LucideChevronLeft,
+    LucideChevronRight,
   ],
 })
 export class AdminConfigComponent implements OnInit {
@@ -63,11 +70,13 @@ export class AdminConfigComponent implements OnInit {
   errorGuardado = signal('');
   toastMessage = signal('');
   toastType = signal<ToastType | null>(null);
+  // ── Paginacion ──────────────────────────────────────────────────────────────
+  currentPage = signal(0);
+  totalPages = signal(0);
+  totalElements = signal(0);
+  readonly PAGE_SIZE = 4;
 
   // ── Computed ──────────────────────────────────────────────────────────────
-  // ⚠️ PARCHE: specialty ahora es string[] por doctor (antes era string único).
-  // flatMap aplana todas las especialidades de todos los doctores antes de
-  // contar valores únicos con Set.
   totalSpecialties = computed(
     () => new Set(this.doctors().flatMap((d) => d.specialty)).size
   );
@@ -86,11 +95,22 @@ export class AdminConfigComponent implements OnInit {
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
-  loadDoctors(): void {
+  loadDoctors(page = 0): void {
     this.loading.set(true);
     this.errorCarga.set('');
-    this.adminService.getDoctors().subscribe({
-      next: (doctors) => {
+    this.adminService.getDoctors(page, this.PAGE_SIZE).subscribe({
+      next: (response) => {
+        this.currentPage.set(response.page);
+        this.totalPages.set(response.totalPages);
+        this.totalElements.set(response.totalElements);
+
+        const doctors = response.content;
+        if (!doctors.length) {
+          this.doctors.set([]);
+          this.loading.set(false);
+          return;
+        }
+
         forkJoin(
           doctors.map((d) => this.adminService.getSchedulesByDoctor(d.id))
         ).subscribe({
@@ -345,11 +365,12 @@ export class AdminConfigComponent implements OnInit {
 
   private reloadDoctor(doctorId: string, fallback: Doctor): void {
     forkJoin([
-      this.adminService.getDoctors(),
+      this.adminService.getDoctors(this.currentPage(), this.PAGE_SIZE),
       this.adminService.getSchedulesByDoctor(doctorId),
     ]).subscribe({
-      next: ([doctors, schedules]) => {
-        const freshDoctor = doctors.find((d) => d.id === doctorId) ?? fallback;
+      next: ([doctorsPage, schedules]) => {
+        const freshDoctor =
+          doctorsPage.content.find((d) => d.id === doctorId) ?? fallback;
         const mapped = this.mapSchedulesToDoctor(schedules);
         this.doctors.update((list) =>
           list.map((d) =>
@@ -363,5 +384,35 @@ export class AdminConfigComponent implements OnInit {
         );
       },
     });
+  }
+  // ── Pagination ───────────────────────────────────────────────────────────────
+  goToPage(page: number): void {
+    if (page < 0 || page >= this.totalPages() || page === this.currentPage())
+      return;
+    this.loadDoctors(page);
+  }
+
+  previousPage(): void {
+    this.goToPage(this.currentPage() - 1);
+  }
+
+  nextPage(): void {
+    this.goToPage(this.currentPage() + 1);
+  }
+
+  get visiblePages(): number[] {
+    const total = this.totalPages();
+    const current = this.currentPage();
+    const maxVisible = 5;
+
+    if (total <= maxVisible) {
+      return Array.from({ length: total }, (_, i) => i);
+    }
+
+    let start = Math.max(0, current - Math.floor(maxVisible / 2));
+    const end = Math.min(total, start + maxVisible);
+    start = Math.max(0, end - maxVisible);
+
+    return Array.from({ length: end - start }, (_, i) => start + i);
   }
 }

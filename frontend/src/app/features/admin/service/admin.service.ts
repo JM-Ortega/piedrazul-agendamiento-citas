@@ -3,10 +3,10 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
+import { PagedResponse } from '../../../shared/models/dtos/paged-response.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { CreateUserRequestDto } from '../models/dtos/CreateUserRequestDto';
 import { dtoSchedule } from '../models/dtos/schedule.dto';
-import { PagedResponse } from '../models/interfaces/PagedResponse';
 
 import { DoctorAdminDto } from '../models/dtos/DoctorAdminDto';
 import { SystemUser } from '../models/interfaces/system-user.model';
@@ -31,33 +31,29 @@ export class AdminService {
   }
 
   /**
-   * Obtiene el listado detallado de todos los médicos registrados.
+   * Obtiene una página de médicos con información detallada, ordenados
+   * por nombre ascendente.
    *
-   * ⚠️ PARCHE TEMPORAL: el backend ahora pagina este endpoint (default size=5).
-   * Pedimos un tamaño grande fijo para traer "todo" mientras no se implementa
-   * paginación real (botones anterior/siguiente) en el panel de admin.
-   * TODO: reemplazar por paginación real cuando la cantidad de doctores crezca.
-   *
-   * @returns Observable con el arreglo de médicos (contenido ya desempaquetado
-   * de la respuesta paginada).
+   * @param page - Índice de página (base 0).
+   * @param size - Cantidad de médicos por página.
+   * @returns Observable con la respuesta paginada completa (content + metadata).
    */
-  getDoctors(): Observable<Doctor[]> {
-    return this.http
-      .get<PagedResponse<Doctor>>(`${this.apiUrl}/doctor/detailed`, {
-        params: { size: 100 },
-      })
-      .pipe(map((response) => response.content));
+  getDoctors(page = 0, size = 4): Observable<PagedResponse<Doctor>> {
+    return this.http.get<PagedResponse<Doctor>>(
+      `${this.apiUrl}/doctor/detailed`,
+      { params: { page, size, sort: 'name,asc' } }
+    );
   }
 
-  /**
-   * Obtiene el listado de médicos con su información administrativa
-   *
-   * @returns Observable con el arreglo de médicos en formato administrativo.
-   */
   getDoctorsAdmin(): Observable<DoctorAdminDto[]> {
-    return this.http.get<DoctorAdminDto[]>(
-      `${this.apiUrl}/user/system-doctors`
-    );
+    return this.http
+      .get<PagedResponse<DoctorAdminDto>>(
+        `${this.apiUrl}/user/system-doctors`,
+        {
+          params: { size: 100 },
+        }
+      )
+      .pipe(map((response) => response.content));
   }
 
   /**
@@ -186,14 +182,12 @@ export class AdminService {
 
   // ── System Users ──────────────────────────────────────────────────────────
 
-  /**
-   * Obtiene el listado de todos los usuarios del sistema (médicos,
-   * agendadores, etc.), independientemente de su rol.
-   *
-   * @returns Observable con el arreglo de usuarios del sistema.
-   */
   getSystemUsers(): Observable<SystemUser[]> {
-    return this.http.get<SystemUser[]>(`${this.apiUrl}/user/system-users`);
+    return this.http
+      .get<PagedResponse<SystemUser>>(`${this.apiUrl}/user/system-users`, {
+        params: { size: 100 },
+      })
+      .pipe(map((response) => response.content));
   }
 
   // ── Specialties ───────────────────────────────────────────────────────────
