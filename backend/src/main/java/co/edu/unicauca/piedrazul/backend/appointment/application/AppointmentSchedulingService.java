@@ -11,7 +11,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.Appointm
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentScheduledEvent;
-import co.edu.unicauca.piedrazul.backend.appointment.events.CitaAgendadaEvent;
+import co.edu.unicauca.piedrazul.backend.appointment.events.ScheduledAppointmentEvent;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
 import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
@@ -128,7 +128,7 @@ public class AppointmentSchedulingService {
         String actorRoles = securityExtractor.currentActorRoles();
 
         eventPublisher.publishEvent(
-                CitaAgendadaEvent.of(
+                ScheduledAppointmentEvent.of(
                         entity,
                         actorId,
                         actorRoles,
