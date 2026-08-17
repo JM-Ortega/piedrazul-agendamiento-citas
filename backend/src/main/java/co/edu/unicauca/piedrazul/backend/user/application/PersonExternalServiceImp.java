@@ -79,6 +79,19 @@ public class PersonExternalServiceImp implements PersonExternalService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public void requireIdentificationAvailable(String identification) {
+        if (identification == null || identification.isBlank()) {
+            throw new InvalidUserDataException("identification is required");
+        }
+
+        if (personRepository.existsByIdentification(identification)) {
+            throw new PersonAlreadyExistsException(
+                    "Ya existe una persona con esa identificación");
+        }
+    }
+
+    @Override
     public void deletePerson(UUID personId) {
         if (personId == null) {
             throw new InvalidUserDataException("personId is required");

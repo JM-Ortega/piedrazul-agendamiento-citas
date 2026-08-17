@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.patients;
 
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientSex;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.RegisterPatientCommand;
 import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 
 import java.time.LocalDate;
@@ -41,6 +42,13 @@ public interface PatientModuleApi {
             LocalDate birthDate,
             String guardianPhone
     );
+
+    /**
+     * Devuelve el paciente existente correspondiente al documento, o lo registra si
+     * falta. Si la persona ya existe, conserva sus datos maestros. No crea cuentas
+     * ni modifica roles.
+     */
+    PatientData resolveOrRegisterPatient(RegisterPatientCommand command);
 
     void deletePatient(UUID personId);
 
