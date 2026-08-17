@@ -18,6 +18,7 @@ export type ButtonVariant =
   | 'icon' // logo de piedrazul (opcional si no existen mas botones así)
   | 'card' // modo de agendamiento (opcional si no hay mas iguales)
   | 'chip' // elegir la hora y filtros
+  | 'plain' // sin fondo, solo texto+ícono, ej. "Volver a..."
   | 'link'; // volver atrás (paginas)
 
 @Component({
@@ -42,6 +43,9 @@ export class ButtonComponent {
   @Input() inactiveChipClasses =
     'border-gray-200 hover:border-[#4e92d9] hover:bg-[#dbeafe] text-[#163c63]';
   @Input() hostDisplay: 'inline' | 'flex' | 'block' = 'inline';
+  // por defecto usa el azul institucional (mismo que 'primary')..
+  @Input() plainTextClass = 'text-[#215c98] hover:text-[#163c63]';
+
   @HostBinding('style.display') get hostDisplayStyle(): string {
     return this.hostDisplay;
   }
@@ -56,7 +60,10 @@ export class ButtonComponent {
   }
 
   getBaseClasses(): string {
-    const sizeClasses = this.variant === 'icon' ? '' : this.getSizeClasses();
+    const sizeClasses =
+      this.variant === 'icon' || this.variant === 'plain'
+        ? ''
+        : this.getSizeClasses();
     const variantClasses = this.getVariantClasses();
     const widthClass = this.fullWidth ? 'w-full' : '';
     const disabledClass = this.disabled
@@ -104,7 +111,8 @@ export class ButtonComponent {
 
       case 'card':
         return `${baseClasses} bg-white rounded-xl shadow-lg px-12 py-7 text-left text-[#215c98] hover:scale-105 active:scale-95 mt-4`;
-
+      case 'plain':
+        return `flex items-center gap-2 ${this.plainTextClass}`;
       default:
         return baseClasses;
     }

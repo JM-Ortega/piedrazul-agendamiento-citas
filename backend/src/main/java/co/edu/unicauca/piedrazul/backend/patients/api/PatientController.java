@@ -79,7 +79,10 @@ public class PatientController {
         PatientData patient = patientService.confirmLinkUserAccount(
                 request.getIdentification(),
                 request.getCode(),
-                request.getPassword()
+                request.getPassword(),
+                request.getSex(),
+                request.getBirthDate(),
+                request.getGuardianPhone()
         );
         return toResponse(patient);
     }

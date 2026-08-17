@@ -59,11 +59,13 @@
   <div>
     <p class="text-gray-700 text-base font-medium mb-1 flex items-center gap-2">
       <svg lucideCalendarRange [size]="18"></svg>
-      Período Laboral *
+      Período Laboral
+      <span class="text-sm text-gray-500 font-normal">(opcional)</span>
     </p>
     <p class="text-gray-400 text-sm mb-3 flex items-center gap-1">
       <svg lucideInfo [size]="14"></svg>
-      Rango de fechas en que el médico estará activo en el sistema
+      Si completa alguno de estos campos, deberá completar todos los demás del
+      horario.
     </p>
     <div class="grid grid-cols-2 gap-5">
       <div>
@@ -171,12 +173,13 @@
       <app-input
         [id]="'interval'"
         type="number"
-        [(ngModel)]="data.interval"
-        (ngModelChange)="emit('interval', $event)"
+        [ngModel]="intervalValue"
+        (ngModelChange)="onIntervalChange($event)"
         name="interval"
         [min]="10"
         [max]="maxInterval"
         [step]="5"
+        placeholder="Ej: 20"
         [errorMessage]="errors['interval']"
         (inputBlur)="fieldBlurred.emit('interval')"
       >
@@ -188,20 +191,23 @@
         for="bookingWindowWeeks"
         class="block text-gray-700 text-base font-medium mb-2"
       >
-        Ventana de Reserva (semanas) *
+        Ventana de Reserva (semanas)
       </label>
-      <app-select
+      <app-input
         id="bookingWindowWeeks"
+        type="number"
         [ngModel]="bookingWindowWeeksValue"
         (ngModelChange)="onBookingWindowWeeksChange($event)"
         name="bookingWindowWeeks"
-        [options]="bookingWindowWeeksOptions | toSelectOptions: false"
-        placeholder="-- Seleccionar --"
+        sanitize="numeric"
+        [min]="1"
+        [max]="10"
+        placeholder="Ej: 4"
         [errorMessage]="errors['bookingWindowWeeks']"
-        [hasSuffix]="true"
+        (inputBlur)="fieldBlurred.emit('bookingWindowWeeks')"
       >
         <svg lucideCalendarRange [size]="18" suffix></svg>
-      </app-select>
+      </app-input>
     </div>
   </div>
 

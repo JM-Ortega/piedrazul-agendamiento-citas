@@ -8,23 +8,23 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import {
-  LucideActivity,
-  LucideBone,
   LucideCalendar,
   LucideCheck,
   LucideDynamicIcon,
   LucideEdit3,
-  LucideHeart,
   LucideSave,
   LucideStethoscope,
-  LucideZap,
 } from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
 import { AppService } from '../../../../core/services/app.service';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { toggleInArray } from '../../../../shared/helpers/array-utils';
+import {
+  getAllSpecialtiesMeta,
+  getSpecialtyMeta,
+} from '../../../../shared/helpers/specialty-catalog';
 import { DoctorAdminDto } from '../../models/dtos/DoctorAdminDto';
 import { AdminService } from '../../service/admin.service';
-
 @Component({
   selector: 'app-admin-doctors',
   templateUrl: './admin-doctors.component.html',
@@ -45,32 +45,7 @@ export class AdminDoctorsComponent implements OnInit {
   public router = inject(Router);
   private appService = inject(AppService);
 
-  readonly specialtiesList = [
-    {
-      name: 'Medicina General',
-      value: 'MEDICINA_GENERAL',
-      icon: LucideHeart,
-      color: 'text-red-600',
-    },
-    {
-      name: 'Quiropraxia',
-      value: 'QUIROPRAXIA',
-      icon: LucideBone,
-      color: 'text-orange-600',
-    },
-    {
-      name: 'Fisioterapia',
-      value: 'FISIOTERAPIA',
-      icon: LucideActivity,
-      color: 'text-green-600',
-    },
-    {
-      name: 'Terapia Neural',
-      value: 'TERAPIA_NEURAL',
-      icon: LucideZap,
-      color: 'text-purple-600',
-    },
-  ];
+  readonly specialtiesList = getAllSpecialtiesMeta();
   // ── State ─────────────────────────────────────────────────────────────────
   doctors = signal<DoctorAdminDto[]>([]);
   loading = signal(false);
@@ -193,9 +168,7 @@ export class AdminDoctorsComponent implements OnInit {
   }
 
   toggleSpecialty(name: string): void {
-    this.editingSpecialties.update((prev) =>
-      prev.includes(name) ? prev.filter((s) => s !== name) : [...prev, name]
-    );
+    this.editingSpecialties.update((prev) => toggleInArray(prev, name));
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -208,19 +181,14 @@ export class AdminDoctorsComponent implements OnInit {
   }
 
   getSpecialtyIcon(name: string) {
-    return (
-      this.specialtiesList.find((s) => s.value === name)?.icon ||
-      LucideStethoscope
-    );
+    return getSpecialtyMeta(name).icon;
   }
 
   getSpecialtyColor(name: string): string {
-    return (
-      this.specialtiesList.find((s) => s.value === name)?.color ||
-      'text-blue-600'
-    );
+    return getSpecialtyMeta(name).color;
   }
+
   getSpecialtyName(value: string): string {
-    return this.specialtiesList.find((s) => s.value === value)?.name || value;
+    return getSpecialtyMeta(value).label;
   }
 }

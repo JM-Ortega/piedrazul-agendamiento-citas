@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
   OnInit,
   signal,
@@ -68,6 +69,15 @@ export class NavbarComponent implements OnInit {
   menuOpen = signal(false);
   showLogoutModal = signal(false);
   showRoleDropdown = signal(false);
+  //Cambio del titulo del panel según el rol activo
+  panelTitle = computed(() =>
+    this.appService.currentRole()
+      ? `Panel de ${this.appService.activeRoleLabel()}`
+      : 'Piedra Azul Salud'
+  );
+  panelSubtitle = computed(() =>
+    this.appService.currentRole() ? 'Piedra Azul Salud' : 'Centro Médico'
+  );
 
   // Icono y color por rol para el dropdown
   readonly roleConfig: Record<

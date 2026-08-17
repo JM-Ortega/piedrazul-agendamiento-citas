@@ -9,7 +9,7 @@ export interface UserForm {
   specialty: string[];
   laborStart: string;
   laborEnd: string;
-  interval: number;
+  interval: number | null;
   workDays: number[];
   startTime: string;
   endTime: string;

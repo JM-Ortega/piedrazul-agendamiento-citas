@@ -10,6 +10,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeServ
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.*;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
+import jakarta.annotation.Nullable;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -34,8 +35,14 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
         this.isNewPatientUseCase = isNewPatientUseCase;
     }
 
+    /**
+     * El parametro puede ser null porque si el paciente es nuevo y por lo tanto no esta registrado en la base de datos
+     * no va a tener patient id
+     * @param patientId
+     * @return Lista de doctores con capacidad de agendamiento asignados a cada especialidad
+     */
     @Override
-    public List<DoctorResponse> getSpecialtiesWithDoctor(UUID patientId) {
+    public List<DoctorResponse> getSpecialtiesWithDoctor(@Nullable UUID patientId) {
         LocalDate from = LocalDate.now();
 
         boolean generalOnly = isNewPatientUseCase.isNewPatient(patientId);
@@ -74,7 +81,7 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
         List<UUID> doctors = doctorConfigConsultPort.getActiveDoctorIds();
 
         if (doctors.isEmpty()) {
-            throw new NoAvailableDoctorsException("No hay medicos activos con disponibilidad.");
+            throw new NoAvailableDoctorsException("No hay médicos activos disponibles");
         }
 
         return doctors;
@@ -84,7 +91,7 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
         List<UUID> doctors = doctorConfigConsultPort.getActiveGeneralDoctorIds();
 
         if (doctors.isEmpty()) {
-            throw new NoAvailableDoctorsException("No hay medicos activos con disponibilidad.");
+            throw new NoAvailableDoctorsException("No hay médicos activos disponibles");
         }
 
         return doctors;

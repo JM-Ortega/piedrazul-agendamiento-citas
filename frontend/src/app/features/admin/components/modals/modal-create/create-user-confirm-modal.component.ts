@@ -7,6 +7,7 @@ import {
 } from '@angular/core';
 import {
   LucideCalendar,
+  LucideCalendarOff,
   LucideStethoscope,
   LucideUserPlus,
   LucideX,
@@ -28,6 +29,7 @@ import { UserForm } from '../../../models/interfaces/UserForm';
     FormatoPipe,
     ButtonComponent,
     LucideX,
+    LucideCalendarOff,
   ],
 })
 export class CreateUserConfirmModalComponent {
@@ -41,4 +43,17 @@ export class CreateUserConfirmModalComponent {
 
   @Output() confirmed = new EventEmitter<void>();
   @Output() cancelled = new EventEmitter<void>();
+
+  get hasScheduleData(): boolean {
+    const f = this.userForm;
+    return !!(
+      f.laborStart ||
+      f.laborEnd ||
+      f.startTime ||
+      f.endTime ||
+      f.interval ||
+      (f.workDays && f.workDays.length > 0) ||
+      f.bookingWindowWeeks
+    );
+  }
 }

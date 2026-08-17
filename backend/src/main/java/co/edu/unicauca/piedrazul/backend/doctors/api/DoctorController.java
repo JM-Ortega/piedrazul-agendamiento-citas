@@ -17,6 +17,8 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -106,30 +108,24 @@ public class DoctorController {
     /**
      * Obtiene una página de doctores con información detallada.
      * <p>
-     * Los resultados se encuentran paginados con un tamaño fijo de cinco doctores
-     * por página.
+     * Los resultados se encuentran paginados y ordenados por nombre de forma ascendente.
+     * Por defecto, el tamaño de la página es de nueve doctores, comenzando desde la página cero.
      * </p>
      *
      * <p>
      * Requiere que el usuario autenticado posea el rol {@code ADMIN}.
      * </p>
      *
-     * @param page índice de la página a consultar. Debe ser mayor o igual a cero.
+     * @param pageable objeto de paginación que define el índice, tamaño y ordenamiento de la consulta.
      * @return un {@link ResponseEntity} con estado {@code 200 OK} que contiene
      * un {@link PageResponse} de {@link DoctorDetailedResponse}.
-     * @throws AuthorizationDeniedException si el usuario autenticado no tiene permisos para acceder al recurso.
-     * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @GetMapping("/detailed")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<PageResponse<DoctorDetailedResponse>> getDoctors(
-            @RequestParam(defaultValue = "0") @Min(0) int page) {
-
-        Pageable pageable = PageRequest.of(page, 5);
-
-        Page<DoctorDetailedResponse> doctors =
-                doctorService.findAllDoctorsDetailed(pageable);
-
+    public ResponseEntity<PageResponse<DoctorDetailedResponse>> getDoctorsDetailed(
+            @PageableDefault(page = 0, size = 9, sort = "name", direction = Sort.Direction.ASC) Pageable pageable
+    ) {
+        Page<DoctorDetailedResponse> doctors = doctorService.findAllDoctorsDetailed(pageable);
         return ResponseEntity.ok(PageResponse.from(doctors));
     }
 

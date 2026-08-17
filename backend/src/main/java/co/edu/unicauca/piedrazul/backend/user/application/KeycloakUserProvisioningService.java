@@ -4,6 +4,7 @@ import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserAccountProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
+import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsException;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.KeycloakUserClient;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.stereotype.Service;
@@ -24,24 +25,40 @@ public class KeycloakUserProvisioningService implements UserAccountProvisioningA
     @Override
     public UserSummary getOrCreateUser(CreateSystemUserRequest request, List<Role> roles) {
         return keycloakClient.findUserByUsername(request.identification())
-                .map(existingUser -> {
-                    UUID userId = UUID.fromString(existingUser.getId());
-                    roles.forEach(role -> keycloakClient.assignRoleIfMissing(userId, role));
-                    return toUserSummary(existingUser);
-                })
+                .map(existingUser -> assignRoles(toUserSummary(existingUser), roles))
                 .orElseGet(() -> {
-                    UserSummary createdUser = toUserSummary(
-                            keycloakClient.createUser(
-                                    request.identification(),
-                                    request.firstName(),
-                                    request.lastName(),
-                                    request.email(),
-                                    request.password()
-                            )
-                    );
-                    roles.forEach(role -> keycloakClient.assignRoleIfMissing(createdUser.id(), role));
-                    return createdUser;
+                    try {
+                        return assignRoles(createUser(request), roles);
+                    } catch (UserAlreadyExistsException conflict) {
+                        // Un conflicto puede deberse a una creación concurrente; este flujo
+                        // admite reutilización, por lo que recupera la cuenta existente.
+                        return assignRoles(findExistingOrRethrow(request, conflict), roles);
+                    }
                 });
+    }
+
+    @Override
+    public UserSummary createAccount(CreateSystemUserRequest request, List<Role> roles) {
+        return assignRoles(createUser(request), roles);
+    }
+
+    @Override
+    public UserSummary ensureAccount(CreateSystemUserRequest request, List<Role> roles) {
+        UserSummary account = keycloakClient.findUserByUsername(request.identification())
+                .map(this::toUserSummary)
+                .orElseGet(() -> {
+                    try {
+                        return createUser(request);
+                    } catch (UserAlreadyExistsException conflict) {
+                        return findExistingOrRethrow(request, conflict);
+                    }
+                });
+
+        // La identidad ya fue verificada; la contraseña solicitada pasa a controlar
+        // la cuenta aunque esta ya existiera.
+        keycloakClient.resetPassword(account.id(), request.password());
+
+        return assignRoles(account, roles);
     }
 
     public Optional<UserSummary> findUserByUsername(String username) {
@@ -54,6 +71,27 @@ public class KeycloakUserProvisioningService implements UserAccountProvisioningA
 
     public void revokeRole(UUID userId, Role role) {
         keycloakClient.revokeRoleIfPresent(userId, role);
+    }
+
+    private UserSummary createUser(CreateSystemUserRequest request) {
+        return toUserSummary(keycloakClient.createUser(
+                request.identification(),
+                request.firstName(),
+                request.lastName(),
+                request.email(),
+                request.password()
+        ));
+    }
+
+    private UserSummary findExistingOrRethrow(CreateSystemUserRequest request, UserAlreadyExistsException conflict) {
+        return keycloakClient.findUserByUsername(request.identification())
+                .map(this::toUserSummary)
+                .orElseThrow(() -> conflict);
+    }
+
+    private UserSummary assignRoles(UserSummary user, List<Role> roles) {
+        roles.forEach(role -> keycloakClient.assignRoleIfMissing(user.id(), role));
+        return user;
     }
 
     private UserSummary toUserSummary(UserRepresentation user) {

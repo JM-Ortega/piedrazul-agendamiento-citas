@@ -59,6 +59,7 @@ public class ClinicalHistoryExternalServiceImpl implements ClinicalHistoryExtern
     private ClinicalHistoryResponse toResponse(ClinicalHistory ch,
                                                String doctorName) {
         return new ClinicalHistoryResponse(
+                ch.getId(),
                 ch.getAttendedAt(),
                 doctorName,
                 ch.getDescription()

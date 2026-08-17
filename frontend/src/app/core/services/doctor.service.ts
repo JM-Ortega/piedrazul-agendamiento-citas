@@ -7,6 +7,7 @@ import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
 import { Doctor } from '../../shared/models/interfaces/doctor.model';
 import { Patient } from '../../shared/models/interfaces/patient.model';
+import { PagedResponse } from '../../shared/models/dtos/pagedResponse-clinicalHistory.dto';
 
 @Injectable({ providedIn: 'root' })
 export class DoctorService {
@@ -14,9 +15,16 @@ export class DoctorService {
   private apiUrl = environment.apiUrl;
 
   medicalRecords = signal<MedicalRecord[]>([]);
+  private currentPage = signal(0);
+  private totalPages = signal(0);
+  readonly isLoadingRecords = signal(false);
   private meCache: Doctor | null = null;
   private meCacheTimestamp = 0;
   private readonly ME_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+
+  get hasMoreRecords(): boolean {
+    return this.currentPage() < this.totalPages() - 1;
+  }
 
   /**
    * Obtiene los datos del doctor autenticado actualmente (según el token de sesión).
@@ -121,16 +129,39 @@ export class DoctorService {
   }
 
   /**
-   * Carga el historial clínico de un paciente y lo guarda en el signal `medicalRecords`.
+   * Carga la siguiente página del historial clínico del paciente
+   * y la acumula sobre las ya cargadas.
    * @param patientId - ID del paciente cuyo historial se desea cargar.
    */
   loadMedicalRecordsByPatient(patientId: string): void {
+    if (this.isLoadingRecords() || !this.hasMoreRecordsFor()) return;
+
+    this.isLoadingRecords.set(true);
+    const nextPage =
+      this.currentPage() === 0 && this.medicalRecords().length === 0
+        ? 0
+        : this.currentPage() + 1;
+
     this.http
-      .get<MedicalRecord[]>(
-        `${this.apiUrl}/clinical-history/patient/${patientId}`
+      .get<PagedResponse<MedicalRecord>>(
+        `${this.apiUrl}/clinical-history/patient/${patientId}`,
+        { params: { page: nextPage } }
       )
-      .subscribe((records) => this.medicalRecords.set(records));
+      .subscribe({
+        next: (res) => {
+          this.medicalRecords.update((prev) => [...prev, ...res.content]);
+          this.currentPage.set(res.page);
+          this.totalPages.set(res.totalPages);
+          this.isLoadingRecords.set(false);
+        },
+        error: () => this.isLoadingRecords.set(false),
+      });
   }
+
+  private hasMoreRecordsFor(): boolean {
+    return this.medicalRecords().length === 0 || this.hasMoreRecords;
+  }
+
   /**
    * Obtiene los datos del paciente asociado a una cita específica.
    *
@@ -151,5 +182,24 @@ export class DoctorService {
   clearMeCache(): void {
     this.meCache = null;
     this.meCacheTimestamp = 0;
+  }
+
+  /**
+   * Reinicia el estado de paginación e historial. Debe llamarse
+   * siempre que se cambie de paciente, antes de cargar la página 0.
+   */
+  resetMedicalRecords(): void {
+    this.medicalRecords.set([]);
+    this.currentPage.set(0);
+    this.totalPages.set(0);
+  }
+
+  /**
+   * Limpia todo el estado en memoria del doctor
+   * (perfil, historial clínico, paginación).
+   */
+  clearAllData(): void {
+    this.clearMeCache();
+    this.resetMedicalRecords();
   }
 }

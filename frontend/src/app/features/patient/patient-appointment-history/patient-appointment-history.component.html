@@ -9,10 +9,16 @@
     }
 
     <div class="bg-white rounded-2xl shadow-md p-8">
-      <h2 class="text-[#163c63] text-2xl mb-6 flex items-center gap-3">
-        <svg lucideClock [size]="28" class="text-[#4e92d9]"></svg>
-        Historial de Citas
-      </h2>
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-[#163c63] text-2xl flex items-center gap-3">
+          <svg lucideClock [size]="28" class="text-[#4e92d9]"></svg>
+          Historial de Citas
+        </h2>
+        <app-pagination
+          [pagination]="pagination()"
+          (pageChange)="loadPage($event)"
+        />
+      </div>
 
       @if (isLoading()) {
         <div class="text-center py-10">
@@ -20,7 +26,7 @@
         </div>
       }
 
-      @if (!isLoading() && pastAppointments().length === 0) {
+      @if (!isLoading() && appointments().length === 0) {
         <div class="text-center py-10">
           <svg
             lucideCalendarDays
@@ -33,9 +39,9 @@
         </div>
       }
 
-      @if (!isLoading() && pastAppointments().length > 0) {
+      @if (!isLoading() && appointments().length > 0) {
         <div class="space-y-4">
-          @for (apt of pastAppointments(); track apt.idAppointment) {
+          @for (apt of appointments(); track apt.idAppointment) {
             <div
               class="flex flex-col md:flex-row md:items-center justify-between bg-[#d9e9f8] border border-[#a7c9ec] rounded-xl p-5 gap-4"
             >
