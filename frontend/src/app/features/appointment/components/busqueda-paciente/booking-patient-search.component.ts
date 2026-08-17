@@ -78,11 +78,17 @@ export class BookingPatientSearchComponent {
         tap(() => {
           this.state.searchLoading.set(true);
           this.state.searchError.set('');
+          this.state.globalErrorMessage.set('');
         }),
         switchMap((query) =>
           this.citaService.getPatientSuggestionsByDocument(query.trim()).pipe(
             catchError((err: AppError) => {
-              this.state.searchError.set(err.message);
+              this.state.searchLoading.set(false);
+              if (err.errorCode === 'PATIENT_NOT_FOUND') {
+                this.state.searchError.set(err.message);
+              } else {
+                this.state.globalErrorMessage.set(err.message);
+              }
               return of([] as PatientSuggestion[]);
             })
           )
@@ -183,6 +189,7 @@ export class BookingPatientSearchComponent {
   private loadPatientByDocument(identification: string): void {
     this.state.searchLoading.set(true);
     this.state.searchError.set('');
+    this.state.globalErrorMessage.set('');
     this.citaService.getPatientByDocument(identification).subscribe({
       next: (patient: Patient | null) => {
         this.state.searchLoading.set(false);
@@ -199,8 +206,9 @@ export class BookingPatientSearchComponent {
         if (err.errorCode === 'PATIENT_NOT_FOUND') {
           this.handleNotFound(identification);
           return;
+        } else {
+          this.state.globalErrorMessage.set(err.message);
         }
-        this.state.searchError.set(err.message);
       },
     });
   }

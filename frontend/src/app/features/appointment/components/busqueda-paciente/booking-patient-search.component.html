@@ -128,6 +128,12 @@
     </div>
   }
 
+  @if (state.globalErrorMessage()) {
+    <div class="mt-2 bg-red-100 text-red-700 p-3 rounded-lg text-sm">
+      {{ state.globalErrorMessage() }}
+    </div>
+  }
+
   <div class="flex gap-4 mt-2">
     <app-button variant="secondary" (buttonClick)="onChangeMode()">
       ← Cambiar modo

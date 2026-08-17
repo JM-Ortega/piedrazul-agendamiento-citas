@@ -91,6 +91,7 @@ export class BookingScheduleSelectorComponent {
     this.state.availableSlots.set([]);
     this.noSlotsAvailable = false;
     this.errorMessageSlots = '';
+    this.globalErrorMessage.set('');
 
     if (!date) return;
 
