@@ -25,6 +25,7 @@ import {
   DEFAULT_DOCUMENT_MAX_LENGTH,
   validateDocumentForType,
 } from '../../../../shared/helpers/document-validation';
+import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 
 /**
  * Capturar y validar los datos de un paciente que no fue encontrado en el sistema para
@@ -58,6 +59,7 @@ export class BookingPatientRegisterComponent {
 
   documentNumber = signal(this.state.patientForm().identification);
   documentError = signal('');
+  globalErrorMessage = signal('');
   isChecking = signal(false);
 
   showExistsModal = signal(false);
@@ -107,6 +109,13 @@ export class BookingPatientRegisterComponent {
     this.documentError.set(validateDocumentForType(type, doc));
   }
 
+  /**
+   * Valida formato de documento y resto del formulario
+   * Si todo es válido, verifica contra el backend si el
+   * documento ya existe antes de avanzar.
+   *
+   * @param form - Referencia al organismo de datos del paciente, para invocar su validación.
+   */
   onContinue(form: PatientDataFormComponent): void {
     const docErr = this.getDocumentFormatError();
     this.documentError.set(docErr);
@@ -123,6 +132,11 @@ export class BookingPatientRegisterComponent {
     return validateDocumentForType(type, doc);
   }
 
+  /**
+   * Consulta si el documento ya existe en el sistema. Si existe, muestra el
+   * modal de advertencia en vez de avanzar. Si no existe (`PATIENT_NOT_FOUND`),
+   * continúa con el registro con normalidad.
+   */
   private checkDocumentExistsAndAdvance(): void {
     const doc = this.documentNumber().trim();
     this.isChecking.set(true);
@@ -137,15 +151,13 @@ export class BookingPatientRegisterComponent {
         }
         this.advance.emit();
       },
-      error: (err) => {
+      error: (err: AppError) => {
         this.isChecking.set(false);
-        if (err.status === 404) {
+        if (err.errorCode === 'PATIENT_NOT_FOUND') {
           this.advance.emit();
           return;
         }
-        this.documentError.set(
-          'Error al verificar el documento. Intente de nuevo.'
-        );
+        this.globalErrorMessage.set(err.message);
       },
     });
   }

@@ -1,5 +1,4 @@
 import { computed, Injectable, signal } from '@angular/core';
-import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { PatientSuggestion } from '../models/dtos/patient-suggestion.dto';
 import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
@@ -75,7 +74,6 @@ export class BookingStateService {
     guardianPhone: '',
   });
 
-  doctorSnapshot = signal<Doctor | null>(null);
   specialtiesWithDoctor = signal<SpecialtyDoctor[]>([]);
   doctorsBySpecialty = signal<SpecialtyDoctor[]>([]);
   selectedSpecialty = signal<string>('');
@@ -87,6 +85,7 @@ export class BookingStateService {
   errorMessageSpecialty = signal<string>('');
   noDoctorsFound = signal<boolean>(false);
   errorMessageDoctors = signal<string>('');
+  globalErrorMessage = signal<string>('');
 
   readonly uniqueSpecialties = computed(() => [
     ...new Set(

@@ -86,6 +86,14 @@
     }
   </div>
 
+  @if (this.globalErrorMessage()) {
+    <div
+      class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"
+    >
+      {{ this.globalErrorMessage() }}
+    </div>
+  }
+
   <div class="flex gap-4 mt-2">
     <app-button variant="secondary" (buttonClick)="goBack()">
       ← Atrás

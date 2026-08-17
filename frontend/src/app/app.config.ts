@@ -22,6 +22,7 @@ import {
   createInterceptorCondition,
   INCLUDE_BEARER_TOKEN_INTERCEPTOR_CONFIG,
 } from 'keycloak-angular';
+import { errorInterceptor } from './core/interceptors/error.interceptor';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -68,7 +69,7 @@ export const appConfig: ApplicationConfig = {
 
     provideHttpClient(
       withXhr(),
-      withInterceptors([includeBearerTokenInterceptor])
+      withInterceptors([includeBearerTokenInterceptor, errorInterceptor])
     ),
     provideNativeDateAdapter(),
   ],
