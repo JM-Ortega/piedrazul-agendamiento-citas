@@ -20,6 +20,16 @@ public interface PersonExternalService {
             UUID userId
     );
 
+    /**
+     * Comprueba que no exista una persona con esa identificación. Es una validación
+     * temprana para evitar efectos externos innecesarios; no garantiza exclusión
+     * frente a registros concurrentes.
+     *
+     * @throws co.edu.unicauca.piedrazul.backend.user.exception.PersonAlreadyExistsException
+     * si ya existe una persona con esa identificación
+     */
+    void requireIdentificationAvailable(String identification);
+
     void deletePerson(UUID personId);
 
     void linkUserId(UUID personId, UUID userId);
