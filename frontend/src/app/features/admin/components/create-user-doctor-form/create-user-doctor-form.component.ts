@@ -17,6 +17,7 @@ import {
   LucideStethoscope,
   type LucideIcon,
 } from '@lucide/angular';
+
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { InputComponent } from '../../../../design-system/atoms/input/input.component';
 import { SelectComponent } from '../../../../design-system/atoms/select/select.component';
@@ -71,7 +72,9 @@ export class CreateUserDoctorFormComponent {
   }
 
   toggleSpecialty(name: string): void {
-    this.dataChange.emit({ specialty: toggleInArray(this.data.specialty, name) });
+    this.dataChange.emit({
+      specialty: toggleInArray(this.data.specialty, name),
+    });
   }
 
   isWorkDaySelected(day: number): boolean {
@@ -79,10 +82,7 @@ export class CreateUserDoctorFormComponent {
   }
 
   toggleWorkDay(day: number): void {
-    const updated = this.data.workDays.includes(day)
-      ? this.data.workDays.filter((d) => d !== day)
-      : [...this.data.workDays, day];
-    this.dataChange.emit({ workDays: updated });
+    this.dataChange.emit({ workDays: toggleInArray(this.data.workDays, day) });
   }
 
   emit(field: keyof DoctorFormData, value: unknown): void {

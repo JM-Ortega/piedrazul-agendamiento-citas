@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
-import { PagedResponse } from '../../../shared/models/dtos/paged-response.dto';
+import { PagedResponse } from '../../../shared/models/dtos/pagedResponse-clinicalHistory.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { CreateUserRequestDto } from '../models/dtos/CreateUserRequestDto';
 import { dtoSchedule } from '../models/dtos/schedule.dto';

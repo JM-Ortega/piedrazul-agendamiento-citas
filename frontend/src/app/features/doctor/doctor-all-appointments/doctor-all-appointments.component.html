@@ -4,6 +4,54 @@
     <h1 class="text-[#163c63] text-3xl font-bold mb-2">Todas Mis Citas</h1>
     <p class="text-gray-600 text-lg">Historial completo de sus citas médicas</p>
   </div>
+  <!-- Export Section -->
+  @if (hasAnyAppointments()) {
+    @if (hasTodayAppointments()) {
+      <div
+        class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200 mb-6"
+      >
+        <div
+          class="flex flex-col sm:flex-row items-center justify-between gap-4"
+        >
+          <div class="flex items-center gap-3">
+            <div class="bg-[#1f7a52] rounded-full p-3">
+              <svg lucideDownload class="text-white" [size]="28"></svg>
+            </div>
+            <div>
+              <h3 class="text-green-800 text-xl font-bold">
+                Exportar Reporte de Hoy
+              </h3>
+              <p class="text-green-600 text-sm flex items-center gap-1 mt-0.5">
+                <svg lucideCalendar [size]="14"></svg>
+                Solo se exportan las citas del día de hoy ({{
+                  formatDate(today)
+                }})
+              </p>
+              <p class="text-green-700 text-base font-medium mt-1">
+                Filtros activos aplicados al reporte
+              </p>
+            </div>
+          </div>
+          <button
+            (click)="showExportModal.set(true)"
+            class="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-colors shadow-lg cursor-pointer"
+          >
+            <svg lucideFileSpreadsheet [size]="24"></svg>
+            Exportar Citas
+          </button>
+        </div>
+      </div>
+    } @else {
+      <div
+        class="bg-gray-50 border-2 border-gray-200 rounded-2xl p-5 text-center mb-6"
+      >
+        <p class="text-gray-500 text-base">
+          No hay citas programadas para hoy, por lo que no es posible exportar
+          un reporte.
+        </p>
+      </div>
+    }
+  }
 
   <!-- Filters -->
   <div class="bg-white rounded-xl shadow-md border-2 border-blue-100 p-6 mb-6">
@@ -61,55 +109,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Export Section -->
-  @if (hasAnyAppointments()) {
-    @if (hasTodayAppointments()) {
-      <div
-        class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200 mb-6"
-      >
-        <div
-          class="flex flex-col sm:flex-row items-center justify-between gap-4"
-        >
-          <div class="flex items-center gap-3">
-            <div class="bg-[#1f7a52] rounded-full p-3">
-              <svg lucideDownload class="text-white" [size]="28"></svg>
-            </div>
-            <div>
-              <h3 class="text-green-800 text-xl font-bold">
-                Exportar Reporte de Hoy
-              </h3>
-              <p class="text-green-600 text-sm flex items-center gap-1 mt-0.5">
-                <svg lucideCalendar [size]="14"></svg>
-                Solo se exportan las citas del día de hoy ({{
-                  formatDate(today)
-                }})
-              </p>
-              <p class="text-green-700 text-base font-medium mt-1">
-                Filtros activos aplicados al reporte
-              </p>
-            </div>
-          </div>
-          <button
-            (click)="showExportModal.set(true)"
-            class="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-colors shadow-lg cursor-pointer"
-          >
-            <svg lucideFileSpreadsheet [size]="24"></svg>
-            Exportar Citas
-          </button>
-        </div>
-      </div>
-    } @else {
-      <div
-        class="bg-gray-50 border-2 border-gray-200 rounded-2xl p-5 text-center mb-6"
-      >
-        <p class="text-gray-500 text-base">
-          No hay citas programadas para hoy, por lo que no es posible exportar
-          un reporte.
-        </p>
-      </div>
-    }
-  }
 
   <!-- Appointments List -->
   <div class="bg-white rounded-xl shadow-md border-2 border-blue-100 p-6">
@@ -211,6 +210,10 @@
         }
       </div>
     }
+    <app-pagination
+      [pagination]="pagination()"
+      (pageChange)="onPageChange($event)"
+    />
   </div>
 
   <!-- Export Modal -->

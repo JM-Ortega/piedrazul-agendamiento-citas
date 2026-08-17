@@ -153,6 +153,10 @@
                         </button>
                       </div>
                     }
+                    <app-pagination
+                      [pagination]="pagination()"
+                      (pageChange)="onPageChange($event)"
+                    />
                   </div>
                 }
 

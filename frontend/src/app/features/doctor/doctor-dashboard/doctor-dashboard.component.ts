@@ -19,7 +19,13 @@ import {
 } from '@lucide/angular';
 import { DoctorService } from '../../../core/services/doctor.service';
 import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
+import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
 import { ConfirmModalComponent } from '../../../design-system/organisms/confirm-modal/confirm-modal.component';
+import { PaginatedState } from '../../../shared/helpers/paginated-state';
+import {
+  parseLocalDateString,
+  toIsoDateString,
+} from '../../../shared/helpers/transform-date-local';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
@@ -40,6 +46,7 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
     LucideUserX,
     ButtonComponent,
     ConfirmModalComponent,
+    PaginationComponent,
   ],
 })
 export class DoctorDashboardComponent implements OnInit {
@@ -47,16 +54,12 @@ export class DoctorDashboardComponent implements OnInit {
   private doctorService = inject(DoctorService);
   private router = inject(Router);
 
-  today = (() => {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  })();
+  today = toIsoDateString(new Date());
 
   currentDoctor = signal<Doctor | null>(null);
-  private appointments = signal<AppointmentsPatient[]>([]);
+  private appointmentsState = new PaginatedState<AppointmentsPatient>();
+  pagination = this.appointmentsState.pagination;
+  readonly PAGE_SIZE = 10;
 
   showConfirmModal = signal(false);
   selectedAppointmentId = signal<string | null>(null);
@@ -67,7 +70,7 @@ export class DoctorDashboardComponent implements OnInit {
   showOutcomeDropdown = signal(false);
 
   todaysAppointments = computed(() =>
-    [...this.appointments()]
+    [...this.appointmentsState.content()]
       .filter(
         (a) => a.date === this.today && a.appointmentState !== 'CANCELADA'
       )
@@ -106,11 +109,18 @@ export class DoctorDashboardComponent implements OnInit {
     });
   }
 
-  private loadAppointments(doctorId: string): void {
-    this.doctorService.getTodayAppointmentsByDoctor(doctorId).subscribe({
-      next: (data) => this.appointments.set(data),
-      error: () => this.appointments.set([]),
-    });
+  private loadAppointments(doctorId: string, pageNumber = 0): void {
+    this.doctorService
+      .getTodayAppointmentsByDoctor(doctorId, pageNumber, this.PAGE_SIZE)
+      .subscribe({
+        next: (response) => this.appointmentsState.set(response),
+        error: () => this.appointmentsState.clear(),
+      });
+  }
+
+  onPageChange(pageNumber: number): void {
+    const doctorId = this.currentDoctor()?.id;
+    if (doctorId) this.loadAppointments(doctorId, pageNumber);
   }
 
   toggleCardDropdown(appointmentId: string): void {
@@ -179,7 +189,7 @@ export class DoctorDashboardComponent implements OnInit {
   }
 
   formatDate(dateStr: string): string {
-    const date = new Date(dateStr + 'T12:00:00');
+    const date = parseLocalDateString(dateStr);
     return new Intl.DateTimeFormat('es-CO', {
       weekday: 'long',
       year: 'numeric',
@@ -187,7 +197,6 @@ export class DoctorDashboardComponent implements OnInit {
       day: 'numeric',
     }).format(date);
   }
-
   statusColor(state: string): string {
     const map: Record<string, string> = {
       AGENDADA: 'bg-green-100 text-green-800 border-green-300',
@@ -201,7 +210,7 @@ export class DoctorDashboardComponent implements OnInit {
 
   statusLabel(state: string): string {
     const map: Record<string, string> = {
-      AGENDADA: 'Confirmada',
+      AGENDADA: 'Agendada',
       ATENDIDA: 'Atendida',
       CANCELADA: 'Cancelada',
       NO_ASISTIO: 'No asistió',
