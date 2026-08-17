@@ -1,11 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientRegistrationData;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientSnapshot;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.PatientInfoMapper;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.PatientRegistrationMapper;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import org.springframework.stereotype.Component;
@@ -50,25 +48,6 @@ public class PatientConsultPortImpl implements PatientConsultPort {
                         p.personId(),
                         PatientInfoMapper.toPatientInfo(p)
                 ));
-    }
-
-    @Override
-    public UUID createPatient(PatientRegistrationData data) {
-
-        PatientData created = patientModuleApi.createPatient(
-                PatientRegistrationMapper.mapDocumentType(data.documentType()),
-                data.documentNumber(),
-                data.firstName(),
-                data.lastName(),
-                data.phone(),
-                data.email(),
-                null,
-                PatientRegistrationMapper.mapGender(data.gender()),
-                data.birthDate(),
-                data.guardianPhone()
-        );
-
-        return created.personId();
     }
 
     @Override
