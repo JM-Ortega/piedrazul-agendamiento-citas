@@ -43,7 +43,13 @@
 
   <!-- Lista de Citas -->
   <div class="bg-white rounded-2xl shadow-lg border-2 border-blue-100 p-8">
-    <h2 class="text-[#163c63] text-2xl mb-6">Citas de Hoy</h2>
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <h2 class="text-[#163c63] text-2xl">Citas de Hoy</h2>
+      <app-pagination
+        [pagination]="pagination()"
+        (pageChange)="onPageChange($event)"
+      />
+    </div>
 
     @if (todaysAppointments().length === 0) {
       <div class="text-center py-12">
@@ -153,10 +159,6 @@
                         </button>
                       </div>
                     }
-                    <app-pagination
-                      [pagination]="pagination()"
-                      (pageChange)="onPageChange($event)"
-                    />
                   </div>
                 }
 

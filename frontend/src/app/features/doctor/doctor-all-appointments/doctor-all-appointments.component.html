@@ -112,10 +112,16 @@
 
   <!-- Appointments List -->
   <div class="bg-white rounded-xl shadow-md border-2 border-blue-100 p-6">
-    <h2 class="text-[#163c63] text-xl font-semibold mb-6">
-      {{ filteredAppointments().length }}
-      {{ filteredAppointments().length === 1 ? 'Cita' : 'Citas' }}
-    </h2>
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <h2 class="text-[#163c63] text-xl font-semibold">
+        {{ filteredAppointments().length }}
+        {{ filteredAppointments().length === 1 ? 'Cita' : 'Citas' }}
+      </h2>
+      <app-pagination
+        [pagination]="pagination()"
+        (pageChange)="onPageChange($event)"
+      />
+    </div>
 
     @if (filteredAppointments().length === 0) {
       <div class="text-center py-16">
@@ -210,10 +216,6 @@
         }
       </div>
     }
-    <app-pagination
-      [pagination]="pagination()"
-      (pageChange)="onPageChange($event)"
-    />
   </div>
 
   <!-- Export Modal -->

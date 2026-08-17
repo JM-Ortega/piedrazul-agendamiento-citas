@@ -59,7 +59,7 @@ export class DoctorDashboardComponent implements OnInit {
   currentDoctor = signal<Doctor | null>(null);
   private appointmentsState = new PaginatedState<AppointmentsPatient>();
   pagination = this.appointmentsState.pagination;
-  readonly PAGE_SIZE = 10;
+  readonly PAGE_SIZE = 3;
 
   showConfirmModal = signal(false);
   selectedAppointmentId = signal<string | null>(null);

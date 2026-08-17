@@ -76,7 +76,7 @@ export class DoctorAllAppointmentsComponent {
   currentDoctor = signal<Doctor | null>(null);
   private appointmentsState = new PaginatedState<AppointmentsPatient>();
   pagination = this.appointmentsState.pagination;
-  readonly PAGE_SIZE = 10;
+  readonly PAGE_SIZE = 3;
   private loaded = signal(false);
 
   filterStatus = signal<FilterStatus>('all');
