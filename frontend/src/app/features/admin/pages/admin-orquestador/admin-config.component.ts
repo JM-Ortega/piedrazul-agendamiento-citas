@@ -100,7 +100,7 @@ export class AdminConfigComponent implements OnInit {
     this.errorCarga.set('');
     this.adminService.getDoctors(page, this.PAGE_SIZE).subscribe({
       next: (response) => {
-        this.currentPage.set(response.pageSize);
+        this.currentPage.set(response.pageNumber);
         this.totalPages.set(response.totalPages);
         this.totalElements.set(response.totalElements);
 
