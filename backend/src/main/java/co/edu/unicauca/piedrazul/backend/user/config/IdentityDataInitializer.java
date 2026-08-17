@@ -5,8 +5,8 @@ import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
-import co.edu.unicauca.piedrazul.backend.user.exception.IdentityProviderException;
 import co.edu.unicauca.piedrazul.backend.user.exception.PersonAlreadyExistsException;
+import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsException;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -105,11 +105,9 @@ public class IdentityDataInitializer {
         try {
             userProvisioningApi.createUser(payload);
         } catch (PersonAlreadyExistsException exception) {
-            // ya sembrado en una corrida anterior (Postgres persistente entre reinicios) — nada que hacer
-        } catch (IdentityProviderException exception) {
-            if (!exception.getMessage().contains("Ya existe un usuario creado")) {
-                throw exception;
-            }
+            // La persona puede existir si la base de datos conserva una inicialización anterior.
+        } catch (UserAlreadyExistsException exception) {
+            // La cuenta puede existir si Keycloak conserva una inicialización anterior.
         }
     }
 
