@@ -17,6 +17,7 @@ import {
   APPOINTMENT_STATUS_CLASSES,
 } from '../../../shared/helpers/appointment-status';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
+import { AppError } from '../../../shared/models/interfaces/api-error.model';
 import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
 
 const PAGE_SIZE = 5;
@@ -67,9 +68,9 @@ export class PatientAppointmentHistoryComponent implements OnInit {
         this.patientId.set(patient.id);
         this.loadPage(0);
       },
-      error: () => {
+      error: (err: AppError) => {
         this.errorMessage.set(
-          'No se pudo obtener la información del paciente.'
+          'No se pudo obtener la información del paciente: ' + err.message
         );
         this.isLoading.set(false);
       },

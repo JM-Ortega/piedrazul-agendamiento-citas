@@ -182,9 +182,13 @@ export class DoctorDashboardComponent implements OnInit {
     this.isMarkingAttended.set(false);
   }
 
-  scheduleNewAppointment(documentNumber: string): void {
+  scheduleNewAppointment(
+    documentNumber: string,
+    specialty: string,
+    idDoctor: string | undefined
+  ): void {
     this.router.navigate(['/medico/nueva-cita'], {
-      queryParams: { documentNumber },
+      state: { documentNumber, specialty, idDoctor },
     });
   }
 

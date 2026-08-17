@@ -165,7 +165,13 @@
                   <app-button
                     variant="primary"
                     extraClass="!px-5 !py-2.5"
-                    (buttonClick)="scheduleNewAppointment(apt.documentNumber)"
+                    (buttonClick)="
+                      scheduleNewAppointment(
+                        apt.documentNumber,
+                        apt.specialty,
+                        currentDoctor()?.id
+                      )
+                    "
                   >
                     <svg lucideCalendar [size]="18"></svg>
                     Nueva cita

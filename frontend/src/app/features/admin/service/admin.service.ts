@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
-import { PagedResponse } from '../../../shared/models/dtos/pagedResponse-clinicalHistory.dto';
+import { PageResponse } from '../../../shared/models/dtos/pageResponse.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { CreateUserRequestDto } from '../models/dtos/CreateUserRequestDto';
 import { dtoSchedule } from '../models/dtos/schedule.dto';
@@ -38,8 +38,8 @@ export class AdminService {
    * @param size - Cantidad de médicos por página.
    * @returns Observable con la respuesta paginada completa (content + metadata).
    */
-  getDoctors(page = 0, size = 4): Observable<PagedResponse<Doctor>> {
-    return this.http.get<PagedResponse<Doctor>>(
+  getDoctors(page = 0, size = 4): Observable<PageResponse<Doctor>> {
+    return this.http.get<PageResponse<Doctor>>(
       `${this.apiUrl}/doctor/detailed`,
       { params: { page, size, sort: 'name,asc' } }
     );
@@ -47,12 +47,9 @@ export class AdminService {
 
   getDoctorsAdmin(): Observable<DoctorAdminDto[]> {
     return this.http
-      .get<PagedResponse<DoctorAdminDto>>(
-        `${this.apiUrl}/user/system-doctors`,
-        {
-          params: { size: 100 },
-        }
-      )
+      .get<PageResponse<DoctorAdminDto>>(`${this.apiUrl}/user/system-doctors`, {
+        params: { size: 100 },
+      })
       .pipe(map((response) => response.content));
   }
 
@@ -184,7 +181,7 @@ export class AdminService {
 
   getSystemUsers(): Observable<SystemUser[]> {
     return this.http
-      .get<PagedResponse<SystemUser>>(`${this.apiUrl}/user/system-users`, {
+      .get<PageResponse<SystemUser>>(`${this.apiUrl}/user/system-users`, {
         params: { size: 100 },
       })
       .pipe(map((response) => response.content));

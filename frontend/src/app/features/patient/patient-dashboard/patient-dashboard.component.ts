@@ -24,6 +24,7 @@ import { ToastComponent } from '../../../design-system/molecules/toast-message/t
 import { getMonthShort } from '../../../shared/helpers/date-format';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
+import { AppError } from '../../../shared/models/interfaces/api-error.model';
 import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
 
 const PAGE_SIZE = 5;
@@ -88,9 +89,9 @@ export class PatientDashboardComponent implements OnInit {
         this.patientId.set(patient.id);
         this.loadPage(0);
       },
-      error: () => {
+      error: (err: AppError) => {
         this.errorMessage.set(
-          'No se pudo obtener la información del paciente.'
+          'No se pudo obtener la información del paciente: ' + err.message
         );
         this.isLoading.set(false);
       },
@@ -166,8 +167,11 @@ export class PatientDashboardComponent implements OnInit {
         const p = this.pagination();
         this.loadPage(p?.pageNumber ?? 0);
       },
-      error: () => {
-        this.showToast('Ocurrió un error al cancelar la cita', 'error');
+      error: (err: AppError) => {
+        this.showToast(
+          'Ocurrió un error al cancelar la cita: ' + err.message,
+          'error'
+        );
       },
     });
   }

@@ -17,6 +17,7 @@ import { ConfirmModalComponent } from '../../../../design-system/organisms/confi
 import { ToastComponent } from '../../../../design-system/molecules/toast-message/toast.component';
 import { AppointmentTableComponent } from '../../components/table/table.component';
 import { SchedulerFiltersComponent } from '../../components/filters/filter.component';
+import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 
 @Component({
   selector: 'app-scheduler-dashboard',
@@ -109,9 +110,9 @@ export class SchedulerDashboardComponent implements OnInit {
       })
       .subscribe({
         next: (data) => this.appointments.set(data),
-        error: () => {
+        error: (err: AppError) => {
           this.errorMessage.set(
-            'No se pudieron cargar las citas. Intente más tarde.'
+            'No se pudieron cargar las citas: ' + err.message
           );
         },
       });
@@ -138,8 +139,11 @@ export class SchedulerDashboardComponent implements OnInit {
           )
         );
       },
-      error: () =>
-        this.showToast('Ocurrió un error al cancelar la cita', 'error'),
+      error: (err: AppError) =>
+        this.showToast(
+          'Ocurrió un error al cancelar la cita: ' + err.message,
+          'error'
+        ),
     });
   }
 
