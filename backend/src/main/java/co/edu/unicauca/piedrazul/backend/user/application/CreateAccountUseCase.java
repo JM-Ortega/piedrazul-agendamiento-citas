@@ -4,14 +4,18 @@ import co.edu.unicauca.piedrazul.backend.doctors.DoctorProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientUserRequest;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
+import co.edu.unicauca.piedrazul.backend.user.events.UserCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.user.exception.InvalidRoleAssignmentException;
 import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
+import org.slf4j.MDC;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.EnumSet;
@@ -27,6 +31,7 @@ public class CreateAccountUseCase implements UserProvisioningApi {
     private final PatientModuleApi patientModuleApi;
     private final PersonExternalService personExternalService;
     private final KeycloakUserProvisioningService keycloakUserProvisioningService;
+
 
     public CreateAccountUseCase(
             DoctorProvisioningApi doctorProvisioningApi,

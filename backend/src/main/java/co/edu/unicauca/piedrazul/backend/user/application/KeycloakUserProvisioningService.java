@@ -1,11 +1,15 @@
 package co.edu.unicauca.piedrazul.backend.user.application;
 
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserAccountProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
+import co.edu.unicauca.piedrazul.backend.user.events.UserCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.KeycloakUserClient;
 import org.keycloak.representations.idm.UserRepresentation;
+import org.slf4j.MDC;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,9 +21,11 @@ public class KeycloakUserProvisioningService implements UserAccountProvisioningA
 
     private final KeycloakUserClient keycloakClient;
 
+
     public KeycloakUserProvisioningService(KeycloakUserClient keycloakClient) {
         this.keycloakClient = keycloakClient;
     }
+
 
     @Override
     public UserSummary getOrCreateUser(CreateSystemUserRequest request, List<Role> roles) {

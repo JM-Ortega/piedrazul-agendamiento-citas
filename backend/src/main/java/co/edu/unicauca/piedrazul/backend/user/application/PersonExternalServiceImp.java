@@ -1,9 +1,11 @@
 package co.edu.unicauca.piedrazul.backend.user.application;
 
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 import co.edu.unicauca.piedrazul.backend.user.domain.Person;
+import co.edu.unicauca.piedrazul.backend.user.events.UserCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
 import co.edu.unicauca.piedrazul.backend.user.exception.PersonAlreadyExistsException;
 import co.edu.unicauca.piedrazul.backend.user.exception.PersonAlreadyLinkedUserException;
@@ -12,6 +14,8 @@ import co.edu.unicauca.piedrazul.backend.user.infrastructure.mappers.PersonApiMa
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.persistence.PersonRepository;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.proyections.PersonNameProjection;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.proyections.UserPersonProjection;
+import org.slf4j.MDC;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -26,7 +30,8 @@ public class PersonExternalServiceImp implements PersonExternalService {
     private final PersonRepository personRepository;
     private final KeycloakUserService keycloakUserService;
 
-    public PersonExternalServiceImp(PersonRepository personRepository, KeycloakUserService keycloakUserService) {
+    public PersonExternalServiceImp(PersonRepository personRepository,
+                                    KeycloakUserService keycloakUserService) {
         this.personRepository = personRepository;
         this.keycloakUserService = keycloakUserService;
     }
@@ -65,17 +70,17 @@ public class PersonExternalServiceImp implements PersonExternalService {
             throw new PersonAlreadyLinkedUserException("La cuenta de usuario " + userId + " ya está vinculada a otra persona");
         }
 
-        Person person = new Person(
+        Person person = personRepository.save(new Person(
                 userId,
                 identificationType,
                 identification,
                 firstName,
                 lastName,
                 phone,
-                email
+                email)
         );
 
-        return PersonApiMapper.toSummary(personRepository.save(person));
+        return PersonApiMapper.toSummary(person);
     }
 
     @Override
