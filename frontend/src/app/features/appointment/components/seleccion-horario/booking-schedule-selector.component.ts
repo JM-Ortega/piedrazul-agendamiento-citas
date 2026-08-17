@@ -108,7 +108,6 @@ export class BookingScheduleSelectorComponent {
               slots = slots.filter((s) => s >= cutoffStr);
             }
           }
-          // TODO si en este caso no hay horarios disponibles también se envía como error? o lo debo manejar acá?
           this.state.availableSlots.set(slots);
           if (!slots || slots.length === 0) {
             this.noSlotsAvailable = true;
@@ -118,12 +117,6 @@ export class BookingScheduleSelectorComponent {
         },
         error: (err: AppError) => {
           this.state.availableSlots.set([]);
-          // TODO cambiar por el que indiquen en el error code cuando no haya espacios disponibles
-          if (err.status === 0) {
-            this.noSlotsAvailable = true;
-            this.errorMessageSlots = err.message;
-            return;
-          }
           this.globalErrorMessage.set(err.message);
         },
       });

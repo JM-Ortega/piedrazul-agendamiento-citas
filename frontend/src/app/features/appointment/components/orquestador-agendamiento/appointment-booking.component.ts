@@ -266,6 +266,7 @@ export class AppointmentBookingComponent implements OnInit {
   private loadSpecialtiesForMode(mode: BookingMode): void {
     this.state.noSpecialtyAvailable.set(false);
     this.state.errorMessageSpecialty.set('');
+    this.state.globalErrorMessage.set('');
 
     if (mode === 'specialty') {
       this.loadSpecialtiesWithDoctor();
@@ -285,12 +286,15 @@ export class AppointmentBookingComponent implements OnInit {
         this.state.specialtiesWithDoctor.set(data);
       },
       error: (err: AppError) => {
-        this.state.noSpecialtyAvailable.set(true);
-        this.state.errorMessageSpecialty.set(
-          err.status === 409 // TODO reemplazar por el error code específico de "no hay especialidades"
-            ? 'No hay médicos disponibles para ninguna especialidad. Intente más tarde.'
-            : err.message
-        );
+        if (
+          err.errorCode === 'NO_ACTIVE_DOCTORS' ||
+          err.errorCode === 'NO_AVAILABLE_DOCTORS'
+        ) {
+          this.state.noSpecialtyAvailable.set(true);
+          this.state.errorMessageSpecialty.set(err.message);
+        } else {
+          this.state.globalErrorMessage.set(err.message);
+        }
       },
     });
   }
@@ -315,16 +319,6 @@ export class AppointmentBookingComponent implements OnInit {
   private traerEspecialidades(patientId: string | null): void {
     this.citaService.getSpecialties(patientId).subscribe({
       next: (specs) => {
-        /** TODO borrar este if (este tipo de errores se capturan en error)
-         * para indicar que no hay especialidades disponibles y se muestra como advertencia (anaranjado)
-         */
-        if (!specs || specs.length === 0) {
-          this.state.noSpecialtyAvailable.set(true);
-          this.state.errorMessageSpecialty.set(
-            'No hay especialidades disponibles.'
-          );
-          return;
-        }
         this.state.specialtiesWithDoctor.set(
           specs.map((s) => ({
             specialty: [s],
@@ -340,8 +334,15 @@ export class AppointmentBookingComponent implements OnInit {
         }
       },
       error: (err: AppError) => {
-        // TODO agregar error code con advertencia (anaranjado) para indicar que no hay especialidades disponibles
-        this.state.globalErrorMessage.set(err.message);
+        if (
+          err.errorCode === 'NO_ACTIVE_DOCTORS' ||
+          err.errorCode === 'NO_AVAILABLE_DOCTORS'
+        ) {
+          this.state.noSpecialtyAvailable.set(true);
+          this.state.errorMessageSpecialty.set(err.message);
+        } else {
+          this.state.globalErrorMessage.set(err.message);
+        }
       },
     });
   }
@@ -365,28 +366,20 @@ export class AppointmentBookingComponent implements OnInit {
     this.citaService.getDoctorsBySpecialty(specialty).subscribe({
       next: (docs) => {
         this.state.doctorsBySpecialty.set(docs);
-        this.state.noDoctorsFound.set(docs.length === 0);
-        /**
-         *  TODO borrar este if (este tipo de errores se capturan en error)
-         * para indicar que no hay médicos disponibles con mensaje de advertencia (anaranjado)
-         */
-        if (docs.length === 0) {
-          this.state.errorMessageDoctors.set(
-            'No hay médicos disponibles para esta especialidad.'
-          );
-          return;
-        }
         if (preselectDoctorId) {
           this.preselectDoctorFromList(docs, preselectDoctorId);
         }
       },
       error: (err: AppError) => {
-        this.state.noDoctorsFound.set(true);
-        this.state.errorMessageDoctors.set(
-          err.status === 404 // TODO cambiar este por el error code que venga desde el backend
-            ? 'No hay médicos disponibles para esta especialidad.'
-            : err.message
-        );
+        if (
+          err.errorCode === 'NO_ACTIVE_DOCTORS' ||
+          err.errorCode === 'NO_AVAILABLE_DOCTORS'
+        ) {
+          this.state.noDoctorsFound.set(true);
+          this.state.errorMessageDoctors.set(err.message);
+        } else {
+          this.state.globalErrorMessage.set(err.message);
+        }
       },
     });
   }
