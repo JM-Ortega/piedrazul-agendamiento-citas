@@ -10,14 +10,16 @@ import {
 import { LucideX } from '@lucide/angular';
 import { SchedulerService } from '../../../../core/services/scheduler.service';
 import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
-import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../../../shared/models/dtos/doctor.dto';
 import { formatLongDateEs } from '../../../../shared/helpers/date-format';
 import { ConfirmModalComponent } from '../../../../design-system/organisms/confirm-modal/confirm-modal.component';
 import { ToastComponent } from '../../../../design-system/molecules/toast-message/toast.component';
+import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
 import { AppointmentTableComponent } from '../../components/table/table.component';
 import { SchedulerFiltersComponent } from '../../components/filters/filter.component';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+
+const PAGE_SIZE = 5;
 
 @Component({
   selector: 'app-scheduler-dashboard',
@@ -29,6 +31,7 @@ import { AppError } from '../../../../shared/models/interfaces/api-error.model';
     ToastComponent,
     AppointmentTableComponent,
     SchedulerFiltersComponent,
+    PaginationComponent,
   ],
   templateUrl: './scheduler-dashboard.component.html',
 })
@@ -46,10 +49,12 @@ export class SchedulerDashboardComponent implements OnInit {
 
   doctors = signal<dtoDoctor[]>([]);
   states = signal<string[]>([]);
-  private appointments = signal<AppointmentsPatient[]>([]);
 
   filterDoctor = signal('');
   filterStatus = signal('');
+
+  /** Página actualmente solicitada (base 0). Se resetea a 0 al cambiar los filtros. */
+  private readonly pageNumber = signal(0);
 
   showCancelModal = signal(false);
   pendingCancelId = signal<string | null>(null);
@@ -59,36 +64,21 @@ export class SchedulerDashboardComponent implements OnInit {
 
   errorMessage = signal('');
 
+  /** Metadata de paginación de la última carga, provista por el servicio. */
+  readonly pagination = computed(() => this.schedulerService.pagination());
+  /** Citas de la página actual. */
+  readonly results = computed(() => this.schedulerService.appointments());
+
   selectedDoctor = computed(() =>
     this.doctors().find((d) => d.id === this.filterDoctor())
-  );
-
-  results = computed(() => {
-    const stateOrder: Record<string, number> = {
-      AGENDADA: 1,
-      ATENDIDA: 2,
-      CANCELADA: 3,
-    };
-    return [...this.appointments()].sort((a, b) => {
-      const stateDiff =
-        stateOrder[a.appointmentState] - stateOrder[b.appointmentState];
-      if (stateDiff !== 0) return stateDiff;
-      return (
-        new Date(`${a.date}T${a.startTime}`).getTime() -
-        new Date(`${b.date}T${b.startTime}`).getTime()
-      );
-    });
-  });
-
-  activeResults = computed(() =>
-    this.results().filter((a) => a.appointmentState !== 'CANCELADA')
   );
 
   constructor() {
     effect(() => {
       const doctorId = this.filterDoctor();
       const status = this.filterStatus();
-      this.loadAppointments(doctorId, status);
+      this.pageNumber.set(0);
+      this.loadAppointments(doctorId, status, 0);
     });
   }
 
@@ -101,15 +91,29 @@ export class SchedulerDashboardComponent implements OnInit {
       .subscribe((data) => this.states.set(data));
   }
 
-  private loadAppointments(doctorId: string, status: string): void {
+  /**
+   * Navega a la página indicada manteniendo los filtros actuales.
+   * Conectado al evento `pageChange` de `app-pagination`.
+   */
+  onPageChange(pageNumber: number): void {
+    this.pageNumber.set(pageNumber);
+    this.loadAppointments(this.filterDoctor(), this.filterStatus(), pageNumber);
+  }
+
+  private loadAppointments(
+    doctorId: string,
+    status: string,
+    pageNumber: number
+  ): void {
     this.schedulerService
-      .getAllAppointments({
+      .loadAllAppointments({
         date: this.today,
         idDoctor: doctorId || undefined,
         state: status || undefined,
+        pageNumber,
+        pageSize: PAGE_SIZE,
       })
       .subscribe({
-        next: (data) => this.appointments.set(data),
         error: (err: AppError) => {
           this.errorMessage.set(
             'No se pudieron cargar las citas: ' + err.message
@@ -131,12 +135,10 @@ export class SchedulerDashboardComponent implements OnInit {
     this.patientAppointmentService.cancelAppointment(appointmentId).subscribe({
       next: () => {
         this.showToast('La cita fue cancelada exitosamente', 'success');
-        this.appointments.set(
-          this.appointments().map((a) =>
-            a.idAppointment === appointmentId
-              ? { ...a, appointmentState: 'CANCELADA' }
-              : a
-          )
+        this.loadAppointments(
+          this.filterDoctor(),
+          this.filterStatus(),
+          this.pageNumber()
         );
       },
       error: (err: AppError) =>
