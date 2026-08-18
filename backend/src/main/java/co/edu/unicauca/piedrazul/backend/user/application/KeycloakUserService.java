@@ -36,7 +36,7 @@ public class KeycloakUserService implements UserModuleApi {
 
     @Override
     public List<String> getUserRoles (UUID userId) {
-        return keycloakClient.getUserRoles(userId);
+        return keycloakClient.getUserRoles(userId.toString());
     }
 
     @Override

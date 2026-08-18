@@ -83,12 +83,12 @@ class KeycloakUserServiceTest {
 	@Test
 	void getUserRolesShouldDelegateToClient() {
 		UUID userId = UUID.fromString("33333333-3333-3333-3333-333333333333");
-		when(keycloakClient.getUserRoles(userId)).thenReturn(List.of(Role.DOCTOR.name(), Role.SCHEDULER.name()));
+		when(keycloakClient.getUserRoles(userId.toString())).thenReturn(List.of(Role.DOCTOR.name(), Role.SCHEDULER.name()));
 
 		List<String> result = keycloakUserService.getUserRoles(userId);
 
 		assertEquals(List.of(Role.DOCTOR.name(), Role.SCHEDULER.name()), result);
-		verify(keycloakClient).getUserRoles(userId);
+		verify(keycloakClient).getUserRoles(userId.toString());
 	}
 
 	@Test

@@ -3,6 +3,7 @@ package co.edu.unicauca.piedrazul.backend.user.infrastructure;
 import co.edu.unicauca.piedrazul.backend.config.security.KeycloakProperties;
 import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -155,7 +156,7 @@ class KeycloakUserClientTest {
 
         when(roleScopeResource.listAll()).thenReturn(List.of(doctorRole, schedulerRole));
 
-        List<String> result = keycloakUserClient.getUserRoles(userId);
+        List<String> result = keycloakUserClient.getUserRoles(userId.toString());
 
         assertEquals(List.of(Role.DOCTOR.name(), Role.SCHEDULER.name()), result);
         verify(roleScopeResource).listAll();
