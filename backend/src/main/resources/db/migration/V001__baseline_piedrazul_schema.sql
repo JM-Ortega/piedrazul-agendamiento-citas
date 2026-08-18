@@ -520,9 +520,9 @@ CREATE UNIQUE INDEX uq_verification_code_active
 CREATE TABLE piedrazul.audit_event (
     id                  UUID                     NOT NULL,
     occurred_at         TIMESTAMPTZ               NOT NULL,
-    actor_username      VARCHAR(100)              NOT NULL,
-    actor_role          VARCHAR(50),
-    action_code         VARCHAR(50)               NOT NULL,
+    actor_id      VARCHAR(100)              NOT NULL,
+    actor_role          VARCHAR(100),
+    action_code         VARCHAR(100)               NOT NULL,
     target_entity_type  VARCHAR(100),
     target_entity_id    VARCHAR(100),
     outcome             VARCHAR(20)               NOT NULL,
@@ -541,8 +541,8 @@ CREATE TABLE piedrazul.audit_event (
 CREATE INDEX idx_audit_event_action_code
     ON piedrazul.audit_event (action_code);
 
-CREATE INDEX idx_audit_event_actor_username
-    ON piedrazul.audit_event (actor_username, occurred_at DESC);
+CREATE INDEX idx_audit_event_actor_id
+    ON piedrazul.audit_event (actor_id, occurred_at DESC);
 
 CREATE INDEX idx_audit_event_target
     ON piedrazul.audit_event (target_entity_type, target_entity_id);
