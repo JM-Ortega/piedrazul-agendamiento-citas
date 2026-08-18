@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.shared.events.audit;
+package co.edu.unicauca.piedrazul.backend.shared.audit;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
