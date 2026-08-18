@@ -13,7 +13,7 @@ public final class AuditEvent {
 
     private final UUID id;
     private final Instant timestamp;
-    private final String actorUsername;
+    private final String actorId;
     private final String actorRole;
     private final AuditAction action;
     private final String targetEntityType;
@@ -26,7 +26,7 @@ public final class AuditEvent {
     private AuditEvent(Builder b) {
         this.id = b.id;
         this.timestamp = b.timestamp;
-        this.actorUsername = b.actorUsername;
+        this.actorId = b.actorId;
         this.actorRole = b.actorRole;
         this.action = b.action;
         this.targetEntityType = b.targetEntityType;
@@ -52,7 +52,7 @@ public final class AuditEvent {
     // --- getters (sin setters) ---
     public UUID getId() { return id; }
     public Instant getTimestamp() { return timestamp; }
-    public String getActorUsername() { return actorUsername; }
+    public String getActorId() { return actorId; }
     public String getActorRole() { return actorRole; }
     public AuditAction getAction() { return action; }
     public String getTargetEntityType() { return targetEntityType; }
@@ -65,15 +65,15 @@ public final class AuditEvent {
     public static class Builder {
         private UUID id = UUID.randomUUID();
         private Instant timestamp = Instant.now();
-        private String actorUsername;
+        private String actorId;
         private String actorRole;
         private AuditAction action;
         private String targetEntityType;
         private String targetEntityId;
         private AuditOutcome outcome;
         private String correlationId;
-        private String beforeState;
-        private String afterState;
+        private String beforeState; // Sirven apr actualización de información
+        private String afterState; // Sirven apr actualización de información
 
         // Privados a propósito: solo accesibles vía reconstruct(),
         // para que nadie los use "por accidente" al crear un evento nuevo.
@@ -85,8 +85,8 @@ public final class AuditEvent {
             this.timestamp = timestamp; return this;
         }
 
-        public Builder actor(String username, String role) {
-            this.actorUsername = username;
+        public Builder actor(String actorId, String role) {
+            this.actorId = actorId;
             this.actorRole = role;
             return this;
         }
@@ -119,7 +119,7 @@ public final class AuditEvent {
 
         public AuditEvent build() {
             if (action == null) throw new IllegalStateException("Action es obligatorio");
-            if (actorUsername == null) throw new IllegalStateException("Actor es obligatorio");
+            if (actorId == null) throw new IllegalStateException("Actor es obligatorio");
             if (outcome == null) throw new IllegalStateException("Outcome es obligatorio");
             return new AuditEvent(this);
         }

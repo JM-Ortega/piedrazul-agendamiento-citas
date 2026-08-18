@@ -17,8 +17,8 @@ public class AuditEventJpaEntity {
     @Column(name = "occurred_at", nullable = false)
     private Instant occurredAt;
 
-    @Column(name = "actor_username", nullable = false, length = 100)
-    private String actorUsername;
+    @Column(name = "actor_id", nullable = false, length = 100)
+    private String actorId;
 
     @Column(name = "actor_role", length = 50)
     private String actorRole;
@@ -48,13 +48,13 @@ public class AuditEventJpaEntity {
 
     protected AuditEventJpaEntity() { }
 
-    public AuditEventJpaEntity(UUID id, Instant occurredAt, String actorUsername, String actorRole,
+    public AuditEventJpaEntity(UUID id, Instant occurredAt, String actorId, String actorRole,
                                AuditAction action, String targetEntityType, String targetEntityId,
                                AuditOutcome outcome, String correlationId,
                                String beforeState, String afterState) {
         this.id = id;
         this.occurredAt = occurredAt;
-        this.actorUsername = actorUsername;
+        this.actorId = actorId;
         this.actorRole = actorRole;
         this.action = action;
         this.targetEntityType = targetEntityType;
@@ -68,7 +68,7 @@ public class AuditEventJpaEntity {
     // Solo getters. Sin setters: refuerza inmutabilidad también a nivel JPA.
     public UUID getId() { return id; }
     public Instant getOccurredAt() { return occurredAt; }
-    public String getActorUsername() { return actorUsername; }
+    public String getActorId() { return actorId; }
     public String getActorRole() { return actorRole; }
     public AuditAction getAction() { return action; }
     public String getTargetEntityType() { return targetEntityType; }

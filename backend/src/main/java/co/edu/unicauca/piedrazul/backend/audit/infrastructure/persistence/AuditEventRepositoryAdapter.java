@@ -22,7 +22,7 @@ public class AuditEventRepositoryAdapter implements AuditEventRepository {
     @Override
     public void save(AuditEvent event) {
         jpaRepository.save(new AuditEventJpaEntity(
-                event.getId(), event.getTimestamp(), event.getActorUsername(), event.getActorRole(),
+                event.getId(), event.getTimestamp(), event.getActorId(), event.getActorRole(),
                 event.getAction(), event.getTargetEntityType(), event.getTargetEntityId(),
                 event.getOutcome(), event.getCorrelationId(), event.getBeforeState(), event.getAfterState()
         ));
@@ -46,7 +46,7 @@ public class AuditEventRepositoryAdapter implements AuditEventRepository {
 
     private AuditEvent toDomain(AuditEventJpaEntity e) {
         return AuditEvent.reconstruct(e.getId(), e.getOccurredAt())
-                .actor(e.getActorUsername(), e.getActorRole())
+                .actor(e.getActorId(), e.getActorRole())
                 .action(e.getAction())
                 .target(e.getTargetEntityType(), e.getTargetEntityId())
                 .outcome(e.getOutcome())

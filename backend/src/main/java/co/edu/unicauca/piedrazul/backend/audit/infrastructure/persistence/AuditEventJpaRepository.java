@@ -16,7 +16,7 @@ public interface AuditEventJpaRepository extends JpaRepository<AuditEventJpaEnti
     // (COUNT) además de la de contenido, no hay que escribirla a mano.
     @Query("""
         SELECT e FROM AuditEventJpaEntity e
-        WHERE (:actorUsername IS NULL OR e.actorUsername = :actorUsername)
+        WHERE (:actorId IS NULL OR e.actorId = :actorId)
           AND (:action IS NULL OR e.action = :action)
           AND (:targetEntityType IS NULL OR e.targetEntityType = :targetEntityType)
           AND (:targetEntityId IS NULL OR e.targetEntityId = :targetEntityId)
@@ -24,7 +24,7 @@ public interface AuditEventJpaRepository extends JpaRepository<AuditEventJpaEnti
           AND (:to IS NULL OR e.occurredAt <= :to)
         """)
     Page<AuditEventJpaEntity> search(
-            @Param("actorUsername") String actorUsername,
+            @Param("actorId") String actorId,
             @Param("action") AuditAction action,
             @Param("targetEntityType") String targetEntityType,
             @Param("targetEntityId") String targetEntityId,

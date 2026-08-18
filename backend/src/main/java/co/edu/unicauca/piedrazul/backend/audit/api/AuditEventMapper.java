@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 public class AuditEventMapper {
     public AuditEventResponse toResponse(AuditEvent e) {
         return new AuditEventResponse(
-                e.getActorUsername(), e.getActorRole(), e.getAction().name(),
+                e.getActorId(), e.getActorRole(), e.getAction().name(),
                 e.getTargetEntityType(), e.getTargetEntityId(), e.getOutcome().name(),
                 e.getTimestamp(), e.getCorrelationId()
         );

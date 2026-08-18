@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.audit.application;
 
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.CitaAgendadaEvent;
+import co.edu.unicauca.piedrazul.backend.appointment.events.CitaAgendadaEvent;
 import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEvent;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEventRepository;
