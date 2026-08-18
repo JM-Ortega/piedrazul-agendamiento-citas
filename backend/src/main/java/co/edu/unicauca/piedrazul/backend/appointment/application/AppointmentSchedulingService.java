@@ -1,7 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.PatientResolutionStrategy;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.UserConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.ResolvedPatient;
@@ -12,11 +11,10 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.Appointm
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentScheduledEvent;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.CitaAgendadaEvent;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
+import co.edu.unicauca.piedrazul.backend.appointment.events.CitaAgendadaEvent;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
-import co.edu.unicauca.piedrazul.backend.shared.events.audit.AppointmentCreatedEvent;
 import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,8 +30,7 @@ public class AppointmentSchedulingService {
     private final AppointmentService appointmentService;
     private final ApplicationEventPublisher eventPublisher;
     private final IsNewPatientUseCase isNewPatientUseCase;
-    private final UserConsultPort userConsultPort;
-    private final AppointmentMapper mapper;
+    private final SecurityContextExtractor securityExtractor;
 
 
     public AppointmentSchedulingService(
@@ -42,15 +39,13 @@ public class AppointmentSchedulingService {
             AppointmentService appointmentService,
             ApplicationEventPublisher eventPublisher,
             IsNewPatientUseCase isNewPatientUseCase,
-            UserConsultPort userConsultPort,
-            AppointmentMapper mapper){
+            SecurityContextExtractor securityExtractor){
         this.appointmentRepository = appointmentRepository;
         this.doctorConfigConsultPort = doctorConfigConsultPort;
         this.appointmentService = appointmentService;
         this.eventPublisher = eventPublisher;
         this.isNewPatientUseCase = isNewPatientUseCase;
-        this.userConsultPort = userConsultPort;
-        this.mapper = mapper;
+        this.securityExtractor = securityExtractor;
     }
 
     @Transactional
@@ -129,17 +124,17 @@ public class AppointmentSchedulingService {
         AppointmentEntity entity = new AppointmentEntity(saved.getIdAppointment(), saved.getIdDoctor(),saved.getIdPatient(),
                 saved.getSpecialty(), saved.getAppointmentState(), saved.getDate(), saved.getStartTime().getTime(), saved.getSchedulingOrigin());
 
+        String actorId = securityExtractor.currentActorId();
+        String actorRoles = securityExtractor.currentActorRoles();
+
         eventPublisher.publishEvent(
                 CitaAgendadaEvent.of(
                         entity,
-                        performedBy.toString(),
-                        userConsultPort.getUserRoles(performedBy).toString(),
-                        MDC.get("correlationId") // puede ser null, y eso es válido — no forzar toString()
+                        actorId,
+                        actorRoles,
+                        MDC.get("correlationId")
                 )
         );
-
-
-        eventPublisher.publishEvent(new AppointmentCreatedEvent(saved.getIdAppointment(), performedBy));
 
         eventPublisher.publishEvent(
                 new AppointmentScheduledEvent(

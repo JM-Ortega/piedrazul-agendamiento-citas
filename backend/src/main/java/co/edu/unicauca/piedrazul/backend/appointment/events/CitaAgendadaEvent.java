@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output;
+package co.edu.unicauca.piedrazul.backend.appointment.events;
 
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
 
@@ -7,8 +7,8 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * Evento de dominio publicado cuando una cita queda agendada exitosamente.
- * Es la API pública del módulo `citas` hacia otros módulos (ej. audit).
+ * Evento publicado cuando una cita queda agendada exitosamente.
+ * Es para la auditoria
  */
 public record CitaAgendadaEvent(
         UUID citaId,

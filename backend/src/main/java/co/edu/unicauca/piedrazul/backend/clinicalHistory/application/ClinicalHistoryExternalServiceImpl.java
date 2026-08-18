@@ -43,11 +43,6 @@ public class ClinicalHistoryExternalServiceImpl implements ClinicalHistoryExtern
     }
 
     @Override
-    @Auditable(
-            action = AuditAction.HISTORIA_CLINICA_CONSULTADA,
-            targetEntityType = "ClinicalHistory",
-            targetIdExpression = "#idPatient"
-    )
     public Page<ClinicalHistoryResponse> getHistoryByPatient(
             UUID idPatient,
             Pageable pageable) {
