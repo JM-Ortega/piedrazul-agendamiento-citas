@@ -64,13 +64,11 @@
             }
           </p>
         </div>
-        <div class="flex gap-4">
-          <div class="text-center bg-[#d9e9f8]/40 rounded-xl px-5 py-3">
-            <p class="text-2xl font-bold text-[#215c98]">
-              {{ activeResults().length }}
-            </p>
-            <p class="text-sm text-gray-500">Citas activas</p>
-          </div>
+        <div>
+          <app-pagination
+            [pagination]="pagination()"
+            (pageChange)="onPageChange($event)"
+          ></app-pagination>
         </div>
       </div>
       <app-appointment-table
