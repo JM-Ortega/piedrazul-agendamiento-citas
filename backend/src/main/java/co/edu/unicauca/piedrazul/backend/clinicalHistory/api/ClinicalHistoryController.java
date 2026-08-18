@@ -1,8 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.clinicalHistory.api;
 
 import co.edu.unicauca.piedrazul.backend.audit.infrastructure.aop.Auditable;
-import co.edu.unicauca.piedrazul.backend.clinicalHistory.ClinicalHistoryExternalService;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.output.ClinicalHistoryResponse;
+import co.edu.unicauca.piedrazul.backend.clinicalHistory.application.ClinicalHistoryExternalServiceImpl;
 import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.shared.pagination.PageResponse;
 import jakarta.validation.constraints.Min;
@@ -20,9 +20,9 @@ import java.util.UUID;
 @RequestMapping("/api/clinical-history")
 @PreAuthorize("hasRole('ADMIN')")
 public class ClinicalHistoryController {
-    private final ClinicalHistoryExternalService service;
+    private final ClinicalHistoryExternalServiceImpl service;
 
-    public ClinicalHistoryController(ClinicalHistoryExternalService service) {
+    public ClinicalHistoryController(ClinicalHistoryExternalServiceImpl service) {
         this.service = service;
     }
 
@@ -30,7 +30,7 @@ public class ClinicalHistoryController {
     @GetMapping("/patient/{idPatient}")
     @Auditable(
             action = AuditAction.HISTORIA_CLINICA_CONSULTADA,
-            targetEntityType = "ClinicalHistory",
+            targetEntityType = "HistoriaClinica",
             targetIdExpression = "#idPatient"
     )
     public ResponseEntity<PageResponse<ClinicalHistoryResponse>> getByPatient(
