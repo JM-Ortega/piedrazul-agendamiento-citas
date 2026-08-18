@@ -12,28 +12,16 @@ import java.util.UUID;
  */
 public record ScheduledAppointmentEvent(
         UUID citaId,
-        UUID pacienteId,
-        UUID medicoId,
         String username,
         String rol,
-        Instant fechaHoraCita,
-        String correlationId,
-        Instant timestamp
+        String correlationId
 ) {
     public static ScheduledAppointmentEvent of(AppointmentEntity cita, String username, String rol, String correlationId) {
-        LocalDateTime fechaHoraLocal = cita.getDate().atTime(cita.getStartTime());
-
-        Instant fechaHoraCitaInstant = fechaHoraLocal.atZone(java.time.ZoneId.systemDefault()).toInstant();
-
         return new ScheduledAppointmentEvent(
                 cita.getIdAppointment(),
-                cita.getIdPatient(),
-                cita.getIdDoctor(),
                 username,
                 rol,
-                fechaHoraCitaInstant,
-                correlationId,
-                Instant.now()
+                correlationId
         );
     }
 }
