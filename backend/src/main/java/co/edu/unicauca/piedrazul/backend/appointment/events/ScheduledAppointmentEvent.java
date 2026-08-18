@@ -10,7 +10,7 @@ import java.util.UUID;
  * Evento publicado cuando una cita queda agendada exitosamente.
  * Es para la auditoria
  */
-public record CitaAgendadaEvent(
+public record ScheduledAppointmentEvent(
         UUID citaId,
         UUID pacienteId,
         UUID medicoId,
@@ -20,12 +20,12 @@ public record CitaAgendadaEvent(
         String correlationId,
         Instant timestamp
 ) {
-    public static CitaAgendadaEvent of(AppointmentEntity cita, String username, String rol, String correlationId) {
+    public static ScheduledAppointmentEvent of(AppointmentEntity cita, String username, String rol, String correlationId) {
         LocalDateTime fechaHoraLocal = cita.getDate().atTime(cita.getStartTime());
 
         Instant fechaHoraCitaInstant = fechaHoraLocal.atZone(java.time.ZoneId.systemDefault()).toInstant();
 
-        return new CitaAgendadaEvent(
+        return new ScheduledAppointmentEvent(
                 cita.getIdAppointment(),
                 cita.getIdPatient(),
                 cita.getIdDoctor(),
