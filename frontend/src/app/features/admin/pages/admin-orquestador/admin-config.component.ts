@@ -130,8 +130,8 @@ export class AdminConfigComponent implements OnInit {
           },
         });
       },
-      error: () => {
-        this.errorCarga.set('Error al cargar los médicos. Intente de nuevo.');
+      error: (err: AppError) => {
+        this.errorCarga.set(err.message);
         this.loading.set(false);
       },
     });

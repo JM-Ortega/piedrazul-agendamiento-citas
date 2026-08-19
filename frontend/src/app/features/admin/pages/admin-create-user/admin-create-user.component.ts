@@ -110,6 +110,8 @@ export class AdminCreateUserComponent implements OnInit {
   submitError: string | null = null;
   isSubmitting = false;
   showConfirmModal = false;
+  loadErrorSpecialties: string | null = null;
+  loadErrorDocumentTypes: string | null = null;
 
   specialtyOptions: SpecialtyOption[] = [];
   documentTypes: string[] = [];
@@ -196,7 +198,8 @@ export class AdminCreateUserComponent implements OnInit {
         this.loadingSpecialties = false;
         this.cdr.markForCheck();
       },
-      error: () => {
+      error: (err: AppError) => {
+        this.loadErrorSpecialties = err.message;
         this.loadingSpecialties = false;
         this.cdr.markForCheck();
       },
@@ -208,7 +211,8 @@ export class AdminCreateUserComponent implements OnInit {
         this.loadingDocumentTypes = false;
         this.cdr.markForCheck();
       },
-      error: () => {
+      error: (err: AppError) => {
+        this.loadErrorDocumentTypes = err.message;
         this.loadingDocumentTypes = false;
         this.cdr.markForCheck();
       },

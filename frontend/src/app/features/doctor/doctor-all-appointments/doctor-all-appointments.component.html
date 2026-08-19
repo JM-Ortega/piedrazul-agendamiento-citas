@@ -52,7 +52,14 @@
       </div>
     }
   }
-
+  @if (errorCarga()) {
+    <div
+      class="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-5 py-4 flex items-center gap-3 mb-6"
+    >
+      <svg lucideCalendar [size]="20" class="shrink-0"></svg>
+      <p class="text-base">{{ errorCarga() }}</p>
+    </div>
+  }
   <!-- Filters -->
   <div class="bg-white rounded-xl shadow-md border-2 border-blue-100 p-6 mb-6">
     <div class="flex items-center gap-2 mb-4 text-[#163c63]">

@@ -71,6 +71,7 @@ export class CreateUserDoctorFormComponent {
   @Input() maxInterval = 300;
   @Input() daysOfWeek: { value: number; label: string }[] = [];
   @Input() errors: Partial<Record<string, string>> = {};
+  @Input() loadError: string | null = null; 
 
   // ── Outputs ───────────────────────────────────────────────────────────────
   @Output() dataChange = new EventEmitter<Partial<DoctorFormData>>();

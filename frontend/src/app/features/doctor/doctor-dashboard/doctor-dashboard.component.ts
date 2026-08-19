@@ -27,6 +27,7 @@ import {
   toIsoDateString,
 } from '../../../shared/helpers/transform-date-local';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
+import { AppError } from '../../../shared/models/interfaces/api-error.model';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
@@ -60,6 +61,7 @@ export class DoctorDashboardComponent implements OnInit {
   private appointmentsState = new PaginatedState<AppointmentsPatient>();
   pagination = this.appointmentsState.pagination;
   readonly PAGE_SIZE = 3;
+  errorCarga = signal('');
 
   showConfirmModal = signal(false);
   selectedAppointmentId = signal<string | null>(null);
@@ -105,16 +107,23 @@ export class DoctorDashboardComponent implements OnInit {
         this.currentDoctor.set(doctor);
         this.loadAppointments(doctor.id);
       },
-      error: () => this.router.navigate(['/']),
+      error: (err: AppError) => {
+        this.errorCarga.set(err.message);
+        this.router.navigate(['/']);
+      },
     });
   }
 
   private loadAppointments(doctorId: string, pageNumber = 0): void {
+    this.errorCarga.set('');
     this.doctorService
       .getTodayAppointmentsByDoctor(doctorId, pageNumber, this.PAGE_SIZE)
       .subscribe({
         next: (response) => this.appointmentsState.set(response),
-        error: () => this.appointmentsState.clear(),
+        error: (err: AppError) => {
+          this.errorCarga.set(err.message);
+          this.appointmentsState.clear();
+        },
       });
   }
 
@@ -167,8 +176,9 @@ export class DoctorDashboardComponent implements OnInit {
         const doctorId = this.currentDoctor()?.id;
         if (doctorId) this.loadAppointments(doctorId);
       },
-      error: () => {
+      error: (err: AppError) => {
         this.isMarkingAttended.set(false);
+        alert(err.message);
       },
     });
   }

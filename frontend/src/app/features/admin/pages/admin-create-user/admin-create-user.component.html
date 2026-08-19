@@ -61,6 +61,11 @@
             >
               <svg lucideCreditCard [size]="20" suffix></svg>
             </app-select>
+            @if (loadErrorDocumentTypes) {
+              <p class="text-red-600 text-sm mt-1">
+                {{ loadErrorDocumentTypes }}
+              </p>
+            }
           </div>
           <!-- Documento -->
           <div>
@@ -223,6 +228,7 @@
           [data]="doctorFormData"
           [specialtyOptions]="specialtyOptions"
           [loadingSpecialties]="loadingSpecialties"
+          [loadError]="loadErrorSpecialties"
           [timeOptions]="timeOptions"
           [maxInterval]="maxInterval"
           [daysOfWeek]="daysOfWeek"

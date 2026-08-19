@@ -15,6 +15,7 @@ import {
   LucideUsers,
 } from '@lucide/angular';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { SystemUser } from '../../models/interfaces/system-user.model';
 import { AdminService } from '../../service/admin.service';
 
@@ -115,8 +116,8 @@ export class AdminUsersComponent implements OnInit {
         this.systemUsers.set(users);
         this.loading.set(false);
       },
-      error: () => {
-        this.errorCarga.set('Error al cargar los usuarios. Intente de nuevo.');
+      error: (err: AppError) => {
+        this.errorCarga.set(err.message);
         this.loading.set(false);
       },
     });

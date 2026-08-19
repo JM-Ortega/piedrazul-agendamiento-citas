@@ -163,8 +163,8 @@ export class AdminDoctorsComponent implements OnInit {
         this.handleCancel();
       },
       error: (err: AppError) => {
-        this.savingDoctorId.set(null);
-        alert(err.message);
+        this.errorCarga.set(err.message);
+        this.loading.set(false);
       },
     });
   }

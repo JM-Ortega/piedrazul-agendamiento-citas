@@ -30,6 +30,7 @@ import {
 import { PaginatedState } from '../../../shared/helpers/paginated-state';
 import { toIsoDateString } from '../../../shared/helpers/transform-date-local';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
+import { AppError } from '../../../shared/models/interfaces/api-error.model';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 
 type ExportColumnKey =
@@ -82,6 +83,7 @@ export class DoctorAllAppointmentsComponent {
   filterStatus = signal<FilterStatus>('all');
   filterDate = signal<FilterDate>('all');
   filterSpecificDate = signal<string>('');
+  errorCarga = signal('');
   showExportModal = signal(false);
   getMonthShort = getMonthShort;
   formatDate = formatLongDateEs;
@@ -150,6 +152,7 @@ export class DoctorAllAppointmentsComponent {
 
   // ── Data loading ──────────────────────────────────────────────────────────
   private loadData(pageNumber = 0): void {
+    this.errorCarga.set('');
     this.doctorService.getMe().subscribe({
       next: (doctor) => {
         if (!doctor) {
@@ -159,9 +162,15 @@ export class DoctorAllAppointmentsComponent {
         this.currentDoctor.set(doctor);
         this.doctorService
           .getAppointmentsByDoctor(doctor.id, pageNumber, this.PAGE_SIZE)
-          .subscribe((response) => this.appointmentsState.set(response));
+          .subscribe({
+            next: (response) => this.appointmentsState.set(response),
+            error: (err: AppError) => this.errorCarga.set(err.message),
+          });
       },
-      error: () => this.router.navigate(['/']),
+      error: (err: AppError) => {
+        this.errorCarga.set(err.message);
+        this.router.navigate(['/']);
+      },
     });
   }
 

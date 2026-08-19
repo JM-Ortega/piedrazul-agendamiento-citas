@@ -46,6 +46,12 @@
       @if (loadingSpecialties) {
         <p class="mt-2 text-sm text-gray-400">Cargando especialidades...</p>
       }
+      @if (loadError) {
+        <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
+          <svg lucideCircleAlert [size]="14"></svg>
+          {{ loadError }}
+        </p>
+      }
       @if (errors['specialty']) {
         <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
           <svg lucideCircleAlert [size]="14"></svg>
