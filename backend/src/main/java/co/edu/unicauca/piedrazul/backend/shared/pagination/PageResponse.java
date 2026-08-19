@@ -9,6 +9,7 @@ public record PageResponse<T>(
         int page,
         int totalPages,
         long totalElements
+
 ) {
 
     public static <T> PageResponse<T> from(Page<T> page) {

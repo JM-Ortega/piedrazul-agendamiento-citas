@@ -9,6 +9,8 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentS
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.BusySlotService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentConfigJpaRepository;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentConfigRepositoryImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.application.ListMyAppointmentsUseCaseImpl;
@@ -29,6 +31,12 @@ public class AppointmentConfig {
             AppointmentJpaRepository jpaRepository,
             AppointmentMapper mapper) {
         return new AppointmentRepositoryImpl(jpaRepository, mapper);
+    }
+
+    @Bean
+    public AppointmentConfigRepository appointmentConfigRepository(
+            AppointmentConfigJpaRepository jpaRepository) {
+        return new AppointmentConfigRepositoryImpl(jpaRepository);
     }
 
     // --- SERVICIOS DE DOMINIO (LÓGICA PURA) ---
@@ -56,14 +64,16 @@ public class AppointmentConfig {
             AppointmentService appointmentService,
             ApplicationEventPublisher eventPublisher,
             IsNewPatientUseCase isNewPatientUseCase,
-            SecurityContextExtractor securityExtractor) {
+            SecurityContextExtractor securityExtractor,
+            AppointmentConfigRepository appointmentConfigRepository) {
         return new AppointmentSchedulingService(
                 appointmentRepository,
                 doctorConfigConsultPort,
                 appointmentService,
                 eventPublisher,
                 isNewPatientUseCase,
-                securityExtractor
+                securityExtractor,
+                appointmentConfigRepository
         );
     }
 
@@ -152,4 +162,15 @@ public class AppointmentConfig {
     public GetAppointmentStatesUseCase getAppointmentStatesUseCase() {
         return new GetAppointmentStatesUseCaseImpl();
     }
+
+    @Bean
+    public UpdateAutonomousSchedulingUseCase updateAutonomousSchedulingUseCase(AppointmentConfigRepository appointmentConfigRepository) {
+        return new UpdateAutonomousSchedulingUseCaseImpl(appointmentConfigRepository);
+    }
+
+    @Bean
+    public GetAutonomousSchedulingContidionUseCase getAutonomousSchedulingContidionUseCase(AppointmentConfigRepository appointmentConfigRepository) {
+        return new GetAutonomousSchedulingContidionUseCaseImpl(appointmentConfigRepository);
+    }
+
 }
