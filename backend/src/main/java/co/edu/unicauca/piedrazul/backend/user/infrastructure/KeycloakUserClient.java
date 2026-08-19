@@ -189,8 +189,6 @@ public class KeycloakUserClient {
         }
     }
 
-     */
-
     /**
      * Fija la contraseña vigente de una cuenta existente. Uso interno del módulo:
      * no se expone en ninguna API pública, para que los consumidores pidan

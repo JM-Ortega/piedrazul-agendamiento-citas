@@ -22,6 +22,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientLinkFinalizer;
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientService;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientRepository;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.support.PostgresIntegrationSupport;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
@@ -126,10 +127,12 @@ class ManualSchedulingRollbackIT extends PostgresIntegrationSupport {
                 DoctorConfigConsultPort doctorConfigConsultPort,
                 AppointmentService appointmentService,
                 ApplicationEventPublisher eventPublisher,
-                IsNewPatientUseCaseImpl isNewPatientUseCase) {
+                IsNewPatientUseCaseImpl isNewPatientUseCase,
+                SecurityContextExtractor securityExtractor) {
             return new AppointmentSchedulingService(
                     appointmentRepository, doctorConfigConsultPort,
-                    appointmentService, eventPublisher, isNewPatientUseCase);
+                    appointmentService, eventPublisher, isNewPatientUseCase,
+                    securityExtractor);
         }
     }
 
