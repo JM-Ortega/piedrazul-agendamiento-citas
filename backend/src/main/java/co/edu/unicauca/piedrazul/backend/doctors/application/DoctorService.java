@@ -95,7 +95,7 @@ public class DoctorService implements DoctorProvisioningApi {
                 .orElse(null);
 
         if (doctor == null) {
-            return;
+            return; 
         }
 
         doctorRepository.delete(doctor);

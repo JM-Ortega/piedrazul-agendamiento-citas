@@ -1,16 +1,17 @@
 import {
   ChangeDetectionStrategy,
-  ChangeDetectorRef,
   Component,
   EventEmitter,
   Input,
   Output,
-  inject,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   LucideCalendarRange,
+  LucideChevronDown,
+  LucideChevronUp,
   LucideCircleAlert,
+  LucideCircleCheck,
   LucideClock,
   LucideDynamicIcon,
   LucideInfo,
@@ -52,6 +53,9 @@ export interface SpecialtyOption {
     SelectComponent,
     ToSelectOptionsPipe,
     DatepickerComponent,
+    LucideChevronDown,
+    LucideChevronUp,
+    LucideCircleCheck,
   ],
 })
 export class CreateUserDoctorFormComponent {
@@ -65,7 +69,42 @@ export class CreateUserDoctorFormComponent {
 
   @Output() dataChange = new EventEmitter<Partial<DoctorFormData>>();
   @Output() fieldBlurred = new EventEmitter<string>();
-  private cdr = inject(ChangeDetectorRef);
+
+  // ── Panel colapsable de horario ──────────────────────────────────────────
+  private scheduleOpened = false;
+
+  toggleSchedule(): void {
+    this.scheduleOpened = !this.scheduleOpened;
+  }
+
+  get isScheduleOpen(): boolean {
+    return this.scheduleOpened || this.hasScheduleErrors;
+  }
+
+  get hasScheduleData(): boolean {
+    const d = this.data;
+    return !!(
+      d.laborStart ||
+      d.laborEnd ||
+      d.startTime ||
+      d.endTime ||
+      d.interval ||
+      (d.workDays && d.workDays.length > 0) ||
+      d.bookingWindowWeeks
+    );
+  }
+
+  get hasScheduleErrors(): boolean {
+    return !!(
+      this.errors['laborStart'] ||
+      this.errors['laborEnd'] ||
+      this.errors['startTime'] ||
+      this.errors['endTime'] ||
+      this.errors['interval'] ||
+      this.errors['workDays'] ||
+      this.errors['bookingWindowWeeks']
+    );
+  }
 
   isSpecialtySelected(name: string): boolean {
     return this.data.specialty.includes(name);
