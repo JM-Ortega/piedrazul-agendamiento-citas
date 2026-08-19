@@ -11,8 +11,11 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.Appointm
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentScheduledEvent;
+import co.edu.unicauca.piedrazul.backend.appointment.events.ScheduledAppointmentEvent;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
-import co.edu.unicauca.piedrazul.backend.shared.events.audit.AppointmentCreatedEvent;
+import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,18 +30,22 @@ public class AppointmentSchedulingService {
     private final AppointmentService appointmentService;
     private final ApplicationEventPublisher eventPublisher;
     private final IsNewPatientUseCase isNewPatientUseCase;
+    private final SecurityContextExtractor securityExtractor;
+
 
     public AppointmentSchedulingService(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService,
             ApplicationEventPublisher eventPublisher,
-            IsNewPatientUseCase isNewPatientUseCase) {
+            IsNewPatientUseCase isNewPatientUseCase,
+            SecurityContextExtractor securityExtractor){
         this.appointmentRepository = appointmentRepository;
         this.doctorConfigConsultPort = doctorConfigConsultPort;
         this.appointmentService = appointmentService;
         this.eventPublisher = eventPublisher;
         this.isNewPatientUseCase = isNewPatientUseCase;
+        this.securityExtractor = securityExtractor;
     }
 
     @Transactional
@@ -114,7 +121,20 @@ public class AppointmentSchedulingService {
 
         Appointment saved = appointmentRepository.save(appointment);
 
-        eventPublisher.publishEvent(new AppointmentCreatedEvent(saved.getIdAppointment(), performedBy));
+        AppointmentEntity entity = new AppointmentEntity(saved.getIdAppointment(), saved.getIdDoctor(),saved.getIdPatient(),
+                saved.getSpecialty(), saved.getAppointmentState(), saved.getDate(), saved.getStartTime().getTime(), saved.getSchedulingOrigin());
+
+        String actorId = securityExtractor.currentActorId();
+        String actorRoles = securityExtractor.currentActorRoles();
+
+        eventPublisher.publishEvent(
+                ScheduledAppointmentEvent.of(
+                        entity,
+                        actorId,
+                        actorRoles,
+                        MDC.get("correlationId")
+                )
+        );
 
         eventPublisher.publishEvent(
                 new AppointmentScheduledEvent(

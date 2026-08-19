@@ -14,6 +14,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.
 import co.edu.unicauca.piedrazul.backend.appointment.application.ListMyAppointmentsUseCaseImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.CancelAppointmentUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.application.CancelAppointmentUseCaseImpl;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -54,13 +55,15 @@ public class AppointmentConfig {
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService,
             ApplicationEventPublisher eventPublisher,
-            IsNewPatientUseCase isNewPatientUseCase) {
+            IsNewPatientUseCase isNewPatientUseCase,
+            SecurityContextExtractor securityExtractor) {
         return new AppointmentSchedulingService(
                 appointmentRepository,
                 doctorConfigConsultPort,
                 appointmentService,
                 eventPublisher,
-                isNewPatientUseCase
+                isNewPatientUseCase,
+                securityExtractor
         );
     }
 

@@ -16,7 +16,5 @@ public interface ClinicalHistoryExternalService {
     //Solo necesita saber qué puede pedirle
 
     void registerClinicalHistory(ClinicalHistoryRequest request);
-
-    Page<ClinicalHistoryResponse> getHistoryByPatient(UUID idPatient, Pageable pageable);
 }
 

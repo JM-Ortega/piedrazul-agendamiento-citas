@@ -1,7 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.user.infrastructure;
 
 import co.edu.unicauca.piedrazul.backend.config.security.KeycloakProperties;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsException;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +16,7 @@ import org.keycloak.representations.idm.UserRepresentation;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +43,12 @@ class KeycloakUserClientTest {
     private KeycloakProperties props;
 
     @Mock
+    private  ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private  SecurityContextExtractor securityExtractor;
+
+    @Mock
     private RealmResource realmResource;
 
     @Mock
@@ -64,7 +73,7 @@ class KeycloakUserClientTest {
 
     @BeforeEach
     void setUp() {
-        keycloakUserClient = new KeycloakUserClient(keycloak, props);
+        keycloakUserClient = new KeycloakUserClient(keycloak, props, securityExtractor, eventPublisher);
     }
 
     @Test
@@ -150,7 +159,7 @@ class KeycloakUserClientTest {
 
         when(roleScopeResource.listAll()).thenReturn(List.of(doctorRole, schedulerRole));
 
-        List<String> result = keycloakUserClient.getUserRoles(userId);
+        List<String> result = keycloakUserClient.getUserRoles(userId.toString());
 
         assertEquals(List.of(Role.DOCTOR.name(), Role.SCHEDULER.name()), result);
         verify(roleScopeResource).listAll();

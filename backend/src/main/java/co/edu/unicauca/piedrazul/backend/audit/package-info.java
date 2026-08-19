@@ -1,4 +1,4 @@
-@ApplicationModule(allowedDependencies = {"shared :: events", "shared :: audit-events"})
+@ApplicationModule(allowedDependencies = {"shared :: audit-events", "shared :: enums", "appointment :: output-dto", "shared :: pagination", "appointment :: events", "user :: events", "doctors :: events", "clinicalHistory :: events"})
 package co.edu.unicauca.piedrazul.backend.audit;
 
 import org.springframework.modulith.ApplicationModule;

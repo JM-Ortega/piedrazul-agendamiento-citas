@@ -48,4 +48,16 @@ public class AppointmentEntity {
     @Column(name = "scheduling_origin", nullable = false, length = 20)
     private SchedulingOrigin schedulingOrigin;
 
+    public AppointmentEntity(UUID idAppointment, UUID idDoctor, UUID idPatient, SpecialtyCode specialty,
+                             AppointmentState appointmentState, LocalDate date, LocalTime startTime,
+                             SchedulingOrigin schedulingOrigin) {
+        this.idAppointment = idAppointment;
+        this.idDoctor = idDoctor;
+        this.idPatient = idPatient;
+        this.specialty = specialty;
+        this.appointmentState = appointmentState;
+        this.date = date;
+        this.startTime = startTime;
+        this.schedulingOrigin = schedulingOrigin;
+    }
 }
