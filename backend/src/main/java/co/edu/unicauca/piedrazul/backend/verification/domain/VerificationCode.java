@@ -80,10 +80,6 @@ public class VerificationCode {
         this.attempts++;
     }
 
-    public void markAsUsed() {
-        this.used = true;
-    }
-
     public void invalidate() {
         this.used = true;
     }

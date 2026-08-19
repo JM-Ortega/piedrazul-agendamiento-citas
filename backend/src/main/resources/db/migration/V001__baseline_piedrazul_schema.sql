@@ -243,8 +243,7 @@ CREATE TABLE piedrazul.doctor (
     appointment_interval    INTEGER NOT NULL,
 
     CONSTRAINT pk_doctor PRIMARY KEY (person_id),
-    CONSTRAINT fk_doctor_person FOREIGN KEY (person_id) REFERENCES piedrazul.person(id),
-    CONSTRAINT ck_doctor_booking_window_weeks CHECK (booking_window_weeks > 0)
+    CONSTRAINT fk_doctor_person FOREIGN KEY (person_id) REFERENCES piedrazul.person(id)
 );
 
 -- ---------------------------------------------------------------------

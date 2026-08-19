@@ -4,11 +4,8 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorR
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorDetailedResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.*;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorInvalidSpecialty;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
@@ -16,10 +13,12 @@ import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.Spec
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class DoctorService implements DoctorProvisioningApi {
     private final DoctorRepository doctorRepository;
@@ -42,14 +41,17 @@ public class DoctorService implements DoctorProvisioningApi {
 
         validateLaborDateRange(request.laborStart(), request.laborEnd());
 
+        int weeks = request.bookingWindowWeeks() != null ? request.bookingWindowWeeks() : 0;
+        int interval = request.appointmentInterval() != null ? request.appointmentInterval() : 0;
+
         // Lo dejamos inactivo porque no tiene horarios
         Doctor doctor = new Doctor(
                 personId,
                 request.laborStart(),
                 request.laborEnd(),
-                request.bookingWindowWeeks(),
+                weeks,
                 false,
-                request.appointmentInterval()
+                interval
         );
 
         // Agregamos las especialidades
@@ -178,20 +180,53 @@ public class DoctorService implements DoctorProvisioningApi {
 
     public Page<DoctorDetailedResponse> findAllDoctorsDetailed(Pageable pageable) {
 
-        Page<Doctor> doctors = doctorRepository.findAll(pageable);
+        boolean isSortingByName = pageable.getSort().stream()
+                .anyMatch(order -> order.getProperty().equalsIgnoreCase("name"));
 
-        List<UUID> ids = doctors.getContent()
-                .stream()
-                .map(Doctor::getPersonId)
-                .toList();
+        if (isSortingByName) {
+            // 1. Si ordena por nombre (externo), obtenemos TODOS los médicos de BD sin paginar
+            List<Doctor> allDoctors = doctorRepository.findAll();
 
-        Map<UUID, String> names = personExternalService.getPersonNames(ids);
+            List<UUID> allIds = allDoctors.stream().map(Doctor::getPersonId).toList();
+            Map<UUID, String> allNames = personExternalService.getPersonNames(allIds);
 
-        return doctors.map(doctor ->
-                DoctorDetailedResponse.fromEntity(
-                        doctor,
-                        names.get(doctor.getPersonId())
-                ));
+            // 2. Mapeamos a DTO
+            List<DoctorDetailedResponse> allResponses = allDoctors.stream()
+                    .map(doctor -> DoctorDetailedResponse.fromEntity(doctor, allNames.get(doctor.getPersonId())))
+                    .collect(Collectors.toList());
+
+            // 3. Ordenamos por nombre
+            boolean isDescending = pageable.getSort().getOrderFor("name").isDescending();
+            Comparator<DoctorDetailedResponse> nameComparator = Comparator.comparing(
+                    d -> d.name() == null ? "" : d.name(),
+                    String.CASE_INSENSITIVE_ORDER
+            );
+            if (isDescending) {
+                nameComparator = nameComparator.reversed();
+            }
+            allResponses.sort(nameComparator);
+
+            // 4. Paginamos manualmente
+            int total = allResponses.size();
+            int start = (int) pageable.getOffset();
+            int end = Math.min((start + pageable.getPageSize()), total);
+
+            if (start >= total) {
+                return new PageImpl<>(List.of(), pageable, total);
+            }
+
+            List<DoctorDetailedResponse> pagedResponses = allResponses.subList(start, end);
+            return new PageImpl<>(pagedResponses, pageable, total);
+
+        } else {
+            // 5. Para cualquier otro campo propio (laborStart, status, etc.), la BD se encarga
+            Page<Doctor> doctors = doctorRepository.findAll(pageable);
+
+            List<UUID> ids = doctors.getContent().stream().map(Doctor::getPersonId).toList();
+            Map<UUID, String> names = personExternalService.getPersonNames(ids);
+
+            return doctors.map(doctor -> DoctorDetailedResponse.fromEntity(doctor, names.get(doctor.getPersonId())));
+        }
     }
 
     public Doctor findByUserId(UUID keycloakId) {
@@ -217,6 +252,10 @@ public class DoctorService implements DoctorProvisioningApi {
                 .stream()
                 .map(SpecialtyCode::valueOf)
                 .toList();
+
+        if (activeSpecialties.isEmpty()) {
+            throw new NoAvailableDoctorsException("No hay médicos activos disponibles");
+        }
 
         if (idPatient == null || appointmentExternalService.isNewPatient(idPatient)) {
             return activeSpecialties.contains(SpecialtyCode.MEDICINA_GENERAL)
@@ -268,4 +307,5 @@ public class DoctorService implements DoctorProvisioningApi {
 
         doctorRepository.save(doctor);
     }
+
 }

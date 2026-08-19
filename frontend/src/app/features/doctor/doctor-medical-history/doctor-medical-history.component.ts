@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
   OnInit,
   signal,
@@ -49,11 +50,15 @@ export class DoctorMedicalHistoryComponent implements OnInit {
   private readonly idAppointment = signal<string>('');
   readonly saveError = signal('');
   readonly isSaving = signal(false);
+  readonly hasMoreRecords = computed(() => this.doctorService.hasMoreRecords);
+  readonly isLoadingRecords = this.doctorService.isLoadingRecords;
 
   ngOnInit(): void {
     const idAppointment =
       this.route.snapshot.paramMap.get('idAppointment') ?? '';
     this.idAppointment.set(idAppointment);
+
+    this.doctorService.resetMedicalRecords();
 
     this.doctorService
       .getPatientByAppointment(idAppointment)
@@ -61,6 +66,13 @@ export class DoctorMedicalHistoryComponent implements OnInit {
         this.patient.set(patient);
         this.doctorService.loadMedicalRecordsByPatient(patient.id);
       });
+  }
+
+  loadMoreRecords(): void {
+    const patientId = this.patient()?.id;
+    if (patientId) {
+      this.doctorService.loadMedicalRecordsByPatient(patientId);
+    }
   }
 
   confirmAttendanceAndExit(): void {
@@ -76,6 +88,7 @@ export class DoctorMedicalHistoryComponent implements OnInit {
       .updateAppointmentAsAttended(idCita, observation)
       .subscribe({
         next: () => {
+          this.doctorService.resetMedicalRecords();
           this.router.navigate(['/medico']);
         },
         error: (err) => {

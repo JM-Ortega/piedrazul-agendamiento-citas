@@ -68,8 +68,8 @@ public class AppointmentConfig {
     }
 
     @Bean
-    public ManualPatientResolutionStrategy manualPatientResolutionStrategy(PatientConsultPort patientConsultPort) {
-        return new ManualPatientResolutionStrategy(patientConsultPort);
+    public ManualPatientResolutionStrategy manualPatientResolutionStrategy(PatientProvisioningPort patientProvisioningPort) {
+        return new ManualPatientResolutionStrategy(patientProvisioningPort);
     }
 
     @Bean

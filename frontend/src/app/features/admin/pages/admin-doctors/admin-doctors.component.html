@@ -174,7 +174,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       @for (
                         specialty of specialtiesList;
-                        track specialty.name
+                        track specialty.value
                       ) {
                         <app-button
                           variant="chip"
@@ -196,7 +196,7 @@
                             "
                           ></svg>
                           <span class="flex-1 text-left">{{
-                            specialty.name
+                            specialty.label
                           }}</span>
                           @if (editingSpecialties().includes(specialty.value)) {
                             <div

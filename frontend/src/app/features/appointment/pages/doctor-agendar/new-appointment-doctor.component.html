@@ -28,6 +28,8 @@
     <app-appointment-booking
       context="doctor"
       [documentNumber]="patientDocument()"
+      [prefillSpecialty]="prefillSpecialty()"
+      [prefillDoctorId]="prefillDoctorId()"
       (goBack)="goToDashboard()"
     ></app-appointment-booking>
   </div>

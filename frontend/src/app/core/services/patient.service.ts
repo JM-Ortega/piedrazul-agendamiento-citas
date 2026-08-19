@@ -111,4 +111,14 @@ export class PatientService {
   getAllDocumentTypes(): Observable<string[]> {
     return this.http.get<string[]>(`${this.apiUrl}/patients/document-types`);
   }
+
+  /**
+   * Resetea todo el estado en memoria y la caché del servicio antes de cerrar sesión.
+   */
+  clearAllData(): void {
+    this.me.set(null);
+    this.me$ = null;
+    this.medicalRecords.set([]);
+    this.error.set(null);
+  }
 }

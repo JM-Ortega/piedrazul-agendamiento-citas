@@ -26,5 +26,4 @@ public interface AppointmentJpaRepository extends JpaRepository<AppointmentEntit
 
     boolean existsByIdPatientAndAppointmentStateIn(UUID idPatient, Collection<AppointmentState> appointmentStates);
 
-
 }

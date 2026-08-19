@@ -8,26 +8,27 @@ import {
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
-  LucideActivity,
   LucideArrowLeft,
-  LucideBone,
-  LucideBuilding2,
   LucideCircleAlert,
   LucideCreditCard,
   LucideDynamicIcon,
   LucideEye,
   LucideEyeOff,
-  LucideHeart,
   LucideMail,
   LucidePhone,
   LucideUser,
   LucideUserPlus,
-  LucideZap,
-  type LucideIcon,
 } from '@lucide/angular';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { InputComponent } from '../../../../design-system/atoms/input/input.component';
 import { SelectComponent } from '../../../../design-system/atoms/select/select.component';
+import {
+  getDocumentIdMaxLength,
+  getDocumentIdSanitize,
+  validateDocumentForType,
+} from '../../../../shared/helpers/document-validation';
+import { getSpecialtyMeta } from '../../../../shared/helpers/specialty-catalog';
+import { timeToMinutes } from '../../../../shared/helpers/time-utils';
 import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 import {
   CreateUserDoctorFormComponent,
@@ -113,10 +114,10 @@ export class AdminCreateUserComponent implements OnInit {
     specialty: [],
     laborStart: '',
     laborEnd: '',
-    interval: 20,
-    workDays: [1, 2, 3, 4, 5],
-    startTime: '08:00',
-    endTime: '12:00',
+    interval: null,
+    workDays: [],
+    startTime: '',
+    endTime: '',
     bookingWindowWeeks: 0,
   };
   private readonly FIELD_ORDER: (keyof FormErrors)[] = [
@@ -177,8 +178,8 @@ export class AdminCreateUserComponent implements OnInit {
   }
   get shiftDurationMinutes() {
     return (
-      this.timeToMinutes(this.userForm.endTime) -
-      this.timeToMinutes(this.userForm.startTime)
+      timeToMinutes(this.userForm.endTime) -
+      timeToMinutes(this.userForm.startTime)
     );
   }
   get maxInterval() {
@@ -199,15 +200,27 @@ export class AdminCreateUserComponent implements OnInit {
       bookingWindowWeeks: this.userForm.bookingWindowWeeks,
     };
   }
-
+  get isScheduleGroupTouched(): boolean {
+    const f = this.userForm;
+    return !!(
+      f.laborStart ||
+      f.laborEnd ||
+      f.startTime ||
+      f.endTime ||
+      f.interval ||
+      (f.workDays && f.workDays.length > 0) ||
+      f.bookingWindowWeeks
+    );
+  }
+  // ── OnInit ────────────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.loadingSpecialties = true;
     this.adminService.getAllSpecialties().subscribe({
       next: (data) => {
-        this.specialtyOptions = data.map((name) => ({
-          name,
-          ...this.getSpecialtyIcon(name),
-        }));
+        this.specialtyOptions = data.map((name) => {
+          const meta = getSpecialtyMeta(name);
+          return { name, icon: meta.icon, colorClass: meta.color };
+        });
         this.loadingSpecialties = false;
         this.cdr.markForCheck();
       },
@@ -241,15 +254,29 @@ export class AdminCreateUserComponent implements OnInit {
     if (this.submitted) this.validateField('roles');
   }
 
+  private readonly SCHEDULE_GROUP_FIELDS: (keyof FormErrors)[] = [
+    'laborStart',
+    'laborEnd',
+    'startTime',
+    'endTime',
+    'interval',
+    'workDays',
+    'bookingWindowWeeks',
+  ];
+
   onDoctorFormChange(patch: Partial<DoctorFormData>): void {
     Object.assign(this.userForm, patch);
     if (this.submitted) {
-      (Object.keys(patch) as (keyof FormErrors)[]).forEach((k) =>
-        this.validateField(k)
+      const patchedKeys = Object.keys(patch) as (keyof FormErrors)[];
+      const touchesGroup = patchedKeys.some((k) =>
+        this.SCHEDULE_GROUP_FIELDS.includes(k)
       );
+      const fieldsToValidate = touchesGroup
+        ? Array.from(new Set([...patchedKeys, ...this.SCHEDULE_GROUP_FIELDS]))
+        : patchedKeys;
+      fieldsToValidate.forEach((k) => this.validateField(k));
     }
   }
-
   // ── Submit ────────────────────────────────────────────────────────────────
   openConfirmModal(): void {
     this.submitted = true;
@@ -306,7 +333,7 @@ export class AdminCreateUserComponent implements OnInit {
             specialty: this.userForm.specialty,
             laborStart: this.userForm.laborStart,
             laborEnd: this.userForm.laborEnd,
-            appointmentInterval: this.userForm.interval,
+            appointmentInterval: this.userForm.interval ?? 0,
             schedules: this.userForm.workDays.map((day) => ({
               workday: DAY_VALUE_TO_WORKDAY[day],
               startTime: `${this.userForm.startTime}:00`,
@@ -346,14 +373,17 @@ export class AdminCreateUserComponent implements OnInit {
 
   private computeFieldError(field: keyof FormErrors): string | undefined {
     switch (field) {
-      case 'documentId':
-        if (!this.userForm.documentId.trim()) {
+      case 'documentId': {
+        const trimmed = this.userForm.documentId.trim();
+        if (!trimmed) {
           return 'El documento de identidad es obligatorio.';
         }
-        if (!/^\d{5,15}$/.test(this.userForm.documentId)) {
-          return 'Debe contener entre 5 y 15 dígitos numéricos.';
-        }
-        return undefined;
+        const formatError = validateDocumentForType(
+          this.userForm.identificationType,
+          trimmed
+        );
+        return formatError || undefined;
+      }
 
       case 'password':
         if (!this.userForm.password) {
@@ -416,7 +446,8 @@ export class AdminCreateUserComponent implements OnInit {
           : undefined;
 
       case 'laborStart':
-        if (!this.hasDoctorRole) return undefined;
+        if (!this.hasDoctorRole || !this.isScheduleGroupTouched)
+          return undefined;
         if (!this.userForm.laborStart) {
           return 'La fecha de inicio laboral es obligatoria.';
         }
@@ -432,7 +463,8 @@ export class AdminCreateUserComponent implements OnInit {
         return undefined;
 
       case 'laborEnd':
-        if (!this.hasDoctorRole) return undefined;
+        if (!this.hasDoctorRole || !this.isScheduleGroupTouched)
+          return undefined;
         if (!this.userForm.laborEnd) {
           return 'La fecha de fin laboral es obligatoria.';
         }
@@ -448,39 +480,64 @@ export class AdminCreateUserComponent implements OnInit {
         return undefined;
 
       case 'startTime': {
-        const start = this.timeToMinutes(this.userForm.startTime);
-        const end = this.timeToMinutes(this.userForm.endTime);
+        if (!this.hasDoctorRole || !this.isScheduleGroupTouched)
+          return undefined;
+        if (!this.userForm.startTime) {
+          return 'La hora de inicio es obligatoria.';
+        }
+        const start = timeToMinutes(this.userForm.startTime);
+        const end = timeToMinutes(this.userForm.endTime);
         return this.userForm.endTime && start >= end
           ? 'La hora de inicio no puede ser igual o posterior a la hora de fin.'
           : undefined;
       }
 
       case 'endTime': {
-        const end = this.timeToMinutes(this.userForm.endTime);
-        const start = this.timeToMinutes(this.userForm.startTime);
+        if (!this.hasDoctorRole || !this.isScheduleGroupTouched)
+          return undefined;
+        if (!this.userForm.endTime) {
+          return 'La hora de fin es obligatoria.';
+        }
+        const end = timeToMinutes(this.userForm.endTime);
+        const start = timeToMinutes(this.userForm.startTime);
         return this.userForm.startTime && start >= end
           ? 'La hora de fin debe ser posterior a la hora de inicio.'
           : undefined;
       }
 
       case 'interval': {
-        const duration = this.shiftDurationMinutes;
+        if (!this.hasDoctorRole || !this.isScheduleGroupTouched)
+          return undefined;
         if (!this.userForm.interval || this.userForm.interval < 10) {
           return 'El intervalo mínimo es 10 minutos.';
         }
-        if (this.userForm.interval > duration) {
+        const duration = this.shiftDurationMinutes;
+        if (duration > 0 && this.userForm.interval > duration) {
           return `El intervalo no puede superar la duración del turno (${duration} min).`;
         }
         return undefined;
       }
-      case 'bookingWindowWeeks':
-        return this.hasDoctorRole && !this.userForm.bookingWindowWeeks
-          ? 'Debe seleccionar la ventana de reserva en semanas.'
-          : undefined;
+
       case 'workDays':
-        return this.hasDoctorRole && this.userForm.workDays.length === 0
+        if (!this.hasDoctorRole || !this.isScheduleGroupTouched)
+          return undefined;
+        return this.userForm.workDays.length === 0
           ? 'Debe seleccionar al menos un día de atención.'
           : undefined;
+
+      case 'bookingWindowWeeks':
+        if (!this.hasDoctorRole || !this.isScheduleGroupTouched)
+          return undefined;
+        if (!this.userForm.bookingWindowWeeks) {
+          return 'Debe indicar la ventana de reserva en semanas.';
+        }
+        if (
+          this.userForm.bookingWindowWeeks < 1 ||
+          this.userForm.bookingWindowWeeks > 10
+        ) {
+          return 'La ventana de reserva debe estar entre 1 y 10 semanas.';
+        }
+        return undefined;
 
       default:
         return undefined;
@@ -513,23 +570,6 @@ export class AdminCreateUserComponent implements OnInit {
     return Object.values(this.errors).every((e) => !e);
   }
 
-  private timeToMinutes(t: string): number {
-    if (!t) return 0;
-    const [h, m] = t.split(':').map(Number);
-    return h * 60 + m;
-  }
-  private getSpecialtyIcon(name: string): {
-    icon: LucideIcon;
-    colorClass: string;
-  } {
-    const map: Record<string, { icon: LucideIcon; colorClass: string }> = {
-      MEDICINA_GENERAL: { icon: LucideHeart, colorClass: 'text-red-700' },
-      QUIROPRAXIA: { icon: LucideBone, colorClass: 'text-orange-700' },
-      FISIOTERAPIA: { icon: LucideActivity, colorClass: 'text-green-700' },
-      TERAPIA_NEURAL: { icon: LucideZap, colorClass: 'text-purple-700' },
-    };
-    return map[name] ?? { icon: LucideBuilding2, colorClass: 'text-gray-400' };
-  }
   inputClass(field: keyof FormErrors, extra = ''): string {
     return (
       'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 ' +
@@ -538,5 +578,12 @@ export class AdminCreateUserComponent implements OnInit {
         : 'border-gray-300 focus:ring-blue-500 ') +
       extra
     );
+  }
+  getDocumentIdMaxLength(): number {
+    return getDocumentIdMaxLength(this.userForm.identificationType);
+  }
+
+  getDocumentIdSanitize(): 'numeric' | 'alphanumeric' {
+    return getDocumentIdSanitize(this.userForm.identificationType);
   }
 }

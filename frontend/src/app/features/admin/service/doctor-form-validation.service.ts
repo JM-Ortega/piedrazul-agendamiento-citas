@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { timeToMinutes } from '../../../shared/helpers/time-utils';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 
 export interface FormErrors {
@@ -13,20 +14,13 @@ export interface FormErrors {
 
 @Injectable({ providedIn: 'root' })
 export class DoctorFormValidationService {
-  timeToMinutes(time: string): number {
-    if (!time) return 0;
-    const [h, m] = time.split(':').map(Number);
-    return h * 60 + m;
-  }
-
   validateFranjaVsIntervalo(
     startTime: string,
     endTime: string,
     interval: number
   ): string {
     if (!startTime || !endTime || startTime >= endTime) return '';
-    const duracion =
-      this.timeToMinutes(endTime) - this.timeToMinutes(startTime);
+    const duracion = timeToMinutes(endTime) - timeToMinutes(startTime);
     if (duracion < interval) {
       return `La franja horaria (${duracion} min) no puede ser menor al intervalo (${interval} min).`;
     }
@@ -97,15 +91,13 @@ export class DoctorFormValidationService {
   horariosValidos(form: Doctor): boolean {
     if (!form.startTime || !form.endTime || form.startTime >= form.endTime)
       return false;
-    const dur =
-      this.timeToMinutes(form.endTime) - this.timeToMinutes(form.startTime);
+    const dur = timeToMinutes(form.endTime) - timeToMinutes(form.startTime);
     if (dur < form.appointmentInterval) return false;
     for (const day of form.workdays ?? []) {
       const ds = form.daySchedules?.[day];
       if (ds) {
         if (ds.startTime >= ds.endTime) return false;
-        const d =
-          this.timeToMinutes(ds.endTime) - this.timeToMinutes(ds.startTime);
+        const d = timeToMinutes(ds.endTime) - timeToMinutes(ds.startTime);
         if (d < form.appointmentInterval) return false;
       }
     }

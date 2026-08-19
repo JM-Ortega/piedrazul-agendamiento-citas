@@ -81,7 +81,7 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
         List<UUID> doctors = doctorConfigConsultPort.getActiveDoctorIds();
 
         if (doctors.isEmpty()) {
-            throw new NoAvailableDoctorsException("No hay medicos activos con disponibilidad.");
+            throw new NoAvailableDoctorsException("No hay médicos activos disponibles");
         }
 
         return doctors;
@@ -91,7 +91,7 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
         List<UUID> doctors = doctorConfigConsultPort.getActiveGeneralDoctorIds();
 
         if (doctors.isEmpty()) {
-            throw new NoAvailableDoctorsException("No hay medicos activos con disponibilidad.");
+            throw new NoAvailableDoctorsException("No hay médicos activos disponibles");
         }
 
         return doctors;

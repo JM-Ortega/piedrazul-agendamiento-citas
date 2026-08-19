@@ -4,6 +4,8 @@ import co.edu.unicauca.piedrazul.backend.config.security.KeycloakProperties;
 import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsException;
+import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +24,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -312,6 +315,39 @@ class KeycloakUserClientTest {
         keycloakUserClient.deleteUser(userId);
 
         verify(userResource).remove();
+    }
+
+    @Test
+    void createUserShouldTranslateConflictIntoUserAlreadyExists() {
+        mockRealm();
+        when(realmResource.users()).thenReturn(usersResource);
+
+        Response conflict = Response.status(Response.Status.CONFLICT).build();
+        when(usersResource.create(any(UserRepresentation.class))).thenReturn(conflict);
+
+        assertThrows(UserAlreadyExistsException.class, () -> keycloakUserClient.createUser(
+                "1061234567", "Ana", "Ruiz", "ana@example.com", "Secreta123"));
+
+        // No se intenta recuperar ni adoptar la cuenta existente.
+        verify(usersResource, never()).searchByUsername(any(), any());
+    }
+
+    @Test
+    void createUserShouldReturnCreatedUserWithIdFromLocationHeader() {
+        mockRealm();
+        when(realmResource.users()).thenReturn(usersResource);
+
+        UUID createdId = UUID.randomUUID();
+        Response created = Response.status(Response.Status.CREATED)
+                .header("Location", "http://kc/admin/realms/" + REALM + "/users/" + createdId)
+                .build();
+        when(usersResource.create(any(UserRepresentation.class))).thenReturn(created);
+
+        UserRepresentation result = keycloakUserClient.createUser(
+                "1061234567", "Ana", "Ruiz", "ana@example.com", "Secreta123");
+
+        assertEquals(createdId.toString(), result.getId());
+        assertEquals("1061234567", result.getUsername());
     }
 
     private void mockRealm() {

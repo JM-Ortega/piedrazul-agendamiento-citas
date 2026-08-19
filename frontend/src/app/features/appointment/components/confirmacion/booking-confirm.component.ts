@@ -10,12 +10,13 @@ import {
   LucideUserSearch,
 } from '@lucide/angular';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
-import { mapHttpError } from '../../../../shared/helpers/http-errors';
 import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { NewAppointment } from '../../models/dtos/newAppointment.dto';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
+import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+
 /**
  * Mostrar el resumen completo de la cita a confirmar
  * y ejecutar la llamada al backend para registrarla.
@@ -41,6 +42,10 @@ export class BookingConfirmComponent {
   confirmed = output<void>();
   back = output<void>();
 
+  /**
+   * Envía la cita al backend. Todos los errores muestran
+   * el mensaje que resuelve el interceptor.
+   */
   confirm(): void {
     const date = this.state.selectedDate();
     if (!date || !this.state.selectedTime() || !this.state.effectiveDoctorId())
@@ -57,19 +62,9 @@ export class BookingConfirmComponent {
         this.state.success.set(true);
         this.confirmed.emit();
       },
-      error: (err) => {
+      error: (err: AppError) => {
         this.state.isLoading.set(false);
-
-        const errorCode = err.error?.errorCode;
-        const isBusinessConflict =
-          errorCode === 'PATIENT_TIME_CONFLICT' ||
-          errorCode === 'PATIENT_SPECIALTY_CONFLICT';
-
-        this.state.errorMessage.set(
-          isBusinessConflict
-            ? err.error?.detail
-            : mapHttpError(err, 'Error inesperado al registrar la cita.')
-        );
+        this.state.errorMessage.set(err.message);
       },
     });
   }

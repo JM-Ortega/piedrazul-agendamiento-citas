@@ -10,6 +10,7 @@ import co.edu.unicauca.piedrazul.backend.user.exception.IdentityProviderExceptio
 import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
+import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsException;
 import jakarta.ws.rs.core.Response;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
@@ -186,6 +187,25 @@ public class KeycloakUserClient {
         } catch (Exception ex) {
             return "[]";
         }
+    }
+
+     */
+
+    /**
+     * Fija la contraseña vigente de una cuenta existente. Uso interno del módulo:
+     * no se expone en ninguna API pública, para que los consumidores pidan
+     * capacidades de negocio y no mecánica de Keycloak.
+     */
+    public void resetPassword(UUID keycloakId, String password) {
+        CredentialRepresentation credential = new CredentialRepresentation();
+        credential.setType(CredentialRepresentation.PASSWORD);
+        credential.setValue(password);
+        credential.setTemporary(false);
+
+        keycloak.realm(props.getRealm())
+                .users()
+                .get(keycloakId.toString())
+                .resetPassword(credential);
     }
 
     public void deleteUser(UUID keycloakId) {
