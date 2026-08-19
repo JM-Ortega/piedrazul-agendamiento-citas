@@ -13,5 +13,5 @@ export interface UserForm {
   workDays: number[];
   startTime: string;
   endTime: string;
-  bookingWindowWeeks: number;
+  bookingWindowWeeks: number | null;
 }
