@@ -85,6 +85,7 @@ export class DoctorEditFormComponent implements OnInit {
 
   // ── Inputs / Outputs ──────────────────────────────────────────────────────
   doctor = input.required<Doctor>();
+  isSaving = input(false);
   saved = output<DoctorSaveEvent>();
   cancelled = output<void>();
 
@@ -137,6 +138,7 @@ export class DoctorEditFormComponent implements OnInit {
     const form = this.editForm();
     if (!form) return false;
     return (
+      !this.isSaving() &&
       this.hasChanges() &&
       !errs.horarioGlobal &&
       !errs.fechas &&
