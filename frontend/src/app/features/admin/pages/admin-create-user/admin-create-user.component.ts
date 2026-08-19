@@ -29,6 +29,7 @@ import {
 import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
 import { getSpecialtyMeta } from '../../../../shared/helpers/specialty-catalog';
 import { timeToMinutes } from '../../../../shared/helpers/time-utils';
+import { DAY_TO_WORKDAY } from '../../../../shared/helpers/workday.util';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 import {
@@ -46,14 +47,11 @@ import { UserFormValidationService } from '../../service/user-form-validation.se
 
 type Role = 'doctor' | 'scheduler';
 
-const DAY_VALUE_TO_WORKDAY: Record<number, string> = {
-  1: 'LUNES',
-  2: 'MARTES',
-  3: 'MIERCOLES',
-  4: 'JUEVES',
-  5: 'VIERNES',
-};
-
+/**
+ * Formulario de creación de usuario (doctor y/o scheduler). Arma el
+ * payload combinando datos de cuenta y, si aplica, datos de doctor
+ * (especialidad, horario), y delega la validación a UserFormValidationService.
+ */
 @Component({
   selector: 'app-admin-create-user',
   standalone: true,
@@ -79,9 +77,32 @@ const DAY_VALUE_TO_WORKDAY: Record<number, string> = {
   templateUrl: './admin-create-user.component.html',
 })
 export class AdminCreateUserComponent implements OnInit {
+  // ── Iconos ────────────────────────────────────────────────────────────────
   readonly Eye = LucideEye;
   readonly EyeOff = LucideEyeOff;
 
+  // ── Constantes ────────────────────────────────────────────────────────────
+  daysOfWeek = [
+    { value: 1, label: 'Lunes' },
+    { value: 2, label: 'Martes' },
+    { value: 3, label: 'Miércoles' },
+    { value: 4, label: 'Jueves' },
+    { value: 5, label: 'Viernes' },
+  ];
+  /** Opciones de hora de 07:00 a 12:00 en pasos de 5 minutos. */
+  readonly timeOptions: string[] = (() => {
+    const opts: string[] = [];
+    for (let h = 7; h <= 12; h++)
+      for (let m = 0; m < 60; m += 5) {
+        if (h === 12 && m > 0) break;
+        opts.push(
+          `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+        );
+      }
+    return opts;
+  })();
+
+  // ── Estado ────────────────────────────────────────────────────────────────
   showPassword = false;
   selectedRoles: Role[] = ['doctor'];
   errors: FormErrors = {};
@@ -94,14 +115,6 @@ export class AdminCreateUserComponent implements OnInit {
   documentTypes: string[] = [];
   loadingSpecialties = false;
   loadingDocumentTypes = false;
-
-  daysOfWeek = [
-    { value: 1, label: 'Lunes' },
-    { value: 2, label: 'Martes' },
-    { value: 3, label: 'Miércoles' },
-    { value: 4, label: 'Jueves' },
-    { value: 5, label: 'Viernes' },
-  ];
 
   userForm: UserForm = {
     documentId: '',
@@ -121,42 +134,42 @@ export class AdminCreateUserComponent implements OnInit {
     bookingWindowWeeks: null,
   };
 
-  readonly timeOptions: string[] = (() => {
-    const opts: string[] = [];
-    for (let h = 7; h <= 12; h++)
-      for (let m = 0; m < 60; m += 5) {
-        if (h === 12 && m > 0) break;
-        opts.push(
-          `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-        );
-      }
-    return opts;
-  })();
-
+  // ── Inyecciones ───────────────────────────────────────────────────────────
   private router = inject(Router);
   private adminService = inject(AdminService);
   private validation = inject(UserFormValidationService);
   private cdr = inject(ChangeDetectorRef);
 
   // ── Getters ───────────────────────────────────────────────────────────────
+  /** True si el rol 'doctor' está seleccionado. */
   get hasDoctorRole() {
     return this.selectedRoles.includes('doctor');
   }
+
+  /** True si el rol 'scheduler' está seleccionado. */
   get hasSchedulerRole() {
     return this.selectedRoles.includes('scheduler');
   }
+
+  /** Duración del turno en minutos, según startTime/endTime del formulario. */
   get shiftDurationMinutes() {
     return (
       timeToMinutes(this.userForm.endTime) -
       timeToMinutes(this.userForm.startTime)
     );
   }
+
+  /** Intervalo máximo permitido entre citas (no menor a 10 minutos). */
   get maxInterval() {
     return Math.max(this.shiftDurationMinutes, 10);
   }
+
+  /** Mapa de número de día a su etiqueta, derivado de daysOfWeek. */
   get dayLabels(): Record<number, string> {
     return Object.fromEntries(this.daysOfWeek.map((d) => [d.value, d.label]));
   }
+
+  /** Subconjunto de userForm que consume el sub-formulario de doctor. */
   get doctorFormData(): DoctorFormData {
     return {
       specialty: this.userForm.specialty,
@@ -170,7 +183,8 @@ export class AdminCreateUserComponent implements OnInit {
     };
   }
 
-  // ── OnInit ────────────────────────────────────────────────────────────────
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+  /** Carga especialidades y tipos de documento disponibles. */
   ngOnInit(): void {
     this.loadingSpecialties = true;
     this.adminService.getAllSpecialties().subscribe({
@@ -202,6 +216,7 @@ export class AdminCreateUserComponent implements OnInit {
   }
 
   // ── Handlers de subcomponentes ────────────────────────────────────────────
+  /** Agrega o quita un rol; revalida el campo 'roles' si ya se envió el form. */
   onRoleToggled(role: Role): void {
     if (this.selectedRoles.includes(role)) {
       if (this.selectedRoles.length > 1)
@@ -212,6 +227,10 @@ export class AdminCreateUserComponent implements OnInit {
     if (this.submitted) this.validateField('roles');
   }
 
+  /**
+   * Aplica el parche del sub-formulario de doctor a userForm. Si un campo
+   * del grupo de horario cambió, revalida todo el grupo (son interdependientes).
+   */
   onDoctorFormChange(patch: Partial<DoctorFormData>): void {
     Object.assign(this.userForm, patch);
     if (this.submitted) {
@@ -229,6 +248,7 @@ export class AdminCreateUserComponent implements OnInit {
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
+  /** Valida todo el formulario y abre el modal de confirmación si pasa. */
   openConfirmModal(): void {
     this.submitted = true;
     this.submitError = null;
@@ -239,6 +259,7 @@ export class AdminCreateUserComponent implements OnInit {
     this.showConfirmModal = true;
   }
 
+  /** Hace scroll hasta el primer campo con error, según el orden definido. */
   private scrollToFirstError(): void {
     const firstErrorField = this.validation.FIELD_ORDER.find(
       (f) => this.errors[f]
@@ -254,6 +275,7 @@ export class AdminCreateUserComponent implements OnInit {
     this.showConfirmModal = false;
   }
 
+  /** Arma el payload y crea el usuario; navega a la lista si tiene éxito. */
   confirmAndCreate(): void {
     this.showConfirmModal = false;
     this.isSubmitting = true;
@@ -287,7 +309,7 @@ export class AdminCreateUserComponent implements OnInit {
               : null,
             schedules: scheduleTouched
               ? this.userForm.workDays.map((day) => ({
-                  workday: DAY_VALUE_TO_WORKDAY[day],
+                  workday: DAY_TO_WORKDAY[day],
                   startTime: `${this.userForm.startTime}:00`,
                   endTime: `${this.userForm.endTime}:00`,
                 }))
@@ -319,10 +341,12 @@ export class AdminCreateUserComponent implements OnInit {
     this.router.navigate(['/admin/usuarios']);
   }
 
+  // ── Validación ────────────────────────────────────────────────────────────
   hasError(f: keyof FormErrors) {
     return !!this.errors[f];
   }
 
+  /** Valida un solo campo y actualiza `errors`. */
   validateField(field: keyof FormErrors): void {
     const message = this.validation.validateField(
       field,
@@ -333,6 +357,7 @@ export class AdminCreateUserComponent implements OnInit {
     this.errors = { ...this.errors, [field]: message };
   }
 
+  /** Valida todo el formulario; retorna true si no hay errores. */
   private validateAll(): boolean {
     this.errors = this.validation.validateAll(
       this.userForm,
@@ -342,6 +367,8 @@ export class AdminCreateUserComponent implements OnInit {
     return Object.values(this.errors).every((e) => !e);
   }
 
+  // ── Helpers de template ───────────────────────────────────────────────────
+  /** Clases de un input, resaltando en rojo si el campo tiene error. */
   inputClass(field: keyof FormErrors, extra = ''): string {
     return (
       'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 ' +
@@ -351,7 +378,7 @@ export class AdminCreateUserComponent implements OnInit {
       extra
     );
   }
-
+  // ── Documento de identidad ────────────────────────────────────────────────
   getDocumentIdMaxLength(): number {
     return getDocumentIdMaxLength(this.userForm.identificationType);
   }

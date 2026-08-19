@@ -17,6 +17,10 @@ import {
   ToastComponent,
   ToastType,
 } from '../../../../design-system/molecules/toast-message/toast.component';
+import {
+  DAY_TO_WORKDAY,
+  workdayToNumber,
+} from '../../../../shared/helpers/workday.util';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
@@ -47,14 +51,6 @@ import { AdminService } from '../../service/admin.service';
 })
 export class AdminConfigComponent implements OnInit {
   private adminService = inject(AdminService);
-
-  private readonly DAY_TO_WORKDAY: Record<number, string> = {
-    1: 'LUNES',
-    2: 'MARTES',
-    3: 'MIERCOLES',
-    4: 'JUEVES',
-    5: 'VIERNES',
-  };
 
   // ── State ─────────────────────────────────────────────────────────────────
   doctors = signal<Doctor[]>([]);
@@ -178,13 +174,13 @@ export class AdminConfigComponent implements OnInit {
     }
 
     removedWorkdays.forEach((day) => {
-      const workday = this.DAY_TO_WORKDAY[day];
+      const workday = DAY_TO_WORKDAY[day];
       if (workday)
         calls.push(this.adminService.deleteSchedule(form.id, workday));
     });
 
     (form.workdays ?? []).forEach((day) => {
-      const workday = this.DAY_TO_WORKDAY[day];
+      const workday = DAY_TO_WORKDAY[day];
       if (!workday) return;
 
       const ds = form.daySchedules?.[day];
@@ -322,7 +318,7 @@ export class AdminConfigComponent implements OnInit {
     const daySchedules: Record<number, DaySchedule> = {};
     const workdays: number[] = [];
     schedules.forEach((s) => {
-      const day = this.workdayToNumber(s.workday);
+      const day = workdayToNumber(s.workday);
       if (day === null) return;
       daySchedules[day] = {
         startTime: s.startTime.substring(0, 5),
@@ -337,17 +333,6 @@ export class AdminConfigComponent implements OnInit {
       daySchedules,
       workdays,
     };
-  }
-
-  private workdayToNumber(workday: dtoSchedule['workday']): number | null {
-    const map: Record<string, number> = {
-      LUNES: 1,
-      MARTES: 2,
-      MIERCOLES: 3,
-      JUEVES: 4,
-      VIERNES: 5,
-    };
-    return map[workday] ?? null;
   }
 
   private reloadDoctor(doctorId: string, fallback: Doctor): void {

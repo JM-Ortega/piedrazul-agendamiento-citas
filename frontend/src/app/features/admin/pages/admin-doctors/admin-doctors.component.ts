@@ -23,6 +23,7 @@ import {
   getAllSpecialtiesMeta,
   getSpecialtyMeta,
 } from '../../../../shared/helpers/specialty-catalog';
+import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { DoctorAdminDto } from '../../models/dtos/DoctorAdminDto';
 import { AdminService } from '../../service/admin.service';
 @Component({
@@ -161,8 +162,9 @@ export class AdminDoctorsComponent implements OnInit {
         this.savingDoctorId.set(null);
         this.handleCancel();
       },
-      error: () => {
+      error: (err: AppError) => {
         this.savingDoctorId.set(null);
+        alert(err.message);
       },
     });
   }
