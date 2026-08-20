@@ -38,11 +38,23 @@ public class AuditController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
-        var criteria = new AuditEventCriteria(actorUsername, action, targetEntityType, targetEntityId, from, to, page, size);
+            @RequestParam(defaultValue = "20") int size) {
+        var criteria = new AuditEventCriteria(actorUsername, action, targetEntityType, targetEntityId, from, to, page,
+                size);
         var result = queryService.search(criteria);
         var content = result.content().stream().map(mapper::toResponse).toList();
-        return ResponseEntity.ok(PageResponse.of(content, result.page(), result.totalPages(), result.totalElements()));
+        var totalPages = result.totalPages();
+        var first = result.page() == 0;
+        var last = result.page() >= totalPages - 1;
+        var empty = content.isEmpty();
+        return ResponseEntity.ok(PageResponse.of(
+                content,
+                result.page(),
+                result.size(),
+                result.totalElements(),
+                totalPages,
+                first,
+                last,
+                empty));
     }
 }
