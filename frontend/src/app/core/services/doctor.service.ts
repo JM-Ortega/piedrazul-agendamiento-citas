@@ -1,13 +1,15 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
-
 import { map, Observable, of, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { withPagination } from '../../shared/helpers/http-pagination'; // ajusta ruta/nombre real
+import { toIsoDateString } from '../../shared/helpers/transform-date-local';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
+import { PagedResponse } from '../../shared/models/dtos/pagedResponse-clinicalHistory.dto';
+import { PageResponse } from '../../shared/models/dtos/pageResponse.dto';
 import { Doctor } from '../../shared/models/interfaces/doctor.model';
 import { Patient } from '../../shared/models/interfaces/patient.model';
-import { PagedResponse } from '../../shared/models/dtos/pagedResponse-clinicalHistory.dto';
 
 @Injectable({ providedIn: 'root' })
 export class DoctorService {
@@ -78,22 +80,54 @@ export class DoctorService {
   }
 
   /**
-   * Obtiene las citas del día actual (fecha local del cliente) para un doctor específico.
-   * La fecha se calcula en formato `YYYY-MM-DD` y se envía como query param junto al `idDoctor`.
+   * Obtiene una página de citas del día actual (fecha local del cliente)
+   * para un doctor específico.
    *
    * @param doctorId - ID del doctor cuyas citas de hoy se quieren consultar.
-   * @returns Observable con la lista de citas del día para ese doctor.
+   * @param pageNumber - Índice de página (base 0). Por defecto 0.
+   * @param pageSize - Cantidad de citas por página. Por defecto 10.
+   * @returns Observable con la respuesta paginada completa (content + metadata).
    */
   getTodayAppointmentsByDoctor(
-    doctorId: string
-  ): Observable<AppointmentsPatient[]> {
-    const d = new Date();
-    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    return this.http.get<AppointmentsPatient[]>(`${this.apiUrl}/appointments`, {
-      params: { idDoctor: doctorId, date: today },
-    });
+    doctorId: string,
+    pageNumber = 0,
+    pageSize = 10
+  ): Observable<PageResponse<AppointmentsPatient>> {
+    const today = toIsoDateString(new Date());
+    const params = withPagination(
+      new HttpParams().set('idDoctor', doctorId).set('date', today),
+      pageNumber,
+      pageSize
+    );
+    return this.http.get<PageResponse<AppointmentsPatient>>(
+      `${this.apiUrl}/appointments`,
+      { params }
+    );
   }
 
+  /**
+   * Obtiene una página de citas de un médico específico.
+   *
+   * @param doctorId - ID del médico.
+   * @param pageNumber - Índice de página (base 0). Por defecto 0.
+   * @param pageSize - Cantidad de citas por página. Por defecto 10.
+   * @returns Observable con la respuesta paginada completa (content + metadata).
+   */
+  getAppointmentsByDoctor(
+    doctorId: string,
+    pageNumber = 0,
+    pageSize = 10
+  ): Observable<PageResponse<AppointmentsPatient>> {
+    const params = withPagination(
+      new HttpParams().set('idDoctor', doctorId),
+      pageNumber,
+      pageSize
+    );
+    return this.http.get<PageResponse<AppointmentsPatient>>(
+      `${this.apiUrl}/appointments`,
+      { params }
+    );
+  }
   /**
    * Marca una cita como atendida.
    *

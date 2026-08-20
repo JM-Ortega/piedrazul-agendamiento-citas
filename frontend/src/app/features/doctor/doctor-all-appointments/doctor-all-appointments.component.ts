@@ -17,9 +17,20 @@ import {
 } from '@lucide/angular';
 import { KEYCLOAK_EVENT_SIGNAL } from 'keycloak-angular';
 import { DoctorService } from '../../../core/services/doctor.service';
-import { SchedulerService } from '../../../core/services/scheduler.service';
+import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
 import { ExportModalComponent } from '../../../design-system/organisms/export-modal/export-modal.component';
+import {
+  APPOINTMENT_STATUS_CLASSES,
+  APPOINTMENT_STATUS_LABELS,
+} from '../../../shared/helpers/appointment-status';
+import {
+  formatLongDateEs,
+  getMonthShort,
+} from '../../../shared/helpers/date-format';
+import { PaginatedState } from '../../../shared/helpers/paginated-state';
+import { toIsoDateString } from '../../../shared/helpers/transform-date-local';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
+import { AppError } from '../../../shared/models/interfaces/api-error.model';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 
 type ExportColumnKey =
@@ -53,45 +64,29 @@ interface ColumnDef {
     LucideFileSpreadsheet,
     LucideFilter,
     ExportModalComponent,
+    PaginationComponent,
   ],
 })
 export class DoctorAllAppointmentsComponent {
   private router = inject(Router);
   private doctorService = inject(DoctorService);
-  private schedulerService = inject(SchedulerService);
   private keycloakEvent = inject(KEYCLOAK_EVENT_SIGNAL);
 
   // ── State ─────────────────────────────────────────────────────────────────
-  today = (() => {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  })();
+  today = toIsoDateString(new Date());
   currentDoctor = signal<Doctor | null>(null);
-  private allAppointments = signal<AppointmentsPatient[]>([]);
+  private appointmentsState = new PaginatedState<AppointmentsPatient>();
+  pagination = this.appointmentsState.pagination;
+  readonly PAGE_SIZE = 3;
   private loaded = signal(false);
 
   filterStatus = signal<FilterStatus>('all');
   filterDate = signal<FilterDate>('all');
   filterSpecificDate = signal<string>('');
+  errorCarga = signal('');
   showExportModal = signal(false);
-
-  readonly monthNames = [
-    'enero',
-    'febrero',
-    'marzo',
-    'abril',
-    'mayo',
-    'junio',
-    'julio',
-    'agosto',
-    'septiembre',
-    'octubre',
-    'noviembre',
-    'diciembre',
-  ];
+  getMonthShort = getMonthShort;
+  formatDate = formatLongDateEs;
 
   readonly columnDefs: ColumnDef[] = [
     { key: 'date', label: 'Fecha de la Cita' },
@@ -106,13 +101,15 @@ export class DoctorAllAppointmentsComponent {
 
   // ── Computed ──────────────────────────────────────────────────────────────
   hasTodayAppointments = computed(() =>
-    this.allAppointments().some(
-      (a) => a.date === this.today && a.appointmentState !== 'CANCELADA'
-    )
+    this.appointmentsState
+      .content()
+      .some((a) => a.date === this.today && a.appointmentState !== 'CANCELADA')
   );
-  hasAnyAppointments = computed(() => this.allAppointments().length > 0);
+  hasAnyAppointments = computed(
+    () => this.appointmentsState.content().length > 0
+  );
   filteredAppointments = computed(() => {
-    let result = this.allAppointments();
+    let result = this.appointmentsState.content();
 
     if (this.filterStatus() !== 'all')
       result = result.filter((a) => a.appointmentState === this.filterStatus());
@@ -133,13 +130,14 @@ export class DoctorAllAppointmentsComponent {
   });
 
   stats = computed(() => ({
-    total: this.allAppointments().length,
-    upcoming: this.allAppointments().filter(
-      (a) => a.date >= this.today && a.appointmentState !== 'CANCELADA'
-    ).length,
-    pending: this.allAppointments().filter(
-      (a) => a.appointmentState === 'ATENDIDA'
-    ).length,
+    total: this.appointmentsState.content().length,
+    upcoming: this.appointmentsState
+      .content()
+      .filter((a) => a.date >= this.today && a.appointmentState !== 'CANCELADA')
+      .length,
+    pending: this.appointmentsState
+      .content()
+      .filter((a) => a.appointmentState === 'ATENDIDA').length,
   }));
 
   // ── Constructor ───────────────────────────────────────────────────────────
@@ -153,7 +151,8 @@ export class DoctorAllAppointmentsComponent {
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
-  private loadData(): void {
+  private loadData(pageNumber = 0): void {
+    this.errorCarga.set('');
     this.doctorService.getMe().subscribe({
       next: (doctor) => {
         if (!doctor) {
@@ -161,47 +160,38 @@ export class DoctorAllAppointmentsComponent {
           return;
         }
         this.currentDoctor.set(doctor);
-        this.schedulerService
-          .getAppointmentsByDoctor(doctor.id)
-          .subscribe((data) => this.allAppointments.set(data));
+        this.doctorService
+          .getAppointmentsByDoctor(doctor.id, pageNumber, this.PAGE_SIZE)
+          .subscribe({
+            next: (response) => this.appointmentsState.set(response),
+            error: (err: AppError) => this.errorCarga.set(err.message),
+          });
       },
-      error: () => this.router.navigate(['/']),
+      error: (err: AppError) => {
+        this.errorCarga.set(err.message);
+        this.router.navigate(['/']);
+      },
     });
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  formatDate(dateStr: string): string {
-    const date = new Date(dateStr + 'T12:00:00');
-    return `${date.getDate()} de ${this.monthNames[date.getMonth()]} de ${date.getFullYear()}`;
+  onPageChange(pageNumber: number): void {
+    this.loadData(pageNumber);
   }
 
-  getMonthShort(dateStr: string): string {
-    return this.monthNames[parseInt(dateStr.split('-')[1]) - 1].slice(0, 3);
-  }
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
   isPast(dateStr: string): boolean {
     return dateStr < this.today;
   }
 
-  statusLabel(s: string): string {
-    const map: Record<string, string> = {
-      AGENDADA: 'Agendada',
-      ATENDIDA: 'Atendida',
-      CANCELADA: 'Cancelada',
-      NO_ASISTIO: 'No asistió',
-      REPROGRAMADA: 'Reprogramada',
-    };
-    return map[s] ?? s;
+  statusLabel(s: AppointmentsPatient['appointmentState']): string {
+    return APPOINTMENT_STATUS_LABELS[s] ?? s;
   }
 
-  statusColor(s: string): string {
-    const map: Record<string, string> = {
-      AGENDADA: 'bg-green-100 text-green-700 border-green-200',
-      REPROGRAMADA: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-      CANCELADA: 'bg-red-100 text-red-700 border-red-200',
-      NO_ASISTIO: 'bg-orange-100 text-orange-700 border-orange-200',
-      ATENDIDA: 'bg-blue-100 text-blue-700 border-blue-200',
-    };
-    return map[s] ?? 'bg-gray-100 text-gray-700 border-gray-200';
+  statusColor(s: AppointmentsPatient['appointmentState']): string {
+    return (
+      (APPOINTMENT_STATUS_CLASSES[s] ?? 'bg-gray-100 text-gray-700') +
+      ' border-current/20'
+    );
   }
 }

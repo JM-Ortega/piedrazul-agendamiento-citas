@@ -76,6 +76,7 @@
             @if (editingId() === doctor.id) {
               <app-doctor-edit-form
                 [doctor]="doctor"
+                [isSaving]="savingDoctorId() === doctor.id"
                 (saved)="onFormSaved($event)"
                 (cancelled)="cancelEdit()"
               />

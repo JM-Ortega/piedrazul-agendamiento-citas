@@ -105,12 +105,6 @@ export class SchedulerService {
     );
   }
 
-  getAppointmentsByDoctor(doctorId: string): Observable<AppointmentsPatient[]> {
-    return this.http.get<AppointmentsPatient[]>(`${this.apiUrl}/appointments`, {
-      params: { idDoctor: doctorId },
-    });
-  }
-
   exportAppointments(payload: AppointmentExportRequest): Observable<Blob> {
     return this.http.post(
       `${this.apiUrl}/reports/appointments/export`,

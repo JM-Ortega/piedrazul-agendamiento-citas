@@ -129,10 +129,6 @@ export class AppService {
     return map[role] ?? '';
   }
 
-  private roleLabel(): string {
-    return this.roleLabelFor(this.currentRole() ?? '');
-  }
-
   /**
    * Realiza el cierre de sesión seguro del usuario.
    *

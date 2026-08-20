@@ -17,6 +17,11 @@ import {
   ToastComponent,
   ToastType,
 } from '../../../../design-system/molecules/toast-message/toast.component';
+import {
+  DAY_TO_WORKDAY,
+  workdayToNumber,
+} from '../../../../shared/helpers/workday.util';
+import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { DoctorCardComponent } from '../../components/doctor-card/doctor-card.component';
@@ -47,20 +52,13 @@ import { AdminService } from '../../service/admin.service';
 export class AdminConfigComponent implements OnInit {
   private adminService = inject(AdminService);
 
-  private readonly DAY_TO_WORKDAY: Record<number, string> = {
-    1: 'LUNES',
-    2: 'MARTES',
-    3: 'MIERCOLES',
-    4: 'JUEVES',
-    5: 'VIERNES',
-  };
-
   // ── State ─────────────────────────────────────────────────────────────────
   doctors = signal<Doctor[]>([]);
   loading = signal(false);
   errorCarga = signal('');
   editingId = signal<string | null>(null);
   savedId = signal<string | null>(null);
+  savingDoctorId = signal<string | null>(null);
 
   showConfirmModal = signal(false);
   doctorToToggle = signal<Doctor | null>(null);
@@ -132,8 +130,8 @@ export class AdminConfigComponent implements OnInit {
           },
         });
       },
-      error: () => {
-        this.errorCarga.set('Error al cargar los médicos. Intente de nuevo.');
+      error: (err: AppError) => {
+        this.errorCarga.set(err.message);
         this.loading.set(false);
       },
     });
@@ -150,7 +148,8 @@ export class AdminConfigComponent implements OnInit {
   }
 
   onFormSaved(event: DoctorSaveEvent): void {
-    const { form, originalDoctor, originalWorkdays, removedWorkdays } = event;
+    const { form, originalDoctor, removedWorkdays } = event;
+    if (this.savingDoctorId() === form.id) return;
     const calls: Observable<unknown>[] = [];
 
     if (originalDoctor.appointmentInterval !== form.appointmentInterval)
@@ -175,13 +174,15 @@ export class AdminConfigComponent implements OnInit {
     }
 
     removedWorkdays.forEach((day) => {
-      const workday = this.DAY_TO_WORKDAY[day];
+      const workday = DAY_TO_WORKDAY[day];
       if (workday)
         calls.push(this.adminService.deleteSchedule(form.id, workday));
     });
 
     (form.workdays ?? []).forEach((day) => {
-      const workday = this.DAY_TO_WORKDAY[day];
+      const workday = DAY_TO_WORKDAY[day];
+      if (!workday) return;
+
       const ds = form.daySchedules?.[day];
       const startTime = this.toTimeBackend(
         ds?.startTime ?? form.startTime ?? '05:00'
@@ -189,14 +190,10 @@ export class AdminConfigComponent implements OnInit {
       const endTime = this.toTimeBackend(
         ds?.endTime ?? form.endTime ?? '12:00'
       );
-      if (!originalWorkdays.includes(day))
-        calls.push(
-          this.adminService.updateSchedule(form.id, workday, startTime, endTime)
-        );
-      else
-        calls.push(
-          this.adminService.updateSchedule(form.id, workday, startTime, endTime)
-        );
+
+      calls.push(
+        this.adminService.updateSchedule(form.id, workday, startTime, endTime)
+      );
     });
 
     if (!calls.length) {
@@ -212,16 +209,9 @@ export class AdminConfigComponent implements OnInit {
         setTimeout(() => this.savedId.set(null), 3000);
         this.showToast('success', 'Configuración guardada correctamente.');
       },
-      error: (err) => {
-        const raw: string =
-          err?.error?.detail ??
-          'Error al guardar los cambios. Intente de nuevo.';
-        const message = raw.startsWith('El usuario ya está activo')
-          ? 'El médico ya está trabajando activamente. Debe deshabilitarlo primero para poder cambiar su período laboral.'
-          : raw;
-        this.errorGuardado.set(message);
+      error: (err: AppError) => {
+        this.errorGuardado.set(err.message);
         this.showErrorModal.set(true);
-        this.showToast('error', message);
       },
     });
   }
@@ -250,10 +240,8 @@ export class AdminConfigComponent implements OnInit {
             );
             this.onCloseToggleModal();
           },
-          error: (err) => {
-            this.forceModalMessage.set(
-              err?.error?.detail ?? 'Error al habilitar el médico.'
-            );
+          error: (err: AppError) => {
+            this.forceModalMessage.set(err.message);
             this.onCloseToggleModal();
             this.showForceModal.set(true);
           },
@@ -267,11 +255,8 @@ export class AdminConfigComponent implements OnInit {
         );
         this.onCloseToggleModal();
       },
-      error: (err) => {
-        this.forceModalMessage.set(
-          err?.error?.detail ??
-            'El médico tiene restricciones para ser deshabilitado.'
-        );
+      error: (err: AppError) => {
+        this.forceModalMessage.set(err.message);
         this.showConfirmModal.set(false);
         this.showForceModal.set(true);
       },
@@ -290,10 +275,8 @@ export class AdminConfigComponent implements OnInit {
         this.forceModalMessage.set('');
         this.doctorToToggle.set(null);
       },
-      error: (err) => {
-        this.forceModalMessage.set(
-          err?.error?.detail ?? 'Error al forzar la deshabilitación.'
-        );
+      error: (err: AppError) => {
+        this.forceModalMessage.set(err.message);
       },
     });
   }
@@ -335,7 +318,7 @@ export class AdminConfigComponent implements OnInit {
     const daySchedules: Record<number, DaySchedule> = {};
     const workdays: number[] = [];
     schedules.forEach((s) => {
-      const day = this.workdayToNumber(s.workday);
+      const day = workdayToNumber(s.workday);
       if (day === null) return;
       daySchedules[day] = {
         startTime: s.startTime.substring(0, 5),
@@ -350,17 +333,6 @@ export class AdminConfigComponent implements OnInit {
       daySchedules,
       workdays,
     };
-  }
-
-  private workdayToNumber(workday: dtoSchedule['workday']): number | null {
-    const map: Record<string, number> = {
-      LUNES: 1,
-      MARTES: 2,
-      MIERCOLES: 3,
-      JUEVES: 4,
-      VIERNES: 5,
-    };
-    return map[workday] ?? null;
   }
 
   private reloadDoctor(doctorId: string, fallback: Doctor): void {

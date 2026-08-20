@@ -19,7 +19,14 @@
       <span class="capitalize">{{ formatDate(today) }}</span>
     </div>
   </div>
-
+  @if (errorCarga()) {
+    <div
+      class="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-5 py-4 flex items-center gap-3 mb-6"
+    >
+      <svg lucideCalendar [size]="20" class="shrink-0"></svg>
+      <p class="text-base">{{ errorCarga() }}</p>
+    </div>
+  }
   <!-- Resumen del Día -->
   <div
     class="bg-linear-to-r from-[#215c98] to-[#4e92d9] text-white rounded-2xl shadow-lg p-6 mb-8"
@@ -43,7 +50,13 @@
 
   <!-- Lista de Citas -->
   <div class="bg-white rounded-2xl shadow-lg border-2 border-blue-100 p-8">
-    <h2 class="text-[#163c63] text-2xl mb-6">Citas de Hoy</h2>
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <h2 class="text-[#163c63] text-2xl">Citas de Hoy</h2>
+      <app-pagination
+        [pagination]="pagination()"
+        (pageChange)="onPageChange($event)"
+      />
+    </div>
 
     @if (todaysAppointments().length === 0) {
       <div class="text-center py-12">

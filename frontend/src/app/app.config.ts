@@ -3,25 +3,25 @@ import {
   withInterceptors,
   withXhr,
 } from '@angular/common/http';
-import { provideNativeDateAdapter } from '@angular/material/core';
 import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
+import { provideNativeDateAdapter } from '@angular/material/core';
 import { provideRouter } from '@angular/router';
-import { routes } from './app.routes';
-import { environment } from '../environments/environment';
 import {
-  provideLucideIcons,
-  LucideSearch,
   LucideCircleCheck,
-  LucideUser,
+  LucideSearch,
   LucideStethoscope,
+  LucideUser,
   LucideUserSearch,
+  provideLucideIcons,
 } from '@lucide/angular';
 import {
-  provideKeycloak,
-  includeBearerTokenInterceptor,
   createInterceptorCondition,
   INCLUDE_BEARER_TOKEN_INTERCEPTOR_CONFIG,
+  includeBearerTokenInterceptor,
+  provideKeycloak,
 } from 'keycloak-angular';
+import { environment } from '../environments/environment';
+import { routes } from './app.routes';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 
 function escapeRegex(value: string): string {
