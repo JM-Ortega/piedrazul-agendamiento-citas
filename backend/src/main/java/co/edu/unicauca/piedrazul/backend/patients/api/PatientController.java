@@ -11,7 +11,9 @@ import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientResponse
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientSummaryResponse;
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientService;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
+import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,10 +29,15 @@ public class PatientController {
 
     private final PatientService patientService;
     private final AppointmentExternalService appointmentExternalService;
+    private final SecurityContextExtractor securityContextExtractor;
+    private final PersonExternalService personExternalService;
 
-    public PatientController(PatientService patientService, AppointmentExternalService appointmentExternalService) {
+    public PatientController(PatientService patientService, AppointmentExternalService appointmentExternalService,
+                             SecurityContextExtractor securityContextExtractor, PersonExternalService personExternalService) {
         this.patientService = patientService;
         this.appointmentExternalService = appointmentExternalService;
+        this.securityContextExtractor = securityContextExtractor;
+        this.personExternalService = personExternalService;
     }
 
     @PostMapping
@@ -107,8 +114,16 @@ public class PatientController {
     @GetMapping("/document/{documentNumber}")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public PatientResponse findByDocument(@PathVariable String documentNumber) {
+        UUID authenticatedActorId = UUID.fromString(securityContextExtractor.currentActorId());
+        String userRoles = securityContextExtractor.currentActorRoles();
+
+        if (userRoles.contains("PATIENT")) {
+            documentNumber = personExternalService.findPersonIdByUserId(authenticatedActorId).toString();
+        }
+
+        String finalDocumentNumber = documentNumber;
         PatientData patient = patientService.findByDocumentNumber(documentNumber)
-                .orElseThrow(() -> new PatientNotFoundException(documentNumber));
+                .orElseThrow(() -> new PatientNotFoundException(finalDocumentNumber));
         return toResponse(patient);
     }
 
