@@ -56,7 +56,7 @@ class UserControllerTest {
 		assertEquals(HttpStatus.OK, response.getStatusCode());
 		PageResponse<SystemUserResponse> body = response.getBody();
 		assertEquals(expectedUsers, body.content());
-		assertEquals(0, body.page());
+		assertEquals(0, body.pageNumber());
 		assertEquals(1, body.totalPages());
 		assertEquals(expectedUsers.size(), body.totalElements());
 		verify(userService).getSystemUsers(pageable);
