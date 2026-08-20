@@ -8,15 +8,12 @@ import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.shared.pagination.PageResponse;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
-import jakarta.annotation.Nullable;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
@@ -37,10 +34,13 @@ import java.util.UUID;
 public class DoctorController {
     private final DoctorService doctorService;
     private final PersonExternalService personExternalService;
+    private final SecurityContextExtractor securityContextExtractor;
 
-    public DoctorController(DoctorService doctorService, PersonExternalService personExternalService) {
+    public DoctorController(DoctorService doctorService, PersonExternalService personExternalService,
+                            SecurityContextExtractor securityContextExtractor) {
         this.doctorService = doctorService;
         this.personExternalService = personExternalService;
+        this.securityContextExtractor = securityContextExtractor;
     }
 
     /**
@@ -89,7 +89,7 @@ public class DoctorController {
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<?> getAllDoctors() {
+    public ResponseEntity<List<DoctorShortResponse>> getAllDoctors() {
         List<Doctor> doctors = doctorService.findAllDoctors();
 
         List<UUID> ids = doctors.stream()
@@ -152,6 +152,13 @@ public class DoctorController {
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<List<SpecialtyCode>> getSpecialties(
             @RequestParam(required = false) UUID patientId) {
+        UUID authenticatedActorId = UUID.fromString(securityContextExtractor.currentActorId());
+        String userRoles = securityContextExtractor.currentActorRoles();
+
+        if (userRoles.contains("PATIENT")) {
+            patientId = personExternalService.findPersonIdByUserId(authenticatedActorId);
+        }
+
         List<SpecialtyCode> specialties = doctorService.getSpecialties(patientId);
         return ResponseEntity.ok(specialties);
     }
@@ -177,7 +184,7 @@ public class DoctorController {
      */
     @PutMapping("/{doctorId}/specialties")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> changeSpecialties(
+    public ResponseEntity<Void> changeSpecialties(
             @PathVariable UUID doctorId,
             @RequestBody List<SpecialtyCode> specialties) {
         doctorService.changeSpecialties(doctorId, specialties);
@@ -198,7 +205,7 @@ public class DoctorController {
      */
     @GetMapping("/all-specialties")
     @PreAuthorize("hasAnyRole('ADMIN')")
-    public ResponseEntity<?> getAllSpecialties() {
+    public ResponseEntity<List<SpecialtyCode>> getAllSpecialties() {
         List<SpecialtyCode> specialties = doctorService.getAllSpecialties();
         return ResponseEntity.ok(specialties);
     }
@@ -219,7 +226,7 @@ public class DoctorController {
      */
     @GetMapping("/specialty/{specialty}")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<?> getDoctorsBySpecialty(@PathVariable SpecialtyCode specialty) {
+    public ResponseEntity<List<DoctorResponse> > getDoctorsBySpecialty(@PathVariable SpecialtyCode specialty) {
         List<Doctor> doctors = doctorService.getDoctorBySpeciality(specialty);
 
         List<UUID> ids = doctors.stream()
@@ -255,7 +262,7 @@ public class DoctorController {
      */
     @PutMapping("/{doctorId}/enable")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> enableDoctor(
+    public ResponseEntity<Void> enableDoctor(
             @PathVariable UUID doctorId
     ) {
         doctorService.enableDoctor(doctorId);
@@ -283,7 +290,7 @@ public class DoctorController {
      */
     @PutMapping("/{doctorId}/labor-date")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateDoctorLaborDate(
+    public ResponseEntity<Void> updateDoctorLaborDate(
             @PathVariable UUID doctorId,
             @RequestParam LocalDate laborStart,
             @RequestParam LocalDate laborEnd
@@ -309,7 +316,7 @@ public class DoctorController {
      */
     @PutMapping("/{doctorId}/appointment-interval")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateDoctorAppointmentInterval(
+    public ResponseEntity<Void> updateDoctorAppointmentInterval(
             @PathVariable UUID doctorId,
             @RequestParam int appointmentInterval
     ) {
@@ -338,7 +345,7 @@ public class DoctorController {
      */
     @PutMapping("/{doctorId}/disable")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> disableDoctor(
+    public ResponseEntity<Void> disableDoctor(
             @PathVariable UUID doctorId,
             @RequestParam(defaultValue = "false") boolean force
     ) {
