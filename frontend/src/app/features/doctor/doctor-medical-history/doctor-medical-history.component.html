@@ -144,6 +144,10 @@
               Sin registros clínicos.
             </div>
           }
+          <app-pagination
+            [pagination]="medicalRecordsPagination()"
+            (pageChange)="onMedicalRecordsPageChange($event)"
+          ></app-pagination>
           @for (r of records(); track r.idClinicalHistory) {
             <div class="bg-white rounded-2xl shadow-md p-6 mb-3">
               <div class="flex flex-col gap-2 mb-1">
@@ -162,14 +166,8 @@
               <p class="text-gray-700">{{ r.description }}</p>
             </div>
           }
-          @if (hasMoreRecords()) {
-            <button
-              (click)="loadMoreRecords()"
-              [disabled]="isLoadingRecords()"
-              class="w-full text-sm font-medium text-[#215c98] border border-[#215c98]/30 rounded-lg px-3 py-2 hover:bg-[#215c98]/8 transition-all"
-            >
-              {{ isLoadingRecords() ? 'Cargando...' : 'Cargar más registros' }}
-            </button>
+          @if (isLoadingRecords()) {
+            <p class="text-sm text-gray-400 text-center mt-2">Cargando...</p>
           }
         </div>
       </div>

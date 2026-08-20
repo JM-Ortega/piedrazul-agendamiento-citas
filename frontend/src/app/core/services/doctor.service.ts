@@ -2,11 +2,11 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { map, Observable, of, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { withPagination } from '../../shared/helpers/http-pagination'; // ajusta ruta/nombre real
+import { withPagination } from '../../shared/helpers/http-pagination';
+import { PaginatedState } from '../../shared/helpers/paginated-state';
 import { toIsoDateString } from '../../shared/helpers/transform-date-local';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
-import { PagedResponse } from '../../shared/models/dtos/pagedResponse-clinicalHistory.dto';
 import { PageResponse } from '../../shared/models/dtos/pageResponse.dto';
 import { Doctor } from '../../shared/models/interfaces/doctor.model';
 import { Patient } from '../../shared/models/interfaces/patient.model';
@@ -16,17 +16,15 @@ export class DoctorService {
   private http = inject(HttpClient);
   private apiUrl = environment.apiUrl;
 
-  medicalRecords = signal<MedicalRecord[]>([]);
-  private currentPage = signal(0);
-  private totalPages = signal(0);
+  /** Tamaño de página por defecto para el historial clínico (3 registros a la vez). */
+  private readonly MEDICAL_RECORDS_PAGE_SIZE = 3;
+
+  /** Historial clínico paginado del paciente actualmente visualizado. */
+  readonly medicalRecordsState = new PaginatedState<MedicalRecord>();
   readonly isLoadingRecords = signal(false);
   private meCache: Doctor | null = null;
   private meCacheTimestamp = 0;
   private readonly ME_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
-
-  get hasMoreRecords(): boolean {
-    return this.currentPage() < this.totalPages() - 1;
-  }
 
   /**
    * Obtiene los datos del doctor autenticado actualmente (según el token de sesión).
@@ -163,37 +161,33 @@ export class DoctorService {
   }
 
   /**
-   * Carga la siguiente página del historial clínico del paciente
-   * y la acumula sobre las ya cargadas.
+   * Carga una página del historial clínico del paciente.
+   *
    * @param patientId - ID del paciente cuyo historial se desea cargar.
+   * @param pageNumber - Índice de página (base 0). Por defecto 0.
    */
-  loadMedicalRecordsByPatient(patientId: string): void {
-    if (this.isLoadingRecords() || !this.hasMoreRecordsFor()) return;
+  loadMedicalRecordsByPatient(patientId: string, pageNumber = 0): void {
+    if (this.isLoadingRecords()) return;
 
     this.isLoadingRecords.set(true);
-    const nextPage =
-      this.currentPage() === 0 && this.medicalRecords().length === 0
-        ? 0
-        : this.currentPage() + 1;
+    const params = withPagination(
+      new HttpParams(),
+      pageNumber,
+      this.MEDICAL_RECORDS_PAGE_SIZE
+    );
 
     this.http
-      .get<PagedResponse<MedicalRecord>>(
+      .get<PageResponse<MedicalRecord>>(
         `${this.apiUrl}/clinical-history/patient/${patientId}`,
-        { params: { page: nextPage } }
+        { params }
       )
       .subscribe({
         next: (res) => {
-          this.medicalRecords.update((prev) => [...prev, ...res.content]);
-          this.currentPage.set(res.page);
-          this.totalPages.set(res.totalPages);
+          this.medicalRecordsState.set(res);
           this.isLoadingRecords.set(false);
         },
         error: () => this.isLoadingRecords.set(false),
       });
-  }
-
-  private hasMoreRecordsFor(): boolean {
-    return this.medicalRecords().length === 0 || this.hasMoreRecords;
   }
 
   /**
@@ -219,13 +213,11 @@ export class DoctorService {
   }
 
   /**
-   * Reinicia el estado de paginación e historial. Debe llamarse
-   * siempre que se cambie de paciente, antes de cargar la página 0.
+   * Reinicia el historial clínico paginado. Debe llamarse siempre que se
+   * cambie de paciente, antes de cargar la página 0.
    */
   resetMedicalRecords(): void {
-    this.medicalRecords.set([]);
-    this.currentPage.set(0);
-    this.totalPages.set(0);
+    this.medicalRecordsState.clear();
   }
 
   /**

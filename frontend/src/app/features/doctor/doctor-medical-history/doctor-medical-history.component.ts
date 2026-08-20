@@ -16,6 +16,7 @@ import {
 } from '@lucide/angular';
 import { DoctorService } from '../../../core/services/doctor.service';
 import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
+import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
@@ -32,6 +33,7 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
     LucideCalendar,
     FormatoPipe,
     ButtonComponent,
+    PaginationComponent,
   ],
 })
 export class DoctorMedicalHistoryComponent implements OnInit {
@@ -47,7 +49,9 @@ export class DoctorMedicalHistoryComponent implements OnInit {
     this.mostrarInfo.update((v) => !v);
   }
 
-  readonly records = this.doctorService.medicalRecords;
+  readonly records = this.doctorService.medicalRecordsState.content;
+  readonly medicalRecordsPagination =
+    this.doctorService.medicalRecordsState.pagination;
   readonly patient = signal<Patient | undefined>(undefined);
   readonly newObservation = signal('');
   /** Caracteres restantes antes de llegar al límite, para mostrar en el contador del textarea. */
@@ -57,7 +61,6 @@ export class DoctorMedicalHistoryComponent implements OnInit {
   private readonly idAppointment = signal<string>('');
   readonly saveError = signal('');
   readonly isSaving = signal(false);
-  readonly hasMoreRecords = computed(() => this.doctorService.hasMoreRecords);
   readonly isLoadingRecords = this.doctorService.isLoadingRecords;
 
   /**
@@ -86,10 +89,15 @@ export class DoctorMedicalHistoryComponent implements OnInit {
       });
   }
 
-  loadMoreRecords(): void {
+  /**
+   * Maneja el cambio de página emitido por `<app-pagination>` para el historial clínico del paciente actual.
+   *
+   * @param page - Número de página (base 0) al que se quiere navegar.
+   */
+  onMedicalRecordsPageChange(page: number): void {
     const patientId = this.patient()?.id;
     if (patientId) {
-      this.doctorService.loadMedicalRecordsByPatient(patientId);
+      this.doctorService.loadMedicalRecordsByPatient(patientId, page);
     }
   }
 
