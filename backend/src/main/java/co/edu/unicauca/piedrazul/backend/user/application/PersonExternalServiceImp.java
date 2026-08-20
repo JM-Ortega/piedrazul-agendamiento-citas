@@ -48,19 +48,19 @@ public class PersonExternalServiceImp implements PersonExternalService {
             UUID userId
     ) {
         if (identificationType == null)
-            throw new InvalidUserDataException("identificationType is required");
+            throw new InvalidUserDataException("El tipo de identificación es requerido");
 
         if (identification == null || identification.isBlank())
-            throw new InvalidUserDataException("identification is required");
+            throw new InvalidUserDataException("La identificación es requerida");
 
         if (firstName == null || firstName.isBlank())
-            throw new InvalidUserDataException("firstName is required");
+            throw new InvalidUserDataException("El nombre es requerido");
 
         if (lastName == null || lastName.isBlank())
-            throw new InvalidUserDataException("lastName is required");
+            throw new InvalidUserDataException("El apellido es requerido");
 
         if (phone == null || phone.isBlank())
-            throw new InvalidUserDataException("phone is required");
+            throw new InvalidUserDataException("El número de celular es requerido");
 
         if (personRepository.existsByIdentification(identification)) {
             throw new PersonAlreadyExistsException("Ya existe una persona con identificación '" + identification + "'");
@@ -87,7 +87,7 @@ public class PersonExternalServiceImp implements PersonExternalService {
     @Transactional(readOnly = true)
     public void requireIdentificationAvailable(String identification) {
         if (identification == null || identification.isBlank()) {
-            throw new InvalidUserDataException("identification is required");
+            throw new InvalidUserDataException("La identificación es requerida");
         }
 
         if (personRepository.existsByIdentification(identification)) {
@@ -99,7 +99,7 @@ public class PersonExternalServiceImp implements PersonExternalService {
     @Override
     public void deletePerson(UUID personId) {
         if (personId == null) {
-            throw new InvalidUserDataException("personId is required");
+            throw new InvalidUserDataException("El id de la persona es requerido");
         }
 
         personRepository.deleteById(personId);
@@ -108,10 +108,10 @@ public class PersonExternalServiceImp implements PersonExternalService {
     @Override
     public void linkUserId(UUID personId, UUID userId) {
         if (personId == null)
-            throw new InvalidUserDataException("personId is required");
+            throw new InvalidUserDataException("El id de la persona es requerido");
 
         if (userId == null)
-            throw new InvalidUserDataException("userId is required");
+            throw new InvalidUserDataException("El id del usuario es requerido");
 
         Person person = personRepository.findById(personId)
                 .orElseThrow(() -> new PersonNotFoundException("No se encontró una persona con id: " + personId));
@@ -210,24 +210,24 @@ public class PersonExternalServiceImp implements PersonExternalService {
     @Override
     public Page<PersonSummary> findByIdsAndNameContaining(Collection<UUID> ids, String term, Pageable pageable) {
         if (ids == null) {
-            throw new InvalidUserDataException("ids is required");
+            throw new InvalidUserDataException("El id del usaurio es requerido");
         }
         if (term == null || term.isBlank()) {
-            throw new InvalidUserDataException("term is required");
+            throw new InvalidUserDataException("El usuario es requerido");
         }
         if (pageable == null) {
-            throw new InvalidUserDataException("pageable is required");
+            throw new InvalidUserDataException("La paginación es requerida");
         }
         if (pageable.isUnpaged()) {
-            throw new InvalidUserDataException("pageable must be paged");
+            throw new InvalidUserDataException("La paginación es obligatoria");
         }
         if (pageable.getSort().isSorted()) {
-            throw new InvalidUserDataException("custom sorting is not supported for this search");
+            throw new InvalidUserDataException("No es posible aplicar el ordenamiento");
         }
 
         String normalized = term.trim().replaceAll("\\s+", " ");
         if (normalized.isBlank()) {
-            throw new InvalidUserDataException("term is required");
+            throw new InvalidUserDataException("El usuario no es valido");
         }
 
         if (ids.isEmpty()) {
