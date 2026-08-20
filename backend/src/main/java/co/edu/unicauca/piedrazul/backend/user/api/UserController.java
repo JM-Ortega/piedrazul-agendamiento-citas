@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/user")
+@PreAuthorize("hasRole('ADMIN')")
 @Tag(name = "Usuarios", description = "Operaciones de administración sobre usuarios del sistema")
 public class UserController {
     private final CreateAccountUseCase createAccountUseCase;
@@ -34,7 +35,6 @@ public class UserController {
 
 
     @GetMapping("/system-users")
-    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Listar usuarios del sistema",
             description = "Devuelve una página con todos los usuarios registrados, ordenada y paginada según los parámetros recibidos.")
     @ApiResponses({
@@ -52,7 +52,6 @@ public class UserController {
 
 
     @GetMapping("/system-doctors")
-    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Listar doctores del sistema",
             description = "Devuelve una página con los usuarios que tienen rol DOCTOR, usando paginación y ordenamiento.")
     @ApiResponses({
@@ -70,7 +69,6 @@ public class UserController {
 
 
     @PostMapping("/users")
-    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Crear usuario del sistema",
             description = "Registra un nuevo usuario del sistema a partir de los datos enviados en el cuerpo de la solicitud.")
     @ApiResponses({
@@ -90,7 +88,6 @@ public class UserController {
 
 
     @PostMapping("/{document}/give-doctor-scheduler")
-    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Asignar rol scheduler a un doctor",
             description = "Otorga el rol scheduler al usuario identificado por el número de documento recibido en la ruta.")
     @ApiResponses({
@@ -108,7 +105,6 @@ public class UserController {
 
 
     @DeleteMapping("/{document}/revoke-doctor-scheduler")
-    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Revocar rol scheduler a un doctor",
             description = "Revoca el rol scheduler del usuario identificado por el número de documento recibido en la ruta.")
     @ApiResponses({

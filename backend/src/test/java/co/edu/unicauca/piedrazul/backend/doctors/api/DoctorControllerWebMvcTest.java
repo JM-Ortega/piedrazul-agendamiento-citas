@@ -4,6 +4,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
@@ -39,12 +40,15 @@ class DoctorControllerWebMvcTest {
     @Mock
     private PersonExternalService personExternalService;
 
+    @Mock
+    SecurityContextExtractor securityContextExtractor;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new DoctorController(doctorService, personExternalService))
+                .standaloneSetup(new DoctorController(doctorService, personExternalService, securityContextExtractor))
                 .setControllerAdvice(new DoctorExceptionHandler())
                 .build();
     }

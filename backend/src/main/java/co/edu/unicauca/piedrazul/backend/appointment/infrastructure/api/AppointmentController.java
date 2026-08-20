@@ -13,6 +13,8 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.outp
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.PageResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.CitaDtoMapper;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
+import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -42,6 +44,8 @@ public class AppointmentController {
     private final AppointmentSchedulingService appointmentSchedulingService;
     private final ManualPatientResolutionStrategy manualPatientResolutionStrategy;
     private final AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy;
+    private final SecurityContextExtractor securityContextExtractor;
+    private final PersonExternalService personExternalService;
 
     public AppointmentController(
             GetAvailableSlotsUseCase getAvailableSlotsUseCase,
@@ -54,7 +58,9 @@ public class AppointmentController {
             CancelAppointmentUseCase cancelAppointmentUseCase, GetAppointmentStatesUseCase getAppointmentStatesUseCase,
             AppointmentSchedulingService appointmentSchedulingService,
             ManualPatientResolutionStrategy manualPatientResolutionStrategy,
-            AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy) {
+            AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy,
+            SecurityContextExtractor securityContextExtractor,
+            PersonExternalService personExternalService) {
         this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
         this.listAppointmentsUseCase = listAppointmentsUseCase;
         this.getSpecialtiesWithDoctorUseCase = getSpecialtiesWithDoctorUseCase;
@@ -67,6 +73,8 @@ public class AppointmentController {
         this.appointmentSchedulingService = appointmentSchedulingService;
         this.manualPatientResolutionStrategy = manualPatientResolutionStrategy;
         this.autonomousPatientResolutionStrategy = autonomousPatientResolutionStrategy;
+        this.securityContextExtractor = securityContextExtractor;
+        this.personExternalService = personExternalService;
     }
 
     // Franjas disponibles según el médico y la fecha
@@ -87,6 +95,15 @@ public class AppointmentController {
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<PageResponse<AppointmentResponse>> list(
             @ModelAttribute ListAppointmentFiltersRequest request) {
+        UUID authenticatedActorId = UUID.fromString(securityContextExtractor.currentActorId());
+        String userRoles = securityContextExtractor.currentActorRoles();
+
+        if (userRoles.contains("PATIENT")) {
+            request.setIdPatient(personExternalService.findPersonIdByUserId(authenticatedActorId));
+        }
+        else if (userRoles.contains("DOCTOR")) {
+            request.setIdDoctor(personExternalService.findPersonIdByUserId(authenticatedActorId));
+        }
 
         PageQuery pageQuery = request.toPageQuery();
 
@@ -99,8 +116,8 @@ public class AppointmentController {
         );
 
         List<AppointmentResponse> content = citaDtoMapper.toResponseList(appointmentPage.content());
-
         PageResponse<AppointmentResponse> response = PageResponse.from(appointmentPage, content);
+
         return ResponseEntity.ok(response);
     }
 
