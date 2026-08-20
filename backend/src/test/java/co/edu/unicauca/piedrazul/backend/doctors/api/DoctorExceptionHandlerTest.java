@@ -35,13 +35,13 @@ class DoctorExceptionHandlerTest {
         HttpServletRequest request = buildRequest("/api/doctor/schedules/123/LUNES");
 
         ProblemDetail result = handler.handleBusinessException(
-                new DoctorScheduleConflictException("A schedule for LUNES already exists"),
+                new DoctorScheduleConflictException("Ya existe un horario para el LUNES"),
                 request
         );
 
         assertThat(result.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
         assertThat(result.getTitle()).isEqualTo("Conflicto");
-        assertThat(result.getDetail()).isEqualTo("A schedule for LUNES already exists");
+        assertThat(result.getDetail()).isEqualTo("Ya existe un horario para el LUNES");
         assertThat(result.getProperties()).containsEntry("errorCode", "DOCTOR_SCHEDULE_CONFLICT");
         assertThat(result.getProperties()).containsEntry("module", "doctors");
     }
