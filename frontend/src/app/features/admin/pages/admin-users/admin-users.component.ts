@@ -15,6 +15,8 @@ import {
   LucideUsers,
 } from '@lucide/angular';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
+import { PaginationMeta } from '../../../../shared/helpers/paginated-state';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { SystemUser } from '../../models/interfaces/system-user.model';
 import { AdminService } from '../../service/admin.service';
@@ -41,6 +43,7 @@ interface UserStyle {
     LucideUserPlus,
     LucideUsers,
     ButtonComponent,
+    PaginationComponent,
   ],
 })
 export class AdminUsersComponent implements OnInit {
@@ -49,6 +52,7 @@ export class AdminUsersComponent implements OnInit {
 
   // ── State ─────────────────────────────────────────────────────────────────
   systemUsers = signal<SystemUser[]>([]);
+  pagination = signal<PaginationMeta | null>(null);
   loading = signal(false);
   errorCarga = signal('');
 
@@ -77,7 +81,7 @@ export class AdminUsersComponent implements OnInit {
     },
   };
 
-  // ── Computed ──────────────────────────────────────────────────────────────
+  // ── Computed (basado en la página actual) ────────────────────────────────
   doctors = computed(() =>
     this.systemUsers().filter(
       (u) =>
@@ -108,12 +112,20 @@ export class AdminUsersComponent implements OnInit {
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
-  loadUsers(): void {
+  loadUsers(pageNumber = 0): void {
     this.loading.set(true);
     this.errorCarga.set('');
-    this.adminService.getSystemUsers().subscribe({
-      next: (users) => {
-        this.systemUsers.set(users);
+    this.adminService.getSystemUsers(pageNumber, 9).subscribe({
+      next: (page) => {
+        this.systemUsers.set(page.content);
+        this.pagination.set({
+          pageNumber: page.pageNumber,
+          pageSize: page.pageSize,
+          totalElements: page.totalElements,
+          totalPages: page.totalPages,
+          first: page.first,
+          last: page.last,
+        });
         this.loading.set(false);
       },
       error: (err: AppError) => {
@@ -121,6 +133,10 @@ export class AdminUsersComponent implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  onPageChange(pageNumber: number): void {
+    this.loadUsers(pageNumber);
   }
 
   navigateToCreate(): void {

@@ -6,17 +6,14 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
-import {
-  LucideChevronLeft,
-  LucideChevronRight,
-  LucidePencil,
-  LucideSettings,
-} from '@lucide/angular';
+import { LucidePencil, LucideSettings } from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
+import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
 import {
   ToastComponent,
   ToastType,
 } from '../../../../design-system/molecules/toast-message/toast.component';
+import { PaginationMeta } from '../../../../shared/helpers/paginated-state';
 import {
   DAY_TO_WORKDAY,
   workdayToNumber,
@@ -45,8 +42,7 @@ import { AdminService } from '../../service/admin.service';
     DoctorEditFormComponent,
     AdminModalsComponent,
     ToastComponent,
-    LucideChevronLeft,
-    LucideChevronRight,
+    PaginationComponent,
   ],
 })
 export class AdminConfigComponent implements OnInit {
@@ -87,6 +83,19 @@ export class AdminConfigComponent implements OnInit {
       : 0;
   });
 
+  pagination = computed<PaginationMeta | null>(() => {
+    const total = this.totalPages();
+    if (total <= 1) return null;
+    const current = this.currentPage();
+    return {
+      pageNumber: current,
+      pageSize: this.PAGE_SIZE,
+      totalElements: this.totalElements(),
+      totalPages: total,
+      first: current === 0,
+      last: current === total - 1,
+    };
+  });
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.loadDoctors();
@@ -362,29 +371,5 @@ export class AdminConfigComponent implements OnInit {
     if (page < 0 || page >= this.totalPages() || page === this.currentPage())
       return;
     this.loadDoctors(page);
-  }
-
-  previousPage(): void {
-    this.goToPage(this.currentPage() - 1);
-  }
-
-  nextPage(): void {
-    this.goToPage(this.currentPage() + 1);
-  }
-
-  get visiblePages(): number[] {
-    const total = this.totalPages();
-    const current = this.currentPage();
-    const maxVisible = 5;
-
-    if (total <= maxVisible) {
-      return Array.from({ length: total }, (_, i) => i);
-    }
-
-    let start = Math.max(0, current - Math.floor(maxVisible / 2));
-    const end = Math.min(total, start + maxVisible);
-    start = Math.max(0, end - maxVisible);
-
-    return Array.from({ length: end - start }, (_, i) => start + i);
   }
 }

@@ -18,7 +18,9 @@ import {
 import { forkJoin, Observable } from 'rxjs';
 import { AppService } from '../../../../core/services/app.service';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
 import { toggleInArray } from '../../../../shared/helpers/array-utils';
+import { PaginationMeta } from '../../../../shared/helpers/paginated-state';
 import {
   getAllSpecialtiesMeta,
   getSpecialtyMeta,
@@ -26,6 +28,7 @@ import {
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { DoctorAdminDto } from '../../models/dtos/DoctorAdminDto';
 import { AdminService } from '../../service/admin.service';
+
 @Component({
   selector: 'app-admin-doctors',
   templateUrl: './admin-doctors.component.html',
@@ -39,6 +42,7 @@ import { AdminService } from '../../service/admin.service';
     LucideStethoscope,
     LucideDynamicIcon,
     ButtonComponent,
+    PaginationComponent,
   ],
 })
 export class AdminDoctorsComponent implements OnInit {
@@ -49,6 +53,7 @@ export class AdminDoctorsComponent implements OnInit {
   readonly specialtiesList = getAllSpecialtiesMeta();
   // ── State ─────────────────────────────────────────────────────────────────
   doctors = signal<DoctorAdminDto[]>([]);
+  pagination = signal<PaginationMeta | null>(null);
   loading = signal(false);
   errorCarga = signal('');
   editingDoctorId = signal<string | null>(null);
@@ -71,12 +76,20 @@ export class AdminDoctorsComponent implements OnInit {
   }
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  loadDoctors(): void {
+  loadDoctors(pageNumber = 0): void {
     this.loading.set(true);
     this.errorCarga.set('');
-    this.adminService.getDoctorsAdmin().subscribe({
-      next: (data) => {
-        this.doctors.set(data);
+    this.adminService.getDoctorsAdmin(pageNumber).subscribe({
+      next: (page) => {
+        this.doctors.set(page.content);
+        this.pagination.set({
+          pageNumber: page.pageNumber,
+          pageSize: page.pageSize,
+          totalElements: page.totalElements,
+          totalPages: page.totalPages,
+          first: page.first,
+          last: page.last,
+        });
         this.loading.set(false);
       },
       error: () => {
@@ -84,6 +97,10 @@ export class AdminDoctorsComponent implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  onPageChange(pageNumber: number): void {
+    this.loadDoctors(pageNumber);
   }
 
   // ── Edit ──────────────────────────────────────────────────────────────────

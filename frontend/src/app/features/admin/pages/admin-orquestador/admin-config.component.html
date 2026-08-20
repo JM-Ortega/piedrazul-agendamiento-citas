@@ -48,10 +48,16 @@
 
     <!-- Lista de doctores -->
     <div class="bg-white rounded-2xl shadow-md p-7 border-2 border-[#d9e9f8]">
-      <h2 class="text-[#163c63] text-2xl mb-6 flex items-center gap-2">
-        <svg lucidePencil [size]="24"></svg>
-        Configuración de Médicos y Terapistas
-      </h2>
+      <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <h2 class="text-[#163c63] text-2xl flex items-center gap-2">
+          <svg lucidePencil [size]="24"></svg>
+          Configuración de Médicos y Terapistas
+        </h2>
+        <app-pagination
+          [pagination]="pagination()"
+          (pageChange)="goToPage($event)"
+        />
+      </div>
 
       @if (loading()) {
         <div class="text-center text-gray-400 text-lg py-10">
@@ -84,58 +90,6 @@
           </div>
         }
       </div>
-      @if (totalPages() > 1) {
-        <div
-          class="flex items-center justify-between px-1 pt-6 mt-2 border-t-2 border-[#215c98]"
-        >
-          <button
-            type="button"
-            [disabled]="currentPage() === 0"
-            (click)="previousPage()"
-            class="flex items-center gap-1 text-base font-semibold transition-colors"
-            [class]="
-              currentPage() > 0
-                ? 'text-[#215c98] hover:text-[#163c63] cursor-pointer'
-                : 'text-gray-300 cursor-not-allowed'
-            "
-          >
-            <svg lucideChevronLeft [size]="18"></svg>
-            Anterior
-          </button>
-
-          <div class="flex items-center gap-2">
-            @for (page of visiblePages; track page) {
-              <button
-                type="button"
-                (click)="goToPage(page)"
-                class="w-9 h-9 rounded-full text-base font-semibold transition-colors flex items-center justify-center"
-                [class]="
-                  page === currentPage()
-                    ? 'bg-[#215c98] text-white'
-                    : 'text-gray-600 hover:bg-gray-100 cursor-pointer'
-                "
-              >
-                {{ page + 1 }}
-              </button>
-            }
-          </div>
-
-          <button
-            type="button"
-            [disabled]="currentPage() >= totalPages() - 1"
-            (click)="nextPage()"
-            class="flex items-center gap-1 text-base font-semibold transition-colors"
-            [class]="
-              currentPage() < totalPages() - 1
-                ? 'text-[#215c98] hover:text-[#163c63] cursor-pointer'
-                : 'text-gray-300 cursor-not-allowed'
-            "
-          >
-            Siguiente
-            <svg lucideChevronRight [size]="18"></svg>
-          </button>
-        </div>
-      }
     </div>
 
     <!-- Guía -->

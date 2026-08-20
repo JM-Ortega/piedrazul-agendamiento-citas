@@ -1,7 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
 import { PageResponse } from '../../../shared/models/dtos/pageResponse.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
@@ -45,12 +44,22 @@ export class AdminService {
     );
   }
 
-  getDoctorsAdmin(): Observable<DoctorAdminDto[]> {
-    return this.http
-      .get<PageResponse<DoctorAdminDto>>(`${this.apiUrl}/user/system-doctors`, {
-        params: { size: 100 },
-      })
-      .pipe(map((response) => response.content));
+  /**
+   * Obtiene una página de médicos con información detallada para el panel
+   * de administración (roles y especialidades), ordenados por nombre ascendente.
+   *
+   * @param page - Índice de página (base 0).
+   * @param size - Cantidad de médicos por página.
+   * @returns Observable con la respuesta paginada completa (content + metadata).
+   */
+  getDoctorsAdmin(
+    page = 0,
+    size = 4
+  ): Observable<PageResponse<DoctorAdminDto>> {
+    return this.http.get<PageResponse<DoctorAdminDto>>(
+      `${this.apiUrl}/user/system-doctors`,
+      { params: { page, size } }
+    );
   }
 
   /**
@@ -179,12 +188,18 @@ export class AdminService {
 
   // ── System Users ──────────────────────────────────────────────────────────
 
-  getSystemUsers(): Observable<SystemUser[]> {
-    return this.http
-      .get<PageResponse<SystemUser>>(`${this.apiUrl}/user/system-users`, {
-        params: { size: 100 },
-      })
-      .pipe(map((response) => response.content));
+  /**
+   * Obtiene una página de usuarios del sistema (médicos y/o agendadores).
+   *
+   * @param page - Índice de página (base 0).
+   * @param size - Cantidad de usuarios por página.
+   * @returns Observable con la respuesta paginada completa (content + metadata).
+   */
+  getSystemUsers(page = 0, size = 9): Observable<PageResponse<SystemUser>> {
+    return this.http.get<PageResponse<SystemUser>>(
+      `${this.apiUrl}/user/system-users`,
+      { params: { page, size } }
+    );
   }
 
   // ── Specialties ───────────────────────────────────────────────────────────
