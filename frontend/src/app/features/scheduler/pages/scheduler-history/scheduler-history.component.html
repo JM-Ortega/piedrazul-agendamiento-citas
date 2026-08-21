@@ -36,10 +36,11 @@
           [doctors]="doctors()"
           [states]="states()"
           title="Filtros Avanzados"
-          description="Los filtros se aplican automáticamente"
-          [(filterDoctor)]="filterDoctor"
-          [(filterDate)]="filterDate"
-          [(filterStatus)]="filterStatus"
+          description="Selecciona los filtros y aplica los cambios"
+          [appliedDoctor]="filterDoctor()"
+          [appliedDate]="filterDate()"
+          [appliedStatus]="filterStatus()"
+          (apply)="onApplyFilters($event)"
         ></app-filter>
       </div>
       <div
