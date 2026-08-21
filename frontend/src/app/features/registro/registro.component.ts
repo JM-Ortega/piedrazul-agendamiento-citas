@@ -24,19 +24,19 @@ import Keycloak from 'keycloak-js';
 import { ButtonComponent } from '../..//design-system/atoms/button/button.component';
 import { InputComponent } from '../../design-system/atoms/input/input.component';
 import {
-  SelectComponent,
-  SelectOption,
-} from '../../design-system/atoms/select/select.component';
-import { DatepickerComponent } from '../../design-system/molecules/datepicker/datepicker.component';
-import {
   PatientPublicResponse,
   PatientService,
 } from '../../core/services/patient.service';
 import {
-  PatientDataFormComponent,
   PatientFormData,
   EMPTY_PATIENT_FORM,
-} from '../../shared/components/form/register-form.component';
+  PatientFormComponent,
+} from '../../shared/components/forms/patient-form/patient-form.component';
+import {
+  ExistingUserFormData,
+  EMPTY_GUARDIAN_FORM,
+  ExistingUserFormComponent,
+} from '../../shared/components/forms/existing-users-form/existing-user-form.component';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
 import { SanitizeRule } from '../../design-system/atoms/input/input.component';
 import {
@@ -45,12 +45,21 @@ import {
   validateDocumentForType,
 } from '../../shared/helpers/document-validation';
 import { AppError } from '../../shared/models/interfaces/api-error.model';
-import {
-  parseLocalDateString,
-  toIsoDateString,
-} from '../../shared/helpers/transform-date-local';
 
 type RegistroStep = 1 | 2 | 3;
+
+/**
+ * Estado del paciente según la combinación de `patientExists`, `hasUserAccount`, `hasSystemUser` y `hasPatientRole`
+ * devuelta por `/patients/document/{doc}/public`:
+ *
+ * - 'not-found': paciente totalmente nuevo (F, F, F, F). Formulario completo + contraseña. No requiere OTP.
+ * - 'found': el paciente existe pero no tiene cuenta vinculada (T, F, F/T, F). Requiere OTP + contraseña.
+ * - 'existing-user': ya existe una cuenta vinculada pero no está registrado como paciente (F, T, T, F/T).
+ *    Requiere OTP + sexo/fecha nacimiento/teléfono de acudiente. No requiere contraseña.
+ * - 'needs-patient-role': paciente y cuenta existen, falta el rol de paciente (T, T, T, F). Solo requiere OTP.
+ * - 'already-linked': todo completo (T, T, T, T). No debe volver a pasar por el registro.
+ * - 'inconsistent': cualquier otra combinación.
+ */
 type PatientStatus =
   | 'idle'
   | 'not-found'
@@ -59,25 +68,6 @@ type PatientStatus =
   | 'needs-patient-role'
   | 'already-linked'
   | 'inconsistent';
-
-/** Datos mínimos requeridos cuando la persona ya tiene cuenta de usuario
- *  pero aún no está registrada como paciente. */
-interface ExistingUserRegistrationData {
-  sex: string;
-  birthDate: string;
-  guardianPhone: string;
-}
-
-const EMPTY_EXISTING_USER_DATA: ExistingUserRegistrationData = {
-  sex: '',
-  birthDate: '',
-  guardianPhone: '',
-};
-
-const SEX_OPTIONS: SelectOption[] = [
-  { value: 'MASCULINO', label: 'Masculino' },
-  { value: 'FEMENINO', label: 'Femenino' },
-];
 
 @Component({
   selector: 'app-registro',
@@ -93,9 +83,8 @@ const SEX_OPTIONS: SelectOption[] = [
     FormsModule,
     ButtonComponent,
     InputComponent,
-    SelectComponent,
-    DatepickerComponent,
-    PatientDataFormComponent,
+    PatientFormComponent,
+    ExistingUserFormComponent,
     FormatoPipe,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -109,11 +98,11 @@ export class RegistroComponent implements OnInit {
   private keycloak = inject(Keycloak);
   private router = inject(Router);
 
-  @ViewChild('patientForm') patientFormRef?: PatientDataFormComponent;
+  @ViewChild('patientForm') patientFormRef?: PatientFormComponent;
+  @ViewChild('existingUserForm') guardianFormRef?: ExistingUserFormComponent;
 
   readonly Eye = LucideEye;
   readonly EyeOff = LucideEyeOff;
-  readonly sexOptions = SEX_OPTIONS;
 
   step = signal<RegistroStep>(1);
   isLoading = signal(false);
@@ -126,12 +115,11 @@ export class RegistroComponent implements OnInit {
   patientStatus = signal<PatientStatus>('idle');
   foundPatient = signal<PatientPublicResponse | null>(null);
 
-  form = signal<PatientFormData>({ ...EMPTY_PATIENT_FORM });
+  /** Todos los datos para el caso en el que no existe usuario ni paciente. */
+  newPatientForm = signal<PatientFormData>({ ...EMPTY_PATIENT_FORM });
 
   /** Datos mínimos para el caso 'existing-user' (sexo, fecha de nacimiento, acudiente). */
-  existingUserData = signal<ExistingUserRegistrationData>({
-    ...EMPTY_EXISTING_USER_DATA,
-  });
+  existingUsersForm = signal<ExistingUserFormData>({ ...EMPTY_GUARDIAN_FORM });
 
   password = signal('');
   confirmPassword = signal('');
@@ -182,7 +170,7 @@ export class RegistroComponent implements OnInit {
       return `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim();
     }
 
-    const f = this.form();
+    const f = this.newPatientForm();
     if (f.firstName || f.lastName) {
       return `${f.firstName} ${f.lastName}`.trim();
     }
@@ -191,36 +179,29 @@ export class RegistroComponent implements OnInit {
   });
 
   documentSanitizeRule = computed<SanitizeRule>(() => {
-    const type = this.form().identificationType;
+    const type = this.newPatientForm().identificationType;
     if (!type) return 'alphanumeric';
     return DOCUMENT_RULES[type]?.sanitize ?? 'alphanumeric';
   });
 
   documentMaxLengthDynamic = computed<number>(() => {
-    const type = this.form().identificationType;
+    const type = this.newPatientForm().identificationType;
     return DOCUMENT_RULES[type]?.max ?? DEFAULT_DOCUMENT_MAX_LENGTH;
   });
 
-  /** Fecha de nacimiento del bloque 'existing-user' como Date, para el datepicker. */
-  existingUserBirthDateAsDate = computed<Date | null>(() => {
-    const raw = this.existingUserData().birthDate;
-    return raw ? parseLocalDateString(raw) : null;
-  });
-
-  /** true si, según la fecha de nacimiento ingresada, la persona es menor de edad. */
-  isMinorExistingUser = computed(() => {
-    const raw = this.existingUserData().birthDate;
-    if (!raw) return false;
-    return this.calcAge(parseLocalDateString(raw)) < 18;
-  });
-
-  onFormChange(value: PatientFormData): void {
-    this.form.set(value);
+  /** Actualiza los datos del formulario de nuevos pacientes (se registran todos los datos) */
+  onNewPatientFormChange(value: PatientFormData): void {
+    this.newPatientForm.set(value);
     this.revalidateDocumentNumber();
   }
 
+  /** Actualiza los datos del formulario de usuarios existentes (se registran los datos necesarios) */
+  onExistingUsersFormChange(value: ExistingUserFormData): void {
+    this.existingUsersForm.set(value);
+  }
+
   private revalidateDocumentNumber(): void {
-    const type = this.form().identificationType;
+    const type = this.newPatientForm().identificationType;
     if (!type) return;
     const msg = validateDocumentForType(type, this.documentNumber());
     this.errors.update((e) => {
@@ -246,26 +227,6 @@ export class RegistroComponent implements OnInit {
 
   onVerificationCodeChange(value: string | number | boolean | null): void {
     this.verificationCode.set(String(value ?? ''));
-  }
-
-  onExistingUserSexChange(value: string): void {
-    this.existingUserData.update((d) => ({ ...d, sex: value }));
-  }
-
-  onExistingUserBirthDateChange(date: Date | null): void {
-    this.existingUserData.update((d) => ({
-      ...d,
-      birthDate: date ? toIsoDateString(date) : '',
-    }));
-  }
-
-  onExistingUserGuardianPhoneChange(
-    value: string | number | boolean | null
-  ): void {
-    this.existingUserData.update((d) => ({
-      ...d,
-      guardianPhone: String(value ?? ''),
-    }));
   }
 
   searchPatient(): void {
@@ -294,6 +255,7 @@ export class RegistroComponent implements OnInit {
 
         const status = this.resolvePatientStatus(patient);
         this.patientStatus.set(status);
+
         if (status === 'inconsistent') {
           this.errorMessage.set(
             'No fue posible validar tu estado de registro. Por favor contacta a soporte.'
@@ -385,7 +347,10 @@ export class RegistroComponent implements OnInit {
     }
 
     if (this.patientStatus() === 'existing-user') {
-      if (!this.validateExistingUserData()) return;
+      const formOk = this.guardianFormRef
+        ? this.guardianFormRef.validate()
+        : true;
+      if (!formOk) return;
     }
 
     this.step.set(2);
@@ -442,7 +407,7 @@ export class RegistroComponent implements OnInit {
     }
 
     // paciente nuevo real
-    const f = this.form();
+    const f = this.newPatientForm();
 
     this.patientService
       .createWithUser({
@@ -472,7 +437,7 @@ export class RegistroComponent implements OnInit {
     this.successMessage.set('');
 
     const isExistingUser = this.isExistingSystemUser();
-    const extra = isExistingUser ? this.existingUserData() : null;
+    const extra = isExistingUser ? this.existingUsersForm() : null;
 
     this.patientService
       .confirmLinkUserAccount({
@@ -553,57 +518,10 @@ export class RegistroComponent implements OnInit {
     return Object.keys(newErrors).length === 0;
   }
 
-  /**
-   * Valida los 3 campos mínimos requeridos cuando la persona ya tiene
-   * cuenta de usuario pero aún no está registrada como paciente: sexo y
-   * fecha de nacimiento son obligatorios; el teléfono de acudiente solo es
-   * obligatorio si, según la fecha ingresada, es menor de 18 años.
-   */
-  private validateExistingUserData(): boolean {
-    const newErrors: Record<string, string> = {};
-    const data = this.existingUserData();
-
-    if (!data.sex) {
-      newErrors['sex'] = 'Este campo es obligatorio';
-    }
-
-    if (!data.birthDate) {
-      newErrors['birthDate'] = 'Ingrese una fecha de nacimiento válida';
-    } else {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const input = parseLocalDateString(data.birthDate);
-      input.setHours(0, 0, 0, 0);
-      if (input >= today) {
-        newErrors['birthDate'] =
-          'La fecha de nacimiento debe ser anterior a hoy';
-      }
-    }
-
-    const guardianPhone = data.guardianPhone.trim();
-    if (guardianPhone && !/^[0-9]{10}$/.test(guardianPhone)) {
-      newErrors['guardianPhone'] =
-        'Ingrese un número válido de exactamente 10 dígitos';
-    } else if (this.isMinorExistingUser() && !guardianPhone) {
-      newErrors['guardianPhone'] =
-        'El celular del acudiente es obligatorio para menores de 18 años';
-    }
-
-    this.errors.set(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }
-
-  private calcAge(birthDate: Date): number {
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
-    return age;
-  }
-
   private resetForm(): void {
-    this.form.set({ ...EMPTY_PATIENT_FORM });
-    this.existingUserData.set({ ...EMPTY_EXISTING_USER_DATA });
+    this.newPatientForm.set({ ...EMPTY_PATIENT_FORM });
+    this.existingUsersForm.set({ ...EMPTY_GUARDIAN_FORM });
     this.patientFormRef?.clearErrors();
+    this.guardianFormRef?.clearErrors();
   }
 }
