@@ -326,6 +326,7 @@ export class AppointmentBookingComponent implements OnInit {
             name: '',
             laborStart: null,
             laborEnd: null,
+            bookingWindowWeeks: null,
             workdays: [],
           }))
         );

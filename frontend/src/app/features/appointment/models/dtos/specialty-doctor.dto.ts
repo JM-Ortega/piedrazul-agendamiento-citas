@@ -4,5 +4,6 @@ export interface SpecialtyDoctor {
   name: string;
   laborStart: string | null;
   laborEnd: string | null;
+  bookingWindowWeeks: number | null;
   workdays: number[];
 }
