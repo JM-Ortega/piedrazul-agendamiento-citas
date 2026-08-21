@@ -14,6 +14,7 @@ export interface PatientPublicResponse {
   patientExists: boolean;
   hasUserAccount: boolean;
   hasSystemUser: boolean;
+  hasPatientRole: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -101,6 +102,9 @@ export class PatientService {
     identification: string;
     code: string;
     password?: string;
+    sex?: string;
+    birthDate?: string;
+    guardianPhone?: string;
   }): Observable<Patient> {
     return this.http.post<Patient>(
       `${this.apiUrl}/patients/link-user-account/confirm`,

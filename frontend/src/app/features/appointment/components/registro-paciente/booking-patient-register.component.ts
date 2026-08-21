@@ -17,9 +17,9 @@ import { ConfirmModalComponent } from '../../../../design-system/organisms/confi
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import {
-  PatientDataFormComponent,
+  PatientFormComponent,
   PatientFormData,
-} from '../../../../shared/components/form/register-form.component';
+} from '../../../../shared/components/forms/patient-form/patient-form.component';
 import {
   DOCUMENT_RULES,
   DEFAULT_DOCUMENT_MAX_LENGTH,
@@ -41,7 +41,7 @@ import { AppError } from '../../../../shared/models/interfaces/api-error.model';
     ButtonComponent,
     InputComponent,
     ConfirmModalComponent,
-    PatientDataFormComponent,
+    PatientFormComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-patient-register.component.html',
@@ -116,7 +116,7 @@ export class BookingPatientRegisterComponent {
    *
    * @param form - Referencia al organismo de datos del paciente, para invocar su validación.
    */
-  onContinue(form: PatientDataFormComponent): void {
+  onContinue(form: PatientFormComponent): void {
     const docErr = this.getDocumentFormatError();
     this.documentError.set(docErr);
     const formOk = form.validate();

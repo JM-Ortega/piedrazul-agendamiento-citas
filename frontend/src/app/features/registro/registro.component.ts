@@ -28,10 +28,15 @@ import {
   PatientService,
 } from '../../core/services/patient.service';
 import {
-  PatientDataFormComponent,
   PatientFormData,
   EMPTY_PATIENT_FORM,
-} from '../../shared/components/form/register-form.component';
+  PatientFormComponent,
+} from '../../shared/components/forms/patient-form/patient-form.component';
+import {
+  ExistingUserFormData,
+  EMPTY_GUARDIAN_FORM,
+  ExistingUserFormComponent,
+} from '../../shared/components/forms/existing-users-form/existing-user-form.component';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
 import { SanitizeRule } from '../../design-system/atoms/input/input.component';
 import {
@@ -42,8 +47,27 @@ import {
 import { AppError } from '../../shared/models/interfaces/api-error.model';
 
 type RegistroStep = 1 | 2 | 3;
+
+/**
+ * Estado del paciente según la combinación de `patientExists`, `hasUserAccount`, `hasSystemUser` y `hasPatientRole`
+ * devuelta por `/patients/document/{doc}/public`:
+ *
+ * - 'not-found': paciente totalmente nuevo (F, F, F, F). Formulario completo + contraseña. No requiere OTP.
+ * - 'found': el paciente existe pero no tiene cuenta vinculada (T, F, F/T, F). Requiere OTP + contraseña.
+ * - 'existing-user': ya existe una cuenta vinculada pero no está registrado como paciente (F, T, T, F/T).
+ *    Requiere OTP + sexo/fecha nacimiento/teléfono de acudiente. No requiere contraseña.
+ * - 'needs-patient-role': paciente y cuenta existen, falta el rol de paciente (T, T, T, F). Solo requiere OTP.
+ * - 'already-linked': todo completo (T, T, T, T). No debe volver a pasar por el registro.
+ * - 'inconsistent': cualquier otra combinación.
+ */
 type PatientStatus =
-  'idle' | 'found' | 'already-linked' | 'not-found' | 'existing-user';
+  | 'idle'
+  | 'not-found'
+  | 'found'
+  | 'existing-user'
+  | 'needs-patient-role'
+  | 'already-linked'
+  | 'inconsistent';
 
 @Component({
   selector: 'app-registro',
@@ -59,7 +83,8 @@ type PatientStatus =
     FormsModule,
     ButtonComponent,
     InputComponent,
-    PatientDataFormComponent,
+    PatientFormComponent,
+    ExistingUserFormComponent,
     FormatoPipe,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -73,7 +98,8 @@ export class RegistroComponent implements OnInit {
   private keycloak = inject(Keycloak);
   private router = inject(Router);
 
-  @ViewChild('patientForm') patientFormRef?: PatientDataFormComponent;
+  @ViewChild('patientForm') patientFormRef?: PatientFormComponent;
+  @ViewChild('existingUserForm') guardianFormRef?: ExistingUserFormComponent;
 
   readonly Eye = LucideEye;
   readonly EyeOff = LucideEyeOff;
@@ -89,7 +115,11 @@ export class RegistroComponent implements OnInit {
   patientStatus = signal<PatientStatus>('idle');
   foundPatient = signal<PatientPublicResponse | null>(null);
 
-  form = signal<PatientFormData>({ ...EMPTY_PATIENT_FORM });
+  /** Todos los datos para el caso en el que no existe usuario ni paciente. */
+  newPatientForm = signal<PatientFormData>({ ...EMPTY_PATIENT_FORM });
+
+  /** Datos mínimos para el caso 'existing-user' (sexo, fecha de nacimiento, acudiente). */
+  existingUsersForm = signal<ExistingUserFormData>({ ...EMPTY_GUARDIAN_FORM });
 
   password = signal('');
   confirmPassword = signal('');
@@ -109,9 +139,28 @@ export class RegistroComponent implements OnInit {
   readonly isExistingSystemUser = computed(
     () => this.patientStatus() === 'existing-user'
   );
+  /** Caso 3: paciente y cuenta ya existen, solo falta el rol de paciente. */
+  readonly needsPatientRoleOnly = computed(
+    () => this.patientStatus() === 'needs-patient-role'
+  );
+  /** Caso 4: ya está completamente registrado, no debe continuar. */
+  readonly isFullyRegistered = computed(
+    () => this.patientStatus() === 'already-linked'
+  );
+  /** Estado que no encaja en ninguno de los casos válidos. */
+  readonly isInconsistentState = computed(
+    () => this.patientStatus() === 'inconsistent'
+  );
 
   readonly requiresPassword = computed(
     () => this.isNewPatient() || this.isExistingPatient()
+  );
+  /** Casos que necesitan validar un código OTP (todos menos el paciente nuevo real). */
+  readonly requiresOtp = computed(
+    () =>
+      this.isExistingPatient() ||
+      this.isExistingSystemUser() ||
+      this.needsPatientRoleOnly()
   );
 
   readonly displayName = computed(() => {
@@ -121,7 +170,7 @@ export class RegistroComponent implements OnInit {
       return `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim();
     }
 
-    const f = this.form();
+    const f = this.newPatientForm();
     if (f.firstName || f.lastName) {
       return `${f.firstName} ${f.lastName}`.trim();
     }
@@ -130,23 +179,29 @@ export class RegistroComponent implements OnInit {
   });
 
   documentSanitizeRule = computed<SanitizeRule>(() => {
-    const type = this.form().identificationType;
+    const type = this.newPatientForm().identificationType;
     if (!type) return 'alphanumeric';
     return DOCUMENT_RULES[type]?.sanitize ?? 'alphanumeric';
   });
 
   documentMaxLengthDynamic = computed<number>(() => {
-    const type = this.form().identificationType;
+    const type = this.newPatientForm().identificationType;
     return DOCUMENT_RULES[type]?.max ?? DEFAULT_DOCUMENT_MAX_LENGTH;
   });
 
-  onFormChange(value: PatientFormData): void {
-    this.form.set(value);
+  /** Actualiza los datos del formulario de nuevos pacientes (se registran todos los datos) */
+  onNewPatientFormChange(value: PatientFormData): void {
+    this.newPatientForm.set(value);
     this.revalidateDocumentNumber();
   }
 
+  /** Actualiza los datos del formulario de usuarios existentes (se registran los datos necesarios) */
+  onExistingUsersFormChange(value: ExistingUserFormData): void {
+    this.existingUsersForm.set(value);
+  }
+
   private revalidateDocumentNumber(): void {
-    const type = this.form().identificationType;
+    const type = this.newPatientForm().identificationType;
     if (!type) return;
     const msg = validateDocumentForType(type, this.documentNumber());
     this.errors.update((e) => {
@@ -198,22 +253,14 @@ export class RegistroComponent implements OnInit {
         this.isLoading.set(false);
         this.foundPatient.set(patient);
 
-        // paciente ya vinculado
-        if (patient.hasUserAccount) {
-          this.patientStatus.set('already-linked');
-          return;
-        }
+        const status = this.resolvePatientStatus(patient);
+        this.patientStatus.set(status);
 
-        // paciente existente sin cuenta
-        if (patient.patientExists) {
-          this.patientStatus.set('found');
-          return;
+        if (status === 'inconsistent') {
+          this.errorMessage.set(
+            'No fue posible validar tu estado de registro. Por favor contacta a soporte.'
+          );
         }
-        if (patient.hasSystemUser) {
-          this.patientStatus.set('existing-user');
-          return;
-        }
-        this.patientStatus.set('not-found');
       },
       error: (err: AppError) => {
         this.isLoading.set(false);
@@ -224,6 +271,48 @@ export class RegistroComponent implements OnInit {
         this.errorMessage.set(err.message);
       },
     });
+  }
+
+  /**
+   * Determina el estado del paciente a partir de la combinación de las 4
+   * variables devueltas por el backend. Ver el comentario del tipo
+   * `PatientStatus` para el detalle de cada caso.
+   */
+  private resolvePatientStatus(p: PatientPublicResponse): PatientStatus {
+    const { patientExists, hasUserAccount, hasSystemUser, hasPatientRole } = p;
+
+    // Paciente totalmente nuevo: no existe registro ni cuenta de ningún tipo.
+    if (
+      !patientExists &&
+      !hasUserAccount &&
+      !hasSystemUser &&
+      !hasPatientRole
+    ) {
+      return 'not-found';
+    }
+
+    // Caso 1: el paciente existe pero no tiene cuenta vinculada.
+    if (patientExists && !hasUserAccount && !hasPatientRole) {
+      return 'found';
+    }
+
+    // Caso 2: ya tiene cuenta vinculada, pero no está registrado como
+    // paciente.
+    if (!patientExists && hasUserAccount && hasSystemUser) {
+      return 'existing-user';
+    }
+
+    // Caso 3: paciente y cuenta existen, solo falta el rol de paciente.
+    if (patientExists && hasUserAccount && hasSystemUser && !hasPatientRole) {
+      return 'needs-patient-role';
+    }
+
+    // Caso 4: todo completo, no debe volver a registrarse.
+    if (patientExists && hasUserAccount && hasSystemUser && hasPatientRole) {
+      return 'already-linked';
+    }
+
+    return 'inconsistent';
   }
 
   onDocumentChange(value: string): void {
@@ -245,12 +334,24 @@ export class RegistroComponent implements OnInit {
 
     if (this.patientStatus() === 'idle') return;
     if (this.patientStatus() === 'already-linked') return;
+    if (this.patientStatus() === 'inconsistent') return;
 
     this.revalidateDocumentNumber();
-    const docErr = this.errors()['documentNumber'];
-    const formOk = this.patientFormRef ? this.patientFormRef.validate() : true;
+    if (this.errors()['documentNumber']) return;
 
-    if (docErr || !formOk) return;
+    if (this.patientStatus() === 'not-found') {
+      const formOk = this.patientFormRef
+        ? this.patientFormRef.validate()
+        : true;
+      if (!formOk) return;
+    }
+
+    if (this.patientStatus() === 'existing-user') {
+      const formOk = this.guardianFormRef
+        ? this.guardianFormRef.validate()
+        : true;
+      if (!formOk) return;
+    }
 
     this.step.set(2);
   }
@@ -285,7 +386,11 @@ export class RegistroComponent implements OnInit {
     this.errorMessage.set('');
     this.successMessage.set('');
 
-    if (this.isExistingPatient() || this.isExistingSystemUser()) {
+    if (
+      this.isExistingPatient() ||
+      this.isExistingSystemUser() ||
+      this.needsPatientRoleOnly()
+    ) {
       this.patientService
         .requestLinkUserAccountCode({ identification: this.documentNumber() })
         .subscribe({
@@ -302,7 +407,7 @@ export class RegistroComponent implements OnInit {
     }
 
     // paciente nuevo real
-    const f = this.form();
+    const f = this.newPatientForm();
 
     this.patientService
       .createWithUser({
@@ -331,12 +436,19 @@ export class RegistroComponent implements OnInit {
     this.errorMessage.set('');
     this.successMessage.set('');
 
+    const isExistingUser = this.isExistingSystemUser();
+    const extra = isExistingUser ? this.existingUsersForm() : null;
+
     this.patientService
       .confirmLinkUserAccount({
         identification: this.documentNumber(),
         code: this.verificationCode(),
-        // solo enviar password si aplica
         password: this.requiresPassword() ? this.password() : undefined,
+        ...(extra && {
+          sex: extra.sex,
+          birthDate: extra.birthDate,
+          guardianPhone: extra.guardianPhone.trim() || undefined,
+        }),
       })
       .subscribe({
         next: () => this.onSuccess(),
@@ -407,7 +519,9 @@ export class RegistroComponent implements OnInit {
   }
 
   private resetForm(): void {
-    this.form.set({ ...EMPTY_PATIENT_FORM });
+    this.newPatientForm.set({ ...EMPTY_PATIENT_FORM });
+    this.existingUsersForm.set({ ...EMPTY_GUARDIAN_FORM });
     this.patientFormRef?.clearErrors();
+    this.guardianFormRef?.clearErrors();
   }
 }
