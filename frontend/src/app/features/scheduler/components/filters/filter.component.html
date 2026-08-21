@@ -7,50 +7,68 @@
     <p class="text-gray-600 mb-5 text-base">{{ description() }}</p>
   }
 
-  <div [class]="'grid grid-cols-1 gap-5 ' + gridColsClass">
-    @if (hasField('doctor')) {
-      <div>
-        <label for="filterDoctor" class="block text-gray-700 mb-2 text-lg"
-          >Médico / Terapista</label
-        >
-        <app-select
-          [id]="'filterDoctor'"
-          [options]="doctorOptions()"
-          placeholder="Todos los médicos"
-          [ngModel]="filterDoctor()"
-          (valueChange)="filterDoctor.set($event)"
-        ></app-select>
-      </div>
-    }
+  <div class="flex flex-col lg:flex-row lg:items-end gap-5">
+    <div [class]="'grid grid-cols-1 gap-5 flex-1 ' + gridColsClass">
+      @if (hasField('doctor')) {
+        <div>
+          <label for="filterDoctor" class="block text-gray-700 mb-2 text-lg"
+            >Médico / Terapista</label
+          >
+          <app-select
+            [id]="'filterDoctor'"
+            [options]="doctorOptions()"
+            placeholder="Todos los médicos"
+            [ngModel]="filterDoctor()"
+            (valueChange)="filterDoctor.set($event)"
+          ></app-select>
+        </div>
+      }
 
-    @if (hasField('date')) {
-      <div>
-        <label for="filterDate" class="block text-gray-700 mb-2 text-lg"
-          >Fecha Específica</label
-        >
-        <app-datepicker
-          [id]="'filterDate'"
-          [ngModel]="filterDateValue()"
-          (valueChange)="onDateChange($event)"
-        ></app-datepicker>
-      </div>
-    }
+      @if (hasField('date')) {
+        <div>
+          <label for="filterDate" class="block text-gray-700 mb-2 text-lg"
+            >Fecha Específica</label
+          >
+          <app-datepicker
+            [id]="'filterDate'"
+            [ngModel]="filterDateValue()"
+            (valueChange)="onDateChange($event)"
+          ></app-datepicker>
+        </div>
+      }
 
-    @if (hasField('status')) {
-      <div>
-        <label for="filterStatus" class="block text-gray-700 mb-2 text-lg"
-          >Estado de la Cita</label
-        >
-        <app-select
-          [id]="'filterStatus'"
-          [options]="statusOptions()"
-          placeholder="Todos los estados"
-          [ngModel]="filterStatus()"
-          (valueChange)="filterStatus.set($event)"
-        ></app-select>
-      </div>
-    }
+      @if (hasField('status')) {
+        <div>
+          <label for="filterStatus" class="block text-gray-700 mb-2 text-lg"
+            >Estado de la Cita</label
+          >
+          <app-select
+            [id]="'filterStatus'"
+            [options]="statusOptions()"
+            placeholder="Todos los estados"
+            [ngModel]="filterStatus()"
+            (valueChange)="filterStatus.set($event)"
+          ></app-select>
+        </div>
+      }
+    </div>
+
+    <!-- Botón para aplicar los filtros -->
+    <app-button
+      variant="primary"
+      [disabled]="!isDirty()"
+      (buttonClick)="onApply()"
+    >
+      Aplicar Filtros
+    </app-button>
   </div>
+
+  <!-- Mensaje fijo, siempre visible, indicando cómo funciona -->
+  <p class="text-sm text-gray-500 mt-3 flex items-center gap-1">
+    ℹ️ Los cambios en los filtros no se aplican automáticamente: selecciona las
+    opciones deseadas y haz clic en
+    <span class="font-semibold text-[#215c98]">"Aplicar Filtros"</span>.
+  </p>
 
   @if (
     (hasField('doctor') && filterDoctor()) ||
@@ -58,7 +76,9 @@
     (hasField('status') && filterStatus())
   ) {
     <div class="mt-4 flex flex-wrap gap-2 items-center">
-      <span class="text-md text-gray-600">Filtros activos:</span>
+      <span class="text-md text-gray-600">
+        Filtros seleccionados{{ isDirty() ? ' (sin aplicar):' : ':' }}
+      </span>
       @if (hasField('doctor') && filterDoctor()) {
         <span
           class="inline-flex items-center gap-1 bg-[#d9e9f8] text-[#215c98] px-3 py-1 rounded-lg text-sm"
