@@ -6,10 +6,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.Manu
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientProvisioningPort;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.BusySlotService;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.FirstAppointmentMustBeGeneralMedicineException;
@@ -128,11 +125,12 @@ class ManualSchedulingRollbackIT extends PostgresIntegrationSupport {
                 AppointmentService appointmentService,
                 ApplicationEventPublisher eventPublisher,
                 IsNewPatientUseCaseImpl isNewPatientUseCase,
-                SecurityContextExtractor securityExtractor) {
+                SecurityContextExtractor securityExtractor,
+                AppointmentConfigRepository appointmentConfigRepository) {
             return new AppointmentSchedulingService(
                     appointmentRepository, doctorConfigConsultPort,
                     appointmentService, eventPublisher, isNewPatientUseCase,
-                    securityExtractor);
+                    securityExtractor, appointmentConfigRepository);
         }
     }
 

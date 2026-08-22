@@ -40,6 +40,8 @@ public class AppointmentController {
     private final UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase;
     private final CancelAppointmentUseCase cancelAppointmentUseCase;
     private final GetAppointmentStatesUseCase getAppointmentStatesUseCase;
+    private final UpdateAutonomousSchedulingUseCase updateAutonomousSchedulingUseCase;
+    private final GetAutonomousSchedulingContidionUseCase getAutonomousSchedulingContidionUseCase;
 
     private final AppointmentSchedulingService appointmentSchedulingService;
     private final ManualPatientResolutionStrategy manualPatientResolutionStrategy;
@@ -55,7 +57,10 @@ public class AppointmentController {
             ListMyAppointmentsUseCase listMyAppointmentsUseCase,
             IsNewPatientUseCase isNewPatientUseCase,
             UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase,
-            CancelAppointmentUseCase cancelAppointmentUseCase, GetAppointmentStatesUseCase getAppointmentStatesUseCase,
+            CancelAppointmentUseCase cancelAppointmentUseCase,
+            GetAppointmentStatesUseCase getAppointmentStatesUseCase,
+            UpdateAutonomousSchedulingUseCase updateAutonomousSchedulingUseCase,
+            GetAutonomousSchedulingContidionUseCase getAutonomousSchedulingContidionUseCase,
             AppointmentSchedulingService appointmentSchedulingService,
             ManualPatientResolutionStrategy manualPatientResolutionStrategy,
             AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy,
@@ -70,11 +75,29 @@ public class AppointmentController {
         this.updateAppointmentStatusUseCase = updateAppointmentStatusUseCase;
         this.cancelAppointmentUseCase = cancelAppointmentUseCase;
         this.getAppointmentStatesUseCase = getAppointmentStatesUseCase;
+        this.updateAutonomousSchedulingUseCase = updateAutonomousSchedulingUseCase;
+        this.getAutonomousSchedulingContidionUseCase = getAutonomousSchedulingContidionUseCase;
         this.appointmentSchedulingService = appointmentSchedulingService;
         this.manualPatientResolutionStrategy = manualPatientResolutionStrategy;
         this.autonomousPatientResolutionStrategy = autonomousPatientResolutionStrategy;
         this.securityContextExtractor = securityContextExtractor;
         this.personExternalService = personExternalService;
+    }
+
+    //Permite cambiar la condicion para el agendamiento autonomo. (Activo o no activo)
+    @PutMapping("/config/autonomous-scheduling")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> setAutonomousSchedulingEnabled(@RequestParam boolean enabled) {
+        updateAutonomousSchedulingUseCase.setEnabledAutonomous(enabled);
+        return ResponseEntity.ok().build();
+    }
+
+    // Obtener la condicion del estado del agendamiento autonomo (Activo o no activo)
+    @GetMapping("/config/autonomous-scheduling")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SCHEDULER', 'PATIENT', 'DOCTOR')")
+    public ResponseEntity<Boolean> getAutonomousSchedulingStatus() {
+        boolean enabled = getAutonomousSchedulingContidionUseCase.isAutonomousSchedulingEnabled();
+        return ResponseEntity.ok(enabled);
     }
 
     // Franjas disponibles según el médico y la fecha

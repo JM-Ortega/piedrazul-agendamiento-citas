@@ -302,6 +302,23 @@ CREATE INDEX idx_appointment_specialty ON piedrazul.appointment (specialty_code)
 CREATE INDEX idx_appointment_state ON piedrazul.appointment (state_code);
 
 -- ---------------------------------------------------------------------
+-- Tabla: appointment_config
+-- Almacena el estado de configuración del módulo de citas para el agendamiento autonomo.
+-- True = habilitado, False = deshabilitado.
+-- Se mantiene como singleton (una sola fila) para simplificar la lógica de negocio.
+-- ---------------------------------------------------------------------
+CREATE TABLE piedrazul.appointment_config(
+    id INTEGER NOT NULL DEFAULT 1,
+    autonomous_scheduling_enabled BOOLEAN NOT NULL,
+
+    CONSTRAINT pk_appointment_config PRIMARY KEY (id),
+    CONSTRAINT ck_appointment_config_singleton CHECK (id = 1)
+);
+
+INSERT INTO piedrazul.appointment_config (id, autonomous_scheduling_enabled)
+VALUES (1, true);
+
+-- ---------------------------------------------------------------------
 -- Tabla: clinical_history
 -- Registro de historia clínica asociado a una cita. patient_id se
 -- mantiene explícito junto a appointment_id

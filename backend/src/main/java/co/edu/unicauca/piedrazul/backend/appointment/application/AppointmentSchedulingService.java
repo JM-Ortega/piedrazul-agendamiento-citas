@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.PatientResolutionStrategy;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentConfigRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.ResolvedPatient;
@@ -17,6 +18,7 @@ import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -31,6 +33,7 @@ public class AppointmentSchedulingService {
     private final ApplicationEventPublisher eventPublisher;
     private final IsNewPatientUseCase isNewPatientUseCase;
     private final SecurityContextExtractor securityExtractor;
+    private final AppointmentConfigRepository appointmentConfigRepository;
 
 
     public AppointmentSchedulingService(
@@ -39,13 +42,15 @@ public class AppointmentSchedulingService {
             AppointmentService appointmentService,
             ApplicationEventPublisher eventPublisher,
             IsNewPatientUseCase isNewPatientUseCase,
-            SecurityContextExtractor securityExtractor){
+            SecurityContextExtractor securityExtractor,
+            AppointmentConfigRepository appointmentConfigRepository){
         this.appointmentRepository = appointmentRepository;
         this.doctorConfigConsultPort = doctorConfigConsultPort;
         this.appointmentService = appointmentService;
         this.eventPublisher = eventPublisher;
         this.isNewPatientUseCase = isNewPatientUseCase;
         this.securityExtractor = securityExtractor;
+        this.appointmentConfigRepository = appointmentConfigRepository;
     }
 
     @Transactional
@@ -69,7 +74,14 @@ public class AppointmentSchedulingService {
             AppointmentTime startTime,
             UUID performedBy,
             PatientResolutionStrategy patientResolutionStrategy) {
+        validateAutonomousSchedulingEnabled();
         schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, false);
+    }
+
+    private void validateAutonomousSchedulingEnabled() {
+        if(!appointmentConfigRepository.isAutonomousSchedulingEnabled()) {
+            throw new AppointmentSchedulingDisableException("La programación autónoma de citas está deshabilitada. Comunicate con el centro medico para agendar tu cita");
+        }
     }
 
     private Appointment schedule(
