@@ -6,9 +6,14 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface DoctorConfigConsultPort {
+
+    //Obtiene el id del doctor a través de el id de usuario
+    Optional<UUID> findByUserId(UUID userId);
+
     // Devuelve las franjas horarias que maneja el médico ese día
     List<AppointmentTime> getSlotsByDoctor(UUID idDoctor, LocalDate date);
 

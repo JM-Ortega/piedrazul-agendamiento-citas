@@ -5,12 +5,12 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 public interface DoctorExternalService {
+
+    Optional<UUID> findByUserId(UUID userId);
+
     List<LocalTime> getSlotsByDoctor(UUID idDoctor, LocalDate date);
 
     int getIntervalMinutesByDoctor(UUID idDoctor);

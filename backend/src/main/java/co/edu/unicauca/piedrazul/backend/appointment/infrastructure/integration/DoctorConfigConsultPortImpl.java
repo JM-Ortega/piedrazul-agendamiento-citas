@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -18,6 +19,11 @@ public class DoctorConfigConsultPortImpl implements DoctorConfigConsultPort {
 
     public DoctorConfigConsultPortImpl(DoctorExternalService doctorExternalService) {
         this.doctorExternalService = doctorExternalService;
+    }
+
+    @Override
+    public Optional<UUID> findByUserId(UUID userId) {
+        return doctorExternalService.findByUserId(userId);
     }
 
     @Override

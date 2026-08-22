@@ -9,14 +9,12 @@ import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 import jakarta.transaction.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.time.DayOfWeek;
 import java.util.stream.Collectors;
 
@@ -31,6 +29,13 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
         this.doctorRepository = doctorRepository;
         this.scheduleService = scheduleService;
         this.personExternalService = personExternalService;
+    }
+
+    @Override
+    public Optional<UUID> findByUserId(UUID userId) {
+        return personExternalService.findByUserId(userId)
+                .filter(person -> doctorRepository.existsById(person.id()))
+                .map(PersonSummary::id);
     }
 
     @Override
