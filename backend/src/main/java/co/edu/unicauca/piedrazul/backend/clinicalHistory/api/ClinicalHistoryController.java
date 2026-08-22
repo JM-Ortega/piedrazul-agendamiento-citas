@@ -18,7 +18,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/clinical-history")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('DOCTOR')")
 public class ClinicalHistoryController {
     private final ClinicalHistoryExternalServiceImpl service;
 
