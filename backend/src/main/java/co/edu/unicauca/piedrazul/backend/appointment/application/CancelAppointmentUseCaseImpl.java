@@ -17,9 +17,15 @@ public class CancelAppointmentUseCaseImpl implements CancelAppointmentUseCase {
     }
 
     @Override
-    public void cancel(UUID  appointmentId) {
+    public void cancel(UUID  appointmentId, UUID patientId) {
 
         Appointment appointment = appointmentRepository.findById(appointmentId);
+
+        if(patientId != null && !patientId.equals(appointment.getIdPatient())) {
+            throw new AppointmentAccessDeniedException(
+                    "El paciente con id " + patientId + " no puede cancelar la cita con id " + appointmentId
+            );
+        }
 
         // No se pueden cancelar citas pasadas (ya manejamos que sean ATENDIDA o NO_ASISTIO)
         //pero por doble seguridad

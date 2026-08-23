@@ -5,6 +5,10 @@ import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.Auto
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.ManualPatientResolutionStrategy;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentPatientNotFoundException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.DoctorConfigInconsistentException;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.ClinicalHistoryDescription;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.ListAppointmentFiltersRequest;
@@ -13,13 +17,13 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.outp
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.PageResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.CitaDtoMapper;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
-import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
-import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
+
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -46,8 +50,9 @@ public class AppointmentController {
     private final AppointmentSchedulingService appointmentSchedulingService;
     private final ManualPatientResolutionStrategy manualPatientResolutionStrategy;
     private final AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy;
-    private final SecurityContextExtractor securityContextExtractor;
-    private final PersonExternalService personExternalService;
+    private final PatientConsultPort patientConsultPort;
+    private final DoctorConfigConsultPort doctorConfigConsultPort;
+
 
     public AppointmentController(
             GetAvailableSlotsUseCase getAvailableSlotsUseCase,
@@ -64,8 +69,8 @@ public class AppointmentController {
             AppointmentSchedulingService appointmentSchedulingService,
             ManualPatientResolutionStrategy manualPatientResolutionStrategy,
             AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy,
-            SecurityContextExtractor securityContextExtractor,
-            PersonExternalService personExternalService) {
+            PatientConsultPort patientConsultPort,
+            DoctorConfigConsultPort doctorConfigConsultPort) {
         this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
         this.listAppointmentsUseCase = listAppointmentsUseCase;
         this.getSpecialtiesWithDoctorUseCase = getSpecialtiesWithDoctorUseCase;
@@ -80,8 +85,8 @@ public class AppointmentController {
         this.appointmentSchedulingService = appointmentSchedulingService;
         this.manualPatientResolutionStrategy = manualPatientResolutionStrategy;
         this.autonomousPatientResolutionStrategy = autonomousPatientResolutionStrategy;
-        this.securityContextExtractor = securityContextExtractor;
-        this.personExternalService = personExternalService;
+        this.patientConsultPort = patientConsultPort;
+        this.doctorConfigConsultPort = doctorConfigConsultPort;
     }
 
     //Permite cambiar la condicion para el agendamiento autonomo. (Activo o no activo)
@@ -117,31 +122,35 @@ public class AppointmentController {
     @GetMapping
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<PageResponse<AppointmentResponse>> list(
-            @ModelAttribute ListAppointmentFiltersRequest request) {
-        UUID authenticatedActorId = UUID.fromString(securityContextExtractor.currentActorId());
-        String userRoles = securityContextExtractor.currentActorRoles();
+            @ModelAttribute ListAppointmentFiltersRequest request,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication) {
 
-        if (userRoles.contains("PATIENT")) {
-            request.setIdPatient(personExternalService.findPersonIdByUserId(authenticatedActorId));
+        UUID userId = UUID.fromString(jwt.getSubject());
+
+        if (hasRole(authentication, "SCHEDULER")) {
+            // Sin restricción — puede filtrar libremente por cualquier doctor/paciente/fecha/estado
+        } else if (hasRole(authentication, "PATIENT")) {
+            UUID idPatient = patientConsultPort.findByUserId(userId)
+                    .map(PatientSnapshot::idPatient)
+                    .orElseThrow(() -> new AppointmentPatientNotFoundException(
+                            "Paciente no encontrado para el userId: " + userId));
+            request.setIdPatient(idPatient);
+        } else if (hasRole(authentication, "DOCTOR")) {
+            UUID idDoctor = doctorConfigConsultPort.findByUserId(userId)
+                    .orElseThrow(() -> new DoctorConfigInconsistentException(
+                            "Doctor no encontrado para el userId: " + userId));
+            request.setIdDoctor(idDoctor);
         }
-        else if (userRoles.contains("DOCTOR")) {
-            request.setIdDoctor(personExternalService.findPersonIdByUserId(authenticatedActorId));
-        }
+        // SCHEDULER no se restringe: puede filtrar libremente por cualquier doctor/paciente
 
         PageQuery pageQuery = request.toPageQuery();
-
         PagedResult<Appointment> appointmentPage = listAppointmentsUseCase.listBy(
-                request.getIdDoctor(),
-                request.getIdPatient(),
-                request.getDate(),
-                request.getState(),
-                pageQuery
+                request.getIdDoctor(), request.getIdPatient(), request.getDate(), request.getState(), pageQuery
         );
 
         List<AppointmentResponse> content = citaDtoMapper.toResponseList(appointmentPage.content());
-        PageResponse<AppointmentResponse> response = PageResponse.from(appointmentPage, content);
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(PageResponse.from(appointmentPage, content));
     }
 
 
@@ -172,10 +181,19 @@ public class AppointmentController {
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<Void> scheduleAppointment(
             @RequestBody @Valid AppointmentRequest request,
-            @AuthenticationPrincipal Jwt jwt) {
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication) {
 
         request.validate();
         UUID performedBy = resolvePerformedBy(jwt);
+
+        if (request.getSchedulingOrigin() == SchedulingOrigin.AUTONOMO && hasRole(authentication, "PATIENT")) {
+            UUID idPatient = patientConsultPort.findByUserId(performedBy)
+                    .map(PatientSnapshot::idPatient)
+                    .orElseThrow(() -> new AppointmentPatientNotFoundException(
+                            "Paciente no encontrado para el userId: " + performedBy));
+            request.setPatientId(idPatient);
+        }
 
         switch (request.getSchedulingOrigin()) {
             case MANUAL -> appointmentSchedulingService.scheduleManual(
@@ -240,8 +258,23 @@ public class AppointmentController {
     //Cancelar una cita
     @PutMapping("/{appointmentId}/cancel")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT')")
-    public ResponseEntity<Void> cancelAppointment(@PathVariable UUID appointmentId) {
-        cancelAppointmentUseCase.cancel(appointmentId);
+    public ResponseEntity<Void> cancelAppointment(
+            @PathVariable UUID appointmentId,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication) {
+
+        UUID patientId = null;
+
+        if(hasRole(authentication, "PATIENT")){
+            UUID userId = UUID.fromString(jwt.getSubject());
+            patientId = patientConsultPort.findByUserId(userId)
+                    .map(PatientSnapshot::idPatient)
+                    .orElseThrow(() -> new AppointmentPatientNotFoundException(
+                            "Paciente no encontrado para el userId: " + userId));
+
+        }
+
+        cancelAppointmentUseCase.cancel(appointmentId, patientId);
         return ResponseEntity.noContent().build(); // 204
     }
 
@@ -253,7 +286,13 @@ public class AppointmentController {
         return ResponseEntity.ok(states);
     }
 
+    // Helper methods
     private UUID resolvePerformedBy(Jwt jwt) {
         return UUID.fromString(jwt.getSubject());
+    }
+
+    private boolean hasRole(Authentication authentication, String role) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_" + role));
     }
 }

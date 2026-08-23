@@ -12,8 +12,8 @@ import java.util.List;
 @NoArgsConstructor
 public class PageResponse<T> {
     private List<T> content;
-    private int pageNumber;
-    private int pageSize;
+    private int page;
+    private int size;
     private long totalElements;
     private int totalPages;
     private boolean first;
@@ -28,8 +28,8 @@ public class PageResponse<T> {
 
         return PageResponse.<T>builder()
                 .content(content)
-                .pageNumber(pagedResult.pageNumber())
-                .pageSize(pagedResult.pageSize())
+                .page(pagedResult.pageNumber())
+                .size(pagedResult.pageSize())
                 .totalElements(pagedResult.totalElements())
                 .totalPages(pagedResult.totalPages())
                 .first(isFirst)

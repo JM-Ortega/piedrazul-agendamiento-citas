@@ -107,6 +107,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
                 "Dr. Lopez",
                 LocalDate.now().plusMonths(6),
                 LocalDate.now(),
+                2,
                 List.of(1, 2, 3)
         );
 
@@ -169,6 +170,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
                 "Dr. Lopez",
                 LocalDate.now().plusMonths(6),
                 LocalDate.now(),
+                2,
                 List.of(1)
         );
         DoctorResponse response2 = new DoctorResponse(
@@ -177,6 +179,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
                 "Dr. Gomez",
                 LocalDate.now().plusMonths(6),
                 LocalDate.now(),
+                2,
                 List.of(1, 2)
         );
 
@@ -219,6 +222,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
                 "Dr. Lopez",
                 LocalDate.now().plusMonths(6),
                 LocalDate.now(),
+                2,
                 List.of(1)
         );
         DoctorResponse response2 = new DoctorResponse(
@@ -227,6 +231,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
                 "Dr. Gomez",
                 LocalDate.now().plusMonths(6),
                 LocalDate.now(),
+                2,
                 List.of(1)
         );
 
@@ -263,6 +268,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
                 "Dr. General",
                 LocalDate.now().plusMonths(6),
                 LocalDate.now(),
+                2,
                 List.of(1, 2, 3)
         );
 
