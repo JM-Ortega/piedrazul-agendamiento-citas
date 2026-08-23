@@ -92,8 +92,6 @@ export class CreateUserDoctorFormComponent {
   get hasScheduleData(): boolean {
     const d = this.data;
     return !!(
-      d.laborStart ||
-      d.laborEnd ||
       d.startTime ||
       d.endTime ||
       d.interval ||
@@ -105,8 +103,6 @@ export class CreateUserDoctorFormComponent {
   /** True si algún campo del bloque de horario/período laboral tiene error. */
   get hasScheduleErrors(): boolean {
     return !!(
-      this.errors['laborStart'] ||
-      this.errors['laborEnd'] ||
       this.errors['startTime'] ||
       this.errors['endTime'] ||
       this.errors['interval'] ||
