@@ -128,14 +128,18 @@ public class AppointmentController {
 
         UUID userId = UUID.fromString(jwt.getSubject());
 
-        if (hasRole(authentication, "PATIENT")) {
+        if (hasRole(authentication, "SCHEDULER")) {
+            // Sin restricción — puede filtrar libremente por cualquier doctor/paciente/fecha/estado
+        } else if (hasRole(authentication, "PATIENT")) {
             UUID idPatient = patientConsultPort.findByUserId(userId)
                     .map(PatientSnapshot::idPatient)
-                    .orElseThrow(() -> new AppointmentPatientNotFoundException("Paciente no encontrado para el userId: " + userId));
+                    .orElseThrow(() -> new AppointmentPatientNotFoundException(
+                            "Paciente no encontrado para el userId: " + userId));
             request.setIdPatient(idPatient);
         } else if (hasRole(authentication, "DOCTOR")) {
             UUID idDoctor = doctorConfigConsultPort.findByUserId(userId)
-                    .orElseThrow(() -> new DoctorConfigInconsistentException("Doctor no encontrado para el userId: " + userId));
+                    .orElseThrow(() -> new DoctorConfigInconsistentException(
+                            "Doctor no encontrado para el userId: " + userId));
             request.setIdDoctor(idDoctor);
         }
         // SCHEDULER no se restringe: puede filtrar libremente por cualquier doctor/paciente

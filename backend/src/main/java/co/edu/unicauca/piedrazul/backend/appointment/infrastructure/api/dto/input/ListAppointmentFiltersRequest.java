@@ -16,8 +16,8 @@ public class ListAppointmentFiltersRequest {
     private UUID idPatient;
     private LocalDate date;
     private AppointmentState state;
-    private int pageNumber = 0;      // Valor por defecto
-    private int pageSize = 5;     // Valor por defecto
+    private int page = 0;      // Valor por defecto
+    private int size = 5;     // Valor por defecto
     private String sortBy = "date";
     private String sortDirection = "DESC";
 
@@ -27,8 +27,8 @@ public class ListAppointmentFiltersRequest {
     );
 
     public PageQuery toPageQuery() {
-        int validatedPage = Math.max(pageNumber, 0);
-        int validatedSize = Math.min(Math.max(pageSize, 1), 100);
+        int validatedPage = Math.max(page, 0);
+        int validatedSize = Math.clamp(size, 1, 100);
         String validSortBy = isValidSortField(sortBy) ? sortBy : "date";
         boolean ascending = "ASC".equalsIgnoreCase(sortDirection);
 

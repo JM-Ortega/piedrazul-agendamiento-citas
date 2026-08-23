@@ -14,6 +14,7 @@ public record DoctorResponse(
         String name,
         LocalDate laborEnd,
         LocalDate laborStart,
+        int bookingWindowWeeks,
         List<Integer> workdays
 ) {
     // Un método estático para convertir la entidad en DTO fácilmente
@@ -26,6 +27,7 @@ public record DoctorResponse(
                 name,
                 doctor.getLaborEnd(),
                 doctor.getLaborStart(),
+                doctor.getBookingWindowWeeks(),
                 Optional.ofNullable(doctor.getSchedules())
                         .orElse(new HashSet<>())
                         .stream()
