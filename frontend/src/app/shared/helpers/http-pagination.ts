@@ -9,6 +9,6 @@ export function withPagination(
   pageSize?: number
 ): HttpParams {
   return params
-    .set('pageNumber', (pageNumber ?? 0).toString())
-    .set('pageSize', (pageSize ?? DEFAULT_PAGE_SIZE).toString());
+    .set('page', (pageNumber ?? 0).toString())
+    .set('size', (pageSize ?? DEFAULT_PAGE_SIZE).toString());
 }

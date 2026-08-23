@@ -2,7 +2,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
   OnInit,
   signal,
@@ -50,6 +49,7 @@ export class SchedulerDashboardComponent implements OnInit {
   doctors = signal<dtoDoctor[]>([]);
   states = signal<string[]>([]);
 
+  // Filtros aplicados (los que están reflejados en la consulta actual).
   filterDoctor = signal('');
   filterStatus = signal('');
 
@@ -73,15 +73,6 @@ export class SchedulerDashboardComponent implements OnInit {
     this.doctors().find((d) => d.id === this.filterDoctor())
   );
 
-  constructor() {
-    effect(() => {
-      const doctorId = this.filterDoctor();
-      const status = this.filterStatus();
-      this.pageNumber.set(0);
-      this.loadAppointments(doctorId, status, 0);
-    });
-  }
-
   ngOnInit(): void {
     this.schedulerService
       .getDoctors()
@@ -89,6 +80,15 @@ export class SchedulerDashboardComponent implements OnInit {
     this.schedulerService
       .getStates()
       .subscribe((data) => this.states.set(data));
+    this.loadAppointments('', '', 0);
+  }
+
+  /** Se conecta al evento (apply) de app-filter. */
+  onApplyFilters(filters: { doctor: string; status: string }): void {
+    this.filterDoctor.set(filters.doctor);
+    this.filterStatus.set(filters.status);
+    this.pageNumber.set(0);
+    this.loadAppointments(filters.doctor, filters.status, 0);
   }
 
   /**
