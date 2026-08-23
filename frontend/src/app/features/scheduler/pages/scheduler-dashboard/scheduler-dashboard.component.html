@@ -15,8 +15,9 @@
           [states]="states()"
           title="Filtros"
           [description]="'Citas del ' + formatDate(today)"
-          [(filterDoctor)]="filterDoctor"
-          [(filterStatus)]="filterStatus"
+          [appliedDoctor]="filterDoctor()"
+          [appliedStatus]="filterStatus()"
+          (apply)="onApplyFilters($event)"
         ></app-filter>
       </div>
       <div class="mb-6 flex justify-between">

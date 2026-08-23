@@ -1,4 +1,4 @@
-import { Component, computed, input, model } from '@angular/core';
+import { Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideSearch } from '@lucide/angular';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
@@ -16,6 +16,12 @@ import {
 } from '../../../../shared/helpers/transform-date-local';
 
 export type SchedulerFilterField = 'doctor' | 'date' | 'status';
+
+export interface SchedulerFilterValues {
+  doctor: string;
+  date: string;
+  status: string;
+}
 
 @Component({
   selector: 'app-filter',
@@ -36,11 +42,35 @@ export class SchedulerFiltersComponent {
   title = input('Filtros');
   description = input('');
 
+  /**
+   * Valores actualmente aplicados. Se usan para inicializar el
+   * borrador y para saber si hay cambios pendientes.
+   */
+  appliedDoctor = input('');
+  appliedDate = input('');
+  appliedStatus = input('');
+
+  /** Se emite únicamente cuando el usuario hace clic en "Aplicar Filtros". */
+  apply = output<SchedulerFilterValues>();
+
   private formatoPipe = new FormatoPipe();
 
-  filterDoctor = model('');
-  filterDate = model('');
-  filterStatus = model('');
+  /**
+   * Borrador local: lo que el usuario está seleccionando en pantalla,
+   * inicializado desde los valores aplicados. No se propaga al padre
+   * hasta que se presiona "Aplicar".
+   */
+  filterDoctor = signal(this.appliedDoctor());
+  filterDate = signal(this.appliedDate());
+  filterStatus = signal(this.appliedStatus());
+
+  /** True si el borrador difiere de lo último aplicado. */
+  isDirty = computed(
+    () =>
+      this.filterDoctor() !== this.appliedDoctor() ||
+      this.filterDate() !== this.appliedDate() ||
+      this.filterStatus() !== this.appliedStatus()
+  );
 
   doctorOptions = computed<SelectOption[]>(() =>
     this.doctors().map((d) => ({
@@ -96,5 +126,14 @@ export class SchedulerFiltersComponent {
 
   clearStatus(): void {
     this.filterStatus.set('');
+  }
+
+  onApply(): void {
+    if (!this.isDirty()) return;
+    this.apply.emit({
+      doctor: this.filterDoctor(),
+      date: this.filterDate(),
+      status: this.filterStatus(),
+    });
   }
 }
