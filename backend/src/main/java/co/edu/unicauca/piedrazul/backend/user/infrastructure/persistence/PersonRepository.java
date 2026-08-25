@@ -62,23 +62,29 @@ public interface PersonRepository extends JpaRepository<Person, UUID> {
             @Param("userIds") Collection<UUID> userIds);
 
     @Query(
-        value = """
-            SELECT p.*
-            FROM piedrazul.person p
-            WHERE p.id IN (:ids)
-              AND extensions.immutable_unaccent(lower(p.first_name || ' ' || p.last_name))
-                  LIKE extensions.immutable_unaccent(lower('%' || :term || '%')) ESCAPE '\\'
-            ORDER BY extensions.immutable_unaccent(lower(p.first_name || ' ' || p.last_name)), p.id
-            """,
-        countQuery = """
-            SELECT COUNT(*)
-            FROM piedrazul.person p
-            WHERE p.id IN (:ids)
-              AND extensions.immutable_unaccent(lower(p.first_name || ' ' || p.last_name))
-                  LIKE extensions.immutable_unaccent(lower('%' || :term || '%')) ESCAPE '\\'
-            """,
-        nativeQuery = true)
-    Page<Person> findByIdInAndFullNameContaining(
+            value = """
+        SELECT p.*
+        FROM piedrazul.person p
+        WHERE p.id IN (:ids)
+          AND (
+                extensions.immutable_unaccent(lower(p.first_name || ' ' || p.last_name))
+                    LIKE extensions.immutable_unaccent(lower('%' || :term || '%')) ESCAPE '\\'
+                OR p.identification LIKE ('%' || :term || '%') ESCAPE '\\'
+              )
+        ORDER BY extensions.immutable_unaccent(lower(p.first_name || ' ' || p.last_name)), p.id
+        """,
+            countQuery = """
+        SELECT COUNT(*)
+        FROM piedrazul.person p
+        WHERE p.id IN (:ids)
+          AND (
+                extensions.immutable_unaccent(lower(p.first_name || ' ' || p.last_name))
+                    LIKE extensions.immutable_unaccent(lower('%' || :term || '%')) ESCAPE '\\'
+                OR p.identification LIKE ('%' || :term || '%') ESCAPE '\\'
+              )
+        """,
+            nativeQuery = true)
+    Page<Person> findByIdInAndFullNameOrIdentificationContaining(
             @Param("ids") Collection<UUID> ids,
             @Param("term") String term,
             Pageable pageable);

@@ -208,9 +208,9 @@ public class PersonExternalServiceImp implements PersonExternalService {
     }
 
     @Override
-    public Page<PersonSummary> findByIdsAndNameContaining(Collection<UUID> ids, String term, Pageable pageable) {
+    public Page<PersonSummary> findByIdsAndNameOrIdentificationContaining(Collection<UUID> ids, String term, Pageable pageable) {
         if (ids == null) {
-            throw new InvalidUserDataException("El id del usaurio es requerido");
+            throw new InvalidUserDataException("El id del usuario es requerido");
         }
         if (term == null || term.isBlank()) {
             throw new InvalidUserDataException("El usuario es requerido");
@@ -239,7 +239,7 @@ public class PersonExternalServiceImp implements PersonExternalService {
                 .replace("%", "\\%")
                 .replace("_", "\\_");
 
-        return personRepository.findByIdInAndFullNameContaining(ids, escaped, pageable)
+        return personRepository.findByIdInAndFullNameOrIdentificationContaining(ids, escaped, pageable)
                 .map(PersonApiMapper::toSummary);
     }
 }

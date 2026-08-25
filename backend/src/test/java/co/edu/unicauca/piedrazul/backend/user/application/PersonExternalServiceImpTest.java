@@ -48,7 +48,7 @@ class PersonExternalServiceImpTest {
     @Test
     void findByIdsAndNameContainingShouldThrowWhenIdsIsNull() {
         assertThrows(InvalidUserDataException.class,
-                () -> personExternalServiceImp.findByIdsAndNameContaining(null, "ort", VALID_PAGEABLE));
+                () -> personExternalServiceImp.findByIdsAndNameOrIdentificationContaining(null, "ort", VALID_PAGEABLE));
 
         verifyNoInteractions(personRepository);
     }
@@ -56,7 +56,7 @@ class PersonExternalServiceImpTest {
     @Test
     void findByIdsAndNameContainingShouldThrowWhenTermIsNull() {
         assertThrows(InvalidUserDataException.class,
-                () -> personExternalServiceImp.findByIdsAndNameContaining(Set.of(ID_1), null, VALID_PAGEABLE));
+                () -> personExternalServiceImp.findByIdsAndNameOrIdentificationContaining(Set.of(ID_1), null, VALID_PAGEABLE));
 
         verifyNoInteractions(personRepository);
     }
@@ -64,7 +64,7 @@ class PersonExternalServiceImpTest {
     @Test
     void findByIdsAndNameContainingShouldThrowWhenTermIsBlank() {
         assertThrows(InvalidUserDataException.class,
-                () -> personExternalServiceImp.findByIdsAndNameContaining(Set.of(ID_1), "   ", VALID_PAGEABLE));
+                () -> personExternalServiceImp.findByIdsAndNameOrIdentificationContaining(Set.of(ID_1), "   ", VALID_PAGEABLE));
 
         verifyNoInteractions(personRepository);
     }
@@ -73,7 +73,7 @@ class PersonExternalServiceImpTest {
     void findByIdsAndNameContainingShouldThrowWhenTermIsOnlyWhitespaceAfterCollapsing() {
         // colapsa a un solo espacio, que sigue estando en blanco tras trim
         assertThrows(InvalidUserDataException.class,
-                () -> personExternalServiceImp.findByIdsAndNameContaining(Set.of(ID_1), "  \t  \n ", VALID_PAGEABLE));
+                () -> personExternalServiceImp.findByIdsAndNameOrIdentificationContaining(Set.of(ID_1), "  \t  \n ", VALID_PAGEABLE));
 
         verifyNoInteractions(personRepository);
     }
@@ -81,7 +81,7 @@ class PersonExternalServiceImpTest {
     @Test
     void findByIdsAndNameContainingShouldThrowWhenPageableIsNull() {
         assertThrows(InvalidUserDataException.class,
-                () -> personExternalServiceImp.findByIdsAndNameContaining(Set.of(ID_1), "ort", null));
+                () -> personExternalServiceImp.findByIdsAndNameOrIdentificationContaining(Set.of(ID_1), "ort", null));
 
         verifyNoInteractions(personRepository);
     }
@@ -89,7 +89,7 @@ class PersonExternalServiceImpTest {
     @Test
     void findByIdsAndNameContainingShouldThrowWhenPageableIsUnpaged() {
         assertThrows(InvalidUserDataException.class,
-                () -> personExternalServiceImp.findByIdsAndNameContaining(Set.of(ID_1), "ort", Pageable.unpaged()));
+                () -> personExternalServiceImp.findByIdsAndNameOrIdentificationContaining(Set.of(ID_1), "ort", Pageable.unpaged()));
 
         verifyNoInteractions(personRepository);
     }
@@ -99,48 +99,48 @@ class PersonExternalServiceImpTest {
         Pageable sortedPageable = PageRequest.of(0, 10, Sort.by("firstName"));
 
         assertThrows(InvalidUserDataException.class,
-                () -> personExternalServiceImp.findByIdsAndNameContaining(Set.of(ID_1), "ort", sortedPageable));
+                () -> personExternalServiceImp.findByIdsAndNameOrIdentificationContaining(Set.of(ID_1), "ort", sortedPageable));
 
         verifyNoInteractions(personRepository);
     }
 
     @Test
-    void findByIdsAndNameContainingShouldReturnEmptyPageWithoutQueryingWhenIdsIsEmpty() {
-        Page<PersonSummary> result = personExternalServiceImp.findByIdsAndNameContaining(Set.of(), "ort", VALID_PAGEABLE);
+    void findByIdsAndNameOrIdentificationContainingShouldReturnEmptyPageWithoutQueryingWhenIdsIsEmpty() {
+        Page<PersonSummary> result = personExternalServiceImp.findByIdsAndNameOrIdentificationContaining(Set.of(), "ort", VALID_PAGEABLE);
 
         assertTrue(result.isEmpty());
         assertEquals(0, result.getTotalElements());
-        verify(personRepository, never()).findByIdInAndFullNameContaining(any(), any(), any());
+        verify(personRepository, never()).findByIdInAndFullNameOrIdentificationContaining(any(), any(), any());
     }
 
     @Test
-    void findByIdsAndNameContainingShouldCollapseRepeatedWhitespaceBeforeQuerying() {
-        when(personRepository.findByIdInAndFullNameContaining(any(), any(), any()))
+    void findByIdsAndNameOrIdentificationContainingShouldCollapseRepeatedWhitespaceBeforeQuerying() {
+        when(personRepository.findByIdInAndFullNameOrIdentificationContaining(any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        personExternalServiceImp.findByIdsAndNameContaining(Set.of(ID_1), "juan   ort", VALID_PAGEABLE);
+        personExternalServiceImp.findByIdsAndNameOrIdentificationContaining(Set.of(ID_1), "juan   ort", VALID_PAGEABLE);
 
         ArgumentCaptor<String> termCaptor = ArgumentCaptor.forClass(String.class);
-        verify(personRepository).findByIdInAndFullNameContaining(eq(Set.of(ID_1)), termCaptor.capture(), eq(VALID_PAGEABLE));
+        verify(personRepository).findByIdInAndFullNameOrIdentificationContaining(eq(Set.of(ID_1)), termCaptor.capture(), eq(VALID_PAGEABLE));
 
         assertEquals("juan ort", termCaptor.getValue());
     }
 
     @Test
-    void findByIdsAndNameContainingShouldEscapeLikeWildcardsAndBackslash() {
-        when(personRepository.findByIdInAndFullNameContaining(any(), any(), any()))
+    void findByIdsAndNameOrIdentificationContainingShouldEscapeLikeWildcardsAndBackslash() {
+        when(personRepository.findByIdInAndFullNameOrIdentificationContaining(any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        personExternalServiceImp.findByIdsAndNameContaining(Set.of(ID_1), "100%_\\ana", VALID_PAGEABLE);
+        personExternalServiceImp.findByIdsAndNameOrIdentificationContaining(Set.of(ID_1), "100%_\\ana", VALID_PAGEABLE);
 
         ArgumentCaptor<String> termCaptor = ArgumentCaptor.forClass(String.class);
-        verify(personRepository).findByIdInAndFullNameContaining(eq(Set.of(ID_1)), termCaptor.capture(), eq(VALID_PAGEABLE));
+        verify(personRepository).findByIdInAndFullNameOrIdentificationContaining(eq(Set.of(ID_1)), termCaptor.capture(), eq(VALID_PAGEABLE));
 
         assertEquals("100\\%\\_\\\\ana", termCaptor.getValue());
     }
 
     @Test
-    void findByIdsAndNameContainingShouldMapRepositoryPageToPersonSummaryPage() {
+    void findByIdsAndNameOrIdentificationContainingShouldMapRepositoryPageToPersonSummaryPage() {
         Person person = new Person(
                 null,
                 IdentificationType.CEDULA,
@@ -152,10 +152,10 @@ class PersonExternalServiceImpTest {
         );
         person.setId(ID_1);
 
-        when(personRepository.findByIdInAndFullNameContaining(any(), any(), any()))
+        when(personRepository.findByIdInAndFullNameOrIdentificationContaining(any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of(person), VALID_PAGEABLE, 1));
 
-        Page<PersonSummary> result = personExternalServiceImp.findByIdsAndNameContaining(Set.of(ID_1), "ort", VALID_PAGEABLE);
+        Page<PersonSummary> result = personExternalServiceImp.findByIdsAndNameOrIdentificationContaining(Set.of(ID_1), "ort", VALID_PAGEABLE);
 
         assertEquals(1, result.getTotalElements());
         assertEquals(ID_1, result.getContent().get(0).id());
