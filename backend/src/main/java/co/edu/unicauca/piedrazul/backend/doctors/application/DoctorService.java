@@ -11,9 +11,11 @@ import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.Doct
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.SpecialtyRepository;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
@@ -178,24 +180,63 @@ public class DoctorService implements DoctorProvisioningApi {
         return doctorRepository.findAll();
     }
 
-    public Page<DoctorDetailedResponse> findAllDoctorsDetailed(Pageable pageable) {
+    public Page<DoctorDetailedResponse> findAllDoctorsDetailed(Pageable pageable, String search) {
 
+        if (search != null && !search.isBlank()) {
+            return findBySearchTermDetailed(search, pageable);
+        }
+
+        return findAllDetailed(pageable);
+    }
+
+    private Page<DoctorDetailedResponse> findBySearchTermDetailed(String search, Pageable pageable) {
+        List<UUID> allDoctorIds = doctorRepository.findAll().stream()
+                .map(Doctor::getPersonId)
+                .toList();
+
+        if (allDoctorIds.isEmpty()) {
+            return new PageImpl<>(List.of(), pageable, 0);
+        }
+
+        // findByIdsAndNameOrIdentificationContaining no admite Sort personalizado.
+        Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+
+        Page<PersonSummary> personPage = personExternalService
+                .findByIdsAndNameOrIdentificationContaining(allDoctorIds, search, unsortedPageable);
+
+        List<UUID> matchedIds = personPage.getContent().stream()
+                .map(PersonSummary::id) // ajustá al getter/record real de PersonSummary
+                .toList();
+
+        Map<UUID, Doctor> doctorsById = doctorRepository.findAllById(matchedIds).stream()
+                .collect(Collectors.toMap(Doctor::getPersonId, d -> d));
+
+        // Se respeta el orden que devuelve el servicio de persona
+        List<DoctorDetailedResponse> content = personPage.getContent().stream()
+                .map(person -> {
+                    Doctor doctor = doctorsById.get(person.id());
+                    return doctor == null ? null : DoctorDetailedResponse.fromEntity(doctor, person.firstName()+person.lastName());
+                })
+                .filter(Objects::nonNull)
+                .toList();
+
+        return new PageImpl<>(content, pageable, personPage.getTotalElements());
+    }
+
+    private Page<DoctorDetailedResponse> findAllDetailed(Pageable pageable) {
         boolean isSortingByName = pageable.getSort().stream()
                 .anyMatch(order -> order.getProperty().equalsIgnoreCase("name"));
 
         if (isSortingByName) {
-            // 1. Si ordena por nombre (externo), obtenemos TODOS los médicos de BD sin paginar
             List<Doctor> allDoctors = doctorRepository.findAll();
 
             List<UUID> allIds = allDoctors.stream().map(Doctor::getPersonId).toList();
             Map<UUID, String> allNames = personExternalService.getPersonNames(allIds);
 
-            // 2. Mapeamos a DTO
             List<DoctorDetailedResponse> allResponses = allDoctors.stream()
                     .map(doctor -> DoctorDetailedResponse.fromEntity(doctor, allNames.get(doctor.getPersonId())))
                     .collect(Collectors.toList());
 
-            // 3. Ordenamos por nombre
             boolean isDescending = pageable.getSort().getOrderFor("name").isDescending();
             Comparator<DoctorDetailedResponse> nameComparator = Comparator.comparing(
                     d -> d.name() == null ? "" : d.name(),
@@ -206,7 +247,6 @@ public class DoctorService implements DoctorProvisioningApi {
             }
             allResponses.sort(nameComparator);
 
-            // 4. Paginamos manualmente
             int total = allResponses.size();
             int start = (int) pageable.getOffset();
             int end = Math.min((start + pageable.getPageSize()), total);
@@ -215,11 +255,8 @@ public class DoctorService implements DoctorProvisioningApi {
                 return new PageImpl<>(List.of(), pageable, total);
             }
 
-            List<DoctorDetailedResponse> pagedResponses = allResponses.subList(start, end);
-            return new PageImpl<>(pagedResponses, pageable, total);
-
+            return new PageImpl<>(allResponses.subList(start, end), pageable, total);
         } else {
-            // 5. Para cualquier otro campo propio (laborStart, status, etc.), la BD se encarga
             Page<Doctor> doctors = doctorRepository.findAll(pageable);
 
             List<UUID> ids = doctors.getContent().stream().map(Doctor::getPersonId).toList();

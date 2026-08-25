@@ -93,11 +93,11 @@ public class DoctorController {
         return ResponseEntity.ok(responses);
     }
 
-
     @GetMapping("/detailed")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Listar doctores con información detallada",
-            description = "Devuelve una página con doctores registrados, incluyendo información detallada, ordenada y paginada según los parámetros recibidos.")
+            description = "Devuelve una página con doctores registrados, incluyendo información detallada, "
+                    + "ordenada y paginada según los parámetros recibidos. Permite filtrar por nombre o cédula.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Doctores obtenidos correctamente"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),
@@ -105,12 +105,13 @@ public class DoctorController {
     })
     public ResponseEntity<PageResponse<DoctorDetailedResponse>> getDoctorsDetailed(
             @Parameter(description = "Parámetros de paginación y ordenamiento")
-            @PageableDefault(page = 0, size = 9, sort = "name", direction = Sort.Direction.ASC) Pageable pageable
+            @PageableDefault(page = 0, size = 9, sort = "name", direction = Sort.Direction.ASC) Pageable pageable,
+            @Parameter(description = "Término de búsqueda por nombre completo o cédula del doctor")
+            @RequestParam(required = false) String search
     ) {
-        Page<DoctorDetailedResponse> doctors = doctorService.findAllDoctorsDetailed(pageable);
+        Page<DoctorDetailedResponse> doctors = doctorService.findAllDoctorsDetailed(pageable, search);
         return ResponseEntity.ok(PageResponse.from(doctors));
     }
-
 
     @GetMapping("/patients/specialties")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
