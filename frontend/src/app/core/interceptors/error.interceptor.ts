@@ -1,7 +1,8 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { catchError, throwError } from 'rxjs';
 import Keycloak from 'keycloak-js';
+import { catchError, tap, throwError } from 'rxjs';
+import { AppHealthService } from '../services/app-health.service';
 import { normalizeHttpError } from './normalize-http-error';
 
 /**
@@ -11,19 +12,30 @@ import { normalizeHttpError } from './normalize-http-error';
  * `normalizeHttpError`, y lo relanza para que cada componente decida cómo
  * reaccionar (mostrar mensaje, navegar, limpiar campos, etc.).
  *
- * El único caso resuelto de forma global, sin intervención de componentes,
- * es la sesión expirada (`UNAUTHORIZED`): siempre redirige a login, ya que
- * no existe una decisión de negocio distinta posible para ese caso.
+ * Dos casos se resuelven de forma global, sin intervención de componentes:
+ * - Sesión expirada (`UNAUTHORIZED`): siempre redirige a login.
+ * - Backend inalcanzable (`NETWORK_ERROR`/`OFFLINE`): activa un estado
+ *   global (`AppHealthService`) que bloquea la UI con una pantalla de error,
+ *   ya que en ese caso ningún componente puede operar con datos reales.
  */
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const keycloak = inject(Keycloak);
+  const appHealth = inject(AppHealthService);
 
   return next(req).pipe(
+    tap(() => appHealth.reportReachable()),
     catchError((error: HttpErrorResponse) => {
       const appError = normalizeHttpError(error);
 
       if (appError.errorCode === 'UNAUTHORIZED') {
         keycloak.login({ redirectUri: window.location.href });
+      }
+
+      if (
+        appError.errorCode === 'NETWORK_ERROR' ||
+        appError.errorCode === 'OFFLINE'
+      ) {
+        appHealth.reportUnreachable();
       }
 
       return throwError(() => appError);
