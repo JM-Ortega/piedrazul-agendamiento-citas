@@ -68,15 +68,6 @@
       </div>
     }
 
-    <!-- Loading -->
-    @if (loading()) {
-      <div
-        class="bg-white rounded-2xl shadow-md p-7 text-center text-gray-400 text-lg py-10"
-      >
-        Cargando usuarios...
-      </div>
-    }
-
     <!-- Empty -->
     @if (!loading() && systemUsers().length === 0) {
       <div class="bg-white rounded-2xl shadow-md p-7">
@@ -87,85 +78,117 @@
     }
 
     <!-- Lista unificada de usuarios -->
-    @if (!loading() && systemUsers().length > 0) {
+    @if (systemUsers().length > 0 || loading()) {
       <div class="bg-white rounded-2xl shadow-md p-7">
-        <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
-          <h2
-            class="text-[#163c63] text-2xl font-semibold flex items-center gap-2"
-          >
-            <svg lucideUsers [size]="26"></svg>
-            Usuarios ({{ pagination()?.totalElements ?? systemUsers().length }})
-          </h2>
+        <div class="mb-6 space-y-3">
+          <div class="flex items-center justify-between flex-wrap gap-4">
+            <h2
+              class="text-[#163c63] text-2xl font-semibold flex items-center gap-2"
+            >
+              <svg lucideUsers [size]="26"></svg>
+              Usuarios ({{
+                pagination()?.totalElements ?? systemUsers().length
+              }})
+            </h2>
 
-          <app-pagination
-            [pagination]="pagination()"
-            (pageChange)="onPageChange($event)"
+            <app-pagination
+              [pagination]="pagination()"
+              (pageChange)="onPageChange($event)"
+            />
+          </div>
+
+          <app-sort-control
+            [options]="sortOptions"
+            [field]="sortField()"
+            [direction]="sortDirection()"
+            (fieldChange)="onSortFieldChange($event)"
+            (directionChange)="onSortDirectionChange($event)"
           />
         </div>
-        <div
-          class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-6"
-        >
-          @for (user of systemUsers(); track user.id) {
-            @let style = userStyle(user);
-            <div
-              [class]="
-                'border-2 rounded-xl p-5 hover:shadow-lg transition-shadow ' +
-                style.card
-              "
-            >
-              <div class="flex items-center gap-3 flex-1 mb-3">
-                <div [class]="'rounded-full p-3 shrink-0 ' + style.iconBg">
-                  @switch (style.icon) {
-                    @case ('users') {
-                      <svg lucideUsers class="text-white" [size]="24"></svg>
+
+        <div class="relative">
+          @if (loading()) {
+            <div class="absolute inset-0 flex items-center justify-center z-10">
+              <div
+                class="w-8 h-8 border-3 border-[#215c98] border-t-transparent rounded-full animate-spin"
+              ></div>
+            </div>
+          }
+
+          <div
+            class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-6 transition-opacity duration-300"
+            [class.opacity-40]="loading()"
+            [class.pointer-events-none]="loading()"
+          >
+            @for (user of systemUsers(); track user.id) {
+              @let style = userStyle(user);
+              <div
+                animate.enter="card-enter-animation"
+                [class]="
+                  'border-2 rounded-xl p-5 hover:shadow-lg transition-shadow ' +
+                  style.card
+                "
+              >
+                <div class="flex items-center gap-3 flex-1 mb-3">
+                  <div [class]="'rounded-full p-3 shrink-0 ' + style.iconBg">
+                    @switch (style.icon) {
+                      @case ('users') {
+                        <svg lucideUsers class="text-white" [size]="24"></svg>
+                      }
+                      @case ('stethoscope') {
+                        <svg
+                          lucideStethoscope
+                          class="text-white"
+                          [size]="24"
+                        ></svg>
+                      }
+                      @case ('calendar') {
+                        <svg
+                          lucideCalendar
+                          [size]="24"
+                          class="text-white"
+                        ></svg>
+                      }
                     }
-                    @case ('stethoscope') {
-                      <svg
-                        lucideStethoscope
-                        class="text-white"
-                        [size]="24"
-                      ></svg>
-                    }
-                    @case ('calendar') {
-                      <svg lucideCalendar [size]="24" class="text-white"></svg>
-                    }
-                  }
+                  </div>
+                  <div class="flex-1">
+                    <h3 [class]="'text-lg font-bold ' + style.title">
+                      {{ user.firstName }} {{ user.lastName }}
+                    </h3>
+                    <div class="flex flex-wrap gap-1 mt-1">
+                      @for (role of relevantRoles(user); track role) {
+                        <span
+                          class="text-xs px-2 py-1 rounded-full font-medium"
+                          [class.bg-[#d9e9f8]]="role.toUpperCase() === 'DOCTOR'"
+                          [class.text-[#215c98]]="
+                            role.toUpperCase() === 'DOCTOR'
+                          "
+                          [class.bg-green-100]="
+                            role.toUpperCase() === 'SCHEDULER'
+                          "
+                          [class.text-green-700]="
+                            role.toUpperCase() === 'SCHEDULER'
+                          "
+                          >{{ roleLabel(role) }}</span
+                        >
+                      }
+                    </div>
+                  </div>
                 </div>
-                <div class="flex-1">
-                  <h3 [class]="'text-lg font-bold ' + style.title">
-                    {{ user.firstName }} {{ user.lastName }}
-                  </h3>
-                  <div class="flex flex-wrap gap-1 mt-1">
-                    @for (role of relevantRoles(user); track role) {
-                      <span
-                        class="text-xs px-2 py-1 rounded-full font-medium"
-                        [class.bg-[#d9e9f8]]="role.toUpperCase() === 'DOCTOR'"
-                        [class.text-[#215c98]]="role.toUpperCase() === 'DOCTOR'"
-                        [class.bg-green-100]="
-                          role.toUpperCase() === 'SCHEDULER'
-                        "
-                        [class.text-green-700]="
-                          role.toUpperCase() === 'SCHEDULER'
-                        "
-                        >{{ roleLabel(role) }}</span
-                      >
-                    }
+                <div class="space-y-2 text-sm text-gray-700 ml-14">
+                  <div class="flex items-center gap-2">
+                    <svg
+                      lucideCreditCard
+                      [size]="16"
+                      [class]="style.docIcon"
+                    ></svg>
+                    <span class="font-medium">Doc:</span>
+                    <span>{{ user.documentId }}</span>
                   </div>
                 </div>
               </div>
-              <div class="space-y-2 text-sm text-gray-700 ml-14">
-                <div class="flex items-center gap-2">
-                  <svg
-                    lucideCreditCard
-                    [size]="16"
-                    [class]="style.docIcon"
-                  ></svg>
-                  <span class="font-medium">Doc:</span>
-                  <span>{{ user.documentId }}</span>
-                </div>
-              </div>
-            </div>
-          }
+            }
+          </div>
         </div>
       </div>
     }

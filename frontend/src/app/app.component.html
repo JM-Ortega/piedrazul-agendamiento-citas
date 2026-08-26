@@ -1,13 +1,66 @@
-<app-navbar></app-navbar>
+@switch (bootstrapState()) {
+  @case ('loading') {
+    <div
+      class="fixed inset-0 flex flex-col items-center justify-center gap-4 bg-blue-50 z-50"
+    >
+      <div
+        class="w-12 h-12 border-4 border-[#215c98] border-t-transparent rounded-full animate-spin"
+      ></div>
+      <p class="text-[#163c63] text-lg">Verificando su sesión...</p>
+    </div>
+  }
 
-<main class="min-h-screen">
-  <router-outlet></router-outlet>
-</main>
+  @case ('keycloak-error') {
+    <div
+      class="fixed inset-0 flex flex-col items-center justify-center gap-4 bg-blue-50 px-4 text-center z-50"
+    >
+      <img
+        src="error.png"
+        alt="Error de conexión con el servidor"
+        class="w-70 h-70"
+      />
+      <p class="text-[#163c63] text-xl font-semibold">
+        No pudimos conectar con el servidor de autenticación
+      </p>
+      <p class="text-gray-600 max-w-md">
+        Verifique su conexión a internet o intente de nuevo en unos momentos.
+      </p>
+      <button
+        (click)="retry()"
+        class="mt-2 bg-[#215c98] hover:bg-[#163c63] text-white px-6 py-3 rounded-xl font-semibold transition-colors"
+      >
+        Reintentar
+      </button>
+    </div>
+  }
 
-<footer class="bg-[#163c63] text-white text-center py-4">
-  <div class="max-w-4xl mx-auto px-4">
-    <p class="text-blue-100 text-sm">
-      © 2026 Piedra Azul Salud — Todos los derechos reservados
-    </p>
-  </div>
-</footer>
+  @case ('backend-error') {
+    <div
+      class="fixed inset-0 flex flex-col items-center justify-center gap-4 bg-blue-50 px-4 text-center z-50"
+    >
+      <img
+        src="error.png"
+        alt="Error de conexión con el servidor"
+        class="w-70 h-70"
+      />
+      <p class="text-[#163c63] text-xl font-semibold">
+        No se pudo conectar con el servidor
+      </p>
+      <p class="text-gray-600 max-w-md">
+        No tienes conexión a internet o el servidor no está disponible en este
+        momento.
+      </p>
+      <button
+        (click)="retry()"
+        class="mt-2 bg-[#215c98] hover:bg-[#163c63] text-white px-6 py-3 rounded-xl font-semibold transition-colors"
+      >
+        Reintentar
+      </button>
+    </div>
+  }
+
+  @case ('ready') {
+    <app-navbar />
+    <router-outlet />
+  }
+}

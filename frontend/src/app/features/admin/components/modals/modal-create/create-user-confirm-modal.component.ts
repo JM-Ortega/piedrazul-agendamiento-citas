@@ -47,8 +47,6 @@ export class CreateUserConfirmModalComponent {
   get hasScheduleData(): boolean {
     const f = this.userForm;
     return !!(
-      f.laborStart ||
-      f.laborEnd ||
       f.startTime ||
       f.endTime ||
       f.interval ||

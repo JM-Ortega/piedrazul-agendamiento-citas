@@ -108,6 +108,10 @@ export class DoctorAllAppointmentsComponent {
   hasAnyAppointments = computed(
     () => this.appointmentsState.content().length > 0
   );
+
+  todayAppointmentsList = computed(() =>
+    this.appointmentsState.content().filter((a) => a.date === this.today)
+  );
   filteredAppointments = computed(() => {
     let result = this.appointmentsState.content();
 

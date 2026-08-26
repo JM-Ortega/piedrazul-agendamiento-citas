@@ -27,9 +27,6 @@
                   formatDate(today)
                 }})
               </p>
-              <p class="text-green-700 text-base font-medium mt-1">
-                Filtros activos aplicados al reporte
-              </p>
             </div>
           </div>
           <button
@@ -229,9 +226,9 @@
   @if (showExportModal()) {
     <app-export-modal
       [idDoctor]="currentDoctor()?.id ?? null"
-      [filterStatus]="filterStatus()"
       [doctorName]="currentDoctor()?.name ?? null"
       [todayFormatted]="formatDate(today)"
+      [appointments]="todayAppointmentsList()"
       (closed)="showExportModal.set(false)"
     />
   }

@@ -306,8 +306,8 @@ export class AdminCreateUserComponent implements OnInit {
       doctor: this.hasDoctorRole
         ? {
             specialty: this.userForm.specialty,
-            laborStart: scheduleTouched ? this.userForm.laborStart : null,
-            laborEnd: scheduleTouched ? this.userForm.laborEnd : null,
+            laborStart: this.userForm.laborStart,
+            laborEnd: this.userForm.laborEnd,
             appointmentInterval: scheduleTouched
               ? this.userForm.interval
               : null,

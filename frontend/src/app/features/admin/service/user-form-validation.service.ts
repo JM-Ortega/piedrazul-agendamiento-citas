@@ -40,8 +40,6 @@ export class UserFormValidationService {
   };
 
   readonly SCHEDULE_GROUP_FIELDS: (keyof FormErrors)[] = [
-    'laborStart',
-    'laborEnd',
     'startTime',
     'endTime',
     'interval',
@@ -51,8 +49,6 @@ export class UserFormValidationService {
 
   isScheduleGroupTouched(form: UserForm): boolean {
     return !!(
-      form.laborStart ||
-      form.laborEnd ||
       form.startTime ||
       form.endTime ||
       form.interval ||
@@ -121,7 +117,7 @@ export class UserFormValidationService {
           : undefined;
 
       case 'laborStart':
-        if (!hasDoctorRole || !scheduleTouched) return undefined;
+        if (!hasDoctorRole) return undefined;
         if (!form.laborStart)
           return 'La fecha de inicio laboral es obligatoria.';
         if (parseInt(form.laborStart.split('-')[0], 10) > 9999)
@@ -131,7 +127,7 @@ export class UserFormValidationService {
         return undefined;
 
       case 'laborEnd':
-        if (!hasDoctorRole || !scheduleTouched) return undefined;
+        if (!hasDoctorRole) return undefined;
         if (!form.laborEnd) return 'La fecha de fin laboral es obligatoria.';
         if (parseInt(form.laborEnd.split('-')[0], 10) > 9999)
           return 'El año no puede tener más de 4 dígitos.';

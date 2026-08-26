@@ -24,6 +24,7 @@ import {
 } from '@lucide/angular';
 import { SchedulerService } from '../../../core/services/scheduler.service';
 import { AppointmentExportRequest } from '../../../shared/models/dtos/AppointmentExportRequest.dto';
+import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { ExportColumnBackend } from '../../../shared/models/types/ExportColumnBackend.type';
 import { ExportFormatBackend } from '../../../shared/models/types/ExportFormatBackend.type';
 import { ButtonComponent } from '../../atoms/button/button.component';
@@ -41,6 +42,7 @@ export type ExportColumnKey =
 
 type ExportFormat = 'excel' | 'pdf' | 'csv';
 type ExportColumns = Record<ExportColumnKey, boolean>;
+type ExportStep = 1 | 2;
 
 interface ColumnDef {
   key: ExportColumnKey;
@@ -86,6 +88,14 @@ const EXT_MAP: Record<ExportFormat, string> = {
   csv: 'csv',
 };
 
+const EXPORT_STATUSES = [
+  'AGENDADA',
+  'REPROGRAMADA',
+  'CANCELADA',
+  'NO_ASISTIO',
+  'ATENDIDA',
+] as const;
+
 @Component({
   selector: 'app-export-modal',
   templateUrl: './export-modal.component.html',
@@ -101,20 +111,23 @@ export class ExportModalComponent {
   /** ID del doctor. Si es null → no filtra por doctor (agendador sin filtro) */
   idDoctor = input<string | null>(null);
 
-  /** Estado activo. Si es null o vacío → todos los estados */
-  filterStatus = input<string | null>(null);
-
   /** Nombre legible del doctor filtrado (para mostrar en el aviso) */
   doctorName = input<string | null>(null);
 
   /** Fecha de hoy formateada para mostrar en el aviso */
   todayFormatted = input.required<string>();
 
+  /** Citas de hoy (todos los estados), para calcular conteos por estado */
+  appointments = input<AppointmentsPatient[]>([]);
+
   // ── Output ─────────────────────────────────────────────────────────────────
   /** Emite cuando el modal debe cerrarse (éxito o cancelación) */
   closed = output<void>();
 
   // ── Estado interno ─────────────────────────────────────────────────────────
+  currentStep = signal<ExportStep>(1);
+  exportStatusFilter = signal<string>('all');
+
   exportFormat = signal<ExportFormat>('excel');
   exportingInProgress = signal(false);
   exportError = signal<string | null>(null);
@@ -172,7 +185,35 @@ export class ExportModalComponent {
     },
   ];
 
+  readonly statusLabels: Record<string, string> = {
+    all: 'Todos los estados',
+    AGENDADA: 'Confirmadas',
+    REPROGRAMADA: 'Reprogramadas',
+    CANCELADA: 'Canceladas',
+    NO_ASISTIO: 'No asistió',
+    ATENDIDA: 'Atendidas',
+  };
+
+  /** Opciones de estado para el select, en el orden en que deben mostrarse. */
+  readonly statusOptions: string[] = ['all', ...EXPORT_STATUSES];
+
   // ── Computed ───────────────────────────────────────────────────────────────
+
+  /** Cantidad de citas de hoy por cada estado, más el total en 'all'. */
+  statusCounts = computed<Record<string, number>>(() => {
+    const list = this.appointments();
+    const counts: Record<string, number> = { all: list.length };
+    for (const s of EXPORT_STATUSES) {
+      counts[s] = list.filter((a) => a.appointmentState === s).length;
+    }
+    return counts;
+  });
+
+  /** Cantidad de citas que se exportarán según el estado seleccionado. */
+  selectedCount = computed(
+    () => this.statusCounts()[this.exportStatusFilter()] ?? 0
+  );
+
   hasSelectedColumns = computed(() =>
     Object.values(this.exportColumns()).some((v) => v)
   );
@@ -211,14 +252,14 @@ export class ExportModalComponent {
     }
   });
 
-  statusLabel(s: string): string {
-    const map: Record<string, string> = {
-      AGENDADA: 'Confirmada',
-      ATENDIDA: 'Atendida',
-      CANCELADA: 'Cancelada',
-      NO_ASISTIO: 'No asistió',
-    };
-    return map[s] ?? s;
+  // ── Navegación entre pasos ────────────────────────────────────────────────
+  goToStep2(): void {
+    if (this.selectedCount() === 0) return;
+    this.currentStep.set(2);
+  }
+
+  goToStep1(): void {
+    this.currentStep.set(1);
   }
 
   accentColor(): string {
@@ -243,17 +284,17 @@ export class ExportModalComponent {
 
   // ── Export ─────────────────────────────────────────────────────────────────
   private buildPayload(): AppointmentExportRequest {
-    const status = this.filterStatus();
+    const status = this.exportStatusFilter();
     return {
       idDoctor: this.idDoctor() ?? null,
       format: FORMAT_MAP[this.exportFormat()],
       columns: this.selectedBackendColumns(),
-      state: status && status !== 'all' ? status : null,
+      state: status !== 'all' ? status : null,
     };
   }
 
   handleExport(): void {
-    if (!this.hasSelectedColumns()) return;
+    if (!this.hasSelectedColumns() || this.selectedCount() === 0) return;
 
     this.exportingInProgress.set(true);
     this.exportError.set(null);

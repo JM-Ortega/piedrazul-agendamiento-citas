@@ -90,6 +90,18 @@
             </div>
           </div>
 
+          <!-- Período laboral (siempre obligatorio) -->
+          <div class="border-t border-gray-100 p-4">
+            <p class="text-sm font-semibold text-gray-700 mb-2">
+              Período laboral
+            </p>
+            <p class="text-gray-800 font-medium">
+              {{ userForm.laborStart }}
+              <span class="text-gray-400 mx-1">→</span>
+              {{ userForm.laborEnd }}
+            </p>
+          </div>
+
           @if (hasScheduleData) {
             <!-- Métricas -->
             <div class="grid grid-cols-2 border-t border-gray-100">
@@ -110,18 +122,6 @@
               </div>
             </div>
 
-            <!-- Período laboral -->
-            <div class="border-t border-gray-100 p-4">
-              <p class="text-sm font-semibold text-gray-700 mb-2">
-                Período laboral
-              </p>
-              <p class="text-gray-800 font-medium">
-                {{ userForm.laborStart }}
-                <span class="text-gray-400 mx-1">→</span>
-                {{ userForm.laborEnd }}
-              </p>
-            </div>
-
             <!-- Días -->
             <div class="border-t border-gray-100 p-4">
               <p class="text-sm font-semibold text-gray-700 mb-3">
@@ -138,13 +138,14 @@
               </div>
             </div>
           } @else {
-            <!-- Sin horario asignado -->
+            <!-- Sin horario de atención asignado -->
             <div
               class="border-t border-gray-100 p-4 flex items-center gap-3 text-gray-500"
             >
               <svg lucideCalendarOff [size]="18"></svg>
               <p class="text-sm">
-                No se asignó horario laboral. Podrá configurarlo más adelante.
+                No se asignó horario de atención. Podrá configurarlo más
+                adelante.
               </p>
             </div>
           }
