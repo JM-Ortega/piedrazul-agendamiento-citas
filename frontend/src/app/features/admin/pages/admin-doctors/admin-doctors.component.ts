@@ -19,6 +19,11 @@ import { forkJoin, Observable } from 'rxjs';
 import { AppService } from '../../../../core/services/app.service';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
+import {
+  SortControlComponent,
+  SortDirection,
+  SortOption,
+} from '../../../../design-system/molecules/sortControl/sortControl.component';
 import { toggleInArray } from '../../../../shared/helpers/array-utils';
 import { PaginationMeta } from '../../../../shared/helpers/paginated-state';
 import {
@@ -43,6 +48,7 @@ import { AdminService } from '../../service/admin.service';
     LucideDynamicIcon,
     ButtonComponent,
     PaginationComponent,
+    SortControlComponent,
   ],
 })
 export class AdminDoctorsComponent implements OnInit {
@@ -62,6 +68,16 @@ export class AdminDoctorsComponent implements OnInit {
   savingDoctorId = signal<string | null>(null);
   hoveredDoctorId = signal<string | null>(null);
 
+  // ── Ordenamiento ──────────────────────────────────────────────────────────
+  sortField = signal('lastName');
+  sortDirection = signal<SortDirection>('asc');
+
+  readonly sortOptions: SortOption[] = [
+    { value: 'firstName', label: 'Nombre' },
+    { value: 'lastName', label: 'Apellido' },
+    { value: 'documentId', label: 'Documento' },
+  ];
+
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.loadDoctors();
@@ -79,7 +95,8 @@ export class AdminDoctorsComponent implements OnInit {
   loadDoctors(pageNumber = 0): void {
     this.loading.set(true);
     this.errorCarga.set('');
-    this.adminService.getDoctorsAdmin(pageNumber).subscribe({
+    const sort = `${this.sortField()},${this.sortDirection()}`;
+    this.adminService.getDoctorsAdmin(pageNumber, 4, sort).subscribe({
       next: (page) => {
         this.doctors.set(page.content);
         this.pagination.set({
@@ -102,7 +119,15 @@ export class AdminDoctorsComponent implements OnInit {
   onPageChange(pageNumber: number): void {
     this.loadDoctors(pageNumber);
   }
+  onSortFieldChange(field: string): void {
+    this.sortField.set(field);
+    this.loadDoctors(0);
+  }
 
+  onSortDirectionChange(direction: SortDirection): void {
+    this.sortDirection.set(direction);
+    this.loadDoctors(0);
+  }
   // ── Edit ──────────────────────────────────────────────────────────────────
   handleEdit(doctor: DoctorAdminDto): void {
     this.editingDoctorId.set(doctor.id);

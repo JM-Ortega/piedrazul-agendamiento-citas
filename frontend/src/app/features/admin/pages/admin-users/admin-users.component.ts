@@ -16,6 +16,11 @@ import {
 } from '@lucide/angular';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
+import {
+  SortControlComponent,
+  SortDirection,
+  SortOption,
+} from '../../../../design-system/molecules/sortControl/sortControl.component';
 import { PaginationMeta } from '../../../../shared/helpers/paginated-state';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { SystemUser } from '../../models/interfaces/system-user.model';
@@ -44,6 +49,7 @@ interface UserStyle {
     LucideUsers,
     ButtonComponent,
     PaginationComponent,
+    SortControlComponent,
   ],
 })
 export class AdminUsersComponent implements OnInit {
@@ -55,6 +61,15 @@ export class AdminUsersComponent implements OnInit {
   pagination = signal<PaginationMeta | null>(null);
   loading = signal(false);
   errorCarga = signal('');
+  // ── Ordenamiento ──────────────────────────────────────────────────────────
+  sortField = signal('lastName');
+  sortDirection = signal<SortDirection>('asc');
+
+  readonly sortOptions: SortOption[] = [
+    { value: 'firstName', label: 'Nombre' },
+    { value: 'lastName', label: 'Apellido' },
+    { value: 'documentId', label: 'Documento' },
+  ];
 
   // ── Estilos por tipo de usuario ──────────────────────────────────────────
   private readonly USER_STYLES: Record<UserType, UserStyle> = {
@@ -115,7 +130,8 @@ export class AdminUsersComponent implements OnInit {
   loadUsers(pageNumber = 0): void {
     this.loading.set(true);
     this.errorCarga.set('');
-    this.adminService.getSystemUsers(pageNumber, 9).subscribe({
+    const sort = `${this.sortField()},${this.sortDirection()}`;
+    this.adminService.getSystemUsers(pageNumber, 9, sort).subscribe({
       next: (page) => {
         this.systemUsers.set(page.content);
         this.pagination.set({
@@ -138,7 +154,15 @@ export class AdminUsersComponent implements OnInit {
   onPageChange(pageNumber: number): void {
     this.loadUsers(pageNumber);
   }
+  onSortFieldChange(field: string): void {
+    this.sortField.set(field);
+    this.loadUsers(0);
+  }
 
+  onSortDirectionChange(direction: SortDirection): void {
+    this.sortDirection.set(direction);
+    this.loadUsers(0);
+  }
   navigateToCreate(): void {
     this.router.navigate(['/admin/usuarios/crear']);
   }

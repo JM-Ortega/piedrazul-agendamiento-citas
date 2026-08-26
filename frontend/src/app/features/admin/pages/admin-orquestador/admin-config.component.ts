@@ -10,6 +10,11 @@ import { LucidePencil, LucideSettings } from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
 import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
 import {
+  SortControlComponent,
+  SortDirection,
+  SortOption,
+} from '../../../../design-system/molecules/sortControl/sortControl.component';
+import {
   ToastComponent,
   ToastType,
 } from '../../../../design-system/molecules/toast-message/toast.component';
@@ -43,6 +48,7 @@ import { AdminService } from '../../service/admin.service';
     AdminModalsComponent,
     ToastComponent,
     PaginationComponent,
+    SortControlComponent,
   ],
 })
 export class AdminConfigComponent implements OnInit {
@@ -69,6 +75,15 @@ export class AdminConfigComponent implements OnInit {
   totalPages = signal(0);
   totalElements = signal(0);
   readonly PAGE_SIZE = 4;
+  // ── Ordenamiento ──────────────────────────────────────────────────────────
+  sortField = signal('appointmentInterval');
+  sortDirection = signal<SortDirection>('asc');
+
+  readonly sortOptions: SortOption[] = [
+    { value: 'name', label: 'Nombre' },
+    { value: 'status', label: 'Estado' },
+    { value: 'appointmentInterval', label: 'Intervalo' },
+  ];
 
   // ── Computed ──────────────────────────────────────────────────────────────
   totalSpecialties = computed(
@@ -105,7 +120,8 @@ export class AdminConfigComponent implements OnInit {
   loadDoctors(page = 0): void {
     this.loading.set(true);
     this.errorCarga.set('');
-    this.adminService.getDoctors(page, this.PAGE_SIZE).subscribe({
+    const sort = `${this.sortField()},${this.sortDirection()}`;
+    this.adminService.getDoctors(page, this.PAGE_SIZE, sort).subscribe({
       next: (response) => {
         this.currentPage.set(response.pageNumber);
         this.totalPages.set(response.totalPages);
@@ -371,5 +387,14 @@ export class AdminConfigComponent implements OnInit {
     if (page < 0 || page >= this.totalPages() || page === this.currentPage())
       return;
     this.loadDoctors(page);
+  }
+  onSortFieldChange(field: string): void {
+    this.sortField.set(field);
+    this.loadDoctors(0);
+  }
+
+  onSortDirectionChange(direction: SortDirection): void {
+    this.sortDirection.set(direction);
+    this.loadDoctors(0);
   }
 }

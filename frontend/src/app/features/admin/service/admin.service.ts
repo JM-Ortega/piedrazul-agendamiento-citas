@@ -30,35 +30,41 @@ export class AdminService {
   }
 
   /**
-   * Obtiene una página de médicos con información detallada, ordenados
-   * por nombre ascendente.
+   * Obtiene una página de médicos con información detallada.
    *
    * @param page - Índice de página (base 0).
    * @param size - Cantidad de médicos por página.
+   * @param sort - Campo y dirección de ordenamiento, formato 'campo,asc|desc'.
    * @returns Observable con la respuesta paginada completa (content + metadata).
    */
-  getDoctors(page = 0, size = 4): Observable<PageResponse<Doctor>> {
+  getDoctors(
+    page = 0,
+    size = 4,
+    sort = 'appointmentInterval,asc'
+  ): Observable<PageResponse<Doctor>> {
     return this.http.get<PageResponse<Doctor>>(
       `${this.apiUrl}/doctor/detailed`,
-      { params: { page, size, sort: 'name,asc' } }
+      { params: { page, size, sort } }
     );
   }
 
   /**
    * Obtiene una página de médicos con información detallada para el panel
-   * de administración (roles y especialidades), ordenados por nombre ascendente.
+   * de administración (roles y especialidades).
    *
    * @param page - Índice de página (base 0).
    * @param size - Cantidad de médicos por página.
+   * @param sort - Campo y dirección de ordenamiento, formato 'campo,asc|desc'.
    * @returns Observable con la respuesta paginada completa (content + metadata).
    */
   getDoctorsAdmin(
     page = 0,
-    size = 4
+    size = 4,
+    sort = 'lastName,asc'
   ): Observable<PageResponse<DoctorAdminDto>> {
     return this.http.get<PageResponse<DoctorAdminDto>>(
       `${this.apiUrl}/user/system-doctors`,
-      { params: { page, size } }
+      { params: { page, size, sort } }
     );
   }
 
@@ -193,12 +199,17 @@ export class AdminService {
    *
    * @param page - Índice de página (base 0).
    * @param size - Cantidad de usuarios por página.
+   * @param sort - Campo y dirección de ordenamiento, formato 'campo,asc|desc'.
    * @returns Observable con la respuesta paginada completa (content + metadata).
    */
-  getSystemUsers(page = 0, size = 9): Observable<PageResponse<SystemUser>> {
+  getSystemUsers(
+    page = 0,
+    size = 9,
+    sort = 'lastName,asc'
+  ): Observable<PageResponse<SystemUser>> {
     return this.http.get<PageResponse<SystemUser>>(
       `${this.apiUrl}/user/system-users`,
-      { params: { page, size } }
+      { params: { page, size, sort } }
     );
   }
 
