@@ -16,9 +16,14 @@ import { ButtonComponent } from '../../../../design-system/atoms/button/button.c
 import { ToastComponent } from '../../../../design-system/molecules/toast-message/toast.component';
 import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
 import { AppointmentTableComponent } from '../../components/table/table.component';
-import { SchedulerFiltersComponent } from '../../components/filters/filter.component';
+import {
+  FiltersComponent,
+  FilterValues,
+} from '../../../../design-system/organisms/filters/filters.component';
+import { FilterFieldConfig } from '../../../../design-system/molecules/filter-field/filterField.model';
 import { SchedulerExportModalComponent } from '../../components/export-modal/export-modal.component';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
 const PAGE_SIZE = 5;
 
@@ -33,7 +38,7 @@ const PAGE_SIZE = 5;
     ConfirmModalComponent,
     ToastComponent,
     AppointmentTableComponent,
-    SchedulerFiltersComponent,
+    FiltersComponent,
     SchedulerExportModalComponent,
     ButtonComponent,
     PaginationComponent,
@@ -51,6 +56,45 @@ export class SchedulerHistoryComponent implements OnInit {
   filterDoctor = signal('');
   filterDate = signal('');
   filterStatus = signal('');
+
+  private formatoPipe = new FormatoPipe();
+
+  appliedFilterValues = computed<FilterValues>(() => ({
+    doctor: this.filterDoctor(),
+    date: this.filterDate(),
+    status: this.filterStatus(),
+  }));
+
+  filterFields = computed<FilterFieldConfig[]>(() => [
+    {
+      id: 'doctor',
+      type: 'select',
+      label: 'Médico / Terapista',
+      placeholder: 'Todos los médicos',
+      options: this.doctors().map((d) => ({
+        value: d.id,
+        label: `${d.name} — ${d.specialties.map((s) => this.formatoPipe.transform(s)).join(', ')}`,
+      })),
+      formatValue: (id) => this.doctors().find((d) => d.id === id)?.name ?? id,
+    },
+    {
+      id: 'date',
+      type: 'date',
+      label: 'Fecha Específica',
+      formatValue: (d) => formatLongDateEs(d),
+    },
+    {
+      id: 'status',
+      type: 'select',
+      label: 'Estado de la Cita',
+      placeholder: 'Todos los estados',
+      options: this.states().map((s) => ({
+        value: s,
+        label: this.formatoPipe.transform(s),
+      })),
+      formatValue: (s) => this.formatoPipe.transform(s),
+    },
+  ]);
 
   /** Página actualmente solicitada (base 0). Se resetea a 0 al cambiar los filtros. */
   private readonly pageNumber = signal(0);
@@ -83,16 +127,17 @@ export class SchedulerHistoryComponent implements OnInit {
   }
 
   /** Se conecta al evento (apply) del componente de filtros. */
-  onApplyFilters(filters: {
-    doctor: string;
-    date: string;
-    status: string;
-  }): void {
-    this.filterDoctor.set(filters.doctor);
-    this.filterDate.set(filters.date);
-    this.filterStatus.set(filters.status);
+  onApplyFilters(filters: FilterValues): void {
+    this.filterDoctor.set(filters['doctor'] ?? '');
+    this.filterDate.set(filters['date'] ?? '');
+    this.filterStatus.set(filters['status'] ?? '');
     this.pageNumber.set(0);
-    this.loadAppointments(filters.doctor, filters.date, filters.status, 0);
+    this.loadAppointments(
+      filters['doctor'] ?? '',
+      filters['date'] ?? '',
+      filters['status'] ?? '',
+      0
+    );
   }
 
   /**
