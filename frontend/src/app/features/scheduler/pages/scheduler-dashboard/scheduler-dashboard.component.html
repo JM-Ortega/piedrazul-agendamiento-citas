@@ -9,16 +9,13 @@
     }
     <div class="bg-white rounded-2xl shadow-md p-7 mt-8">
       <div class="pb-4">
-        <app-filter
-          [fields]="['doctor', 'status']"
-          [doctors]="doctors()"
-          [states]="states()"
-          title="Filtros"
-          [description]="'Citas del ' + formatDate(today)"
-          [appliedDoctor]="filterDoctor()"
-          [appliedStatus]="filterStatus()"
+        <app-filters
+          [fields]="filterFields()"
+          title="Filtros Avanzados"
+          description="Selecciona los filtros y aplica los cambios"
+          [appliedValues]="appliedFilterValues()"
           (apply)="onApplyFilters($event)"
-        ></app-filter>
+        ></app-filters>
       </div>
       <div class="mb-6 flex justify-between">
         <div>
