@@ -14,9 +14,14 @@ import { formatLongDateEs } from '../../../../shared/helpers/date-format';
 import { ConfirmModalComponent } from '../../../../design-system/organisms/confirm-modal/confirm-modal.component';
 import { ToastComponent } from '../../../../design-system/molecules/toast-message/toast.component';
 import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
+import {
+  FiltersComponent,
+  FilterValues,
+} from '../../../../design-system/organisms/filters/filters.component';
+import { FilterFieldConfig } from '../../../../design-system/molecules/filter-field/filterField.model';
 import { AppointmentTableComponent } from '../../components/table/table.component';
-import { SchedulerFiltersComponent } from '../../components/filters/filter.component';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
 const PAGE_SIZE = 5;
 
@@ -29,7 +34,7 @@ const PAGE_SIZE = 5;
     ConfirmModalComponent,
     ToastComponent,
     AppointmentTableComponent,
-    SchedulerFiltersComponent,
+    FiltersComponent,
     PaginationComponent,
   ],
   templateUrl: './scheduler-dashboard.component.html',
@@ -37,6 +42,7 @@ const PAGE_SIZE = 5;
 export class SchedulerDashboardComponent implements OnInit {
   private schedulerService = inject(SchedulerService);
   private patientAppointmentService = inject(PatientAppointmentService);
+  private formatoPipe = new FormatoPipe();
 
   readonly today = (() => {
     const d = new Date();
@@ -49,11 +55,39 @@ export class SchedulerDashboardComponent implements OnInit {
   doctors = signal<dtoDoctor[]>([]);
   states = signal<string[]>([]);
 
-  // Filtros aplicados (los que están reflejados en la consulta actual).
   filterDoctor = signal('');
   filterStatus = signal('');
 
-  /** Página actualmente solicitada (base 0). Se resetea a 0 al cambiar los filtros. */
+  appliedFilterValues = computed<FilterValues>(() => ({
+    doctor: this.filterDoctor(),
+    status: this.filterStatus(),
+  }));
+
+  filterFields = computed<FilterFieldConfig[]>(() => [
+    {
+      id: 'doctor',
+      type: 'select',
+      label: 'Médico / Terapista',
+      placeholder: 'Todos los médicos',
+      options: this.doctors().map((d) => ({
+        value: d.id,
+        label: `${d.name} — ${d.specialties.map((s) => this.formatoPipe.transform(s)).join(', ')}`,
+      })),
+      formatValue: (id) => this.doctors().find((d) => d.id === id)?.name ?? id,
+    },
+    {
+      id: 'status',
+      type: 'select',
+      label: 'Estado de la Cita',
+      placeholder: 'Todos los estados',
+      options: this.states().map((s) => ({
+        value: s,
+        label: this.formatoPipe.transform(s),
+      })),
+      formatValue: (s) => this.formatoPipe.transform(s),
+    },
+  ]);
+
   private readonly pageNumber = signal(0);
 
   showCancelModal = signal(false);
@@ -83,17 +117,16 @@ export class SchedulerDashboardComponent implements OnInit {
     this.loadAppointments('', '', 0);
   }
 
-  /** Se conecta al evento (apply) de app-filter. */
-  onApplyFilters(filters: { doctor: string; status: string }): void {
-    this.filterDoctor.set(filters.doctor);
-    this.filterStatus.set(filters.status);
+  /** Se conecta al evento (apply) del componente de filtros. */
+  onApplyFilters(filters: FilterValues): void {
+    this.filterDoctor.set(filters['doctor'] ?? '');
+    this.filterStatus.set(filters['status'] ?? '');
     this.pageNumber.set(0);
-    this.loadAppointments(filters.doctor, filters.status, 0);
+    this.loadAppointments(filters['doctor'] ?? '', filters['status'] ?? '', 0);
   }
 
   /**
    * Navega a la página indicada manteniendo los filtros actuales.
-   * Conectado al evento `pageChange` de `app-pagination`.
    */
   onPageChange(pageNumber: number): void {
     this.pageNumber.set(pageNumber);

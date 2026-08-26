@@ -1,0 +1,52 @@
+<div class="bg-white">
+  <h2 class="text-[#163c63] text-2xl mb-2 flex items-center gap-2">
+    <svg lucideSearch [size]="24"></svg>
+    {{ title() }}
+  </h2>
+  @if (description()) {
+    <p class="text-gray-600 mb-5 text-base">{{ description() }}</p>
+  }
+
+  <div class="flex flex-col lg:flex-row lg:items-end gap-5">
+    <div [class]="'grid grid-cols-1 gap-5 flex-1 ' + gridColsClass">
+      @for (field of fields(); track field.id) {
+        <app-filter-field
+          [config]="field"
+          [value]="getValue(field.id)"
+          (valueChange)="setValue(field.id, $event)"
+        ></app-filter-field>
+      }
+    </div>
+
+    <app-button
+      variant="primary"
+      [disabled]="!isDirty()"
+      (buttonClick)="onApply()"
+    >
+      Aplicar Filtros
+    </app-button>
+  </div>
+
+  <p class="text-sm text-gray-500 mt-3 flex items-center gap-1">
+    ℹ️ Los cambios en los filtros no se aplican automáticamente: selecciona las
+    opciones deseadas y haz clic en "Aplicar Filtros".
+  </p>
+
+  @if (activeFilters().length) {
+    <div class="mt-4 flex flex-wrap gap-2 items-center">
+      <span class="text-md text-gray-600">
+        Filtros seleccionados{{ isDirty() ? ' (sin aplicar):' : ':' }}
+      </span>
+      @for (entry of activeFilters(); track entry.field.id) {
+        <span
+          class="inline-flex items-center gap-1 bg-[#d9e9f8] text-[#215c98] px-3 py-1 rounded-lg text-sm"
+        >
+          {{ displayValue(entry.field, entry.value) }}
+          <app-button variant="icon" (buttonClick)="clearValue(entry.field.id)"
+            >×</app-button
+          >
+        </span>
+      }
+    </div>
+  }
+</div>
