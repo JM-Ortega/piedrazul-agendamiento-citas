@@ -95,22 +95,22 @@ public class Doctor {
 
     }
 
-    public void updateInfo(LocalDate laborStart, LocalDate laborEnd, int weeks, int minutes) {
+    public void updateInfo(LocalDate laborStart, LocalDate laborEnd, int minutes, int weeks) {
         if (laborStart == null) {
             throw new DoctorValidationException(
-                    "El médico no tiene una fecha de inicio laboral."
+                    "El médico no tiene una fecha de inicio laboral"
             );
         }
 
         if (laborEnd == null) {
             throw new DoctorValidationException(
-                    "El médico no tiene una fecha de finalización laboral."
+                    "El médico no tiene una fecha de finalización laboral"
             );
         }
 
         if (laborEnd.isBefore(laborStart)) {
             throw new DateConflictException(
-                    "La fecha de finalización no puede ser anterior a la fecha de inicio."
+                    "La fecha de finalización no puede ser anterior a la fecha de inicio"
             );
         }
 
