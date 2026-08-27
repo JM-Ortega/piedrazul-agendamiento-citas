@@ -1,34 +1,39 @@
-import { Component, EventEmitter, Output, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Output,
+  inject,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import {
-  LucideAngularModule,
-  X,
-  LogIn,
-  UserPlus,
-  MessageCircle,
-  Phone,
-} from 'lucide-angular';
+  LucideLogIn,
+  LucideMessageCircle,
+  LucidePhone,
+  LucideUserPlus,
+} from '@lucide/angular';
 import Keycloak from 'keycloak-js';
 import { environment } from '../../../../environments/environment';
+import { ButtonComponent } from '../../atoms/button/button.component';
 
 @Component({
   selector: 'app-appointment-modal',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [
+    LucideLogIn,
+    LucideUserPlus,
+    LucideMessageCircle,
+    LucidePhone,
+    ButtonComponent,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './appointment-modal.component.html',
 })
 export class AppointmentModalComponent {
-  @Output() close = new EventEmitter<void>();
+  @Output() finish = new EventEmitter<void>();
 
   private keycloak = inject(Keycloak);
   private router = inject(Router);
-
-  readonly X = X;
-  readonly LogIn = LogIn;
-  readonly UserPlus = UserPlus;
-  readonly MessageCircle = MessageCircle;
-  readonly Phone = Phone;
 
   readonly whatsappUrl = `https://wa.me/${environment.contact.whatsapp}`;
   readonly whatsappDisplay = environment.contact.whatsappDisplay;
@@ -44,12 +49,12 @@ export class AppointmentModalComponent {
 
   register(): void {
     this.router.navigate(['/registro']);
-    this.close.emit();
+    this.finish.emit();
   }
 
   onBackdropClick(event: MouseEvent): void {
     if (event.target === event.currentTarget) {
-      this.close.emit();
+      this.finish.emit();
     }
   }
 }

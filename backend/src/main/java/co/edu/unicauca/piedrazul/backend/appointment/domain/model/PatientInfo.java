@@ -1,13 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.model;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.GuardianRequiredException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InconsistentPatientInfoException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidBirthDateException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidDocumentException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidEmailException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidPatientInfoException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidPersonNameException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.InvalidPhoneException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.*;
 import org.jmolecules.ddd.annotation.ValueObject;
 
 import java.time.LocalDate;
@@ -76,9 +69,7 @@ public class PatientInfo {
     }
 
     private void validate() {
-        if (!documentNumber.matches("\\d{6,12}")) {
-            throw new InvalidDocumentException("El número de documento debe tener entre 6 y 12 dígitos");
-        }
+        validateDocumentNumber();
 
         if (!firstName.matches("^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$")) {
             throw new InvalidPersonNameException("El nombre contiene caracteres inválidos");
@@ -113,6 +104,24 @@ public class PatientInfo {
         if (age >= 18 && (documentType == DocumentType.TARJETA_IDENTIDAD
                 || documentType == DocumentType.REGISTRO_NACIMIENTO)) {
             throw new InconsistentPatientInfoException("Un adulto no debería tener este tipo de documento");
+        }
+    }
+
+    private void validateDocumentNumber() {
+        boolean valid = switch (documentType) {
+            case CEDULA -> documentNumber.matches("^[0-9]{6,10}$");
+            case TARJETA_IDENTIDAD -> documentNumber.matches("^[0-9]{10,11}$");
+            case REGISTRO_NACIMIENTO -> documentNumber.matches("^[0-9]{8,20}$");
+            case PASAPORTE -> documentNumber.matches("^[A-Za-z0-9]{6,9}$");
+        };
+
+        if (!valid) {
+            throw new InvalidDocumentException(switch (documentType) {
+                case CEDULA -> "La cédula debe contener entre 6 y 10 dígitos numéricos";
+                case TARJETA_IDENTIDAD -> "La tarjeta de identidad debe contener entre 10 y 11 dígitos numéricos";
+                case REGISTRO_NACIMIENTO -> "El registro de nacimiento debe contener entre 8 y 20 dígitos numéricos";
+                case PASAPORTE -> "El pasaporte debe contener entre 6 y 9 caracteres alfanuméricos";
+            });
         }
     }
 

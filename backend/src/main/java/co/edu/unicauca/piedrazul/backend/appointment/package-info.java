@@ -7,7 +7,12 @@
         "shared::events",
         "doctors::output-dtos",
         "config::validation",
-        "jackson::sanitization"
+        "jackson::sanitization",
+        "user",
+        "shared::audit-events",
+        "shared::enums",
+        "jackson::validation",
+        "clinicalHistory::"
 })
 package co.edu.unicauca.piedrazul.backend.appointment;
 

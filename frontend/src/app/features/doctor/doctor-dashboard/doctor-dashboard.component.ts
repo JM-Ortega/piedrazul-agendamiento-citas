@@ -1,19 +1,33 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import {
-  Calendar,
-  Check,
-  ChevronDown,
-  ClipboardList,
-  Clock,
-  FileText,
-  LucideAngularModule,
-  Plus,
-  User,
-  UserX,
-} from 'lucide-angular';
+  LucideCalendar,
+  LucideCheck,
+  LucideChevronDown,
+  LucideClipboardList,
+  LucideClock,
+  LucideFileText,
+  LucideUser,
+  LucideUserX,
+} from '@lucide/angular';
 import { DoctorService } from '../../../core/services/doctor.service';
+import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
+import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
+import { ConfirmModalComponent } from '../../../design-system/organisms/confirm-modal/confirm-modal.component';
+import { PaginatedState } from '../../../shared/helpers/paginated-state';
+import {
+  parseLocalDateString,
+  toIsoDateString,
+} from '../../../shared/helpers/transform-date-local';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
+import { AppError } from '../../../shared/models/interfaces/api-error.model';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
@@ -21,32 +35,33 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
   selector: 'app-doctor-dashboard',
   templateUrl: './doctor-dashboard.component.html',
   standalone: true,
-  imports: [LucideAngularModule, FormatoPipe],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    LucideCalendar,
+    LucideCheck,
+    LucideChevronDown,
+    LucideClipboardList,
+    LucideClock,
+    LucideFileText,
+    LucideUser,
+    LucideUserX,
+    ButtonComponent,
+    ConfirmModalComponent,
+    PaginationComponent,
+  ],
 })
 export class DoctorDashboardComponent implements OnInit {
+  private formatoPipe = new FormatoPipe();
   private doctorService = inject(DoctorService);
   private router = inject(Router);
 
-  readonly Calendar = Calendar;
-  readonly Clock = Clock;
-  readonly FileText = FileText;
-  readonly User = User;
-  readonly Plus = Plus;
-  readonly Check = Check;
-  readonly ChevronDown = ChevronDown;
-  readonly ClipboardList = ClipboardList;
-  readonly UserX = UserX;
-
-  today = (() => {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  })();
+  today = toIsoDateString(new Date());
 
   currentDoctor = signal<Doctor | null>(null);
-  private appointments = signal<AppointmentsPatient[]>([]);
+  private appointmentsState = new PaginatedState<AppointmentsPatient>();
+  pagination = this.appointmentsState.pagination;
+  readonly PAGE_SIZE = 3;
+  errorCarga = signal('');
 
   showConfirmModal = signal(false);
   selectedAppointmentId = signal<string | null>(null);
@@ -57,7 +72,7 @@ export class DoctorDashboardComponent implements OnInit {
   showOutcomeDropdown = signal(false);
 
   todaysAppointments = computed(() =>
-    [...this.appointments()]
+    [...this.appointmentsState.content()]
       .filter(
         (a) => a.date === this.today && a.appointmentState !== 'CANCELADA'
       )
@@ -92,15 +107,29 @@ export class DoctorDashboardComponent implements OnInit {
         this.currentDoctor.set(doctor);
         this.loadAppointments(doctor.id);
       },
-      error: () => this.router.navigate(['/']),
+      error: (err: AppError) => {
+        this.errorCarga.set(err.message);
+        this.router.navigate(['/']);
+      },
     });
   }
 
-  private loadAppointments(doctorId: string): void {
-    this.doctorService.getTodayAppointmentsByDoctor(doctorId).subscribe({
-      next: (data) => this.appointments.set(data),
-      error: () => this.appointments.set([]),
-    });
+  private loadAppointments(doctorId: string, pageNumber = 0): void {
+    this.errorCarga.set('');
+    this.doctorService
+      .getTodayAppointmentsByDoctor(doctorId, pageNumber, this.PAGE_SIZE)
+      .subscribe({
+        next: (response) => this.appointmentsState.set(response),
+        error: (err: AppError) => {
+          this.errorCarga.set(err.message);
+          this.appointmentsState.clear();
+        },
+      });
+  }
+
+  onPageChange(pageNumber: number): void {
+    const doctorId = this.currentDoctor()?.id;
+    if (doctorId) this.loadAppointments(doctorId, pageNumber);
   }
 
   toggleCardDropdown(appointmentId: string): void {
@@ -133,26 +162,23 @@ export class DoctorDashboardComponent implements OnInit {
     const id = this.selectedAppointmentId();
     const outcome = this.selectedOutcome();
     if (!id || !outcome) return;
+    if (outcome === 'ATENDIDA') {
+      this.closeModal();
+      this.router.navigate(['medico/control-medico/', id]);
+      return;
+    }
 
     this.isMarkingAttended.set(true);
 
-    const request$ =
-      outcome === 'ATENDIDA'
-        ? this.doctorService.updateAppointmentAsAttended(id, outcome)
-        : this.doctorService.updateAppointmentAsUnassisted(id, outcome);
-
-    request$.subscribe({
+    this.doctorService.updateAppointmentAsUnassisted(id, outcome).subscribe({
       next: () => {
         this.closeModal();
         const doctorId = this.currentDoctor()?.id;
         if (doctorId) this.loadAppointments(doctorId);
-
-        if (outcome === 'ATENDIDA') {
-          this.router.navigate(['medico/control-medico/', id]);
-        }
       },
-      error: () => {
+      error: (err: AppError) => {
         this.isMarkingAttended.set(false);
+        alert(err.message);
       },
     });
   }
@@ -166,14 +192,18 @@ export class DoctorDashboardComponent implements OnInit {
     this.isMarkingAttended.set(false);
   }
 
-  scheduleNewAppointment(documentNumber: string): void {
+  scheduleNewAppointment(
+    documentNumber: string,
+    specialty: string,
+    idDoctor: string | undefined
+  ): void {
     this.router.navigate(['/medico/nueva-cita'], {
-      queryParams: { documentNumber },
+      state: { documentNumber, specialty, idDoctor },
     });
   }
 
   formatDate(dateStr: string): string {
-    const date = new Date(dateStr + 'T12:00:00');
+    const date = parseLocalDateString(dateStr);
     return new Intl.DateTimeFormat('es-CO', {
       weekday: 'long',
       year: 'numeric',
@@ -181,7 +211,6 @@ export class DoctorDashboardComponent implements OnInit {
       day: 'numeric',
     }).format(date);
   }
-
   statusColor(state: string): string {
     const map: Record<string, string> = {
       AGENDADA: 'bg-green-100 text-green-800 border-green-300',
@@ -195,12 +224,17 @@ export class DoctorDashboardComponent implements OnInit {
 
   statusLabel(state: string): string {
     const map: Record<string, string> = {
-      AGENDADA: 'Confirmada',
+      AGENDADA: 'Agendada',
       ATENDIDA: 'Atendida',
       CANCELADA: 'Cancelada',
       NO_ASISTIO: 'No asistió',
       REPROGRAMADA: 'Pendiente',
     };
     return map[state] ?? state;
+  }
+  formattedSpecialties(specialties: string[] | undefined): string {
+    return (specialties ?? [])
+      .map((s) => this.formatoPipe.transform(s))
+      .join(', ');
   }
 }

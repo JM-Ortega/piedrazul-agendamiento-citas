@@ -7,7 +7,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -166,26 +166,12 @@ class BusySlotServiceTest {
      * diferente a AGENDADA desde fuera del dominio.
      */
     private Appointment buildAppointmentWithState(LocalTime time, AppointmentState state) {
-        PatientInfo patientInfo = PatientInfo.of(
-                DocumentType.CEDULA,
-                "12345678",
-                "Carlos",
-                "Gomez",
-                "3001234567",
-                Gender.MASCULINO,
-                LocalDate.of(1990, 6, 15),
-                "carlos@correo.com",
-                null
-        );
 
         return Appointment.reconstruct(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                "Dra. Lopez",
                 UUID.randomUUID(),
-                "Carlos Gomez",
-                patientInfo,
-                Specialty.FISIOTERAPIA,
+                SpecialtyCode.FISIOTERAPIA,
                 state,
                 LocalDate.now().plusDays(1),
                 new AppointmentTime(time),

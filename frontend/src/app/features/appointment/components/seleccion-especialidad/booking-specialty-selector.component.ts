@@ -1,8 +1,19 @@
-import { Component, inject, output, computed } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  computed,
+  Component,
+  inject,
+  output,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, UserSearch } from 'lucide-angular';
-import { BookingStateService } from '../../services/booking-state.service';
+import { LucideUserSearch } from '@lucide/angular';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+import { BookingStateService } from '../../services/booking-state.service';
+import {
+  SelectComponent,
+  SelectOption,
+} from '../../../../design-system/atoms/select/select.component';
 
 /**
  * Permite al usuario elegir una especialidad y,
@@ -11,21 +22,32 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 @Component({
   selector: 'app-booking-specialty-selector',
   standalone: true,
-  imports: [FormsModule, LucideAngularModule, FormatoPipe],
+  imports: [FormsModule, LucideUserSearch, ButtonComponent, SelectComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-specialty-selector.component.html',
 })
 export class BookingSpecialtySelectorComponent {
-  readonly UserSearch = UserSearch;
-
   protected state = inject(BookingStateService);
+
+  private formatoPipe = new FormatoPipe();
+
+  specialtyOptions = computed<SelectOption[]>(() =>
+    this.state.uniqueSpecialties().map((s) => ({
+      value: s,
+      label: this.formatoPipe.transform(s),
+    }))
+  );
+
+  doctorOptions = computed<SelectOption[]>(() =>
+    this.state.doctorsBySpecialty().map((d) => ({
+      value: d.id,
+      label: d.name,
+    }))
+  );
 
   advance = output<void>();
   back = output<void>();
-
-  readonly filteredSpecialties = computed(() => {
-    const specialties = this.state.uniqueSpecialties();
-    return specialties;
-  });
+  specialtyChanged = output<string>();
 
   onSpecialtyChange(specialty: string): void {
     this.state.selectedSpecialty.set(specialty);
@@ -38,15 +60,13 @@ export class BookingSpecialtySelectorComponent {
     if (this.state.bookingMode() === 'specialty') {
       const match = this.state
         .specialtiesWithDoctor()
-        .find((s) => s.specialty === specialty);
+        .find((s) => s.specialty.includes(specialty));
       this.state.assignedDoctor.set(match ?? null);
     } else {
       this.state.doctorsBySpecialty.set([]);
       this.specialtyChanged.emit(specialty);
     }
   }
-
-  specialtyChanged = output<string>();
 
   onDoctorChange(doctorId: string): void {
     this.state.selectedDoctorId.set(doctorId);
@@ -60,7 +80,6 @@ export class BookingSpecialtySelectorComponent {
   }
 
   goBack(): void {
-    this.state.resetSpecialtyState();
     this.back.emit();
   }
 }

@@ -1,84 +1,58 @@
 package co.edu.unicauca.piedrazul.backend.patients.infrastructure.mappers;
 
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientSex;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
-import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
-import co.edu.unicauca.piedrazul.backend.patients.domain.Gender;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
+import co.edu.unicauca.piedrazul.backend.patients.domain.Sex;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 
 public final class PatientApiMapper {
 
     private PatientApiMapper() {
     }
 
-    public static PatientData toPatientData(Patient source) {
-        if (source == null) {
+    public static PatientData toPatientData(Patient patient, PersonSummary person) {
+        if (patient == null) {
             throw new IllegalArgumentException("Patient cannot be null");
+        }
+        if (person == null) {
+            throw new IllegalArgumentException("PersonSummary cannot be null");
         }
 
         return new PatientData(
-                source.getId(),
-                source.getUserId(),
-                toApiDocumentType(source.getDocumentType()),
-                source.getDocumentNumber(),
-                source.getFirstName(),
-                source.getLastName(),
-                source.getPhone(),
-                source.getEmail(),
-                toApiGender(source.getGender()),
-                source.getBirthDate(),
-                source.getGuardianPhone()
+                patient.getPersonId(),
+                person.userId(),
+                person.identificationType(),
+                person.identification(),
+                person.firstName(),
+                person.lastName(),
+                person.phone(),
+                person.email(),
+                toApiSex(patient.getSex()),
+                patient.getBirthDate(),
+                patient.getGuardianPhone()
         );
     }
 
-    public static DocumentType toDomainDocumentType(PatientDocumentType source) {
+    public static Sex toDomainSex(PatientSex source) {
         if (source == null) {
             return null;
         }
 
         return switch (source) {
-            case CEDULA -> DocumentType.CEDULA;
-            case TARJETA_IDENTIDAD -> DocumentType.TARJETA_IDENTIDAD;
-            case REGISTRO_NACIMIENTO -> DocumentType.REGISTRO_NACIMIENTO;
-            case PASAPORTE -> DocumentType.PASAPORTE;
+            case MASCULINO -> Sex.MASCULINO;
+            case FEMENINO -> Sex.FEMENINO;
         };
     }
 
-    public static Gender toDomainGender(PatientGender source) {
+    public static PatientSex toApiSex(Sex source) {
         if (source == null) {
             return null;
         }
 
         return switch (source) {
-            case MASCULINO -> Gender.MASCULINO;
-            case FEMENINO -> Gender.FEMENINO;
-            case OTRO -> Gender.OTRO;
-        };
-    }
-
-    public static PatientDocumentType toApiDocumentType(DocumentType source) {
-        if (source == null) {
-            return null;
-        }
-
-        return switch (source) {
-            case CEDULA -> PatientDocumentType.CEDULA;
-            case TARJETA_IDENTIDAD -> PatientDocumentType.TARJETA_IDENTIDAD;
-            case REGISTRO_NACIMIENTO -> PatientDocumentType.REGISTRO_NACIMIENTO;
-            case PASAPORTE -> PatientDocumentType.PASAPORTE;
-        };
-    }
-
-    public static PatientGender toApiGender(Gender source) {
-        if (source == null) {
-            return null;
-        }
-
-        return switch (source) {
-            case MASCULINO -> PatientGender.MASCULINO;
-            case FEMENINO -> PatientGender.FEMENINO;
-            case OTRO -> PatientGender.OTRO;
+            case MASCULINO -> PatientSex.MASCULINO;
+            case FEMENINO -> PatientSex.FEMENINO;
         };
     }
 }

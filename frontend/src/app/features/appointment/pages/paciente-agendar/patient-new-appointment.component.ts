@@ -1,18 +1,25 @@
-import { CommonModule } from '@angular/common';
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { Router } from '@angular/router';
+import { LucideArrowLeft } from '@lucide/angular';
 import { AppService } from '../../../../core/services/app.service';
 import { PatientService } from '../../../../core/services/patient.service';
+import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
-import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
-import { PatientAppointmentService } from '../../services/PatientApointment.service';
-import {ArrowLeft, LucideAngularModule,} from 'lucide-angular';
 
 @Component({
   selector: 'app-patient-new-appointment',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, AppointmentBookingComponent],
+  imports: [LucideArrowLeft, AppointmentBookingComponent, ButtonComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './patient-new-appointment.component.html',
 })
 export class PatientNewAppointmentComponent implements OnInit {
@@ -22,8 +29,6 @@ export class PatientNewAppointmentComponent implements OnInit {
   private router = inject(Router);
   private currentPatient = signal<Patient | null>(null);
   protected isNewPatient = signal<boolean>(false);
-
-  readonly ArrowLeft = ArrowLeft;
 
   /**
    * Snapshot que se pasa al componente atómico.
@@ -35,10 +40,10 @@ export class PatientNewAppointmentComponent implements OnInit {
       id: patient?.id ?? this.appService.keycloakId() ?? undefined,
       firstName: patient?.firstName ?? this.appService.firstName(),
       lastName: patient?.lastName ?? this.appService.lastName(),
-      documentNumber: patient?.documentNumber,
-      documentType: patient?.documentType,
+      identification: patient?.identification,
+      identificationType: patient?.identificationType,
       phone: patient?.phone,
-      gender: patient?.gender,
+      sex: patient?.sex,
       birthDate: patient?.birthDate,
       email: patient?.email,
     };
@@ -60,12 +65,6 @@ export class PatientNewAppointmentComponent implements OnInit {
         this.isNewPatient.set(false);
       },
     });
-  }
-
-  onAppointmentConfirmed(event: AppointmentConfirmedEvent): void {
-    this.appointmentService
-      .getAppointmentsByPatient(event.patientId)
-      .subscribe((appts) => this.appointmentService.appointments.set(appts));
   }
 
   goBack(): void {

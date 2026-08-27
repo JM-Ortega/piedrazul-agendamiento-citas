@@ -2,17 +2,18 @@
   <h2 class="text-[#163c63] text-2xl mb-4">Datos del Paciente</h2>
 
   <div>
-    <label class="block text-gray-700 mb-2 text-lg">Buscar por Número de Documento</label>
+    <label for="searchDocument" class="block text-gray-700 mb-2 text-lg"
+      >Buscar por Número de Documento</label
+    >
 
     <div class="relative">
       <div class="flex gap-3">
-
         <div class="relative flex-1">
           <input
+            id="searchDocument"
             type="text"
             inputmode="numeric"
             [ngModel]="state.searchQuery()"
-            (ngModelChange)="onQueryChange($event)"
             (input)="handleDocInput($event)"
             (keyup.enter)="onSearchExact()"
             (blur)="closeSuggestions()"
@@ -24,40 +25,58 @@
 
           @if (state.searchLoading()) {
             <div class="absolute right-3 top-1/2 -translate-y-1/2">
-              <svg class="animate-spin h-5 w-5 text-[#215c98]" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10"
-                        stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+              <svg
+                class="animate-spin h-5 w-5 text-[#215c98]"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v8z"
+                ></path>
               </svg>
             </div>
           }
         </div>
 
-        <button
-          type="button"
-          (click)="onSearchExact()"
+        <app-button
+          variant="primary"
+          (buttonClick)="onSearchExact()"
           [disabled]="state.searchLoading()"
-          class="bg-[#215c98] hover:bg-[#163c63] text-white px-5 py-3 rounded-xl
-                 transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer"
         >
-          <lucide-angular [img]="Search" [size]="18"></lucide-angular>
-          Buscar
-        </button>
+          <svg lucideSearch [size]="18"></svg> Buscar
+        </app-button>
       </div>
 
       @if (showSuggestions() && state.searchSuggestions().length > 0) {
-        <ul class="absolute z-20 w-full mt-1 bg-white border border-blue-200 rounded-xl
-                   shadow-lg max-h-56 overflow-y-auto">
-          @for (suggestion of state.searchSuggestions(); track suggestion.documentNumber) {
+        <ul
+          class="absolute z-20 w-full mt-1 bg-white border border-blue-200 rounded-xl shadow-lg max-h-56 overflow-y-auto"
+        >
+          @for (
+            suggestion of state.searchSuggestions();
+            track suggestion.identification
+          ) {
             <li>
               <button
                 type="button"
                 (mousedown)="selectSuggestion(suggestion)"
-                class="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors
-                       text-gray-700 border-b border-gray-100 last:border-0"
+                class="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors text-gray-700 border-b border-gray-100 last:border-0"
               >
-                <span class="font-medium text-blue-800">{{ suggestion.documentNumber }}</span>
-                <span class="text-gray-500"> — {{ suggestion.firstName }} {{ suggestion.lastName }}</span>
+                <span class="font-medium text-blue-800">{{
+                  suggestion.identification
+                }}</span>
+                <span class="text-gray-500">
+                  — {{ suggestion.firstName }} {{ suggestion.lastName }}</span
+                >
               </button>
             </li>
           }
@@ -83,8 +102,10 @@
   @if (state.foundPatient(); as p) {
     <div class="bg-green-50 border-2 border-green-300 rounded-xl p-5">
       <div class="flex items-center gap-3 mb-3">
-        <lucide-angular [img]="CheckCircle" class="text-green-500" [size]="28"></lucide-angular>
-        <h3 class="text-green-800 text-xl font-semibold">Paciente Encontrado</h3>
+        <svg lucideCheckCircle class="text-green-500" [size]="28"></svg>
+        <h3 class="text-green-800 text-xl font-semibold">
+          Paciente Encontrado
+        </h3>
       </div>
       <div class="grid grid-cols-2 gap-3 text-gray-700">
         <div>
@@ -93,7 +114,7 @@
         </div>
         <div>
           <p class="text-gray-500 text-sm">Documento</p>
-          <p class="font-medium">{{ p.documentNumber }}</p>
+          <p class="font-medium">{{ p.identification }}</p>
         </div>
         <div>
           <p class="text-gray-500 text-sm">Celular</p>
@@ -101,31 +122,32 @@
         </div>
         <div>
           <p class="text-gray-500 text-sm">Género</p>
-          <p class="font-medium">{{ p.gender | formato }}</p>
+          <p class="font-medium">{{ p.sex | formato }}</p>
         </div>
       </div>
     </div>
   }
 
+  @if (state.globalErrorMessage()) {
+    <div class="mt-2 bg-red-100 text-red-700 p-3 rounded-lg text-sm">
+      {{ state.globalErrorMessage() }}
+    </div>
+  }
+
   <div class="flex gap-4 mt-2">
-    <button
-      type="button"
-      (click)="onChangeMode()"
-      class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600
-             hover:bg-gray-50 transition-colors cursor-pointer"
-    >
+    <app-button variant="secondary" (buttonClick)="onChangeMode()">
       ← Cambiar modo
-    </button>
+    </app-button>
 
     @if (state.foundPatient()) {
-      <button
-        type="button"
-        (click)="confirmPatient()"
-        class="flex-1 bg-[#215c98] hover:bg-[#163c63] text-white py-3 rounded-xl
-               text-lg transition-colors cursor-pointer"
+      <app-button
+        variant="primary"
+        (buttonClick)="confirmPatient()"
+        [fullWidth]="true"
+        class="flex-1"
       >
         Continuar →
-      </button>
+      </app-button>
     }
   </div>
 </div>

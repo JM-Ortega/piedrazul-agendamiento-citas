@@ -1,206 +1,130 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorDetailedResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.*;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
-import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
+import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.SpecialtyRepository;
+import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class DoctorService implements DoctorProvisioningApi {
     private final DoctorRepository doctorRepository;
-    private final UserModuleApi userModuleApi;
     private final AppointmentExternalService appointmentExternalService;
+    private final PersonExternalService personExternalService;
+    private final SpecialtyRepository specialtyRepository;
 
-    public DoctorService(DoctorRepository doctorRepository, UserModuleApi userModuleApi, AppointmentExternalService appointmentExternalService) {
+    public DoctorService(DoctorRepository doctorRepository, AppointmentExternalService appointmentExternalService,
+    PersonExternalService personExternalService, SpecialtyRepository specialtyRepository)
+    {
         this.doctorRepository = doctorRepository;
-        this.userModuleApi = userModuleApi;
         this.appointmentExternalService = appointmentExternalService;
+        this.personExternalService = personExternalService;
+        this.specialtyRepository = specialtyRepository;
     }
 
     @Transactional
     @Override
-    public void createDoctor(UUID userId, String firstName, String lastName, String identificacion, CreateDoctorRequest request) {
-        if (doctorRepository.findByIdUser(userId) != null) {
-            return;
-        }
+    public void createDoctor(UUID personId, CreateDoctorRequest request) {
 
-        persistDoctor(userId, firstName, lastName, identificacion, request);
-    }
-
-    private void persistDoctor(UUID userId, String firstName, String lastName, String identificacion, CreateDoctorRequest request) {
         validateLaborDateRange(request.laborStart(), request.laborEnd());
 
-        // 1. Mapeo de DTO a Entidad
-        Doctor doctor = new Doctor();
-        doctor.setFirstName(firstName);
-        doctor.setLastName(lastName);
-        doctor.setDocumentType(request.documentType());
-        doctor.setIdentification(identificacion);
-        doctor.setPhone(request.phone());
-        doctor.setSpecialty(request.specialty());
-        doctor.setLaborStart(request.laborStart());
-        doctor.setLaborEnd(request.laborEnd());
-        doctor.setAppointmentInterval(request.appointmentInterval());
-        doctor.setStatus(calculateActiveStatus(request.laborStart(), request.laborEnd()));
-        doctor.setIdUser(userId);
+        int weeks = request.bookingWindowWeeks() != null ? request.bookingWindowWeeks() : 0;
+        int interval = request.appointmentInterval() != null ? request.appointmentInterval() : 0;
 
-        List<Schedule> schedules = request.schedules().stream()
-                .map(s -> new Schedule(
-                        doctor,
-                        s.startTime(),
-                        s.endTime(),
-                        s.workday()
-                ))
-                .toList();
+        // Lo dejamos inactivo porque no tiene horarios
+        Doctor doctor = new Doctor(
+                personId,
+                request.laborStart(),
+                request.laborEnd(),
+                weeks,
+                false,
+                interval
+        );
 
-        doctor.setSchedules(schedules);
+        // Agregamos las especialidades
+        for (SpecialtyCode code : request.specialty()) {
+            Specialty specialty = specialtyRepository.findById(code)
+                    .orElseThrow(() -> new DoctorInvalidSpecialty("Especialidad inválida: " + code));
 
-        // 3. Persistencia
-        Doctor savedDoctor = doctorRepository.save(doctor);
-
-        // 4. Deshabilitar el usuario si el doctor no está activo.
-        if (!savedDoctor.isStatus()) {
-            userModuleApi.deactivateUser(savedDoctor.getIdUser());
-        }
-    }
-
-    private boolean calculateActiveStatus(LocalDate start, LocalDate end) {
-        if (start == null) {
-            throw new DoctorValidationException("La fecha de inicio es obligatoria");
+            doctor.addSpecialty(specialty);
         }
 
-        LocalDate today = LocalDate.now();
-        if (end == null) {
-            return !today.isBefore(start);
+        // Agregamos horarios si hay
+        if (request.schedules() != null) {
+            request.schedules().forEach(schedule ->
+                    doctor.updateSchedule(
+                            schedule.workday(),
+                            schedule.startTime(),
+                            schedule.endTime()
+                    )
+            );
+            doctor.activateIfPossible();
         }
-
-        return !today.isBefore(start) && !today.isAfter(end);
-    }
-
-    @Transactional
-    //Metodo para validar si el medico esta activo o no usarlo cada vez que ingrese el medico
-    public void updateDoctorStatus(UUID idDoctor) {
-        Doctor doctor = doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-
-        boolean isActive = calculateActiveStatus(doctor.getLaborStart(), doctor.getLaborEnd());
-
-        // Solo guardamos si el estado cambió (optimización de JPA)
-        if (doctor.isStatus() != isActive) {
-            doctor.setStatus(isActive);
-            doctorRepository.save(doctor);
-        }
-
-        syncUserStatus(doctor);
-    }
-
-    // Actualizar la fecha de inicio laboral de un doctor
-    @Transactional
-    public void updateDoctorLaborStart(UUID idDoctor, LocalDate newLaborStart) {
-        if (newLaborStart == null) {
-            throw new DoctorValidationException("La fecha de inicio es obligatoria");
-        }
-
-        Doctor doctor = doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-
-        if (doctor.getLaborEnd() != null && newLaborStart.isAfter(doctor.getLaborEnd())) {
-            throw new DateConflictException("La fecha de inicio no puede ser posterior a la fecha de finalización");
-        }
-
-        doctor.setLaborStart(newLaborStart);
-        doctor.setStatus(calculateActiveStatus(doctor.getLaborStart(), doctor.getLaborEnd()));
-        syncUserStatus(doctor);
 
         doctorRepository.save(doctor);
+
+
+        if (doctor.isStatus()) {
+            personExternalService.ensureDoctorRole(personId);
+        } else {
+            personExternalService.revokeDoctorRole(personId);
+        }
     }
 
-    // Actualizar la fecha de finalización laboral de un doctor
     @Transactional
-    public void updateDoctorLaborEnd(UUID idDoctor, LocalDate newLaborEnd) {
-        if (newLaborEnd == null) {
-            throw new DoctorValidationException("La fecha de finalización es obligatoria");
+    @Override
+    public void deleteDoctor(UUID personId) {
+        if (personId == null) {
+            throw new DoctorValidationException("El personId es obligatorio");
         }
 
+        Doctor doctor = doctorRepository.findById(personId)
+                .orElse(null);
+
+        if (doctor == null) {
+            return; 
+        }
+
+        doctorRepository.delete(doctor);
+    }
+
+    @Transactional
+    public void updateDoctorInfo(UUID idDoctor, LocalDate laborStart, LocalDate laborEnd, int appointmentInterval,
+                                 int bookingWindowWeeks) {
         Doctor doctor = doctorRepository.findById(idDoctor)
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
-        if (doctor.getLaborStart() == null) {
-            throw new DateConflictException("No se puede actualizar la fecha de finalización porque el médico no tiene fecha de inicio registrada");
-        }
+        doctor.updateInfo(laborStart, laborEnd, appointmentInterval, bookingWindowWeeks);
 
-        if (newLaborEnd.isBefore(doctor.getLaborStart())) {
-            throw new DateConflictException("La fecha de finalización no puede ser anterior a la fecha de inicio");
-        }
-
-        doctor.setLaborEnd(newLaborEnd);
-        doctor.setStatus(calculateActiveStatus(doctor.getLaborStart(), doctor.getLaborEnd()));
-        syncUserStatus(doctor);
-
-        doctorRepository.save(doctor);
-    }
-
-    // Actualizar el intervalo de atención de un doctor, valida que al menos un horario del doctor pueda acomodar el nuevo intervalo
-    @Transactional
-    public void updateDoctorAppointmentInterval(UUID idDoctor, int newAppointmentInterval) {
-        if (newAppointmentInterval <= 0) {
-            throw new DoctorValidationException("El intervalo de atención debe ser mayor a 0");
-        }
-
-        Doctor doctor = doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-
-        // Evita intervalos imposibles para todos los horarios existentes.
-        List<Schedule> schedules = doctor.getSchedules() == null ? List.of() : doctor.getSchedules();
-        if (!schedules.isEmpty()) {
-            boolean fitsAtLeastOneSchedule = schedules.stream().anyMatch(schedule -> {
-                long duration = ChronoUnit.MINUTES.between(schedule.getStartTime(), schedule.getEndTime());
-                return duration >= newAppointmentInterval;
-            });
-
-            if (!fitsAtLeastOneSchedule) {
-                throw new IllegalArgumentException("El nuevo intervalo es mayor a la duración de todos los horarios del médico");
-            }
-        }
-
-        doctor.setAppointmentInterval(newAppointmentInterval);
         doctorRepository.save(doctor);
     }
 
     // Habilitar medico
     @Transactional
-    public void enableDoctor(UUID idDoctor, LocalDate newStart, LocalDate newEnd) {
-        validateLaborDateRange(newStart, newEnd);
-
+    public void enableDoctor(UUID idDoctor) {
         Doctor doctor = doctorRepository.findById(idDoctor)
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
-        // 1. Actualizamos el periodo laboral
-        doctor.setLaborStart(newStart);
-        doctor.setLaborEnd(newEnd);
+        doctor.activate();
 
-        // 2. Cambiamos el estado (aquí forzamos true porque es la acción de habilitar)
-        doctor.setStatus(true);
-
-        // 3. Reactivamos el usuario para que pueda loguearse
-        syncUserStatus(doctor);
-
-        // 4. Guardamos y retornamos el DTO actualizado
         doctorRepository.save(doctor);
+
+        syncUserStatus(doctor);
     }
 
     //Deshabilitar medico
@@ -214,6 +138,7 @@ public class DoctorService implements DoctorProvisioningApi {
 
         // 2. Validación
         // Si hoy es antes de que siquiera empiece a trabajar, lanzamos la advertencia
+        // Si da qeu si el front debe volver a enviar la peticino pero ahora con force true
         if (today.isBefore(doctor.getLaborStart()) && !force) {
             throw new DateConflictException(
                     "El doctor aún no ha iniciado labores (Inicia: " + doctor.getLaborStart() +
@@ -225,13 +150,13 @@ public class DoctorService implements DoctorProvisioningApi {
         // Si hoy es antes del inicio (por el force), igualamos fin al inicio.
         // De lo contrario, el fin es hoy.
         if (today.isBefore(doctor.getLaborStart())) {
-            doctor.setLaborEnd(doctor.getLaborStart());
+            doctor.updateLaborPeriod(doctor.getLaborStart(), doctor.getLaborStart());
         } else {
-            doctor.setLaborEnd(today);
+            doctor.updateLaborPeriod(doctor.getLaborStart(), today);
         }
 
         // 4. Cambiar el estado del Doctor
-        doctor.setStatus(false);
+        doctor.deactivate();
 
         // 5. Desactivamos el usuario para que no pueda loguearse
         syncUserStatus(doctor);
@@ -240,67 +165,143 @@ public class DoctorService implements DoctorProvisioningApi {
         doctorRepository.save(doctor);
     }
 
-    @Transactional
-    public void addSpecialities(UUID doctorId, List<Specialty> specialties) {
-
-        Doctor doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-
-        doctor.getSpecialty().addAll(specialties);
-    }
-
-    @Transactional
-    public void removeSpecialities(UUID doctorId, List<Specialty> specialties) {
-
-        Doctor doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-
-        doctor.getSpecialty().removeAll(specialties);
-    }
-
     public List<Doctor> findAllDoctors() {
         return doctorRepository.findAll();
     }
 
-    public Doctor getDoctorById(UUID idDoctor) {
-        return doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
+    public Page<DoctorDetailedResponse> findAllDoctorsDetailed(Pageable pageable, String search) {
+
+        if (search != null && !search.isBlank()) {
+            return findBySearchTermDetailed(search, pageable);
+        }
+
+        return findAllDetailed(pageable);
+    }
+
+    private Page<DoctorDetailedResponse> findBySearchTermDetailed(String search, Pageable pageable) {
+        List<UUID> allDoctorIds = doctorRepository.findAll().stream()
+                .map(Doctor::getPersonId)
+                .toList();
+
+        if (allDoctorIds.isEmpty()) {
+            return new PageImpl<>(List.of(), pageable, 0);
+        }
+
+        // findByIdsAndNameOrIdentificationContaining no admite Sort personalizado.
+        Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+
+        Page<PersonSummary> personPage = personExternalService
+                .findByIdsAndNameOrIdentificationContaining(allDoctorIds, search, unsortedPageable);
+
+        List<UUID> matchedIds = personPage.getContent().stream()
+                .map(PersonSummary::id) // ajustá al getter/record real de PersonSummary
+                .toList();
+
+        Map<UUID, Doctor> doctorsById = doctorRepository.findAllById(matchedIds).stream()
+                .collect(Collectors.toMap(Doctor::getPersonId, d -> d));
+
+        // Se respeta el orden que devuelve el servicio de persona
+        List<DoctorDetailedResponse> content = personPage.getContent().stream()
+                .map(person -> {
+                    Doctor doctor = doctorsById.get(person.id());
+                    return doctor == null ? null : DoctorDetailedResponse.fromEntity(doctor, person.firstName()+person.lastName());
+                })
+                .filter(Objects::nonNull)
+                .toList();
+
+        return new PageImpl<>(content, pageable, personPage.getTotalElements());
+    }
+
+    private Page<DoctorDetailedResponse> findAllDetailed(Pageable pageable) {
+        boolean isSortingByName = pageable.getSort().stream()
+                .anyMatch(order -> order.getProperty().equalsIgnoreCase("name"));
+
+        if (isSortingByName) {
+            List<Doctor> allDoctors = doctorRepository.findAll();
+
+            List<UUID> allIds = allDoctors.stream().map(Doctor::getPersonId).toList();
+            Map<UUID, String> allNames = personExternalService.getPersonNames(allIds);
+
+            List<DoctorDetailedResponse> allResponses = allDoctors.stream()
+                    .map(doctor -> DoctorDetailedResponse.fromEntity(doctor, allNames.get(doctor.getPersonId())))
+                    .collect(Collectors.toList());
+
+            boolean isDescending = pageable.getSort().getOrderFor("name").isDescending();
+            Comparator<DoctorDetailedResponse> nameComparator = Comparator.comparing(
+                    d -> d.name() == null ? "" : d.name(),
+                    String.CASE_INSENSITIVE_ORDER
+            );
+            if (isDescending) {
+                nameComparator = nameComparator.reversed();
+            }
+            allResponses.sort(nameComparator);
+
+            int total = allResponses.size();
+            int start = (int) pageable.getOffset();
+            int end = Math.min((start + pageable.getPageSize()), total);
+
+            if (start >= total) {
+                return new PageImpl<>(List.of(), pageable, total);
+            }
+
+            return new PageImpl<>(allResponses.subList(start, end), pageable, total);
+        } else {
+            Page<Doctor> doctors = doctorRepository.findAll(pageable);
+
+            List<UUID> ids = doctors.getContent().stream().map(Doctor::getPersonId).toList();
+            Map<UUID, String> names = personExternalService.getPersonNames(ids);
+
+            return doctors.map(doctor -> DoctorDetailedResponse.fromEntity(doctor, names.get(doctor.getPersonId())));
+        }
     }
 
     public Doctor findByUserId(UUID keycloakId) {
-        Doctor doctor = doctorRepository.findByIdUser(keycloakId);
+        Doctor doctor = doctorRepository.findByPersonId(personExternalService.findPersonIdByUserId(keycloakId));
         if (doctor == null) {
             throw new DoctorNotFoundException("Doctor no encontrado para el usuario autenticado");
         }
         return doctor;
     }
 
-    public List<Doctor> getDoctorBySpeciality(Specialty specialty) {
-        return doctorRepository.findBySpecialtyContaining(specialty);
+    public List<Doctor> getDoctorBySpeciality(SpecialtyCode specialty) {
+        return doctorRepository.findBySpecialtiesCode(specialty);
     }
 
-    public List<Specialty> getSpecialties (UUID idPatient){
-        List<Specialty> activeSpecialities = doctorRepository.findAllDistinctSpecialtiesByActiveDoctors();
-        if (appointmentExternalService.isNewPatient(idPatient)){
-            if(activeSpecialities.contains(Specialty.MEDICINA_GENERAL)){
-                return List.of(Specialty.MEDICINA_GENERAL);
-            }
-        }else {
-            return activeSpecialities;
+    public List<Doctor> getDoctorsById(List<UUID> doctorIds) {
+        return doctorRepository.findByPersonIdIn(doctorIds);
+    }
+
+    public List<SpecialtyCode> getSpecialties(UUID idPatient) {
+
+        List<SpecialtyCode> activeSpecialties = doctorRepository
+                .findAllDistinctSpecialtyCodesByActiveDoctors()
+                .stream()
+                .map(SpecialtyCode::valueOf)
+                .toList();
+
+        if (activeSpecialties.isEmpty()) {
+            throw new NoAvailableDoctorsException("No hay médicos activos disponibles");
         }
-        return Collections.emptyList();
+
+        if (idPatient == null || appointmentExternalService.isNewPatient(idPatient)) {
+            return activeSpecialties.contains(SpecialtyCode.MEDICINA_GENERAL)
+                    ? List.of(SpecialtyCode.MEDICINA_GENERAL)
+                    : Collections.emptyList();
+        }
+
+        return activeSpecialties;
     }
 
-    public List<Specialty> getAllSpecialties (){
-        return Arrays.asList(Specialty.values());
+    public List<SpecialtyCode> getAllSpecialties (){
+        return Arrays.asList(SpecialtyCode.values());
     }
 
     private void syncUserStatus(Doctor doctor) {
         if (doctor.isStatus()) {
-            userModuleApi.activateUser(doctor.getIdUser());
+            personExternalService.ensureDoctorRole(doctor.getPersonId());
             return;
         }
-        userModuleApi.deactivateUser(doctor.getIdUser());
+        personExternalService.revokeDoctorRole(doctor.getPersonId());
     }
 
     private void validateLaborDateRange(LocalDate laborStart, LocalDate laborEnd) {
@@ -314,4 +315,23 @@ public class DoctorService implements DoctorProvisioningApi {
             throw new DateConflictException("La fecha de finalización no puede ser anterior a la fecha de inicio");
         }
     }
+
+    @Transactional
+    public void changeSpecialties(UUID doctorId, List<SpecialtyCode> codigosNuevos) {
+
+        Doctor doctor = doctorRepository.findById(doctorId)
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado: " + doctorId));
+
+        Set<Specialty> nuevas = new HashSet<>(specialtyRepository.findAllById(codigosNuevos));
+        if (nuevas.size() != new HashSet<>(codigosNuevos).size()) {
+            throw new IllegalArgumentException("Alguna especialidad enviada no existe en el catálogo");
+        }
+
+        Set<Specialty> actuales = doctor.getSpecialties();
+        actuales.removeIf(s -> !nuevas.contains(s)); // quita las que ya no vienen
+        actuales.addAll(nuevas); // agrega las nuevas
+
+        doctorRepository.save(doctor);
+    }
+
 }

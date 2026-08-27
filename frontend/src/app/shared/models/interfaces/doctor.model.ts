@@ -3,7 +3,7 @@ import { DaySchedule } from './daySchedule.model';
 export interface Doctor {
   id: string;
   name: string;
-  specialty: string;
+  specialty: string[];
   appointmentInterval: number;
   workdays: number[];
   startTime: string;
@@ -11,6 +11,6 @@ export interface Doctor {
   laborStart: string;
   laborEnd: string;
   status?: boolean;
-  daySchedules?: { [day: number]: DaySchedule };
+  daySchedules?: Record<number, DaySchedule>;
   email?: string;
 }

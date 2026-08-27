@@ -1,26 +1,93 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+  ViewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import {
+  LucideArrowLeft,
+  LucideCheckCircle,
+  LucideDynamicIcon,
+  LucideEye,
+  LucideEyeOff,
+  LucideKeyRound,
+  LucideSearch,
+  LucideUserPlus,
+} from '@lucide/angular';
 import Keycloak from 'keycloak-js';
-import { ArrowLeft, CheckCircle, Eye, EyeOff, KeyRound, Calendar,
-  LucideAngularModule, Search, UserPlus,} from 'lucide-angular';
-import { PatientPublicResponse, PatientService,} from '../../core/services/patient.service';
-import { MatDatepickerModule } from '@angular/material/datepicker';
+import { ButtonComponent } from '../..//design-system/atoms/button/button.component';
+import { InputComponent } from '../../design-system/atoms/input/input.component';
+import {
+  PatientPublicResponse,
+  PatientService,
+} from '../../core/services/patient.service';
+import {
+  PatientFormData,
+  EMPTY_PATIENT_FORM,
+  PatientFormComponent,
+} from '../../shared/components/forms/patient-form/patient-form.component';
+import {
+  ExistingUserFormData,
+  EMPTY_GUARDIAN_FORM,
+  ExistingUserFormComponent,
+} from '../../shared/components/forms/existing-users-form/existing-user-form.component';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
+import { SanitizeRule } from '../../design-system/atoms/input/input.component';
+import {
+  DOCUMENT_RULES,
+  DEFAULT_DOCUMENT_MAX_LENGTH,
+  validateDocumentForType,
+} from '../../shared/helpers/document-validation';
+import { AppError } from '../../shared/models/interfaces/api-error.model';
 
 type RegistroStep = 1 | 2 | 3;
+
+/**
+ * Estado del paciente según la combinación de `patientExists`, `hasUserAccount`, `hasSystemUser` y `hasPatientRole`
+ * devuelta por `/patients/document/{doc}/public`:
+ *
+ * - 'not-found': paciente totalmente nuevo (F, F, F, F). Formulario completo + contraseña. No requiere OTP.
+ * - 'found': el paciente existe pero no tiene cuenta vinculada (T, F, F/T, F). Requiere OTP + contraseña.
+ * - 'existing-user': ya existe una cuenta vinculada pero no está registrado como paciente (F, T, T, F/T).
+ *    Requiere OTP + sexo/fecha nacimiento/teléfono de acudiente. No requiere contraseña.
+ * - 'needs-patient-role': paciente y cuenta existen, falta el rol de paciente (T, T, T, F). Solo requiere OTP.
+ * - 'already-linked': todo completo (T, T, T, T). No debe volver a pasar por el registro.
+ * - 'inconsistent': cualquier otra combinación.
+ */
 type PatientStatus =
   | 'idle'
-  | 'found'
-  | 'already-linked'
   | 'not-found'
-  | 'existing-user';
+  | 'found'
+  | 'existing-user'
+  | 'needs-patient-role'
+  | 'already-linked'
+  | 'inconsistent';
 
 @Component({
   selector: 'app-registro',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule, MatDatepickerModule, FormatoPipe],
+  imports: [
+    LucideArrowLeft,
+    LucideCheckCircle,
+    LucideKeyRound,
+    LucideSearch,
+    LucideUserPlus,
+    LucideDynamicIcon,
+    CommonModule,
+    FormsModule,
+    ButtonComponent,
+    InputComponent,
+    PatientFormComponent,
+    ExistingUserFormComponent,
+    FormatoPipe,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './registro.component.html',
 })
 export class RegistroComponent implements OnInit {
@@ -31,14 +98,11 @@ export class RegistroComponent implements OnInit {
   private keycloak = inject(Keycloak);
   private router = inject(Router);
 
-  readonly Search = Search;
-  readonly CheckCircle = CheckCircle;
-  readonly ArrowLeft = ArrowLeft;
-  readonly Eye = Eye;
-  readonly EyeOff = EyeOff;
-  readonly UserPlus = UserPlus;
-  readonly KeyRound = KeyRound;
-  readonly Calendar = Calendar;
+  @ViewChild('patientForm') patientFormRef?: PatientFormComponent;
+  @ViewChild('existingUserForm') guardianFormRef?: ExistingUserFormComponent;
+
+  readonly Eye = LucideEye;
+  readonly EyeOff = LucideEyeOff;
 
   step = signal<RegistroStep>(1);
   isLoading = signal(false);
@@ -46,99 +110,58 @@ export class RegistroComponent implements OnInit {
   successMessage = signal('');
   showPassword = signal(false);
   showConfirmPassword = signal(false);
-  today = signal(new Date().toISOString().split('T')[0]);
 
   documentNumber = signal('');
   patientStatus = signal<PatientStatus>('idle');
   foundPatient = signal<PatientPublicResponse | null>(null);
 
-  form = signal({
-    documentType: '',
-    firstName: '',
-    lastName: '',
-    phone: '',
-    gender: '',
-    birthDate: '',
-    guardianPhone: '',
-    email: '',
-  });
+  /** Todos los datos para el caso en el que no existe usuario ni paciente. */
+  newPatientForm = signal<PatientFormData>({ ...EMPTY_PATIENT_FORM });
+
+  /** Datos mínimos para el caso 'existing-user' (sexo, fecha de nacimiento, acudiente). */
+  existingUsersForm = signal<ExistingUserFormData>({ ...EMPTY_GUARDIAN_FORM });
 
   password = signal('');
   confirmPassword = signal('');
   verificationCode = signal('');
-  
-  private readonly PASSWORD_MIN = 6;
-  private readonly PASSWORD_MAX = 100;
+
+  protected readonly PASSWORD_MIN = 6;
+  protected readonly PASSWORD_MAX = 100;
   private readonly PASSWORD_ALPHANUMERIC = /^(?=.*[a-zA-Z])(?=.*[0-9]).+$/;
   readonly maxBirthDate = new Date();
 
   errors = signal<Record<string, string>>({});
 
-  docInputWarning = signal('');
-  private docWarnTimer: ReturnType<typeof setTimeout> | null = null;
-
-  private readonly DOC_MAX = 12;
-  private readonly INVALID_DOC_CHARS = /[^a-zA-Z0-9]/g;
-
-  handleDocInput(event: Event): void {
-    const el = event.target as HTMLInputElement;
-    const raw = el.value;
-    const clean = raw.replace(this.INVALID_DOC_CHARS, '');
-    if (clean !== raw) {
-      el.value = clean;
-      this.flashDocWarning(
-        'Solo se permiten letras y números, sin caracteres especiales',
-      );
-    }
-    if (clean.length > this.DOC_MAX) {
-      el.value = clean.slice(0, this.DOC_MAX);
-      this.flashDocWarning(
-        `Solo se permiten máximo ${this.DOC_MAX} caracteres`,
-      );
-    }
-    this.onDocumentChange(el.value);
-  }
-
-  private flashDocWarning(text: string): void {
-    this.docInputWarning.set(text);
-    if (this.docWarnTimer) clearTimeout(this.docWarnTimer);
-    this.docWarnTimer = setTimeout(() => this.docInputWarning.set(''), 3000);
-  }
-
-  readonly NAME_MAX = 30;
-  readonly EMAIL_MAX = 100;
-  readonly PHONE_MAX = 10;
-
-  firstNameLimitMsg = signal('');
-  lastNameLimitMsg = signal('');
-  phoneLimitMsg = signal('');
-  emailLimitMsg = signal('');
-  guardianPhoneLimitMsg = signal('');
-
-  private readonly VALID_NAME_REGEX = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s\-]+$/;
-  private readonly VALID_EMAIL_REGEX =
-    /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
-  private readonly INVALID_EMAIL_CHARS = /['"<>()[\]\\,;:{}|^~`!#$%&*=?/]/;
-
-  private timers: Record<string, ReturnType<typeof setTimeout>> = {};
+  protected readonly DOCUMENT_INPUT_MAX_LENGTH = 20;
 
   readonly isNewPatient = computed(() => this.patientStatus() === 'not-found');
   readonly isExistingPatient = computed(() => this.patientStatus() === 'found');
   readonly isExistingSystemUser = computed(
-    () => this.patientStatus() === 'existing-user',
+    () => this.patientStatus() === 'existing-user'
   );
-  readonly isAlreadyLinked = computed(
-    () => this.patientStatus() === 'already-linked',
+  /** Caso 3: paciente y cuenta ya existen, solo falta el rol de paciente. */
+  readonly needsPatientRoleOnly = computed(
+    () => this.patientStatus() === 'needs-patient-role'
+  );
+  /** Caso 4: ya está completamente registrado, no debe continuar. */
+  readonly isFullyRegistered = computed(
+    () => this.patientStatus() === 'already-linked'
+  );
+  /** Estado que no encaja en ninguno de los casos válidos. */
+  readonly isInconsistentState = computed(
+    () => this.patientStatus() === 'inconsistent'
   );
 
   readonly requiresPassword = computed(
-    () => this.isNewPatient() || this.isExistingPatient(),
+    () => this.isNewPatient() || this.isExistingPatient()
   );
-
-  readonly isMinorPatient = computed(() => {
-    if (!this.isNewPatient()) return false;
-    return this.isMinorByBirthDate(this.form().birthDate);
-  });
+  /** Casos que necesitan validar un código OTP (todos menos el paciente nuevo real). */
+  readonly requiresOtp = computed(
+    () =>
+      this.isExistingPatient() ||
+      this.isExistingSystemUser() ||
+      this.needsPatientRoleOnly()
+  );
 
   readonly displayName = computed(() => {
     const p = this.foundPatient();
@@ -147,13 +170,64 @@ export class RegistroComponent implements OnInit {
       return `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim();
     }
 
-    const f = this.form();
+    const f = this.newPatientForm();
     if (f.firstName || f.lastName) {
       return `${f.firstName} ${f.lastName}`.trim();
     }
 
     return '';
   });
+
+  documentSanitizeRule = computed<SanitizeRule>(() => {
+    const type = this.newPatientForm().identificationType;
+    if (!type) return 'alphanumeric';
+    return DOCUMENT_RULES[type]?.sanitize ?? 'alphanumeric';
+  });
+
+  documentMaxLengthDynamic = computed<number>(() => {
+    const type = this.newPatientForm().identificationType;
+    return DOCUMENT_RULES[type]?.max ?? DEFAULT_DOCUMENT_MAX_LENGTH;
+  });
+
+  /** Actualiza los datos del formulario de nuevos pacientes (se registran todos los datos) */
+  onNewPatientFormChange(value: PatientFormData): void {
+    this.newPatientForm.set(value);
+    this.revalidateDocumentNumber();
+  }
+
+  /** Actualiza los datos del formulario de usuarios existentes (se registran los datos necesarios) */
+  onExistingUsersFormChange(value: ExistingUserFormData): void {
+    this.existingUsersForm.set(value);
+  }
+
+  private revalidateDocumentNumber(): void {
+    const type = this.newPatientForm().identificationType;
+    if (!type) return;
+    const msg = validateDocumentForType(type, this.documentNumber());
+    this.errors.update((e) => {
+      const next = { ...e };
+      if (msg) next['documentNumber'] = msg;
+      else delete next['documentNumber'];
+      return next;
+    });
+  }
+
+  onDocumentNumberChange(value: string | number | boolean | null): void {
+    this.onDocumentChange(String(value ?? ''));
+    this.revalidateDocumentNumber();
+  }
+
+  onPasswordChange(value: string | number | boolean | null): void {
+    this.password.set(String(value ?? ''));
+  }
+
+  onConfirmPasswordChange(value: string | number | boolean | null): void {
+    this.confirmPassword.set(String(value ?? ''));
+  }
+
+  onVerificationCodeChange(value: string | number | boolean | null): void {
+    this.verificationCode.set(String(value ?? ''));
+  }
 
   searchPatient(): void {
     this.patientStatus.set('idle');
@@ -164,10 +238,10 @@ export class RegistroComponent implements OnInit {
 
     const doc = this.documentNumber().trim();
 
-    if (!/^[a-zA-Z0-9]{1,12}$/.test(doc)) {
+    if (!/^[a-zA-Z0-9]{1,20}$/.test(doc)) {
       this.errors.set({
         documentNumber:
-          'Ingresa un documento válido (máximo 12 caracteres alfanuméricos, sin caracteres especiales)',
+          'Ingresa un documento válido (máximo 20 caracteres alfanuméricos, sin caracteres especiales)',
       });
       return;
     }
@@ -179,43 +253,66 @@ export class RegistroComponent implements OnInit {
         this.isLoading.set(false);
         this.foundPatient.set(patient);
 
-        // paciente ya vinculado
-        if (patient.hasUserAccount) {
-          this.patientStatus.set('already-linked');
-          return;
-        }
+        const status = this.resolvePatientStatus(patient);
+        this.patientStatus.set(status);
 
-        // paciente existente sin cuenta
-        if (patient.patientExists) {
-          this.patientStatus.set('found');
-          return;
+        if (status === 'inconsistent') {
+          this.errorMessage.set(
+            'No fue posible validar tu estado de registro. Por favor contacta a soporte.'
+          );
         }
-
-        // existe usuario del sistema pero no paciente
-        if (patient.hasSystemUser) {
-          this.patientStatus.set('existing-user');
-          return;
-        }
-
-        // fallback defensivo
-        this.patientStatus.set('not-found');
       },
-      error: (err) => {
+      error: (err: AppError) => {
         this.isLoading.set(false);
-
-        if (err.status === 404) {
+        if (err.errorCode === 'PATIENT_NOT_FOUND') {
           this.patientStatus.set('not-found');
-        } else if (err.status === 0) {
-          this.errorMessage.set(
-            'No se pudo conectar con el servidor. Intenta más tarde.',
-          );
-        } else {
-          this.errorMessage.set(
-            'Error al buscar el documento. Intenta de nuevo.',
-          );
+          return;
         }
+        this.errorMessage.set(err.message);
       },
     });
+  }
+
+  /**
+   * Determina el estado del paciente a partir de la combinación de las 4
+   * variables devueltas por el backend. Ver el comentario del tipo
+   * `PatientStatus` para el detalle de cada caso.
+   */
+  private resolvePatientStatus(p: PatientPublicResponse): PatientStatus {
+    const { patientExists, hasUserAccount, hasSystemUser, hasPatientRole } = p;
+
+    // Paciente totalmente nuevo: no existe registro ni cuenta de ningún tipo.
+    if (
+      !patientExists &&
+      !hasUserAccount &&
+      !hasSystemUser &&
+      !hasPatientRole
+    ) {
+      return 'not-found';
+    }
+
+    // Caso 1: el paciente existe pero no tiene cuenta vinculada.
+    if (patientExists && !hasUserAccount && !hasPatientRole) {
+      return 'found';
+    }
+
+    // Caso 2: ya tiene cuenta vinculada, pero no está registrado como
+    // paciente.
+    if (!patientExists && hasUserAccount && hasSystemUser) {
+      return 'existing-user';
+    }
+
+    // Caso 3: paciente y cuenta existen, solo falta el rol de paciente.
+    if (patientExists && hasUserAccount && hasSystemUser && !hasPatientRole) {
+      return 'needs-patient-role';
+    }
+
+    // Caso 4: todo completo, no debe volver a registrarse.
+    if (patientExists && hasUserAccount && hasSystemUser && hasPatientRole) {
+      return 'already-linked';
+    }
+
+    return 'inconsistent';
   }
 
   onDocumentChange(value: string): void {
@@ -235,16 +332,25 @@ export class RegistroComponent implements OnInit {
     this.errorMessage.set('');
     this.successMessage.set('');
 
-    if (this.patientStatus() === 'idle') {
-      return;
+    if (this.patientStatus() === 'idle') return;
+    if (this.patientStatus() === 'already-linked') return;
+    if (this.patientStatus() === 'inconsistent') return;
+
+    this.revalidateDocumentNumber();
+    if (this.errors()['documentNumber']) return;
+
+    if (this.patientStatus() === 'not-found') {
+      const formOk = this.patientFormRef
+        ? this.patientFormRef.validate()
+        : true;
+      if (!formOk) return;
     }
 
-    if (this.patientStatus() === 'already-linked') {
-      return;
-    }
-
-    if (!this.validateStep1()) {
-      return;
+    if (this.patientStatus() === 'existing-user') {
+      const formOk = this.guardianFormRef
+        ? this.guardianFormRef.validate()
+        : true;
+      if (!formOk) return;
     }
 
     this.step.set(2);
@@ -280,42 +386,46 @@ export class RegistroComponent implements OnInit {
     this.errorMessage.set('');
     this.successMessage.set('');
 
-    if (this.isExistingPatient() || this.isExistingSystemUser()) {
+    if (
+      this.isExistingPatient() ||
+      this.isExistingSystemUser() ||
+      this.needsPatientRoleOnly()
+    ) {
       this.patientService
-        .requestLinkUserAccountCode({ documentNumber: this.documentNumber() })
+        .requestLinkUserAccountCode({ identification: this.documentNumber() })
         .subscribe({
           next: () => {
             this.isLoading.set(false);
             this.successMessage.set(
-              'Se generó un código de verificación. Por ahora revísalo en la consola del backend.',
+              'Se generó un código de verificación. Por ahora revísalo en la consola del backend.'
             );
             this.step.set(3);
           },
-          error: (err) => this.handleError(err),
+          error: (err: AppError) => this.handleError(err),
         });
       return;
     }
 
     // paciente nuevo real
-    const f = this.form();
+    const f = this.newPatientForm();
 
     this.patientService
       .createWithUser({
         username: this.documentNumber(),
         password: this.password(),
-        documentType: f.documentType,
-        documentNumber: this.documentNumber(),
+        identificationType: f.identificationType,
+        identification: this.documentNumber(),
         firstName: f.firstName,
         lastName: f.lastName,
         phone: f.phone,
-        email: f.email.trim() || undefined,
-        gender: f.gender,
+        email: (f.email ?? '').trim() || undefined,
+        sex: f.sex,
         birthDate: f.birthDate,
-        guardianPhone: f.guardianPhone.trim() || undefined,
+        guardianPhone: (f.guardianPhone ?? '').trim() || undefined,
       })
       .subscribe({
         next: () => this.onSuccess(),
-        error: (err) => this.handleError(err),
+        error: (err: AppError) => this.handleError(err),
       });
   }
 
@@ -326,121 +436,24 @@ export class RegistroComponent implements OnInit {
     this.errorMessage.set('');
     this.successMessage.set('');
 
+    const isExistingUser = this.isExistingSystemUser();
+    const extra = isExistingUser ? this.existingUsersForm() : null;
+
     this.patientService
       .confirmLinkUserAccount({
-        documentNumber: this.documentNumber(),
+        identification: this.documentNumber(),
         code: this.verificationCode(),
-        // solo enviar password si aplica
         password: this.requiresPassword() ? this.password() : undefined,
+        ...(extra && {
+          sex: extra.sex,
+          birthDate: extra.birthDate,
+          guardianPhone: extra.guardianPhone.trim() || undefined,
+        }),
       })
       .subscribe({
         next: () => this.onSuccess(),
-        error: (err) => this.handleError(err),
+        error: (err: AppError) => this.handleError(err),
       });
-  }
-
-  handleNameInput(event: Event, field: 'firstName' | 'lastName'): void {
-    const el = event.target as HTMLInputElement;
-    const limitMsg =
-      field === 'firstName' ? this.firstNameLimitMsg : this.lastNameLimitMsg;
-    let value = el.value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    value = value.replace(/[^a-zA-ZñÑ\s]/g, '');
-    value = value.replace(/^\s+/, '');
-    value = value.replace(/\s{2,}/g, ' ');
-    value = value.replace(/(\S+)/g, (word) =>
-      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-    );
-    if (value.length > this.NAME_MAX) {
-      value = value.slice(0, this.NAME_MAX);
-      this.flash(
-        limitMsg,
-        `Solo se permiten máximo ${this.NAME_MAX} caracteres`,
-        field,
-      );
-    } else {
-      limitMsg.set('');
-    }
-
-    el.value = value;
-    this.setFormField(field, value as any);
-  }
-
-  handlePhoneInput(event: Event): void {
-    const el = event.target as HTMLInputElement;
-    const digits = el.value.replace(/\D/g, '');
-
-    if (digits.length > this.PHONE_MAX) {
-      el.value = digits.slice(0, this.PHONE_MAX);
-      this.updateFormField('phone', el.value);
-      this.flash(
-        this.phoneLimitMsg,
-        `Solo se permiten máximo ${this.PHONE_MAX} dígitos`,
-        'phone',
-      );
-    } else {
-      el.value = digits;
-      this.updateFormField('phone', digits);
-      this.phoneLimitMsg.set('');
-    }
-  }
-
-  handleEmailInput(event: Event): void {
-    const el = event.target as HTMLInputElement;
-    const value = el.value;
-
-    if (value.length > this.EMAIL_MAX) {
-      el.value = value.slice(0, this.EMAIL_MAX);
-      this.updateFormField('email', el.value);
-      this.flash(
-        this.emailLimitMsg,
-        `Solo se permiten máximo ${this.EMAIL_MAX} caracteres`,
-        'email',
-      );
-    } else {
-      this.updateFormField('email', value);
-      this.emailLimitMsg.set('');
-    }
-  }
-
-  handleGuardianPhoneInput(event: Event): void {
-    const el = event.target as HTMLInputElement;
-    const digits = el.value.replace(/\D/g, '');
-
-    if (digits.length > this.PHONE_MAX) {
-      el.value = digits.slice(0, this.PHONE_MAX);
-      this.updateFormField('guardianPhone', el.value);
-      this.flash(
-        this.guardianPhoneLimitMsg,
-        `Solo se permiten máximo ${this.PHONE_MAX} dígitos`,
-        'gphone',
-      );
-    } else {
-      el.value = digits;
-      this.updateFormField('guardianPhone', digits);
-      this.guardianPhoneLimitMsg.set('');
-    }
-  }
-
-  setFormField(key: string, value: string): void {
-    this.form.update((f) => ({ ...f, [key]: value }));
-  }
-
-  getFormField(key: string): string {
-    return (this.form() as Record<string, string>)[key] ?? '';
-  }
-
-  private updateFormField(key: string, value: string): void {
-    this.form.update((f) => ({ ...f, [key]: value }));
-  }
-
-  private flash(
-    sig: ReturnType<typeof signal<string>>,
-    text: string,
-    key: string,
-  ): void {
-    sig.set(text);
-    if (this.timers[key]) clearTimeout(this.timers[key]);
-    this.timers[key] = setTimeout(() => sig.set(''), 3000);
   }
 
   private onSuccess(): void {
@@ -451,94 +464,35 @@ export class RegistroComponent implements OnInit {
     });
   }
 
-  private handleError(err: any): void {
+  /**
+   * Maneja errores de las peticiones de los pasos 2 y 3 (crear cuenta,
+   * vincular acceso, confirmar código).
+   *
+   * @param err - Error ya normalizado por el interceptor.
+   */
+  private handleError(err: AppError): void {
     this.isLoading.set(false);
 
-    const detail = err.error?.detail;
-    const errorCode = err.error?.errorCode;
-
-    if (err.status === 0) {
-      this.errorMessage.set(
-        'No se pudo conectar con el servidor. Intenta más tarde.',
-      );
-      return;
+    if (
+      err.errorCode === 'INVALID_VERIFICATION_CODE' ||
+      err.errorCode === 'VERIFICATION_CODE_EXPIRED' ||
+      err.errorCode === 'VERIFICATION_CODE_BLOCKED'
+    ) {
+      this.verificationCode.set('');
     }
 
-    switch (errorCode) {
-      case 'PATIENT_ALREADY_LINKED':
-        this.errorMessage.set('Este paciente ya tiene una cuenta asociada.');
-        break;
-      case 'USERNAME_TAKEN':
-        this.errorMessage.set(
-          'Ya existe una cuenta asociada a este documento.',
-        );
-        break;
-      case 'INVALID_VERIFICATION_CODE':
-        this.errorMessage.set('El código de verificación es inválido.');
-        break;
-      case 'VERIFICATION_CODE_EXPIRED':
-        this.errorMessage.set('El código de verificación expiró.');
-        break;
-      case 'VERIFICATION_CODE_BLOCKED':
-        this.errorMessage.set(
-          'El código fue bloqueado por exceso de intentos.',
-        );
-        break;
-      default:
-        this.errorMessage.set(
-          detail || 'Ocurrió un error al crear la cuenta. Intenta de nuevo.',
-        );
-        break;
-    }
-  }
-
-  private validateStep1(): boolean {
-    const newErrors: Record<string, string> = {};
-
-    if (this.isNewPatient() || this.isExistingSystemUser()) {
-      const f = this.form();
-
-      if (!f.documentType) {
-        newErrors['documentType'] = 'Selecciona el tipo de documento';
-      }
-
-      const firstNameErr = this.validateName(f.firstName, 'Nombres');
-      if (firstNameErr) newErrors['firstName'] = firstNameErr;
-
-      const lastNameErr = this.validateName(f.lastName, 'Apellidos');
-      if (lastNameErr) newErrors['lastName'] = lastNameErr;
-
-      const phoneErr = this.validatePhone(f.phone, 'Celular');
-      if (phoneErr) newErrors['phone'] = phoneErr;
-
-      if (!f.gender) {
-        newErrors['gender'] = 'Selecciona el género';
-      }
-
-      const birthErr = this.validateBirthDate(f.birthDate, f.documentType);
-      if (birthErr) newErrors['birthDate'] = birthErr;
-
-      const emailErr = this.validateEmail(f.email);
-      if (emailErr) newErrors['email'] = emailErr;
-
-      const gPhoneErr = this.validateGuardianPhone(
-        f.guardianPhone,
-        f.birthDate,
-      );
-      if (gPhoneErr) newErrors['guardianPhone'] = gPhoneErr;
-    }
-
-    this.errors.set(newErrors);
-    return Object.keys(newErrors).length === 0;
+    this.errorMessage.set(err.message);
   }
 
   private validateStep2(): boolean {
     const newErrors: Record<string, string> = {};
     if (this.requiresPassword()) {
       if (this.password().length < this.PASSWORD_MIN) {
-        newErrors['password'] = `La contraseña debe tener al menos ${this.PASSWORD_MIN} caracteres`;
+        newErrors['password'] =
+          `La contraseña debe tener al menos ${this.PASSWORD_MIN} caracteres`;
       } else if (this.password().length > this.PASSWORD_MAX) {
-        newErrors['password'] = `La contraseña no puede superar los ${this.PASSWORD_MAX} caracteres`;
+        newErrors['password'] =
+          `La contraseña no puede superar los ${this.PASSWORD_MAX} caracteres`;
       } else if (!this.PASSWORD_ALPHANUMERIC.test(this.password())) {
         newErrors['password'] = 'La contraseña debe contener letras y números';
       }
@@ -564,138 +518,10 @@ export class RegistroComponent implements OnInit {
     return Object.keys(newErrors).length === 0;
   }
 
-  private validateName(value: string | undefined, label: string): string {
-    const trimmed = value?.trim() ?? '';
-
-    if (!trimmed) {
-      return `Ingresa ${label.toLowerCase()}`;
-    }
-    if (trimmed.length > this.NAME_MAX) {
-      return `Se permiten ingresar máximo ${this.NAME_MAX} caracteres`;
-    }
-    if (!this.VALID_NAME_REGEX.test(trimmed)) {
-      return 'Solo se permiten letras, espacios y guión medio (-)';
-    }
-    return '';
-  }
-
-  private validatePhone(
-    value: string | undefined,
-    label: string,
-    required = true,
-  ): string {
-    const trimmed = value?.trim() ?? '';
-
-    if (!trimmed) {
-      return required ? `Ingresa el ${label.toLowerCase()}` : '';
-    }
-    if (trimmed.length < this.PHONE_MAX) {
-      return `El número debe tener al menos ${this.PHONE_MAX} dígitos`;
-    }
-    if (!/^[0-9]{10}$/.test(trimmed)) {
-      return `Ingresa un número válido de ${this.PHONE_MAX} dígitos`;
-    }
-    return '';
-  }
-
-  private validateBirthDate(
-    value: string | undefined,
-    documentType: string | undefined,
-  ): string {
-    if (!value) {
-      return 'Ingresa una fecha de nacimiento válida';
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const input = new Date(value);
-    input.setHours(0, 0, 0, 0);
-
-    if (input >= today) {
-      return 'La fecha de nacimiento debe ser anterior a hoy';
-    }
-
-    if (documentType === 'CEDULA') {
-      const age = this.calcAge(input);
-      if (age < 18) {
-        return (
-          'La fecha ingresada indica que el paciente es menor de edad. ' +
-          'Para Cédula el paciente debe tener 18 años o más.'
-        );
-      }
-    }
-
-    return '';
-  }
-
-  private validateEmail(value: string | undefined): string {
-    if (!value) return '';
-
-    if (value.length > this.EMAIL_MAX) {
-      return `El correo no puede superar los ${this.EMAIL_MAX} caracteres`;
-    }
-    if (this.INVALID_EMAIL_CHARS.test(value)) {
-      return 'No se permiten caracteres especiales como \', ", <, >, (, ), [, ], etc.';
-    }
-    if (!this.VALID_EMAIL_REGEX.test(value)) {
-      return 'La estructura del correo no es válida. Ejemplo: nombre@dominio.com';
-    }
-    return '';
-  }
-
-  private validateGuardianPhone(
-    guardianPhone: string | undefined,
-    birthDate: string | undefined,
-  ): string {
-    const trimmed = guardianPhone?.trim() ?? '';
-
-    if (trimmed) {
-      const formatErr = this.validatePhone(
-        trimmed,
-        'celular del acudiente',
-        false,
-      );
-      if (formatErr) return formatErr;
-    }
-
-    if (!birthDate) return '';
-
-    const age = this.calcAge(new Date(birthDate));
-    if (age < 18 && !trimmed) {
-      return 'El celular del acudiente es obligatorio para menores de 18 años';
-    }
-
-    return '';
-  }
-
-  private calcAge(birthDate: Date): number {
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
-    return age;
-  }
-
-  private isMinorByBirthDate(birthDate: string): boolean {
-    if (!birthDate) return false;
-    return this.calcAge(new Date(birthDate)) < 18;
-  }
-
   private resetForm(): void {
-    this.form.set({
-      documentType: '',
-      firstName: '',
-      lastName: '',
-      phone: '',
-      gender: '',
-      birthDate: '',
-      guardianPhone: '',
-      email: '',
-    });
-    this.firstNameLimitMsg.set('');
-    this.lastNameLimitMsg.set('');
-    this.phoneLimitMsg.set('');
-    this.emailLimitMsg.set('');
-    this.guardianPhoneLimitMsg.set('');
+    this.newPatientForm.set({ ...EMPTY_PATIENT_FORM });
+    this.existingUsersForm.set({ ...EMPTY_GUARDIAN_FORM });
+    this.patientFormRef?.clearErrors();
+    this.guardianFormRef?.clearErrors();
   }
 }

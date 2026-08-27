@@ -15,7 +15,7 @@ public interface JpaNotificationScheduleRepository
 
     @Query(value = """
             SELECT *
-            FROM notification_schedules
+            FROM notification_schedule
             WHERE status = 'PENDING'
               AND COALESCE(next_retry_at, scheduled_at) <= :now
             ORDER BY COALESCE(next_retry_at, scheduled_at) ASC

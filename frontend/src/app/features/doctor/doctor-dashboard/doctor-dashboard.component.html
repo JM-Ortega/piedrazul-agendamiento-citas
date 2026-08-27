@@ -3,31 +3,30 @@
   <div class="bg-white rounded-2xl shadow-lg p-8 mb-6 border-2 border-blue-100">
     <div class="flex items-center gap-4 mb-4">
       <div class="bg-blue-100 rounded-full p-4">
-        <lucide-angular
-          [img]="User"
-          [size]="40"
-          class="text-[#4e92d9]"
-        ></lucide-angular>
+        <svg lucideUser [size]="40" class="text-[#4e92d9]"></svg>
       </div>
       <div>
         <h1 class="text-[#215c98] text-3xl">
           Bienvenido, {{ currentDoctor()?.name }}
         </h1>
         <p class="text-gray-600 text-xl mt-1">
-          {{ currentDoctor()?.specialty | formato }}
+          {{ formattedSpecialties(currentDoctor()?.specialty) }}
         </p>
       </div>
     </div>
     <div class="flex items-center gap-2 text-gray-700 text-lg">
-      <lucide-angular
-        [img]="Calendar"
-        [size]="20"
-        class="text-[#4e92d9]"
-      ></lucide-angular>
+      <svg lucideCalendar [size]="20" class="text-[#4e92d9]"></svg>
       <span class="capitalize">{{ formatDate(today) }}</span>
     </div>
   </div>
-
+  @if (errorCarga()) {
+    <div
+      class="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-5 py-4 flex items-center gap-3 mb-6"
+    >
+      <svg lucideCalendar [size]="20" class="shrink-0"></svg>
+      <p class="text-base">{{ errorCarga() }}</p>
+    </div>
+  }
   <!-- Resumen del Día -->
   <div
     class="bg-linear-to-r from-[#215c98] to-[#4e92d9] text-white rounded-2xl shadow-lg p-6 mb-8"
@@ -51,15 +50,21 @@
 
   <!-- Lista de Citas -->
   <div class="bg-white rounded-2xl shadow-lg border-2 border-blue-100 p-8">
-    <h2 class="text-[#163c63] text-2xl mb-6">Citas de Hoy</h2>
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <h2 class="text-[#163c63] text-2xl">Citas de Hoy</h2>
+      <app-pagination
+        [pagination]="pagination()"
+        (pageChange)="onPageChange($event)"
+      />
+    </div>
 
     @if (todaysAppointments().length === 0) {
       <div class="text-center py-12">
-        <lucide-angular
-          [img]="Calendar"
+        <svg
+          lucideCalendar
           [size]="64"
           class="mx-auto text-gray-300 mb-4"
-        ></lucide-angular>
+        ></svg>
         <p class="text-gray-500 text-xl">No tiene citas programadas para hoy</p>
       </div>
     } @else {
@@ -88,10 +93,7 @@
                       class="bg-[#4e92d9] text-white rounded-xl px-4 py-3 text-center min-w-20"
                     >
                       <div class="flex items-center gap-1 justify-center">
-                        <lucide-angular
-                          [img]="Clock"
-                          [size]="18"
-                        ></lucide-angular>
+                        <svg lucideClock [size]="18"></svg>
                         <span class="text-xl">{{
                           apt.startTime.slice(0, 5)
                         }}</span>
@@ -105,11 +107,7 @@
                       {{ apt.patientFirstName }} {{ apt.patientLastName }}
                     </h3>
                     <div class="flex items-center gap-2 text-gray-700">
-                      <lucide-angular
-                        [img]="User"
-                        [size]="16"
-                        class="text-[#163c63]"
-                      ></lucide-angular>
+                      <svg lucideUser [size]="16" class="text-[#163c63]"></svg>
                       <span class="text-base"
                         >Doc: {{ apt.documentNumber }}</span
                       >
@@ -123,17 +121,15 @@
                 <!-- Dropdown inline "Actualizar estado": solo cuando la cita está AGENDADA -->
                 @if (apt.appointmentState === 'AGENDADA') {
                   <div class="relative">
-                    <button
-                      (click)="toggleCardDropdown(apt.idAppointment)"
-                      class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg transition-colors text-base"
+                    <app-button
+                      variant="success"
+                      extraClass="!px-5 !py-2.5"
+                      (buttonClick)="toggleCardDropdown(apt.idAppointment)"
                     >
-                      <lucide-angular
-                        [img]="ClipboardList"
-                        [size]="18"
-                      ></lucide-angular>
+                      <svg lucideClipboardList [size]="18"></svg>
                       <span>Estado</span>
-                      <lucide-angular
-                        [img]="ChevronDown"
+                      <svg
+                        lucideChevronDown
                         [size]="16"
                         class="transition-transform"
                         [style.transform]="
@@ -141,8 +137,8 @@
                             ? 'rotate(180deg)'
                             : 'rotate(0deg)'
                         "
-                      ></lucide-angular>
-                    </button>
+                      ></svg>
+                    </app-button>
 
                     @if (openCardDropdownId() === apt.idAppointment) {
                       <div
@@ -154,10 +150,7 @@
                           "
                           class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-emerald-50 text-emerald-700 transition-colors"
                         >
-                          <lucide-angular
-                            [img]="Check"
-                            [size]="16"
-                          ></lucide-angular>
+                          <svg lucideCheck [size]="16"></svg>
                           Atender
                         </button>
 
@@ -168,10 +161,7 @@
                           "
                           class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-red-50 text-red-600 transition-colors"
                         >
-                          <lucide-angular
-                            [img]="UserX"
-                            [size]="16"
-                          ></lucide-angular>
+                          <svg lucideUserX [size]="16"></svg>
                           No asistió
                         </button>
                       </div>
@@ -181,16 +171,20 @@
 
                 <!-- Botón "Nueva cita": solo cuando la cita ya fue ATENDIDA -->
                 @if (apt.appointmentState === 'ATENDIDA') {
-                  <button
-                    (click)="scheduleNewAppointment(apt.documentNumber)"
-                    class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg transition-colors text-base"
+                  <app-button
+                    variant="primary"
+                    extraClass="!px-5 !py-2.5"
+                    (buttonClick)="
+                      scheduleNewAppointment(
+                        apt.documentNumber,
+                        apt.specialty,
+                        currentDoctor()?.id
+                      )
+                    "
                   >
-                    <lucide-angular
-                      [img]="Calendar"
-                      [size]="18"
-                    ></lucide-angular>
+                    <svg lucideCalendar [size]="18"></svg>
                     Nueva cita
-                  </button>
+                  </app-button>
                 }
               </div>
             </div>
@@ -202,73 +196,39 @@
 </div>
 
 <!-- Modal de confirmación -->
-@if (showConfirmModal()) {
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-  >
-    <div
-      class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border-2 border-blue-100"
-    >
-      <div class="flex items-center gap-3 mb-4">
-        <div class="bg-emerald-100 rounded-full p-3">
-          <lucide-angular
-            [img]="FileText"
-            [size]="28"
-            class="text-emerald-600"
-          ></lucide-angular>
-        </div>
-        <h3 class="text-blue-900 text-xl font-semibold">
-          Actualizar estado de cita
-        </h3>
+<app-confirm-modal
+  [visible]="showConfirmModal()"
+  title="Actualizar estado de cita"
+  iconPosition="inline"
+  [richMessage]="true"
+  maxWidth="max-w-md"
+  [fullWidthButtons]="true"
+  cancelLabel="Cancelar"
+  confirmLabel="Confirmar"
+  [confirmVariant]="selectedOutcome() === 'NO_ASISTIO' ? 'danger' : 'success'"
+  iconBg="bg-[#d9e9f8]"
+  (dismissed)="closeModal()"
+  (confirmed)="confirmMarkAsAttended()"
+>
+  <svg lucideFileText [size]="28" icon class="text-[#215c98]"></svg>
+  <span message>
+    @if (selectedOutcome() === 'ATENDIDA') {
+      <div
+        class="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-4 text-sm text-gray-700 text-left"
+      >
+        <p>¿Deseas atender esta cita?</p>
+        <p>
+          - A continuación, podrá registrar una observación para el seguimiento
+          del control médico
+        </p>
       </div>
-
-      @if (selectedOutcome() === 'ATENDIDA') {
-        <div
-          class="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-4 mb-6 text-sm text-gray-700"
-        >
-          <p>¿Deseas marcar esta cita como <strong>Atendida</strong>?</p>
-          <p class="mt-2">- Se actualizará el estado de la cita</p>
-          <p>- Deberás llenar la historia clínica</p>
-          <p>- Podrás agendar una nueva cita para este paciente si lo deseas</p>
-        </div>
-      } @else if (selectedOutcome() === 'NO_ASISTIO') {
-        <div
-          class="bg-red-50 border border-red-200 rounded-xl px-4 py-4 mb-6 text-sm text-gray-700"
-        >
-          <p>¿Deseas marcar esta cita como <strong>No asistió</strong>?</p>
-          <p class="mt-2">Solo se actualizará el estado de la cita.</p>
-        </div>
-      }
-
-      <div class="flex gap-3 justify-end">
-        <button
-          (click)="closeModal()"
-          [disabled]="isMarkingAttended()"
-          class="px-6 py-2.5 rounded-lg border-2 border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors text-base disabled:opacity-50"
-        >
-          Cancelar
-        </button>
-        <button
-          (click)="confirmMarkAsAttended()"
-          [disabled]="isMarkingAttended()"
-          [class]="
-            (selectedOutcome() === 'NO_ASISTIO'
-              ? 'bg-red-500 hover:bg-red-600'
-              : 'bg-emerald-600 hover:bg-emerald-700') +
-            ' flex items-center gap-2 px-6 py-2.5 rounded-lg text-white transition-colors
-              text-base disabled:opacity-50 disabled:cursor-not-allowed'
-          "
-        >
-          @if (isMarkingAttended()) {
-            <span
-              class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
-            ></span>
-            Guardando...
-          } @else {
-            Confirmar
-          }
-        </button>
+    } @else if (selectedOutcome() === 'NO_ASISTIO') {
+      <div
+        class="bg-red-50 border border-red-200 rounded-xl px-4 py-4 text-sm text-gray-700 text-left"
+      >
+        <p>¿Deseas marcar esta cita como <strong>No asistió</strong>?</p>
+        <p class="mt-2">Se actualizará el estado de la cita.</p>
       </div>
-    </div>
-  </div>
-}
+    }
+  </span>
+</app-confirm-modal>

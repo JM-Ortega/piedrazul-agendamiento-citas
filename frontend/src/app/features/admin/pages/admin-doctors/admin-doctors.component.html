@@ -5,7 +5,7 @@
       class="bg-linear-to-r from-[#163c63] to-[#215c98] text-white rounded-2xl p-7 shadow-lg"
     >
       <div class="flex items-center gap-3">
-        <lucide-angular [img]="Stethoscope" [size]="34"></lucide-angular>
+        <svg lucideStethoscope [size]="34"></svg>
         <div>
           <h1 class="text-3xl font-bold">Gestión de Médicos</h1>
           <p class="text-[#a7c9ec] text-lg mt-2">
@@ -45,16 +45,36 @@
     <!-- Lista -->
     @if (!loading() && doctors().length > 0) {
       <div class="bg-white rounded-2xl shadow-md p-7">
-        <h2
-          class="text-[#163c63] text-2xl font-semibold mb-6 flex items-center gap-2"
-        >
-          <lucide-angular [img]="Stethoscope" [size]="26"></lucide-angular>
-          Médicos Registrados ({{ doctors().length }})
-        </h2>
+        <div class="mb-6 space-y-3">
+          <div class="flex items-center justify-between flex-wrap gap-4">
+            <h2
+              class="text-[#163c63] text-2xl font-semibold flex items-center gap-2"
+            >
+              <svg lucideStethoscope [size]="26"></svg>
+              Médicos Registrados ({{
+                pagination()?.totalElements ?? doctors().length
+              }})
+            </h2>
+
+            <app-pagination
+              [pagination]="pagination()"
+              (pageChange)="onPageChange($event)"
+            />
+          </div>
+
+          <app-sort-control
+            [options]="sortOptions"
+            [field]="sortField()"
+            [direction]="sortDirection()"
+            (fieldChange)="onSortFieldChange($event)"
+            (directionChange)="onSortDirectionChange($event)"
+          />
+        </div>
 
         <div class="space-y-4">
           @for (doctor of doctors(); track doctor.id) {
             <div
+              animate.enter="card-enter-animation"
               class="border-2 border-[#a7c9ec] rounded-xl p-6 bg-[#d9e9f8]/30 edit-container hover:shadow-lg transition-shadow relative"
             >
               <!-- ── MODO EDICIÓN ── -->
@@ -73,27 +93,24 @@
                       </p>
                     </div>
                     <div class="flex gap-2">
-                      <button
-                        (click)="handleCancel()"
-                        class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <lucide-angular [img]="X" [size]="18"></lucide-angular>
-                      </button>
-                      <button
-                        (click)="handleSave(doctor)"
+                      <app-button
+                        variant="primary"
                         [disabled]="savingDoctorId() === doctor.id"
-                        class="px-6 py-2 bg-[#215c98] hover:bg-[#163c63] disabled:opacity-60 text-white rounded-lg transition-colors flex items-center gap-2 cursor-pointer"
+                        (buttonClick)="handleSave(doctor)"
                       >
-                        <lucide-angular
-                          [img]="Save"
-                          [size]="18"
-                        ></lucide-angular>
+                        <svg lucideSave [size]="18"></svg>
                         {{
                           savingDoctorId() === doctor.id
                             ? 'Guardando...'
                             : 'Guardar'
                         }}
-                      </button>
+                      </app-button>
+                      <app-button
+                        variant="danger"
+                        (buttonClick)="handleCancel()"
+                      >
+                        Cancelar
+                      </app-button>
                     </div>
                   </div>
 
@@ -121,24 +138,24 @@
                           "
                         >
                           @if (editingHasScheduler()) {
-                            <lucide-angular
-                              [img]="Check"
+                            <svg
+                              lucideCheck
                               [size]="16"
                               class="text-white"
-                            ></lucide-angular>
+                            ></svg>
                           }
                         </div>
                         <div class="flex-1">
                           <div class="flex items-center gap-2">
-                            <lucide-angular
-                              [img]="Calendar"
+                            <svg
+                              lucideCalendar
                               [size]="20"
                               [class]="
                                 editingHasScheduler()
                                   ? 'text-green-600'
                                   : 'text-gray-600'
                               "
-                            ></lucide-angular>
+                            ></svg>
                             <span
                               [class]="
                                 'text-base font-bold ' +
@@ -177,29 +194,29 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       @for (
                         specialty of specialtiesList;
-                        track specialty.name
+                        track specialty.value
                       ) {
-                        <button
-                          type="button"
-                          (click)="toggleSpecialty(specialty.value)"
-                          [class]="
-                            'px-5 py-4 rounded-xl border-2 transition-all text-base font-medium flex items-center gap-3 ' +
-                            (editingSpecialties().includes(specialty.value)
-                              ? 'border-[#215c98] bg-[#d9e9f8] text-[#163c63] shadow-md'
-                              : 'border-gray-300 bg-white text-gray-700 hover:border-[#4e92d9]')
+                        <app-button
+                          variant="chip"
+                          class="w-full"
+                          [active]="
+                            editingSpecialties().includes(specialty.value)
                           "
+                          activeChipClasses="border-[#215c98] bg-[#d9e9f8] text-[#163c63] shadow-md"
+                          extraClass="!flex !items-center !gap-3 !px-5 !text-left !font-medium"
+                          (buttonClick)="toggleSpecialty(specialty.value)"
                         >
-                          <lucide-angular
-                            [img]="specialty.icon"
+                          <svg
+                            [lucideIcon]="specialty.icon"
                             [size]="24"
                             [class]="
                               editingSpecialties().includes(specialty.value)
                                 ? 'text-[#215c98]'
                                 : specialty.color
                             "
-                          ></lucide-angular>
+                          ></svg>
                           <span class="flex-1 text-left">{{
-                            specialty.name
+                            specialty.label
                           }}</span>
                           @if (editingSpecialties().includes(specialty.value)) {
                             <div
@@ -208,7 +225,7 @@
                               ✓
                             </div>
                           }
-                        </button>
+                        </app-button>
                       }
                     </div>
                   </div>
@@ -219,11 +236,11 @@
                   <div class="flex-1">
                     <div class="flex items-center gap-3 mb-3">
                       <div class="rounded-full p-3 bg-[#215c98] shrink-0">
-                        <lucide-angular
-                          [img]="Stethoscope"
+                        <svg
+                          lucideStethoscope
                           class="text-white"
                           [size]="24"
-                        ></lucide-angular>
+                        ></svg>
                       </div>
                       <div>
                         <h3 class="text-xl font-bold text-[#163c63]">
@@ -268,11 +285,11 @@
                               <span
                                 class="text-xs px-3 py-1 rounded-full font-medium bg-white border-2 border-[#a7c9ec] text-[#163c63] flex items-center gap-1"
                               >
-                                <lucide-angular
-                                  [img]="getSpecialtyIcon(spec)"
+                                <svg
+                                  [lucideIcon]="getSpecialtyIcon(spec)"
                                   [size]="14"
                                   [class]="getSpecialtyColor(spec)"
-                                ></lucide-angular>
+                                ></svg>
                                 {{ getSpecialtyName(spec) }}
                               </span>
                             }
@@ -283,18 +300,15 @@
                   </div>
 
                   <div class="relative shrink-0 edit-container">
-                    <button
-                      (click)="handleEdit(doctor)"
+                    <app-button
+                      variant="primary"
                       (mouseenter)="hoveredDoctorId.set(doctor.id)"
                       (mouseleave)="hoveredDoctorId.set(null)"
-                      class="px-5 py-3 bg-[#215c98] hover:bg-[#163c63] text-white rounded-lg transition-colors flex items-center gap-2 font-semibold cursor-pointer"
+                      (buttonClick)="handleEdit(doctor)"
                     >
-                      <lucide-angular
-                        [img]="Edit3"
-                        [size]="18"
-                      ></lucide-angular>
+                      <svg lucideEdit3 [size]="18"></svg>
                       Editar
-                    </button>
+                    </app-button>
 
                     @if (hoveredDoctorId() === doctor.id) {
                       <div

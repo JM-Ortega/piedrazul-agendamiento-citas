@@ -1,0 +1,23 @@
+<div>
+  <label [for]="config().id" class="block text-gray-700 mb-2 text-lg">{{
+    config().label
+  }}</label>
+  @switch (config().type) {
+    @case ('select') {
+      <app-select
+        [id]="config().id"
+        [options]="config().options ?? []"
+        [placeholder]="config().placeholder ?? ''"
+        [ngModel]="value()"
+        (valueChange)="valueChange.emit($event)"
+      ></app-select>
+    }
+    @case ('date') {
+      <app-datepicker
+        [id]="config().id"
+        [ngModel]="dateValue()"
+        (valueChange)="onDateChange($event)"
+      ></app-datepicker>
+    }
+  }
+</div>

@@ -1,8 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.clinicalHistory;
 
-
-import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.input.ClinicalHistoryRequest;
+import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.internal.ClinicalHistoryRequest;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.output.ClinicalHistoryResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -13,10 +15,6 @@ public interface ClinicalHistoryExternalService {
     //El controller no necesita saber cómo funciona el servicio
     //Solo necesita saber qué puede pedirle
 
-    ClinicalHistoryResponse registerClinicalHistory(ClinicalHistoryRequest request);
-
-    List<ClinicalHistoryResponse> getHistoryByPatient(UUID idPatient);
-
-
+    void registerClinicalHistory(ClinicalHistoryRequest request);
 }
 

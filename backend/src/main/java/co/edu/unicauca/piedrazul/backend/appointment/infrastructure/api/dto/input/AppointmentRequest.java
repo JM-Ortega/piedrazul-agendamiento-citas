@@ -5,26 +5,31 @@ import co.edu.unicauca.piedrazul.backend.jackson.validation.ValidDocument;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
+import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.UUID;
 
+@Setter
 @Getter
-@ValidDocument
+@ValidDocument(
+        documentField = "documentNumber",
+        typeField = "documentType"
+)
 public class AppointmentRequest {
     @NotNull(message = "El médico es obligatorio")
     private UUID doctorId;
 
     @NotNull(message = "La especialidad es obligatoria")
-    private Specialty specialty;
+    private SpecialtyCode specialty;
 
     @NotNull(message = "La fecha es obligatoria")
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)

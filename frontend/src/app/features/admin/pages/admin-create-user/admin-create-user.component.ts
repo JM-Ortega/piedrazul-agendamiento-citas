@@ -1,91 +1,87 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  inject,
+  OnInit,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
-  Activity,
-  ArrowLeft,
-  Bone,
-  Building2,
-  CircleAlert,
-  CreditCard,
-  Eye,
-  EyeOff,
-  Heart,
-  Lock,
-  LucideAngularModule,
-  LucideIconData,
-  Mail,
-  User,
-  UserPlus,
-  Zap,
-} from 'lucide-angular';
+  LucideArrowLeft,
+  LucideCircleAlert,
+  LucideCreditCard,
+  LucideDynamicIcon,
+  LucideEye,
+  LucideEyeOff,
+  LucideMail,
+  LucidePhone,
+  LucideUser,
+  LucideUserPlus,
+} from '@lucide/angular';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { InputComponent } from '../../../../design-system/atoms/input/input.component';
+import { SelectComponent } from '../../../../design-system/atoms/select/select.component';
+import {
+  getDocumentIdMaxLength,
+  getDocumentIdSanitize,
+} from '../../../../shared/helpers/document-validation';
+import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
+import { getSpecialtyMeta } from '../../../../shared/helpers/specialty-catalog';
+import { timeToMinutes } from '../../../../shared/helpers/time-utils';
+import { DAY_TO_WORKDAY } from '../../../../shared/helpers/workday.util';
+import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 import {
   CreateUserDoctorFormComponent,
-  DoctorFormData,
   SpecialtyOption,
 } from '../../components/create-user-doctor-form/create-user-doctor-form.component';
 import { CreateUserRolesComponent } from '../../components/create-user-roles/create-user-roles.component';
-import { CreateUserConfirmModalComponent } from '../../components/modals/modals-create/create-user-confirm-modal.component';
+import { CreateUserConfirmModalComponent } from '../../components/modals/modal-create/create-user-confirm-modal.component';
 import { CreateUserRequestDto } from '../../models/dtos/CreateUserRequestDto';
+import { DoctorFormData } from '../../models/interfaces/DoctorFormData';
 import { FormErrors } from '../../models/interfaces/FormErrors';
 import { UserForm } from '../../models/interfaces/UserForm';
 import { AdminService } from '../../service/admin.service';
+import { UserFormValidationService } from '../../service/user-form-validation.service';
 
 type Role = 'doctor' | 'scheduler';
 
-const DAY_VALUE_TO_WORKDAY: Record<number, string> = {
-  1: 'LUNES',
-  2: 'MARTES',
-  3: 'MIERCOLES',
-  4: 'JUEVES',
-  5: 'VIERNES',
-};
-
+/**
+ * Formulario de creación de usuario (doctor y/o scheduler). Arma el
+ * payload combinando datos de cuenta y, si aplica, datos de doctor
+ * (especialidad, horario), y delega la validación a UserFormValidationService.
+ */
 @Component({
   selector: 'app-admin-create-user',
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
-    LucideAngularModule,
     CreateUserRolesComponent,
     CreateUserDoctorFormComponent,
     CreateUserConfirmModalComponent,
+    LucideDynamicIcon,
+    LucideArrowLeft,
+    LucideCircleAlert,
+    LucideCreditCard,
+    LucideMail,
+    LucideUser,
+    LucideUserPlus,
+    LucidePhone,
+    InputComponent,
+    ButtonComponent,
+    SelectComponent,
+    ToSelectOptionsPipe,
   ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-create-user.component.html',
 })
 export class AdminCreateUserComponent implements OnInit {
-  // ── Icons ─────────────────────────────────────────────────────────────────
-  readonly ArrowLeft = ArrowLeft;
-  readonly UserPlus = UserPlus;
-  readonly CreditCard = CreditCard;
-  readonly Lock = Lock;
-  readonly Eye = Eye;
-  readonly EyeOff = EyeOff;
-  readonly User = User;
-  readonly Mail = Mail;
-  readonly CircleAlert = CircleAlert;
-  readonly Heart = Heart;
-  readonly Bone = Bone;
-  readonly Activity = Activity;
-  readonly Zap = Zap;
-  readonly Building2 = Building2;
+  // ── Iconos ────────────────────────────────────────────────────────────────
+  readonly Eye = LucideEye;
+  readonly EyeOff = LucideEyeOff;
 
-  // ── State ─────────────────────────────────────────────────────────────────
-  showPassword = false;
-  selectedRoles: Role[] = ['doctor'];
-  errors: FormErrors = {};
-  submitted = false;
-  submitError: string | null = null;
-  isSubmitting = false;
-  showConfirmModal = false;
-
-  specialtyOptions: SpecialtyOption[] = [];
-  documentTypes: string[] = [];
-  loadingSpecialties = false;
-  loadingDocumentTypes = false;
-
+  // ── Constantes ────────────────────────────────────────────────────────────
   daysOfWeek = [
     { value: 1, label: 'Lunes' },
     { value: 2, label: 'Martes' },
@@ -93,23 +89,7 @@ export class AdminCreateUserComponent implements OnInit {
     { value: 4, label: 'Jueves' },
     { value: 5, label: 'Viernes' },
   ];
-
-  userForm: UserForm = {
-    documentId: '',
-    documentType: '',
-    password: '',
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    specialty: [],
-    laborStart: '',
-    laborEnd: '',
-    interval: 20,
-    workDays: [1, 2, 3, 4, 5],
-    startTime: '08:00',
-    endTime: '12:00',
-  };
+  /** Opciones de hora de 07:00 a 12:00 en pasos de 5 minutos. */
   readonly timeOptions: string[] = (() => {
     const opts: string[] = [];
     for (let h = 7; h <= 12; h++)
@@ -122,32 +102,78 @@ export class AdminCreateUserComponent implements OnInit {
     return opts;
   })();
 
+  // ── Estado ────────────────────────────────────────────────────────────────
+  showPassword = false;
+  selectedRoles: Role[] = ['doctor'];
+  errors: FormErrors = {};
+  submitted = false;
+  submitError: string | null = null;
+  isSubmitting = false;
+  showConfirmModal = false;
+  loadErrorSpecialties: string | null = null;
+  loadErrorDocumentTypes: string | null = null;
+
+  specialtyOptions: SpecialtyOption[] = [];
+  documentTypes: string[] = [];
+  loadingSpecialties = false;
+  loadingDocumentTypes = false;
+
+  userForm: UserForm = {
+    documentId: '',
+    identificationType: '',
+    password: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    specialty: [],
+    laborStart: '',
+    laborEnd: '',
+    interval: null,
+    workDays: [],
+    startTime: '',
+    endTime: '',
+    bookingWindowWeeks: null,
+  };
+
+  // ── Inyecciones ───────────────────────────────────────────────────────────
   private router = inject(Router);
   private adminService = inject(AdminService);
+  private validation = inject(UserFormValidationService);
+  private cdr = inject(ChangeDetectorRef);
 
   // ── Getters ───────────────────────────────────────────────────────────────
+  /** True si el rol 'doctor' está seleccionado. */
   get hasDoctorRole() {
     return this.selectedRoles.includes('doctor');
   }
+
+  /** True si el rol 'scheduler' está seleccionado. */
   get hasSchedulerRole() {
     return this.selectedRoles.includes('scheduler');
   }
+
+  /** Duración del turno en minutos, según startTime/endTime del formulario. */
   get shiftDurationMinutes() {
     return (
-      this.timeToMinutes(this.userForm.endTime) -
-      this.timeToMinutes(this.userForm.startTime)
+      timeToMinutes(this.userForm.endTime) -
+      timeToMinutes(this.userForm.startTime)
     );
   }
+
+  /** Intervalo máximo permitido entre citas (no menor a 10 minutos). */
   get maxInterval() {
     return Math.max(this.shiftDurationMinutes, 10);
   }
+
+  /** Mapa de número de día a su etiqueta, derivado de daysOfWeek. */
   get dayLabels(): Record<number, string> {
     return Object.fromEntries(this.daysOfWeek.map((d) => [d.value, d.label]));
   }
+
+  /** Subconjunto de userForm que consume el sub-formulario de doctor. */
   get doctorFormData(): DoctorFormData {
     return {
-      documentType: this.userForm.documentType,
-      phone: this.userForm.phone,
       specialty: this.userForm.specialty,
       laborStart: this.userForm.laborStart,
       laborEnd: this.userForm.laborEnd,
@@ -155,21 +181,27 @@ export class AdminCreateUserComponent implements OnInit {
       workDays: this.userForm.workDays,
       startTime: this.userForm.startTime,
       endTime: this.userForm.endTime,
+      bookingWindowWeeks: this.userForm.bookingWindowWeeks,
     };
   }
 
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+  /** Carga especialidades y tipos de documento disponibles. */
   ngOnInit(): void {
     this.loadingSpecialties = true;
     this.adminService.getAllSpecialties().subscribe({
       next: (data) => {
-        this.specialtyOptions = data.map((name) => ({
-          name,
-          ...this.getSpecialtyIcon(name),
-        }));
+        this.specialtyOptions = data.map((name) => {
+          const meta = getSpecialtyMeta(name);
+          return { name, icon: meta.icon, colorClass: meta.color };
+        });
         this.loadingSpecialties = false;
+        this.cdr.markForCheck();
       },
-      error: () => {
+      error: (err: AppError) => {
+        this.loadErrorSpecialties = err.message;
         this.loadingSpecialties = false;
+        this.cdr.markForCheck();
       },
     });
     this.loadingDocumentTypes = true;
@@ -177,14 +209,18 @@ export class AdminCreateUserComponent implements OnInit {
       next: (data) => {
         this.documentTypes = data;
         this.loadingDocumentTypes = false;
+        this.cdr.markForCheck();
       },
-      error: () => {
+      error: (err: AppError) => {
+        this.loadErrorDocumentTypes = err.message;
         this.loadingDocumentTypes = false;
+        this.cdr.markForCheck();
       },
     });
   }
 
   // ── Handlers de subcomponentes ────────────────────────────────────────────
+  /** Agrega o quita un rol; revalida el campo 'roles' si ya se envió el form. */
   onRoleToggled(role: Role): void {
     if (this.selectedRoles.includes(role)) {
       if (this.selectedRoles.length > 1)
@@ -195,27 +231,55 @@ export class AdminCreateUserComponent implements OnInit {
     if (this.submitted) this.validateField('roles');
   }
 
+  /**
+   * Aplica el parche del sub-formulario de doctor a userForm. Si un campo
+   * del grupo de horario cambió, revalida todo el grupo (son interdependientes).
+   */
   onDoctorFormChange(patch: Partial<DoctorFormData>): void {
     Object.assign(this.userForm, patch);
     if (this.submitted) {
-      (Object.keys(patch) as (keyof FormErrors)[]).forEach((k) =>
-        this.validateField(k)
+      const patchedKeys = Object.keys(patch) as (keyof FormErrors)[];
+      const touchesGroup = patchedKeys.some((k) =>
+        this.validation.SCHEDULE_GROUP_FIELDS.includes(k)
       );
+      const fieldsToValidate = touchesGroup
+        ? Array.from(
+            new Set([...patchedKeys, ...this.validation.SCHEDULE_GROUP_FIELDS])
+          )
+        : patchedKeys;
+      fieldsToValidate.forEach((k) => this.validateField(k));
     }
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
+  /** Valida todo el formulario y abre el modal de confirmación si pasa. */
   openConfirmModal(): void {
     this.submitted = true;
     this.submitError = null;
-    if (!this.validateAll()) return;
+    if (!this.validateAll()) {
+      this.scrollToFirstError();
+      return;
+    }
     this.showConfirmModal = true;
+  }
+
+  /** Hace scroll hasta el primer campo con error, según el orden definido. */
+  private scrollToFirstError(): void {
+    const firstErrorField = this.validation.FIELD_ORDER.find(
+      (f) => this.errors[f]
+    );
+    if (!firstErrorField) return;
+    const elementId =
+      this.validation.FIELD_TO_ELEMENT_ID[firstErrorField] ??
+      `error-anchor-${firstErrorField}`;
+    scrollToElementById(elementId);
   }
 
   closeConfirmModal(): void {
     this.showConfirmModal = false;
   }
 
+  /** Arma el payload y crea el usuario; navega a la lista si tiene éxito. */
   confirmAndCreate(): void {
     this.showConfirmModal = false;
     this.isSubmitting = true;
@@ -225,9 +289,15 @@ export class AdminCreateUserComponent implements OnInit {
       ...(this.hasSchedulerRole ? ['SCHEDULER'] : []),
     ];
 
+    const scheduleTouched = this.validation.isScheduleGroupTouched(
+      this.userForm
+    );
+
     const payload: CreateUserRequestDto = {
       user: {
         identification: this.userForm.documentId,
+        identificationType: this.userForm.identificationType,
+        phone: this.userForm.phone,
         firstName: this.userForm.firstName.trim(),
         lastName: this.userForm.lastName.trim(),
         email: this.userForm.email.trim(),
@@ -235,17 +305,22 @@ export class AdminCreateUserComponent implements OnInit {
       },
       doctor: this.hasDoctorRole
         ? {
-            documentType: this.userForm.documentType,
-            phone: this.userForm.phone,
             specialty: this.userForm.specialty,
             laborStart: this.userForm.laborStart,
             laborEnd: this.userForm.laborEnd,
-            appointmentInterval: this.userForm.interval,
-            schedules: this.userForm.workDays.map((day) => ({
-              workday: DAY_VALUE_TO_WORKDAY[day],
-              startTime: `${this.userForm.startTime}:00`,
-              endTime: `${this.userForm.endTime}:00`,
-            })),
+            appointmentInterval: scheduleTouched
+              ? this.userForm.interval
+              : null,
+            schedules: scheduleTouched
+              ? this.userForm.workDays.map((day) => ({
+                  workday: DAY_TO_WORKDAY[day],
+                  startTime: `${this.userForm.startTime}:00`,
+                  endTime: `${this.userForm.endTime}:00`,
+                }))
+              : [],
+            bookingWindowWeeks: scheduleTouched
+              ? this.userForm.bookingWindowWeeks
+              : null,
           }
         : null,
       patient: null,
@@ -257,10 +332,11 @@ export class AdminCreateUserComponent implements OnInit {
         this.isSubmitting = false;
         this.router.navigate(['/admin/usuarios']);
       },
-      error: (err) => {
+      error: (err: AppError) => {
         this.isSubmitting = false;
-        this.submitError =
-          err?.error?.message ?? 'Ocurrió un error al crear el usuario.';
+        this.submitError = err.message;
+        this.cdr.markForCheck();
+        scrollToElementById('submit-error-banner');
       },
     });
   }
@@ -268,208 +344,35 @@ export class AdminCreateUserComponent implements OnInit {
   navigateBack(): void {
     this.router.navigate(['/admin/usuarios']);
   }
+
+  // ── Validación ────────────────────────────────────────────────────────────
   hasError(f: keyof FormErrors) {
     return !!this.errors[f];
   }
 
-  // ── Validación (sin cambios) ───────────────────────────────────────────────
+  /** Valida un solo campo y actualiza `errors`. */
   validateField(field: keyof FormErrors): void {
-    this.errors[field] = undefined;
-
-    switch (field) {
-      case 'documentId':
-        if (!this.userForm.documentId.trim()) {
-          this.errors.documentId = 'El documento de identidad es obligatorio.';
-        } else if (!/^\d{5,15}$/.test(this.userForm.documentId)) {
-          this.errors.documentId =
-            'Debe contener entre 5 y 15 dígitos numéricos.';
-        }
-        break;
-
-      case 'password':
-        if (!this.userForm.password) {
-          this.errors.password = 'La contraseña es obligatoria.';
-        } else if (this.userForm.password.length < 6) {
-          this.errors.password = 'Mínimo 6 caracteres.';
-        }
-        break;
-
-      case 'firstName':
-        if (!this.userForm.firstName.trim()) {
-          this.errors.firstName = 'El nombre es obligatorio.';
-        } else if (this.userForm.firstName.trim().length < 2) {
-          this.errors.firstName = 'Mínimo 2 caracteres.';
-        }
-        break;
-
-      case 'lastName':
-        if (!this.userForm.lastName.trim()) {
-          this.errors.lastName = 'El apellido es obligatorio.';
-        } else if (this.userForm.lastName.trim().length < 2) {
-          this.errors.lastName = 'Mínimo 2 caracteres.';
-        }
-        break;
-
-      case 'roles':
-        if (this.selectedRoles.length === 0) {
-          this.errors.roles = 'Debe seleccionar al menos un rol.';
-        }
-        break;
-
-      case 'email':
-        if (!this.userForm.email.trim()) {
-          this.errors.email = 'El correo electrónico es obligatorio.';
-        } else if (
-          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.userForm.email.trim())
-        ) {
-          this.errors.email = 'Ingrese un correo electrónico válido.';
-        }
-        break;
-
-      case 'documentType':
-        if (this.hasDoctorRole && !this.userForm.documentType) {
-          this.errors.documentType = 'El tipo de documento es obligatorio.';
-        }
-        break;
-
-      case 'phone':
-        if (this.hasDoctorRole) {
-          if (!this.userForm.phone.trim()) {
-            this.errors.phone = 'El teléfono es obligatorio.';
-          } else if (!/^\d{10}$/.test(this.userForm.phone)) {
-            // ← exactamente 10
-            this.errors.phone =
-              'El teléfono debe tener exactamente 10 dígitos.';
-          }
-        }
-        break;
-
-      case 'specialty':
-        if (this.hasDoctorRole && this.userForm.specialty.length === 0) {
-          this.errors.specialty = 'Debe seleccionar al menos una especialidad.';
-        }
-        break;
-
-      case 'laborStart':
-        if (this.hasDoctorRole) {
-          if (!this.userForm.laborStart) {
-            this.errors.laborStart =
-              'La fecha de inicio laboral es obligatoria.';
-          } else if (
-            parseInt(this.userForm.laborStart.split('-')[0], 10) > 9999
-          ) {
-            this.errors.laborStart = 'El año no puede tener más de 4 dígitos.';
-          } else if (
-            this.userForm.laborEnd &&
-            this.userForm.laborStart >= this.userForm.laborEnd
-          ) {
-            this.errors.laborStart =
-              'La fecha de inicio debe ser anterior a la fecha de fin.';
-          }
-        }
-        break;
-
-      case 'laborEnd':
-        if (this.hasDoctorRole) {
-          if (!this.userForm.laborEnd) {
-            this.errors.laborEnd = 'La fecha de fin laboral es obligatoria.';
-          } else if (
-            parseInt(this.userForm.laborEnd.split('-')[0], 10) > 9999
-          ) {
-            this.errors.laborEnd = 'El año no puede tener más de 4 dígitos.';
-          } else if (
-            this.userForm.laborStart &&
-            this.userForm.laborStart >= this.userForm.laborEnd
-          ) {
-            this.errors.laborEnd =
-              'La fecha de fin debe ser posterior a la fecha de inicio.';
-          }
-        }
-        break;
-
-      case 'startTime': {
-        const start = this.timeToMinutes(this.userForm.startTime);
-        const end = this.timeToMinutes(this.userForm.endTime);
-        if (this.userForm.endTime && start >= end) {
-          this.errors.startTime =
-            'La hora de inicio no puede ser igual o posterior a la hora de fin.';
-        }
-        break;
-      }
-
-      case 'endTime': {
-        const end = this.timeToMinutes(this.userForm.endTime);
-        const start = this.timeToMinutes(this.userForm.startTime);
-        if (this.userForm.startTime && start >= end) {
-          this.errors.endTime =
-            'La hora de fin debe ser posterior a la hora de inicio.';
-        }
-        break;
-      }
-
-      case 'interval': {
-        const duration = this.shiftDurationMinutes;
-        if (!this.userForm.interval || this.userForm.interval < 10) {
-          this.errors.interval = 'El intervalo mínimo es 10 minutos.';
-        } else if (this.userForm.interval > duration) {
-          this.errors.interval = `El intervalo no puede superar la duración del turno (${duration} min).`;
-        }
-        break;
-      }
-
-      case 'workDays':
-        if (this.hasDoctorRole && this.userForm.workDays.length === 0) {
-          this.errors.workDays =
-            'Debe seleccionar al menos un día de atención.';
-        }
-        break;
-    }
+    const message = this.validation.validateField(
+      field,
+      this.userForm,
+      this.hasDoctorRole,
+      this.selectedRoles.length
+    );
+    this.errors = { ...this.errors, [field]: message };
   }
 
+  /** Valida todo el formulario; retorna true si no hay errores. */
   private validateAll(): boolean {
-    const fields: (keyof FormErrors)[] = [
-      'documentId',
-      'password',
-      'firstName',
-      'lastName',
-      'email',
-      'roles',
-    ];
-    if (this.hasDoctorRole) {
-      fields.push(
-        'documentType',
-        'phone',
-        'specialty',
-        'laborStart',
-        'laborEnd',
-        'startTime',
-        'endTime',
-        'interval',
-        'workDays'
-      );
-    }
-    fields.forEach((f) => this.validateField(f));
+    this.errors = this.validation.validateAll(
+      this.userForm,
+      this.hasDoctorRole,
+      this.selectedRoles.length
+    );
     return Object.values(this.errors).every((e) => !e);
   }
 
-  private timeToMinutes(t: string): number {
-    if (!t) return 0;
-    const [h, m] = t.split(':').map(Number);
-    return h * 60 + m;
-  }
-  private getSpecialtyIcon(name: string): {
-    icon: LucideIconData;
-    colorClass: string;
-  } {
-    const map: Record<string, { icon: LucideIconData; colorClass: string }> = {
-      MEDICINA_GENERAL: { icon: Heart, colorClass: 'text-red-700' },
-      QUIROPRAXIA: { icon: Bone, colorClass: 'text-orange-700' },
-      FISIOTERAPIA: { icon: Activity, colorClass: 'text-green-700' },
-      TERAPIA_NEURAL: { icon: Zap, colorClass: 'text-purple-700' },
-    };
-    return map[name] ?? { icon: Building2, colorClass: 'text-gray-400' };
-  }
-
+  // ── Helpers de template ───────────────────────────────────────────────────
+  /** Clases de un input, resaltando en rojo si el campo tiene error. */
   inputClass(field: keyof FormErrors, extra = ''): string {
     return (
       'w-full border-2 rounded-xl py-3 text-base focus:outline-none focus:ring-2 ' +
@@ -478,5 +381,13 @@ export class AdminCreateUserComponent implements OnInit {
         : 'border-gray-300 focus:ring-blue-500 ') +
       extra
     );
+  }
+  // ── Documento de identidad ────────────────────────────────────────────────
+  getDocumentIdMaxLength(): number {
+    return getDocumentIdMaxLength(this.userForm.identificationType);
+  }
+
+  getDocumentIdSanitize(): 'numeric' | 'alphanumeric' {
+    return getDocumentIdSanitize(this.userForm.identificationType);
   }
 }

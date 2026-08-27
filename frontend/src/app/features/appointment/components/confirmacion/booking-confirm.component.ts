@@ -1,16 +1,21 @@
-import { Component, inject, output } from '@angular/core';
 import {
-  CheckCircle,
-  LucideAngularModule,
-  Stethoscope,
-  UserSearch,
-} from 'lucide-angular';
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  output,
+} from '@angular/core';
+import {
+  LucideCheckCircle,
+  LucideStethoscope,
+  LucideUserSearch,
+} from '@lucide/angular';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
+import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { NewAppointment } from '../../models/dtos/newAppointment.dto';
-import { AppointmentConfirmedEvent } from '../../models/interfaces/appointmentConfirmedEvent.model';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import {FormatoPipe} from "../../../../shared/pipes/formatoPipe";
-import {ErroresPipe} from "../../../../shared/pipes/erroresPipe";
+import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 
 /**
  * Mostrar el resumen completo de la cita a confirmar
@@ -19,21 +24,28 @@ import {ErroresPipe} from "../../../../shared/pipes/erroresPipe";
 @Component({
   selector: 'app-booking-confirm',
   standalone: true,
-  imports: [LucideAngularModule, FormatoPipe, ErroresPipe],
+  imports: [
+    LucideCheckCircle,
+    LucideStethoscope,
+    LucideUserSearch,
+    FormatoPipe,
+    ErroresPipe,
+    ButtonComponent,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-confirm.component.html',
 })
 export class BookingConfirmComponent {
-  readonly CheckCircle = CheckCircle;
-  readonly Stethoscope = Stethoscope;
-  readonly UserSearch = UserSearch;
-
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
 
-  confirmed = output<AppointmentConfirmedEvent>();
-
+  confirmed = output<void>();
   back = output<void>();
 
+  /**
+   * Envía la cita al backend. Todos los errores muestran
+   * el mensaje que resuelve el interceptor.
+   */
   confirm(): void {
     const date = this.state.selectedDate();
     if (!date || !this.state.selectedTime() || !this.state.effectiveDoctorId())
@@ -48,30 +60,11 @@ export class BookingConfirmComponent {
       next: () => {
         this.state.isLoading.set(false);
         this.state.success.set(true);
-        this.confirmed.emit({ patientId: this.state.resolvePatientId() });
+        this.confirmed.emit();
       },
-      error: (err) => {
+      error: (err: AppError) => {
         this.state.isLoading.set(false);
-
-        if (err.status === 0) {
-          this.state.errorMessage.set(
-            'No se pudo conectar con el servidor. Intente más tarde.',
-          );
-          return;
-        }
-
-        const errorCode = err.error?.errorCode;
-        const detail = err.error?.detail;
-        switch (errorCode) {
-          case 'PATIENT_TIME_CONFLICT':
-          case 'PATIENT_SPECIALTY_CONFLICT':
-            this.state.errorMessage.set(detail);
-            break;
-          default:
-            this.state.errorMessage.set(
-              detail || 'Error inesperado al registrar la cita.',
-            );
-        }
+        this.state.errorMessage.set(err.message);
       },
     });
   }

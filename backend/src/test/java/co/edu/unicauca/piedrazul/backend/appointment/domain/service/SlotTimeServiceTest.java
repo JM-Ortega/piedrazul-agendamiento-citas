@@ -3,11 +3,8 @@ package co.edu.unicauca.piedrazul.backend.appointment.domain.service;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -192,26 +189,11 @@ class SlotTimeServiceTest {
     // ─────────────────────────────────────────────
 
     private Appointment buildAppointmentWithState(LocalTime time, AppointmentState state) {
-        PatientInfo patientInfo = PatientInfo.of(
-                DocumentType.CEDULA,
-                "12345678",
-                "Ana",
-                "Torres",
-                "3101234567",
-                Gender.FEMENINO,
-                LocalDate.of(1995, 3, 20),
-                "ana@correo.com",
-                null
-        );
-
         return Appointment.reconstruct(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                "Dr. Ramirez",
                 UUID.randomUUID(),
-                "Ana Torres",
-                patientInfo,
-                Specialty.FISIOTERAPIA,
+                SpecialtyCode.FISIOTERAPIA,
                 state,
                 LocalDate.now().plusDays(1),
                 new AppointmentTime(time),

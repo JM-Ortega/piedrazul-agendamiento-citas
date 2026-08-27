@@ -3,19 +3,29 @@ spring:
     name: backend
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:app_db}?currentSchema=${DB_SCHEMA:piedrazul}
-    username: ${DB_USER:piedrazul}
-    password: ${DB_PASSWORD:piedrazul}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:piedrazul_db}
+    username: ${APP_DB_USERNAME:piedrazul_app}
+    password: ${APP_DB_PASSWORD:piedrazul_app}
     driver-class-name: org.postgresql.Driver
+
+  flyway:
+    enabled: true
+    user: ${MIGRATION_DB_USERNAME:piedrazul_migration}
+    password: ${MIGRATION_DB_PASSWORD:piedrazul_migration}
+    default-schema: ${DB_SCHEMA:piedrazul}
+    schemas: ${DB_SCHEMA:piedrazul},extensions
+    locations: classpath:db/migration
+    clean-disabled: true
+    validate-on-migrate: true
+    baseline-on-migrate: false
 
   jpa:
     hibernate:
-      ddl-auto: ${JPA_DDL_AUTO:update}
+      ddl-auto: ${JPA_DDL_AUTO:validate}
     show-sql: ${JPA_SHOW_SQL:false}
     properties:
       hibernate:
         format_sql: ${JPA_FORMAT_SQL:false}
-        default_schema: ${DB_SCHEMA:piedrazul}
 
   security:
     oauth2:
@@ -35,9 +45,11 @@ spring:
 
   modulith:
     events:
+      completion-mode: archive
+      republish-outstanding-events-on-restart: true
       jdbc:
         schema-initialization:
-          enabled: ${MODULITH_SCHEMA_INIT:true}
+          enabled: false
 
 
 server:
@@ -56,9 +68,11 @@ app:
 
       admin:
         username: ${IDENTITY_SEED_ADMIN_USERNAME:}
+        identification-type: ${IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE:CEDULA}
         first-name: ${IDENTITY_SEED_ADMIN_FIRST_NAME:}
         last-name: ${IDENTITY_SEED_ADMIN_LAST_NAME:}
         email: ${IDENTITY_SEED_ADMIN_EMAIL:}
+        phone: ${IDENTITY_SEED_ADMIN_PHONE:}
         password: ${IDENTITY_SEED_ADMIN_PASSWORD:}
 
 keycloak:

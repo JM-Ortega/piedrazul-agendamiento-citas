@@ -2,7 +2,6 @@ package co.edu.unicauca.piedrazul.backend.patients.api;
 
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.CreatePatientWithUserRequest;
-import co.edu.unicauca.piedrazul.backend.patients.domain.DocumentType;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.ConfirmLinkUserAccountRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientRequest;
@@ -12,6 +11,9 @@ import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientResponse
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientSummaryResponse;
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientService;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
+import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
+import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,23 +29,29 @@ public class PatientController {
 
     private final PatientService patientService;
     private final AppointmentExternalService appointmentExternalService;
+    private final SecurityContextExtractor securityContextExtractor;
+    private final PersonExternalService personExternalService;
 
-    public PatientController(PatientService patientService, AppointmentExternalService appointmentExternalService) {
+    public PatientController(PatientService patientService, AppointmentExternalService appointmentExternalService,
+                             SecurityContextExtractor securityContextExtractor, PersonExternalService personExternalService) {
         this.patientService = patientService;
         this.appointmentExternalService = appointmentExternalService;
+        this.securityContextExtractor = securityContextExtractor;
+        this.personExternalService = personExternalService;
     }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public PatientResponse create(@Valid @RequestBody CreatePatientRequest request) {
         PatientData patient = patientService.createPatient(
-                request.getDocumentType(),
-                request.getDocumentNumber(),
+                request.getIdentificationType(),
+                request.getIdentification(),
                 request.getFirstName(),
                 request.getLastName(),
                 request.getPhone(),
                 request.getEmail(),
-                request.getGender(),
+                null,
+                request.getSex(),
                 request.getBirthDate(),
                 request.getGuardianPhone()
         );
@@ -55,13 +63,13 @@ public class PatientController {
         PatientData patient = patientService.createPatientWithUser(
                 request.getUsername(),
                 request.getPassword(),
-                request.getDocumentType(),
-                request.getDocumentNumber(),
+                request.getIdentificationType(),
+                request.getIdentification(),
                 request.getFirstName(),
                 request.getLastName(),
                 request.getPhone(),
                 request.getEmail(),
-                request.getGender(),
+                request.getSex(),
                 request.getBirthDate(),
                 request.getGuardianPhone()
         );
@@ -70,15 +78,18 @@ public class PatientController {
 
     @PostMapping("/link-user-account/request-code")
     public void requestLinkUserAccountCode(@Valid @RequestBody RequestLinkUserAccountCodeRequest request) {
-        patientService.requestLinkUserAccountCode(request.getDocumentNumber());
+        patientService.requestLinkUserAccountCode(request.getIdentification());
     }
 
     @PostMapping("/link-user-account/confirm")
     public PatientResponse confirmLinkUserAccount(@Valid @RequestBody ConfirmLinkUserAccountRequest request) {
         PatientData patient = patientService.confirmLinkUserAccount(
-                request.getDocumentNumber(),
+                request.getIdentification(),
                 request.getCode(),
-                request.getPassword()
+                request.getPassword(),
+                request.getSex(),
+                request.getBirthDate(),
+                request.getGuardianPhone()
         );
         return toResponse(patient);
     }
@@ -103,8 +114,16 @@ public class PatientController {
     @GetMapping("/document/{documentNumber}")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public PatientResponse findByDocument(@PathVariable String documentNumber) {
+        UUID authenticatedActorId = UUID.fromString(securityContextExtractor.currentActorId());
+        String userRoles = securityContextExtractor.currentActorRoles();
+
+        if (userRoles.contains("PATIENT")) {
+            documentNumber = personExternalService.findPersonIdByUserId(authenticatedActorId).toString();
+        }
+
+        String finalDocumentNumber = documentNumber;
         PatientData patient = patientService.findByDocumentNumber(documentNumber)
-                .orElseThrow(() -> new PatientNotFoundException(documentNumber));
+                .orElseThrow(() -> new PatientNotFoundException(finalDocumentNumber));
         return toResponse(patient);
     }
 
@@ -147,21 +166,21 @@ public class PatientController {
     }
 
     @GetMapping("/document-types")
-    public List<DocumentType> findAllDocumentTypes() {
+    public List<IdentificationType> findAllDocumentTypes() {
         return patientService.getAllDocumentTypes();
     }
 
     private PatientResponse toResponse(PatientData patient) {
         return new PatientResponse(
-                patient.id(),
+                patient.personId(),
                 patient.userId(),
-                patient.documentType(),
-                patient.documentNumber(),
+                patient.identificationType(),
+                patient.identification(),
                 patient.firstName(),
                 patient.lastName(),
                 patient.phone(),
                 patient.email(),
-                patient.gender(),
+                patient.sex(),
                 patient.birthDate(),
                 patient.guardianPhone()
         );
@@ -169,8 +188,8 @@ public class PatientController {
 
     private PatientSummaryResponse toSummaryResponse(PatientData patient) {
         return new PatientSummaryResponse(
-                patient.id(),
-                patient.documentNumber(),
+                patient.personId(),
+                patient.identification(),
                 patient.firstName(),
                 patient.lastName()
         );

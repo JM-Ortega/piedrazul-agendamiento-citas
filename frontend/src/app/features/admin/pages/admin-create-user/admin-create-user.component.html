@@ -4,15 +4,17 @@
     <div
       class="bg-linear-to-r from-[#163c63] to-[#215c98] text-white rounded-2xl p-7 shadow-lg"
     >
-      <button
-        (click)="navigateBack()"
-        class="flex items-center gap-2 text-white hover:text-[#a7c9ec] mb-4 text-lg cursor-pointer"
+      <app-button
+        variant="plain"
+        plainTextClass="text-white hover:text-[#a7c9ec]"
+        extraClass="!mb-4 !text-lg"
+        (buttonClick)="navigateBack()"
       >
-        <lucide-angular [img]="ArrowLeft" [size]="20"></lucide-angular>
+        <svg lucideArrowLeft [size]="20"></svg>
         Volver a Gestión de Usuarios
-      </button>
+      </app-button>
       <div class="flex items-center gap-3">
-        <lucide-angular [img]="UserPlus" [size]="34"></lucide-angular>
+        <svg lucideUserPlus [size]="34"></svg>
         <div>
           <h1 class="text-3xl font-bold">Crear Nuevo Usuario</h1>
           <p class="text-[#a7c9ec] text-lg mt-2">
@@ -22,23 +24,10 @@
       </div>
     </div>
 
-    <!-- Error global -->
-    @if (submitError) {
-      <div
-        class="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-5 py-4 flex items-start gap-3"
-      >
-        <lucide-angular
-          [img]="CircleAlert"
-          [size]="20"
-          class="shrink-0 mt-0.5"
-        ></lucide-angular>
-        <p class="text-base">{{ submitError }}</p>
-      </div>
-    }
-
     <div class="bg-white rounded-2xl shadow-md p-8">
       <!-- Roles -->
       <app-create-user-roles
+        id="error-anchor-roles"
         [selectedRoles]="selectedRoles"
         [errorRoles]="errors.roles"
         (roleToggled)="onRoleToggled($event)"
@@ -52,6 +41,32 @@
           Información Básica
         </h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <!-- Tipo de Documento -->
+          <div>
+            <label
+              for="identificationType"
+              class="block text-gray-700 text-base font-medium mb-2"
+            >
+              Tipo de Documento *
+            </label>
+            <app-select
+              id="identificationType"
+              [(ngModel)]="userForm.identificationType"
+              name="identificationType"
+              [options]="documentTypes | toSelectOptions"
+              [loading]="loadingDocumentTypes"
+              [hasSuffix]="true"
+              [errorMessage]="errors['identificationType']"
+              (selectBlur)="validateField('identificationType')"
+            >
+              <svg lucideCreditCard [size]="20" suffix></svg>
+            </app-select>
+            @if (loadErrorDocumentTypes) {
+              <p class="text-red-600 text-sm mt-1">
+                {{ loadErrorDocumentTypes }}
+              </p>
+            }
+          </div>
           <!-- Documento -->
           <div>
             <label
@@ -61,77 +76,23 @@
               Documento de Identidad *
               <span class="text-sm text-gray-500">(solo dígitos)</span>
             </label>
-            <div class="relative">
-              <lucide-angular
-                [img]="CreditCard"
-                [size]="20"
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              >
-              </lucide-angular>
-              <input
-                id="documentId"
-                type="text"
-                inputmode="numeric"
-                [(ngModel)]="userForm.documentId"
-                name="documentId"
-                (blur)="validateField('documentId')"
-                [class]="inputClass('documentId', 'pl-12 pr-4')"
-                placeholder="1234567890"
-                maxlength="15"
-                autocomplete="off"
-              />
-            </div>
-            @if (hasError('documentId')) {
-              <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-                <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular
-                >{{ errors.documentId }}
-              </p>
-            }
-          </div>
-
-          <!-- Contraseña -->
-          <div>
-            <label
-              for="password"
-              class="block text-gray-700 text-base font-medium mb-2"
-              >Contraseña *</label
+            <app-input
+              id="documentId"
+              type="text"
+              [(ngModel)]="userForm.documentId"
+              name="documentId"
+              [sanitize]="getDocumentIdSanitize()"
+              [maxLength]="getDocumentIdMaxLength()"
+              placeholder="1234567890"
+              autocomplete="off"
+              [errorMessage]="
+                hasError('documentId') ? errors.documentId : undefined
+              "
+              (inputBlur)="validateField('documentId')"
             >
-            <div class="relative">
-              <lucide-angular
-                [img]="Lock"
-                [size]="20"
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              >
-              </lucide-angular>
-              <input
-                id="password"
-                [type]="showPassword ? 'text' : 'password'"
-                [(ngModel)]="userForm.password"
-                name="password"
-                (blur)="validateField('password')"
-                [class]="inputClass('password', 'pl-12 pr-12')"
-                placeholder="Mín. 6 caracteres"
-                autocomplete="new-password"
-              />
-              <button
-                type="button"
-                (click)="showPassword = !showPassword"
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                <lucide-angular
-                  [img]="showPassword ? EyeOff : Eye"
-                  [size]="20"
-                ></lucide-angular>
-              </button>
-            </div>
-            @if (hasError('password')) {
-              <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-                <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular
-                >{{ errors.password }}
-              </p>
-            }
+              <svg lucideCreditCard [size]="20" suffix></svg>
+            </app-input>
           </div>
-
           <!-- Nombre -->
           <div>
             <label
@@ -139,30 +100,20 @@
               class="block text-gray-700 text-base font-medium mb-2"
               >Nombre *</label
             >
-            <div class="relative">
-              <lucide-angular
-                [img]="User"
-                [size]="20"
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              >
-              </lucide-angular>
-              <input
-                id="firstName"
-                type="text"
-                [(ngModel)]="userForm.firstName"
-                name="firstName"
-                (blur)="validateField('firstName')"
-                [class]="inputClass('firstName', 'pl-12 pr-4')"
-                placeholder="Juan"
-                autocomplete="off"
-              />
-            </div>
-            @if (hasError('firstName')) {
-              <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-                <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular
-                >{{ errors.firstName }}
-              </p>
-            }
+            <app-input
+              id="firstName"
+              type="text"
+              [(ngModel)]="userForm.firstName"
+              name="firstName"
+              placeholder="Juan"
+              autocomplete="off"
+              [errorMessage]="
+                hasError('firstName') ? errors.firstName : undefined
+              "
+              (inputBlur)="validateField('firstName')"
+            >
+              <svg lucideUser [size]="20" suffix></svg>
+            </app-input>
           </div>
 
           <!-- Apellido -->
@@ -172,30 +123,79 @@
               class="block text-gray-700 text-base font-medium mb-2"
               >Apellido *</label
             >
-            <div class="relative">
-              <lucide-angular
-                [img]="User"
-                [size]="20"
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+            <app-input
+              id="lastName"
+              type="text"
+              [(ngModel)]="userForm.lastName"
+              name="lastName"
+              placeholder="Pérez"
+              autocomplete="off"
+              [errorMessage]="
+                hasError('lastName') ? errors.lastName : undefined
+              "
+              (inputBlur)="validateField('lastName')"
+            >
+              <svg lucideUser [size]="20" suffix></svg>
+            </app-input>
+          </div>
+
+          <!-- Contraseña -->
+          <div>
+            <label
+              for="password"
+              class="block text-gray-700 text-base font-medium mb-2"
+              >Contraseña *</label
+            >
+            <app-input
+              id="password"
+              [type]="showPassword ? 'text' : 'password'"
+              [(ngModel)]="userForm.password"
+              name="password"
+              placeholder="Mín. 6 caracteres"
+              autocomplete="new-password"
+              [errorMessage]="
+                hasError('password') ? errors.password : undefined
+              "
+              (inputBlur)="validateField('password')"
+            >
+              <button
+                type="button"
+                suffix
+                (click)="showPassword = !showPassword"
+                class="pointer-events-auto text-gray-400 hover:text-gray-600"
               >
-              </lucide-angular>
-              <input
-                id="lastName"
-                type="text"
-                [(ngModel)]="userForm.lastName"
-                name="lastName"
-                (blur)="validateField('lastName')"
-                [class]="inputClass('lastName', 'pl-12 pr-4')"
-                placeholder="Pérez"
-                autocomplete="off"
-              />
-            </div>
-            @if (hasError('lastName')) {
-              <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-                <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular
-                >{{ errors.lastName }}
-              </p>
-            }
+                <svg
+                  [lucideIcon]="showPassword ? EyeOff : Eye"
+                  [size]="20"
+                ></svg>
+              </button>
+            </app-input>
+          </div>
+
+          <!-- Teléfono -->
+          <div>
+            <label
+              for="phone"
+              class="block text-gray-700 text-base font-medium mb-2"
+            >
+              Teléfono *
+              <span class="text-sm text-gray-500">(solo dígitos)</span>
+            </label>
+            <app-input
+              [id]="'phone'"
+              type="text"
+              [inputMode]="'numeric'"
+              [(ngModel)]="userForm.phone"
+              name="phone"
+              sanitize="numeric"
+              [maxLength]="10"
+              placeholder="3001234567"
+              autocomplete="off"
+              [errorMessage]="errors['phone']"
+              (inputBlur)="validateField('phone')"
+            >
+              <svg lucidePhone [size]="20" suffix class="text-gray-400"></svg>
+            </app-input>
           </div>
 
           <!-- Email (siempre visible) -->
@@ -205,30 +205,19 @@
               class="block text-gray-700 text-base font-medium mb-2"
               >Correo Electrónico *</label
             >
-            <div class="relative">
-              <lucide-angular
-                [img]="Mail"
-                [size]="20"
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              >
-              </lucide-angular>
-              <input
-                id="email"
-                type="email"
-                [(ngModel)]="userForm.email"
-                name="email"
-                (blur)="validateField('email')"
-                [class]="inputClass('email', 'pl-12 pr-4')"
-                placeholder="usuario@piedrazul.dev"
-                autocomplete="off"
-              />
-            </div>
-            @if (hasError('email')) {
-              <p class="mt-1 text-sm text-red-600 flex items-center gap-1">
-                <lucide-angular [img]="CircleAlert" [size]="14"></lucide-angular
-                >{{ errors.email }}
-              </p>
-            }
+            <app-input
+              id="email"
+              type="email"
+              [(ngModel)]="userForm.email"
+              name="email"
+              placeholder="usuario@piedrazul.dev"
+              autocomplete="off"
+              [validateEmailFormat]="false"
+              [errorMessage]="hasError('email') ? errors.email : undefined"
+              (inputBlur)="validateField('email')"
+            >
+              <svg lucideMail [size]="20" suffix></svg>
+            </app-input>
           </div>
         </div>
       </div>
@@ -238,9 +227,8 @@
         <app-create-user-doctor-form
           [data]="doctorFormData"
           [specialtyOptions]="specialtyOptions"
-          [documentTypes]="documentTypes"
           [loadingSpecialties]="loadingSpecialties"
-          [loadingDocumentTypes]="loadingDocumentTypes"
+          [loadError]="loadErrorSpecialties"
           [timeOptions]="timeOptions"
           [maxInterval]="maxInterval"
           [daysOfWeek]="daysOfWeek"
@@ -249,33 +237,49 @@
           (fieldBlurred)="validateField($any($event))"
         />
       }
-
+      <!-- Error global -->
+      @if (submitError) {
+        <div
+          id="submit-error-banner"
+          class="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-5 py-4 flex items-start gap-3 mt-8"
+        >
+          <svg lucideCircleAlert [size]="20" class="shrink-0 mt-0.5"></svg>
+          <p class="text-base">{{ submitError }}</p>
+        </div>
+      }
       <!-- Botones -->
       <div class="flex gap-4 pt-8 border-t-2 border-gray-100 mt-8">
-        <button
-          type="button"
-          (click)="navigateBack()"
-          [disabled]="isSubmitting"
-          class="flex-1 px-6 py-4 border-2 border-gray-300 text-gray-700 rounded-xl text-lg font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
-        >
-          Cancelar
-        </button>
-        <button
-          type="button"
-          (click)="openConfirmModal()"
-          [disabled]="isSubmitting"
-          class="flex-1 px-6 py-4 bg-[#215c98] hover:bg-[#163c63] disabled:bg-[#a7c9ec] text-white rounded-xl text-lg font-semibold transition-colors flex items-center justify-center gap-2"
-        >
-          @if (isSubmitting) {
-            <span
-              class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"
-            ></span>
-            Guardando...
-          } @else {
-            <lucide-angular [img]="UserPlus" [size]="24"></lucide-angular>
-            Crear Usuario
-          }
-        </button>
+        <div class="flex-1">
+          <app-button
+            variant="secondary"
+            size="lg"
+            [disabled]="isSubmitting"
+            [fullWidth]="true"
+            (buttonClick)="navigateBack()"
+          >
+            Cancelar
+          </app-button>
+        </div>
+        <div class="flex-1">
+          <app-button
+            variant="primary"
+            size="lg"
+            [disabled]="isSubmitting"
+            [loading]="isSubmitting"
+            [fullWidth]="true"
+            (buttonClick)="openConfirmModal()"
+          >
+            @if (isSubmitting) {
+              <span
+                class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"
+              ></span>
+              Guardando...
+            } @else {
+              <svg lucideUserPlus [size]="24"></svg>
+              Crear Usuario
+            }
+          </app-button>
+        </div>
       </div>
     </div>
   </div>

@@ -1,22 +1,36 @@
-import { Component, HostListener, inject, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  HostListener,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import {
-  Activity,
-  ArrowLeft,
-  Bone,
-  Calendar,
-  Check,
-  CreditCard,
-  Edit3,
-  Heart,
-  LucideAngularModule,
-  Save,
-  Stethoscope,
-  X,
-  Zap,
-} from 'lucide-angular';
+  LucideCalendar,
+  LucideCheck,
+  LucideDynamicIcon,
+  LucideEdit3,
+  LucideSave,
+  LucideStethoscope,
+} from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
 import { AppService } from '../../../../core/services/app.service';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
+import {
+  SortControlComponent,
+  SortDirection,
+  SortOption,
+} from '../../../../design-system/molecules/sortControl/sortControl.component';
+import { toggleInArray } from '../../../../shared/helpers/array-utils';
+import { PaginationMeta } from '../../../../shared/helpers/paginated-state';
+import {
+  getAllSpecialtiesMeta,
+  getSpecialtyMeta,
+} from '../../../../shared/helpers/specialty-catalog';
+import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { DoctorAdminDto } from '../../models/dtos/DoctorAdminDto';
 import { AdminService } from '../../service/admin.service';
 
@@ -24,54 +38,28 @@ import { AdminService } from '../../service/admin.service';
   selector: 'app-admin-doctors',
   templateUrl: './admin-doctors.component.html',
   standalone: true,
-  imports: [LucideAngularModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    LucideCalendar,
+    LucideCheck,
+    LucideEdit3,
+    LucideSave,
+    LucideStethoscope,
+    LucideDynamicIcon,
+    ButtonComponent,
+    PaginationComponent,
+    SortControlComponent,
+  ],
 })
 export class AdminDoctorsComponent implements OnInit {
   private adminService = inject(AdminService);
   public router = inject(Router);
   private appService = inject(AppService);
 
-  readonly ArrowLeft = ArrowLeft;
-  readonly Stethoscope = Stethoscope;
-  readonly Edit3 = Edit3;
-  readonly X = X;
-  readonly Save = Save;
-  readonly Check = Check;
-  readonly Calendar = Calendar;
-  readonly CreditCard = CreditCard;
-  readonly Heart = Heart;
-  readonly Bone = Bone;
-  readonly Activity = Activity;
-  readonly Zap = Zap;
-
-  readonly specialtiesList = [
-    {
-      name: 'Medicina General',
-      value: 'MEDICINA_GENERAL',
-      icon: Heart,
-      color: 'text-red-600',
-    },
-    {
-      name: 'Quiropraxia',
-      value: 'QUIROPRAXIA',
-      icon: Bone,
-      color: 'text-orange-600',
-    },
-    {
-      name: 'Fisioterapia',
-      value: 'FISIOTERAPIA',
-      icon: Activity,
-      color: 'text-green-600',
-    },
-    {
-      name: 'Terapia Neural',
-      value: 'TERAPIA_NEURAL',
-      icon: Zap,
-      color: 'text-purple-600',
-    },
-  ];
+  readonly specialtiesList = getAllSpecialtiesMeta();
   // ── State ─────────────────────────────────────────────────────────────────
   doctors = signal<DoctorAdminDto[]>([]);
+  pagination = signal<PaginationMeta | null>(null);
   loading = signal(false);
   errorCarga = signal('');
   editingDoctorId = signal<string | null>(null);
@@ -79,6 +67,16 @@ export class AdminDoctorsComponent implements OnInit {
   editingHasScheduler = signal(false);
   savingDoctorId = signal<string | null>(null);
   hoveredDoctorId = signal<string | null>(null);
+
+  // ── Ordenamiento ──────────────────────────────────────────────────────────
+  sortField = signal('lastName');
+  sortDirection = signal<SortDirection>('asc');
+
+  readonly sortOptions: SortOption[] = [
+    { value: 'firstName', label: 'Nombre' },
+    { value: 'lastName', label: 'Apellido' },
+    { value: 'documentId', label: 'Documento' },
+  ];
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
@@ -94,12 +92,21 @@ export class AdminDoctorsComponent implements OnInit {
   }
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  loadDoctors(): void {
+  loadDoctors(pageNumber = 0): void {
     this.loading.set(true);
     this.errorCarga.set('');
-    this.adminService.getDoctorsAdmin().subscribe({
-      next: (data) => {
-        this.doctors.set(data);
+    const sort = `${this.sortField()},${this.sortDirection()}`;
+    this.adminService.getDoctorsAdmin(pageNumber, 4, sort).subscribe({
+      next: (page) => {
+        this.doctors.set(page.content);
+        this.pagination.set({
+          pageNumber: page.pageNumber,
+          pageSize: page.pageSize,
+          totalElements: page.totalElements,
+          totalPages: page.totalPages,
+          first: page.first,
+          last: page.last,
+        });
         this.loading.set(false);
       },
       error: () => {
@@ -109,6 +116,18 @@ export class AdminDoctorsComponent implements OnInit {
     });
   }
 
+  onPageChange(pageNumber: number): void {
+    this.loadDoctors(pageNumber);
+  }
+  onSortFieldChange(field: string): void {
+    this.sortField.set(field);
+    this.loadDoctors(0);
+  }
+
+  onSortDirectionChange(direction: SortDirection): void {
+    this.sortDirection.set(direction);
+    this.loadDoctors(0);
+  }
   // ── Edit ──────────────────────────────────────────────────────────────────
   handleEdit(doctor: DoctorAdminDto): void {
     this.editingDoctorId.set(doctor.id);
@@ -133,10 +152,9 @@ export class AdminDoctorsComponent implements OnInit {
     const currentSpecialties = doctor.specialties;
     const newSpecialties = this.editingSpecialties();
 
-    const toAdd = newSpecialties.filter((s) => !currentSpecialties.includes(s));
-    const toRemove = currentSpecialties.filter(
-      (s) => !newSpecialties.includes(s)
-    );
+    const specialtiesChanged =
+      newSpecialties.length !== currentSpecialties.length ||
+      newSpecialties.some((s) => !currentSpecialties.includes(s));
 
     const hadScheduler = doctor.roles
       .map((r) => r.toUpperCase())
@@ -145,10 +163,10 @@ export class AdminDoctorsComponent implements OnInit {
 
     const calls: Observable<void>[] = [];
 
-    if (toAdd.length > 0)
-      calls.push(this.adminService.addSpecialties(doctor.id, toAdd));
-    if (toRemove.length > 0)
-      calls.push(this.adminService.removeSpecialties(doctor.id, toRemove));
+    if (specialtiesChanged)
+      calls.push(
+        this.adminService.changeSpecialties(doctor.id, newSpecialties)
+      );
     if (!hadScheduler && wantsScheduler)
       calls.push(this.adminService.giveDoctorSchedulerRole(doctor.documentId));
     if (hadScheduler && !wantsScheduler)
@@ -186,16 +204,15 @@ export class AdminDoctorsComponent implements OnInit {
         this.savingDoctorId.set(null);
         this.handleCancel();
       },
-      error: () => {
-        this.savingDoctorId.set(null);
+      error: (err: AppError) => {
+        this.errorCarga.set(err.message);
+        this.loading.set(false);
       },
     });
   }
 
   toggleSpecialty(name: string): void {
-    this.editingSpecialties.update((prev) =>
-      prev.includes(name) ? prev.filter((s) => s !== name) : [...prev, name]
-    );
+    this.editingSpecialties.update((prev) => toggleInArray(prev, name));
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -208,18 +225,14 @@ export class AdminDoctorsComponent implements OnInit {
   }
 
   getSpecialtyIcon(name: string) {
-    return (
-      this.specialtiesList.find((s) => s.value === name)?.icon || Stethoscope
-    );
+    return getSpecialtyMeta(name).icon;
   }
 
   getSpecialtyColor(name: string): string {
-    return (
-      this.specialtiesList.find((s) => s.value === name)?.color ||
-      'text-blue-600'
-    );
+    return getSpecialtyMeta(name).color;
   }
+
   getSpecialtyName(value: string): string {
-    return this.specialtiesList.find((s) => s.value === value)?.name || value;
+    return getSpecialtyMeta(value).label;
   }
 }

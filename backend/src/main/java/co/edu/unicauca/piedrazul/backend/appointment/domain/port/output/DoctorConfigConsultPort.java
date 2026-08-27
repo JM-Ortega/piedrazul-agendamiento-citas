@@ -5,17 +5,20 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface DoctorConfigConsultPort {
+
+    //Obtiene el id del doctor a través de el id de usuario
+    Optional<UUID> findByUserId(UUID userId);
+
     // Devuelve las franjas horarias que maneja el médico ese día
     List<AppointmentTime> getSlotsByDoctor(UUID idDoctor, LocalDate date);
 
     // Devuelve el intervalo entre citas configurado para el médico
     int getIntervalMinutesByDoctor(UUID idDoctor);
-
-    // Obtener el nombre del doctor
-    String getDoctorName(UUID idDoctor);
 
     // Obtener IDs de medicos activos
     List<UUID> getActiveDoctorIds();
@@ -25,4 +28,13 @@ public interface DoctorConfigConsultPort {
 
     // Obtener información de medicos en una sola operación por sus IDs
     List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
+
+    // Obtiene las semanas agendables asociadas al doctor
+    Map<UUID, Integer> getBookingWindowWeeksByDoctorIds(List<UUID> doctorIds);
+
+    // Obtiene el intervalo de semanas asociadas al doctor
+    Map<UUID, Integer> getIntervalMinutesByDoctorIds(List<UUID> doctorIds);
+
+    //obtiene el nombre de un doctor
+    String getDoctorName(UUID idDoctor);
 }

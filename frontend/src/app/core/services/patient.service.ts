@@ -1,18 +1,20 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
+import { shareReplay, tap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
-import { Patient } from '../../shared/models/interfaces/patient.model';
 import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
+import { Patient } from '../../shared/models/interfaces/patient.model';
 
 export interface PatientPublicResponse {
-  documentType: string | null;
+  identificationType: string | null;
   maskedDocument: string;
   firstName: string | null;
   lastName: string | null;
   patientExists: boolean;
   hasUserAccount: boolean;
   hasSystemUser: boolean;
+  hasPatientRole: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -23,45 +25,48 @@ export class PatientService {
   medicalRecords = signal<MedicalRecord[]>([]);
   error = signal<string | null>(null);
   readonly documentTypes = signal<string[]>([]);
+  readonly me = signal<Patient | null>(null);
+  private me$: Observable<Patient> | null = null;
 
   loadDocumentTypes(): void {
     if (this.documentTypes().length > 0) return;
     this.getAllDocumentTypes().subscribe({
       next: (types) => this.documentTypes.set(types),
-      error: () => {},
+      error: () => {
+        console.error('Error al cargar los tipos de documento');
+      },
     });
   }
 
+  /**
+   * Devuelve los datos del paciente autenticado. La primera llamada cachea
+   * el resultado en memoria para el resto de la sesión
+   */
   getMe(): Observable<Patient> {
-    return this.http.get<Patient>(`${this.apiUrl}/patients/me`);
+    const cached = this.me();
+    if (cached) return of(cached);
+
+    if (!this.me$) {
+      this.me$ = this.http.get<Patient>(`${this.apiUrl}/patients/me`).pipe(
+        tap((patient) => this.me.set(patient)),
+        shareReplay(1)
+      );
+    }
+    return this.me$;
   }
 
-  loadMyMedicalRecords(patientId: string | null): void {
-    this.http.get<MedicalRecord[]>(`${this.apiUrl}/clinical-history/patient/${patientId}`)
-      .subscribe({
-        next: (records) => this.medicalRecords.set(records),
-        error: (err) => {
-          if (err.status === 0) {
-            this.error.set('No se pudo conectar con el servidor.');
-          } else {
-            this.error.set(err.error?.message ?? 'Error al cargar el historial.');
-          }
-        }
-      });
-  }
-
-  getByDocument(documentNumber: string): Observable<Patient> {
-    return this.http.get<Patient>(
-      `${this.apiUrl}/patients/document/${documentNumber}`,
-    );
+  /** Borra los datos del paciente autenticado. */
+  invalidateMeCache(): void {
+    this.me.set(null);
+    this.me$ = null;
   }
 
   // consulta el estado público del documento
   getPublicByDocument(
-    documentNumber: string,
+    documentNumber: string
   ): Observable<PatientPublicResponse> {
     return this.http.get<PatientPublicResponse>(
-      `${this.apiUrl}/patients/document/${documentNumber}/public`,
+      `${this.apiUrl}/patients/document/${documentNumber}/public`
     );
   }
 
@@ -69,13 +74,13 @@ export class PatientService {
   createWithUser(data: {
     username: string;
     password: string;
-    documentType: string;
-    documentNumber: string;
+    identificationType: string;
+    identification: string;
     firstName: string;
     lastName: string;
     phone: string;
     email?: string;
-    gender: string;
+    sex: string;
     birthDate: string;
     guardianPhone?: string;
   }): Observable<Patient> {
@@ -84,27 +89,40 @@ export class PatientService {
 
   // solicita OTP para vincular o completar registro
   requestLinkUserAccountCode(data: {
-    documentNumber: string;
+    identification: string;
   }): Observable<void> {
     return this.http.post<void>(
       `${this.apiUrl}/patients/link-user-account/request-code`,
-      data,
+      data
     );
   }
 
   // confirma OTP y crea o vincula la cuenta según el caso
   confirmLinkUserAccount(data: {
-    documentNumber: string;
+    identification: string;
     code: string;
     password?: string;
+    sex?: string;
+    birthDate?: string;
+    guardianPhone?: string;
   }): Observable<Patient> {
     return this.http.post<Patient>(
       `${this.apiUrl}/patients/link-user-account/confirm`,
-      data,
+      data
     );
   }
 
   getAllDocumentTypes(): Observable<string[]> {
     return this.http.get<string[]>(`${this.apiUrl}/patients/document-types`);
+  }
+
+  /**
+   * Resetea todo el estado en memoria y la caché del servicio antes de cerrar sesión.
+   */
+  clearAllData(): void {
+    this.me.set(null);
+    this.me$ = null;
+    this.medicalRecords.set([]);
+    this.error.set(null);
   }
 }

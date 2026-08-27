@@ -1,20 +1,24 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.PatientResolutionStrategy;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentConfigRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.ResolvedPatient;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientAlreadyScheduledInSpecialtyException;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.PatientScheduleTimeConflictException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentScheduledEvent;
-import co.edu.unicauca.piedrazul.backend.appointment.exception.FirstAppointmentMustBeGeneralMedicineException;
-import co.edu.unicauca.piedrazul.backend.shared.events.AppointmentCreatedEvent;
+import co.edu.unicauca.piedrazul.backend.appointment.events.ScheduledAppointmentEvent;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
+import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -28,28 +32,35 @@ public class AppointmentSchedulingService {
     private final AppointmentService appointmentService;
     private final ApplicationEventPublisher eventPublisher;
     private final IsNewPatientUseCase isNewPatientUseCase;
+    private final SecurityContextExtractor securityExtractor;
+    private final AppointmentConfigRepository appointmentConfigRepository;
+
 
     public AppointmentSchedulingService(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             AppointmentService appointmentService,
             ApplicationEventPublisher eventPublisher,
-            IsNewPatientUseCase isNewPatientUseCase) {
+            IsNewPatientUseCase isNewPatientUseCase,
+            SecurityContextExtractor securityExtractor,
+            AppointmentConfigRepository appointmentConfigRepository){
         this.appointmentRepository = appointmentRepository;
         this.doctorConfigConsultPort = doctorConfigConsultPort;
         this.appointmentService = appointmentService;
         this.eventPublisher = eventPublisher;
         this.isNewPatientUseCase = isNewPatientUseCase;
+        this.securityExtractor = securityExtractor;
+        this.appointmentConfigRepository = appointmentConfigRepository;
     }
 
     @Transactional
     public void scheduleManual(
             PatientSchedulingContext patientContext,
             UUID idDoctor,
-            Specialty specialty,
+            SpecialtyCode specialty,
             LocalDate date,
             AppointmentTime startTime,
-            String performedBy,
+            UUID performedBy,
             PatientResolutionStrategy patientResolutionStrategy) {
         schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, true);
     }
@@ -58,21 +69,28 @@ public class AppointmentSchedulingService {
     public void scheduleAutonomous(
             PatientSchedulingContext patientContext,
             UUID idDoctor,
-            Specialty specialty,
+            SpecialtyCode specialty,
             LocalDate date,
             AppointmentTime startTime,
-            String performedBy,
+            UUID performedBy,
             PatientResolutionStrategy patientResolutionStrategy) {
+        validateAutonomousSchedulingEnabled();
         schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, false);
+    }
+
+    private void validateAutonomousSchedulingEnabled() {
+        if(!appointmentConfigRepository.isAutonomousSchedulingEnabled()) {
+            throw new AppointmentSchedulingDisableException("La programación autónoma de citas está deshabilitada. Comunicate con el centro medico para agendar tu cita");
+        }
     }
 
     private Appointment schedule(
             PatientSchedulingContext patientContext,
             UUID idDoctor,
-            Specialty specialty,
+            SpecialtyCode specialty,
             LocalDate date,
             AppointmentTime startTime,
-            String performedBy,
+            UUID performedBy,
             PatientResolutionStrategy patientResolutionStrategy,
             boolean manualFlow) {
 
@@ -95,10 +113,7 @@ public class AppointmentSchedulingService {
         AppointmentSchedulingRequest request =
                 new AppointmentSchedulingRequest(
                         idDoctor,
-                        doctorName,
                         resolvedPatient.idPatient(),
-                        patientName,
-                        patientInfo,
                         specialty,
                         date,
                         startTime
@@ -118,7 +133,20 @@ public class AppointmentSchedulingService {
 
         Appointment saved = appointmentRepository.save(appointment);
 
-        eventPublisher.publishEvent(new AppointmentCreatedEvent(saved.getIdAppointment().toString(), performedBy));
+        AppointmentEntity entity = new AppointmentEntity(saved.getIdAppointment(), saved.getIdDoctor(),saved.getIdPatient(),
+                saved.getSpecialty(), saved.getAppointmentState(), saved.getDate(), saved.getStartTime().getTime(), saved.getSchedulingOrigin());
+
+        String actorId = securityExtractor.currentActorId();
+        String actorRoles = securityExtractor.currentActorRoles();
+
+        eventPublisher.publishEvent(
+                ScheduledAppointmentEvent.of(
+                        entity,
+                        actorId,
+                        actorRoles,
+                        MDC.get("correlationId")
+                )
+        );
 
         eventPublisher.publishEvent(
                 new AppointmentScheduledEvent(
@@ -142,16 +170,16 @@ public class AppointmentSchedulingService {
         return patientInfo.getFirstName() + " " + patientInfo.getLastName();
     }
 
-    private void validateNewPatientFirstAppointmentSpecialty(UUID idPatient, Specialty specialty) {
+    private void validateNewPatientFirstAppointmentSpecialty(UUID idPatient, SpecialtyCode specialty) {
         boolean isNewPatient = isNewPatientUseCase.isNewPatient(idPatient);
-        if (isNewPatient && specialty != Specialty.MEDICINA_GENERAL) {
+        if (isNewPatient && specialty != SpecialtyCode.MEDICINA_GENERAL) {
             throw new FirstAppointmentMustBeGeneralMedicineException(
-                    "La primera cita de un paciente nuevo debe ser con MEDICINA_GENERAL"
+                    "La primera cita de un paciente nuevo debe ser con MEDICINA GENERAL"
             );
         }
     }
 
-    private void validateUniqueScheduledAppointmentBySpecialty(UUID idPatient, Specialty specialty) {
+    private void validateUniqueScheduledAppointmentBySpecialty(UUID idPatient, SpecialtyCode specialty) {
         boolean hasScheduledInSameSpecialty = appointmentRepository.findByPatientId(idPatient)
                 .stream()
                 .anyMatch(appointment -> appointment.getSpecialty() == specialty
@@ -168,7 +196,7 @@ public class AppointmentSchedulingService {
         boolean hasTimeConflict = appointmentRepository.findByPatientIdAndDate(idPatient, date)
                 .stream()
                 .anyMatch(appointment -> appointment.getStartTime().equals(startTime)
-                        && appointment.getAppointmentState().isActive());
+                        && appointment.getAppointmentState().isBussy());
 
         if (hasTimeConflict) {
             throw new PatientScheduleTimeConflictException(

@@ -6,7 +6,6 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.verification.application.VerificationCodeSender;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -24,12 +23,9 @@ public class NotificationVerificationCodeSender implements VerificationCodeSende
 
 
     @Override
-    public void sendCode(String subject, String displayName, String phone, String email, String code, int expirationMinutes) {
-        UUID subjectId = parseOrDerive(subject);
-
+    public void sendCode(String subject, String displayName, String phone, String email, String code, int expirationMinutes, UUID recipientId, UUID verificationCodeId) {
         RecipientSnapshot recipient = new RecipientSnapshot(
-                subjectId,
-                RecipientType.PATIENT,
+                recipientId,
                 displayName,
                 phone,
                 email,
@@ -45,17 +41,9 @@ public class NotificationVerificationCodeSender implements VerificationCodeSende
 
         notificationModuleApi.sendNow(new SendNotificationCommand(
                 NotificationType.OTP_CODE,
-                new AggregateReference(AggregateType.VERIFICATION, subjectId),
+                new AggregateReference(AggregateType.VERIFICATION, verificationCodeId),
                 recipient,
                 variables
         ));
-    }
-
-    private UUID parseOrDerive(String subject) {
-        try {
-            return UUID.fromString(subject);
-        } catch (IllegalArgumentException e) {
-            return UUID.nameUUIDFromBytes(subject.getBytes(StandardCharsets.UTF_8));
-        }
     }
 }

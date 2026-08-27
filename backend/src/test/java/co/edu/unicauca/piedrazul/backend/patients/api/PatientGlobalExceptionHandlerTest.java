@@ -21,7 +21,7 @@ class PatientGlobalExceptionHandlerTest {
         ProblemDetail result = handler.handleIllegalArgument(exception, request);
 
         assertThat(result.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
-        assertThat(result.getTitle()).isEqualTo("Bad request");
+        assertThat(result.getTitle()).isEqualTo("Solicitud inválida");
         assertThat(result.getDetail()).isEqualTo("documentNumber is required");
         assertThat(result.getType().toString()).isEqualTo("https://piedrazul/errors/patients/invalid-argument");
         assertThat(result.getInstance().toString()).isEqualTo("/api/patients");
@@ -38,7 +38,7 @@ class PatientGlobalExceptionHandlerTest {
         ProblemDetail result = handler.handleIllegalState(exception, request);
 
         assertThat(result.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
-        assertThat(result.getTitle()).isEqualTo("Conflict");
+        assertThat(result.getTitle()).isEqualTo("Conflicto");
         assertThat(result.getDetail()).isEqualTo("patient already has a user linked");
         assertThat(result.getType().toString()).isEqualTo("https://piedrazul/errors/patients/invalid-state");
         assertThat(result.getInstance().toString()).isEqualTo("/api/patients/link-user-account");
@@ -57,7 +57,7 @@ class PatientGlobalExceptionHandlerTest {
         ProblemDetail result = handler.handleRuntime(exception, request);
 
         assertThat(result.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
-        assertThat(result.getTitle()).isEqualTo(HttpStatus.NOT_FOUND.getReasonPhrase());
+        assertThat(result.getTitle()).isEqualTo("No encontrado");
         assertThat(result.getDetail()).isEqualTo("Patient not found");
         assertThat(result.getType().toString()).isEqualTo("https://piedrazul/errors/patients/patient-not-found");
         assertThat(result.getInstance().toString()).isEqualTo("/api/patients/123");
@@ -74,7 +74,7 @@ class PatientGlobalExceptionHandlerTest {
         ProblemDetail result = handler.handleRuntime(exception, request);
 
         assertThat(result.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
-        assertThat(result.getTitle()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase());
+        assertThat(result.getTitle()).isEqualTo("Error interno del servidor");
         assertThat(result.getDetail()).isEqualTo("Unexpected error");
         assertThat(result.getType().toString()).isEqualTo("https://piedrazul/errors/patients/internal-error");
         assertThat(result.getInstance().toString()).isEqualTo("/api/patients");
