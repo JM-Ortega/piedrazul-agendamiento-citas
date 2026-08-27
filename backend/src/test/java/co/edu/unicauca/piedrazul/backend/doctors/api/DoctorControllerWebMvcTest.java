@@ -68,16 +68,16 @@ class DoctorControllerWebMvcTest {
                 .andExpect(jsonPath("$[0].specialties[0]").value("QUIROPRAXIA"));
     }
 
-    @Test
-    void updateDoctorAppointmentIntervalShouldReturnNoContent() throws Exception {
-        UUID doctorId = UUID.fromString("33333333-3333-3333-3333-333333333333");
-
-        mockMvc.perform(put("/api/doctor/{doctorId}/appointment-interval", doctorId)
-                        .param("appointmentInterval", "30"))
-                .andExpect(status().isNoContent());
-
-        verify(doctorService).updateDoctorAppointmentInterval(doctorId, 30);
-    }
+//    @Test
+//    void updateDoctorAppointmentIntervalShouldReturnNoContent() throws Exception {
+//        UUID doctorId = UUID.fromString("33333333-3333-3333-3333-333333333333");
+//
+//        mockMvc.perform(put("/api/doctor/{doctorId}/appointment-interval", doctorId)
+//                        .param("appointmentInterval", "30"))
+//                .andExpect(status().isNoContent());
+//
+//        verify(doctorService).updateDoctorAppointmentInterval(doctorId, 30);
+//    }
 
     private Doctor buildDoctor(UUID doctorId, SpecialtyCode specialtyCode) {
         Doctor doctor = new Doctor(doctorId, LocalDate.now().minusDays(10), LocalDate.now().plusDays(10), 4, true, 20);

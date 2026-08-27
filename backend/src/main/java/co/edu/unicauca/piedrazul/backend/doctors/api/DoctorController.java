@@ -68,6 +68,7 @@ public class DoctorController {
         return DoctorDetailedResponse.fromEntity(doctor, names.get(doctor.getPersonId()));
     }
 
+    // No paginar
     @GetMapping
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     @Operation(summary = "Listar todos los doctores",
@@ -218,8 +219,7 @@ public class DoctorController {
         return ResponseEntity.noContent().build();
     }
 
-
-    @PutMapping("/{doctorId}/labor-date")
+    @PutMapping("/{doctorId}/update-info")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Actualizar el período laboral de un doctor",
             description = "Modifica la fecha de inicio y la fecha de finalización de labores del doctor.")
@@ -228,42 +228,25 @@ public class DoctorController {
             @ApiResponse(responseCode = "401", description = "No autenticado"),
             @ApiResponse(responseCode = "403", description = "No tiene permisos para actualizar el período laboral"),
             @ApiResponse(responseCode = "404", description = "No existe un doctor con el identificador proporcionado"),
-            @ApiResponse(responseCode = "409", description = "Conflicto con las fechas de inicio y fin de labor proporcionadas")
+            @ApiResponse(responseCode = "409", description = "Conflicto con las fechas de inicio y fin de labor proporcionadas"),
+            @ApiResponse(responseCode = "400", description = "El intervalo  o  ventana de agendamiento proporcionada no es válida")
     })
-    public ResponseEntity<Void> updateDoctorLaborDate(
+    public ResponseEntity<Void> updateDoctorInfo(
             @Parameter(description = "Identificador único (UUID) del doctor")
             @PathVariable UUID doctorId,
             @Parameter(description = "Nueva fecha de inicio de labores")
             @RequestParam LocalDate laborStart,
             @Parameter(description = "Nueva fecha de finalización de labores")
-            @RequestParam LocalDate laborEnd
-    ) {
-        doctorService.updateDoctorLaborDate(doctorId, laborStart, laborEnd);
-        return ResponseEntity.noContent().build();
-    }
-
-
-    @PutMapping("/{doctorId}/appointment-interval")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Actualizar la duración de citas de un doctor",
-            description = "Modifica la duración (en minutos) de las citas atendidas por el doctor.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Duración de citas actualizada correctamente"),
-            @ApiResponse(responseCode = "400", description = "El intervalo proporcionado no es válido"),
-            @ApiResponse(responseCode = "401", description = "No autenticado"),
-            @ApiResponse(responseCode = "403", description = "No tiene permisos para actualizar el intervalo de citas"),
-            @ApiResponse(responseCode = "404", description = "No existe un doctor con el identificador proporcionado")
-    })
-    public ResponseEntity<Void> updateDoctorAppointmentInterval(
-            @Parameter(description = "Identificador único (UUID) del doctor")
-            @PathVariable UUID doctorId,
+            @RequestParam LocalDate laborEnd,
             @Parameter(description = "Nueva duración de las citas, expresada en minutos")
-            @RequestParam int appointmentInterval
+            @RequestParam int appointmentInterval,
+            @Parameter(description = "Nueva duración de las ventana de agendamiento " +
+                    "expresada en semanas")
+            @RequestParam int bookingWindowWeeks
     ) {
-        doctorService.updateDoctorAppointmentInterval(doctorId, appointmentInterval);
+        doctorService.updateDoctorInfo(doctorId, laborStart, laborEnd,appointmentInterval,bookingWindowWeeks);
         return ResponseEntity.noContent().build();
     }
-
 
     @PutMapping("/{doctorId}/disable")
     @PreAuthorize("hasRole('ADMIN')")

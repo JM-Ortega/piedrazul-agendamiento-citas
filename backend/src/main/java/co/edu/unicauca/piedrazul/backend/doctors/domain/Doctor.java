@@ -95,6 +95,56 @@ public class Doctor {
 
     }
 
+    public void updateInfo(LocalDate laborStart, LocalDate laborEnd, int minutes, int weeks) {
+        if (laborStart == null) {
+            throw new DoctorValidationException(
+                    "El médico no tiene una fecha de inicio laboral"
+            );
+        }
+
+        if (laborEnd == null) {
+            throw new DoctorValidationException(
+                    "El médico no tiene una fecha de finalización laboral"
+            );
+        }
+
+        if (laborEnd.isBefore(laborStart)) {
+            throw new DateConflictException(
+                    "La fecha de finalización no puede ser anterior a la fecha de inicio"
+            );
+        }
+
+        if (weeks <= 0) {
+            throw new DoctorValidationException(
+                    "La ventana de agendamiento debe ser mayor que cero");
+        }
+
+        if (minutes <= 0) {
+            throw new DoctorValidationException(
+                    "El intervalo debe ser mayor que cero");
+        }
+
+        // Evita intervalos imposibles para los horarios existentes
+        if (!schedules.isEmpty()) {
+
+            boolean valid = schedules.stream()
+                    .anyMatch(schedule -> Duration.between(
+                            schedule.getStartTime(),
+                            schedule.getEndTime()
+                    ).toMinutes() >= minutes);
+
+            if (!valid) {
+                throw new DoctorValidationException(
+                        "El intervalo es mayor que la duración de algunos o todos los horarios");
+            }
+        }
+
+        this.appointmentInterval = minutes;
+        this.bookingWindowWeeks = weeks;
+        this.laborStart = laborStart;
+        this.laborEnd = laborEnd;
+    }
+
     public void updateLaborPeriod(LocalDate laborStart, LocalDate laborEnd) {
         if (laborStart == null) {
             throw new DoctorValidationException(

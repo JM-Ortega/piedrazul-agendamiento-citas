@@ -104,23 +104,12 @@ public class DoctorService implements DoctorProvisioningApi {
     }
 
     @Transactional
-    public void updateDoctorLaborDate(UUID idDoctor, LocalDate laborStart, LocalDate laborEnd) {
+    public void updateDoctorInfo(UUID idDoctor, LocalDate laborStart, LocalDate laborEnd, int appointmentInterval,
+                                 int bookingWindowWeeks) {
         Doctor doctor = doctorRepository.findById(idDoctor)
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
-        doctor.updateLaborPeriod(laborStart, laborEnd);
-
-        doctorRepository.save(doctor);
-    }
-
-
-    // Actualizar el intervalo de atención de un doctor, valida que al menos un horario del doctor pueda acomodar el nuevo intervalo
-    @Transactional
-    public void updateDoctorAppointmentInterval(UUID idDoctor, int newAppointmentInterval) {
-        Doctor doctor = doctorRepository.findById(idDoctor)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-
-        doctor.updateAppointmentInterval(newAppointmentInterval);
+        doctor.updateInfo(laborStart, laborEnd, appointmentInterval, bookingWindowWeeks);
 
         doctorRepository.save(doctor);
     }

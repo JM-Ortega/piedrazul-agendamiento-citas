@@ -13,6 +13,7 @@ public record   DoctorDetailedResponse(
         String name,
         List<String> specialty,
         int appointmentInterval,
+        int bookingWindowWeeks,
         List<Integer> workdays,
         LocalDate laborStart,
         LocalDate laborEnd,
@@ -27,6 +28,7 @@ public record   DoctorDetailedResponse(
                         .map(s -> s.getCode().name())
                         .toList(),
                 doctor.getAppointmentInterval(),
+                doctor.getBookingWindowWeeks(),
                 Optional.ofNullable(doctor.getSchedules())
                         .orElse(new HashSet<>())
                         .stream()
