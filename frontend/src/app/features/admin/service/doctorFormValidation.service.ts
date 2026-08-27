@@ -9,6 +9,7 @@ export interface FormErrors {
   fechaFin: string;
   intervalo: string;
   dias: string;
+  bookingWindowWeeks: string;
   horariosDia: Record<number, string>;
 }
 
@@ -27,6 +28,33 @@ export class DoctorFormValidationService {
     return '';
   }
 
+  /**
+   * Valida que la ventana de agendamiento (en semanas, contadas desde hoy)
+   * no se extienda más allá de la fecha de fin del período laboral.
+   * Sin esto, un paciente podría agendar una cita para una fecha en la
+   * que el médico ya no está activo en el sistema.
+   */
+  validateBookingWindow(bookingWindowWeeks: number, laborEnd: string): string {
+    if (!bookingWindowWeeks || bookingWindowWeeks <= 0) {
+      return 'La ventana de agendamiento debe ser mayor a 0.';
+    }
+    if (bookingWindowWeeks > 52) {
+      return 'La ventana de agendamiento no puede superar 52 semanas.';
+    }
+    if (!laborEnd) return '';
+
+    const today = new Date();
+    const limitDate = new Date(today);
+    limitDate.setDate(limitDate.getDate() + bookingWindowWeeks * 7);
+
+    const laborEndDate = new Date(laborEnd + 'T00:00:00');
+
+    if (limitDate > laborEndDate) {
+      return `Con ${bookingWindowWeeks} semanas, se podrían agendar citas después del ${laborEnd}, cuando el médico ya no estará activo. Reduzca la ventana o extienda el período laboral.`;
+    }
+    return '';
+  }
+
   validateForm(form: Doctor): FormErrors {
     const errors: FormErrors = {
       horarioGlobal: '',
@@ -35,6 +63,7 @@ export class DoctorFormValidationService {
       fechaFin: '',
       intervalo: '',
       dias: '',
+      bookingWindowWeeks: '',
       horariosDia: {},
     };
 
@@ -64,6 +93,11 @@ export class DoctorFormValidationService {
       errors.fechas =
         'La fecha de inicio no puede ser igual o posterior a la fecha de fin.';
     }
+
+    errors.bookingWindowWeeks = this.validateBookingWindow(
+      form.bookingWindowWeeks,
+      form.laborEnd
+    );
 
     if (!(form.workdays ?? []).length) {
       errors.dias = 'Debe seleccionar al menos un día de atención.';

@@ -125,6 +125,38 @@
       </div>
     </div>
   </div>
+  <!-- Ventana de Agendamiento -->
+  <div>
+    <p class="text-gray-700 font-semibold text-lg mb-2 flex items-center gap-2">
+      <svg lucideCalendarRange [size]="20" class="text-indigo-500"></svg>
+      Ventana de Agendamiento
+    </p>
+    <p class="text-gray-600 text-base mb-3 leading-relaxed max-w-xl">
+      Indica con cuántas semanas de anticipación los pacientes pueden agendar
+      una cita con este médico. Por ejemplo, si pone <strong>4</strong>, un
+      paciente podrá agendar citas desde hoy hasta 4 semanas después, pero no
+      más adelante.
+    </p>
+    <div class="max-w-xs">
+      <label
+        for="bookingWindowWeeks"
+        class="block text-gray-700 mb-1 text-base"
+      >
+        Semanas de anticipación
+      </label>
+      <app-input
+        id="bookingWindowWeeks"
+        type="number"
+        [(ngModel)]="editForm()!.bookingWindowWeeks"
+        (ngModelChange)="updateField('bookingWindowWeeks', $event)"
+        name="bookingWindowWeeks"
+        [min]="1"
+        [max]="52"
+        [step]="1"
+        [errorMessage]="errors().bookingWindowWeeks"
+      />
+    </div>
+  </div>
   <!-- Días de Atención -->
   <div>
     <label

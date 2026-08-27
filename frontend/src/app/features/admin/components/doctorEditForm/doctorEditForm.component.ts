@@ -11,6 +11,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import {
   LucideCalendar,
+  LucideCalendarRange,
   LucideChevronDown,
   LucideChevronUp,
   LucideClock,
@@ -49,6 +50,7 @@ export interface DoctorSaveEvent {
   imports: [
     FormsModule,
     LucideCalendar,
+    LucideCalendarRange,
     LucideChevronDown,
     LucideChevronUp,
     LucideClock,
@@ -108,6 +110,7 @@ export class DoctorEditFormComponent implements OnInit {
     fechaFin: '',
     intervalo: '',
     dias: '',
+    bookingWindowWeeks: '',
     horariosDia: {},
   });
 
@@ -126,7 +129,8 @@ export class DoctorEditFormComponent implements OnInit {
       form.laborStart !== orig.laborStart ||
       form.laborEnd !== orig.laborEnd ||
       form.startTime !== orig.startTime ||
-      form.endTime !== orig.endTime
+      form.endTime !== orig.endTime ||
+      form.bookingWindowWeeks !== orig.bookingWindowWeeks
     )
       return true;
     const fDays = [...(form.workdays ?? [])].sort((a, b) => a - b);
@@ -155,6 +159,7 @@ export class DoctorEditFormComponent implements OnInit {
       !errs.fechaFin &&
       !errs.intervalo &&
       !errs.dias &&
+      !errs.bookingWindowWeeks &&
       Object.keys(errs.horariosDia).length === 0 &&
       this.validationService.horariosValidos(form)
     );
@@ -267,7 +272,7 @@ export class DoctorEditFormComponent implements OnInit {
       form,
       originalDoctor: orig,
       originalWorkdays: this.originalWorkdays(),
-      removedWorkdays, // ← añadir
+      removedWorkdays,
     });
   }
 

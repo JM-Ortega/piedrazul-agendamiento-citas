@@ -5,6 +5,7 @@ export interface Doctor {
   name: string;
   specialty: string[];
   appointmentInterval: number;
+  bookingWindowWeeks: number;
   workdays: number[];
   startTime: string;
   endTime: string;

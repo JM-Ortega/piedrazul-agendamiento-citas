@@ -106,6 +106,38 @@ export class AdminService {
       { params: { laborStart, laborEnd } }
     );
   }
+  /**
+   *
+   * Actualiza la información laboral de un médico: período laboral,
+   * intervalo entre citas y ventana de agendamiento.
+   *
+   * @param doctorId - Identificador del médico.
+   * @param laborStart - Nueva fecha de inicio laboral (formato ISO, ej. 'YYYY-MM-DD').
+   * @param laborEnd - Nueva fecha de fin laboral (formato ISO, ej. 'YYYY-MM-DD').
+   * @param appointmentInterval - Nueva duración de las citas, en minutos.
+   * @param bookingWindowWeeks - Nueva ventana de agendamiento, en semanas.
+   * @returns Observable que completa sin contenido si la actualización fue exitosa.
+   */
+  updateDoctorInfo(
+    doctorId: string,
+    laborStart: string,
+    laborEnd: string,
+    appointmentInterval: number,
+    bookingWindowWeeks: number
+  ): Observable<void> {
+    return this.http.put<void>(
+      `${this.apiUrl}/doctor/${doctorId}/update-info`,
+      null,
+      {
+        params: {
+          laborStart,
+          laborEnd,
+          appointmentInterval,
+          bookingWindowWeeks,
+        },
+      }
+    );
+  }
 
   /**
    * Habilita a un médico en el sistema, asignándole un nuevo período laboral.
