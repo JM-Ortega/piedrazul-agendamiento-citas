@@ -86,6 +86,28 @@ public class PatientService implements PatientModuleApi {
     }
 
     @Override
+    public UUID createPatientNoSchedule(
+            IdentificationType identificationType,
+            String identification,
+            String firstName,
+            String lastName,
+            String phone,
+            String email,
+            UUID userId,
+            PatientSex sex,
+            LocalDate birthDate,
+            String guardianPhone
+    ) {
+        PersonSummary person = personExternalService.createPerson(
+                identificationType, identification, firstName, lastName, phone, email, userId
+        );
+
+        Patient patient = PatientFactory.create(person, sex, birthDate, guardianPhone);
+
+        return patient.getPersonId();
+    }
+
+    @Override
     public PatientData createPatientForExistingPerson(
             UUID personId,
             PatientSex sex,

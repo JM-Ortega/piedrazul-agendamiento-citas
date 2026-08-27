@@ -36,6 +36,19 @@ public interface PatientModuleApi {
             String guardianPhone
     );
 
+    UUID createPatientNoSchedule(
+            IdentificationType identificationType,
+            String identification,
+            String firstName,
+            String lastName,
+            String phone,
+            String email,
+            UUID userId,
+            PatientSex sex,
+            LocalDate birthDate,
+            String guardianPhone
+    );
+
     PatientData createPatientForExistingPerson(
             UUID personId,
             PatientSex sex,
