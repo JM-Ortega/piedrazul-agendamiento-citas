@@ -68,6 +68,7 @@ public class DoctorController {
         return DoctorDetailedResponse.fromEntity(doctor, names.get(doctor.getPersonId()));
     }
 
+    // No paginar
     @GetMapping
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     @Operation(summary = "Listar todos los doctores",
@@ -218,6 +219,34 @@ public class DoctorController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/{doctorId}/labor-date")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Actualizar el período laboral de un doctor",
+            description = "Modifica la fecha de inicio y la fecha de finalización de labores del doctor.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Período laboral actualizado correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para actualizar el período laboral"),
+            @ApiResponse(responseCode = "404", description = "No existe un doctor con el identificador proporcionado"),
+            @ApiResponse(responseCode = "409", description = "Conflicto con las fechas de inicio y fin de labor proporcionadas")
+    })
+    public ResponseEntity<Void> updateDoctorInfo(
+            @Parameter(description = "Identificador único (UUID) del doctor")
+            @PathVariable UUID doctorId,
+            @Parameter(description = "Nueva fecha de inicio de labores")
+            @RequestParam LocalDate laborStart,
+            @Parameter(description = "Nueva fecha de finalización de labores")
+            @RequestParam LocalDate laborEnd,
+            @Parameter(description = "Nueva duración de las citas, expresada en minutos")
+            @RequestParam int appointmentInterval,
+            @Parameter(description = "Nueva duración de las ventana de agendamiento " +
+                    "expresada en semanas")
+            @RequestParam int bookingWindowWeeks
+
+    ) {
+        doctorService.updateDoctorInfo(doctorId, laborStart, laborEnd,appointmentInterval,bookingWindowWeeks);
+        return ResponseEntity.noContent().build();
+    }
 
     @PutMapping("/{doctorId}/labor-date")
     @PreAuthorize("hasRole('ADMIN')")
