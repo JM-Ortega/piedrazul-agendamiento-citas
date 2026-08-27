@@ -1,15 +1,13 @@
 package co.edu.unicauca.piedrazul.backend.user.application;
 
-import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
+import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.KeycloakUserClient;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 
-@Slf4j
 @Service
 public class KeycloakUserService implements UserModuleApi {
 
@@ -36,12 +34,7 @@ public class KeycloakUserService implements UserModuleApi {
 
     @Override
     public List<String> getUserRoles (UUID userId) {
-        return keycloakClient.getUserRoles(userId.toString());
-    }
-
-    @Override
-    public Map<UUID, List<String>> getUserRolesByIds(Collection<UUID> userIds) {
-        return keycloakClient.getUserRolesByIds(userIds);
+        return keycloakClient.getUserRoles(userId);
     }
 
     @Override
@@ -60,13 +53,13 @@ public class KeycloakUserService implements UserModuleApi {
     }
 
     @Override
-    public void ensureDoctorRole(UUID userId) {
-        keycloakClient.assignRoleIfMissing(userId, Role.DOCTOR);
+    public void activateUser(UUID id) {
+        keycloakClient.activateUser(id);
     }
 
     @Override
-    public void revokeDoctorRole(UUID userId) {
-        keycloakClient.revokeRoleIfPresent(userId, Role.DOCTOR);
+    public void deactivateUser(UUID id) {
+        keycloakClient.deactivateUser(id);
     }
 
     @Override
@@ -92,8 +85,7 @@ public class KeycloakUserService implements UserModuleApi {
                 user.getUsername(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getEmail(),
-                user.getRealmRoles()
+                user.getEmail()
         );
     }
 }

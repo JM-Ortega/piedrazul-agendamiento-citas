@@ -8,8 +8,6 @@ import java.util.UUID;
 
 public class NotificationAttempt {
 
-    private static final int MAX_ERROR_MESSAGE_LENGTH = 500;
-
     private final UUID id;
     private final UUID notificationId;
     private final UUID scheduleId;
@@ -211,7 +209,7 @@ public class NotificationAttempt {
         this.status = AttemptStatus.FAILED;
         this.failureType = failureType;
         this.errorCode = errorCode;
-        this.errorMessage = truncateErrorMessage(errorMessage);
+        this.errorMessage = errorMessage;
         this.failedAt = now;
         this.updatedAt = now;
     }
@@ -223,7 +221,7 @@ public class NotificationAttempt {
         this.status = AttemptStatus.BOUNCED;
         this.failureType = FailureType.PERMANENT;
         this.errorCode = errorCode;
-        this.errorMessage = truncateErrorMessage(errorMessage);
+        this.errorMessage = errorMessage;
         this.failedAt = now;
         this.updatedAt = now;
     }
@@ -235,17 +233,9 @@ public class NotificationAttempt {
         this.status = AttemptStatus.UNDELIVERED;
         this.failureType = FailureType.PERMANENT;
         this.errorCode = errorCode;
-        this.errorMessage = truncateErrorMessage(errorMessage);
+        this.errorMessage = errorMessage;
         this.failedAt = now;
         this.updatedAt = now;
-    }
-
-    private static String truncateErrorMessage(String errorMessage) {
-        if (errorMessage == null || errorMessage.length() <= MAX_ERROR_MESSAGE_LENGTH) {
-            return errorMessage;
-        }
-
-        return errorMessage.substring(0, MAX_ERROR_MESSAGE_LENGTH);
     }
 
     public void markUnknown(Instant now) {

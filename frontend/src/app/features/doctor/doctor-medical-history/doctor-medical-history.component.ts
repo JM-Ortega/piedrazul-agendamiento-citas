@@ -1,131 +1,92 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  OnInit,
-  signal,
-} from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import {
-  LucideCalendar,
-  LucideClipboardPen,
-  LucideClipboardPlus,
-  LucideFolderOpen,
-  LucideSave,
-} from '@lucide/angular';
-import { DoctorService } from '../../../core/services/doctor.service';
-import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
-import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
+import { DoctorService } from '../../../core/services/doctor.service';
+import {
+  LucideAngularModule, ClipboardPen, ArrowLeft,
+  ClipboardPlus, Save, FolderOpen, Calendar,
+} from 'lucide-angular';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
 @Component({
   selector: 'app-doctor-medical-history',
   templateUrl: './doctor-medical-history.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    LucideClipboardPen,
-    LucideClipboardPlus,
-    LucideSave,
-    LucideFolderOpen,
-    LucideCalendar,
-    FormatoPipe,
-    ButtonComponent,
-    PaginationComponent,
-  ],
+  imports: [ LucideAngularModule, FormatoPipe],
 })
 export class DoctorMedicalHistoryComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   readonly doctorService = inject(DoctorService);
 
-  /** Longitud máxima permitida para la observación de la historia clínica. */
-  readonly OBSERVATION_MAX_LENGTH = 300;
+  readonly ClipboardPen = ClipboardPen;
+  readonly ArrowLeft = ArrowLeft;
+  readonly ClipboardPlus = ClipboardPlus;
+  readonly Save = Save;
+  readonly FolderOpen = FolderOpen;
+  readonly Calendar = Calendar;
 
   readonly mostrarInfo = signal(false);
-  toggleInfo() {
-    this.mostrarInfo.update((v) => !v);
-  }
+  toggleInfo() { this.mostrarInfo.update((v) => !v); }
 
-  readonly records = this.doctorService.medicalRecordsState.content;
-  readonly medicalRecordsPagination =
-    this.doctorService.medicalRecordsState.pagination;
+  readonly hasSavedRecord = signal(false);
+  readonly showExitModal = signal(false);
+
+  readonly records = this.doctorService.medicalRecords;
   readonly patient = signal<Patient | undefined>(undefined);
   readonly newObservation = signal('');
-  /** Caracteres restantes antes de llegar al límite, para mostrar en el contador del textarea. */
-  readonly remainingObservationChars = computed(
-    () => this.OBSERVATION_MAX_LENGTH - this.newObservation().length
-  );
   private readonly idAppointment = signal<string>('');
   readonly saveError = signal('');
-  readonly isSaving = signal(false);
-  readonly isLoadingRecords = this.doctorService.isLoadingRecords;
-
-  /**
-   * Actualiza la observación truncándola a {@link OBSERVATION_MAX_LENGTH}
-   * caracteres, para evitar que el usuario supere el límite incluso si
-   * pega texto largo.
-   *
-   * @param value - Valor crudo emitido por el evento `input` del textarea.
-   */
-  onObservationChange(value: string): void {
-    this.newObservation.set(value.slice(0, this.OBSERVATION_MAX_LENGTH));
-  }
+  readonly saveSuccess = signal('');
 
   ngOnInit(): void {
-    const idAppointment =
-      this.route.snapshot.paramMap.get('idAppointment') ?? '';
+    const idAppointment = this.route.snapshot.paramMap.get('idAppointment') ?? '';
     this.idAppointment.set(idAppointment);
 
-    this.doctorService.resetMedicalRecords();
-
-    this.doctorService
-      .getPatientByAppointment(idAppointment)
-      .subscribe((patient) => {
-        this.patient.set(patient);
-        this.doctorService.loadMedicalRecordsByPatient(patient.id);
-      });
+    this.doctorService.getPatientByAppointment(idAppointment).subscribe((patient) => {
+      this.patient.set(patient);
+      this.doctorService.loadMedicalRecordsByPatient(patient.id);
+    });
   }
 
-  /**
-   * Maneja el cambio de página emitido por `<app-pagination>` para el historial clínico del paciente actual.
-   *
-   * @param page - Número de página (base 0) al que se quiere navegar.
-   */
-  onMedicalRecordsPageChange(page: number): void {
-    const patientId = this.patient()?.id;
-    if (patientId) {
-      this.doctorService.loadMedicalRecordsByPatient(patientId, page);
+  handleBack(): void {
+    if (this.hasSavedRecord()) {
+      this.hasSavedRecord.set(false);
+      this.router.navigate(['/medico']);
+    } else {
+      this.showExitModal.set(true);
     }
   }
 
-  confirmAttendanceAndExit(): void {
+  confirmExit(): void {
+    this.showExitModal.set(false);
+    this.router.navigate(['/medico']);
+  }
+
+  cancelExit(): void {
+    this.showExitModal.set(false);
+  }
+
+  addRecord(): void {
+    const observations = this.newObservation().trim();
     const idCita = this.idAppointment();
-    if (!idCita) return;
 
-    const observation =
-      this.newObservation().trim().slice(0, this.OBSERVATION_MAX_LENGTH) ||
-      null;
-
+    if (!observations || !idCita) return;
     this.saveError.set('');
-    this.isSaving.set(true);
-
-    this.doctorService
-      .updateAppointmentAsAttended(idCita, observation)
-      .subscribe({
-        next: () => {
-          this.doctorService.resetMedicalRecords();
-          this.router.navigate(['/medico']);
-        },
-        error: (err) => {
-          this.isSaving.set(false);
-          this.saveError.set(
-            err?.error?.message ||
-              'Ocurrió un error al guardar la historia clínica'
-          );
-        },
-      });
+    this.saveSuccess.set('');
+    this.doctorService.addMedicalRecord(idCita, observations).subscribe({
+      next: (saved) => {this.doctorService.medicalRecords
+        .update((current) => [saved, ...current,]);
+        this.newObservation.set('');
+        this.saveSuccess.set('Historia clínica guardada correctamente');
+        this.hasSavedRecord.set(true);
+      },
+      error: (err) => {
+        this.saveError.set(
+          err?.error?.message ||
+          'Ocurrió un error al guardar la historia clínica'
+        );
+      },
+    });
   }
 }

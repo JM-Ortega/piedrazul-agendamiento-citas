@@ -4,21 +4,19 @@
       <div
         class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"
       >
-        {{ errorMessage() }}
+        ⚠️ {{ errorMessage() }}
       </div>
     }
 
     <div class="bg-white rounded-2xl shadow-md p-8">
-      <div class="flex items-center justify-between mb-6">
-        <h2 class="text-[#163c63] text-2xl flex items-center gap-3">
-          <svg lucideClock [size]="28" class="text-[#4e92d9]"></svg>
-          Historial de Citas
-        </h2>
-        <app-pagination
-          [pagination]="pagination()"
-          (pageChange)="loadPage($event)"
-        />
-      </div>
+      <h2 class="text-[#163c63] text-2xl mb-6 flex items-center gap-3">
+        <lucide-angular
+          [img]="Clock"
+          [size]="28"
+          class="text-[#4e92d9]"
+        ></lucide-angular>
+        Historial de Citas
+      </h2>
 
       @if (isLoading()) {
         <div class="text-center py-10">
@@ -26,22 +24,22 @@
         </div>
       }
 
-      @if (!isLoading() && appointments().length === 0) {
+      @if (!isLoading() && upcomingAppointments().length === 0) {
         <div class="text-center py-10">
-          <svg
-            lucideCalendarDays
+          <lucide-angular
+            [img]="CalendarDays"
             [size]="64"
             class="text-blue-200 mx-auto mb-4"
-          ></svg>
+          ></lucide-angular>
           <p class="text-gray-500 text-xl mb-4">
             No tiene citas en su historial
           </p>
         </div>
       }
 
-      @if (!isLoading() && appointments().length > 0) {
+      @if (!isLoading() && upcomingAppointments().length > 0) {
         <div class="space-y-4">
-          @for (apt of appointments(); track apt.idAppointment) {
+          @for (apt of upcomingAppointments(); track apt.idAppointment) {
             <div
               class="flex flex-col md:flex-row md:items-center justify-between bg-[#d9e9f8] border border-[#a7c9ec] rounded-xl p-5 gap-4"
             >
@@ -50,7 +48,7 @@
                   class="bg-[#215c98] text-white rounded-xl p-3 text-center min-w-15 shrink-0"
                 >
                   <p class="text-2xl font-bold leading-none">
-                    {{ apt.date.split('-')[2] }}
+                    {{ apt.date.split("-")[2] }}
                   </p>
                   <p class="text-xs uppercase">{{ getMonthShort(apt.date) }}</p>
                 </div>
@@ -59,14 +57,10 @@
                   <p class="text-[#163c63] text-xl font-semibold">
                     Dr. {{ apt.doctorName }}
                   </p>
-                  <p class="text-gray-500 text-base">
-                    {{ apt.specialty | formato }}
-                  </p>
+                  <p class="text-gray-500 text-base">{{ apt.specialty | formato }}</p>
                   <div class="flex items-center gap-2 mt-1 text-gray-600">
-                    <svg lucideClock [size]="16"></svg>
-                    <span class="text-base">{{
-                      apt.startTime.slice(0, 5)
-                    }}</span>
+                    <lucide-angular [img]="Clock" [size]="16"></lucide-angular>
+                    <span class="text-base">{{ apt.startTime.slice(0, 5) }}</span>
                   </div>
                 </div>
               </div>

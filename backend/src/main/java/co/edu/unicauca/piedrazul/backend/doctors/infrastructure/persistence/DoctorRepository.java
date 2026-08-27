@@ -1,57 +1,50 @@
 package co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence;
 
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.proyections.DoctorSpecialtyProjection;
-import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
-import org.jspecify.annotations.NonNull;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
-
+@Repository
 public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
     // Buscar doctores por especialidad
-    List<Doctor> findBySpecialtiesCode(SpecialtyCode specialty);
+    List<Doctor> findBySpecialtyContaining(Specialty specialty);
 
     // Buscar solo los doctores que están activos
     List<Doctor> findByStatusTrue();
-    
-    // Buscar por el ID del doctor
-    Doctor findByPersonId(UUID personId);
 
-    List<Doctor> findByPersonIdIn(List<UUID> doctorIds);
+    // Buscar por el ID de usuario vinculado
+    Doctor findByIdUser(UUID idUser);
+
+    // Buscar por el ID del doctor
+    Doctor findByIdDoctor(UUID idDoctor);
+
+    List<Doctor> findByIdDoctorIn(List<UUID> doctorIds);
 
     // Verifica si el doctor existe buscandolo por su ID
-    boolean existsById(@NonNull UUID id);
+    boolean existsById(UUID id);
 
-    // Devuelve los codigos de todas las especialidades de los doctores activos, sin repetir
-    @Query("""
-        SELECT DISTINCT s.code
-        FROM Doctor d
-        JOIN d.specialties s
-        WHERE d.status = true
-    """)
-    List<String> findAllDistinctSpecialtyCodesByActiveDoctors();
+    // Devuelve todas las especialidades de los doctores activos, si repetir
+    @Query("SELECT DISTINCT s FROM Doctor d JOIN d.specialty s WHERE d.status = true")
+    List<Specialty> findAllDistinctSpecialtiesByActiveDoctors();
 
+    // Devuelve todas las especialidades de un doctor
     @Query("""
-        SELECT DISTINCT d
+        SELECT s
         FROM Doctor d
-        LEFT JOIN FETCH d.specialties
+        JOIN d.specialty s
+        WHERE d.identification = :identification
     """)
-    List<Doctor> findAllWithSpecialties();
+    List<Specialty> findSpecialtiesByIdentification(String identification);
 
     @Query("""
-        SELECT new co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.proyections.DoctorSpecialtyProjection(
-            d.personId,
-            s.code
-        )
+        SELECT d.idDoctor
         FROM Doctor d
-        JOIN d.specialties s
-        WHERE d.personId IN :personIds
+        WHERE d.identification = :identification
     """)
-    List<DoctorSpecialtyProjection> findSpecialtiesByPersonIds(@Param("personIds") Collection<UUID> personIds);
+    UUID doctorIdByIdentification(String identification);
 }

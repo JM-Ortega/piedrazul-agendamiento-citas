@@ -9,7 +9,7 @@ public class BusySlotService {
     // Devuelve true si esa hora ya esta ocupada por una cita
     public boolean isBusy(List<Appointment> existingAppointments, AppointmentTime newHour, int minutesInterval){
         return  existingAppointments.stream()
-                .filter(c -> c.getAppointmentState().isBussy())
+                .filter(c -> c.getAppointmentState().isActive())
                 .anyMatch(c -> c.getStartTime()
                                             .collidesWith(newHour, minutesInterval));
     }

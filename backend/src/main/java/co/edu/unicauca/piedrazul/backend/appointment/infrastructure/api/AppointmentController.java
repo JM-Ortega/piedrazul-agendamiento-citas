@@ -3,27 +3,18 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api;
 import co.edu.unicauca.piedrazul.backend.appointment.application.AppointmentSchedulingService;
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.AutonomousPatientResolutionStrategy;
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.ManualPatientResolutionStrategy;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
-import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentPatientNotFoundException;
-import co.edu.unicauca.piedrazul.backend.appointment.exception.DoctorConfigInconsistentException;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.ClinicalHistoryDescription;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.ListAppointmentFiltersRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentResponse;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.PageResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.CitaDtoMapper;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
-
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -43,16 +34,10 @@ public class AppointmentController {
     private final IsNewPatientUseCase isNewPatientUseCase;
     private final UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase;
     private final CancelAppointmentUseCase cancelAppointmentUseCase;
-    private final GetAppointmentStatesUseCase getAppointmentStatesUseCase;
-    private final UpdateAutonomousSchedulingUseCase updateAutonomousSchedulingUseCase;
-    private final GetAutonomousSchedulingContidionUseCase getAutonomousSchedulingContidionUseCase;
 
     private final AppointmentSchedulingService appointmentSchedulingService;
     private final ManualPatientResolutionStrategy manualPatientResolutionStrategy;
     private final AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy;
-    private final PatientConsultPort patientConsultPort;
-    private final DoctorConfigConsultPort doctorConfigConsultPort;
-
 
     public AppointmentController(
             GetAvailableSlotsUseCase getAvailableSlotsUseCase,
@@ -63,14 +48,9 @@ public class AppointmentController {
             IsNewPatientUseCase isNewPatientUseCase,
             UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase,
             CancelAppointmentUseCase cancelAppointmentUseCase,
-            GetAppointmentStatesUseCase getAppointmentStatesUseCase,
-            UpdateAutonomousSchedulingUseCase updateAutonomousSchedulingUseCase,
-            GetAutonomousSchedulingContidionUseCase getAutonomousSchedulingContidionUseCase,
             AppointmentSchedulingService appointmentSchedulingService,
             ManualPatientResolutionStrategy manualPatientResolutionStrategy,
-            AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy,
-            PatientConsultPort patientConsultPort,
-            DoctorConfigConsultPort doctorConfigConsultPort) {
+            AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy) {
         this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
         this.listAppointmentsUseCase = listAppointmentsUseCase;
         this.getSpecialtiesWithDoctorUseCase = getSpecialtiesWithDoctorUseCase;
@@ -79,30 +59,9 @@ public class AppointmentController {
         this.isNewPatientUseCase = isNewPatientUseCase;
         this.updateAppointmentStatusUseCase = updateAppointmentStatusUseCase;
         this.cancelAppointmentUseCase = cancelAppointmentUseCase;
-        this.getAppointmentStatesUseCase = getAppointmentStatesUseCase;
-        this.updateAutonomousSchedulingUseCase = updateAutonomousSchedulingUseCase;
-        this.getAutonomousSchedulingContidionUseCase = getAutonomousSchedulingContidionUseCase;
         this.appointmentSchedulingService = appointmentSchedulingService;
         this.manualPatientResolutionStrategy = manualPatientResolutionStrategy;
         this.autonomousPatientResolutionStrategy = autonomousPatientResolutionStrategy;
-        this.patientConsultPort = patientConsultPort;
-        this.doctorConfigConsultPort = doctorConfigConsultPort;
-    }
-
-    //Permite cambiar la condicion para el agendamiento autonomo. (Activo o no activo)
-    @PutMapping("/config/autonomous-scheduling")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> setAutonomousSchedulingEnabled(@RequestParam boolean enabled) {
-        updateAutonomousSchedulingUseCase.setEnabledAutonomous(enabled);
-        return ResponseEntity.ok().build();
-    }
-
-    // Obtener la condicion del estado del agendamiento autonomo (Activo o no activo)
-    @GetMapping("/config/autonomous-scheduling")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<Boolean> getAutonomousSchedulingStatus() {
-        boolean enabled = getAutonomousSchedulingContidionUseCase.isAutonomousSchedulingEnabled();
-        return ResponseEntity.ok(enabled);
     }
 
     // Franjas disponibles según el médico y la fecha
@@ -118,41 +77,17 @@ public class AppointmentController {
         return ResponseEntity.ok(slots);
     }
 
-    // Un unico método para listar por idDoctor, idPatient, fecha, estado o combinaciones.
+    // Un unico método para listar por idDoctor, idPatient, fecha o combinaciones
     @GetMapping
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<PageResponse<AppointmentResponse>> list(
-            @ModelAttribute ListAppointmentFiltersRequest request,
-            @AuthenticationPrincipal Jwt jwt,
-            Authentication authentication) {
+    public ResponseEntity<List<AppointmentResponse>> list(
+            @RequestParam(required = false) UUID idDoctor,
+            @RequestParam(required = false) UUID idPatient,
+            @RequestParam(required = false) LocalDate date) {
 
-        UUID userId = UUID.fromString(jwt.getSubject());
-
-        if (hasRole(authentication, "SCHEDULER")) {
-            // Sin restricción — puede filtrar libremente por cualquier doctor/paciente/fecha/estado
-        } else if (hasRole(authentication, "PATIENT")) {
-            UUID idPatient = patientConsultPort.findByUserId(userId)
-                    .map(PatientSnapshot::idPatient)
-                    .orElseThrow(() -> new AppointmentPatientNotFoundException(
-                            "Paciente no encontrado para el userId: " + userId));
-            request.setIdPatient(idPatient);
-        } else if (hasRole(authentication, "DOCTOR")) {
-            UUID idDoctor = doctorConfigConsultPort.findByUserId(userId)
-                    .orElseThrow(() -> new DoctorConfigInconsistentException(
-                            "Doctor no encontrado para el userId: " + userId));
-            request.setIdDoctor(idDoctor);
-        }
-        // SCHEDULER no se restringe: puede filtrar libremente por cualquier doctor/paciente
-
-        PageQuery pageQuery = request.toPageQuery();
-        PagedResult<Appointment> appointmentPage = listAppointmentsUseCase.listBy(
-                request.getIdDoctor(), request.getIdPatient(), request.getDate(), request.getState(), pageQuery
-        );
-
-        List<AppointmentResponse> content = citaDtoMapper.toResponseList(appointmentPage.content());
-        return ResponseEntity.ok(PageResponse.from(appointmentPage, content));
+        // Mapper para pasar de Domain a DTO
+        return ResponseEntity.ok(listAppointmentsUseCase.listBy(idDoctor, idPatient, date).stream().map(citaDtoMapper::toResponse).toList());
     }
-
 
     @GetMapping("/me")
     @PreAuthorize("hasRole('PATIENT')")
@@ -181,19 +116,10 @@ public class AppointmentController {
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<Void> scheduleAppointment(
             @RequestBody @Valid AppointmentRequest request,
-            @AuthenticationPrincipal Jwt jwt,
-            Authentication authentication) {
+            @AuthenticationPrincipal Jwt jwt) {
 
         request.validate();
-        UUID performedBy = resolvePerformedBy(jwt);
-
-        if (request.getSchedulingOrigin() == SchedulingOrigin.AUTONOMO && hasRole(authentication, "PATIENT")) {
-            UUID idPatient = patientConsultPort.findByUserId(performedBy)
-                    .map(PatientSnapshot::idPatient)
-                    .orElseThrow(() -> new AppointmentPatientNotFoundException(
-                            "Paciente no encontrado para el userId: " + performedBy));
-            request.setPatientId(idPatient);
-        }
+        String performedBy = resolvePerformedBy(jwt);
 
         switch (request.getSchedulingOrigin()) {
             case MANUAL -> appointmentSchedulingService.scheduleManual(
@@ -237,13 +163,11 @@ public class AppointmentController {
         return ResponseEntity.ok(getSpecialtiesWithDoctorUseCase.getSpecialtiesWithDoctor(patientId));
     }
 
-    // Actualizar el estado de una cita a atendida y crear su HC asociada
+    // Actualizar el estado de una cita a atendida
     @PutMapping("/{appointmentId}/mark-as-attended")
     @PreAuthorize("hasRole('DOCTOR')")
-    public ResponseEntity<Void> markAppointmentAsAttended(@PathVariable UUID appointmentId
-        , @RequestBody(required = false) ClinicalHistoryDescription request) {
-        String description = (request != null) ? request.description() : null;
-        updateAppointmentStatusUseCase.markAsAttended(appointmentId, description);
+    public ResponseEntity<Void> markAppointmentAsAttended(@PathVariable UUID appointmentId) {
+        updateAppointmentStatusUseCase.markAsAttended(appointmentId);
         return ResponseEntity.ok().build();
     }
 
@@ -258,41 +182,17 @@ public class AppointmentController {
     //Cancelar una cita
     @PutMapping("/{appointmentId}/cancel")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT')")
-    public ResponseEntity<Void> cancelAppointment(
-            @PathVariable UUID appointmentId,
-            @AuthenticationPrincipal Jwt jwt,
-            Authentication authentication) {
-
-        UUID patientId = null;
-
-        if(hasRole(authentication, "PATIENT")){
-            UUID userId = UUID.fromString(jwt.getSubject());
-            patientId = patientConsultPort.findByUserId(userId)
-                    .map(PatientSnapshot::idPatient)
-                    .orElseThrow(() -> new AppointmentPatientNotFoundException(
-                            "Paciente no encontrado para el userId: " + userId));
-
-        }
-
-        cancelAppointmentUseCase.cancel(appointmentId, patientId);
+    public ResponseEntity<Void> cancelAppointment(@PathVariable UUID appointmentId) {
+        cancelAppointmentUseCase.cancel(appointmentId);
         return ResponseEntity.noContent().build(); // 204
     }
 
-    // Listar los estados de las citas
-    @GetMapping("/list-all-states")
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR')")
-    public ResponseEntity<List<AppointmentState>> listAppointmentStates() {
-        List<AppointmentState> states = getAppointmentStatesUseCase.getAppointmentStates();
-        return ResponseEntity.ok(states);
-    }
+    private String resolvePerformedBy(Jwt jwt) {
+        String preferredUsername = jwt.getClaimAsString("preferred_username");
+        if (preferredUsername != null && !preferredUsername.isBlank()) {
+            return preferredUsername;
+        }
 
-    // Helper methods
-    private UUID resolvePerformedBy(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
-    }
-
-    private boolean hasRole(Authentication authentication, String role) {
-        return authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_" + role));
+        return jwt.getSubject();
     }
 }

@@ -1,18 +1,22 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.model;
 
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
-import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 
 import java.time.LocalDate;
 import java.util.Objects;
 import java.util.UUID;
 
+import static org.hibernate.action.internal.BulkOperationCleanupAction.schedule;
+
 
 public class Appointment {
     private final UUID idAppointment;
     private final UUID idDoctor;
+    private final String doctorName;
     private final UUID idPatient;
-    private final SpecialtyCode specialty;
+    private final String patientName;
+    private final PatientInfo  patientInfo;
+    private final Specialty specialty;
     private AppointmentState appointmentState;
     private final LocalDate date;
     private final AppointmentTime startTime;
@@ -21,18 +25,25 @@ public class Appointment {
     // Constructor privado — solo accesible desde los factory methods
     private Appointment(UUID idAppointment,
                         UUID idDoctor,
+                        String doctorName,
                         UUID idPatient,
-                        SpecialtyCode specialty,
+                        String patientName,
+                        PatientInfo patientInfo,
+                        Specialty specialty,
                         LocalDate date,
                         AppointmentTime startTime,
                         SchedulingOrigin schedulingOrigin) {
         this.idAppointment = idAppointment;
         this.idDoctor = idDoctor;
+        this.doctorName = doctorName;
         this.idPatient = idPatient;
+        this.patientName = patientName;
+        this.patientInfo = patientInfo;
         this.specialty = specialty;
         this.date = date;
         this.startTime = startTime;
         this.schedulingOrigin = schedulingOrigin;
+
         // Siempre inicia en AGENDADA
         this.appointmentState   = AppointmentState.AGENDADA;
     }
@@ -71,6 +82,7 @@ public class Appointment {
             SchedulingOrigin origin) {
 
         Objects.requireNonNull(request.idDoctor());
+        Objects.requireNonNull(request.doctorName());
         Objects.requireNonNull(request.specialty());
         Objects.requireNonNull(request.date());
         Objects.requireNonNull(request.startTime());
@@ -78,7 +90,10 @@ public class Appointment {
         return new Appointment(
                 null,
                 request.idDoctor(),
+                request.doctorName(),
                 request.idPatient(),
+                request.patientName(),
+                request.patientInfo(),
                 request.specialty(),
                 request.date(),
                 request.startTime(),
@@ -88,8 +103,11 @@ public class Appointment {
 
     public static Appointment reconstruct (UUID idAppointment,
                                           UUID idDoctor,
+                                          String doctorName,
                                           UUID idPatient,
-                                          SpecialtyCode specialty,
+                                           String patientName,
+                                          PatientInfo patientInfo,
+                                          Specialty specialty,
                                           AppointmentState appointmentState,
                                           LocalDate date,
                                           AppointmentTime startTime,
@@ -99,7 +117,10 @@ public class Appointment {
         Appointment appointment = new Appointment(
                 idAppointment,
                 idDoctor,
+                doctorName,
                 idPatient,
+                patientName,
+                patientInfo,
                 specialty,
                 date,
                 startTime,
@@ -153,12 +174,24 @@ public class Appointment {
         return appointmentState;
     }
 
-    public SpecialtyCode getSpecialty() {
+    public Specialty getSpecialty() {
         return specialty;
+    }
+
+    public PatientInfo getPatientInfo() {
+        return patientInfo;
+    }
+
+    public String getPatientName() {
+        return patientName;
     }
 
     public UUID getIdPatient() {
         return idPatient;
+    }
+
+    public String getDoctorName() {
+        return doctorName;
     }
 
     public UUID getIdDoctor() {

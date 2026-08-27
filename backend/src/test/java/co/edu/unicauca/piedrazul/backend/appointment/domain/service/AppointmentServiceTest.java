@@ -1,11 +1,14 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.service;
 
-import co.edu.unicauca.piedrazul.backend.appointment.exception.SlotNotAvailableException;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.SlotNotAvailableException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
-import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,8 +52,10 @@ class AppointmentServiceTest {
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
         AppointmentSchedulingRequest request = buildRequest(
                 idDoctor,
+                "Dr. Lopez",
                 idPatient,
-                SpecialtyCode.FISIOTERAPIA,
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
                 LocalDate.now().plusDays(1),
                 startTime
         );
@@ -63,7 +68,7 @@ class AppointmentServiceTest {
         assertThat(result.getIdDoctor()).isEqualTo(idDoctor);
         assertThat(result.getIdPatient()).isEqualTo(idPatient);
         assertThat(result.getSchedulingOrigin()).isEqualTo(SchedulingOrigin.MANUAL);
-        assertThat(result.getSpecialty()).isEqualTo(SpecialtyCode.FISIOTERAPIA);
+        assertThat(result.getSpecialty()).isEqualTo(Specialty.FISIOTERAPIA);
         assertThat(result.getStartTime()).isEqualTo(startTime);
     }
 
@@ -73,8 +78,10 @@ class AppointmentServiceTest {
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
         AppointmentSchedulingRequest request = buildRequest(
                 UUID.randomUUID(),
+                "Dr. Lopez",
                 null,
-                SpecialtyCode.FISIOTERAPIA,
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
                 LocalDate.now().plusDays(1),
                 startTime
         );
@@ -92,8 +99,10 @@ class AppointmentServiceTest {
         List<Appointment> existingAppointments = List.of();
         AppointmentSchedulingRequest request = buildRequest(
                 UUID.randomUUID(),
+                "Dr. Lopez",
                 UUID.randomUUID(),
-                SpecialtyCode.FISIOTERAPIA,
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
                 LocalDate.now().plusDays(1),
                 startTime
         );
@@ -114,8 +123,10 @@ class AppointmentServiceTest {
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
         AppointmentSchedulingRequest request = buildRequest(
                 UUID.randomUUID(),
+                "Dr. Lopez",
                 UUID.randomUUID(),
-                SpecialtyCode.FISIOTERAPIA,
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
                 LocalDate.now().plusDays(1),
                 startTime
         );
@@ -134,8 +145,10 @@ class AppointmentServiceTest {
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
         AppointmentSchedulingRequest request = buildRequest(
                 UUID.randomUUID(),
+                "Dr. Lopez",
                 UUID.randomUUID(),
-                SpecialtyCode.FISIOTERAPIA,
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
                 LocalDate.now().plusDays(1),
                 startTime
         );
@@ -157,8 +170,10 @@ class AppointmentServiceTest {
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(10, 0));
         AppointmentSchedulingRequest request = buildRequest(
                 idDoctor,
+                "Dr. Lopez",
                 idPatient,
-                SpecialtyCode.QUIROPRAXIA,
+                "Carlos Gomez",
+                Specialty.QUIROPRAXIA,
                 LocalDate.now().plusDays(1),
                 startTime
         );
@@ -171,7 +186,7 @@ class AppointmentServiceTest {
         assertThat(result.getIdDoctor()).isEqualTo(idDoctor);
         assertThat(result.getIdPatient()).isEqualTo(idPatient);
         assertThat(result.getSchedulingOrigin()).isEqualTo(SchedulingOrigin.AUTONOMO);
-        assertThat(result.getSpecialty()).isEqualTo(SpecialtyCode.QUIROPRAXIA);
+        assertThat(result.getSpecialty()).isEqualTo(Specialty.QUIROPRAXIA);
         assertThat(result.getStartTime()).isEqualTo(startTime);
     }
 
@@ -181,8 +196,10 @@ class AppointmentServiceTest {
         List<Appointment> existingAppointments = List.of();
         AppointmentSchedulingRequest request = buildRequest(
                 UUID.randomUUID(),
+                "Dr. Lopez",
                 UUID.randomUUID(),
-                SpecialtyCode.FISIOTERAPIA,
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
                 LocalDate.now().plusDays(1),
                 startTime
         );
@@ -203,8 +220,10 @@ class AppointmentServiceTest {
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(10, 0));
         AppointmentSchedulingRequest request = buildRequest(
                 UUID.randomUUID(),
+                "Dr. Lopez",
                 UUID.randomUUID(),
-                SpecialtyCode.FISIOTERAPIA,
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
                 LocalDate.now().plusDays(1),
                 startTime
         );
@@ -221,8 +240,10 @@ class AppointmentServiceTest {
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(10, 0));
         AppointmentSchedulingRequest request = buildRequest(
                 UUID.randomUUID(),
+                "Dr. Lopez",
                 UUID.randomUUID(),
-                SpecialtyCode.FISIOTERAPIA,
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
                 LocalDate.now().plusDays(1),
                 startTime
         );
@@ -238,8 +259,10 @@ class AppointmentServiceTest {
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(10, 0));
         AppointmentSchedulingRequest request = buildRequest(
                 UUID.randomUUID(),
+                "Dr. Lopez",
                 null,
-                SpecialtyCode.FISIOTERAPIA,
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
                 LocalDate.now().plusDays(1),
                 startTime
         );
@@ -262,8 +285,10 @@ class AppointmentServiceTest {
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
         AppointmentSchedulingRequest request = buildRequest(
                 idDoctor,
+                "Dr. Lopez",
                 idPatient,
-                SpecialtyCode.FISIOTERAPIA,
+                "Carlos Gomez",
+                Specialty.FISIOTERAPIA,
                 LocalDate.now().plusDays(1),
                 startTime
         );
@@ -281,18 +306,35 @@ class AppointmentServiceTest {
     // Fixture
     // ─────────────────────────────────────────────
 
-
+    private PatientInfo buildPatientInfo() {
+        return PatientInfo.of(
+                DocumentType.CEDULA,
+                "12345678",
+                "Carlos",
+                "Gomez",
+                "3001234567",
+                Gender.MASCULINO,
+                LocalDate.of(1990, 6, 15),
+                "carlos@correo.com",
+                null
+        );
+    }
 
         private AppointmentSchedulingRequest buildRequest(
                         UUID idDoctor,
+                        String doctorName,
                         UUID idPatient,
-                        SpecialtyCode specialty,
+                        String patientName,
+                        Specialty specialty,
                         LocalDate date,
                         AppointmentTime startTime
         ) {
                 return new AppointmentSchedulingRequest(
                                 idDoctor,
+                                doctorName,
                                 idPatient,
+                                patientName,
+                                buildPatientInfo(),
                                 specialty,
                                 date,
                                 startTime

@@ -11,13 +11,13 @@ public class RequestLinkUserAccountCodeRequest {
     @Size(max = 12)
     @Pattern(regexp = "^[A-Za-z0-9._-]{5,30}$")
     @Sanitize
-    private String identification;
+    private String documentNumber;
 
-    public String getIdentification() {
-        return identification;
+    public String getDocumentNumber() {
+        return documentNumber;
     }
 
-    public void setIdentification(String identification) {
-        this.identification = identification;
+    public void setDocumentNumber(String documentNumber) {
+        this.documentNumber = documentNumber;
     }
 }

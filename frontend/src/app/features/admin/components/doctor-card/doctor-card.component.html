@@ -15,37 +15,36 @@
         {{ doctor().name }}
         @if (doctor().status === false) {
           <span
-            class="text-xs font-normal text-red-700 bg-red-100 px-2 py-0.5 rounded-full"
+            class="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full"
           >
             Inactivo
           </span>
         }
       </p>
       <p class="text-gray-600 text-base">
-        {{ formattedSpecialties(doctor().specialty) }}
+        {{ doctor().specialty | formato }}
       </p>
     </div>
   </div>
 
   @if (isSaved()) {
     <span class="flex items-center gap-1 text-green-600 text-base">
-      <svg lucideCheckCircle [size]="18"></svg>
+      <lucide-angular [img]="CheckCircle" [size]="18"></lucide-angular>
       Guardado
     </span>
   }
 
   @if (!isEditing()) {
     <div class="relative shrink-0">
-      <app-button
-        variant="primary"
-        extraClass="!rounded-xl !px-5 !py-2.5 !text-base"
+      <button
+        (click)="handleEdit()"
         (mouseenter)="hoveredButton.set(true)"
         (mouseleave)="hoveredButton.set(false)"
-        (buttonClick)="handleEdit()"
+        class="flex items-center gap-2 px-5 py-2.5 rounded-xl transition-colors text-base bg-[#215c98] hover:bg-[#163c63] text-white cursor-pointer"
       >
-        <svg lucidePencil [size]="18"></svg>
+        <lucide-angular [img]="Pencil" [size]="18"></lucide-angular>
         Editar
-      </app-button>
+      </button>
 
       @if (hoveredButton()) {
         <div
@@ -68,12 +67,20 @@
     <div class="flex justify-between items-center gap-3 flex-wrap">
       <div class="flex flex-wrap gap-3 text-sm text-gray-600">
         <span class="bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1">
-          <svg lucideClock [size]="14" class="text-[#163c63]"></svg>
+          <lucide-angular
+            [img]="Clock"
+            [size]="14"
+            class="text-[#163c63]"
+          ></lucide-angular>
           {{ getDisplaySchedule().startTime }} –
           {{ getDisplaySchedule().endTime }}
         </span>
         <span class="bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1">
-          <svg lucideClock [size]="14" class="text-[#163c63]"></svg>
+          <lucide-angular
+            [img]="Clock"
+            [size]="14"
+            class="text-[#163c63]"
+          ></lucide-angular>
           Intervalo: {{ doctor().appointmentInterval }} min
         </span>
         <span class="bg-blue-50 px-3 py-1.5 rounded-lg">
@@ -83,7 +90,7 @@
           <span
             class="bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg flex items-center gap-1"
           >
-            <svg lucideClock [size]="14"></svg>
+            <lucide-angular [img]="Clock" [size]="14"></lucide-angular>
             Horarios personalizados por día
           </span>
         }
@@ -91,24 +98,25 @@
 
       <!-- Botón Habilitado/Deshabilitado alineado a la derecha -->
       <div class="relative shrink-0">
-        <app-button
-          variant="chip"
-          [active]="doctor().status !== false"
-          activeChipClasses="bg-green-100 text-green-700 hover:bg-green-200 border-transparent"
-          inactiveChipClasses="bg-red-100 text-red-700 hover:bg-red-200 border-transparent"
-          extraClass="!w-auto !py-1.5 !px-4 !rounded-lg !flex !items-center !gap-2"
+        <button
+          (click)="toggleModal.emit(doctor())"
           (mouseenter)="hoveredStatus.set(true)"
           (mouseleave)="hoveredStatus.set(false)"
-          (buttonClick)="toggleModal.emit(doctor())"
+          class="flex items-center gap-2 px-4 py-1.5 rounded-lg font-semibold text-base transition-all cursor-pointer"
+          [class]="
+            doctor().status !== false
+              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+              : 'bg-red-100 text-red-700 hover:bg-red-200'
+          "
         >
           @if (doctor().status !== false) {
-            <svg lucidePower [size]="16"></svg>
+            <lucide-angular [img]="Power" [size]="16"></lucide-angular>
             Habilitado
           } @else {
-            <svg lucidePowerOff [size]="16"></svg>
+            <lucide-angular [img]="PowerOff" [size]="16"></lucide-angular>
             Deshabilitado
           }
-        </app-button>
+        </button>
 
         @if (hoveredStatus()) {
           <div
@@ -131,7 +139,7 @@
       <span
         class="bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg flex items-center gap-1"
       >
-        <svg lucideCalendar [size]="14"></svg>
+        <lucide-angular [img]="Calendar" [size]="14"></lucide-angular>
         Período laboral: {{ doctor().laborStart }} – {{ doctor().laborEnd }}
       </span>
     </div>
@@ -140,7 +148,7 @@
       <div class="flex flex-wrap gap-2">
         @for (day of doctor().workdays; track day) {
           @if (day >= 1 && day <= 5) {
-            @let ds = $safeNavigationMigration(doctor().daySchedules?.[day]);
+            @let ds = doctor().daySchedules?.[day];
             @if (
               ds &&
               (ds.startTime !== doctor().startTime ||

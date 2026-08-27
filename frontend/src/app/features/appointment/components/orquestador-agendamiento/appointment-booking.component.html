@@ -5,14 +5,15 @@
 }
 
 @if (state.bookingMode() !== null) {
+
   <div class="flex gap-2 mb-6">
     @for (label of state.stepLabels(); track label; let i = $index) {
       <div
         class="flex-1 text-center py-2 rounded-xl text-sm font-medium transition-all"
         [ngClass]="{
-          'bg-[#215c98] text-white shadow': state.step() === i + 1,
-          'bg-green-100 text-green-700': state.step() > i + 1,
-          'bg-white text-gray-400 border border-gray-200': state.step() < i + 1,
+          'bg-[#215c98] text-white shadow':                 state.step() === i + 1,
+          'bg-green-100 text-green-700':                   state.step() > i + 1,
+          'bg-white text-gray-400 border border-gray-200': state.step() < i + 1
         }"
       >
         {{ label }}
@@ -21,10 +22,11 @@
   </div>
 
   <div class="bg-white rounded-2xl shadow-xl p-8">
+
     @if (isPatientStep) {
+
       @if (patientSubStep === 'search') {
         <app-booking-patient-search
-          [prefillDocument]="pendingSearchDocument"
           (patientConfirmed)="onPatientConfirmed()"
           (patientMissing)="onPatientMissing()"
           (changeMode)="onSearchChangeMode()"
@@ -35,7 +37,6 @@
         <app-booking-patient-register
           (advance)="onRegisterAdvance()"
           (goBack)="onRegisterGoBack()"
-          (documentAlreadyExists)="onExistingDocumentConfirmed($event)"
         ></app-booking-patient-register>
       }
     }
@@ -57,10 +58,11 @@
 
     @if (state.step() === state.confirmStep() && !state.success()) {
       <app-booking-confirm
-        (confirmed)="onConfirmed()"
+        (confirmed)="onConfirmed($event)"
         (back)="onConfirmBack()"
       ></app-booking-confirm>
     }
+
   </div>
 }
 
@@ -68,7 +70,8 @@
   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl p-8 shadow-xl text-center w-80">
       <div
-        class="flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mx-auto mb-5 animate-bounce"
+        class="flex items-center justify-center w-20 h-20 rounded-full bg-green-100
+               mx-auto mb-5 animate-bounce"
       >
         <svg
           class="w-10 h-10 text-green-500"
@@ -77,11 +80,7 @@
           stroke-width="2.5"
           viewBox="0 0 24 24"
         >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M5 13l4 4L19 7"
-          />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
         </svg>
       </div>
       <h2 class="text-2xl font-bold text-gray-800 mb-2">¡Cita Agendada!</h2>
@@ -89,13 +88,14 @@
         {{ state.successMessage() }}<br />
         Será redirigido en unos segundos...
       </p>
-      <app-button
-        variant="success"
-        [fullWidth]="true"
-        (buttonClick)="onSuccessGoBack()"
+      <button
+        (click)="onSuccessGoBack()"
+        class="w-full py-3 px-6 rounded-xl font-semibold text-white
+               bg-gradient-to-r from-green-500 to-emerald-600 shadow-lg
+               hover:shadow-xl hover:scale-[1.03] active:scale-[0.98] transition-all duration-200"
       >
         Volver al Inicio
-      </app-button>
+      </button>
     </div>
   </div>
 }

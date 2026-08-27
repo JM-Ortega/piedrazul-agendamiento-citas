@@ -3,8 +3,8 @@ package co.edu.unicauca.piedrazul.backend.patients.api.dto.input;
 import co.edu.unicauca.piedrazul.backend.jackson.normalization.NormalizeName;
 import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
 import co.edu.unicauca.piedrazul.backend.jackson.validation.ValidDocument;
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientSex;
-import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -13,10 +13,7 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
-@ValidDocument(
-        documentField = "identification",
-        typeField = "identificationType"
-)
+@ValidDocument
 public class CreatePatientWithUserRequest {
 
     @NotBlank
@@ -26,12 +23,12 @@ public class CreatePatientWithUserRequest {
     private String username;
 
     @NotNull
-    private IdentificationType identificationType;
+    private PatientDocumentType documentType;
 
     @NotBlank
     @Size(max = 20)
     @Sanitize
-    private String identification;
+    private String documentNumber;
 
     @NotBlank
     @Size(min = 2, max = 60)
@@ -59,7 +56,7 @@ public class CreatePatientWithUserRequest {
     private String email;
 
     @NotNull
-    private PatientSex sex;
+    private PatientGender gender;
 
     @NotNull
     private LocalDate birthDate;
@@ -77,12 +74,12 @@ public class CreatePatientWithUserRequest {
         return username;
     }
 
-    public IdentificationType getIdentificationType() {
-        return identificationType;
+    public PatientDocumentType getDocumentType() {
+        return documentType;
     }
 
-    public String getIdentification() {
-        return identification;
+    public String getDocumentNumber() {
+        return documentNumber;
     }
 
     public String getFirstName() {
@@ -101,8 +98,8 @@ public class CreatePatientWithUserRequest {
         return email;
     }
 
-    public PatientSex getSex() {
-        return sex;
+    public PatientGender getGender() {
+        return gender;
     }
 
     public LocalDate getBirthDate() {

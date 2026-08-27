@@ -1,6 +1,5 @@
 export interface PatientSuggestion {
-  id: string;
-  identification: string;
+  documentNumber: string;
   firstName: string;
   lastName: string;
 }

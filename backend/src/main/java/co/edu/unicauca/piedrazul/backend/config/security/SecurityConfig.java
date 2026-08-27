@@ -44,7 +44,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType("application/json");
-                            response.getWriter().write("{\"error\":\"no autorizado\"}");
+                            response.getWriter().write("{\"error\":\"unauthorized\"}");
                         })
                 );
 

@@ -15,11 +15,11 @@ public @interface ValidDocument {
 
     String message() default "El número de documento no coincide con el tipo de documento";
 
-    String documentField() default "identification";
-
-    String typeField() default "identificationType";
-
     Class<?>[] groups() default {};
 
     Class<? extends Payload>[] payload() default {};
+
+    String documentField() default "documentNumber";
+
+    String typeField() default "documentType";
 }

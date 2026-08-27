@@ -5,16 +5,16 @@ import java.util.UUID;
 public class PatientSummaryResponse {
 
     private UUID id;
-    private String identification;
+    private String documentNumber;
     private String firstName;
     private String lastName;
 
     public PatientSummaryResponse() {
     }
 
-    public PatientSummaryResponse(UUID id, String identification, String firstName, String lastName) {
+    public PatientSummaryResponse(UUID id, String documentNumber, String firstName, String lastName) {
         this.id = id;
-        this.identification = identification;
+        this.documentNumber = documentNumber;
         this.firstName = firstName;
         this.lastName = lastName;
     }
@@ -23,8 +23,8 @@ public class PatientSummaryResponse {
         return id;
     }
 
-    public String getIdentification() {
-        return identification;
+    public String getDocumentNumber() {
+        return documentNumber;
     }
 
     public String getFirstName() {
@@ -39,8 +39,8 @@ public class PatientSummaryResponse {
         this.id = id;
     }
 
-    public void setIdentification(String identification) {
-        this.identification = identification;
+    public void setDocumentNumber(String documentNumber) {
+        this.documentNumber = documentNumber;
     }
 
     public void setFirstName(String firstName) {

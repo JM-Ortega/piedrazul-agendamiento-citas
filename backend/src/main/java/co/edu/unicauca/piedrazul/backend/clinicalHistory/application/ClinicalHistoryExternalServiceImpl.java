@@ -1,89 +1,74 @@
 package co.edu.unicauca.piedrazul.backend.clinicalHistory.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
-import co.edu.unicauca.piedrazul.backend.appointment.events.ScheduledAppointmentEvent;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentExternalData;
-import co.edu.unicauca.piedrazul.backend.clinicalHistory.events.ClinicalHistoryCreatedEvent;
-import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
-import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
-import co.edu.unicauca.piedrazul.backend.audit.infrastructure.aop.Auditable;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.ClinicalHistoryExternalService;
-import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.internal.ClinicalHistoryRequest;
+import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.input.ClinicalHistoryRequest;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.output.ClinicalHistoryResponse;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.domain.ClinicalHistory;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.infrastructure.persistence.ClinicalHistoryRepository;
-import org.slf4j.MDC;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
 public class ClinicalHistoryExternalServiceImpl implements ClinicalHistoryExternalService {
+
     private final ClinicalHistoryRepository repository;
     private final AppointmentExternalService appointmentExternalService;
-    private final ApplicationEventPublisher eventPublisher;
-    private final SecurityContextExtractor securityExtractor;
 
     public ClinicalHistoryExternalServiceImpl(ClinicalHistoryRepository repository,
-                                              AppointmentExternalService appointmentExternalService,
-                                              ApplicationEventPublisher eventPublisher,
-                                              SecurityContextExtractor securityExtractor) {
+                                              AppointmentExternalService appointmentExternalService) {
         this.repository = repository;
         this.appointmentExternalService = appointmentExternalService;
-        this.eventPublisher = eventPublisher;
-        this.securityExtractor = securityExtractor;
     }
 
     @Override
-    public void registerClinicalHistory(ClinicalHistoryRequest request) {
+    public ClinicalHistoryResponse registerClinicalHistory(ClinicalHistoryRequest request) {
 
-        if (repository.existsByIdAppointment(request.appointmentId())) {
+        if (repository.existsByIdAppointment(request.idAppointment())) {
             throw new RuntimeException("Esta cita ya tiene una historia clínica registrada");
         }
 
-        ClinicalHistory save = repository.save(new ClinicalHistory(
-                request.patientId(),
-                request.appointmentId(),
-                request.attendedAt(),
-                request.doctorName(),
+        AppointmentExternalData appointmentData = appointmentExternalService
+                .getAppointmentData(request.idAppointment());
+
+        if (!appointmentData.state().equals("ATENDIDA")) {
+            throw new IllegalStateException("Solo se puede generar una historia clínica de una cita atendida");
+        }
+
+
+
+        ClinicalHistory clinicalHistory = new ClinicalHistory(
+                request.idAppointment(),
+                appointmentData.idDoctor(),
+                appointmentData.idPatient(),
+                appointmentData.date(),
                 request.description()
-        ));
-
-        String actorId = securityExtractor.currentActorId();
-        String actorRoles = securityExtractor.currentActorRoles();
-
-        eventPublisher.publishEvent(
-                ClinicalHistoryCreatedEvent.of(
-                        save.getId(),
-                        actorId,
-                        actorRoles,
-                        MDC.get("correlationId")
-                )
         );
+
+        ClinicalHistory saved = repository.save(clinicalHistory);
+
+        return toResponse(saved, appointmentData.doctorName());
     }
 
 
-    public Page<ClinicalHistoryResponse> getHistoryByPatient(
-            UUID idPatient,
-            Pageable pageable) {
-
-        return repository.findByIdPatient(idPatient, pageable)
+    @Override
+    public List<ClinicalHistoryResponse> getHistoryByPatient(UUID idPatient) {
+        return repository.findByIdPatient(idPatient)
+                .stream()
                 .map(ch -> {
-                    AppointmentExternalData appointmentData =
-                            appointmentExternalService
-                                    .getAppointmentData(ch.getIdAppointment());
-
+                    AppointmentExternalData appointmentData = appointmentExternalService
+                            .getAppointmentData(ch.getIdAppointment());
                     return toResponse(ch, appointmentData.doctorName());
-                });
+                })
+                .toList();
     }
 
     private ClinicalHistoryResponse toResponse(ClinicalHistory ch,
                                                String doctorName) {
         return new ClinicalHistoryResponse(
-                ch.getId(),
                 ch.getAttendedAt(),
                 doctorName,
                 ch.getDescription()

@@ -1,73 +1,91 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.ScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleValidationException;
-import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
+import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
 import jakarta.transaction.Transactional;
 
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 public class ScheduleService {
-    private final DoctorRepository doctorRepository;
+    private final ScheduleRepository scheduleRepository;
 
-    public ScheduleService(DoctorRepository doctorRepository) {
-        this.doctorRepository = doctorRepository;
+    public ScheduleService(ScheduleRepository scheduleRepository) {
+        this.scheduleRepository = scheduleRepository;
     }
 
-    // Metodo unico para actualizar y crear horarios
+    // Crear un horario para un doctor específico
     @Transactional
-    public void updateSchedule(
-            UUID doctorId,
-            ScheduleRequest request
-    ) {
-        Doctor doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
+    public Schedule addSchedule(Doctor doctor, Schedule schedule) {
+        if (doctor == null || doctor.getIdDoctor() == null) {
+            throw new DoctorScheduleValidationException("Doctor must be provided");
+        }
 
-        doctor.updateSchedule(
-                request.workday(),
-                request.startTime(),
-                request.endTime()
-        );
+        boolean alreadyExistsForWorkday = scheduleRepository.findByDoctor(doctor).stream()
+                .anyMatch(existing -> existing.getWorkday().equals(schedule.getWorkday()));
+        if (alreadyExistsForWorkday) {
+            throw new DoctorScheduleConflictException("A schedule for " + schedule.getWorkday() + " already exists");
+        }
 
-        doctorRepository.save(doctor);
+        schedule.setDoctor(doctor);
+        return scheduleRepository.save(schedule);
+    }
+
+    // Modificar el horario para un doctor en un día específico (Workday)
+    @Transactional
+    public Schedule updateScheduleByWorkday(Doctor doctor, Workday workday, Schedule newScheduleData) {
+        if (doctor == null || doctor.getIdDoctor() == null) {
+            throw new DoctorScheduleValidationException("Se debe seleccionar un doctor");
+        }
+
+        List<Schedule> schedules = scheduleRepository.findByDoctor(doctor);
+
+        Schedule existingSchedule = schedules.stream()
+                .filter(s -> s.getWorkday().equals(workday))
+                .findFirst()
+            .orElseThrow(() -> new DoctorScheduleNotFoundException("Schedule not found for this day"));
+
+        // Actualizamos los datos
+        existingSchedule.setStartTime(newScheduleData.getStartTime());
+        existingSchedule.setEndTime(newScheduleData.getEndTime());
+
+        return scheduleRepository.save(existingSchedule);
     }
 
     @Transactional
-    public void deleteScheduleByWorkday(UUID doctorId, Workday workday) {
-        Doctor doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-        doctor.removeSchedule(workday);
+    public void deleteScheduleByWorkday(Doctor doctor, Workday workday) {
+        if (doctor == null || doctor.getIdDoctor() == null) {
+            throw new IllegalArgumentException("Se debe seleccionar un doctor");
+        }
 
-        doctorRepository.save(doctor);
+        scheduleRepository.deleteByDoctorAndWorkday(doctor, workday);
     }
 
-    public List<Schedule> getSchedulesByDoctor(UUID doctorId) {
-        Doctor doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
-
-        return doctor.getSchedules().stream().toList();
+    public List<Schedule> getSchedulesByDoctor(Doctor doctor) {
+        if (doctor == null || doctor.getIdDoctor() == null) {
+            throw new DoctorScheduleValidationException("Se debe seleccionar un doctor");
+        }
+        return scheduleRepository.findByDoctor(doctor);
     }
 
-    public List<LocalTime> getAvailableIntervalsByWorkday(UUID doctorId, Workday workday) {
-        Doctor doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
+    public List<LocalTime> getAvailableIntervalsByWorkday(Doctor doctor, Workday workday) {
+        if (doctor == null || doctor.getIdDoctor() == null) {
+            throw new DoctorScheduleValidationException("Se debe seleccionar un doctor");
+        }
 
         int appointmentInterval = doctor.getAppointmentInterval();
         if (appointmentInterval <= 0) {
             throw new DoctorScheduleValidationException("El intervalo entre citas médicas debe ser mayor que 0");
         }
 
-        List<Schedule> schedules = doctor.getSchedules().stream()
+        List<Schedule> schedules = scheduleRepository.findByDoctor(doctor).stream()
                 .filter(schedule -> schedule.getWorkday().equals(workday))
                 .toList();
 

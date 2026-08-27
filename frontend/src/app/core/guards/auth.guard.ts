@@ -11,7 +11,7 @@ import { AuthGuardData, createAuthGuard } from 'keycloak-angular';
 const isAccessAllowed = async (
   route: ActivatedRouteSnapshot,
   state: RouterStateSnapshot,
-  authData: AuthGuardData
+  authData: AuthGuardData,
 ): Promise<boolean | UrlTree> => {
   const { authenticated, grantedRoles, keycloak } = authData;
   const router = inject(Router);

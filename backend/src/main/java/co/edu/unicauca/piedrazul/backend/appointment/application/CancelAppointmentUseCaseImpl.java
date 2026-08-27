@@ -3,7 +3,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.application;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.CancelAppointmentUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
-import co.edu.unicauca.piedrazul.backend.appointment.exception.*;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.CancelAppointmentNotAllowedException;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -17,15 +17,9 @@ public class CancelAppointmentUseCaseImpl implements CancelAppointmentUseCase {
     }
 
     @Override
-    public void cancel(UUID  appointmentId, UUID patientId) {
+    public void cancel(UUID  appointmentId) {
 
         Appointment appointment = appointmentRepository.findById(appointmentId);
-
-        if(patientId != null && !patientId.equals(appointment.getIdPatient())) {
-            throw new AppointmentAccessDeniedException(
-                    "El paciente con id " + patientId + " no puede cancelar la cita con id " + appointmentId
-            );
-        }
 
         // No se pueden cancelar citas pasadas (ya manejamos que sean ATENDIDA o NO_ASISTIO)
         //pero por doble seguridad

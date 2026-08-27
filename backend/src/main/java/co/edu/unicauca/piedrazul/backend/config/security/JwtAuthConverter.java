@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.config.security;
 
-import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
+import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;

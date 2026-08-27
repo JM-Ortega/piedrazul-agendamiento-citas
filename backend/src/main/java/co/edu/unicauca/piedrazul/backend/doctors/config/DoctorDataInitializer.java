@@ -1,15 +1,15 @@
 package co.edu.unicauca.piedrazul.backend.doctors.config;
 
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.ScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateScheduleRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.DocumentType;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
-import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
-import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
-import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
+import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
-import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
@@ -17,10 +17,11 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Collections;
 import java.util.List;
 
 @Component
-@Order(2)
+@Order(1)
 public class DoctorDataInitializer implements ApplicationRunner {
 
     private final DoctorRepository doctorRepository;
@@ -40,22 +41,21 @@ public class DoctorDataInitializer implements ApplicationRunner {
         userProvisioningApi.createUser(new CreateSystemUserPayload(
                         new CreateSystemUserRequest(
                                 "11000001",
-                                 IdentificationType.CEDULA,
                                 "Clara Inés",
                                 "Córdoba",
                                 "clara.cordoba@piedrazul.com",
-                                "3208337463",
                                 "Doctor123!"
                         ), new CreateDoctorRequest(
-                        List.of(SpecialtyCode.TERAPIA_NEURAL),
+                        DocumentType.CEDULA,
+                        "3208337463",
+                        List.of(Specialty.TERAPIA_NEURAL),
                         LocalDate.of(2026, 1, 1),
                         LocalDate.of(2026, 12, 31),
                         20,
-                        8,
-                        List.of(new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.LUNES),
-                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.MARTES),
-                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.JUEVES),
-                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.VIERNES))
+                        List.of(new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.LUNES),
+                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.MARTES),
+                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.JUEVES),
+                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.VIERNES))
                 ),
                         null,
                         List.of(Role.DOCTOR))
@@ -65,24 +65,23 @@ public class DoctorDataInitializer implements ApplicationRunner {
         userProvisioningApi.createUser(new CreateSystemUserPayload(
                 new CreateSystemUserRequest(
                         "11000002",
-                         IdentificationType.CEDULA,
                         "José Ignacio",
                         "García",
                         "jose.garcia@piedrazul.com",
-                        "3147826393",
                         "Doctor123!"
                 ),
                 new CreateDoctorRequest(
-                        List.of(SpecialtyCode.FISIOTERAPIA),
+                        DocumentType.CEDULA,
+                        "3147826393",
+                        List.of(Specialty.FISIOTERAPIA),
                         LocalDate.of(2026, 1, 1),
                         LocalDate.of(2026, 12, 31),
                         30,
-                        4,
                         List.of(
-                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.LUNES),
-                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.MARTES),
-                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.MIERCOLES),
-                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(10, 0, 0), Workday.VIERNES)
+                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.LUNES),
+                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.MARTES),
+                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.MIERCOLES),
+                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(10, 0, 0), Workday.VIERNES)
                         )
                 ),
                 null,
@@ -92,22 +91,21 @@ public class DoctorDataInitializer implements ApplicationRunner {
         userProvisioningApi.createUser(new CreateSystemUserPayload(
                 new CreateSystemUserRequest(
                         "11000003",
-                         IdentificationType.CEDULA,
                         "Ibis Ester",
                         "Peña",
                         "ibis.pena@piedrazul.com",
-                        "314738447",
                         "Doctor123!"
                 ),
                 new CreateDoctorRequest(
-                        List.of(SpecialtyCode.QUIROPRAXIA),
+                        DocumentType.CEDULA,
+                        "314738447",
+                        List.of(Specialty.QUIROPRAXIA),
                         LocalDate.of(2026, 1, 1),
                         LocalDate.of(2026, 3,1),
                         30,
-                        8,
                         List.of(
-                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(11, 0, 0), Workday.JUEVES),
-                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(10, 0, 0), Workday.VIERNES)
+                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(11, 0, 0), Workday.JUEVES),
+                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(10, 0, 0), Workday.VIERNES)
                         )
                 ),
                 null,
@@ -117,23 +115,22 @@ public class DoctorDataInitializer implements ApplicationRunner {
         userProvisioningApi.createUser(new CreateSystemUserPayload(
                 new CreateSystemUserRequest(
                         "11000004",
-                         IdentificationType.CEDULA,
                         "Rocío",
                         "Gómez",
                         "rocio.gomez@piedrazul.dev",
-                        "3147826393",
                         "Doctor123!"
                 ),
                 new CreateDoctorRequest(
-                        List.of(SpecialtyCode.MEDICINA_GENERAL),
+                        DocumentType.CEDULA,
+                        "3147826393",
+                        List.of(Specialty.MEDICINA_GENERAL),
                         LocalDate.of(2026, 1, 1),
                         LocalDate.of(2026, 12, 31),
                         10,
-                        4,
                         List.of(
-                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.MIERCOLES),
-                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.JUEVES),
-                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.VIERNES)
+                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.MIERCOLES),
+                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.JUEVES),
+                                new CreateScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.VIERNES)
                         )
                 ),
                 null,

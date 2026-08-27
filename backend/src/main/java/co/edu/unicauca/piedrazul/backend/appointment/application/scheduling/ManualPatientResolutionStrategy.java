@@ -1,43 +1,57 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application.scheduling;
 
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientRegistrationData;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientSnapshot;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientProvisioningPort;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.ResolvedPatient;
 
-/**
- * Resuelve el paciente de una cita agendada por personal de la clínica.
- *
- * <p>El agendamiento nunca crea cuentas ni modifica accesos: solo garantiza que
- * exista el paciente necesario para la cita.
- */
+import java.util.Optional;
+import java.util.UUID;
+
 public class ManualPatientResolutionStrategy implements PatientResolutionStrategy {
 
-    private final PatientProvisioningPort patientProvisioningPort;
+    private final PatientConsultPort patientConsultPort;
 
-    public ManualPatientResolutionStrategy(PatientProvisioningPort patientProvisioningPort) {
-        this.patientProvisioningPort = patientProvisioningPort;
+    public ManualPatientResolutionStrategy(PatientConsultPort patientConsultPort) {
+        this.patientConsultPort = patientConsultPort;
     }
 
     @Override
     public ResolvedPatient resolve(PatientSchedulingContext context) {
-        PatientSnapshot snapshot = patientProvisioningPort.resolveOrRegister(
-                new PatientRegistrationData(
-                        context.documentType(),
-                        context.documentNumber(),
-                        context.firstName(),
-                        context.lastName(),
-                        context.phone(),
-                        context.email(),
-                        context.gender(),
-                        context.birthDate(),
-                        context.guardianPhone()
-                )
+        Optional<PatientSnapshot> existingPatient = patientConsultPort.findByDocumentNumber(context.documentNumber());
+
+        if (existingPatient.isPresent()) {
+            PatientSnapshot snapshot = existingPatient.get();
+            return new ResolvedPatient(snapshot.idPatient(), snapshot.patientInfo());
+        }
+
+        // Mapeo a la entidad del dominio
+        PatientInfo patientInfo = PatientInfo.of(
+                context.documentType(),
+                context.documentNumber(),
+                context.firstName(),
+                context.lastName(),
+                context.phone(),
+                context.gender(),
+                context.birthDate(),
+                context.email(),
+                context.guardianPhone()
         );
 
-        // Los datos provienen de la persona ya registrada: si existía, los del
-        // formulario no la sobrescriben.
-        return new ResolvedPatient(snapshot.idPatient(), snapshot.patientInfo());
+        UUID idPatient = patientConsultPort.createPatient(new PatientRegistrationData(
+                context.documentType(),
+                context.documentNumber(),
+                context.firstName(),
+                context.lastName(),
+                context.phone(),
+                context.email(),
+                context.gender(),
+                context.birthDate(),
+                context.guardianPhone()
+        ));
+
+        return new ResolvedPatient(idPatient, patientInfo);
     }
 }

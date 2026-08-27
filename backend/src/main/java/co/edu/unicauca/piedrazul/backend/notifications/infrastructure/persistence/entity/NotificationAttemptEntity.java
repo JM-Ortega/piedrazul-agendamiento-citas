@@ -17,20 +17,14 @@ import java.util.UUID;
 @Entity
 @Table(
         name = "notification_attempts",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uq_notification_attempts_number",
-                        columnNames = {"notification_id", "channel", "attempt_number"}
-                )
-        },
         indexes = {
                 @Index(
-                        name = "idx_notification_attempts_notification_channel",
+                        name = "idx_attempt_notification_channel",
                         columnList = "notification_id, channel"
                 ),
                 @Index(
-                        name = "idx_notification_attempts_schedule",
-                        columnList = "schedule_id"
+                        name = "idx_attempt_provider_message_id",
+                        columnList = "provider_message_id"
                 )
         }
 )
@@ -38,11 +32,11 @@ public class NotificationAttemptEntity {
 
     @Id
     @Column(
-            name = "id",
+            name = "id_attempt",
             nullable = false,
             updatable = false
     )
-    private UUID id;
+    private UUID idAttempt;
 
     @Column(name = "notification_id", nullable = false)
     private UUID notificationId;
@@ -54,12 +48,13 @@ public class NotificationAttemptEntity {
     @Column(
             name = "channel",
             nullable = false,
-            length = 20
+            length = 40
     )
     private NotificationChannel channel;
 
     @Column(
             name = "provider_name",
+            nullable = false,
             length = 100
     )
     private String providerName;
@@ -71,24 +66,24 @@ public class NotificationAttemptEntity {
     @Column(
             name = "status",
             nullable = false,
-            length = 20
+            length = 40
     )
     private AttemptStatus status;
 
     @Enumerated(EnumType.STRING)
     @Column(
             name = "failure_type",
-            length = 20
+            length = 40
     )
     private FailureType failureType;
 
     @Column(name = "provider_message_id")
     private String providerMessageId;
 
-    @Column(name = "error_code", length = 100)
+    @Column(name = "error_code")
     private String errorCode;
 
-    @Column(name = "error_message", length = 500)
+    @Column(name = "error_message", length = 4000)
     private String errorMessage;
 
     @Column(name = "sent_at")

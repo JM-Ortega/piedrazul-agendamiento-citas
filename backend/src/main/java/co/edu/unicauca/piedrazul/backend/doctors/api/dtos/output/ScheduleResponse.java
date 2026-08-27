@@ -16,8 +16,8 @@ public record ScheduleResponse(
     // Un método estático para convertir la entidad en DTO fácilmente
     public static ScheduleResponse fromEntity(Schedule schedule) {
         return new ScheduleResponse(
-                schedule.getId(),
-                schedule.getDoctor().getPersonId(),
+                schedule.getIdSchedule(),
+                schedule.getDoctor().getIdDoctor(),
                 schedule.getStartTime(),
                 schedule.getEndTime(),
                 schedule.getWorkday()

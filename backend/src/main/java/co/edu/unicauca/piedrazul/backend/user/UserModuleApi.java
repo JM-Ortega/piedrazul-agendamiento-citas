@@ -2,9 +2,7 @@ package co.edu.unicauca.piedrazul.backend.user;
 
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 
-import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,9 +13,7 @@ public interface UserModuleApi {
 
     List<UserSummary> findDoctors();
 
-    List<String> getUserRoles (UUID userId);
-
-    Map<UUID, List<String>> getUserRolesByIds(Collection<UUID> userIds);
+    List<String> getUserRoles(UUID userId);
 
     void ensureSchedulerRole(UUID userId);
 
@@ -27,9 +23,9 @@ public interface UserModuleApi {
 
     boolean existsById(UUID id);
 
-    void ensureDoctorRole(UUID id);
+    void activateUser(UUID id);
 
-    void revokeDoctorRole(UUID id);
+    void deactivateUser(UUID id);
 
     void ensurePatientRole(UUID userId);
 }

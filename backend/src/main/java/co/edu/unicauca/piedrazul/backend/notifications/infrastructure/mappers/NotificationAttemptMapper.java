@@ -14,7 +14,7 @@ public class NotificationAttemptMapper {
 
         NotificationAttemptEntity entity = new NotificationAttemptEntity();
 
-        entity.setId(attempt.getId());
+        entity.setIdAttempt(attempt.getId());
         entity.setNotificationId(attempt.getNotificationId());
         entity.setScheduleId(attempt.getScheduleId());
 
@@ -48,7 +48,7 @@ public class NotificationAttemptMapper {
         }
 
         return NotificationAttempt.reconstruct(
-                entity.getId(),
+                entity.getIdAttempt(),
                 entity.getNotificationId(),
                 entity.getScheduleId(),
                 entity.getChannel(),

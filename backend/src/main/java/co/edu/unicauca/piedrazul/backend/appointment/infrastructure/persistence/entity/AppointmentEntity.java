@@ -2,7 +2,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
-import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -16,26 +16,32 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "appointment", schema = "piedrazul")
+@Table(name = "appointment")
 public class AppointmentEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "id", updatable = false, nullable = false)
+    @Column(name = "id_appointment", updatable = false, nullable = false)
     private UUID idAppointment;
 
-    @Column(name = "doctor_id", nullable = false)
+    @Column(name = "id_doctor", nullable = false)
     private UUID idDoctor;
 
-    @Column(name = "patient_id", nullable = false)
+    @Column(name = "doctor_name", nullable = false)
+    private String doctorName;
+
+    @Column(name = "id_patient", nullable = true)
     private UUID idPatient;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "specialty_code", nullable = false, length = 40)
-    private SpecialtyCode specialty;
+    @Column(name = "patient_name", nullable = false)
+    private String patientName;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "state_code", nullable = false, length = 40)
+    @Column(name = "specialty", nullable = false)
+    private Specialty specialty;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "appot_state", nullable = false)
     private AppointmentState appointmentState;
 
     @Column(name = "date", nullable = false)
@@ -45,19 +51,8 @@ public class AppointmentEntity {
     private LocalTime startTime;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "scheduling_origin", nullable = false, length = 20)
+    @Column(name = "scheduling_origin", nullable = false)
     private SchedulingOrigin schedulingOrigin;
 
-    public AppointmentEntity(UUID idAppointment, UUID idDoctor, UUID idPatient, SpecialtyCode specialty,
-                             AppointmentState appointmentState, LocalDate date, LocalTime startTime,
-                             SchedulingOrigin schedulingOrigin) {
-        this.idAppointment = idAppointment;
-        this.idDoctor = idDoctor;
-        this.idPatient = idPatient;
-        this.specialty = specialty;
-        this.appointmentState = appointmentState;
-        this.date = date;
-        this.startTime = startTime;
-        this.schedulingOrigin = schedulingOrigin;
-    }
+
 }

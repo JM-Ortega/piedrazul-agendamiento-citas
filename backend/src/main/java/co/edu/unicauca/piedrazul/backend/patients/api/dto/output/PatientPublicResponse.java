@@ -1,57 +1,31 @@
 package co.edu.unicauca.piedrazul.backend.patients.api.dto.output;
 
-import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
+import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
 
-/**
- * Estado público de un documento frente al registro y la habilitación de acceso.
- *
- * <ul>
- *   <li>{@code patientExists}: existe {@code Patient}.</li>
- *   <li>{@code hasUserAccount}: {@code Person} tiene una cuenta vinculada.</li>
- *   <li>{@code hasSystemUser}: existe una cuenta para el documento en el
- *       proveedor de identidad, aunque no esté vinculada a {@code Person}.</li>
- *   <li>{@code hasPatientRole}: la cuenta vinculada posee el rol de paciente;
- *       si no hay cuenta vinculada, es {@code false}.</li>
- * </ul>
- */
 public record PatientPublicResponse(
-        String identificationType,
+        String documentType,
         String maskedDocument,
         String firstName,
         String lastName,
         boolean patientExists,
         boolean hasUserAccount,
-        boolean hasSystemUser,
-        boolean hasPatientRole
+        boolean hasSystemUser
 ) {
 
-    public static PatientPublicResponse from(PersonSummary person, boolean hasSystemUser, boolean hasPatientRole) {
+    // Caso: existe paciente en dominio
+    public static PatientPublicResponse from(Patient patient, boolean hasSystemUser) {
         return new PatientPublicResponse(
-                person.identificationType().toString(),
-                maskDocument(person.identification()),
-                person.firstName(),
-                person.lastName(),
+                patient.getDocumentType().toString(),
+                maskDocument(patient.getDocumentNumber()),
+                patient.getFirstName(),
+                patient.getLastName(),
                 true,
-                person.userId() != null,
-                hasSystemUser,
-                hasPatientRole
+                patient.hasUserAccount(),
+                hasSystemUser
         );
     }
 
-    public static PatientPublicResponse fromPersonWithoutPatient(
-            PersonSummary person, boolean hasSystemUser, boolean hasPatientRole) {
-        return new PatientPublicResponse(
-                person.identificationType().toString(),
-                maskDocument(person.identification()),
-                person.firstName(),
-                person.lastName(),
-                false,
-                person.userId() != null,
-                hasSystemUser,
-                hasPatientRole
-        );
-    }
-
+    // Caso: NO existe paciente pero sí existe usuario del sistema
     public static PatientPublicResponse fromSystemUserOnly(String documentNumber) {
         return new PatientPublicResponse(
                 null,
@@ -60,8 +34,7 @@ public record PatientPublicResponse(
                 null,
                 false,
                 false,
-                true,
-                false
+                true
         );
     }
 

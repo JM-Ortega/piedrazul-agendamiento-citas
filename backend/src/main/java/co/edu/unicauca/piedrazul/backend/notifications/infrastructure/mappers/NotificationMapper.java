@@ -4,6 +4,7 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.model.AggregateRef
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.Notification;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.RecipientSnapshot;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.persistence.entity.NotificationEntity;
+import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.util.NotificationMaskingUtil;
 import org.springframework.stereotype.Component;
 
 import java.util.Locale;
@@ -18,16 +19,25 @@ public class NotificationMapper {
 
         NotificationEntity entity = new NotificationEntity();
 
-        entity.setId(notification.getId());
+        entity.setIdNotification(notification.getId());
         entity.setType(notification.getType());
         entity.setAggregateType(notification.getAggregate().type());
         entity.setAggregateId(notification.getAggregate().id());
 
         entity.setRecipientId(notification.getRecipient().recipientId());
+        entity.setRecipientType(notification.getRecipient().recipientType());
         entity.setRecipientName(notification.getRecipient().displayName());
         entity.setRecipientPhoneE164(notification.getRecipient().phoneE164());
         entity.setRecipientEmail(notification.getRecipient().email());
         entity.setRecipientLocale(notification.getRecipient().locale().toLanguageTag());
+
+        entity.setRecipientContactMasked(
+                NotificationMaskingUtil.maskRecipient(
+                        notification.getRecipient().phoneE164(),
+                        notification.getRecipient().email(),
+                        notification.getRecipient().displayName()
+                )
+        );
 
         entity.setChannelPreference(notification.getChannelPreference());
         entity.setVariables(notification.getVariables());
@@ -51,6 +61,7 @@ public class NotificationMapper {
 
         RecipientSnapshot recipient = new RecipientSnapshot(
                 entity.getRecipientId(),
+                entity.getRecipientType(),
                 entity.getRecipientName(),
                 entity.getRecipientPhoneE164(),
                 entity.getRecipientEmail(),
@@ -59,7 +70,7 @@ public class NotificationMapper {
         );
 
         return Notification.reconstruct(
-                entity.getId(),
+                entity.getIdNotification(),
                 entity.getType(),
                 aggregate,
                 recipient,

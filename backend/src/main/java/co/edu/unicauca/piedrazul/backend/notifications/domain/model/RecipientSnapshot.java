@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record RecipientSnapshot(
         UUID recipientId,
+        RecipientType recipientType,
         String displayName,
         String phoneE164,
         String email,

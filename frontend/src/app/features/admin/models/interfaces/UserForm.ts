@@ -1,6 +1,6 @@
 export interface UserForm {
   documentId: string;
-  identificationType: string;
+  documentType: string;
   password: string;
   firstName: string;
   lastName: string;
@@ -9,9 +9,8 @@ export interface UserForm {
   specialty: string[];
   laborStart: string;
   laborEnd: string;
-  interval: number | null;
+  interval: number;
   workDays: number[];
   startTime: string;
   endTime: string;
-  bookingWindowWeeks: number | null;
 }

@@ -70,7 +70,7 @@ public class ReportService {
                             a.idAppointment(),
                             a.idPatient(),
                             a.patientFullName(),
-                            patient != null ? patient.identification() : "",
+                            patient != null ? patient.documentNumber() : "",
                             patient != null ? patient.phone() : "",
                             a.date(),
                             a.startTime(),

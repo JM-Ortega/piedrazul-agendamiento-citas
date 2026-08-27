@@ -1,12 +1,13 @@
 package co.edu.unicauca.piedrazul.backend.notifications.infrastructure.persistence.entity;
 
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.*;
-import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.persistence.converter.ChannelPreferenceConverter;
-import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.persistence.converter.VariablesConverter;
+import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.crypto.EncryptedStringConverter;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.Map;
@@ -17,34 +18,29 @@ import java.util.UUID;
 @NoArgsConstructor
 @Entity
 @Table(
-        name = "notification",
+        name = "notifications",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uq_notification_idempotency_key",
+                        name = "uk_notifications_idempotency_key",
                         columnNames = "idempotency_key"
                 )
-        },
-        indexes = {
-                @Index(name = "idx_notification_type", columnList = "type_code"),
-                @Index(name = "idx_notification_recipient", columnList = "recipient_id"),
-                @Index(name = "idx_notification_aggregate", columnList = "aggregate_id, aggregate_type")
         }
 )
 public class NotificationEntity {
 
     @Id
     @Column(
-            name = "id",
+            name = "id_notification",
             nullable = false,
             updatable = false
     )
-    private UUID id;
+    private UUID idNotification;
 
     @Enumerated(EnumType.STRING)
     @Column(
-            name = "type_code",
+            name = "type",
             nullable = false,
-            length = 60
+            length = 80
     )
     private NotificationType type;
 
@@ -52,7 +48,7 @@ public class NotificationEntity {
     @Column(
             name = "aggregate_type",
             nullable = false,
-            length = 40
+            length = 80
     )
     private AggregateType aggregateType;
 
@@ -65,36 +61,49 @@ public class NotificationEntity {
     @Column(name = "recipient_id", nullable = false)
     private UUID recipientId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(
+            name = "recipient_type",
+            nullable = false,
+            length = 40
+    )
+    private RecipientType recipientType;
+
     @Column(
             name = "recipient_name",
-            nullable = false,
-            length = 200
+            nullable = false
     )
     private String recipientName;
 
-    @Column(name = "recipient_phone", length = 20)
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(name = "recipient_phone_encrypted")
     private String recipientPhoneE164;
 
-    @Column(name = "recipient_email", length = 255)
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(name = "recipient_email_encrypted")
     private String recipientEmail;
 
     @Column(
             name = "recipient_locale",
-            length = 10
+            nullable = false,
+            length = 20
     )
     private String recipientLocale;
 
-    @Convert(converter = ChannelPreferenceConverter.class)
+    @Column(name = "recipient_contact_masked")
+    private String recipientContactMasked;
+
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(
             name = "channel_preference_json",
-            columnDefinition = "TEXT"
+            columnDefinition = "jsonb"
     )
     private ChannelPreference channelPreference;
 
-    @Convert(converter = VariablesConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(
             name = "variables_json",
-            columnDefinition = "TEXT",
+            columnDefinition = "jsonb",
             nullable = false
     )
     private Map<String, String> variables;
@@ -103,7 +112,7 @@ public class NotificationEntity {
     @Column(
             name = "status",
             nullable = false,
-            length = 20
+            length = 40
     )
     private NotificationStatus status;
 

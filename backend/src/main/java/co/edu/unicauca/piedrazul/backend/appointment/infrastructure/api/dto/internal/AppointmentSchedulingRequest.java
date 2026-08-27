@@ -1,7 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
-import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -10,8 +11,11 @@ import java.util.UUID;
 // para crear una cita.
 public record AppointmentSchedulingRequest(
         UUID idDoctor,
+        String doctorName,
         UUID idPatient,
-        SpecialtyCode specialty,
+        String patientName,
+        PatientInfo patientInfo,
+        Specialty specialty,
         LocalDate date,
         AppointmentTime startTime
 ) {
