@@ -19,7 +19,7 @@ import { UserForm } from '../../../models/interfaces/UserForm';
 
 @Component({
   selector: 'app-create-user-confirm-modal',
-  templateUrl: './create-user-confirm-modal.component.html',
+  templateUrl: './createUserConfirmModal.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [

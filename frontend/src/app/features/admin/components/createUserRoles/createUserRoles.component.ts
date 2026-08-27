@@ -16,7 +16,7 @@ type Role = 'doctor' | 'scheduler';
 
 @Component({
   selector: 'app-create-user-roles',
-  templateUrl: './create-user-roles.component.html',
+  templateUrl: './createUserRoles.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [

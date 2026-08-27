@@ -36,7 +36,7 @@ import { AdminService } from '../../service/admin.service';
 
 @Component({
   selector: 'app-admin-doctors',
-  templateUrl: './admin-doctors.component.html',
+  templateUrl: './adminDoctors.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [

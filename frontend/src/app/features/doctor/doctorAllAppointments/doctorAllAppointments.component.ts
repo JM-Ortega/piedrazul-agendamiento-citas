@@ -53,7 +53,7 @@ interface ColumnDef {
 
 @Component({
   selector: 'app-doctor-all-appointments',
-  templateUrl: './doctor-all-appointments.component.html',
+  templateUrl: './doctorAllAppointments.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [

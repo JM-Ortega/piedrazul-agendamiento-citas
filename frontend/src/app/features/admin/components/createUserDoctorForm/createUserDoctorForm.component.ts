@@ -40,7 +40,7 @@ export interface SpecialtyOption {
  */
 @Component({
   selector: 'app-create-user-doctor-form',
-  templateUrl: './create-user-doctor-form.component.html',
+  templateUrl: './createUserDoctorForm.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [

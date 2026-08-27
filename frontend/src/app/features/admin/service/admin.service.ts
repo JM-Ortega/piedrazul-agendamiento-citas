@@ -8,7 +8,7 @@ import { CreateUserRequestDto } from '../models/dtos/CreateUserRequestDto';
 import { dtoSchedule } from '../models/dtos/schedule.dto';
 
 import { DoctorAdminDto } from '../models/dtos/DoctorAdminDto';
-import { SystemUser } from '../models/interfaces/system-user.model';
+import { SystemUser } from '../models/interfaces/systemUser.model';
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Injectable({ providedIn: 'root' })
@@ -67,7 +67,7 @@ export class AdminService {
       { params: { page, size, sort } }
     );
   }
-
+  //borra
   /**
    * Actualiza el intervalo entre citas (en minutos) de un médico.
    *
@@ -85,7 +85,7 @@ export class AdminService {
       { params: { appointmentInterval } }
     );
   }
-
+  //borra
   /**
    * Actualiza el rango de fechas del período laboral (fecha de inicio y
    * fin) durante el cual un médico está activo en el sistema.

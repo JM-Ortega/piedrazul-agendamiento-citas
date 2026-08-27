@@ -23,7 +23,7 @@ import {
 } from '../../../../design-system/molecules/sortControl/sortControl.component';
 import { PaginationMeta } from '../../../../shared/helpers/paginated-state';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
-import { SystemUser } from '../../models/interfaces/system-user.model';
+import { SystemUser } from '../../models/interfaces/systemUser.model';
 import { AdminService } from '../../service/admin.service';
 
 type UserType = 'both' | 'doctor' | 'scheduler';
@@ -38,7 +38,7 @@ interface UserStyle {
 
 @Component({
   selector: 'app-admin-users',
-  templateUrl: './admin-users.component.html',
+  templateUrl: './adminUsers.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [

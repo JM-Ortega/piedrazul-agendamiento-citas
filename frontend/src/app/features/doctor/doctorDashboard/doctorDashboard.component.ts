@@ -33,7 +33,7 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
 @Component({
   selector: 'app-doctor-dashboard',
-  templateUrl: './doctor-dashboard.component.html',
+  templateUrl: './doctorDashboard.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [

@@ -10,7 +10,7 @@ import { Doctor } from '../../../../../shared/models/interfaces/doctor.model';
 
 @Component({
   selector: 'app-admin-modals',
-  templateUrl: './admin-modals.component.html',
+  templateUrl: './adminModals.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideX, LucideSave, LucidePowerOff, ConfirmModalComponent],

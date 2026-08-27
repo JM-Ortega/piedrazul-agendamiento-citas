@@ -27,7 +27,7 @@ import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPip
 import {
   DoctorFormValidationService,
   FormErrors,
-} from '../../service/doctor-form-validation.service';
+} from '../../service/doctorFormValidation.service';
 
 export interface DoctorSaveEvent {
   form: Doctor;
@@ -43,7 +43,7 @@ export interface DoctorSaveEvent {
  */
 @Component({
   selector: 'app-doctor-edit-form',
-  templateUrl: './doctor-edit-form.component.html',
+  templateUrl: './doctorEditForm.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [

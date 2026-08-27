@@ -26,18 +26,18 @@ import {
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
-import { DoctorCardComponent } from '../../components/doctor-card/doctor-card.component';
+import { DoctorCardComponent } from '../../components/doctorCard/doctorCard.component';
 import {
   DoctorEditFormComponent,
   DoctorSaveEvent,
-} from '../../components/doctor-edit-form/doctor-edit-form.component';
-import { AdminModalsComponent } from '../../components/modals/modal-horarios/admin-modals.component';
+} from '../../components/doctorEditForm/doctorEditForm.component';
+import { AdminModalsComponent } from '../../components/modals/modalHorarios/adminModals.component';
 import { dtoSchedule } from '../../models/dtos/schedule.dto';
 import { AdminService } from '../../service/admin.service';
 
 @Component({
   selector: 'app-admin-config',
-  templateUrl: './admin-config.component.html',
+  templateUrl: './adminConfig.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [

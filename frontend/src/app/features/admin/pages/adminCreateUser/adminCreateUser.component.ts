@@ -35,15 +35,15 @@ import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPip
 import {
   CreateUserDoctorFormComponent,
   SpecialtyOption,
-} from '../../components/create-user-doctor-form/create-user-doctor-form.component';
-import { CreateUserRolesComponent } from '../../components/create-user-roles/create-user-roles.component';
-import { CreateUserConfirmModalComponent } from '../../components/modals/modal-create/create-user-confirm-modal.component';
+} from '../../components/createUserDoctorForm/createUserDoctorForm.component';
+import { CreateUserRolesComponent } from '../../components/createUserRoles/createUserRoles.component';
+import { CreateUserConfirmModalComponent } from '../../components/modals/modalCreate/createUserConfirmModal.component';
 import { CreateUserRequestDto } from '../../models/dtos/CreateUserRequestDto';
 import { DoctorFormData } from '../../models/interfaces/DoctorFormData';
 import { FormErrors } from '../../models/interfaces/FormErrors';
 import { UserForm } from '../../models/interfaces/UserForm';
 import { AdminService } from '../../service/admin.service';
-import { UserFormValidationService } from '../../service/user-form-validation.service';
+import { UserFormValidationService } from '../../service/userFormValidation.service';
 
 type Role = 'doctor' | 'scheduler';
 
@@ -74,7 +74,7 @@ type Role = 'doctor' | 'scheduler';
     ToSelectOptionsPipe,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './admin-create-user.component.html',
+  templateUrl: './adminCreateUser.component.html',
 })
 export class AdminCreateUserComponent implements OnInit {
   // ── Iconos ────────────────────────────────────────────────────────────────

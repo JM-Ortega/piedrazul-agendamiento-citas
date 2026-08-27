@@ -23,7 +23,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
  */
 @Component({
   selector: 'app-doctor-card',
-  templateUrl: './doctor-card.component.html',
+  templateUrl: './doctorCard.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [

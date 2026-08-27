@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/user")
 @PreAuthorize("hasRole('ADMIN')")
 @Tag(name = "Usuarios", description = "Operaciones de administración sobre usuarios del sistema")
-public class UserController {
+public class    UserController {
     private final CreateAccountUseCase createAccountUseCase;
     private final UserService userService;
 
