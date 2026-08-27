@@ -15,22 +15,20 @@ export class NuevaCitaService {
 
   getPatientByDocument(documentId: string): Observable<Patient | null> {
     return this.http.get<Patient>(
-      `${this.apiUrl}/patients/document/${documentId}`
+      `${this.apiUrl}/patients/document/${documentId}`,
     );
   }
 
   getPatientSuggestionsByDocument(
-    documentPrefix: string
+    documentPrefix: string,
   ): Observable<PatientSuggestion[]> {
     return this.http.get<PatientSuggestion[]>(
       `${this.apiUrl}/patients/search/by-document-prefix`,
-      { params: { documentPrefix } }
+      { params: { documentPrefix } },
     );
   }
 
-  getSpecialtiesWithDoctor(
-    patientId: string | null
-  ): Observable<SpecialtyDoctor[]> {
+  getSpecialtiesWithDoctor(patientId: string | null): Observable<SpecialtyDoctor[]> {
     const url = patientId
       ? `${this.apiUrl}/appointments/specialties-with-doctor?patientId=${patientId}`
       : `${this.apiUrl}/appointments/specialties-with-doctor`;
@@ -39,22 +37,22 @@ export class NuevaCitaService {
 
   getSpecialties(patientId: string | null): Observable<string[]> {
     const url = patientId
-      ? `${this.apiUrl}/doctor/patients/specialties?patientId=${patientId}`
-      : `${this.apiUrl}/doctor/patients/specialties`;
+      ? `${this.apiUrl}/doctor/doctors/patients/specialties?patientId=${patientId}`
+      : `${this.apiUrl}/doctor/doctors/patients/specialties`;
     return this.http.get<string[]>(url);
   }
 
   getDoctorsBySpecialty(specialty: string): Observable<SpecialtyDoctor[]> {
     return this.http.get<SpecialtyDoctor[]>(
-      `${this.apiUrl}/doctor/specialty/${specialty}`
+      `${this.apiUrl}/doctor/doctors/specialty/${specialty}`,
     );
   }
 
   getAvailableSlots(doctorId: string, date: string): Observable<string[]> {
     return this.http
-      .get<{ time: string }[]>(`${this.apiUrl}/appointments/available-slots`, {
-        params: { doctorId, date },
-      })
+      .get<
+        { time: string }[]
+      >(`${this.apiUrl}/appointments/available-slots`, { params: { doctorId, date } })
       .pipe(map((slots) => slots.map((s) => s.time)));
   }
 

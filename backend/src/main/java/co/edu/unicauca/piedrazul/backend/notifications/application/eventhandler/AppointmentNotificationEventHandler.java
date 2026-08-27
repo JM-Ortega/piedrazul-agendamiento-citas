@@ -9,6 +9,7 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.model.AggregateTyp
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.ChannelPreference;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.NotificationType;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.RecipientSnapshot;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.model.RecipientType;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.ReminderScheduleCalculator;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.modulith.events.ApplicationModuleListener;
@@ -46,6 +47,7 @@ public class AppointmentNotificationEventHandler {
 
         RecipientSnapshot recipient = new RecipientSnapshot(
                 event.patientId(),
+                RecipientType.PATIENT,
                 event.patientName(),
                 event.patientPhone(),
                 event.patientEmail(),

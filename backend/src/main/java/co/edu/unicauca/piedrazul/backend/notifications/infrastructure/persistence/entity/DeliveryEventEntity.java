@@ -23,14 +23,18 @@ import java.util.UUID;
                 @Index(
                         name = "idx_delivery_event_provider_message",
                         columnList = "provider_name, provider_message_id"
+                ),
+                @Index(
+                        name = "idx_delivery_event_provider_event",
+                        columnList = "provider_name, provider_event_id"
                 )
         }
 )
 public class DeliveryEventEntity {
 
     @Id
-    @Column(name = "id", nullable = false, updatable = false)
-    private UUID id;
+    @Column(name = "id_delivery_event", nullable = false, updatable = false)
+    private UUID idDeliveryEvent;
 
     @Column(name = "attempt_id", nullable = false)
     private UUID attemptId;
@@ -44,20 +48,20 @@ public class DeliveryEventEntity {
     @Column(name = "provider_event_id")
     private String providerEventId;
 
-    @Column(name = "event_type", nullable = false, length = 100)
+    @Column(name = "event_type", nullable = false)
     private String eventType;
 
-    @Column(name = "raw_status", nullable = false, length = 100)
+    @Column(name = "raw_status", nullable = false)
     private String rawStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "normalized_status", nullable = false, length = 20)
+    @Column(name = "normalized_status", nullable = false, length = 40)
     private AttemptStatus normalizedStatus;
 
-    @Column(name = "payload_json", columnDefinition = "TEXT")
+    @Column(name = "payload_json", columnDefinition = "jsonb")
     private String payloadJson;
 
-    @Column(name = "event_timestamp", nullable = false)
+    @Column(name = "event_timestamp")
     private Instant eventTimestamp;
 
     @Column(name = "received_at", nullable = false)

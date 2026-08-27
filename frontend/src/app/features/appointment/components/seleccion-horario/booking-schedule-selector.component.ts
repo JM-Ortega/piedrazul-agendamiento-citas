@@ -1,23 +1,15 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  signal,
-  inject,
-  output,
-} from '@angular/core';
-import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
-import { DateAdapter } from '@angular/material/core';
+import { Component, computed, inject, output } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { MatNativeDateModule } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { LucideCalendar, LucideUserSearch } from '@lucide/angular';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
-import { CustomDateAdapter } from '../../../../design-system/molecules/datepicker/customDateAdapter';
-import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { LucideAngularModule, UserSearch, Calendar } from 'lucide-angular';
 import { BookingStateService } from '../../services/booking-state.service';
 import { CalendarService } from '../../services/calendar.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import {FormatoPipe} from "../../../../shared/pipes/formatoPipe";
 
 /**
  * Permite al usuario elegir una fecha y hora
@@ -31,21 +23,20 @@ import { AppError } from '../../../../shared/models/interfaces/api-error.model';
   standalone: true,
   imports: [
     CommonModule,
-    LucideUserSearch,
-    LucideCalendar,
+    FormsModule,
+    LucideAngularModule,
     MatDatepickerModule,
+    MatInputModule,
+    MatFormFieldModule,
     MatNativeDateModule,
     FormatoPipe,
-    ButtonComponent,
   ],
-  providers: [
-    { provide: MAT_DATE_LOCALE, useValue: 'es-CO' },
-    { provide: DateAdapter, useClass: CustomDateAdapter },
-  ],
-  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-schedule-selector.component.html',
 })
 export class BookingScheduleSelectorComponent {
+  readonly UserSearch = UserSearch;
+  readonly Calendar = Calendar;
+
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
   private calendarService = inject(CalendarService);
@@ -53,7 +44,6 @@ export class BookingScheduleSelectorComponent {
   // Estado local: errores y disponibilidad de slots
   noSlotsAvailable = false;
   errorMessageSlots = '';
-  globalErrorMessage = signal('');
 
   advance = output<void>();
   back = output<void>();
@@ -63,27 +53,21 @@ export class BookingScheduleSelectorComponent {
     if (!doctor) return () => false;
     return this.calendarService.buildDateFilter(
       doctor,
-      this.state.isSchedulerContext() || this.state.isDoctorContext()
+      this.state.isSchedulerContext() || this.state.isDoctorContext(),
     );
   });
 
-  readonly minDate = computed(() => {
-    const doctor = this.state.effectiveDoctor();
-    return this.calendarService.getMinDate(
-      doctor,
-      this.state.isSchedulerContext() || this.state.isDoctorContext()
-    );
-  });
+  readonly minDate = computed(() =>
+    this.calendarService.getMinDate(
+      this.state.isSchedulerContext() || this.state.isDoctorContext(),
+    ),
+  );
 
   readonly maxDate = computed(() => {
     const doctor = this.state.effectiveDoctor();
-    if (!doctor) return this.calendarService.getMinDate(doctor);
+    if (!doctor) return this.calendarService.getMinDate();
     return this.calendarService.getMaxDate(doctor);
   });
-
-  readonly startAt = computed(
-    () => this.state.selectedDate() ?? this.minDate()
-  );
 
   onDateSelected(date: Date | null): void {
     this.state.selectedDate.set(date);
@@ -91,7 +75,6 @@ export class BookingScheduleSelectorComponent {
     this.state.availableSlots.set([]);
     this.noSlotsAvailable = false;
     this.errorMessageSlots = '';
-    this.globalErrorMessage.set('');
 
     if (!date) return;
 
@@ -109,6 +92,7 @@ export class BookingScheduleSelectorComponent {
               slots = slots.filter((s) => s >= cutoffStr);
             }
           }
+
           this.state.availableSlots.set(slots);
           if (!slots || slots.length === 0) {
             this.noSlotsAvailable = true;
@@ -116,9 +100,18 @@ export class BookingScheduleSelectorComponent {
               'No hay horarios disponibles para esta fecha.';
           }
         },
-        error: (err: AppError) => {
+        error: (err) => {
           this.state.availableSlots.set([]);
-          this.globalErrorMessage.set(err.message);
+          this.noSlotsAvailable = true;
+
+          if (err.status === 0) {
+            this.errorMessageSlots =
+              'No se pudo conectar con el servidor. Intente más tarde.';
+            return;
+          }
+          const detail = err.error?.detail;
+          this.errorMessageSlots =
+            detail || 'Error al cargar los horarios disponibles.';
         },
       });
   }

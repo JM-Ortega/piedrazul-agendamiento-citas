@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
-import co.edu.unicauca.piedrazul.backend.appointment.exception.NoAvailableDoctorsException;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.NoAvailableDoctorsException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
@@ -16,7 +16,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,10 +58,9 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
 
     @Test
     void getSpecialtiesWithDoctorShouldThrowWhenNoActiveDoctors() {
-                when(isNewPatientUseCase.isNewPatient(anyPatient())).thenReturn(false);
-                when(doctorConfigConsultPort.getActiveDoctorIds()).thenReturn(List.of());
+        when(doctorConfigConsultPort.getActiveDoctorIds()).thenReturn(List.of());
 
-                assertThatThrownBy(() -> useCase.getSpecialtiesWithDoctor(anyPatient()))
+        assertThatThrownBy(() -> useCase.getSpecialtiesWithDoctor(UUID.randomUUID()))
                 .isInstanceOf(NoAvailableDoctorsException.class)
                 .hasMessageContaining("No hay medicos activos");
     }
@@ -74,22 +72,18 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
     @Test
     void getSpecialtiesWithDoctorShouldThrowWhenActiveDoctorsHaveNoSlots() {
         UUID idDoctor = UUID.randomUUID();
-        when(isNewPatientUseCase.isNewPatient(anyPatient())).thenReturn(false);
         when(doctorConfigConsultPort.getActiveDoctorIds()).thenReturn(List.of(idDoctor));
-        when(doctorConfigConsultPort.getBookingWindowWeeksByDoctorIds(List.of(idDoctor)))
-                .thenReturn(Map.of(idDoctor, 1));
-        when(doctorConfigConsultPort.getIntervalMinutesByDoctorIds(List.of(idDoctor)))
-                .thenReturn(Map.of(idDoctor, 30));
 
         // Sin slots configurados para ningún día del periodo
         when(doctorConfigConsultPort.getSlotsByDoctor(eq(idDoctor), any(LocalDate.class)))
                 .thenReturn(List.of());
         when(appointmentRepository.findByDoctorIdAndDate(eq(idDoctor), any(LocalDate.class)))
                 .thenReturn(List.of());
+        when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor)).thenReturn(30);
         when(slotTimeService.calculateAvailable(any(), any(), anyInt()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThatThrownBy(() -> useCase.getSpecialtiesWithDoctor(anyPatient()))
+        assertThatThrownBy(() -> useCase.getSpecialtiesWithDoctor(UUID.randomUUID()))
                 .isInstanceOf(NoAvailableDoctorsException.class)
                 .hasMessageContaining("No hay medicos con espacios disponibles");
     }
@@ -102,35 +96,27 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
     void getSpecialtiesWithDoctorShouldReturnDoctorWhenHasAvailableSlots() {
         UUID idDoctor = UUID.randomUUID();
         DoctorResponse doctorInfo = new DoctorResponse(
-                List.of("FISIOTERAPIA"),
-                idDoctor,
-                "Dr. Lopez",
-                LocalDate.now().plusMonths(6),
-                LocalDate.now(),
-                2,
-                List.of(1, 2, 3)
+                "FISIOTERAPIA", idDoctor, "Dr. Lopez",
+                LocalDate.now().plusMonths(6), List.of(1, 2, 3)
         );
 
-        when(isNewPatientUseCase.isNewPatient(anyPatient())).thenReturn(false);
         when(doctorConfigConsultPort.getActiveDoctorIds()).thenReturn(List.of(idDoctor));
-        when(doctorConfigConsultPort.getBookingWindowWeeksByDoctorIds(List.of(idDoctor)))
-                .thenReturn(Map.of(idDoctor, 1));
-        when(doctorConfigConsultPort.getIntervalMinutesByDoctorIds(List.of(idDoctor)))
-                .thenReturn(Map.of(idDoctor, 30));
+        // Tiene slots disponibles al menos un día laborable
         when(doctorConfigConsultPort.getSlotsByDoctor(eq(idDoctor), any(LocalDate.class)))
                 .thenReturn(List.of(new AppointmentTime(LocalTime.of(9, 0))));
         when(appointmentRepository.findByDoctorIdAndDate(eq(idDoctor), any(LocalDate.class)))
                 .thenReturn(List.of());
+        when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor)).thenReturn(30);
         when(slotTimeService.calculateAvailable(any(), any(), anyInt()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(doctorConfigConsultPort.getDoctorInfoByIds(List.of(idDoctor)))
                 .thenReturn(List.of(doctorInfo));
 
-        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor(anyPatient());
+        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor(UUID.randomUUID());
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().id()).isEqualTo(idDoctor);
-        assertThat(result.getFirst().specialty()).containsExactly("FISIOTERAPIA");
+        assertThat(result.getFirst().specialty()).isEqualTo("FISIOTERAPIA");
     }
 
     @Test
@@ -138,19 +124,15 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
         UUID idDoctor1 = UUID.randomUUID(); // pocos slots
         UUID idDoctor2 = UUID.randomUUID(); // muchos slots
 
-        when(isNewPatientUseCase.isNewPatient(anyPatient())).thenReturn(false);
         when(doctorConfigConsultPort.getActiveDoctorIds())
                 .thenReturn(List.of(idDoctor1, idDoctor2));
-        when(doctorConfigConsultPort.getBookingWindowWeeksByDoctorIds(List.of(idDoctor1, idDoctor2)))
-                .thenReturn(Map.of(idDoctor1, 1, idDoctor2, 1));
-        when(doctorConfigConsultPort.getIntervalMinutesByDoctorIds(List.of(idDoctor1, idDoctor2)))
-                .thenReturn(Map.of(idDoctor1, 30, idDoctor2, 30));
 
         // Doctor 1 — 1 slot disponible
         when(doctorConfigConsultPort.getSlotsByDoctor(eq(idDoctor1), any(LocalDate.class)))
                 .thenReturn(List.of(new AppointmentTime(LocalTime.of(9, 0))));
         when(appointmentRepository.findByDoctorIdAndDate(eq(idDoctor1), any(LocalDate.class)))
                 .thenReturn(List.of());
+        when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor1)).thenReturn(30);
 
         // Doctor 2 — 3 slots disponibles
         when(doctorConfigConsultPort.getSlotsByDoctor(eq(idDoctor2), any(LocalDate.class)))
@@ -161,26 +143,17 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
                 ));
         when(appointmentRepository.findByDoctorIdAndDate(eq(idDoctor2), any(LocalDate.class)))
                 .thenReturn(List.of());
+        when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor2)).thenReturn(30);
         when(slotTimeService.calculateAvailable(any(), any(), anyInt()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         DoctorResponse response1 = new DoctorResponse(
-                List.of("FISIOTERAPIA"),
-                idDoctor1,
-                "Dr. Lopez",
-                LocalDate.now().plusMonths(6),
-                LocalDate.now(),
-                2,
-                List.of(1)
+                "FISIOTERAPIA", idDoctor1, "Dr. Lopez",
+                LocalDate.now().plusMonths(6), List.of(1)
         );
         DoctorResponse response2 = new DoctorResponse(
-                List.of("QUIROPRAXIA"),
-                idDoctor2,
-                "Dr. Gomez",
-                LocalDate.now().plusMonths(6),
-                LocalDate.now(),
-                2,
-                List.of(1, 2)
+                "QUIROPRAXIA", idDoctor2, "Dr. Gomez",
+                LocalDate.now().plusMonths(6), List.of(1, 2)
         );
 
         // El usecase ordena por slots desc antes de pedir info
@@ -188,7 +161,7 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
         when(doctorConfigConsultPort.getDoctorInfoByIds(List.of(idDoctor2, idDoctor1)))
                 .thenReturn(List.of(response2, response1));
 
-        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor(anyPatient());
+        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor(UUID.randomUUID());
 
         // El primero debe ser el que tiene más slots
         assertThat(result.getFirst().id()).isEqualTo(idDoctor2);
@@ -199,91 +172,37 @@ class GetSpecialtiesWithDoctorUseCaseImplTest {
         UUID idDoctor1 = UUID.randomUUID();
         UUID idDoctor2 = UUID.randomUUID();
 
-        when(isNewPatientUseCase.isNewPatient(anyPatient())).thenReturn(false);
         when(doctorConfigConsultPort.getActiveDoctorIds())
                 .thenReturn(List.of(idDoctor1, idDoctor2));
-        when(doctorConfigConsultPort.getBookingWindowWeeksByDoctorIds(List.of(idDoctor1, idDoctor2)))
-                .thenReturn(Map.of(idDoctor1, 1, idDoctor2, 1));
-        when(doctorConfigConsultPort.getIntervalMinutesByDoctorIds(List.of(idDoctor1, idDoctor2)))
-                .thenReturn(Map.of(idDoctor1, 30, idDoctor2, 30));
 
         // Ambos tienen slots
         when(doctorConfigConsultPort.getSlotsByDoctor(any(UUID.class), any(LocalDate.class)))
                 .thenReturn(List.of(new AppointmentTime(LocalTime.of(9, 0))));
         when(appointmentRepository.findByDoctorIdAndDate(any(UUID.class), any(LocalDate.class)))
                 .thenReturn(List.of());
+        when(doctorConfigConsultPort.getIntervalMinutesByDoctor(any(UUID.class))).thenReturn(30);
         when(slotTimeService.calculateAvailable(any(), any(), anyInt()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         // Ambos tienen la misma especialidad
         DoctorResponse response1 = new DoctorResponse(
-                List.of("FISIOTERAPIA"),
-                idDoctor1,
-                "Dr. Lopez",
-                LocalDate.now().plusMonths(6),
-                LocalDate.now(),
-                2,
-                List.of(1)
+                "FISIOTERAPIA", idDoctor1, "Dr. Lopez",
+                LocalDate.now().plusMonths(6), List.of(1)
         );
         DoctorResponse response2 = new DoctorResponse(
-                List.of("FISIOTERAPIA"),
-                idDoctor2,
-                "Dr. Gomez",
-                LocalDate.now().plusMonths(6),
-                LocalDate.now(),
-                2,
-                List.of(1)
+                "FISIOTERAPIA", idDoctor2, "Dr. Gomez",
+                LocalDate.now().plusMonths(6), List.of(1)
         );
 
         when(doctorConfigConsultPort.getDoctorInfoByIds(any()))
                 .thenReturn(List.of(response1, response2));
 
-        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor(anyPatient());
+        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor(UUID.randomUUID());
 
         // Solo debe aparecer una vez FISIOTERAPIA
         assertThat(result).hasSize(1);
-        assertThat(result.getFirst().specialty()).containsExactly("FISIOTERAPIA");
-    }
-
-    @Test
-    void getSpecialtiesWithDoctorShouldUseOnlyGeneralDoctorsForNewPatient() {
-        UUID generalDoctorId = UUID.randomUUID();
-
-        when(isNewPatientUseCase.isNewPatient(anyPatient())).thenReturn(true);
-        when(doctorConfigConsultPort.getActiveGeneralDoctorIds()).thenReturn(List.of(generalDoctorId));
-        when(doctorConfigConsultPort.getBookingWindowWeeksByDoctorIds(List.of(generalDoctorId)))
-                .thenReturn(Map.of(generalDoctorId, 1));
-        when(doctorConfigConsultPort.getIntervalMinutesByDoctorIds(List.of(generalDoctorId)))
-                .thenReturn(Map.of(generalDoctorId, 30));
-        when(doctorConfigConsultPort.getSlotsByDoctor(eq(generalDoctorId), any(LocalDate.class)))
-                .thenReturn(List.of(new AppointmentTime(LocalTime.of(8, 0))));
-        when(appointmentRepository.findByDoctorIdAndDate(eq(generalDoctorId), any(LocalDate.class)))
-                .thenReturn(List.of());
-        when(slotTimeService.calculateAvailable(any(), any(), anyInt()))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-
-        DoctorResponse doctorInfo = new DoctorResponse(
-                List.of("MEDICINA_GENERAL"),
-                generalDoctorId,
-                "Dr. General",
-                LocalDate.now().plusMonths(6),
-                LocalDate.now(),
-                2,
-                List.of(1, 2, 3)
-        );
-
-        when(doctorConfigConsultPort.getDoctorInfoByIds(List.of(generalDoctorId)))
-                .thenReturn(List.of(doctorInfo));
-
-        List<DoctorResponse> result = useCase.getSpecialtiesWithDoctor(anyPatient());
-
-        assertThat(result).hasSize(1);
-        assertThat(result.getFirst().id()).isEqualTo(generalDoctorId);
-        assertThat(result.getFirst().specialty()).containsExactly("MEDICINA_GENERAL");
-    }
-
-    private UUID anyPatient() {
-        return UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        assertThat(result.stream().map(DoctorResponse::specialty).distinct().count())
+                .isEqualTo(1);
     }
 
 }

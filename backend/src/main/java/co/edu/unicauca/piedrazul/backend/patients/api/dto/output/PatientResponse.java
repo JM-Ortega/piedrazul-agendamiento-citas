@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.patients.api.dto.output;
 
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientSex;
-import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -10,38 +10,38 @@ public class PatientResponse {
 
     private final UUID id;
     private final UUID userId;
-    private final IdentificationType identificationType;
-    private final String identification;
+    private final PatientDocumentType documentType;
+    private final String documentNumber;
     private final String firstName;
     private final String lastName;
     private final String phone;
     private final String email;
-    private final PatientSex sex;
+    private final PatientGender gender;
     private final LocalDate birthDate;
     private final String guardianPhone;
 
     public PatientResponse(
             UUID id,
             UUID userId,
-            IdentificationType identificationType,
-            String identification,
+            PatientDocumentType documentType,
+            String documentNumber,
             String firstName,
             String lastName,
             String phone,
             String email,
-            PatientSex sex,
+            PatientGender gender,
             LocalDate birthDate,
             String guardianPhone
     ) {
         this.id = id;
         this.userId = userId;
-        this.identificationType = identificationType;
-        this.identification = identification;
+        this.documentType = documentType;
+        this.documentNumber = documentNumber;
         this.firstName = firstName;
         this.lastName = lastName;
         this.phone = phone;
         this.email = email;
-        this.sex = sex;
+        this.gender = gender;
         this.birthDate = birthDate;
         this.guardianPhone = guardianPhone;
     }
@@ -54,12 +54,12 @@ public class PatientResponse {
         return userId;
     }
 
-    public IdentificationType getIdentificationType() {
-        return identificationType;
+    public PatientDocumentType getDocumentType() {
+        return documentType;
     }
 
-    public String getIdentification() {
-        return identification;
+    public String getDocumentNumber() {
+        return documentNumber;
     }
 
     public String getFirstName() {
@@ -78,8 +78,8 @@ public class PatientResponse {
         return email;
     }
 
-    public PatientSex getSex() {
-        return sex;
+    public PatientGender getGender() {
+        return gender;
     }
 
     public LocalDate getBirthDate() {

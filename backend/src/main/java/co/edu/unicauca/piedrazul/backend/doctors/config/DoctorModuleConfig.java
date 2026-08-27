@@ -6,8 +6,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.application.ScheduleService;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
-import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.SpecialtyRepository;
-import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
+import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -23,8 +22,8 @@ public class DoctorModuleConfig {
      * Bean para ScheduleService
      */
     @Bean
-    public ScheduleService scheduleService(DoctorRepository doctorRepository) {
-        return new ScheduleService(doctorRepository);
+    public ScheduleService scheduleService(ScheduleRepository scheduleRepository) {
+        return new ScheduleService(scheduleRepository);
     }
 
     /**
@@ -33,12 +32,10 @@ public class DoctorModuleConfig {
     @Bean
     public DoctorService doctorService(
             DoctorRepository doctorRepository,
-            AppointmentExternalService appointmentExternalService,
-            PersonExternalService personExternalService,
-            SpecialtyRepository specialtyRepository
+            UserModuleApi userModuleApi,
+            AppointmentExternalService appointmentExternalService
     ) {
-        return new DoctorService(doctorRepository, appointmentExternalService, personExternalService,
-                specialtyRepository);
+        return new DoctorService(doctorRepository, userModuleApi, appointmentExternalService);
     }
 
     /**
@@ -47,10 +44,9 @@ public class DoctorModuleConfig {
     @Bean
     public DoctorExternalServiceImpl doctorExternalServiceImpl(
             DoctorRepository doctorRepository,
-            ScheduleService scheduleService,
-            PersonExternalService personExternalService
+            ScheduleService scheduleService
     ) {
-        return new DoctorExternalServiceImpl(doctorRepository, scheduleService, personExternalService);
+        return new DoctorExternalServiceImpl(doctorRepository, scheduleService);
     }
 }
 

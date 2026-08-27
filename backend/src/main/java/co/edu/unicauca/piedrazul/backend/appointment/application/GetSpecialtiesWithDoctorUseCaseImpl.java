@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
+import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.NoAvailableDoctorsException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetSpecialtiesWithDoctorUseCase;
@@ -8,9 +9,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.Appointm
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
-import co.edu.unicauca.piedrazul.backend.appointment.exception.*;
-import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
-import jakarta.annotation.Nullable;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -35,54 +33,33 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
         this.isNewPatientUseCase = isNewPatientUseCase;
     }
 
-    /**
-     * El parametro puede ser null porque si el paciente es nuevo y por lo tanto no esta registrado en la base de datos
-     * no va a tener patient id
-     * @param patientId
-     * @return Lista de doctores con capacidad de agendamiento asignados a cada especialidad
-     */
     @Override
-    public List<DoctorResponse> getSpecialtiesWithDoctor(@Nullable UUID patientId) {
+    public List<DoctorResponse> getSpecialtiesWithDoctor(UUID patientId) {
         LocalDate from = LocalDate.now();
+        LocalDate to = from.plusMonths(1);
 
-        boolean generalOnly = isNewPatientUseCase.isNewPatient(patientId);
+        List<UUID> activeDoctorIds;
 
-        List<UUID> activeDoctorIds = generalOnly
-                ? getActiveGeneralDoctorsOrThrow()
-                : getActiveDoctorsOrThrow();
-
-        Map<UUID, Integer> availability = calculateAvailability(activeDoctorIds, from);
-        List<UUID> orderedDoctors = sortDoctorsByAvailability(availability);
-        Map<UUID, DoctorResponse> doctorMap = loadAndNormalizeDoctors(orderedDoctors);
-
-        if (generalOnly) {
-            return orderedDoctors.stream()
-                    .map(doctorMap::get)
-                    .filter(Objects::nonNull)
-                    .map(this::restrictToGeneralMedicine)
-                    .toList();
+        if(isNewPatientUseCase.isNewPatient(patientId)){
+            activeDoctorIds = getActiveGeneralDoctorsOrThrow();
+        }else{
+            activeDoctorIds = getActiveDoctorsOrThrow();
         }
 
-        return selectUniqueSpecialties(orderedDoctors, doctorMap);
-    }
+        Map<UUID, Integer> availability = calculateAvailability(activeDoctorIds, from, to);
 
-    private DoctorResponse restrictToGeneralMedicine(DoctorResponse doctor) {
-        return new DoctorResponse(
-                List.of(SpecialtyCode.MEDICINA_GENERAL.name()),
-                doctor.id(),
-                doctor.name(),
-                doctor.laborEnd(),
-                doctor.laborStart(),
-                doctor.bookingWindowWeeks(),
-                doctor.workdays()
-        );
+        List<UUID> orderedDoctors = sortDoctorsByAvailability(availability);
+
+        Map<UUID, DoctorResponse> doctorMap = loadAndNormalizeDoctors(orderedDoctors);
+
+        return selectUniqueSpecialties(orderedDoctors, doctorMap);
     }
 
     private List<UUID> getActiveDoctorsOrThrow() {
         List<UUID> doctors = doctorConfigConsultPort.getActiveDoctorIds();
 
         if (doctors.isEmpty()) {
-            throw new NoAvailableDoctorsException("No hay médicos activos disponibles");
+            throw new NoAvailableDoctorsException("No hay medicos activos con disponibilidad.");
         }
 
         return doctors;
@@ -92,36 +69,15 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
         List<UUID> doctors = doctorConfigConsultPort.getActiveGeneralDoctorIds();
 
         if (doctors.isEmpty()) {
-            throw new NoAvailableDoctorsException("No hay médicos activos disponibles");
+            throw new NoAvailableDoctorsException("No hay medicos activos con disponibilidad.");
         }
 
         return doctors;
     }
 
-    private Map<UUID, Integer> calculateAvailability(List<UUID> doctorIds, LocalDate from) {
-
-        Map<UUID, Integer> bookingWindowWeeks =
-                doctorConfigConsultPort.getBookingWindowWeeksByDoctorIds(doctorIds);
-        Map<UUID, Integer> intervalMinutes =
-                doctorConfigConsultPort.getIntervalMinutesByDoctorIds(doctorIds);
-
-        for (UUID doctorId : doctorIds) {
-            if (!bookingWindowWeeks.containsKey(doctorId)) {
-                throw new DoctorConfigInconsistentException(
-                        "No se encontró bookingWindowWeeks para el doctor: " + doctorId);
-            }
-            if (!intervalMinutes.containsKey(doctorId)) {
-                throw new DoctorConfigInconsistentException(
-                        "No se encontró appointmentInterval para el doctor: " + doctorId);
-            }
-        }
-
+    private Map<UUID, Integer> calculateAvailability(List<UUID> doctorIds, LocalDate from, LocalDate to) {
         Map<UUID, Integer> result = doctorIds.stream()
-                .map(id -> {
-                    LocalDate to = from.plusWeeks(bookingWindowWeeks.get(id));
-                    int interval = intervalMinutes.get(id);
-                    return Map.entry(id, countAvailableSlotsForPeriod(id, from, to, interval));
-                })
+                .map(id -> Map.entry(id, countAvailableSlotsForPeriod(id, from, to)))
                 .filter(entry -> entry.getValue() > 0)
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
@@ -159,21 +115,34 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
         return orderedDoctorIds.stream()
                 .map(doctorMap::get)
                 .filter(Objects::nonNull)
-                .flatMap(doctor -> doctor.specialty().stream()
-                        .filter(usedSpecialties::add)
-                        .map(specialty -> new DoctorResponse(
-                                List.of(specialty),
-                                doctor.id(),
-                                doctor.name(),
-                                doctor.laborEnd(),
-                                doctor.laborStart(),
-                                doctor.bookingWindowWeeks(),
-                                doctor.workdays()
-                        )))
+                .map(doctor -> buildDoctorWithUniqueSpecialty(doctor, usedSpecialties))
+                .filter(Objects::nonNull)
                 .toList();
     }
 
-    private int countAvailableSlotsForPeriod(UUID doctorId, LocalDate from, LocalDate to, int interval) {
+    private DoctorResponse buildDoctorWithUniqueSpecialty(
+            DoctorResponse doctor,
+            Set<String> usedSpecialties) {
+
+        return extractSpecialties(doctor.specialty()).stream()
+                .filter(s -> !usedSpecialties.contains(s))
+                .findFirst()
+                .map(specialty -> {
+                    usedSpecialties.add(specialty);
+                    return new DoctorResponse(
+                            specialty,
+                            doctor.id(),
+                            doctor.name(),
+                            doctor.laborEnd(),
+                            doctor.workdays()
+                    );
+                })
+                .orElse(null);
+    }
+
+    private int countAvailableSlotsForPeriod(UUID doctorId, LocalDate from, LocalDate to) {
+        int interval = doctorConfigConsultPort.getIntervalMinutesByDoctor(doctorId);
+
         return from.datesUntil(to.plusDays(1))
                 .filter(this::isWeekday)
                 .mapToInt(date -> safeCountSlotsForDay(doctorId, date, interval))
@@ -208,19 +177,27 @@ public class GetSpecialtiesWithDoctorUseCaseImpl implements GetSpecialtiesWithDo
                 .sorted()
                 .toList();
 
-        List<String> specialties = Optional.ofNullable(doctor.specialty()).orElse(List.of());
-        List<String> normalizedSpecialties = specialties.isEmpty()
-                ? List.of("SIN_ESPECIALIDAD")
-                : specialties; // se conservan TODAS, no solo la primera
+        List<String> specialties = extractSpecialties(doctor.specialty());
+
+        String mainSpecialty = specialties.isEmpty()
+                ? "SIN_ESPECIALIDAD"
+                : specialties.getFirst();
 
         return new DoctorResponse(
-                normalizedSpecialties,
+                mainSpecialty,
                 doctor.id(),
                 doctor.name(),
                 doctor.laborEnd(),
-                doctor.laborStart(),
-                doctor.bookingWindowWeeks(),
                 workdays
         );
+    }
+
+    private List<String> extractSpecialties(String raw) {
+        if (raw == null || raw.isBlank()) return List.of();
+
+        return Arrays.stream(raw.replace("[", "").replace("]", "").split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .toList();
     }
 }

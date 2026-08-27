@@ -1,13 +1,14 @@
-<div class="min-h-screen bg-blue-50 py-8">
-  <div class="max-w-3xl mx-auto">
+<div class="min-h-screen bg-blue-50 py-8 px-4">
+  <div class="max-w-2xl mx-auto">
+
     <div class="mb-6">
-      <app-button
-        variant="link"
-        (buttonClick)="goBack()"
-        extraClass="!px-0 !py-1"
+      <button
+        (click)="goBack()"
+        class="flex items-center gap-2 text-[#215c98] text-lg hover:text-[#4e92d9] mb-4 transition-colors cursor-pointer"
       >
-        <svg lucideArrowLeft [size]="20"></svg>Volver al inicio
-      </app-button>
+        <lucide-angular [img]="ArrowLeft" [size]="20"></lucide-angular>
+         Volver al inicio
+      </button>
       <h1 class="text-[#215c98] text-3xl font-bold">Nueva Cita</h1>
       <p class="text-gray-500 text-lg mt-1">Agende una cita médica</p>
     </div>
@@ -16,7 +17,9 @@
       context="patient"
       [patientData]="patientSnapshot()"
       [isNewPatient]="isNewPatient()"
+      (appointmentConfirmed)="onAppointmentConfirmed($event)"
       (goBack)="goBack()"
     ></app-appointment-booking>
+
   </div>
 </div>

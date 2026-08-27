@@ -1,32 +1,22 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  Input,
-  inject,
-  output,
-  signal,
-} from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Component, inject, OnDestroy, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideCheckCircle, LucideSearch } from '@lucide/angular';
+import { CheckCircle, LucideAngularModule, Search } from 'lucide-angular';
 import {
   debounceTime,
   distinctUntilChanged,
   of,
   Subject,
   switchMap,
+  takeUntil,
 } from 'rxjs';
-import { catchError, filter, tap } from 'rxjs/operators';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
-import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { PatientSuggestion } from '../../models/dtos/patient-suggestion.dto';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import {FormatoPipe} from "../../../../shared/pipes/formatoPipe";
 
 const MIN_CHARS = 3;
-const MAX_DOC_LENGTH = 20;
+const MAX_DOC_LENGTH = 12;
 const MIN_DOC_LENGTH = 6;
 
 /**
@@ -36,26 +26,15 @@ const MIN_DOC_LENGTH = 6;
 @Component({
   selector: 'app-booking-patient-search',
   standalone: true,
-  imports: [
-    FormsModule,
-    LucideCheckCircle,
-    LucideSearch,
-    FormatoPipe,
-    ButtonComponent,
-  ],
-  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [FormsModule, LucideAngularModule, FormatoPipe],
   templateUrl: './booking-patient-search.component.html',
 })
-export class BookingPatientSearchComponent {
+export class BookingPatientSearchComponent implements OnDestroy {
+  readonly CheckCircle = CheckCircle;
+  readonly Search = Search;
+
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
-
-  /** Si llega un valor, precarga el documento y dispara la búsqueda exacta automáticamente. */
-  @Input() set prefillDocument(value: string) {
-    if (!value) return;
-    this.state.searchQuery.set(value);
-    this.onSearchExact();
-  }
 
   patientConfirmed = output<void>();
   patientMissing = output<void>();
@@ -66,34 +45,29 @@ export class BookingPatientSearchComponent {
   private docWarnTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly searchInput$ = new Subject<string>();
+  private readonly destroy$ = new Subject<void>();
 
   constructor() {
     this.searchInput$
       .pipe(
         debounceTime(300),
         distinctUntilChanged(),
-        // si no cumple los caracteres mínimos, no pasa al switchMap
-        filter((query) => query.trim().length >= MIN_CHARS),
-        // Activar loader antes de lanzar la petición
-        tap(() => {
+        switchMap((query) => {
+          const trimmed = query.trim();
+
+          if (trimmed.length < MIN_CHARS) {
+            this.state.searchSuggestions.set([]);
+            this.state.searchLoading.set(false);
+            this.showSuggestions.set(false);
+            return of([] as PatientSuggestion[]);
+          }
+
           this.state.searchLoading.set(true);
           this.state.searchError.set('');
-          this.state.globalErrorMessage.set('');
+
+          return this.citaService.getPatientSuggestionsByDocument(trimmed);
         }),
-        switchMap((query) =>
-          this.citaService.getPatientSuggestionsByDocument(query.trim()).pipe(
-            catchError((err: AppError) => {
-              this.state.searchLoading.set(false);
-              if (err.errorCode === 'PATIENT_NOT_FOUND') {
-                this.state.searchError.set(err.message);
-              } else {
-                this.state.globalErrorMessage.set(err.message);
-              }
-              return of([] as PatientSuggestion[]);
-            })
-          )
-        ),
-        takeUntilDestroyed()
+        takeUntil(this.destroy$),
       )
       .subscribe({
         next: (suggestions) => {
@@ -101,43 +75,32 @@ export class BookingPatientSearchComponent {
           this.state.searchSuggestions.set(suggestions);
           this.showSuggestions.set(suggestions.length > 0);
         },
+        error: () => {
+          this.state.searchLoading.set(false);
+        },
       });
   }
 
-  /**
-   * Sanea el número de documento mientras se escribe: filtra caracteres
-   * no alfanuméricos y limita la longitud máxima, mostrando un aviso
-   * temporal si el usuario intentó algo fuera de esas reglas.
-   *
-   * @param event - Evento desencadenado al escribir en el input.
-   */
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
   handleDocInput(event: Event): void {
     const el = event.target as HTMLInputElement;
     const raw = el.value;
-    // 1. Limpieza de caracteres especiales
-    let clean = raw.replace(/[^a-zA-Z0-9]/g, '');
+    const clean = raw.replace(/[^a-zA-Z0-9]/g, '');
     if (clean !== raw) {
       el.value = clean;
       this.flashWarning(
-        'Solo se permiten letras y números, sin caracteres especiales'
+        'Solo se permiten letras y números, sin caracteres especiales',
       );
     }
-    // 2. Control de longitud máxima
     if (clean.length > MAX_DOC_LENGTH) {
-      clean = clean.slice(0, MAX_DOC_LENGTH);
-      el.value = clean;
+      el.value = clean.slice(0, MAX_DOC_LENGTH);
       this.flashWarning(`Solo se permiten máximo ${MAX_DOC_LENGTH} caracteres`);
     }
-    // 3. Actualización de Estados y Signals
-    this.state.searchQuery.set(clean);
-    this.state.searchError.set('');
-    this.clearResult();
-    // 4. Lógica de sugerencias
-    if (clean.trim().length < MIN_CHARS) {
-      this.state.searchSuggestions.set([]);
-      this.showSuggestions.set(false);
-    }
-    this.searchInput$.next(clean);
+    this.onQueryChange(el.value);
   }
 
   private flashWarning(text: string): void {
@@ -146,11 +109,25 @@ export class BookingPatientSearchComponent {
     this.docWarnTimer = setTimeout(() => this.docInputWarning.set(''), 3000);
   }
 
+  onQueryChange(value: string): void {
+    const clean = value.replace(/[^a-zA-Z0-9]/g, '').slice(0, MAX_DOC_LENGTH);
+    this.state.searchQuery.set(clean);
+    this.state.searchError.set('');
+    this.clearResult();
+
+    if (clean.trim().length < MIN_CHARS) {
+      this.state.searchSuggestions.set([]);
+      this.showSuggestions.set(false);
+    }
+
+    this.searchInput$.next(clean);
+  }
+
   onSearchExact(): void {
     const query = this.state.searchQuery().trim();
     if (query.length < MIN_DOC_LENGTH) {
       this.state.searchError.set(
-        `El documento debe tener al menos ${MIN_DOC_LENGTH} caracteres alfanuméricos.`
+        `El documento debe tener al menos ${MIN_DOC_LENGTH} caracteres alfanuméricos.`,
       );
       return;
     }
@@ -162,8 +139,8 @@ export class BookingPatientSearchComponent {
   selectSuggestion(suggestion: PatientSuggestion): void {
     this.showSuggestions.set(false);
     this.state.searchSuggestions.set([]);
-    this.state.searchQuery.set(suggestion.identification);
-    this.loadPatientByDocument(suggestion.identification);
+    this.state.searchQuery.set(suggestion.documentNumber);
+    this.loadPatientByDocument(suggestion.documentNumber);
   }
 
   closeSuggestions(): void {
@@ -179,18 +156,10 @@ export class BookingPatientSearchComponent {
     this.changeMode.emit();
   }
 
-  /**
-   * Busca un paciente por documento exacto. Si no existe
-   * se emite evento para registrar al paciente.
-   * Cualquier otro error se muestra tal cual lo resuelve el interceptor.
-   *
-   * @param identification - Número de documento a buscar.
-   */
-  private loadPatientByDocument(identification: string): void {
+  private loadPatientByDocument(documentNumber: string): void {
     this.state.searchLoading.set(true);
     this.state.searchError.set('');
-    this.state.globalErrorMessage.set('');
-    this.citaService.getPatientByDocument(identification).subscribe({
+    this.citaService.getPatientByDocument(documentNumber).subscribe({
       next: (patient: Patient | null) => {
         this.state.searchLoading.set(false);
         if (patient) {
@@ -198,26 +167,29 @@ export class BookingPatientSearchComponent {
           this.state.patientId.set(patient.id);
           this.state.notFound.set(false);
         } else {
-          this.handleNotFound(identification);
+          this.handleNotFound(documentNumber);
         }
       },
-      error: (err: AppError) => {
+      error: (err) => {
         this.state.searchLoading.set(false);
-        if (err.errorCode === 'PATIENT_NOT_FOUND') {
-          this.handleNotFound(identification);
-          return;
+        if (err.status === 404) {
+          this.handleNotFound(documentNumber);
+        } else if (err.status === 0) {
+          this.state.searchError.set(
+            'No se pudo conectar con el servidor. Intente más tarde.',
+          );
         } else {
-          this.state.globalErrorMessage.set(err.message);
+          this.state.searchError.set('Error al buscar el paciente.');
         }
       },
     });
   }
 
-  private handleNotFound(identification: string): void {
+  private handleNotFound(documentNumber: string): void {
     this.state.foundPatient.set(null);
     this.state.notFound.set(true);
     this.state.patientId.set(null);
-    this.state.patientForm.update((f) => ({ ...f, identification }));
+    this.state.patientForm.update((f) => ({ ...f, documentNumber }));
     this.patientMissing.emit();
   }
 

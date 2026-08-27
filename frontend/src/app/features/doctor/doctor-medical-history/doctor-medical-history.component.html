@@ -1,16 +1,21 @@
 <div class="min-h-screen bg-blue-50 py-8 px-6">
   <div class="max-w-6xl mx-auto">
+
+    <!-- Header: volver + título -->
     <div class="mb-6">
+      <button (click)="handleBack()"
+        class="flex items-center gap-2 text-[#215c98] text-lg hover:text-[#4e92d9] mb-4 transition-colors cursor-pointer">
+        <lucide-angular [img]="ArrowLeft" [size]="20"></lucide-angular>
+        volver al inicio
+      </button>
       <div class="flex items-center gap-3">
-        <svg lucideClipboardPen [size]="40" class="text-[#163c63]"></svg>
+        <lucide-angular [img]="ClipboardPen" [size]="40" class="text-[#163c63]"></lucide-angular>
         <h3 class="text-2xl font-bold text-[#163c63]">Historia Clínica</h3>
       </div>
     </div>
 
     @if (!patient()) {
-      <div
-        class="bg-red-50 border border-red-300 text-red-700 px-6 py-4 rounded-xl"
-      >
+      <div class="bg-red-50 border border-red-300 text-red-700 px-6 py-4 rounded-xl">
         Paciente no encontrado.
       </div>
     }
@@ -18,8 +23,10 @@
     @if (patient()) {
       <!-- Layout de dos columnas -->
       <div class="flex flex-col lg:flex-row gap-6 items-start">
+
         <!-- Columna izquierda (más ancha): info paciente + nueva observación -->
         <div class="w-full lg:w-7/12 space-y-6">
+
           <!-- Info paciente -->
           <div class="bg-white rounded-2xl shadow-md p-6">
             <div class="flex items-center justify-between flex-wrap gap-3">
@@ -30,147 +37,149 @@
 
               <button
                 (click)="toggleInfo()"
-                class="flex items-center gap-1.5 text-sm font-medium text-[#215c98] border border-[#215c98]/30 rounded-lg px-3 py-1.5 hover:bg-[#215c98]/8 hover:border-[#215c98]/60 transition-all duration-200 select-none cursor-pointer"
+                class="flex items-center gap-1.5 text-sm font-medium text-[#215c98] border border-[#215c98]/30
+                      rounded-lg px-3 py-1.5 hover:bg-[#215c98]/8 hover:border-[#215c98]/60
+                      transition-all duration-200 select-none cursor-pointer"
               >
-                <span>{{
-                  mostrarInfo() ? 'Ocultar' : 'Ver más información'
-                }}</span>
+                <span>{{ mostrarInfo() ? 'Ocultar' : 'Ver más información' }}</span>
                 <svg
                   class="w-3.5 h-3.5 transition-transform duration-200"
                   [class.rotate-180]="mostrarInfo()"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
+                  viewBox="0 0 20 20" fill="currentColor"
                 >
-                  <path
-                    fill-rule="evenodd"
+                  <path fill-rule="evenodd"
                     d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-                    clip-rule="evenodd"
-                  />
+                    clip-rule="evenodd"/>
                 </svg>
               </button>
             </div>
 
             @if (mostrarInfo()) {
-              <div
-                class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 pt-4 border-t border-[#215c98]/15"
-              >
-                <p>
-                  <strong class="text-[#163c63]">Tipo de documento: </strong
-                  >{{ patient()!.identificationType | formato }}
-                </p>
-                <p>
-                  <strong class="text-[#163c63]">Documento: </strong
-                  >{{ patient()!.identification }}
-                </p>
-                <p>
-                  <strong class="text-[#163c63]">Género: </strong
-                  >{{ patient()!.sex | formato }}
-                </p>
-                <p>
-                  <strong class="text-[#163c63]">Teléfono: </strong
-                  >{{ patient()!.phone }}
-                </p>
-                <p>
-                  <strong class="text-[#163c63]">Correo electrónico: </strong
-                  >{{ patient()!.email || 'No registra' }}
-                </p>
-                <p>
-                  <strong class="text-[#163c63]"
-                    >Teléfono del acudiente: </strong
-                  >{{ patient()!.guardianPhone || 'No registra' }}
-                </p>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 pt-4 border-t border-[#215c98]/15">
+                <p><strong class="text-[#163c63]">Tipo de documento: </strong>{{ patient()!.documentType | formato }}</p>
+                <p><strong class="text-[#163c63]">Documento: </strong>{{ patient()!.documentNumber }}</p>
+                <p><strong class="text-[#163c63]">Género: </strong>{{ patient()!.gender | formato }}</p>
+                <p><strong class="text-[#163c63]">Teléfono: </strong>{{ patient()!.phone }}</p>
+                <p><strong class="text-[#163c63]">Correo electrónico: </strong>{{ patient()!.email || 'No registra' }}</p>
+                <p><strong class="text-[#163c63]">Teléfono del acudiente: </strong>{{ patient()!.guardianPhone || 'No registra' }}</p>
               </div>
             }
           </div>
 
           <!-- Nueva observación -->
           <div class="bg-white rounded-2xl shadow-md p-6">
-            <h5
-              class="flex items-center gap-2 text-lg font-semibold text-[#163c63] mb-4"
-            >
-              <svg lucideClipboardPlus [size]="30" class="text-[#163c63]"></svg>
+            <h5 class="flex items-center gap-2 text-lg font-semibold text-[#163c63] mb-4">
+              <lucide-angular [img]="ClipboardPlus" [size]="30" class="text-[#163c63]"></lucide-angular>
               Agregar Observación
             </h5>
             <textarea
               [value]="newObservation()"
-              (input)="onObservationChange($any($event.target).value)"
+              (input)="newObservation.set($any($event.target).value)"
               rows="3"
-              maxlength="300"
               placeholder="Escriba las observaciones de la consulta..."
-              class="w-full border-2 border-[#d9e9f8] focus:border-[#a7c9ec] rounded-xl px-4 py-3 outline-none transition-colors resize-none"
+              class="w-full border-2 border-[#d9e9f8] focus:border-[#a7c9ec] rounded-xl px-4 py-3 outline-none transition-colors mb-3 resize-none"
             ></textarea>
-            <p class="text-sm text-gray-500 text-right mb-3">
-              {{ remainingObservationChars() }} caracteres restantes
-            </p>
             @if (saveError()) {
-              <div
-                class="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-xl mb-3"
-              >
+              <div class="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-xl mb-3">
                 ⚠️ {{ saveError() }}
               </div>
             }
-            <app-button
-              variant="primary"
-              [disabled]="isSaving()"
-              (buttonClick)="confirmAttendanceAndExit()"
+            @if (saveSuccess()) {
+              <div class="bg-green-50 border border-green-300 text-green-700 px-4 py-3 rounded-xl mb-3">
+                ✅ {{ saveSuccess() }}
+              </div>
+            }
+            <button
+              (click)="addRecord()"
+              [disabled]="!newObservation().trim()"
+              class="flex items-center gap-2 bg-[#215c98] hover:bg-[#163c63] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl transition-colors"
             >
-              @if (isSaving()) {
-                <span
-                  class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
-                ></span>
-                Guardando...
-              } @else {
-                <svg lucideSave [size]="25" class="text-white"></svg>
-                Guardar y salir
-              }
-            </app-button>
+              <lucide-angular [img]="Save" [size]="30" class="text-white"></lucide-angular>
+              Guardar
+            </button>
           </div>
+
         </div>
 
         <!-- Columna derecha (más angosta): historial -->
-        <div
-          class="w-full lg:w-5/12 lg:max-h-[75vh] lg:overflow-y-auto lg:pr-1"
-        >
-          <h5
-            class="flex items-center gap-2 text-lg font-semibold text-[#163c63] mb-4"
-          >
-            <svg lucideFolderOpen [size]="30" class="text-[#163c63]"></svg>
+        <div class="w-full lg:w-5/12 lg:max-h-[75vh] lg:overflow-y-auto lg:pr-1">
+          <h5 class="flex items-center gap-2 text-lg font-semibold text-[#163c63] mb-4">
+            <lucide-angular [img]="FolderOpen" [size]="30" class="text-[#163c63]"></lucide-angular>
             Historial de Consultas
           </h5>
           @if (records().length === 0) {
-            <div
-              class="bg-blue-50 border border-blue-200 text-[#215c98] px-4 py-3 rounded-xl"
-            >
+            <div class="bg-blue-50 border border-blue-200 text-[#215c98] px-4 py-3 rounded-xl">
               Sin registros clínicos.
             </div>
           }
-          <app-pagination
-            [pagination]="medicalRecordsPagination()"
-            (pageChange)="onMedicalRecordsPageChange($event)"
-          ></app-pagination>
-          @for (r of records(); track r.idClinicalHistory) {
+          @for (r of records(); track r.attendedAt) {
             <div class="bg-white rounded-2xl shadow-md p-6 mb-3">
               <div class="flex flex-col gap-2 mb-1">
                 <span class="flex items-center gap-2 text-gray-700 text-sm">
-                  <svg lucideCalendar [size]="22" class="text-[#163c63]"></svg>
-                  <strong class="text-[#163c63]">Fecha:</strong
-                  >{{ r.attendedAt }}
+                  <lucide-angular [img]="Calendar" [size]="22" class="text-[#163c63]"></lucide-angular>
+                  <strong class="text-[#163c63]">Fecha:</strong>{{ r.attendedAt }}
                 </span>
-                <span
-                  class="flex items-center gap-2 text-gray-700 text-sm mt-2"
-                >
-                  <strong class="text-[#163c63]">Médico:</strong
-                  >{{ r.doctorName }}
+                <span class="flex items-center gap-2 text-gray-700 text-sm mt-2">
+                  <strong class="text-[#163c63]">Médico:</strong>{{ r.doctorName }}
                 </span>
               </div>
               <p class="text-gray-700">{{ r.description }}</p>
             </div>
           }
-          @if (isLoadingRecords()) {
-            <p class="text-sm text-gray-400 text-center mt-2">Cargando...</p>
-          }
         </div>
+
       </div>
     }
+
   </div>
 </div>
+
+<!-- Modal de confirmación de salida -->
+@if (showExitModal()) {
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+    (click)="cancelExit()"
+  >
+    <div
+      class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8"
+      (click)="$event.stopPropagation()"
+    >
+      <!-- Icono de advertencia -->
+      <div class="flex justify-center mb-5">
+        <div class="bg-amber-100 rounded-full p-4">
+          <svg class="w-10 h-10 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Título y mensaje -->
+      <h2 class="text-xl font-bold text-[#163c63] text-center mb-2">
+        ¿Salir sin guardar historial?
+      </h2>
+      <p class="text-gray-500 text-center text-sm leading-relaxed mb-6">
+        Aún no has agregado ningún registro clínico en esta consulta.
+        Si sales ahora, <span class="font-semibold text-amber-600">la cita quedará sin historial clínico registrado</span>.
+      </p>
+
+      <!-- Acciones -->
+      <div class="flex flex-col sm:flex-row gap-3">
+        <button
+          (click)="cancelExit()"
+          class="flex-1 px-4 py-3 rounded-xl border-2 border-[#215c98]/30 text-[#215c98] font-medium
+                 hover:bg-[#215c98]/8 hover:border-[#215c98]/60 transition-all duration-200 cursor-pointer"
+        >
+          Registrar historial
+        </button>
+        <button
+          (click)="confirmExit()"
+          class="flex-1 px-4 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-medium
+                 transition-colors duration-200 cursor-pointer"
+        >
+          Salir
+        </button>
+      </div>
+    </div>
+  </div>
+}

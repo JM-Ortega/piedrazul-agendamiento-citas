@@ -1,28 +1,27 @@
-import {
-  provideHttpClient,
-  withInterceptors,
-  withXhr,
-} from '@angular/common/http';
-import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideNativeDateAdapter } from '@angular/material/core';
+import {
+  ApplicationConfig,
+  importProvidersFrom,
+  provideZoneChangeDetection,
+} from '@angular/core';
 import { provideRouter } from '@angular/router';
+import { routes } from './app.routes';
+import { environment } from '../environments/environment';
 import {
-  LucideCircleCheck,
-  LucideSearch,
-  LucideStethoscope,
-  LucideUser,
-  LucideUserSearch,
-  provideLucideIcons,
-} from '@lucide/angular';
+  LucideAngularModule,
+  Search,
+  CheckCircle,
+  User,
+  Stethoscope,
+  UserSearch,
+} from 'lucide-angular';
 import {
+  provideKeycloak,
+  includeBearerTokenInterceptor,
   createInterceptorCondition,
   INCLUDE_BEARER_TOKEN_INTERCEPTOR_CONFIG,
-  includeBearerTokenInterceptor,
-  provideKeycloak,
 } from 'keycloak-angular';
-import { environment } from '../environments/environment';
-import { routes } from './app.routes';
-import { errorInterceptor } from './core/interceptors/error.interceptor';
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -36,14 +35,6 @@ const apiUrlCondition = createInterceptorCondition({
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideLucideIcons(
-      LucideSearch,
-      LucideCircleCheck,
-      LucideUser,
-      LucideStethoscope,
-      LucideUserSearch
-    ),
-
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
 
@@ -67,10 +58,17 @@ export const appConfig: ApplicationConfig = {
       useValue: [apiUrlCondition],
     },
 
-    provideHttpClient(
-      withXhr(),
-      withInterceptors([includeBearerTokenInterceptor, errorInterceptor])
-    ),
+    provideHttpClient(withInterceptors([includeBearerTokenInterceptor])),
     provideNativeDateAdapter(),
+
+    importProvidersFrom(
+      LucideAngularModule.pick({
+        Search,
+        CheckCircle,
+        User,
+        Stethoscope,
+        UserSearch,
+      })
+    ),
   ],
 };

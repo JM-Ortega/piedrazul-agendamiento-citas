@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.jackson.validation;
 
+import co.edu.unicauca.piedrazul.backend.jackson.validation.ValidDocument;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;

@@ -1,5 +1,6 @@
 export interface dtoDoctor {
   id: string;
   name: string;
-  specialties: string[];
+  specialty: string;
+  email?: string;
 }

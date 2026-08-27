@@ -2,110 +2,81 @@
   <h2 class="text-[#163c63] text-2xl mb-2">Seleccionar Horario</h2>
 
   @if (state.effectiveDoctor(); as doctor) {
-    <div class="flex items-center gap-2 text-lg text-gray-500">
-      <svg lucideUserSearch [size]="16"></svg>
+    <div class="flex items-center gap-2 text-sm text-gray-500">
+      <lucide-angular [img]="UserSearch" [size]="16"></lucide-angular>
       <span>{{ doctor.name }} · {{ state.selectedSpecialty() | formato }}</span>
     </div>
   }
 
-  <div
-    class="transition-all duration-500"
-    [ngClass]="{
-      'flex justify-center': !state.selectedDate() || noSlotsAvailable,
-      'grid grid-cols-1 lg:grid-cols-2 gap-8 items-start':
-        state.selectedDate() && !noSlotsAvailable,
-    }"
-  >
-    <div class="w-full">
-      <p class="text-gray-700 mb-2 font-medium">Fecha *</p>
-
-      @if (state.selectedDate()) {
-        <div
-          class="flex items-center gap-2 bg-[#e6f0fa] rounded-xl px-4 py-3 text-[#163c63] font-medium mb-4"
-        >
-          <svg lucideCalendar [size]="18"></svg>
-          {{ state.confirmDate() }}
-        </div>
-      }
-
-      @if (state.selectedDate() && noSlotsAvailable) {
-        <div
-          class="mt-4 mb-4 text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm"
-        >
-          ⚠️ {{ errorMessageSlots }}
-        </div>
-      }
-
-      <div
-        class="max-w-[340px] border-2 border-[#a7c9ec] rounded-2xl transition-all duration-500"
-        [ngClass]="{
-          'mx-auto': !state.selectedDate() || noSlotsAvailable,
-          'mx-0': state.selectedDate() && !noSlotsAvailable,
-        }"
-      >
-        <mat-calendar
-          [dateFilter]="dateFilter()"
-          [minDate]="minDate()"
-          [maxDate]="maxDate()"
-          [startAt]="startAt()"
-          [selected]="state.selectedDate()"
-          (selectedChange)="onDateSelected($event)"
-        >
-        </mat-calendar>
-      </div>
-
-      <p class="text-sm text-gray-500 mt-2">
-        Solo se muestran días hábiles del médico, excluyendo fines de semana y
-        festivos colombianos.
-      </p>
-    </div>
-
-    @if (state.selectedDate() && !noSlotsAvailable) {
-      <div class="animate-fade-in">
-        <fieldset class="border-0 p-0 m-0">
-          <legend class="block text-gray-700 mb-4 font-medium">Hora *</legend>
-          <div class="grid grid-cols-3 sm:grid-cols-4 gap-3">
-            @for (slot of state.availableSlots(); track slot) {
-              <button
-                type="button"
-                (click)="state.selectedTime.set(slot)"
-                class="py-3 rounded-xl border-2 text-base font-semibold transition-all duration-200 cursor-pointer"
-                [ngClass]="{
-                  'border-[#4e92d9] bg-[#4e92d9] text-white':
-                    state.selectedTime() === slot,
-                  'border-gray-200 hover:border-[#4e92d9] hover:bg-[#dbeafe] text-[#163c63]':
-                    state.selectedTime() !== slot,
-                }"
-              >
-                {{ slot.slice(0, 5) }}
-              </button>
-            }
-          </div>
-        </fieldset>
-      </div>
-    }
+  <div>
+    <label class="block text-gray-700 mb-2 font-medium">Fecha *</label>
+    <mat-form-field appearance="outline" class="w-full">
+      <input
+        matInput
+        [matDatepicker]="picker"
+        [matDatepickerFilter]="dateFilter()"
+        [min]="minDate()"
+        [max]="maxDate()"
+        [value]="state.selectedDate()"
+        (dateChange)="onDateSelected($event.value)"
+        placeholder="mm/dd/aaaa"
+        readonly
+      />
+      <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker #picker></mat-datepicker>
+    </mat-form-field>
+    <p class="text-xs text-gray-400 -mt-4">
+      Solo se muestran días hábiles del médico, excluyendo fines de semana y festivos colombianos.
+    </p>
   </div>
 
-  @if (this.globalErrorMessage()) {
-    <div
-      class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"
-    >
-      {{ this.globalErrorMessage() }}
+  @if (state.selectedDate()) {
+    <div class="flex items-center gap-2 bg-[#e6f0fa] rounded-xl px-4 py-3 text-[#163c63] font-medium">
+      <lucide-angular [img]="Calendar" [size]="18"></lucide-angular>
+       {{ state.confirmDate() }}
+    </div>
+  }
+
+  @if (state.availableSlots().length > 0) {
+    <div>
+      <label class="block text-gray-700 mb-2 font-medium">Hora *</label>
+      <div class="grid grid-cols-4 sm:grid-cols-5 gap-2">
+        @for (slot of state.availableSlots(); track slot) {
+          <button
+            (click)="state.selectedTime.set(slot)"
+            class="py-3 rounded-xl border-2 text-base font-semibold transition-colors cursor-pointer"
+            [ngClass]="{
+              'border-[#4e92d9] bg-[#a7c9ec] text-white': state.selectedTime() === slot,
+              'border-gray-200 hover:border-[#4e92d9] hover:bg-[#dbeafe] text-[#163c63]': state.selectedTime() !== slot
+            }"
+          >
+            {{ slot.slice(0, 5) }}
+          </button>
+        }
+      </div>
+    </div>
+  }
+
+  @if (state.selectedDate() && noSlotsAvailable) {
+    <div class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm">
+      ⚠️ {{ errorMessageSlots }}
     </div>
   }
 
   <div class="flex gap-4 mt-2">
-    <app-button variant="secondary" (buttonClick)="goBack()">
+    <button
+      (click)="goBack()"
+      class="border-2 border-gray-300 px-6 py-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+    >
       ← Atrás
-    </app-button>
-    <app-button
-      variant="primary"
+    </button>
+    <button
       [disabled]="!state.canGoToConfirmStep()"
-      (buttonClick)="goToConfirm()"
-      [fullWidth]="true"
-      class="flex-1"
+      (click)="goToConfirm()"
+      class="flex-1 bg-[#215c98] text-white py-3 rounded-xl disabled:opacity-50
+             hover:bg-[#163c63] transition-colors cursor-pointer"
     >
       Revisar Cita →
-    </app-button>
+    </button>
   </div>
 </div>

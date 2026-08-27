@@ -8,7 +8,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientC
 
 import java.util.List;
 import java.util.UUID;
-import co.edu.unicauca.piedrazul.backend.appointment.exception.*;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentPatientNotFoundException;
 
 public class ListMyAppointmentsUseCaseImpl implements ListMyAppointmentsUseCase {
 
@@ -23,7 +23,6 @@ public class ListMyAppointmentsUseCaseImpl implements ListMyAppointmentsUseCase 
         this.patientConsultPort = patientConsultPort;
     }
 
-    //Se busca el paciente a través de su id de usuario
     @Override
     public List<Appointment> execute(UUID userId) {
         PatientSnapshot patient = patientConsultPort.findByUserId(userId)

@@ -2,30 +2,30 @@ package co.edu.unicauca.piedrazul.backend.appointment.domain.model;
 
 public enum AppointmentState {
     AGENDADA{
-        @Override public boolean isBussy(){
+        @Override public boolean isActive(){
             return  true;
         }
     },
     ATENDIDA{
-        @Override public boolean isBussy(){
-            return  true;
+        @Override public boolean isActive(){
+            return  false;
         }
     },
     CANCELADA{
-        @Override public boolean isBussy(){
+        @Override public boolean isActive(){
             return  false;
         }
     },
     NO_ASISTIO{
-        @Override public boolean isBussy(){
+        @Override public boolean isActive(){
             return  false;
         }
     },
     REPROGRAMADA{
-        @Override public boolean isBussy(){
-            return  false;
+        @Override public boolean isActive(){
+            return  true;
         }
     };
 
-    public abstract boolean isBussy();
+    public abstract boolean isActive();
 }

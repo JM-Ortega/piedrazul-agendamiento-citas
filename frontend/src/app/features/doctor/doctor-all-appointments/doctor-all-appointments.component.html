@@ -4,63 +4,45 @@
     <h1 class="text-[#163c63] text-3xl font-bold mb-2">Todas Mis Citas</h1>
     <p class="text-gray-600 text-lg">Historial completo de sus citas médicas</p>
   </div>
-  <!-- Export Section -->
-  @if (hasAnyAppointments()) {
-    @if (hasTodayAppointments()) {
-      <div
-        class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200 mb-6"
-      >
-        <div
-          class="flex flex-col sm:flex-row items-center justify-between gap-4"
-        >
-          <div class="flex items-center gap-3">
-            <div class="bg-[#1f7a52] rounded-full p-3">
-              <svg lucideDownload class="text-white" [size]="28"></svg>
-            </div>
-            <div>
-              <h3 class="text-green-800 text-xl font-bold">
-                Exportar Reporte de Hoy
-              </h3>
-              <p class="text-green-600 text-sm flex items-center gap-1 mt-0.5">
-                <svg lucideCalendar [size]="14"></svg>
-                Solo se exportan las citas del día de hoy ({{
-                  formatDate(today)
-                }})
-              </p>
-            </div>
-          </div>
-          <button
-            (click)="showExportModal.set(true)"
-            class="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-colors shadow-lg cursor-pointer"
-          >
-            <svg lucideFileSpreadsheet [size]="24"></svg>
-            Exportar Citas
-          </button>
-        </div>
-      </div>
-    } @else {
-      <div
-        class="bg-gray-50 border-2 border-gray-200 rounded-2xl p-5 text-center mb-6"
-      >
-        <p class="text-gray-500 text-base">
-          No hay citas programadas para hoy, por lo que no es posible exportar
-          un reporte.
-        </p>
-      </div>
-    }
-  }
-  @if (errorCarga()) {
+
+  <!-- Statistics Cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
     <div
-      class="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-5 py-4 flex items-center gap-3 mb-6"
+      class="bg-linear-to-br from-[#215c98] to-[#4e92d9] text-white rounded-xl shadow-lg p-6"
     >
-      <svg lucideCalendar [size]="20" class="shrink-0"></svg>
-      <p class="text-base">{{ errorCarga() }}</p>
+      <p class="text-white text-sm uppercase tracking-wide mb-1">
+        Total de Citas
+      </p>
+      <p class="text-4xl font-bold text-white">
+        {{ stats().total }}
+      </p>
     </div>
-  }
+
+    <div
+      class="bg-linear-to-br from-[#1f7a52] to-[#45b884] text-white rounded-xl shadow-lg p-6"
+    >
+      <p class="text-white text-sm uppercase tracking-wide mb-1">
+        Próximas Citas
+      </p>
+      <p class="text-4xl font-bold text-white">
+        {{ stats().upcoming }}
+      </p>
+    </div>
+
+    <div
+      class="bg-linear-to-br from-[#b86a2d] to-[#e39a58] text-white rounded-xl shadow-lg p-6"
+    >
+      <p class="text-white text-sm uppercase tracking-wide mb-1">Atendidas</p>
+      <p class="text-4xl font-bold text-white">
+        {{ stats().pending }}
+      </p>
+    </div>
+  </div>
+
   <!-- Filters -->
   <div class="bg-white rounded-xl shadow-md border-2 border-blue-100 p-6 mb-6">
     <div class="flex items-center gap-2 mb-4 text-[#163c63]">
-      <svg lucideFilter [size]="20"></svg>
+      <lucide-angular [img]="Filter" [size]="20"></lucide-angular>
       <h3 class="text-lg font-semibold">Filtros</h3>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -114,26 +96,76 @@
     </div>
   </div>
 
+  <!-- Export Section -->
+  @if (hasAnyAppointments()) {
+    @if (hasTodayAppointments()) {
+      <div
+        class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200 mb-6"
+      >
+        <div
+          class="flex flex-col sm:flex-row items-center justify-between gap-4"
+        >
+          <div class="flex items-center gap-3">
+            <div class="bg-[#1f7a52] rounded-full p-3">
+              <lucide-angular
+                [img]="Download"
+                class="text-white"
+                [size]="28"
+              ></lucide-angular>
+            </div>
+            <div>
+              <h3 class="text-green-800 text-xl font-bold">
+                Exportar Reporte de Hoy
+              </h3>
+              <p class="text-green-600 text-sm flex items-center gap-1 mt-0.5">
+                <lucide-angular [img]="Calendar" [size]="14"></lucide-angular>
+                Solo se exportan las citas del día de hoy ({{
+                  formatDate(today)
+                }})
+              </p>
+              <p class="text-green-700 text-base font-medium mt-1">
+                Filtros activos aplicados al reporte
+              </p>
+            </div>
+          </div>
+          <button
+            (click)="showExportModal.set(true)"
+            class="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-colors shadow-lg cursor-pointer"
+          >
+            <lucide-angular
+              [img]="FileSpreadsheet"
+              [size]="24"
+            ></lucide-angular>
+            Exportar Citas
+          </button>
+        </div>
+      </div>
+    } @else {
+      <div
+        class="bg-gray-50 border-2 border-gray-200 rounded-2xl p-5 text-center mb-6"
+      >
+        <p class="text-gray-500 text-base">
+          No hay citas programadas para hoy, por lo que no es posible exportar
+          un reporte.
+        </p>
+      </div>
+    }
+  }
+
   <!-- Appointments List -->
   <div class="bg-white rounded-xl shadow-md border-2 border-blue-100 p-6">
-    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
-      <h2 class="text-[#163c63] text-xl font-semibold">
-        {{ filteredAppointments().length }}
-        {{ filteredAppointments().length === 1 ? 'Cita' : 'Citas' }}
-      </h2>
-      <app-pagination
-        [pagination]="pagination()"
-        (pageChange)="onPageChange($event)"
-      />
-    </div>
+    <h2 class="text-[#163c63] text-xl font-semibold mb-6">
+      {{ filteredAppointments().length }}
+      {{ filteredAppointments().length === 1 ? 'Cita' : 'Citas' }}
+    </h2>
 
     @if (filteredAppointments().length === 0) {
       <div class="text-center py-16">
-        <svg
-          lucideCalendar
-          [size]="64"
+        <lucide-angular
+          [img]="Calendar"
           class="mx-auto text-gray-300 mb-4"
-        ></svg>
+          [size]="64"
+        ></lucide-angular>
         <p class="text-gray-500 text-xl">
           No hay citas que coincidan con los filtros seleccionados
         </p>
@@ -174,7 +206,7 @@
                   <div
                     class="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-current/30"
                   >
-                    <svg lucideClock [size]="14"></svg>
+                    <lucide-angular [img]="Clock" [size]="14"></lucide-angular>
                     <span class="text-sm font-semibold">{{
                       apt.startTime.slice(0, 5)
                     }}</span>
@@ -187,11 +219,11 @@
                     {{ apt.patientFirstName }} {{ apt.patientLastName }}
                   </h3>
                   <div class="flex items-center gap-2 text-gray-700">
-                    <svg
-                      lucideCreditCard
+                    <lucide-angular
+                      [img]="CreditCard"
                       [size]="16"
                       class="text-[#4e92d9]"
-                    ></svg>
+                    ></lucide-angular>
                     <span class="text-[#163c63]"
                       >Doc: {{ apt.documentNumber }}</span
                     >
@@ -226,9 +258,9 @@
   @if (showExportModal()) {
     <app-export-modal
       [idDoctor]="currentDoctor()?.id ?? null"
+      [filterStatus]="filterStatus()"
       [doctorName]="currentDoctor()?.name ?? null"
       [todayFormatted]="formatDate(today)"
-      [appointments]="todayAppointmentsList()"
       (closed)="showExportModal.set(false)"
     />
   }

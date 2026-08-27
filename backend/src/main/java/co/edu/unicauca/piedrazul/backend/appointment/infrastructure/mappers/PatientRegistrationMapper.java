@@ -2,38 +2,36 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientSex;
-import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
 
 public final class PatientRegistrationMapper {
 
     private PatientRegistrationMapper() {
     }
 
-    public static IdentificationType mapDocumentType(DocumentType source) {
+    public static PatientDocumentType mapDocumentType(DocumentType source) {
         if (source == null) {
             return null;
         }
 
         return switch (source) {
-            case CEDULA -> IdentificationType.CEDULA;
-            case TARJETA_IDENTIDAD -> IdentificationType.TARJETA_IDENTIDAD;
-            case REGISTRO_NACIMIENTO -> IdentificationType.REGISTRO_NACIMIENTO;
-            case PASAPORTE -> IdentificationType.PASAPORTE;
+            case CEDULA -> PatientDocumentType.CEDULA;
+            case TARJETA_IDENTIDAD -> PatientDocumentType.TARJETA_IDENTIDAD;
+            case REGISTRO_NACIMIENTO -> PatientDocumentType.REGISTRO_NACIMIENTO;
+            case PASAPORTE -> PatientDocumentType.PASAPORTE;
         };
     }
 
-    public static PatientSex mapGender(Gender source) {
+    public static PatientGender mapGender(Gender source) {
         if (source == null) {
             return null;
         }
 
         return switch (source) {
-            case MASCULINO -> PatientSex.MASCULINO;
-            case FEMENINO -> PatientSex.FEMENINO;
-            case OTRO -> throw new IllegalArgumentException(
-                    "El valor de género OTRO ya no es soportado por el modelo de paciente"
-            );
+            case MASCULINO -> PatientGender.MASCULINO;
+            case FEMENINO -> PatientGender.FEMENINO;
+            case OTRO -> PatientGender.OTRO;
         };
     }
 }

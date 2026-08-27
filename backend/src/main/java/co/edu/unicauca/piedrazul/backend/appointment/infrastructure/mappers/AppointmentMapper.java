@@ -19,7 +19,9 @@ public class AppointmentMapper {
         //Mapeo los valores de la entidad de dominio a la entidad JPA
         appointmentEntity.setIdAppointment(appointment.getIdAppointment());
         appointmentEntity.setIdDoctor(appointment.getIdDoctor());
+        appointmentEntity.setDoctorName(appointment.getDoctorName());
         appointmentEntity.setIdPatient(appointment.getIdPatient());
+        appointmentEntity.setPatientName(appointment.getPatientName());
         appointmentEntity.setSpecialty(appointment.getSpecialty());
         appointmentEntity.setAppointmentState(appointment.getAppointmentState());
         appointmentEntity.setDate(appointment.getDate());
@@ -41,7 +43,10 @@ public class AppointmentMapper {
         return Appointment.reconstruct(
                 entity.getIdAppointment(),
                 entity.getIdDoctor(),
+                entity.getDoctorName(),
                 entity.getIdPatient(),
+                entity.getPatientName(),
+                null,
                 entity.getSpecialty(),
                 entity.getAppointmentState(),
                 entity.getDate(),

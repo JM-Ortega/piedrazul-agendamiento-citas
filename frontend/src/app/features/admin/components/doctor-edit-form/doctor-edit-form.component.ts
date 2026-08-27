@@ -1,5 +1,4 @@
 import {
-  ChangeDetectionStrategy,
   Component,
   computed,
   inject,
@@ -8,27 +7,20 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import {
-  LucideCalendar,
-  LucideChevronDown,
-  LucideChevronUp,
-  LucideClock,
-  LucideSave,
-} from '@lucide/angular';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
-import { InputComponent } from '../../../../design-system/atoms/input/input.component';
-import { SelectComponent } from '../../../../design-system/atoms/select/select.component';
-import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
-import { toIsoDateString } from '../../../../shared/helpers/transform-date-local';
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  LucideAngularModule,
+  Save,
+} from 'lucide-angular';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
-import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 import {
   DoctorFormValidationService,
   FormErrors,
 } from '../../service/doctor-form-validation.service';
-
 export interface DoctorSaveEvent {
   form: Doctor;
   originalDoctor: Doctor;
@@ -36,34 +28,21 @@ export interface DoctorSaveEvent {
   removedWorkdays: number[];
 }
 
-/**
- * Formulario de edición de un doctor existente. Clona `doctor` al iniciar,
- * mantiene su propio estado editable (`editForm`) y solo emite `saved` con
- * el diff (incluyendo días removidos) cuando el usuario guarda.
- */
 @Component({
   selector: 'app-doctor-edit-form',
   templateUrl: './doctor-edit-form.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    FormsModule,
-    LucideCalendar,
-    LucideChevronDown,
-    LucideChevronUp,
-    LucideClock,
-    LucideSave,
-    ButtonComponent,
-    DatepickerComponent,
-    ToSelectOptionsPipe,
-    SelectComponent,
-    InputComponent,
-  ],
+  imports: [LucideAngularModule],
 })
 export class DoctorEditFormComponent implements OnInit {
   private validationService = inject(DoctorFormValidationService);
 
-  // ── Constantes ────────────────────────────────────────────────────────────
+  readonly Save = Save;
+  readonly Clock = Clock;
+  readonly Calendar = Calendar;
+  readonly ChevronDown = ChevronDown;
+  readonly ChevronUp = ChevronUp;
+
   readonly DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   readonly DAY_FULL_LABELS = [
     'Domingo',
@@ -74,11 +53,8 @@ export class DoctorEditFormComponent implements OnInit {
     'Viernes',
     'Sábado',
   ];
-
-  /** Días hábiles seleccionables (lunes a viernes). */
   readonly weekDays = [1, 2, 3, 4, 5];
 
-  /** Opciones de hora de 07:00 a 12:00 en pasos de 5 minutos. */
   readonly timeOptions: string[] = (() => {
     const opts: string[] = [];
     for (let h = 7; h <= 12; h++) {
@@ -94,7 +70,6 @@ export class DoctorEditFormComponent implements OnInit {
 
   // ── Inputs / Outputs ──────────────────────────────────────────────────────
   doctor = input.required<Doctor>();
-  isSaving = input(false);
   saved = output<DoctorSaveEvent>();
   cancelled = output<void>();
 
@@ -115,8 +90,6 @@ export class DoctorEditFormComponent implements OnInit {
   private originalWorkdays = signal<number[]>([]);
 
   // ── Computed ──────────────────────────────────────────────────────────────
-
-  /** True si `editForm` difiere de `originalDoctor` en algún campo relevante. */
   hasChanges = computed(() => {
     const form = this.editForm();
     const orig = this.originalDoctor();
@@ -141,13 +114,11 @@ export class DoctorEditFormComponent implements OnInit {
     return false;
   });
 
-  /** True si hay cambios, no hay errores pendientes y no se está guardando ya. */
   canSave = computed(() => {
     const errs = this.errors();
     const form = this.editForm();
     if (!form) return false;
     return (
-      !this.isSaving() &&
       this.hasChanges() &&
       !errs.horarioGlobal &&
       !errs.fechas &&
@@ -161,7 +132,6 @@ export class DoctorEditFormComponent implements OnInit {
   });
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
-  /** Clona el doctor recibido a estado editable y valida el estado inicial. */
   ngOnInit(): void {
     const doc = this.doctor();
     const clone: Doctor = {
@@ -175,9 +145,7 @@ export class DoctorEditFormComponent implements OnInit {
     this.errors.set(this.validationService.validateForm(clone));
   }
 
-  // ── Campos del formulario ──────────────────────────────────────────────────────────
-
-  /** Actualiza un campo simple de `editForm` y revalida. */
+  // ── Form methods ──────────────────────────────────────────────────────────
   updateField(field: keyof Doctor, value: Doctor[keyof Doctor]): void {
     const form = this.editForm();
     if (!form) return;
@@ -186,7 +154,6 @@ export class DoctorEditFormComponent implements OnInit {
     this.errors.set(this.validationService.validateForm(updated));
   }
 
-  /** Agrega o quita un día de `workdays`, limpiando su horario si se quita. */
   toggleDay(day: number): void {
     const form = this.editForm();
     if (!form) return;
@@ -200,7 +167,6 @@ export class DoctorEditFormComponent implements OnInit {
     this.errors.set(this.validationService.validateForm(updated));
   }
 
-  /** Actualiza un campo de horario (inicio/fin) para un día específico. */
   updateDaySchedule(
     day: number,
     field: keyof DaySchedule,
@@ -219,7 +185,6 @@ export class DoctorEditFormComponent implements OnInit {
     this.errors.set(this.validationService.validateForm(updated));
   }
 
-  /** Elimina el horario personalizado de un día, volviendo al horario general. */
   resetDaySchedule(day: number): void {
     const form = this.editForm();
     if (!form) return;
@@ -230,12 +195,10 @@ export class DoctorEditFormComponent implements OnInit {
     this.errors.set(this.validationService.validateForm(updated));
   }
 
-  /** True si el día tiene un horario propio distinto al general. */
   hasDayOverride(day: number): boolean {
     return !!this.editForm()?.daySchedules?.[day];
   }
 
-  /** Valor a mostrar para un día: su horario propio o el horario general. */
   getDayScheduleValue(day: number, field: keyof DaySchedule): string {
     const form = this.editForm();
     if (!form) return '';
@@ -245,14 +208,10 @@ export class DoctorEditFormComponent implements OnInit {
     );
   }
 
-  /** Cantidad de días con horario personalizado. */
   getEditFormDayScheduleCount(): number {
     return Object.keys(this.editForm()?.daySchedules ?? {}).length;
   }
 
-  // ── Guardar ───────────────────────────────────────────────────────────────
-
-  /** Calcula los días removidos y emite el evento `saved` con el diff completo. */
   onSave(): void {
     if (!this.canSave()) return;
     const form = this.editForm();
@@ -270,9 +229,6 @@ export class DoctorEditFormComponent implements OnInit {
       removedWorkdays, // ← añadir
     });
   }
-
-  // ── Inputs de fecha (período laboral) ────────────────────────────────────
-  /** Limita el año escrito a mano en laborStart a 4 dígitos. */
   onLaborStartInput(event: Event): void {
     const input = event.target as HTMLInputElement;
     const value = input.value;
@@ -286,7 +242,6 @@ export class DoctorEditFormComponent implements OnInit {
     }
   }
 
-  /** Limita el año escrito a mano en laborEnd a 4 dígitos. */
   onLaborEndInput(event: Event): void {
     const input = event.target as HTMLInputElement;
     const value = input.value;
@@ -298,10 +253,5 @@ export class DoctorEditFormComponent implements OnInit {
         this.updateField('laborEnd', input.value);
       }
     }
-  }
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  /** Convierte un Date del datepicker a 'yyyy-mm-dd', o '' si es null. */
-  toDateString(date: Date | null): string {
-    return date ? toIsoDateString(date) : '';
   }
 }

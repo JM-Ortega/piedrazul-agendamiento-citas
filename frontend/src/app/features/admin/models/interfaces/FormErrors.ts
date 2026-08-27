@@ -1,7 +1,7 @@
 export interface FormErrors {
   [key: string]: string | undefined;
   documentId?: string;
-  identificationType?: string;
+  documentType?: string;
   password?: string;
   firstName?: string;
   lastName?: string;
@@ -15,5 +15,4 @@ export interface FormErrors {
   endTime?: string;
   interval?: string;
   workDays?: string;
-  bookingWindowWeeks?: string;
 }

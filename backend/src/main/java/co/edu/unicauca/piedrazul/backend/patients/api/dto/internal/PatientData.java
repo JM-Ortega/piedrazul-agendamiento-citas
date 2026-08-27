@@ -1,21 +1,21 @@
 package co.edu.unicauca.piedrazul.backend.patients.api.dto.internal;
 
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientSex;
-import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
 
 import java.time.LocalDate;
 import java.util.UUID;
 
 public record PatientData(
-        UUID personId,
+        UUID id,
         UUID userId,
-        IdentificationType identificationType,
-        String identification,
+        PatientDocumentType documentType,
+        String documentNumber,
         String firstName,
         String lastName,
         String phone,
         String email,
-        PatientSex sex,
+        PatientGender gender,
         LocalDate birthDate,
         String guardianPhone
 ) {}

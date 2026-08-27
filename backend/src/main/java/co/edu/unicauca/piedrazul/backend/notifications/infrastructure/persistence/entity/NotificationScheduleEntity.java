@@ -13,20 +13,12 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(
-        name = "notification_schedule",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uq_notification_schedule_notification",
-                        columnNames = "notification_id"
-                )
-        }
-)
+@Table(name = "notification_schedules")
 public class NotificationScheduleEntity {
 
     @Id
-    @Column(name = "id", nullable = false, updatable = false)
-    private UUID id;
+    @Column(name = "id_schedule", nullable = false, updatable = false)
+    private UUID idSchedule;
 
     @Column(name = "notification_id", nullable = false)
     private UUID notificationId;
@@ -35,7 +27,7 @@ public class NotificationScheduleEntity {
     private Instant scheduledAt;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
+    @Column(name = "status", nullable = false, length = 40)
     private ScheduleStatus status;
 
     @Column(name = "next_retry_at")

@@ -4,7 +4,7 @@
   role="button"
   tabindex="0"
   (click)="onBackdropClick($event)"
-  (keydown.escape)="finish.emit()"
+  (keydown.escape)="close.emit()"
 >
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
     <!-- Header -->
@@ -15,25 +15,23 @@
           Para agendar necesitas una cuenta en el sistema
         </p>
       </div>
-      <app-button
-        (buttonClick)="finish.emit()"
-        variant="danger"
-        size="sm"
-        extraClass="w-9 h-9"
+      <button
+        (click)="close.emit()"
+        class="text-blue-200 hover:text-white transition-colors ml-4 mt-1"
+        aria-label="Cerrar"
       >
-        ×
-      </app-button>
+        <lucide-angular [img]="X" [size]="20" />
+      </button>
     </div>
 
     <!-- Opciones principales -->
     <div class="p-6 flex flex-col gap-3">
-      <app-button
-        (buttonClick)="login()"
-        variant="primary"
-        extraClass="gap-4 w-full text-left justify-start"
+      <button
+        (click)="login()"
+        class="flex items-center gap-4 w-full bg-[#215c98] hover:bg-[#1a4a7a] text-white px-5 py-4 rounded-xl transition-all active:scale-95 text-left cursor-pointer"
       >
-        <div class="bg-[#4e92d9] p-2 rounded-lg shrink-0">
-          <svg lucideLogIn [size]="22" color="white"></svg>
+        <div class="bg-blue-600 p-2 rounded-lg shrink-0">
+          <lucide-angular [img]="LogIn" [size]="22" color="white" />
         </div>
         <div>
           <div class="font-semibold text-base">Ya tengo una cuenta</div>
@@ -41,23 +39,22 @@
             Ingresa con tu usuario y contraseña
           </div>
         </div>
-      </app-button>
-      <app-button
-        (buttonClick)="register()"
-        extraClass="text-left justify-start gap-4 w-full bg-white text-[#215c98] border-2 border-[#215c98] hover:bg-blue-50 px-5 py-4 rounded-xl transition-all"
+      </button>
+
+      <button
+        (click)="register()"
+        class="flex items-center gap-4 w-full bg-white border-2 border-[#215c98] hover:bg-blue-50 text-[#215c98] px-5 py-4 rounded-xl transition-all active:scale-95 text-left cursor-pointer"
       >
         <div class="bg-[#d9e9f8] p-2 rounded-lg shrink-0">
-          <svg lucideUserPlus [size]="22" class="text-[#215c98]"></svg>
+          <lucide-angular [img]="UserPlus" [size]="22" class="text-[#215c98]" />
         </div>
         <div>
-          <div class="text-[#215c98] font-semibold text-base">
-            Crear mi cuenta
-          </div>
+          <div class="font-semibold text-base">Crear mi cuenta</div>
           <div class="text-[#215c98] text-sm">
             Regístrate para agendar tu cita
           </div>
         </div>
-      </app-button>
+      </button>
     </div>
 
     <!-- Contacto -->
@@ -72,12 +69,12 @@
           rel="noopener noreferrer"
           class="flex items-center justify-center gap-2 flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-xl transition-all active:scale-95 text-left"
         >
-          <svg
-            lucideMessageCircle
+          <lucide-angular
+            [img]="MessageCircle"
             [size]="18"
             color="white"
             class="shrink-0"
-          ></svg>
+          />
           <div>
             <div class="text-sm font-medium">{{ whatsappDisplay }}</div>
             <div class="text-green-100 text-xs">Escríbenos</div>
@@ -88,7 +85,7 @@
           [href]="phoneUrl"
           class="flex items-center justify-center gap-2 flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-xl transition-all active:scale-95 text-left"
         >
-          <svg lucidePhone [size]="18" class="shrink-0"></svg>
+          <lucide-angular [img]="Phone" [size]="18" class="shrink-0" />
           <div>
             <div class="text-sm font-medium">{{ phoneDisplay }}</div>
             <div class="text-gray-400 text-xs">Llámanos</div>

@@ -8,13 +8,13 @@ public class PatientAlreadyLinkedUserException extends PatientBusinessException 
 
     public PatientAlreadyLinkedUserException(UUID patientId) {
         super(
-                "El paciente con id " + patientId + " ya tiene una cuenta de usuario vinculada",
+                "Patient with id " + patientId + " already has a linked user account",
                 "PATIENT_ALREADY_LINKED_USER",
                 HttpStatus.CONFLICT
         );
     }
 
     public PatientAlreadyLinkedUserException() {
-        super("El paciente ya tiene una cuenta de usuario vinculada", "PATIENT_ALREADY_LINKED_USER", HttpStatus.CONFLICT);
+        super("Patient already has a linked user account", "PATIENT_ALREADY_LINKED_USER", HttpStatus.CONFLICT);
     }
 }

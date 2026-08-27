@@ -1,5 +1,4 @@
 import {
-  ChangeDetectionStrategy,
   Component,
   computed,
   inject,
@@ -8,26 +7,23 @@ import {
   signal,
 } from '@angular/core';
 import {
-  LucideCalendar,
-  LucideCircleCheck,
-  LucideCircleUser,
-  LucideClock,
-  LucideCreditCard,
-  LucideDownload,
-  LucideDynamicIcon,
-  LucideFileSpreadsheet,
-  LucideFileText,
-  LucidePhone,
-  LucideStethoscope,
-  LucideTag,
-  type LucideIcon,
-} from '@lucide/angular';
+  Calendar,
+  CheckCircle,
+  Clock,
+  CreditCard,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  LucideAngularModule,
+  Phone,
+  Stethoscope,
+  Tag,
+  UserCircle,
+} from 'lucide-angular';
 import { SchedulerService } from '../../../core/services/scheduler.service';
 import { AppointmentExportRequest } from '../../../shared/models/dtos/AppointmentExportRequest.dto';
-import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { ExportColumnBackend } from '../../../shared/models/types/ExportColumnBackend.type';
 import { ExportFormatBackend } from '../../../shared/models/types/ExportFormatBackend.type';
-import { ButtonComponent } from '../../atoms/button/button.component';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 export type ExportColumnKey =
@@ -42,21 +38,11 @@ export type ExportColumnKey =
 
 type ExportFormat = 'excel' | 'pdf' | 'csv';
 type ExportColumns = Record<ExportColumnKey, boolean>;
-type ExportStep = 1 | 2;
 
 interface ColumnDef {
   key: ExportColumnKey;
   label: string;
-  icon: LucideIcon;
-}
-
-interface FormatDef {
-  value: ExportFormat;
-  label: string;
-  active: string;
-  icon: LucideIcon;
-  activeIcon: string;
-  activeLabel: string;
+  icon: any;
 }
 
 const COLUMN_MAP: Record<ExportColumnKey, ExportColumnBackend> = {
@@ -88,28 +74,28 @@ const EXT_MAP: Record<ExportFormat, string> = {
   csv: 'csv',
 };
 
-const EXPORT_STATUSES = [
-  'AGENDADA',
-  'REPROGRAMADA',
-  'CANCELADA',
-  'NO_ASISTIO',
-  'ATENDIDA',
-] as const;
-
 @Component({
   selector: 'app-export-modal',
   templateUrl: './export-modal.component.html',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideDynamicIcon, LucideDownload, LucideCalendar, ButtonComponent],
+  imports: [LucideAngularModule],
 })
 export class ExportModalComponent {
   private schedulerService = inject(SchedulerService);
+
+  // ── Icons ──────────────────────────────────────────────────────────────────
+  readonly Calendar = Calendar;
+  readonly Download = Download;
+  readonly FileSpreadsheet = FileSpreadsheet;
+  readonly FileText = FileText;
 
   // ── Inputs desde el padre ──────────────────────────────────────────────────
 
   /** ID del doctor. Si es null → no filtra por doctor (agendador sin filtro) */
   idDoctor = input<string | null>(null);
+
+  /** Estado activo. Si es null o vacío → todos los estados */
+  filterStatus = input<string | null>(null);
 
   /** Nombre legible del doctor filtrado (para mostrar en el aviso) */
   doctorName = input<string | null>(null);
@@ -117,17 +103,11 @@ export class ExportModalComponent {
   /** Fecha de hoy formateada para mostrar en el aviso */
   todayFormatted = input.required<string>();
 
-  /** Citas de hoy (todos los estados), para calcular conteos por estado */
-  appointments = input<AppointmentsPatient[]>([]);
-
   // ── Output ─────────────────────────────────────────────────────────────────
   /** Emite cuando el modal debe cerrarse (éxito o cancelación) */
   closed = output<void>();
 
   // ── Estado interno ─────────────────────────────────────────────────────────
-  currentStep = signal<ExportStep>(1);
-  exportStatusFilter = signal<string>('all');
-
   exportFormat = signal<ExportFormat>('excel');
   exportingInProgress = signal(false);
   exportError = signal<string | null>(null);
@@ -144,122 +124,65 @@ export class ExportModalComponent {
   });
 
   readonly columnDefs: ColumnDef[] = [
-    { key: 'date', label: 'Fecha de la Cita', icon: LucideCalendar },
-    { key: 'time', label: 'Hora de la Cita', icon: LucideClock },
-    { key: 'patient', label: 'Nombre del Paciente', icon: LucideCircleUser },
-    {
-      key: 'documentId',
-      label: 'Documento de Identidad',
-      icon: LucideCreditCard,
-    },
-    { key: 'phone', label: 'Teléfono del Paciente', icon: LucidePhone },
-    { key: 'status', label: 'Estado de la Cita', icon: LucideCircleCheck },
-    { key: 'specialty', label: 'Especialidad', icon: LucideTag },
-    { key: 'doctorName', label: 'Nombre del Médico', icon: LucideStethoscope },
+    { key: 'date', label: 'Fecha de la Cita', icon: Calendar },
+    { key: 'time', label: 'Hora de la Cita', icon: Clock },
+    { key: 'patient', label: 'Nombre del Paciente', icon: UserCircle },
+    { key: 'documentId', label: 'Documento de Identidad', icon: CreditCard },
+    { key: 'phone', label: 'Teléfono del Paciente', icon: Phone },
+    { key: 'status', label: 'Estado de la Cita', icon: CheckCircle },
+    { key: 'specialty', label: 'Especialidad', icon: Tag },
+    { key: 'doctorName', label: 'Nombre del Médico', icon: Stethoscope },
   ];
-
-  readonly formatOptions: FormatDef[] = [
-    {
-      value: 'excel',
-      label: 'Excel',
-      active: 'border-green-600 bg-green-50',
-      icon: LucideFileSpreadsheet,
-      activeIcon: 'text-green-600',
-      activeLabel: 'text-green-700',
-    },
-    {
-      value: 'pdf',
-      label: 'PDF',
-      active: 'border-[#215c98] bg-[#eaf1f8]',
-      icon: LucideFileText,
-      activeIcon: 'text-[#215c98]',
-      activeLabel: 'text-[#163c63]',
-    },
-    {
-      value: 'csv',
-      label: 'CSV',
-      active: 'border-orange-600 bg-orange-50',
-      icon: LucideFileText,
-      activeIcon: 'text-orange-600',
-      activeLabel: 'text-orange-700',
-    },
-  ];
-
-  readonly statusLabels: Record<string, string> = {
-    all: 'Todos los estados',
-    AGENDADA: 'Confirmadas',
-    REPROGRAMADA: 'Reprogramadas',
-    CANCELADA: 'Canceladas',
-    NO_ASISTIO: 'No asistió',
-    ATENDIDA: 'Atendidas',
-  };
-
-  /** Opciones de estado para el select, en el orden en que deben mostrarse. */
-  readonly statusOptions: string[] = ['all', ...EXPORT_STATUSES];
 
   // ── Computed ───────────────────────────────────────────────────────────────
-
-  /** Cantidad de citas de hoy por cada estado, más el total en 'all'. */
-  statusCounts = computed<Record<string, number>>(() => {
-    const list = this.appointments();
-    const counts: Record<string, number> = { all: list.length };
-    for (const s of EXPORT_STATUSES) {
-      counts[s] = list.filter((a) => a.appointmentState === s).length;
-    }
-    return counts;
-  });
-
-  /** Cantidad de citas que se exportarán según el estado seleccionado. */
-  selectedCount = computed(
-    () => this.statusCounts()[this.exportStatusFilter()] ?? 0
-  );
-
   hasSelectedColumns = computed(() =>
-    Object.values(this.exportColumns()).some((v) => v)
+    Object.values(this.exportColumns()).some((v) => v),
   );
 
   private selectedBackendColumns = computed<ExportColumnBackend[]>(() =>
     (Object.entries(this.exportColumns()) as [ExportColumnKey, boolean][])
       .filter(([, v]) => v)
-      .map(([k]) => COLUMN_MAP[k])
+      .map(([k]) => COLUMN_MAP[k]),
   );
 
   colors = computed(() => {
     switch (this.exportFormat()) {
       case 'excel':
         return {
-          header: 'bg-[#1f7a52]',
-          border: 'border-[#1f7a52]',
-          bg: 'bg-[#e6f5ee]',
-          icon: 'text-[#1f7a52]',
-          button: 'bg-[#1f7a52] hover:bg-[#166345]',
+          header: 'bg-green-700',
+          border: 'border-green-600',
+          bg: 'bg-green-50',
+          icon: 'text-green-600',
+          button: 'bg-green-600 hover:bg-green-700',
         };
       case 'pdf':
         return {
-          header: 'bg-[#215c98]',
-          border: 'border-[#215c98]',
-          bg: 'bg-[#eaf1f8]',
-          button: 'bg-[#215c98] hover:bg-[#163c63]',
+          header: 'bg-red-700',
+          border: 'border-red-600',
+          bg: 'bg-red-50',
+          icon: 'text-red-600',
+          button: 'bg-red-600 hover:bg-red-700',
         };
       default:
         return {
-          header: 'bg-[#b86a2d]',
-          border: 'border-[#b86a2d]',
-          bg: 'bg-[#faf1e8]',
-          icon: 'text-[#b86a2d]',
-          button: 'bg-[#b86a2d] hover:bg-[#96551f]',
+          header: 'bg-orange-700',
+          border: 'border-orange-600',
+          bg: 'bg-orange-50',
+          icon: 'text-orange-600',
+          button: 'bg-orange-600 hover:bg-orange-700',
         };
     }
   });
 
-  // ── Navegación entre pasos ────────────────────────────────────────────────
-  goToStep2(): void {
-    if (this.selectedCount() === 0) return;
-    this.currentStep.set(2);
-  }
-
-  goToStep1(): void {
-    this.currentStep.set(1);
+  statusLabel(s: string): string {
+    const map: Record<string, string> = {
+      AGENDADA: 'Confirmada',
+      ATENDIDA: 'Atendida',
+      CANCELADA: 'Cancelada',
+      NO_ASISTIO: 'No asistió',
+      REPROGRAMADA: 'Pendiente',
+    };
+    return map[s] ?? s;
   }
 
   accentColor(): string {
@@ -284,17 +207,17 @@ export class ExportModalComponent {
 
   // ── Export ─────────────────────────────────────────────────────────────────
   private buildPayload(): AppointmentExportRequest {
-    const status = this.exportStatusFilter();
+    const status = this.filterStatus();
     return {
       idDoctor: this.idDoctor() ?? null,
       format: FORMAT_MAP[this.exportFormat()],
       columns: this.selectedBackendColumns(),
-      state: status !== 'all' ? status : null,
+      state: status && status !== 'all' ? status : null,
     };
   }
 
   handleExport(): void {
-    if (!this.hasSelectedColumns() || this.selectedCount() === 0) return;
+    if (!this.hasSelectedColumns()) return;
 
     this.exportingInProgress.set(true);
     this.exportError.set(null);
@@ -317,7 +240,7 @@ export class ExportModalComponent {
       },
       error: () => {
         this.exportError.set(
-          'Ocurrió un error al generar el reporte. Intente nuevamente.'
+          'Ocurrió un error al generar el reporte. Intente nuevamente.',
         );
         this.exportingInProgress.set(false);
       },

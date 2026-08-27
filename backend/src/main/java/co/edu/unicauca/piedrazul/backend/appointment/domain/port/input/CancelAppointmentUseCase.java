@@ -9,6 +9,6 @@ public interface CancelAppointmentUseCase {
      *
      * @param appointmentId ID de la cita a cancelar
      */
-        void cancel(UUID appointmentId,  UUID patientId);
+        void cancel(UUID appointmentId);
 
 }

@@ -1,12 +1,16 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.service;
 
-import co.edu.unicauca.piedrazul.backend.appointment.exception.SlotNotAvailableException;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.exception.SlotNotAvailableException;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
 
-
+import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 public class AppointmentService {
 

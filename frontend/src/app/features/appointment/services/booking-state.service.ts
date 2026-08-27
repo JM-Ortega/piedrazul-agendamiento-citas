@@ -1,10 +1,10 @@
 import { computed, Injectable, signal } from '@angular/core';
+import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { PatientSuggestion } from '../models/dtos/patient-suggestion.dto';
 import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
 import { BookingContext } from '../models/types/bookingContext.type';
 import { BookingMode } from '../models/types/bookingMode.type';
-import { toIsoDateString } from '../../../shared/helpers/transform-date-local';
 
 /**
  * Servicio de estado compartido para el flujo de agendamiento de citas.
@@ -24,7 +24,7 @@ export class BookingStateService {
   step = signal<number>(1);
 
   readonly patientLookupStep = computed(() =>
-    this.isSchedulerContext() ? 1 : null
+    this.isSchedulerContext() ? 1 : null,
   );
   readonly specialtyStep = computed(() => (this.isSchedulerContext() ? 2 : 1));
   readonly scheduleStep = computed(() => (this.isSchedulerContext() ? 3 : 2));
@@ -33,13 +33,15 @@ export class BookingStateService {
   readonly stepLabels = computed(() => {
     if (this.isSchedulerContext())
       return ['1. Paciente', '2. Especialidad', '3. Horario', '4. Confirmar'];
+    if (this.isDoctorContext())
+      return ['1. Especialidad', '2. Horario', '3. Confirmar'];
     return ['1. Especialidad', '2. Horario', '3. Confirmar'];
   });
 
   readonly modeSelectionLabel = computed(() =>
     this.isSchedulerContext()
       ? '¿Cómo desea agendar la cita?'
-      : '¿Cómo desea agendar su cita?'
+      : '¿Cómo desea agendar su cita?',
   );
 
   readonly successMessage = computed(() => {
@@ -63,17 +65,18 @@ export class BookingStateService {
 
   // Agendador: formulario para registrar paciente nuevo
   patientForm = signal<Omit<Patient, 'id'>>({
-    identificationType: '',
-    identification: '',
+    documentType: '',
+    documentNumber: '',
     firstName: '',
     lastName: '',
     phone: '',
-    sex: '',
+    gender: '',
     birthDate: '',
     email: '',
     guardianPhone: '',
   });
 
+  doctorSnapshot = signal<Doctor | null>(null);
   specialtiesWithDoctor = signal<SpecialtyDoctor[]>([]);
   doctorsBySpecialty = signal<SpecialtyDoctor[]>([]);
   selectedSpecialty = signal<string>('');
@@ -85,31 +88,23 @@ export class BookingStateService {
   errorMessageSpecialty = signal<string>('');
   noDoctorsFound = signal<boolean>(false);
   errorMessageDoctors = signal<string>('');
-  globalErrorMessage = signal<string>('');
 
   readonly uniqueSpecialties = computed(() => [
-    ...new Set(
-      this.specialtiesWithDoctor()
-        .flatMap((s) => s.specialty)
-        .filter(
-          (specialty): specialty is string =>
-            typeof specialty === 'string' && specialty.trim() !== ''
-        )
-    ),
+    ...new Set(this.specialtiesWithDoctor().map((s) => s.specialty)),
   ]);
 
   readonly effectiveDoctor = computed<SpecialtyDoctor | null>(() => {
     if (this.isDoctorContext()) {
       return (
         this.doctorsBySpecialty().find(
-          (d) => d.id === this.selectedDoctorId()
+          (d) => d.id === this.selectedDoctorId(),
         ) ?? null
       );
     }
     return this.bookingMode() === 'specialty'
       ? this.assignedDoctor()
       : (this.doctorsBySpecialty().find(
-          (d) => d.id === this.selectedDoctorId()
+          (d) => d.id === this.selectedDoctorId(),
         ) ?? null);
   });
 
@@ -141,22 +136,20 @@ export class BookingStateService {
   readonly confirmDocumentType = computed(() => {
     if (this.isSchedulerContext())
       return (
-        this.foundPatient()?.identificationType ??
-        this.patientForm().identificationType
+        this.foundPatient()?.documentType ?? this.patientForm().documentType
       );
-    if (this.isDoctorContext())
-      return this.foundPatient()?.identificationType ?? '';
-    return this.patientSnapshot()?.identificationType ?? '';
+    if (this.isDoctorContext()) return this.foundPatient()?.documentType ?? '';
+    return this.patientSnapshot()?.documentType ?? '';
   });
 
   readonly confirmDocument = computed(() => {
     if (this.isSchedulerContext())
       return (
-        this.foundPatient()?.identification ?? this.patientForm().identification
+        this.foundPatient()?.documentNumber ?? this.patientForm().documentNumber
       );
     if (this.isDoctorContext())
-      return this.foundPatient()?.identification ?? '';
-    return this.patientSnapshot()?.identification ?? '';
+      return this.foundPatient()?.documentNumber ?? '';
+    return this.patientSnapshot()?.documentNumber ?? '';
   });
 
   readonly confirmPhone = computed(() => {
@@ -168,9 +161,9 @@ export class BookingStateService {
 
   readonly confirmGender = computed(() => {
     if (this.isSchedulerContext())
-      return this.foundPatient()?.sex ?? this.patientForm().sex;
-    if (this.isDoctorContext()) return this.foundPatient()?.sex ?? '';
-    return this.patientSnapshot()?.sex ?? '';
+      return this.foundPatient()?.gender ?? this.patientForm().gender;
+    if (this.isDoctorContext()) return this.foundPatient()?.gender ?? '';
+    return this.patientSnapshot()?.gender ?? '';
   });
 
   readonly confirmBirthDate = computed(() => {
@@ -190,15 +183,7 @@ export class BookingStateService {
   readonly confirmDate = computed(() => {
     const d = this.selectedDate();
     if (!d) return '';
-    const days = [
-      'Domingo',
-      'Lunes',
-      'Martes',
-      'Miércoles',
-      'Jueves',
-      'Viernes',
-      'Sábado',
-    ];
+    const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     const months = [
       'Enero',
       'Febrero',
@@ -226,11 +211,17 @@ export class BookingStateService {
   });
 
   readonly canGoToConfirmStep = computed(
-    () => !!this.selectedDate() && !!this.selectedTime()
+    () => !!this.selectedDate() && !!this.selectedTime(),
   );
 
   formatLocalDate(date: Date): string {
-    return toIsoDateString(date);
+    return (
+      date.getFullYear() +
+      '-' +
+      String(date.getMonth() + 1).padStart(2, '0') +
+      '-' +
+      String(date.getDate()).padStart(2, '0')
+    );
   }
 
   resolvePatientId(): string {
@@ -270,12 +261,12 @@ export class BookingStateService {
 
   resetPatientForm(): void {
     this.patientForm.set({
-      identification: '',
-      identificationType: '',
+      documentNumber: '',
+      documentType: '',
       firstName: '',
       lastName: '',
       phone: '',
-      sex: '',
+      gender: '',
       birthDate: '',
       email: '',
       guardianPhone: '',

@@ -120,7 +120,7 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
                             {!usernameHidden && (
                                 <div className="pz-field">
                                     <label htmlFor="username" className="pz-label">
-                                        Documento de identidad
+                                        Cédula
                                     </label>
                                     <input
                                         tabIndex={2}
@@ -129,10 +129,12 @@ export default function Login(props: PageProps<Extract<KcContext, { pageId: "log
                                         name="username"
                                         defaultValue={login.username ?? ""}
                                         type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
                                         autoFocus
                                         autoComplete={enableWebAuthnConditionalUI ? "username webauthn" : "username"}
                                         aria-invalid={hasError}
-                                        placeholder="Ej: 1234567890 o AB123456"
+                                        placeholder="Ej: 1234567890"
                                     />
                                     {messagesPerField.existsError("username") && (
                                         <span

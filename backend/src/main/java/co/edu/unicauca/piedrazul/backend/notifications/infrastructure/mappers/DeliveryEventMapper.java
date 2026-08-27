@@ -14,7 +14,7 @@ public class DeliveryEventMapper {
 
         DeliveryEventEntity entity = new DeliveryEventEntity();
 
-        entity.setId(event.getId());
+        entity.setIdDeliveryEvent(event.getId());
         entity.setAttemptId(event.getAttemptId());
 
         entity.setProviderName(event.getProviderName());
@@ -40,7 +40,7 @@ public class DeliveryEventMapper {
         }
 
         return DeliveryEvent.reconstruct(
-                entity.getId(),
+                entity.getIdDeliveryEvent(),
                 entity.getAttemptId(),
                 entity.getProviderName(),
                 entity.getProviderMessageId(),
