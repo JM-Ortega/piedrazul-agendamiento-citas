@@ -1,37 +1,37 @@
 import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  inject,
-  signal,
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    effect,
+    inject,
+    signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
 import {
-  LucideCalendar,
-  LucideClock,
-  LucideCreditCard,
-  LucideDownload,
-  LucideFileSpreadsheet,
-  LucideFilter,
+    LucideCalendar,
+    LucideClock,
+    LucideCreditCard,
+    LucideDownload,
+    LucideFileSpreadsheet,
+    LucideFilter,
 } from '@lucide/angular';
 import { KEYCLOAK_EVENT_SIGNAL } from 'keycloak-angular';
 import { DoctorService } from '../../../core/services/doctor.service';
 import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
-import { ExportModalComponent } from '../../../design-system/organisms/export-modal/export-modal.component';
 import {
-  APPOINTMENT_STATUS_CLASSES,
-  APPOINTMENT_STATUS_LABELS,
+    APPOINTMENT_STATUS_CLASSES,
+    APPOINTMENT_STATUS_LABELS,
 } from '../../../shared/helpers/appointment-status';
 import {
-  formatLongDateEs,
-  getMonthShort,
+    formatLongDateEs,
+    getMonthShort,
 } from '../../../shared/helpers/date-format';
 import { PaginatedState } from '../../../shared/helpers/paginated-state';
 import { toIsoDateString } from '../../../shared/helpers/transform-date-local';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { AppError } from '../../../shared/models/interfaces/api-error.model';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
+import { ExportModalComponent } from '../components/exportModal/exportModal.component';
 
 type ExportColumnKey =
   | 'date'

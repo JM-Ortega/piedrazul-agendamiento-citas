@@ -89,18 +89,6 @@ export class DoctorDashboardComponent implements OnInit {
       })
   );
 
-  totalCount = computed(() => this.todaysAppointments().length);
-  confirmedCount = computed(
-    () =>
-      this.todaysAppointments().filter((a) => a.appointmentState === 'AGENDADA')
-        .length
-  );
-  pendingCount = computed(
-    () =>
-      this.todaysAppointments().filter((a) => a.appointmentState === 'ATENDIDA')
-        .length
-  );
-
   ngOnInit(): void {
     this.doctorService.getMe().subscribe({
       next: (doctor) => {

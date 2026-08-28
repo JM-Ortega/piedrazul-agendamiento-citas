@@ -22,12 +22,12 @@ import {
   LucideTag,
   type LucideIcon,
 } from '@lucide/angular';
-import { SchedulerService } from '../../../core/services/scheduler.service';
-import { AppointmentExportRequest } from '../../../shared/models/dtos/AppointmentExportRequest.dto';
-import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
-import { ExportColumnBackend } from '../../../shared/models/types/ExportColumnBackend.type';
-import { ExportFormatBackend } from '../../../shared/models/types/ExportFormatBackend.type';
-import { ButtonComponent } from '../../atoms/button/button.component';
+import { SchedulerService } from '../../../../core/services/scheduler.service';
+import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { AppointmentExportRequest } from '../../../../shared/models/dtos/AppointmentExportRequest.dto';
+import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
+import { ExportColumnBackend } from '../../../../shared/models/types/ExportColumnBackend.type';
+import { ExportFormatBackend } from '../../../../shared/models/types/ExportFormatBackend.type';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 export type ExportColumnKey =
@@ -98,7 +98,7 @@ const EXPORT_STATUSES = [
 
 @Component({
   selector: 'app-export-modal',
-  templateUrl: './export-modal.component.html',
+  templateUrl: './exportModal.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideDynamicIcon, LucideDownload, LucideCalendar, ButtonComponent],
