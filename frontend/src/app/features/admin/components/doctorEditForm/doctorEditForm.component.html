@@ -1,0 +1,308 @@
+<!-- Botones Cancelar / Guardar -->
+<div class="flex justify-end gap-2 px-5 py-3 border-t border-[#a7c9ec]">
+  <app-button
+    variant="danger"
+    extraClass="!rounded-xl !px-4 !py-2"
+    [disabled]="isSaving()"
+    (buttonClick)="cancelled.emit()"
+  >
+    Cancelar
+  </app-button>
+  <app-button
+    variant="success"
+    extraClass="!rounded-xl !px-5 !py-2.5"
+    [disabled]="!canSave()"
+    [loading]="isSaving()"
+    (buttonClick)="onSave()"
+  >
+    @if (isSaving()) {
+      <span
+        class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
+      ></span>
+      Guardando...
+    } @else {
+      <svg lucideSave [size]="18"></svg>
+      Guardar
+    }
+  </app-button>
+</div>
+
+<!-- Campos del formulario -->
+<div class="px-5 pb-5 space-y-6 pt-4">
+  <!-- Período Laboral -->
+  <div>
+    <p
+      class="text-gray-700 font-semibold text-base mb-3 flex items-center gap-2"
+    >
+      <svg lucideCalendar [size]="18" class="text-purple-500"></svg>
+      Período Laboral
+    </p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label for="laborStart" class="block text-gray-700 mb-1 text-base">
+          Fecha Inicio
+        </label>
+        <app-datepicker
+          id="laborStart"
+          variant="purple"
+          format="yyyy-mm-dd"
+          [ngModel]="editForm()!.laborStart"
+          (ngModelChange)="updateField('laborStart', toDateString($event))"
+          [errorMessage]="errors().fechaInicio || errors().fechas || undefined"
+        />
+      </div>
+      <div>
+        <label for="laborEnd" class="block text-gray-700 mb-1 text-base">
+          Fecha Fin
+        </label>
+        <app-datepicker
+          id="laborEnd"
+          variant="purple"
+          format="yyyy-mm-dd"
+          [ngModel]="editForm()!.laborEnd"
+          (ngModelChange)="updateField('laborEnd', toDateString($event))"
+          [errorMessage]="errors().fechaFin || errors().fechas || undefined"
+        />
+      </div>
+    </div>
+  </div>
+
+  <!-- Horario Semanal -->
+  <div>
+    <p
+      class="text-gray-700 font-semibold text-base mb-3 flex items-center gap-2"
+    >
+      <svg lucideClock [size]="18" class="text-[#4e92d9]"></svg>
+      Horario Semanal
+    </p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div>
+        <label for="startTime" class="block text-gray-700 mb-1 text-base">
+          Hora Inicio (por defecto)
+        </label>
+        <app-select
+          id="startTime"
+          [(ngModel)]="editForm()!.startTime"
+          (ngModelChange)="updateField('startTime', $event)"
+          name="startTime"
+          [options]="timeOptions | toSelectOptions: false"
+          placeholder="-- Seleccionar --"
+          [errorMessage]="errors().horarioGlobal"
+        />
+      </div>
+      <div>
+        <label for="endTime" class="block text-gray-700 mb-1 text-base">
+          Hora Fin (por defecto)
+        </label>
+        <app-select
+          id="endTime"
+          [(ngModel)]="editForm()!.endTime"
+          (ngModelChange)="updateField('endTime', $event)"
+          name="endTime"
+          [options]="timeOptions | toSelectOptions: false"
+          placeholder="-- Seleccionar --"
+          [errorMessage]="errors().horarioGlobal"
+        />
+      </div>
+      <div>
+        <label
+          for="appointmentInterval"
+          class="block text-gray-700 mb-1 text-base"
+        >
+          Intervalo (min)
+        </label>
+        <app-input
+          id="appointmentInterval"
+          type="number"
+          [(ngModel)]="editForm()!.appointmentInterval"
+          (ngModelChange)="updateField('appointmentInterval', $event)"
+          name="appointmentInterval"
+          [min]="5"
+          [max]="120"
+          [step]="5"
+          [errorMessage]="errors().intervalo"
+        />
+      </div>
+    </div>
+  </div>
+  <!-- Ventana de Agendamiento -->
+  <div>
+    <p
+      class="text-gray-700 font-semibold text-base mb-3 flex items-center gap-2"
+    >
+      <svg lucideCalendarRange [size]="18" class="text-indigo-500"></svg>
+      Ventana de Agendamiento
+    </p>
+    <p class="text-gray-500 text-sm mb-3">
+      Semanas de anticipación con las que los pacientes pueden agendar citas.
+    </p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div>
+        <label
+          for="bookingWindowWeeks"
+          class="block text-gray-700 mb-1 text-base"
+        >
+          Semanas de anticipación
+        </label>
+        <app-input
+          id="bookingWindowWeeks"
+          type="number"
+          [(ngModel)]="editForm()!.bookingWindowWeeks"
+          (ngModelChange)="updateField('bookingWindowWeeks', $event)"
+          name="bookingWindowWeeks"
+          [min]="1"
+          [max]="52"
+          [step]="1"
+          [errorMessage]="errors().bookingWindowWeeks"
+        />
+      </div>
+    </div>
+  </div>
+  <!-- Días de Atención -->
+  <div>
+    <label
+      for="workdays"
+      class="block text-gray-700 mb-2 text-base font-semibold"
+      >Días de Atención</label
+    >
+    <div class="flex gap-2 flex-wrap">
+      @for (day of weekDays; track day) {
+        <app-button
+          variant="chip"
+          extraClass="!w-14"
+          [active]="editForm()!.workdays.includes(day)"
+          activeChipClasses="bg-[#215c98] text-white border-[#215c98]"
+          inactiveChipClasses="bg-white text-gray-500 border-gray-200 hover:border-[#4e92d9]"
+          (buttonClick)="toggleDay(day)"
+        >
+          {{ DAY_LABELS[day] }}
+        </app-button>
+      }
+    </div>
+    @if (errors().dias) {
+      <p class="text-red-500 text-sm mt-2">⚠️ {{ errors().dias }}</p>
+    }
+  </div>
+
+  <!-- Horarios específicos por día -->
+  @if (editForm()!.workdays.length > 0) {
+    <div class="border-2 border-[#a7c9ec] rounded-xl overflow-hidden">
+      <button
+        (click)="showDaySchedules.set(!showDaySchedules())"
+        class="w-full flex items-center justify-between px-5 py-3 bg-[#d9e9f8] hover:bg-[#a7c9ec] transition-colors text-[#163c63] text-base cursor-pointer"
+      >
+        <span class="flex items-center gap-2">
+          <svg lucideClock [size]="18"></svg>
+          <span class="font-semibold">Horarios específicos por día</span>
+          @if (getEditFormDayScheduleCount() > 0) {
+            <span
+              class="bg-amber-400 text-white text-xs px-2 py-0.5 rounded-full"
+            >
+              {{ getEditFormDayScheduleCount() }} personalizado{{
+                getEditFormDayScheduleCount() > 1 ? 's' : ''
+              }}
+            </span>
+          }
+        </span>
+        @if (showDaySchedules()) {
+          <svg lucideChevronUp [size]="20"></svg>
+        } @else {
+          <svg lucideChevronDown [size]="20"></svg>
+        }
+      </button>
+
+      @if (showDaySchedules()) {
+        <div class="p-4 space-y-3 bg-white">
+          <p class="text-gray-500 text-sm">
+            Puede establecer una hora de inicio y fin diferente para cada día.
+            Si no se personaliza, se usará el horario por defecto.
+          </p>
+          @for (day of editForm()!.workdays; track day) {
+            @if (day >= 1 && day <= 5) {
+              <div
+                class="rounded-xl border-2 p-4 transition-all"
+                [class]="
+                  hasDayOverride(day)
+                    ? 'border-amber-300 bg-amber-50'
+                    : 'border-[#d9e9f8] bg-[#d9e9f8]/30'
+                "
+              >
+                <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div class="flex items-center gap-3 sm:w-32 shrink-0">
+                    <div
+                      class="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0"
+                      [class]="
+                        hasDayOverride(day)
+                          ? 'bg-amber-400 text-white'
+                          : 'bg-[#d9e9f8] text-[#215c98]'
+                      "
+                    >
+                      {{ DAY_LABELS[day] }}
+                    </div>
+                    <span class="text-gray-700 text-base hidden sm:block">
+                      {{ DAY_FULL_LABELS[day] }}
+                    </span>
+                  </div>
+
+                  <div class="flex flex-1 flex-wrap gap-3 items-end">
+                    <div class="flex-1 min-w-32.5">
+                      <label
+                        for="startTime-{{ day }}"
+                        class="block text-gray-600 text-sm mb-1"
+                      >
+                        Hora Inicio
+                      </label>
+                      <app-select
+                        id="startTime-{{ day }}"
+                        [ngModel]="getDayScheduleValue(day, 'startTime')"
+                        (ngModelChange)="
+                          updateDaySchedule(day, 'startTime', $event)
+                        "
+                        name="startTime-{{ day }}"
+                        [options]="timeOptions | toSelectOptions: false"
+                        [errorMessage]="errors().horariosDia[day]"
+                      />
+                    </div>
+                    <div class="flex-1 min-w-32.5">
+                      <label
+                        for="endTime-{{ day }}"
+                        class="block text-gray-600 text-sm mb-1"
+                      >
+                        Hora Fin
+                      </label>
+                      <app-select
+                        id="endTime-{{ day }}"
+                        [ngModel]="getDayScheduleValue(day, 'endTime')"
+                        (ngModelChange)="
+                          updateDaySchedule(day, 'endTime', $event)
+                        "
+                        name="endTime-{{ day }}"
+                        [options]="timeOptions | toSelectOptions: false"
+                        [errorMessage]="errors().horariosDia[day]"
+                      />
+                    </div>
+                    @if (hasDayOverride(day)) {
+                      <app-button
+                        variant="link"
+                        extraClass="!text-sm !text-gray-400 hover:!text-red-500 !pb-2 shrink-0"
+                        (buttonClick)="resetDaySchedule(day)"
+                      >
+                        Usar por defecto
+                      </app-button>
+                    }
+                  </div>
+                </div>
+                @if (!hasDayOverride(day)) {
+                  <p class="text-xs text-gray-400 mt-2 sm:ml-13">
+                    Usando horario por defecto: {{ editForm()!.startTime }} –
+                    {{ editForm()!.endTime }}
+                  </p>
+                }
+              </div>
+            }
+          }
+        </div>
+      }
+    </div>
+  }
+</div>

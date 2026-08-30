@@ -8,7 +8,7 @@ import { CreateUserRequestDto } from '../models/dtos/CreateUserRequestDto';
 import { dtoSchedule } from '../models/dtos/schedule.dto';
 
 import { DoctorAdminDto } from '../models/dtos/DoctorAdminDto';
-import { SystemUser } from '../models/interfaces/system-user.model';
+import { SystemUser } from '../models/interfaces/systemUser.model';
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Injectable({ providedIn: 'root' })
@@ -69,41 +69,35 @@ export class AdminService {
   }
 
   /**
-   * Actualiza el intervalo entre citas (en minutos) de un médico.
    *
-   * @param doctorId - Identificador del médico.
-   * @param appointmentInterval - Nuevo intervalo entre citas, en minutos.
-   * @returns Observable que completa sin contenido si la actualización fue exitosa.
-   */
-  updateAppointmentInterval(
-    doctorId: string,
-    appointmentInterval: number
-  ): Observable<void> {
-    return this.http.put<void>(
-      `${this.apiUrl}/doctor/${doctorId}/appointment-interval`,
-      null,
-      { params: { appointmentInterval } }
-    );
-  }
-
-  /**
-   * Actualiza el rango de fechas del período laboral (fecha de inicio y
-   * fin) durante el cual un médico está activo en el sistema.
+   * Actualiza la información laboral de un médico: período laboral,
+   * intervalo entre citas y ventana de agendamiento.
    *
    * @param doctorId - Identificador del médico.
    * @param laborStart - Nueva fecha de inicio laboral (formato ISO, ej. 'YYYY-MM-DD').
    * @param laborEnd - Nueva fecha de fin laboral (formato ISO, ej. 'YYYY-MM-DD').
+   * @param appointmentInterval - Nueva duración de las citas, en minutos.
+   * @param bookingWindowWeeks - Nueva ventana de agendamiento, en semanas.
    * @returns Observable que completa sin contenido si la actualización fue exitosa.
    */
-  updateLaborDate(
+  updateDoctorInfo(
     doctorId: string,
     laborStart: string,
-    laborEnd: string
+    laborEnd: string,
+    appointmentInterval: number,
+    bookingWindowWeeks: number
   ): Observable<void> {
     return this.http.put<void>(
-      `${this.apiUrl}/doctor/${doctorId}/labor-date`,
+      `${this.apiUrl}/doctor/${doctorId}/update-info`,
       null,
-      { params: { laborStart, laborEnd } }
+      {
+        params: {
+          laborStart,
+          laborEnd,
+          appointmentInterval,
+          bookingWindowWeeks,
+        },
+      }
     );
   }
 

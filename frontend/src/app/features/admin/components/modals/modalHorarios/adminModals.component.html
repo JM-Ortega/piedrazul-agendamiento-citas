@@ -1,0 +1,74 @@
+<!-- Modal: Confirmar Toggle -->
+<app-confirm-modal
+  [visible]="showConfirmModal() && !!doctorToToggle()"
+  title="Confirmar Cambio"
+  [richMessage]="true"
+  maxWidth="max-w-md"
+  [fullWidthButtons]="true"
+  cancelLabel="Cancelar"
+  [confirmLabel]="
+    'Sí, ' + (doctorToToggle()?.status === false ? 'Habilitar' : 'Deshabilitar')
+  "
+  [confirmVariant]="doctorToToggle()?.status === false ? 'success' : 'danger'"
+  [iconBg]="doctorToToggle()?.status === false ? 'bg-green-100' : 'bg-red-100'"
+  (dismissed)="closeToggleModal.emit()"
+  (confirmed)="confirmToggle.emit()"
+>
+  <svg
+    lucideSave
+    [size]="24"
+    icon
+    [class]="
+      doctorToToggle()?.status === false ? 'text-green-600' : 'text-red-600'
+    "
+  ></svg>
+  <span message>
+    ¿Está seguro de que desea
+    <strong>{{
+      doctorToToggle()?.status === false ? 'habilitar' : 'deshabilitar'
+    }}</strong>
+    a <strong>{{ doctorToToggle()?.name }}</strong
+    >?
+  </span>
+</app-confirm-modal>
+
+<!-- Modal: Forzar Deshabilitación -->
+<app-confirm-modal
+  [visible]="showForceModal() && !!doctorToToggle()"
+  title="Atención"
+  [richMessage]="true"
+  maxWidth="max-w-md"
+  [fullWidthButtons]="true"
+  cancelLabel="Cancelar"
+  confirmLabel="Sí, forzar"
+  confirmVariant="danger"
+  iconBg="bg-red-100"
+  (dismissed)="cancelForceDisable.emit()"
+  (confirmed)="confirmForceDisable.emit()"
+>
+  <svg lucidePowerOff [size]="24" icon class="text-red-600"></svg>
+  <span message>
+    <p class="text-gray-600 text-base mb-4">{{ forceModalMessage() }}</p>
+    <p class="text-gray-700 text-base font-semibold">
+      ¿Desea forzar la deshabilitación de
+      <strong>{{ doctorToToggle()?.name }}</strong> de todas formas?
+    </p>
+  </span>
+</app-confirm-modal>
+<!-- Modal: Error al Guardar -->
+<app-confirm-modal
+  [visible]="showErrorModal()"
+  title="No se pudo completar la acción"
+  [richMessage]="true"
+  maxWidth="max-w-md"
+  [fullWidthButtons]="true"
+  [showCancel]="false"
+  confirmLabel="Entendido"
+  confirmVariant="primary"
+  iconBg="bg-red-100"
+  (dismissed)="closeErrorModal.emit()"
+  (confirmed)="closeErrorModal.emit()"
+>
+  <svg lucideCircleAlert [size]="24" icon class="text-red-600"></svg>
+  <span message>{{ errorGuardado() }}</span>
+</app-confirm-modal>
