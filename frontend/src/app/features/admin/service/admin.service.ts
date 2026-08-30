@@ -67,45 +67,7 @@ export class AdminService {
       { params: { page, size, sort } }
     );
   }
-  //borra
-  /**
-   * Actualiza el intervalo entre citas (en minutos) de un médico.
-   *
-   * @param doctorId - Identificador del médico.
-   * @param appointmentInterval - Nuevo intervalo entre citas, en minutos.
-   * @returns Observable que completa sin contenido si la actualización fue exitosa.
-   */
-  updateAppointmentInterval(
-    doctorId: string,
-    appointmentInterval: number
-  ): Observable<void> {
-    return this.http.put<void>(
-      `${this.apiUrl}/doctor/${doctorId}/appointment-interval`,
-      null,
-      { params: { appointmentInterval } }
-    );
-  }
-  //borra
-  /**
-   * Actualiza el rango de fechas del período laboral (fecha de inicio y
-   * fin) durante el cual un médico está activo en el sistema.
-   *
-   * @param doctorId - Identificador del médico.
-   * @param laborStart - Nueva fecha de inicio laboral (formato ISO, ej. 'YYYY-MM-DD').
-   * @param laborEnd - Nueva fecha de fin laboral (formato ISO, ej. 'YYYY-MM-DD').
-   * @returns Observable que completa sin contenido si la actualización fue exitosa.
-   */
-  updateLaborDate(
-    doctorId: string,
-    laborStart: string,
-    laborEnd: string
-  ): Observable<void> {
-    return this.http.put<void>(
-      `${this.apiUrl}/doctor/${doctorId}/labor-date`,
-      null,
-      { params: { laborStart, laborEnd } }
-    );
-  }
+
   /**
    *
    * Actualiza la información laboral de un médico: período laboral,

@@ -177,23 +177,20 @@ export class AdminConfigComponent implements OnInit {
     if (this.savingDoctorId() === form.id) return;
     const calls: Observable<unknown>[] = [];
 
-    if (originalDoctor.appointmentInterval !== form.appointmentInterval)
-      calls.push(
-        this.adminService.updateAppointmentInterval(
-          form.id,
-          form.appointmentInterval
-        )
-      );
-
-    if (
+    const infoChanged =
+      originalDoctor.appointmentInterval !== form.appointmentInterval ||
       originalDoctor.laborStart !== form.laborStart ||
-      originalDoctor.laborEnd !== form.laborEnd
-    ) {
+      originalDoctor.laborEnd !== form.laborEnd ||
+      originalDoctor.bookingWindowWeeks !== form.bookingWindowWeeks;
+
+    if (infoChanged) {
       calls.push(
-        this.adminService.updateLaborDate(
+        this.adminService.updateDoctorInfo(
           form.id,
           form.laborStart,
-          form.laborEnd
+          form.laborEnd,
+          form.appointmentInterval,
+          form.bookingWindowWeeks
         )
       );
     }
