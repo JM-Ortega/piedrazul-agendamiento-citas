@@ -46,7 +46,7 @@
           id="laborStart"
           variant="purple"
           format="yyyy-mm-dd"
-          [(ngModel)]="editForm()!.laborStart"
+          [ngModel]="editForm()!.laborStart"
           (ngModelChange)="updateField('laborStart', toDateString($event))"
           [errorMessage]="errors().fechaInicio || errors().fechas || undefined"
         />
@@ -59,7 +59,7 @@
           id="laborEnd"
           variant="purple"
           format="yyyy-mm-dd"
-          [(ngModel)]="editForm()!.laborEnd"
+          [ngModel]="editForm()!.laborEnd"
           (ngModelChange)="updateField('laborEnd', toDateString($event))"
           [errorMessage]="errors().fechaFin || errors().fechas || undefined"
         />

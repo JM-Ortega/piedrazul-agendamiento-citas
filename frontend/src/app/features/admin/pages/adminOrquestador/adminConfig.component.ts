@@ -266,9 +266,9 @@ export class AdminConfigComponent implements OnInit {
             this.onCloseToggleModal();
           },
           error: (err: AppError) => {
-            this.forceModalMessage.set(err.message);
             this.onCloseToggleModal();
-            this.showForceModal.set(true);
+            this.errorGuardado.set(err.message);
+            this.showErrorModal.set(true);
           },
         });
       return;
