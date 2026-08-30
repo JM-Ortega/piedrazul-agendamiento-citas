@@ -65,18 +65,20 @@
       <div
         [class]="fullWidthButtons ? 'flex gap-5' : 'flex gap-5 justify-center'"
       >
-        <app-button
-          variant="secondary"
-          [class]="fullWidthButtons ? 'flex-1' : ''"
-          [fullWidth]="fullWidthButtons"
-          (buttonClick)="onDismiss()"
-        >
-          {{ cancelLabel }}
-        </app-button>
+        @if (showCancel) {
+          <app-button
+            variant="secondary"
+            [class]="fullWidthButtons ? 'flex-1' : ''"
+            [fullWidth]="fullWidthButtons"
+            (buttonClick)="onDismiss()"
+          >
+            {{ cancelLabel }}
+          </app-button>
+        }
         <app-button
           [variant]="confirmVariant"
           [class]="fullWidthButtons ? 'flex-1' : ''"
-          [fullWidth]="fullWidthButtons"
+          [fullWidth]="showCancel ? fullWidthButtons : true"
           (buttonClick)="onConfirm()"
         >
           {{ confirmLabel }}

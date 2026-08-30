@@ -22,6 +22,7 @@ export class ConfirmModalComponent {
   @Input() maxWidth = 'max-w-sm';
   @Input() fullWidthButtons = false;
   @Input() iconPosition: 'top' | 'inline' = 'top';
+  @Input() showCancel = true;
 
   @Output() confirmed = new EventEmitter<void>();
   @Output() dismissed = new EventEmitter<void>();
