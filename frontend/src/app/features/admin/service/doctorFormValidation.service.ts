@@ -38,8 +38,8 @@ export class DoctorFormValidationService {
     if (!bookingWindowWeeks || bookingWindowWeeks <= 0) {
       return 'La ventana de agendamiento debe ser mayor a 0.';
     }
-    if (bookingWindowWeeks > 52) {
-      return 'La ventana de agendamiento no puede superar 52 semanas.';
+    if (bookingWindowWeeks > 10) {
+      return 'La ventana de agendamiento no puede superar 10 semanas.';
     }
     if (!laborEnd) return '';
 
