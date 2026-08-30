@@ -48,6 +48,7 @@ export class DoctorService {
       name: string;
       specialty: string[];
       appointmentInterval: number;
+      bookingWindowWeeks: number;
       laborStart: string;
       laborEnd: string;
       status: boolean;
@@ -61,6 +62,7 @@ export class DoctorService {
             name: res.name,
             specialty: res.specialty,
             appointmentInterval: res.appointmentInterval,
+            bookingWindowWeeks: res.bookingWindowWeeks,
             laborStart: res.laborStart,
             laborEnd: res.laborEnd,
             status: res.status,
