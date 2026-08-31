@@ -1,0 +1,153 @@
+<div>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+    <!-- Columna 1: médico (+ especialidad si aplica) -->
+    <div class="w-full space-y-4">
+      <div>
+        <label for="doctor" class="block text-gray-700 font-medium mb-1"
+          >Médico *</label
+        >
+        <app-select
+          [id]="'doctor'"
+          [options]="doctorOptions()"
+          placeholder="Seleccione un médico..."
+          [ngModel]="state.selectedDoctorId()"
+          (valueChange)="onDoctorChange($event)"
+        ></app-select>
+      </div>
+
+      @if (!state.isPatientContext() && state.selectedDoctorId()) {
+        <div>
+          <label for="specialty" class="block text-gray-700 font-medium mb-1">
+            Especialidad *
+          </label>
+          <app-select
+            [id]="'specialty'"
+            [options]="specialtyOptions()"
+            placeholder="Seleccione una especialidad..."
+            [ngModel]="state.selectedSpecialty()"
+            (valueChange)="onSpecialtyChange($event)"
+          ></app-select>
+        </div>
+      }
+
+      @if (state.noDoctorsFound()) {
+        <p
+          class="text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm"
+        >
+          ⚠️ {{ state.errorMessageDoctors() }}
+        </p>
+      }
+
+      @if (state.globalErrorMessage()) {
+        <div class="bg-red-100 text-red-700 p-3 rounded-lg text-sm">
+          {{ state.globalErrorMessage() }}
+        </div>
+      }
+    </div>
+
+    <!-- Columna 2: fecha -->
+    <div class="w-full">
+      @if (state.doctorSpecialtyComplete()) {
+        <p class="text-gray-700 font-medium">Fecha *</p>
+        <p class="text-sm mb-2 text-gray-500">
+          Solo se muestran días hábiles del médico, excluyendo fines de semana y
+          festivos colombianos.
+        </p>
+        @if (state.selectedDate() && noSlotsAvailable) {
+          <div
+            class="mt-4 mb-4 text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm"
+          >
+            ⚠️ {{ errorMessageSlots }}
+          </div>
+        }
+
+        <div
+          class="w-[295px] h-[350px] border-2 border-[#a7c9ec] rounded-2xl overflow-hidden"
+        >
+          <div class="w-[340px] scale-85 origin-top-left">
+            <mat-calendar
+              [dateFilter]="dateFilter()"
+              [minDate]="minDate()"
+              [maxDate]="maxDate()"
+              [startAt]="startAt()"
+              [selected]="state.selectedDate()"
+              (selectedChange)="onDateSelected($event)"
+            >
+            </mat-calendar>
+          </div>
+        </div>
+      } @else {
+        <div
+          class="h-full min-h-[220px] flex items-center justify-center text-center text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-2xl p-6"
+        >
+          Seleccione
+          {{ state.isPatientContext() ? 'un médico' : 'médico y especialidad' }}
+          para ver las fechas disponibles.
+        </div>
+      }
+    </div>
+
+    <!-- Columna 3: hora -->
+    <div class="w-full">
+      @if (state.selectedDate() && !noSlotsAvailable) {
+        <fieldset class="border-0 p-0 m-0">
+          <legend class="block text-gray-700 mb-4 font-medium">Hora *</legend>
+          @if (state.selectedDate()) {
+            <div
+              class="flex items-center gap-2 bg-[#e6f0fa] rounded-xl px-4 py-3 text-[#163c63] font-medium mb-4"
+            >
+              <svg lucideCalendar [size]="18"></svg>
+              {{ state.confirmDate() }}
+            </div>
+          }
+          <div class="grid grid-cols-3 sm:grid-cols-4 gap-3">
+            @for (slot of state.availableSlots(); track slot) {
+              <button
+                type="button"
+                (click)="state.selectedTime.set(slot)"
+                class="py-3 rounded-xl border-2 text-base font-semibold transition-all duration-200 cursor-pointer"
+                [ngClass]="{
+                  'border-[#4e92d9] bg-[#4e92d9] text-white':
+                    state.selectedTime() === slot,
+                  'border-gray-200 hover:border-[#4e92d9] hover:bg-[#dbeafe] text-[#163c63]':
+                    state.selectedTime() !== slot,
+                }"
+              >
+                {{ slot.slice(0, 5) }}
+              </button>
+            }
+          </div>
+        </fieldset>
+      } @else {
+        <div
+          class="h-full min-h-[220px] flex items-center justify-center text-center text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-2xl p-6"
+        >
+          Seleccione una fecha para ver los horarios disponibles.
+        </div>
+      }
+    </div>
+  </div>
+
+  @if (globalErrorMessageSlots()) {
+    <div
+      class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"
+    >
+      {{ globalErrorMessageSlots() }}
+    </div>
+  }
+
+  <div class="flex gap-4 mt-2">
+    <app-button variant="secondary" (buttonClick)="goBack()">
+      ← {{ state.isSchedulerContext() ? 'Atrás' : 'Volver' }}
+    </app-button>
+    <app-button
+      variant="primary"
+      [disabled]="!state.canGoToConfirmStep()"
+      (buttonClick)="goToConfirm()"
+      [fullWidth]="true"
+      class="flex-1"
+    >
+      Revisar Cita →
+    </app-button>
+  </div>
+</div>
