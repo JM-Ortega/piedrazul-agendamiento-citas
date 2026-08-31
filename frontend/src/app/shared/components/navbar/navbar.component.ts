@@ -111,10 +111,24 @@ export class NavbarComponent implements OnInit {
         event.navigationTrigger === 'popstate' &&
         this.appService.currentRole()
       ) {
+        // dejamos que el guard de esa ruta se encargue del popstate.
+        if (this.isLeavingProtectedRoute()) return;
+
         history.pushState(null, '', location.href);
         this.showLogoutModal.set(true);
       }
     });
+  }
+
+  /**
+   * True si la ruta activa actual (antes de procesar esta navegación)
+   * está marcada con `data: { confirmExitLocally: true }`, indicando que
+   * el propio componente controla la confirmación de salida.
+   */
+  private isLeavingProtectedRoute(): boolean {
+    let route = this.router.routerState.snapshot.root;
+    while (route.firstChild) route = route.firstChild;
+    return !!route.data['confirmExitLocally'];
   }
 
   goToLogin(): void {

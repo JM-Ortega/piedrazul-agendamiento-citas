@@ -7,7 +7,13 @@
       </div>
     </div>
 
-    @if (!patient()) {
+    @if (isLoadingPatient()) {
+      <div class="flex items-center justify-center py-12">
+        <div
+          class="w-8 h-8 border-3 border-[#215c98] border-t-transparent rounded-full animate-spin"
+        ></div>
+      </div>
+    } @else if (!patient()) {
       <div
         class="bg-red-50 border border-red-300 text-red-700 px-6 py-4 rounded-xl"
       >
@@ -173,4 +179,24 @@
       </div>
     }
   </div>
+  <!-- Modal: confirmar salida sin guardar -->
+  <app-confirm-modal
+    [visible]="showExitConfirmModal()"
+    title="¿Salir sin guardar?"
+    iconPosition="top"
+    [richMessage]="true"
+    maxWidth="max-w-md"
+    [fullWidthButtons]="true"
+    cancelLabel="Cancelar"
+    confirmLabel="Sí, salir"
+    confirmVariant="danger"
+    iconBg="bg-amber-100"
+    (dismissed)="cancelExit()"
+    (confirmed)="confirmExit()"
+  >
+    <svg lucideAlertCircle [size]="28" icon class="text-amber-600"></svg>
+    <span message>
+      Los datos no guardados se perderán y la cita quedará sin atender.
+    </span>
+  </app-confirm-modal>
 </div>
