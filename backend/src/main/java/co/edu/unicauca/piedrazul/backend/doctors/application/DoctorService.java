@@ -204,7 +204,7 @@ public class DoctorService implements DoctorProvisioningApi {
         List<DoctorDetailedResponse> content = personPage.getContent().stream()
                 .map(person -> {
                     Doctor doctor = doctorsById.get(person.id());
-                    return doctor == null ? null : DoctorDetailedResponse.fromEntity(doctor, person.firstName()+person.lastName());
+                    return doctor == null ? null : DoctorDetailedResponse.fromEntity(doctor, person.firstName()+" "+person.lastName());
                 })
                 .filter(Objects::nonNull)
                 .toList();
