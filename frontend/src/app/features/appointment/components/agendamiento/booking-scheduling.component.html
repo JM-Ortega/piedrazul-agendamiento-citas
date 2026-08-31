@@ -3,7 +3,7 @@
     <!-- Columna 1: médico (+ especialidad si aplica) -->
     <div class="w-full space-y-4">
       <div>
-        <label for="doctor" class="block text-gray-700 font-medium mb-1"
+        <label for="doctor" class="block text-gray-600 text-sm font-bold mb-1"
           >Médico *</label
         >
         <app-select
@@ -17,7 +17,10 @@
 
       @if (!state.isPatientContext() && state.selectedDoctorId()) {
         <div>
-          <label for="specialty" class="block text-gray-700 font-medium mb-1">
+          <label
+            for="specialty"
+            class="block text-gray-600 text-sm font-bold mb-1"
+          >
             Tipo de atención *
           </label>
           <app-select
@@ -48,11 +51,17 @@
     <!-- Columna 2: fecha -->
     <div class="w-full">
       @if (state.doctorSpecialtyComplete()) {
-        <p class="text-gray-700 font-medium">Fecha *</p>
-        <p class="text-sm mb-2 text-gray-500">
-          Solo se muestran días hábiles del médico, excluyendo fines de semana y
-          festivos colombianos.
+        <p class="text-sm text-gray-500">
+          <strong class="text-gray-600 font-bold"> Fecha * </strong>
         </p>
+        @if (state.selectedDate()) {
+          <div
+            class="flex items-center gap-2 bg-[#e6f0fa] rounded-xl px-2 py-1 text-[#163c63] mb-2"
+          >
+            <svg lucideCalendar [size]="18"></svg>
+            {{ state.confirmDate() }}
+          </div>
+        }
         @if (state.selectedDate() && noSlotsAvailable) {
           <div
             class="mt-4 mb-4 text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm"
@@ -62,7 +71,7 @@
         }
 
         <div
-          class="w-[295px] h-[350px] border-2 border-[#a7c9ec] rounded-2xl overflow-hidden"
+          class="w-[295px] h-[335px] border-2 border-[#a7c9ec] rounded-2xl overflow-hidden"
         >
           <div class="w-[340px] scale-85 origin-top-left">
             <mat-calendar
@@ -93,21 +102,15 @@
     <div class="w-full">
       @if (state.selectedDate() && !noSlotsAvailable) {
         <fieldset class="border-0 p-0 m-0">
-          <legend class="block text-gray-700 mb-4 font-medium">Hora *</legend>
-          @if (state.selectedDate()) {
-            <div
-              class="flex items-center gap-2 bg-[#e6f0fa] rounded-xl px-4 py-3 text-[#163c63] font-medium mb-4"
-            >
-              <svg lucideCalendar [size]="18"></svg>
-              {{ state.confirmDate() }}
-            </div>
-          }
+          <legend class="block text-gray-600 text-sm mb-1 font-bold">
+            Hora *
+          </legend>
           <div class="grid grid-cols-3 sm:grid-cols-4 gap-3">
             @for (slot of state.availableSlots(); track slot) {
               <button
                 type="button"
                 (click)="state.selectedTime.set(slot)"
-                class="py-3 rounded-xl border-2 text-base font-semibold transition-all duration-200 cursor-pointer"
+                class="py-1 rounded-xl border-2 text-2sm font-semibold transition-all duration-200 cursor-pointer"
                 [ngClass]="{
                   'border-[#4e92d9] bg-[#4e92d9] text-white':
                     state.selectedTime() === slot,
