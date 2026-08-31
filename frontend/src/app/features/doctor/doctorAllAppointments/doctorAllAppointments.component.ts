@@ -173,27 +173,33 @@ export class DoctorAllAppointmentsComponent {
     status: this.filterStatus(),
   }));
 
-  filterFields = computed<FilterFieldConfig[]>(() => [
-    {
-      id: 'date',
-      type: 'date',
-      label: 'Fecha Específica',
-      formatValue: (d) => formatLongDateEs(d),
-    },
-    {
-      id: 'status',
-      type: 'select',
-      label: 'Por Estado',
-      placeholder: 'Todos los estados',
-      options: [
-        { value: 'AGENDADA', label: 'Agendadas' },
-        { value: 'REPROGRAMADA', label: 'Reprogramadas' },
-        { value: 'CANCELADA', label: 'Canceladas' },
-        { value: 'NO_ASISTIO', label: 'No asistió' },
-        { value: 'ATENDIDA', label: 'Atendidas' },
-      ],
-    },
-  ]);
+  filterFields = computed<FilterFieldConfig[]>(() => {
+    const statusOptions = [
+      { value: 'AGENDADA', label: 'Agendadas' },
+      { value: 'REPROGRAMADA', label: 'Reprogramadas' },
+      { value: 'CANCELADA', label: 'Canceladas' },
+      { value: 'NO_ASISTIO', label: 'No asistió' },
+      { value: 'ATENDIDA', label: 'Atendidas' },
+    ];
+
+    return [
+      {
+        id: 'date',
+        type: 'date',
+        label: 'Fecha Específica',
+        formatValue: (d) => formatLongDateEs(d),
+      },
+      {
+        id: 'status',
+        type: 'select',
+        label: 'Por Estado',
+        placeholder: 'Todos los estados',
+        options: statusOptions,
+        formatValue: (v) =>
+          statusOptions.find((o) => o.value === v)?.label ?? v,
+      },
+    ];
+  });
   // ── Constructor ───────────────────────────────────────────────────────────
   constructor() {
     effect(() => {
