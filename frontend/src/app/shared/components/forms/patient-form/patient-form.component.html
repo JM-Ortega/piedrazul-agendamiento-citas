@@ -15,6 +15,27 @@
     ></app-select>
   </div>
 
+  @if (showDocumentNumber) {
+    <div>
+      <label
+        for="documentNumber"
+        class="block text-gray-700 mb-1 text-sm font-medium"
+      >
+        Número de documento <span class="text-red-500">*</span>
+      </label>
+      <app-input
+        [id]="'documentNumber'"
+        type="text"
+        [sanitize]="documentSanitizeRule()"
+        [maxLength]="documentMaxLength"
+        placeholder="Ingrese el número de documento"
+        [ngModel]="get('identification')"
+        (valueChange)="setFromInput('identification', $event)"
+        [errorMessage]="errors()['identification']"
+      ></app-input>
+    </div>
+  }
+
   <div>
     <label for="firstName" class="block text-gray-700 mb-1 text-sm font-medium">
       Nombres <span class="text-red-500">*</span>
