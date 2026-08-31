@@ -22,7 +22,11 @@
         <p><strong>Género:</strong> {{ state.confirmGender() | formato }}</p>
         <p>
           <strong>Fecha de Nacimiento:</strong>
-          {{ state.confirmBirthDate() }}
+          {{ formatLongDateEs(state.confirmBirthDate()) }}
+        </p>
+        <p>
+          <strong>Edad:</strong>
+          {{ calculateAge(state.confirmBirthDate()) }}
         </p>
       } @else {
         @if (state.confirmDocument()) {

@@ -16,6 +16,8 @@ import { NewAppointment } from '../../models/dtos/newAppointment.dto';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { formatLongDateEs } from '../../../../shared/helpers/date-format';
+import { calculateAge } from '../../../../shared/helpers/calculateAge';
 
 /**
  * Mostrar el resumen completo de la cita a confirmar
@@ -38,6 +40,8 @@ import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 export class BookingConfirmComponent {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
+  formatLongDateEs = formatLongDateEs;
+  calculateAge = calculateAge;
 
   confirmed = output<void>();
   back = output<void>();
