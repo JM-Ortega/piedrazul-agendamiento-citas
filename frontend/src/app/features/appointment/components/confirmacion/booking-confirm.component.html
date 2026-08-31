@@ -21,7 +21,8 @@
         <p><strong>Celular:</strong> {{ state.confirmPhone() }}</p>
         <p><strong>Género:</strong> {{ state.confirmGender() | formato }}</p>
         <p>
-          <strong>Fecha de Nacimiento:</strong> {{ state.confirmBirthDate() }}
+          <strong>Fecha de Nacimiento:</strong>
+          {{ state.confirmBirthDate() }}
         </p>
       } @else {
         @if (state.confirmDocument()) {
@@ -35,12 +36,26 @@
         <svg lucideStethoscope [size]="18"></svg>
         Cita
       </h3>
+
       <p>
-        <strong>Especialidad:</strong> {{ state.selectedSpecialty() | formato }}
+        <strong>Especialidad:</strong>
+        {{ state.selectedSpecialty() | formato }}
       </p>
-      <p><strong>Médico:</strong> {{ state.confirmDoctorName() }}</p>
-      <p><strong>Fecha:</strong> {{ state.confirmDate() }}</p>
-      <p><strong>Hora:</strong> {{ state.selectedTime().slice(0, 5) }}</p>
+
+      <p>
+        <strong>Médico:</strong>
+        {{ state.selectedDoctorName() }}
+      </p>
+
+      <p>
+        <strong>Fecha:</strong>
+        {{ state.confirmDate() }}
+      </p>
+
+      <p>
+        <strong>Hora:</strong>
+        {{ state.selectedTime().slice(0, 5) }}
+      </p>
     </div>
   </div>
 

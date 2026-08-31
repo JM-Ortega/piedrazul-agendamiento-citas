@@ -48,7 +48,7 @@ export class BookingConfirmComponent {
    */
   confirm(): void {
     const date = this.state.selectedDate();
-    if (!date || !this.state.selectedTime() || !this.state.effectiveDoctorId())
+    if (!date || !this.state.selectedTime() || !this.state.selectedDoctorId())
       return;
 
     this.state.isLoading.set(true);
@@ -76,7 +76,7 @@ export class BookingConfirmComponent {
 
   private buildPayload(date: Date): NewAppointment {
     const base = {
-      doctorId: this.state.effectiveDoctorId(),
+      doctorId: this.state.selectedDoctorId(),
       specialty: this.state.selectedSpecialty(),
       date: this.state.formatLocalDate(date),
       startTime: this.state.selectedTime(),
