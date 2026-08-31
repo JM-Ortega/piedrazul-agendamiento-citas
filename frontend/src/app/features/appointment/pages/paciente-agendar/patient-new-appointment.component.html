@@ -1,15 +1,11 @@
 <div class="h-screen bg-blue-50 px-8 py-4">
   <div>
     <div class="mb-6">
-      <app-button
-        variant="link"
-        (buttonClick)="goBack()"
-        extraClass="!px-0 !py-1"
-      >
-        <svg lucideArrowLeft [size]="20"></svg>Volver al inicio
+      <app-button variant="plain" (buttonClick)="goBack()">
+        <svg lucideArrowLeft [size]="20"></svg>Volver
       </app-button>
-      <h1 class="text-[#215c98] text-3xl font-bold">Nueva Cita</h1>
-      <p class="text-gray-500 text-lg mt-1">Agende una cita médica</p>
+      <h1 class="text-[#215c98] text-xl font-bold">Nueva Cita</h1>
+      <p class="text-gray-500 text-2sm">Agende una cita médica</p>
     </div>
 
     <app-appointment-booking

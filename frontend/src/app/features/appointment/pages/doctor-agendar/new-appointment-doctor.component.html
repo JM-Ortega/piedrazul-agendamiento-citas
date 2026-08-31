@@ -1,14 +1,14 @@
-<div class="h-screen bg-blue-50 px-8 py-4">
+<div class="h-screen bg-blue-50 px-8 py-2">
   <div>
-    <div class="mb-6">
+    <div class="items-center mb-2 gap-4">
       <app-button variant="plain" (buttonClick)="goToDashboard()">
-        <svg lucideArrowLeft [size]="20"></svg> Volver al inicio
+        <svg lucideArrowLeft [size]="20"></svg> Volver
       </app-button>
 
-      <div class="flex items-center gap-4">
-        <h1 class="text-[#215c98] text-2xl font-bold">Nueva Cita</h1>
+      <div>
+        <h1 class="text-[#215c98] text-xl font-bold">Nueva Cita</h1>
         @if (patientDocument()) {
-          <p class="text-gray-500 text-3sm mt-1">
+          <p class="text-gray-500 text-2sm">
             Agendando cita para el paciente con documento
             <span class="font-semibold text-[#215c98]">{{
               patientDocument()
