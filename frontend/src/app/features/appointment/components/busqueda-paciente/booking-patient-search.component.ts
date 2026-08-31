@@ -61,7 +61,6 @@ export class BookingPatientSearchComponent {
 
   patientConfirmed = output<void>();
   patientMissing = output<void>();
-  changeMode = output<void>();
   showSuggestions = signal(false);
 
   docInputWarning = signal('');
@@ -174,11 +173,6 @@ export class BookingPatientSearchComponent {
 
   confirmPatient(): void {
     this.patientConfirmed.emit();
-  }
-
-  onChangeMode(): void {
-    this.state.resetSearchState();
-    this.changeMode.emit();
   }
 
   /**
