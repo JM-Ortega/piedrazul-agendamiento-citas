@@ -112,7 +112,7 @@ export class ButtonComponent {
       case 'card':
         return `${baseClasses} bg-white rounded-xl shadow-lg px-12 py-7 text-left text-[#215c98] hover:scale-105 active:scale-95 mt-4`;
       case 'plain':
-        return `flex items-center gap-2 ${this.plainTextClass}`;
+        return `flex items-center gap-2 rounded-lg px-3 py-1.5 -mx-3 -my-1.5 hover:bg-black/5 hover:shadow-sm ${this.plainTextClass}`;
       default:
         return baseClasses;
     }
