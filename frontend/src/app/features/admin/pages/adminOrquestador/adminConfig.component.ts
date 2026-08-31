@@ -7,8 +7,9 @@ import {
   signal,
 } from '@angular/core';
 import { LucidePencil, LucideSettings } from '@lucide/angular';
-import { forkJoin, Observable } from 'rxjs';
+import { finalize, forkJoin, Observable } from 'rxjs';
 import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
+import { SearchInputComponent } from '../../../../design-system/molecules/searchInput/searchInput.component';
 import {
   SortControlComponent,
   SortDirection,
@@ -49,10 +50,14 @@ import { AdminService } from '../../service/admin.service';
     ToastComponent,
     PaginationComponent,
     SortControlComponent,
+    SearchInputComponent,
   ],
 })
 export class AdminConfigComponent implements OnInit {
   private adminService = inject(AdminService);
+  // ── Búsqueda ─────────────────────────────────────────────────────────────
+  searchTerm = signal('');
+  searching = signal(false);
 
   // ── State ─────────────────────────────────────────────────────────────────
   doctors = signal<Doctor[]>([]);
@@ -119,47 +124,52 @@ export class AdminConfigComponent implements OnInit {
   // ── Data loading ──────────────────────────────────────────────────────────
   loadDoctors(page = 0): void {
     this.loading.set(true);
+    this.searching.set(true);
     this.errorCarga.set('');
     const sort = `${this.sortField()},${this.sortDirection()}`;
-    this.adminService.getDoctors(page, this.PAGE_SIZE, sort).subscribe({
-      next: (response) => {
-        this.currentPage.set(response.pageNumber);
-        this.totalPages.set(response.totalPages);
-        this.totalElements.set(response.totalElements);
+    const search = this.searchTerm() || undefined;
+    this.adminService
+      .getDoctors(page, this.PAGE_SIZE, sort, search)
+      .pipe(finalize(() => this.searching.set(false)))
+      .subscribe({
+        next: (response) => {
+          this.currentPage.set(response.pageNumber);
+          this.totalPages.set(response.totalPages);
+          this.totalElements.set(response.totalElements);
 
-        const doctors = response.content;
-        if (!doctors.length) {
-          this.doctors.set([]);
+          const doctors = response.content;
+          if (!doctors.length) {
+            this.doctors.set([]);
+            this.loading.set(false);
+            return;
+          }
+
+          forkJoin(
+            doctors.map((d) => this.adminService.getSchedulesByDoctor(d.id))
+          ).subscribe({
+            next: (allSchedules) => {
+              this.doctors.set(
+                doctors.map((d, i) => ({
+                  ...d,
+                  workdays: d.workdays ?? [],
+                  ...this.mapSchedulesToDoctor(allSchedules[i]),
+                }))
+              );
+              this.loading.set(false);
+            },
+            error: () => {
+              this.doctors.set(
+                doctors.map((d) => ({ ...d, workdays: d.workdays ?? [] }))
+              );
+              this.loading.set(false);
+            },
+          });
+        },
+        error: (err: AppError) => {
+          this.errorCarga.set(err.message);
           this.loading.set(false);
-          return;
-        }
-
-        forkJoin(
-          doctors.map((d) => this.adminService.getSchedulesByDoctor(d.id))
-        ).subscribe({
-          next: (allSchedules) => {
-            this.doctors.set(
-              doctors.map((d, i) => ({
-                ...d,
-                workdays: d.workdays ?? [],
-                ...this.mapSchedulesToDoctor(allSchedules[i]),
-              }))
-            );
-            this.loading.set(false);
-          },
-          error: () => {
-            this.doctors.set(
-              doctors.map((d) => ({ ...d, workdays: d.workdays ?? [] }))
-            );
-            this.loading.set(false);
-          },
-        });
-      },
-      error: (err: AppError) => {
-        this.errorCarga.set(err.message);
-        this.loading.set(false);
-      },
-    });
+        },
+      });
   }
 
   // ── Edit handlers ─────────────────────────────────────────────────────────
@@ -171,7 +181,16 @@ export class AdminConfigComponent implements OnInit {
   cancelEdit(): void {
     this.editingId.set(null);
   }
+  onSearch(term: string): void {
+    this.applySearch(term);
+  }
 
+  private applySearch(value: string): void {
+    const trimmed = value.trim();
+    if (trimmed === this.searchTerm()) return;
+    this.searchTerm.set(trimmed);
+    this.loadDoctors(0);
+  }
   onFormSaved(event: DoctorSaveEvent): void {
     const { form, originalDoctor, removedWorkdays } = event;
     if (this.savingDoctorId() === form.id) return;
@@ -358,8 +377,15 @@ export class AdminConfigComponent implements OnInit {
   }
 
   private reloadDoctor(doctorId: string, fallback: Doctor): void {
+    const sort = `${this.sortField()},${this.sortDirection()}`;
+    const search = this.searchTerm() || undefined;
     forkJoin([
-      this.adminService.getDoctors(this.currentPage(), this.PAGE_SIZE),
+      this.adminService.getDoctors(
+        this.currentPage(),
+        this.PAGE_SIZE,
+        sort,
+        search
+      ),
       this.adminService.getSchedulesByDoctor(doctorId),
     ]).subscribe({
       next: ([doctorsPage, schedules]) => {

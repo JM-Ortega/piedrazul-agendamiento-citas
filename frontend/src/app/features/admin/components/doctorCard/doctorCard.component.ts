@@ -55,7 +55,13 @@ export class DoctorCardComponent {
   // ── Eventos ───────────────────────────────────────────────────────────────
   /** Emite el doctor actual para que el padre abra el modo edición. */
   handleEdit(): void {
+    this.hoveredButton.set(false);
     this.edit.emit(this.doctor());
+  }
+  /** Emite el doctor actual para que el padre abra el modal de habilitar/deshabilitar. */
+  handleToggle(): void {
+    this.hoveredStatus.set(false);
+    this.toggleModal.emit(this.doctor());
   }
 
   // ── Horario ───────────────────────────────────────────────────────────────

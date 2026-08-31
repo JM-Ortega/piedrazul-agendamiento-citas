@@ -75,7 +75,7 @@ export class AdminDoctorsComponent implements OnInit {
   readonly sortOptions: SortOption[] = [
     { value: 'firstName', label: 'Nombre' },
     { value: 'lastName', label: 'Apellido' },
-    { value: 'identification', label: 'Documento' },
+    { value: 'documentId', label: 'Documento' },
   ];
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────

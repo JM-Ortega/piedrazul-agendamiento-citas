@@ -13,7 +13,6 @@ import {
   LucideCreditCard,
   LucideDownload,
   LucideFileSpreadsheet,
-  LucideFilter,
 } from '@lucide/angular';
 import { KEYCLOAK_EVENT_SIGNAL } from 'keycloak-angular';
 import { DoctorService } from '../../../core/services/doctor.service';
@@ -64,7 +63,6 @@ interface ColumnDef {
     LucideCreditCard,
     LucideDownload,
     LucideFileSpreadsheet,
-    LucideFilter,
     ExportModalComponent,
     PaginationComponent,
     FiltersComponent,

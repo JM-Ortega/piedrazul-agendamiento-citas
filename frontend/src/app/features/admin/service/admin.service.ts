@@ -40,11 +40,16 @@ export class AdminService {
   getDoctors(
     page = 0,
     size = 4,
-    sort = 'appointmentInterval,asc'
+    sort = 'appointmentInterval,asc',
+    search?: string
   ): Observable<PageResponse<Doctor>> {
+    const params: Record<string, string | number> = { page, size, sort };
+    if (search) {
+      params['search'] = search;
+    }
     return this.http.get<PageResponse<Doctor>>(
       `${this.apiUrl}/doctor/detailed`,
-      { params: { page, size, sort } }
+      { params }
     );
   }
 

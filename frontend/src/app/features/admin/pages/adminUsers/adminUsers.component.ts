@@ -68,7 +68,7 @@ export class AdminUsersComponent implements OnInit {
   readonly sortOptions: SortOption[] = [
     { value: 'firstName', label: 'Nombre' },
     { value: 'lastName', label: 'Apellido' },
-    { value: 'identification', label: 'Documento' },
+    { value: 'documentId', label: 'Documento' },
   ];
 
   // ── Estilos por tipo de usuario ──────────────────────────────────────────

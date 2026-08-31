@@ -99,7 +99,7 @@
           extraClass="!w-auto !py-1.5 !px-4 !rounded-lg !flex !items-center !gap-2"
           (mouseenter)="hoveredStatus.set(true)"
           (mouseleave)="hoveredStatus.set(false)"
-          (buttonClick)="toggleModal.emit(doctor())"
+          (buttonClick)="handleToggle()"
         >
           @if (doctor().status !== false) {
             <svg lucidePower [size]="16"></svg>
