@@ -13,22 +13,23 @@ import { timer } from 'rxjs';
 import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
-import { BookingSpecialtySelectorComponent } from '../../../appointment/components/seleccion-especialidad/booking-specialty-selector.component';
-import { BookingScheduleSelectorComponent } from '../../../appointment/components/seleccion-horario/booking-schedule-selector.component';
+import { BookingSchedulingComponent } from '../../../appointment/components/agendamiento/booking-scheduling.component';
 import { BookingPatientSearchComponent } from '../../components/busqueda-paciente/booking-patient-search.component';
 import { BookingPatientRegisterComponent } from '../../components/registro-paciente/booking-patient-register.component';
 import { SpecialtyDoctor } from '../../models/dtos/specialty-doctor.dto';
 import { BookingContext } from '../../models/types/bookingContext.type';
-import { BookingMode } from '../../models/types/bookingMode.type';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { BookingConfirmComponent } from '../confirmacion/booking-confirm.component';
-import { BookingModeSelectorComponent } from '../modo-agendamiento/booking-mode-selector.component';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 
 /**
  * Coordina el flujo de agendamiento componiendo los
  * componentes hermanos en el orden correcto según el contexto y step actual.
+ *
+ * Ya no existe selección de "modo" de agendamiento: el comportamiento
+ * (qué inputs se muestran, qué petición trae los médicos) depende
+ * únicamente de `context`.
  */
 @Component({
   selector: 'app-appointment-booking',
@@ -36,11 +37,9 @@ import { AppError } from '../../../../shared/models/interfaces/api-error.model';
   providers: [BookingStateService],
   imports: [
     CommonModule,
-    BookingModeSelectorComponent,
     BookingPatientSearchComponent,
     BookingPatientRegisterComponent,
-    BookingSpecialtySelectorComponent,
-    BookingScheduleSelectorComponent,
+    BookingSchedulingComponent,
     BookingConfirmComponent,
     ButtonComponent,
   ],
@@ -72,8 +71,9 @@ export class AppointmentBookingComponent implements OnInit {
   private pendingDocumentNumber = '';
 
   /**
-   * Especialidad e id del médico a preseleccionar en contexto `doctor`,
-   * usados al reagendar desde una cita previa.
+   * Especialidad e id del médico a preseleccionar en contexto `doctor`
+   * (tanto para el médico en sesión por defecto como al reagendar desde
+   * una cita previa). El usuario puede cambiar ambos libremente.
    */
   @Input() prefillSpecialty = '';
   @Input() prefillDoctorId = '';
@@ -93,24 +93,29 @@ export class AppointmentBookingComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.state.context.set(this.context);
+    this.state.initContext(this.context);
     if (this.state.isDoctorContext()) {
       this.initDoctorContext();
+    } else if (this.state.isPatientContext()) {
+      this.initPatientContext();
     }
   }
 
+  private initPatientContext(): void {
+    this.state.step.set(this.state.schedulingStep());
+    this.loadDoctors();
+  }
+
   /**
-   * Inicializa el flujo cuando un médico agenda una cita.
-   * En el paso de especialidad carga TODAS las especialidades
-   * disponibles y, si además llegaronm `prefillSpecialty`/`prefillDoctorId`,
-   * se preselecciona esa combinación.
+   * Inicializa el flujo cuando un médico agenda una cita. Si llega
+   * `documentNumber`, primero busca al paciente para tener su id
+   * disponible (por si afecta la disponibilidad de médicos).
    */
   private initDoctorContext(): void {
-    this.state.bookingMode.set('specialty-doctor');
-    this.state.step.set(this.state.specialtyStep());
+    this.state.step.set(this.state.schedulingStep());
 
     if (!this.pendingDocumentNumber) {
-      this.finishDoctorInit();
+      this.loadDoctors();
       return;
     }
 
@@ -120,40 +125,18 @@ export class AppointmentBookingComponent implements OnInit {
         next: (patient) => {
           this.state.foundPatient.set(patient);
           this.state.patientId.set(patient?.id ?? null);
-          this.finishDoctorInit();
+          this.loadDoctors();
         },
         error: (err: AppError) => {
           this.state.globalErrorMessage.set(err.message);
+          this.loadDoctors();
         },
       });
   }
 
-  private finishDoctorInit(): void {
-    this.loadSpecialtiesForMode('specialty-doctor');
-    this.applyPrefillSelection();
-    this.state.step.set(this.state.specialtyStep());
-  }
-
-  /**
-   * Si llegó especialidad + id de médico de una cita previa, selecciona esa
-   * especialidad y carga sus médicos para preseleccionar el médico indicado
-   * sin restringir el resto de especialidades ya cargadas.
-   */
-  private applyPrefillSelection(): void {
-    if (!this.prefillSpecialty || !this.prefillDoctorId) return;
-    this.loadDoctorsBySpecialty(this.prefillSpecialty, this.prefillDoctorId);
-  }
-
-  onModeSelected(mode: BookingMode): void {
-    if (!this.state.isSchedulerContext()) {
-      this.loadSpecialtiesForMode(mode);
-    }
-  }
-
   /**
    * Al confirmar un paciente encontrado, determina si es paciente nuevo
-   * antes de avanzar, para que el paso de especialidad pueda restringir
-   * opciones según corresponda.
+   * antes de avanzar, y carga los médicos para el paso de agendamiento.
    */
   onPatientConfirmed(): void {
     const patientId = this.state.patientId();
@@ -161,19 +144,19 @@ export class AppointmentBookingComponent implements OnInit {
       this.patientAppointmentService.hasAppointments(patientId).subscribe({
         next: (isNew) => {
           this.state.isNewPatient.set(isNew);
-          this.loadSpecialtiesForMode(this.state.bookingMode());
-          this.state.step.set(this.state.specialtyStep());
+          this.loadDoctors();
+          this.state.step.set(this.state.schedulingStep());
         },
         error: (err: AppError) => {
           this.state.globalErrorMessage.set(err.message);
           this.state.isNewPatient.set(false);
-          this.loadSpecialtiesForMode(this.state.bookingMode());
-          this.state.step.set(this.state.specialtyStep());
+          this.loadDoctors();
+          this.state.step.set(this.state.schedulingStep());
         },
       });
     } else {
-      this.loadSpecialtiesForMode(this.state.bookingMode());
-      this.state.step.set(this.state.specialtyStep());
+      this.loadDoctors();
+      this.state.step.set(this.state.schedulingStep());
     }
   }
 
@@ -184,7 +167,6 @@ export class AppointmentBookingComponent implements OnInit {
   onSearchChangeMode(): void {
     this.patientSubStep = 'search';
     this.pendingSearchDocument = '';
-    this.state.bookingMode.set(null);
     this.state.step.set(1);
   }
 
@@ -203,8 +185,8 @@ export class AppointmentBookingComponent implements OnInit {
   // Eventos de BookingPatientRegister
   onRegisterAdvance(): void {
     this.state.isNewPatient.set(true);
-    this.loadSpecialtiesForMode(this.state.bookingMode());
-    this.state.step.set(this.state.specialtyStep());
+    this.loadDoctors();
+    this.state.step.set(this.state.schedulingStep());
   }
 
   onRegisterGoBack(): void {
@@ -216,39 +198,24 @@ export class AppointmentBookingComponent implements OnInit {
     this.state.searchError.set('');
   }
 
-  // Eventos de BookingSpecialtySelector
-  onSpecialtyChanged(specialty: string): void {
-    this.loadDoctorsBySpecialty(specialty);
+  // Eventos de BookingScheduling
+  onSchedulingAdvance(): void {
+    this.state.step.set(this.state.confirmStep());
   }
 
-  onSpecialtyAdvance(): void {
-    this.state.step.set(this.state.scheduleStep());
-  }
-
-  onSpecialtyBack(): void {
-    this.state.resetSpecialtyState();
+  onSchedulingBack(): void {
     if (this.state.isSchedulerContext()) {
+      this.state.resetDoctorState();
       this.patientSubStep = this.state.notFound() ? 'register' : 'search';
       this.state.step.set(this.state.patientLookupStep()!);
       return;
     }
-    if (this.state.isDoctorContext()) {
-      this.goBack.emit();
-      return;
-    }
-    this.state.bookingMode.set(null);
-  }
-
-  onScheduleAdvance(): void {
-    this.state.step.set(this.state.confirmStep());
-  }
-
-  onScheduleBack(): void {
-    this.state.step.set(this.state.specialtyStep());
+    // doctor / patient: no hay paso previo dentro del flujo, se sale de él
+    this.goBack.emit();
   }
 
   onConfirmBack(): void {
-    this.state.step.set(this.state.scheduleStep());
+    this.state.step.set(this.state.schedulingStep());
   }
 
   /** Tras confirmar la cita, espera 3s para mostrar el mensaje de éxito y cierra el flujo. */
@@ -263,112 +230,30 @@ export class AppointmentBookingComponent implements OnInit {
   }
 
   // Carga de datos
-  private loadSpecialtiesForMode(mode: BookingMode): void {
-    this.state.noSpecialtyAvailable.set(false);
-    this.state.errorMessageSpecialty.set('');
-    this.state.globalErrorMessage.set('');
-
-    if (mode === 'specialty') {
-      this.loadSpecialtiesWithDoctor();
-    } else if (mode === 'specialty-doctor') {
-      this.loadSpecialties();
-    }
-  }
-
   /**
-   * Carga especialidades con su médico ya asignado (modo `specialty`).
-   */
-  private loadSpecialtiesWithDoctor(): void {
-    const patientId = this.resolvePatientIdForSpecialties() || null;
-
-    this.citaService.getSpecialtiesWithDoctor(patientId).subscribe({
-      next: (data) => {
-        this.state.specialtiesWithDoctor.set(data);
-      },
-      error: (err: AppError) => {
-        if (
-          err.errorCode === 'NO_ACTIVE_DOCTORS' ||
-          err.errorCode === 'NO_AVAILABLE_DOCTORS'
-        ) {
-          this.state.noSpecialtyAvailable.set(true);
-          this.state.errorMessageSpecialty.set(err.message);
-        } else {
-          this.state.globalErrorMessage.set(err.message);
-        }
-      },
-    });
-  }
-
-  private loadSpecialties(): void {
-    const patientId = this.resolvePatientIdForSpecialties();
-
-    if (!patientId) {
-      this.traerEspecialidades(null);
-      return;
-    }
-    this.traerEspecialidades(patientId);
-  }
-
-  /**
-   * Carga especialidades sin médico asignado (modo `specialty-doctor`,
-   * usado tanto por el agendador/paciente sin médico elegido como por el
-   * contexto `doctor`).
+   * Carga la lista de médicos para el contexto actual:
+   * - `patient`: `getDoctors`, sin filtrar por especialidad.
+   * - `doctor` / `scheduler`: `getSpecialtiesWithDoctor`, cada médico trae
+   *   sus propias especialidades.
    *
-   * @param patientId - Id del paciente para filtrar especialidades, o `null` si no aplica.
+   * En contexto `doctor`, si llegó `prefillDoctorId`, intenta preseleccionar
+   * ese médico (y su especialidad) una vez cargada la lista.
    */
-  private traerEspecialidades(patientId: string | null): void {
-    this.citaService.getSpecialties(patientId).subscribe({
-      next: (specs) => {
-        this.state.specialtiesWithDoctor.set(
-          specs.map((s) => ({
-            specialty: [s],
-            id: '',
-            name: '',
-            laborStart: null,
-            laborEnd: null,
-            bookingWindowWeeks: null,
-            workdays: [],
-          }))
-        );
-        if (this.prefillSpecialty && specs.includes(this.prefillSpecialty)) {
-          this.state.selectedSpecialty.set(this.prefillSpecialty);
-        }
-      },
-      error: (err: AppError) => {
-        if (
-          err.errorCode === 'NO_ACTIVE_DOCTORS' ||
-          err.errorCode === 'NO_AVAILABLE_DOCTORS'
-        ) {
-          this.state.noSpecialtyAvailable.set(true);
-          this.state.errorMessageSpecialty.set(err.message);
-        } else {
-          this.state.globalErrorMessage.set(err.message);
-        }
-      },
-    });
-  }
-
-  /**
-   * Carga los médicos disponibles para una especialidad elegida. Si se
-   * indica `preselectDoctorId`, intenta preseleccionar ese médico
-   * una vez cargada la lista (usado al reagendar desde una cita previa).
-   *
-   * @param specialty - Especialidad seleccionada por el usuario.
-   * @param preselectDoctorId - Id del médico a preseleccionar tras cargar, si aplica.
-   */
-  private loadDoctorsBySpecialty(
-    specialty: string,
-    preselectDoctorId?: string
-  ): void {
+  private loadDoctors(): void {
     this.state.noDoctorsFound.set(false);
     this.state.errorMessageDoctors.set('');
-    this.state.doctorsBySpecialty.set([]);
+    this.state.globalErrorMessage.set('');
 
-    this.citaService.getDoctorsBySpecialty(specialty).subscribe({
+    const patientId = this.state.resolvePatientId() || null;
+    const request$ = this.state.isPatientContext()
+      ? this.citaService.getDoctors(patientId)
+      : this.citaService.getSpecialtiesWithDoctor(patientId);
+
+    request$.subscribe({
       next: (docs) => {
-        this.state.doctorsBySpecialty.set(docs);
-        if (preselectDoctorId) {
-          this.preselectDoctorFromList(docs, preselectDoctorId);
+        this.state.doctors.set(docs);
+        if (this.state.isDoctorContext()) {
+          this.applyDoctorPrefill(docs);
         }
       },
       error: (err: AppError) => {
@@ -386,42 +271,29 @@ export class AppointmentBookingComponent implements OnInit {
   }
 
   /**
-   * Preselecciona un médico dentro de una lista disponible utilizando su identificador.
+   * Preselecciona médico y especialidad en contexto `doctor` a partir de
+   * `prefillDoctorId`/`prefillSpecialty`, sin restringir el resto de
+   * médicos/especialidades ya cargados: el usuario puede cambiar ambos.
    *
-   * Si el médico especificado existe en la lista, actualiza el estado local con su ID y nombre.
-   * De lo contrario, establece un mensaje de error indicando que el médico ya no está disponible.
-   *
-   * @param docs - Lista de médicos disponibles para la especialidad (`SpecialtyDoctor[]`).
-   * @param doctorId - Identificador único del médico a buscar (`string`).
+   * @param docs - Lista de médicos ya cargada.
    */
-  private preselectDoctorFromList(
-    docs: SpecialtyDoctor[],
-    doctorId: string
-  ): void {
-    const match = docs.find((d) => d.id === doctorId);
+  private applyDoctorPrefill(docs: SpecialtyDoctor[]): void {
+    if (!this.prefillDoctorId) return;
+
+    const match = docs.find((d) => d.id === this.prefillDoctorId);
     if (!match) {
       this.state.errorMessageDoctors.set(
-        'El médico de la cita anterior ya no está disponible para esta especialidad. Seleccione uno nuevo.'
+        'El médico de la cita anterior ya no está disponible. Seleccione uno nuevo.'
       );
       return;
     }
+
     this.state.selectedDoctorId.set(match.id);
     this.state.selectedDoctorName.set(match.name);
-  }
-
-  /**
-   * Obtiene el ID del paciente según el contexto actual del proceso de agendamiento.
-   *
-   * - En contexto de agendador (`isSchedulerContext`): Retorna directamente el ID del paciente en el estado.
-   * - En otros contextos: Intenta obtener el ID del estado principal o, en su defecto,
-   *   del snapshot del paciente (`patientSnapshot`).
-   *
-   * @returns {string} El ID del paciente identificado o una cadena vacía si no existe.
-   */
-  private resolvePatientIdForSpecialties(): string {
-    if (this.state.isSchedulerContext()) {
-      return this.state.patientId() ?? '';
-    }
-    return this.state.patientId() ?? this.state.patientSnapshot()?.id ?? '';
+    this.state.selectedSpecialty.set(
+      this.prefillSpecialty && match.specialty.includes(this.prefillSpecialty)
+        ? this.prefillSpecialty
+        : (match.specialty[0] ?? '')
+    );
   }
 }

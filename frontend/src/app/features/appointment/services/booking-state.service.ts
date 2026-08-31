@@ -3,44 +3,42 @@ import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { PatientSuggestion } from '../models/dtos/patient-suggestion.dto';
 import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
 import { BookingContext } from '../models/types/bookingContext.type';
-import { BookingMode } from '../models/types/bookingMode.type';
 import { toIsoDateString } from '../../../shared/helpers/transform-date-local';
+import { formatLongDateEs } from '../../../shared/helpers/date-format';
+
+/** Especialidad fija con la que se agenda cuando el contexto es `patient`. */
+export const PATIENT_DEFAULT_SPECIALTY = 'TERAPIA_NEURAL';
 
 /**
  * Servicio de estado compartido para el flujo de agendamiento de citas.
- * Actúa como la única fuente de verdad para todos los componentes
- * hermanos del flujo: patient-search, patient-register, specialty-selector,
- * schedule-selector y confirm.
+ * Única fuente de verdad para los componentes hermanos del flujo:
+ * patient-search, patient-register, booking-scheduling y confirm.
+ *
+ * El flujo ya no depende de un "modo" de agendamiento: el comportamiento
+ * (qué inputs se muestran, qué petición trae los médicos, si la
+ * especialidad es editable) depende únicamente de `context`.
  */
 @Injectable()
 export class BookingStateService {
   context = signal<BookingContext>('patient');
 
   readonly isSchedulerContext = computed(() => this.context() === 'scheduler');
-
   readonly isDoctorContext = computed(() => this.context() === 'doctor');
+  readonly isPatientContext = computed(() => this.context() === 'patient');
 
-  bookingMode = signal<BookingMode>(null);
   step = signal<number>(1);
 
   readonly patientLookupStep = computed(() =>
     this.isSchedulerContext() ? 1 : null
   );
-  readonly specialtyStep = computed(() => (this.isSchedulerContext() ? 2 : 1));
-  readonly scheduleStep = computed(() => (this.isSchedulerContext() ? 3 : 2));
-  readonly confirmStep = computed(() => (this.isSchedulerContext() ? 4 : 3));
+  readonly schedulingStep = computed(() => (this.isSchedulerContext() ? 2 : 1));
+  readonly confirmStep = computed(() => (this.isSchedulerContext() ? 3 : 2));
 
   readonly stepLabels = computed(() => {
     if (this.isSchedulerContext())
-      return ['1. Paciente', '2. Especialidad', '3. Horario', '4. Confirmar'];
-    return ['1. Especialidad', '2. Horario', '3. Confirmar'];
+      return ['1. Paciente', '2. Agendamiento', '3. Confirmar'];
+    return ['1. Agendamiento', '2. Confirmar'];
   });
-
-  readonly modeSelectionLabel = computed(() =>
-    this.isSchedulerContext()
-      ? '¿Cómo desea agendar la cita?'
-      : '¿Cómo desea agendar su cita?'
-  );
 
   readonly successMessage = computed(() => {
     if (this.isSchedulerContext() || this.isDoctorContext())
@@ -74,48 +72,38 @@ export class BookingStateService {
     guardianPhone: '',
   });
 
-  specialtiesWithDoctor = signal<SpecialtyDoctor[]>([]);
-  doctorsBySpecialty = signal<SpecialtyDoctor[]>([]);
-  selectedSpecialty = signal<string>('');
-  assignedDoctor = signal<SpecialtyDoctor | null>(null);
+  /**
+   * Lista de médicos disponibles para el contexto actual.
+   * - `patient`: viene de `getDoctors`, `specialty` de cada entrada se ignora.
+   * - `doctor` / `scheduler`: viene de `getSpecialtiesWithDoctor`, cada
+   *   entrada trae las especialidades propias de ese médico.
+   */
+  doctors = signal<SpecialtyDoctor[]>([]);
   selectedDoctorId = signal<string>('');
   selectedDoctorName = signal<string>('');
+  selectedSpecialty = signal<string>('');
 
-  noSpecialtyAvailable = signal<boolean>(false);
-  errorMessageSpecialty = signal<string>('');
   noDoctorsFound = signal<boolean>(false);
   errorMessageDoctors = signal<string>('');
   globalErrorMessage = signal<string>('');
 
-  readonly uniqueSpecialties = computed(() => [
-    ...new Set(
-      this.specialtiesWithDoctor()
-        .flatMap((s) => s.specialty)
-        .filter(
-          (specialty): specialty is string =>
-            typeof specialty === 'string' && specialty.trim() !== ''
-        )
-    ),
-  ]);
-
-  readonly effectiveDoctor = computed<SpecialtyDoctor | null>(() => {
-    if (this.isDoctorContext()) {
-      return (
-        this.doctorsBySpecialty().find(
-          (d) => d.id === this.selectedDoctorId()
-        ) ?? null
-      );
-    }
-    return this.bookingMode() === 'specialty'
-      ? this.assignedDoctor()
-      : (this.doctorsBySpecialty().find(
-          (d) => d.id === this.selectedDoctorId()
-        ) ?? null);
+  /** Especialidades seleccionables para el médico actualmente elegido (doctor/scheduler). */
+  readonly specialtyOptionsForSelectedDoctor = computed(() => {
+    const doctor = this.doctors().find((d) => d.id === this.selectedDoctorId());
+    return doctor?.specialty ?? [];
   });
 
-  readonly effectiveDoctorId = computed(() => this.effectiveDoctor()?.id ?? '');
+  readonly selectedDoctor = computed<SpecialtyDoctor | null>(
+    () => this.doctors().find((d) => d.id === this.selectedDoctorId()) ?? null
+  );
 
-  //Estado de horario
+  /** `true` cuando ya hay suficiente información de médico/especialidad para mostrar el calendario. */
+  readonly doctorSpecialtyComplete = computed(() => {
+    if (this.isPatientContext()) return !!this.selectedDoctorId();
+    return !!this.selectedDoctorId() && !!this.selectedSpecialty();
+  });
+
+  // Estado de horario
   selectedDate = signal<Date | null>(null);
   selectedTime = signal<string>('');
   availableSlots = signal<string[]>([]);
@@ -180,49 +168,10 @@ export class BookingStateService {
     return this.patientSnapshot()?.birthDate ?? '';
   });
 
-  readonly confirmDoctorName = computed(() => {
-    if (this.isDoctorContext()) return this.selectedDoctorName();
-    return this.bookingMode() === 'specialty'
-      ? (this.assignedDoctor()?.name ?? '')
-      : this.selectedDoctorName();
-  });
-
   readonly confirmDate = computed(() => {
-    const d = this.selectedDate();
-    if (!d) return '';
-    const days = [
-      'Domingo',
-      'Lunes',
-      'Martes',
-      'Miércoles',
-      'Jueves',
-      'Viernes',
-      'Sábado',
-    ];
-    const months = [
-      'Enero',
-      'Febrero',
-      'Marzo',
-      'Abril',
-      'Mayo',
-      'Junio',
-      'Julio',
-      'Agosto',
-      'Septiembre',
-      'Octubre',
-      'Noviembre',
-      'Diciembre',
-    ];
-    return `${days[d.getDay()]} ${d.getDate()} de ${months[d.getMonth()]} de ${d.getFullYear()}`;
-  });
-
-  readonly canGoToScheduleStep = computed(() => {
-    if (this.isDoctorContext()) {
-      return !!this.selectedSpecialty() && !!this.selectedDoctorId();
-    }
-    return this.bookingMode() === 'specialty'
-      ? !!this.selectedSpecialty() && !!this.assignedDoctor()
-      : !!this.selectedSpecialty() && !!this.selectedDoctorId();
+    const date = this.selectedDate();
+    if (!date) return '';
+    return formatLongDateEs(date);
   });
 
   readonly canGoToConfirmStep = computed(
@@ -239,6 +188,44 @@ export class BookingStateService {
     return this.patientSnapshot()?.id ?? '';
   }
 
+  /**
+   * Inicializa el contexto del flujo. Para `patient` fija de una vez la
+   * especialidad, ya que en ese contexto no hay selector de especialidad.
+   */
+  initContext(context: BookingContext): void {
+    this.context.set(context);
+    if (context === 'patient') {
+      this.selectedSpecialty.set(PATIENT_DEFAULT_SPECIALTY);
+    }
+  }
+
+  /**
+   * Selecciona un médico y limpia en cascada todo lo que dependía de la
+   * selección anterior (especialidad —salvo en `patient`—, fecha, hora y slots).
+   */
+  selectDoctor(doctorId: string): void {
+    this.selectedDoctorId.set(doctorId);
+    const doctor = this.doctors().find((d) => d.id === doctorId);
+    this.selectedDoctorName.set(doctor?.name ?? '');
+    this.selectedSpecialty.set(
+      this.isPatientContext() ? PATIENT_DEFAULT_SPECIALTY : ''
+    );
+    this.resetScheduleState();
+  }
+
+  /** Selecciona una especialidad (doctor/scheduler) y limpia fecha, hora y slots. */
+  selectSpecialty(specialty: string): void {
+    this.selectedSpecialty.set(specialty);
+    this.resetScheduleState();
+  }
+
+  /** Selecciona una fecha y limpia la hora previamente elegida. */
+  selectDate(date: Date | null): void {
+    this.selectedDate.set(date);
+    this.selectedTime.set('');
+    this.availableSlots.set([]);
+  }
+
   resetSearchState(): void {
     this.searchQuery.set('');
     this.searchSuggestions.set([]);
@@ -249,17 +236,17 @@ export class BookingStateService {
     this.patientId.set(null);
   }
 
-  resetSpecialtyState(): void {
-    this.selectedSpecialty.set('');
-    this.assignedDoctor.set(null);
+  /** Limpia toda la selección de médico/especialidad/horario (usado al volver a buscar paciente). */
+  resetDoctorState(): void {
+    this.doctors.set([]);
     this.selectedDoctorId.set('');
     this.selectedDoctorName.set('');
-    this.doctorsBySpecialty.set([]);
-    this.specialtiesWithDoctor.set([]);
-    this.noSpecialtyAvailable.set(false);
-    this.errorMessageSpecialty.set('');
+    if (!this.isPatientContext()) {
+      this.selectedSpecialty.set('');
+    }
     this.noDoctorsFound.set(false);
     this.errorMessageDoctors.set('');
+    this.resetScheduleState();
   }
 
   resetScheduleState(): void {

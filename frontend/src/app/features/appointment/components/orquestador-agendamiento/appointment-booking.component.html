@@ -1,68 +1,37 @@
-@if (state.bookingMode() === null) {
-  <app-booking-mode-selector
-    (modeSelected)="onModeSelected($event)"
-  ></app-booking-mode-selector>
-}
-
-@if (state.bookingMode() !== null) {
-  <div class="flex gap-2 mb-6">
-    @for (label of state.stepLabels(); track label; let i = $index) {
-      <div
-        class="flex-1 text-center py-2 rounded-xl text-sm font-medium transition-all"
-        [ngClass]="{
-          'bg-[#215c98] text-white shadow': state.step() === i + 1,
-          'bg-green-100 text-green-700': state.step() > i + 1,
-          'bg-white text-gray-400 border border-gray-200': state.step() < i + 1,
-        }"
-      >
-        {{ label }}
-      </div>
-    }
-  </div>
-
-  <div class="bg-white rounded-2xl shadow-xl p-8">
-    @if (isPatientStep) {
-      @if (patientSubStep === 'search') {
-        <app-booking-patient-search
-          [prefillDocument]="pendingSearchDocument"
-          (patientConfirmed)="onPatientConfirmed()"
-          (patientMissing)="onPatientMissing()"
-          (changeMode)="onSearchChangeMode()"
-        ></app-booking-patient-search>
-      }
-
-      @if (patientSubStep === 'register') {
-        <app-booking-patient-register
-          (advance)="onRegisterAdvance()"
-          (goBack)="onRegisterGoBack()"
-          (documentAlreadyExists)="onExistingDocumentConfirmed($event)"
-        ></app-booking-patient-register>
-      }
+<div class="bg-white rounded-2xl shadow-xl px-4 py-3">
+  @if (isPatientStep) {
+    @if (patientSubStep === 'search') {
+      <app-booking-patient-search
+        [prefillDocument]="pendingSearchDocument"
+        (patientConfirmed)="onPatientConfirmed()"
+        (patientMissing)="onPatientMissing()"
+        (changeMode)="onSearchChangeMode()"
+      ></app-booking-patient-search>
     }
 
-    @if (state.step() === state.specialtyStep()) {
-      <app-booking-specialty-selector
-        (advance)="onSpecialtyAdvance()"
-        (back)="onSpecialtyBack()"
-        (specialtyChanged)="onSpecialtyChanged($event)"
-      ></app-booking-specialty-selector>
+    @if (patientSubStep === 'register') {
+      <app-booking-patient-register
+        (advance)="onRegisterAdvance()"
+        (goBack)="onRegisterGoBack()"
+        (documentAlreadyExists)="onExistingDocumentConfirmed($event)"
+      ></app-booking-patient-register>
     }
+  }
 
-    @if (state.step() === state.scheduleStep()) {
-      <app-booking-schedule-selector
-        (advance)="onScheduleAdvance()"
-        (back)="onScheduleBack()"
-      ></app-booking-schedule-selector>
-    }
+  @if (state.step() === state.schedulingStep()) {
+    <app-booking-scheduling
+      (advance)="onSchedulingAdvance()"
+      (back)="onSchedulingBack()"
+    ></app-booking-scheduling>
+  }
 
-    @if (state.step() === state.confirmStep() && !state.success()) {
-      <app-booking-confirm
-        (confirmed)="onConfirmed()"
-        (back)="onConfirmBack()"
-      ></app-booking-confirm>
-    }
-  </div>
-}
+  @if (state.step() === state.confirmStep() && !state.success()) {
+    <app-booking-confirm
+      (confirmed)="onConfirmed()"
+      (back)="onConfirmBack()"
+    ></app-booking-confirm>
+  }
+</div>
 
 @if (state.success()) {
   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
