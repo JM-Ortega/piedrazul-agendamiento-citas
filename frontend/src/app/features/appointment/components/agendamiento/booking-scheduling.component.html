@@ -18,12 +18,12 @@
       @if (!state.isPatientContext() && state.selectedDoctorId()) {
         <div>
           <label for="specialty" class="block text-gray-700 font-medium mb-1">
-            Especialidad *
+            Tipo de atención *
           </label>
           <app-select
             [id]="'specialty'"
             [options]="specialtyOptions()"
-            placeholder="Seleccione una especialidad..."
+            placeholder="Seleccione un tipo de atención..."
             [ngModel]="state.selectedSpecialty()"
             (valueChange)="onSpecialtyChange($event)"
           ></app-select>
@@ -81,7 +81,9 @@
           class="h-full min-h-[220px] flex items-center justify-center text-center text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-2xl p-6"
         >
           Seleccione
-          {{ state.isPatientContext() ? 'un médico' : 'médico y especialidad' }}
+          {{
+            state.isPatientContext() ? 'un médico' : 'médico y tipo de atención'
+          }}
           para ver las fechas disponibles.
         </div>
       }
