@@ -259,8 +259,27 @@ export class AdminConfigComponent implements OnInit {
 
   // ── Toggle handlers ───────────────────────────────────────────────────────
   openToggleModal(doctor: Doctor): void {
+    // Si se intenta HABILITAR un médico sin horario configurado,
+    if (!doctor.status && !this.hasScheduleConfigured(doctor)) {
+      this.errorGuardado.set(
+        'Debes añadir un horario laboral al médico antes de poder habilitarlo.'
+      );
+      this.showErrorModal.set(true);
+      return;
+    }
+
     this.doctorToToggle.set(doctor);
     this.showConfirmModal.set(true);
+  }
+  /** True si el médico tiene todos los datos mínimos de horario para poder habilitarse. */
+  private hasScheduleConfigured(doctor: Doctor): boolean {
+    return !!(
+      doctor.startTime &&
+      doctor.endTime &&
+      doctor.workdays?.length &&
+      doctor.laborStart &&
+      doctor.laborEnd
+    );
   }
 
   onCloseToggleModal(): void {

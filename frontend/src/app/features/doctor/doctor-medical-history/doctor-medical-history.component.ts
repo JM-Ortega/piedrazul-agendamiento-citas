@@ -20,6 +20,8 @@ import { DoctorService } from '../../../core/services/doctor.service';
 import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
 import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
 import { ConfirmModalComponent } from '../../../design-system/organisms/confirm-modal/confirm-modal.component';
+import { calcAge } from '../../../shared/helpers/patient-validation';
+import { parseLocalDateString } from '../../../shared/helpers/transform-date-local';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
@@ -70,6 +72,22 @@ export class DoctorMedicalHistoryComponent
   readonly saveError = signal('');
   readonly isSaving = signal(false);
   readonly isLoadingRecords = this.doctorService.isLoadingRecords;
+
+  readonly patientBirthDateFormatted = computed(() => {
+    const p = this.patient();
+    if (!p?.birthDate) return 'No registra';
+    return parseLocalDateString(p.birthDate).toLocaleDateString('es-CO', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  });
+
+  readonly patientAge = computed(() => {
+    const p = this.patient();
+    if (!p?.birthDate) return null;
+    return calcAge(parseLocalDateString(p.birthDate));
+  });
 
   // ── Salida de la ruta (CanDeactivate) ────────────────────────────────────
   /** Modal de confirmación al intentar salir sin haber guardado la atención. */
