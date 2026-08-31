@@ -24,6 +24,7 @@ import { PatientSuggestion } from '../../models/dtos/patient-suggestion.dto';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { formatLongDateEs } from '../../../../shared/helpers/date-format';
 
 const MIN_CHARS = 3;
 const MAX_DOC_LENGTH = 20;
@@ -49,6 +50,7 @@ const MIN_DOC_LENGTH = 6;
 export class BookingPatientSearchComponent {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
+  formatLongDateEs = formatLongDateEs;
 
   /** Si llega un valor, precarga el documento y dispara la búsqueda exacta automáticamente. */
   @Input() set prefillDocument(value: string) {
@@ -211,6 +213,20 @@ export class BookingPatientSearchComponent {
         }
       },
     });
+  }
+
+  calculateAge(birthDate: string): number {
+    const birth = new Date(birthDate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDifference = today.getMonth() - birth.getMonth();
+    if (
+      monthDifference < 0 ||
+      (monthDifference === 0 && today.getDate() < birth.getDate())
+    ) {
+      age--;
+    }
+    return age;
   }
 
   private handleNotFound(identification: string): void {
