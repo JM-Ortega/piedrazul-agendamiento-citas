@@ -43,7 +43,6 @@ public interface PatientModuleApi {
             String lastName,
             String phone,
             String email,
-            UUID userId,
             PatientSex sex,
             LocalDate birthDate,
             String guardianPhone
