@@ -1,7 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.doctors.exception;
 
-public class DoctorHasScheduledAppointments extends RuntimeException {
-  public DoctorHasScheduledAppointments(String message) {
-    super(message);
-  }
+import org.springframework.http.HttpStatus;
+
+public class DoctorHasScheduledAppointments extends DoctorBusinessException {
+    public DoctorHasScheduledAppointments(String message) {
+        super(message, "DOCTOR_SCHEDULED_APPOINTMENTS", HttpStatus.CONFLICT);
+    }
 }
