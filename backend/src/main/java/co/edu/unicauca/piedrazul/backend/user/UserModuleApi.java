@@ -11,7 +11,7 @@ import java.util.UUID;
 public interface UserModuleApi {
     Optional<UserSummary> findUserByUsername(String username);
 
-    List<UserSummary> findSchedulers();
+    List<UserSummary> getSystemUsers();
 
     List<UserSummary> findDoctors();
 
