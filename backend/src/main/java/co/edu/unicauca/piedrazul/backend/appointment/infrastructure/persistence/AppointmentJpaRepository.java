@@ -20,6 +20,8 @@ public interface AppointmentJpaRepository extends JpaRepository<AppointmentEntit
 
     List<AppointmentEntity> findByIdDoctorAndDateAndAppointmentState(UUID idDoctor, LocalDate date, AppointmentState appointmentState);
 
+    List<AppointmentEntity> findByIdDoctorAndAppointmentState(UUID idDoctor, AppointmentState appointmentState);
+
     List<AppointmentEntity> findByIdPatientAndDate(UUID idPatient, LocalDate date);
 
     List<AppointmentEntity> findByAppointmentStateAndDateBefore(AppointmentState state, LocalDate date);
