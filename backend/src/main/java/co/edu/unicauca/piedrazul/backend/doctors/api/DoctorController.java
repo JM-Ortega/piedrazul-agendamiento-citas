@@ -78,7 +78,7 @@ public class DoctorController {
             @ApiResponse(responseCode = "401", description = "No autenticado"),
             @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar doctores")
     })
-    public ResponseEntity<List<DoctorShortResponse>> getAllDoctors() {
+    public ResponseEntity<List<DoctorShortResponse>> getActiveDoctors() {
         List<Doctor> doctors = doctorService.findAllDoctors();
 
         List<Doctor> activeDoctors = doctors.stream()
@@ -92,6 +92,41 @@ public class DoctorController {
         );
 
         List<DoctorShortResponse> responses = activeDoctors.stream()
+                .map(d -> DoctorShortResponse.fromEntity(
+                        d,
+                        names.get(d.getPersonId())
+                ))
+                .toList();
+
+        return ResponseEntity.ok(responses);
+    }
+
+    // No paginar
+    @GetMapping("/neural-doctors")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
+    @Operation(summary = "Listar todos los doctores",
+            description = "Devuelve la lista completa de doctores registrados en el sistema, incluyendo sus especialidades y nombre. La lista puede estar vacía si no hay doctores registrados.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Doctores obtenidos correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar doctores")
+    })
+    public ResponseEntity<List<DoctorShortResponse>> getNeuralDoctors() {
+        List<Doctor> doctors = doctorService.findAllDoctors();
+
+        List<Doctor> neuralDoctors = doctors.stream()
+                .filter(Doctor::isStatus)
+                .filter(d -> d.getSpecialties().stream()
+                        .anyMatch(s -> s.getCode() == SpecialtyCode.TERAPIA_NEURAL))
+                .toList();
+
+        Map<UUID, String> names = personExternalService.getPersonNames(
+                neuralDoctors.stream()
+                        .map(Doctor::getPersonId)
+                        .toList()
+        );
+
+        List<DoctorShortResponse> responses = neuralDoctors.stream()
                 .map(d -> DoctorShortResponse.fromEntity(
                         d,
                         names.get(d.getPersonId())
