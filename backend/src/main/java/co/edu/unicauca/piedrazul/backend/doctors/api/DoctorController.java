@@ -69,7 +69,7 @@ public class DoctorController {
     }
 
     // No paginar
-    @GetMapping
+    @GetMapping("/active-doctors")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     @Operation(summary = "Listar todos los doctores",
             description = "Devuelve la lista completa de doctores registrados en el sistema, incluyendo sus especialidades y nombre. La lista puede estar vacía si no hay doctores registrados.")
@@ -81,14 +81,21 @@ public class DoctorController {
     public ResponseEntity<List<DoctorShortResponse>> getAllDoctors() {
         List<Doctor> doctors = doctorService.findAllDoctors();
 
-        List<UUID> ids = doctors.stream()
-                .map(Doctor::getPersonId)
+        List<Doctor> activeDoctors = doctors.stream()
+                .filter(Doctor::isStatus)
                 .toList();
 
-        Map<UUID, String> names = personExternalService.getPersonNames(ids);
+        Map<UUID, String> names = personExternalService.getPersonNames(
+                activeDoctors.stream()
+                        .map(Doctor::getPersonId)
+                        .toList()
+        );
 
-        List<DoctorShortResponse> responses = doctors.stream()
-                .map(d -> DoctorShortResponse.fromEntity(d,names.get(d.getPersonId())))
+        List<DoctorShortResponse> responses = activeDoctors.stream()
+                .map(d -> DoctorShortResponse.fromEntity(
+                        d,
+                        names.get(d.getPersonId())
+                ))
                 .toList();
 
         return ResponseEntity.ok(responses);
