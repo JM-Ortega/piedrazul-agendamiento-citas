@@ -143,6 +143,12 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
     }
 
     @Override
+    public boolean hasScheduledAppointments(UUID doctorID){
+        List<Appointment> appointments = appointmentRepository.findByDoctorIdAndState(doctorID, "AGENDADA");
+        return !appointments.isEmpty();
+    }
+
+    @Override
     public boolean isNewPatient(UUID patientId){
         return isNewPatientUseCase.isNewPatient(patientId);
     }

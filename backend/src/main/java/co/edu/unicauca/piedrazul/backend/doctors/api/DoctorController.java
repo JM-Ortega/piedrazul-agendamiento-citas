@@ -69,7 +69,7 @@ public class DoctorController {
     }
 
     // No paginar
-    @GetMapping
+    @GetMapping("/active-doctors")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     @Operation(summary = "Listar todos los doctores",
             description = "Devuelve la lista completa de doctores registrados en el sistema, incluyendo sus especialidades y nombre. La lista puede estar vacía si no hay doctores registrados.")
@@ -78,17 +78,60 @@ public class DoctorController {
             @ApiResponse(responseCode = "401", description = "No autenticado"),
             @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar doctores")
     })
-    public ResponseEntity<List<DoctorShortResponse>> getAllDoctors() {
+    public ResponseEntity<List<DoctorShortResponse>> getActiveDoctors() {
         List<Doctor> doctors = doctorService.findAllDoctors();
 
-        List<UUID> ids = doctors.stream()
-                .map(Doctor::getPersonId)
+        List<Doctor> activeDoctors = doctors.stream()
+                .filter(Doctor::isStatus)
                 .toList();
 
-        Map<UUID, String> names = personExternalService.getPersonNames(ids);
+        Map<UUID, String> names = personExternalService.getPersonNames(
+                activeDoctors.stream()
+                        .map(Doctor::getPersonId)
+                        .toList()
+        );
 
-        List<DoctorShortResponse> responses = doctors.stream()
-                .map(d -> DoctorShortResponse.fromEntity(d,names.get(d.getPersonId())))
+        List<DoctorShortResponse> responses = activeDoctors.stream()
+                .map(d -> DoctorShortResponse.fromEntity(
+                        d,
+                        names.get(d.getPersonId())
+                ))
+                .toList();
+
+        return ResponseEntity.ok(responses);
+    }
+
+    // No paginar
+    @GetMapping("/neural-doctors")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
+    @Operation(summary = "Listar todos los doctores",
+            description = "Devuelve la lista completa de doctores con especialidad de terapia neural registrados en el sistema, " +
+                    "incluyendo sus especialidades y nombre. La lista puede estar vacía si no hay doctores para terapia neural registrados.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Doctores obtenidos correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar doctores")
+    })
+    public ResponseEntity<List<DoctorShortResponse>> getNeuralDoctors() {
+        List<Doctor> doctors = doctorService.findAllDoctors();
+
+        List<Doctor> neuralDoctors = doctors.stream()
+                .filter(Doctor::isStatus)
+                .filter(d -> d.getSpecialties().stream()
+                        .anyMatch(s -> s.getCode() == SpecialtyCode.TERAPIA_NEURAL))
+                .toList();
+
+        Map<UUID, String> names = personExternalService.getPersonNames(
+                neuralDoctors.stream()
+                        .map(Doctor::getPersonId)
+                        .toList()
+        );
+
+        List<DoctorShortResponse> responses = neuralDoctors.stream()
+                .map(d -> DoctorShortResponse.fromEntity(
+                        d,
+                        names.get(d.getPersonId())
+                ))
                 .toList();
 
         return ResponseEntity.ok(responses);
@@ -202,7 +245,8 @@ public class DoctorController {
     @PutMapping("/{doctorId}/enable")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Habilitar un doctor",
-            description = "Habilita un doctor previamente deshabilitado. La activación solo se realiza si el doctor cumple todas las condiciones necesarias para prestar atención.")
+            description = "Habilita un doctor previamente deshabilitado. La activación solo se realiza si el doctor " +
+                    "cumple todas las condiciones necesarias para prestar atención.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Doctor habilitado correctamente"),
             @ApiResponse(responseCode = "400", description = "El doctor no cumple los requisitos para ser habilitado"),
@@ -251,21 +295,19 @@ public class DoctorController {
     @PutMapping("/{doctorId}/disable")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Deshabilitar un doctor",
-            description = "Deshabilita un doctor. Si el parámetro 'force' es true, la operación se realiza ignorando las validaciones que normalmente lo impedirían.")
+            description = "Deshabilita un doctor. La desactivación solo se realiza si el doctor aun tiene citas.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Doctor deshabilitado correctamente"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),
             @ApiResponse(responseCode = "403", description = "No tiene permisos para deshabilitar doctores"),
             @ApiResponse(responseCode = "404", description = "No existe un doctor con el identificador proporcionado"),
-            @ApiResponse(responseCode = "409", description = "El doctor aún no ha finalizado su período laboral")
+            @ApiResponse(responseCode = "409", description = "El doctor aún tiene citas por atender")
     })
     public ResponseEntity<Void> disableDoctor(
             @Parameter(description = "Identificador único (UUID) del doctor")
-            @PathVariable UUID doctorId,
-            @Parameter(description = "Indica si la deshabilitación debe forzarse ignorando validaciones")
-            @RequestParam(defaultValue = "false") boolean force
+            @PathVariable UUID doctorId
     ) {
-        doctorService.disableDoctor(doctorId, force);
+        doctorService.disableDoctor(doctorId);
         return ResponseEntity.noContent().build();
     }
 }

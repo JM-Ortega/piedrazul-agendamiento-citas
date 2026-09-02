@@ -56,6 +56,15 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     }
 
     @Override
+    public List<Appointment> findByDoctorIdAndState(UUID idDoctor, String state){
+        return jpaRepository
+                .findByIdDoctorAndAppointmentState(idDoctor, AppointmentState.valueOf(state))
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public List<Appointment> findByPatientIdAndDate(UUID idPatient, LocalDate date) {
         return jpaRepository.findByIdPatientAndDate(idPatient, date).stream().map(mapper::toDomain).toList();
     }

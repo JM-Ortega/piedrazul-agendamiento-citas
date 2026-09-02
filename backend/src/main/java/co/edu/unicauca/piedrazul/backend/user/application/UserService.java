@@ -32,19 +32,19 @@ public class UserService {
     }
 
     public Page<SystemUserResponse> getSystemUsers(Pageable pageable) {
-        List<UserSummary> doctors = keycloakUserService.findDoctors();
-        List<UserSummary> schedulers = keycloakUserService.findSchedulers();
+        List<UserSummary> users =
+                new ArrayList<>(keycloakUserService.getSystemUsers());
 
-        Map<UUID, UserSummary> usersById = new LinkedHashMap<>();
-        Stream.concat(doctors.stream(), schedulers.stream())
-                .forEach(user -> usersById.putIfAbsent(user.id(), user));
+        int total = users.size();
 
-        List<UserSummary> allUsers = new ArrayList<>(usersById.values());
+        if (users.isEmpty()) {
+            return new PageImpl<>(List.of(), pageable, 0);
+        }
 
         // 1. Aplicar Ordenamiento en Memoria
-        applySorting(allUsers, pageable.getSort());
+        applySorting(users, pageable.getSort());
 
-        int total = allUsers.size();
+
         // Calcular límites de la página
         int start = (int) pageable.getOffset();
         int end = Math.min((start + pageable.getPageSize()), total);
@@ -54,7 +54,7 @@ public class UserService {
         }
 
         // Paginar primero la lista base
-        List<UserSummary> pagedUsers = allUsers.subList(start, end);
+        List<UserSummary> pagedUsers = users.subList(start, end);
 
         // Consultar roles SOLO para los usuarios de la página actual
         Set<UUID> pagedUserIds = pagedUsers
@@ -190,6 +190,10 @@ public class UserService {
             Comparator<UserSummary> currentComparator = switch (order.getProperty().toLowerCase()) {
                 case "lastname" -> Comparator.comparing(UserSummary::lastName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
                 case "firstname" -> Comparator.comparing(UserSummary::firstName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
+                case "documentid" -> Comparator.comparing(
+                        user -> parseDocumentToLong(user.username()),
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                );
                 default -> Comparator.comparing(UserSummary::firstName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
             };
 
@@ -202,6 +206,16 @@ public class UserService {
 
         if (comparator != null) {
             users.sort(comparator);
+        }
+    }
+
+    // Método auxiliar para evitar que la aplicación falle si un documento tiene letras o es nulo
+    private Long parseDocumentToLong(String documentId) {
+        if (documentId == null) return null;
+        try {
+            return Long.parseLong(documentId.replaceAll("\\D+", "")); // Extrae solo los dígitos
+        } catch (NumberFormatException e) {
+            return 0L;
         }
     }
 }

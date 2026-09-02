@@ -20,6 +20,8 @@ public interface AppointmentRepository {
 
     List<Appointment> findByDoctorIdAndDateAndState(UUID idDoctor, LocalDate date, String state);
 
+    List<Appointment> findByDoctorIdAndState(UUID idDoctor, String state);
+
     //metodo para listar y usado en algo más
     List<Appointment> findByPatientIdAndDate(UUID idPatient, LocalDate date);
 

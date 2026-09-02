@@ -42,7 +42,7 @@ class UserServiceTest {
 				"luis@test.com", List.of("SCHEDULER"));
 
 		when(keycloakUserService.findDoctors()).thenReturn(List.of(doctor, scheduler));
-		when(keycloakUserService.findSchedulers()).thenReturn(List.of(scheduler));
+		when(keycloakUserService.getSystemUsers()).thenReturn(List.of(scheduler));
 
 		when(keycloakUserService.getUserRolesByIds(Set.of(doctorId, schedulerId)))
 				.thenReturn(Map.of(
@@ -71,7 +71,7 @@ class UserServiceTest {
 		assertEquals(List.of(Role.SCHEDULER.name(), Role.DOCTOR.name()), result.get(1).roles());
 
 		verify(keycloakUserService).findDoctors();
-		verify(keycloakUserService).findSchedulers();
+		verify(keycloakUserService).getSystemUsers();
 		verify(keycloakUserService).getUserRolesByIds(Set.of(doctorId, schedulerId));
 	}
 
