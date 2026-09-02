@@ -8,12 +8,12 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
-  LucideAlertCircle,
   LucideCalendar,
   LucideClipboardPen,
   LucideClipboardPlus,
   LucideFolderOpen,
   LucideSave,
+  LucideTriangleAlert,
 } from '@lucide/angular';
 import { CanComponentDeactivate } from '../../../core/guards/canDeactivate.guard';
 import { DoctorService } from '../../../core/services/doctor.service';
@@ -31,7 +31,7 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    LucideAlertCircle,
+    LucideTriangleAlert,
     LucideClipboardPen,
     LucideClipboardPlus,
     LucideSave,

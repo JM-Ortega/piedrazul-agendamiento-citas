@@ -198,11 +198,11 @@
     cancelLabel="Cancelar"
     confirmLabel="Sí, salir"
     confirmVariant="danger"
-    iconBg="bg-amber-100"
+    iconBg="bg-red-100"
     (dismissed)="cancelExit()"
     (confirmed)="confirmExit()"
   >
-    <svg lucideAlertCircle [size]="28" icon class="text-amber-600"></svg>
+    <svg lucideTriangleAlert [size]="28" icon class="text-red-600"></svg>
     <span message>
       Los datos no guardados se perderán y la cita quedará sin atender.
     </span>
