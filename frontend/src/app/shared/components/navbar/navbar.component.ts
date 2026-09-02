@@ -1,10 +1,14 @@
 import {
+  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   computed,
+  ElementRef,
   inject,
+  OnDestroy,
   OnInit,
   signal,
+  viewChild,
 } from '@angular/core';
 import {
   NavigationStart,
@@ -60,11 +64,13 @@ import { ButtonComponent } from '../../../design-system/atoms/button/button.comp
     ButtonComponent,
   ],
 })
-export class NavbarComponent implements OnInit {
+export class NavbarComponent implements OnInit, AfterViewInit, OnDestroy {
   private keycloak = inject(Keycloak);
   appService = inject(AppService);
   private router = inject(Router);
   readonly exactMatch = { exact: true };
+  private topBar = viewChild.required<ElementRef<HTMLElement>>('topBar');
+  private resizeObserver?: ResizeObserver;
 
   menuOpen = signal(false);
   showLogoutModal = signal(false);
@@ -103,7 +109,7 @@ export class NavbarComponent implements OnInit {
   };
 
   ngOnInit(): void {
-    history.pushState(null, '', location.href);
+    history.pushState({ appGuard: true }, '', location.href);
 
     this.router.events.subscribe((event) => {
       if (
@@ -111,10 +117,26 @@ export class NavbarComponent implements OnInit {
         event.navigationTrigger === 'popstate' &&
         this.appService.currentRole()
       ) {
-        history.pushState(null, '', location.href);
+        if (this.isLeavingProtectedRoute()) return;
+
+        const state = history.state as { appGuard?: boolean } | null;
+        if (!state?.appGuard) return;
+
+        history.pushState({ appGuard: true }, '', location.href);
         this.showLogoutModal.set(true);
       }
     });
+  }
+
+  /**
+   * True si la ruta activa actual (antes de procesar esta navegación)
+   * está marcada con `data: { confirmExitLocally: true }`, indicando que
+   * el propio componente controla la confirmación de salida.
+   */
+  private isLeavingProtectedRoute(): boolean {
+    let route = this.router.routerState.snapshot.root;
+    while (route.firstChild) route = route.firstChild;
+    return !!route.data['confirmExitLocally'];
   }
 
   goToLogin(): void {
@@ -146,5 +168,24 @@ export class NavbarComponent implements OnInit {
   confirmLogout(): void {
     this.showLogoutModal.set(false);
     this.appService.logout();
+  }
+  ngAfterViewInit(): void {
+    this.updateNavbarHeightVar();
+    this.resizeObserver = new ResizeObserver(() =>
+      this.updateNavbarHeightVar()
+    );
+    this.resizeObserver.observe(this.topBar().nativeElement);
+  }
+
+  ngOnDestroy(): void {
+    this.resizeObserver?.disconnect();
+  }
+
+  private updateNavbarHeightVar(): void {
+    const height = this.topBar().nativeElement.offsetHeight;
+    document.documentElement.style.setProperty(
+      '--navbar-height',
+      `${height}px`
+    );
   }
 }

@@ -1,64 +1,62 @@
-<div class="space-y-6 mt-8 pt-8 border-t-2 border-[#a7c9ec]">
-  <h3 class="text-[#215c98] text-xl font-semibold flex items-center gap-2">
-    <svg lucideStethoscope [size]="24"></svg>
+<div class="bg-white rounded-xl shadow-md p-5 space-y-4">
+  <h3 class="text-[#215c98] text-lg font-semibold flex items-center gap-2">
+    <svg lucideStethoscope [size]="20"></svg>
     Información del Médico
   </h3>
 
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-    <!-- Especialidades -->
-    <div id="error-anchor-specialty" class="sm:col-span-2">
-      <p class="block text-gray-700 text-base font-medium mb-1">
-        Especialidades *
-        <span class="text-sm text-gray-500 font-normal ml-1"
-          >(puede seleccionar varias)</span
+  <!-- Especialidades -->
+  <div id="error-anchor-specialty">
+    <p class="block text-gray-700 text-base font-medium mb-1">
+      Especialidades *
+      <span class="text-sm text-gray-500 font-normal ml-1"
+        >(puede seleccionar varias)</span
+      >
+    </p>
+    <div class="grid grid-cols-2 gap-2.5 mt-2">
+      @for (sp of specialtyOptions; track sp.name) {
+        <app-button
+          variant="chip"
+          [active]="isSpecialtySelected(sp.name)"
+          activeChipClasses="border-[#215c98] bg-[#d9e9f8] text-[#215c98] shadow-md"
+          extraClass="!flex !items-center !gap-2.5 !px-3 !py-2 !text-left !font-medium"
+          (buttonClick)="toggleSpecialty(sp.name)"
         >
-      </p>
-      <div class="grid grid-cols-2 gap-3 mt-2">
-        @for (sp of specialtyOptions; track sp.name) {
-          <app-button
-            variant="chip"
-            [active]="isSpecialtySelected(sp.name)"
-            activeChipClasses="border-[#215c98] bg-[#d9e9f8] text-[#215c98] shadow-md"
-            extraClass="!flex !items-center !gap-3 !px-4 !text-left !font-medium"
-            (buttonClick)="toggleSpecialty(sp.name)"
-          >
-            <svg
-              [lucideIcon]="sp.icon"
-              [size]="22"
-              [class]="
-                isSpecialtySelected(sp.name)
-                  ? 'text-[#215c98] shrink-0'
-                  : sp.colorClass + ' shrink-0'
-              "
-            ></svg>
-            <span class="flex-1 text-left">{{ sp.name | formato }}</span>
-            @if (isSpecialtySelected(sp.name)) {
-              <div
-                class="bg-[#215c98] text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shrink-0"
-              >
-                ✓
-              </div>
-            }
-          </app-button>
-        }
-      </div>
-
-      @if (loadingSpecialties) {
-        <p class="mt-2 text-sm text-gray-400">Cargando especialidades...</p>
-      }
-      @if (loadError) {
-        <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
-          <svg lucideCircleAlert [size]="14"></svg>
-          {{ loadError }}
-        </p>
-      }
-      @if (errors['specialty']) {
-        <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
-          <svg lucideCircleAlert [size]="14"></svg>
-          {{ errors['specialty'] }}
-        </p>
+          <svg
+            [lucideIcon]="sp.icon"
+            [size]="18"
+            [class]="
+              isSpecialtySelected(sp.name)
+                ? 'text-[#215c98] shrink-0'
+                : sp.colorClass + ' shrink-0'
+            "
+          ></svg>
+          <span class="flex-1 text-left text-sm">{{ sp.name | formato }}</span>
+          @if (isSpecialtySelected(sp.name)) {
+            <div
+              class="bg-[#215c98] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold shrink-0"
+            >
+              ✓
+            </div>
+          }
+        </app-button>
       }
     </div>
+
+    @if (loadingSpecialties) {
+      <p class="mt-2 text-sm text-gray-400">Cargando especialidades...</p>
+    }
+    @if (loadError) {
+      <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
+        <svg lucideCircleAlert [size]="14"></svg>
+        {{ loadError }}
+      </p>
+    }
+    @if (errors['specialty']) {
+      <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
+        <svg lucideCircleAlert [size]="14"></svg>
+        {{ errors['specialty'] }}
+      </p>
+    }
   </div>
 
   <!-- Período Laboral (siempre obligatorio, siempre visible) -->
@@ -67,11 +65,11 @@
       <svg lucideCalendarRange [size]="18"></svg>
       Período Laboral *
     </p>
-    <p class="text-gray-400 text-sm mb-3 flex items-center gap-1">
+    <p class="text-gray-400 text-sm mb-2.5 flex items-center gap-1">
       <svg lucideInfo [size]="14"></svg>
       Rango de fechas en que el médico estará activo en el sistema.
     </p>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div>
         <label
           for="laborStart"
@@ -110,13 +108,13 @@
   <!-- Panel colapsable: Horario de Atención (opcional) -->
   <div
     id="error-anchor-workDays"
-    class="border-2 rounded-xl overflow-hidden"
+    class="border-2 rounded-xl overflow-hidden scroll-mt-[calc(var(--navbar-height,80px)+12px)]"
     [class]="hasScheduleErrors ? 'border-red-300' : 'border-gray-200'"
   >
     <button
       type="button"
       (click)="toggleSchedule()"
-      class="w-full flex items-center justify-between px-5 py-3 transition-colors text-base"
+      class="w-full flex items-center justify-between px-4 py-2.5 transition-colors text-base"
       [class]="
         hasScheduleErrors
           ? 'bg-red-50 hover:bg-red-100 text-red-700'
@@ -153,7 +151,7 @@
     </button>
 
     @if (isScheduleOpen) {
-      <div class="p-5 space-y-6 bg-white">
+      <div class="p-4 space-y-4 bg-white">
         <p class="text-gray-400 text-sm flex items-center gap-1">
           <svg lucideInfo [size]="14"></svg>
           Si completa alguno de estos campos, deberá completar todos los demás
@@ -161,7 +159,7 @@
         </p>
 
         <!-- Horario -->
-        <div class="grid grid-cols-2 gap-5">
+        <div class="grid grid-cols-2 gap-3">
           <div>
             <label
               for="startTime"
@@ -216,14 +214,14 @@
         </div>
 
         <!-- Intervalo y Ventana de Reserva -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label
               for="interval"
-              class="block text-gray-700 text-base font-medium mb-2"
+              class="text-gray-700 text-base font-medium mb-2 min-h-12 flex flex-col justify-start"
             >
-              Intervalo entre citas (min)
-              <span class="text-sm text-gray-500 font-normal ml-1">
+              <span>Intervalo entre citas (min)</span>
+              <span class="text-sm text-gray-500 font-normal">
                 máx. {{ maxInterval }} min
               </span>
             </label>
@@ -246,9 +244,9 @@
           <div>
             <label
               for="bookingWindowWeeks"
-              class="block text-gray-700 text-base font-medium mb-2"
+              class="text-gray-700 text-base font-medium mb-2 min-h-12 flex flex-col justify-start"
             >
-              Ventana de Reserva (semanas)
+              <span>Ventana de Reserva (semanas)</span>
             </label>
             <app-input
               id="bookingWindowWeeks"
@@ -267,23 +265,22 @@
             </app-input>
           </div>
         </div>
-
         <!-- Días de Atención -->
         <div>
           <p class="block text-gray-700 text-base font-medium mb-1">
             Días de Atención
           </p>
-          <p class="text-gray-400 text-sm mb-3 flex items-center gap-1">
+          <p class="text-gray-400 text-sm mb-2.5 flex items-center gap-1">
             <svg lucideInfo [size]="14"></svg>
             Disponible de lunes a viernes
           </p>
-          <div class="flex flex-wrap gap-3">
+          <div class="flex flex-wrap gap-2">
             @for (day of daysOfWeek; track day.value) {
               <app-button
                 variant="chip"
                 [active]="isWorkDaySelected(day.value)"
                 activeChipClasses="border-[#215c98] bg-[#d9e9f8] text-[#215c98]"
-                extraClass="!px-5"
+                extraClass="!px-3.5"
                 (buttonClick)="toggleWorkDay(day.value)"
               >
                 {{ day.label }}

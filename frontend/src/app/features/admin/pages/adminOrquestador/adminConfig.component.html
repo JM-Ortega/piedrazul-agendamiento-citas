@@ -1,57 +1,33 @@
-<div class="min-h-screen bg-blue-50 py-8 px-4">
-  <div class="max-w-5xl mx-auto space-y-6">
+<div class="min-h-screen bg-blue-50 py-4 px-4 md:px-8">
+  <div class="max-w-[1600px] mx-auto space-y-4">
     <!-- Header -->
     <div
-      class="bg-linear-to-r from-[#163c63] to-[#215c98] text-white rounded-2xl p-7 shadow-lg"
+      class="bg-linear-to-r from-[#163c63] to-[#215c98] text-white rounded-xl px-20 py-4 shadow-md"
     >
-      <h1 class="text-3xl font-bold flex items-center gap-3">
-        <svg lucideSettings [size]="34"></svg>
-        Panel de Administración
+      <h1 class="text-xl font-bold flex items-center gap-2">
+        <svg lucideSettings [size]="22"></svg>
+        Panel de Configuracion de Horarios
       </h1>
-      <p class="text-[#a7c9ec] text-lg mt-2">
+      <p class="text-[#a7c9ec] text-sm mt-1">
         Configure los parámetros del sistema de agendamiento
       </p>
     </div>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <div
-        class="bg-white rounded-2xl shadow p-5 text-center border-2 border-[#d9e9f8]"
-      >
-        <p class="text-4xl font-bold text-[#215c98]">{{ totalElements() }}</p>
-        <p class="text-gray-500 text-base mt-1">Médicos / Terapistas</p>
-      </div>
-      <div
-        class="bg-white rounded-2xl shadow p-5 text-center border-2 border-[#d9e9f8]"
-      >
-        <p class="text-4xl font-bold text-[#215c98]">
-          {{ totalSpecialties() }}
-        </p>
-        <p class="text-gray-500 text-base mt-1">Especialidades</p>
-      </div>
-      <div
-        class="bg-white rounded-2xl shadow p-5 text-center border-2 border-[#d9e9f8]"
-      >
-        <p class="text-4xl font-bold text-[#215c98]">{{ avgInterval() }} min</p>
-        <p class="text-gray-500 text-base mt-1">Intervalo promedio</p>
-      </div>
-    </div>
-
     <!-- Error de carga -->
     @if (errorCarga()) {
-      <div
-        class="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-4 text-base"
-      >
-        ⚠️ {{ errorCarga() }}
-      </div>
+      ...
     }
 
     <!-- Lista de doctores -->
-    <div class="bg-white rounded-2xl shadow-md p-7 border-2 border-[#d9e9f8]">
-      <div class="mb-6 space-y-3">
-        <div class="flex items-center justify-between flex-wrap gap-3">
-          <h2 class="text-[#163c63] text-2xl flex items-center gap-2">
-            <svg lucidePencil [size]="24"></svg>
+    <div
+      class="bg-white rounded-xl shadow-md p-4 md:p-5 border border-[#d9e9f8]"
+    >
+      <div class="mb-4 space-y-3">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <h2
+            class="text-[#163c63] text-lg font-semibold flex items-center gap-2"
+          >
+            <svg lucidePencil [size]="18"></svg>
             Configuración de Médicos y Terapistas
           </h2>
           <app-pagination
@@ -60,34 +36,63 @@
           />
         </div>
 
-        <app-sort-control
-          [options]="sortOptions"
-          [field]="sortField()"
-          [direction]="sortDirection()"
-          (fieldChange)="onSortFieldChange($event)"
-          (directionChange)="onSortDirectionChange($event)"
-        />
+        <!-- Buscador (izquierda) + Ordenamiento (derecha) -->
+        <div class="flex items-end justify-between flex-wrap gap-3">
+          <div class="flex flex-col gap-1 w-full sm:w-64">
+            <span
+              class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+            >
+              Buscar
+            </span>
+            <app-search-input
+              size="sm"
+              placeholder="Buscar médico o documento..."
+              [loading]="searching()"
+              [showButton]="false"
+              (searchChange)="onSearch($event)"
+              (searchNow)="onSearch($event)"
+            />
+          </div>
+
+          <div class="flex flex-col gap-1">
+            <span
+              class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+            >
+              Ordenar por
+            </span>
+            <app-sort-control
+              [options]="sortOptions"
+              [field]="sortField()"
+              [direction]="sortDirection()"
+              (fieldChange)="onSortFieldChange($event)"
+              (directionChange)="onSortDirectionChange($event)"
+            />
+          </div>
+        </div>
       </div>
 
       <div class="relative">
         @if (loading()) {
           <div class="absolute inset-0 flex items-center justify-center z-10">
             <div
-              class="w-8 h-8 border-3 border-[#215c98] border-t-transparent rounded-full animate-spin"
+              class="w-6 h-6 border-2 border-[#215c98] border-t-transparent rounded-full animate-spin"
             ></div>
           </div>
         }
 
+        <!-- Después -->
         <div
-          class="space-y-4 transition-opacity duration-300"
+          class="grid grid-cols-1 lg:grid-cols-2 gap-y-3 gap-x-5 transition-opacity duration-300"
           [class.opacity-40]="loading()"
           [class.pointer-events-none]="loading()"
         >
           @for (doctor of doctors(); track doctor.id) {
             <div
+              [id]="'doctor-card-' + doctor.id"
               animate.enter="card-enter-animation"
-              class="border-2 rounded-2xl transition-all"
+              class="border rounded-xl transition-all scroll-mt-[calc(var(--navbar-height,80px)+12px)]"
               [class]="containerClass(doctor)"
+              [class.lg:col-span-2]="editingId() === doctor.id"
             >
               <app-doctor-card
                 [doctor]="doctor"
@@ -112,41 +117,43 @@
     </div>
 
     <!-- Guía -->
-    <div class="bg-[#215c98] text-white rounded-2xl p-6">
-      <h3 class="text-xl mb-4">Guía de Configuración</h3>
+    <div class="bg-[#215c98] text-white rounded-xl p-4">
+      <h3 class="text-base font-semibold mb-3">Guía de Configuración</h3>
       <div
-        class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[#d9e9f8] text-base"
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-[#d9e9f8] text-sm"
       >
         <div>
-          <p class="font-semibold text-white mb-1">Período Laboral</p>
+          <p class="font-semibold text-white mb-0.5">Período Laboral</p>
           <p>
             Fecha de inicio y fin del contrato o período de trabajo del médico
             en la clínica.
           </p>
         </div>
         <div>
-          <p class="font-semibold text-white mb-1">Franja Horaria</p>
+          <p class="font-semibold text-white mb-0.5">Franja Horaria</p>
           <p>
             Define el inicio y fin de la jornada del médico cada día de
             atención. Puede personalizarse por día.
           </p>
         </div>
         <div>
-          <p class="font-semibold text-white mb-1">Intervalo</p>
+          <p class="font-semibold text-white mb-0.5">Intervalo</p>
           <p>
             Tiempo en minutos entre cada cita. Determina el número de citas
             disponibles por día.
           </p>
         </div>
         <div>
-          <p class="font-semibold text-white mb-1">Días</p>
+          <p class="font-semibold text-white mb-0.5">Días</p>
           <p>
             Seleccione los días de la semana (lunes a viernes) en que el médico
             presta sus servicios.
           </p>
         </div>
         <div>
-          <p class="font-semibold text-white mb-1">Habilitar / Deshabilitar</p>
+          <p class="font-semibold text-white mb-0.5">
+            Habilitar / Deshabilitar
+          </p>
           <p>
             Permite activar o desactivar un médico para que aparezca o no en el
             sistema de agendamiento.

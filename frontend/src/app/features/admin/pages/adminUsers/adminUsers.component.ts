@@ -10,6 +10,7 @@ import { Router } from '@angular/router';
 import {
   LucideCalendar,
   LucideCreditCard,
+  LucideInfo,
   LucideStethoscope,
   LucideUserPlus,
   LucideUsers,
@@ -44,6 +45,7 @@ interface UserStyle {
   imports: [
     LucideCalendar,
     LucideCreditCard,
+    LucideInfo,
     LucideStethoscope,
     LucideUserPlus,
     LucideUsers,
@@ -68,7 +70,7 @@ export class AdminUsersComponent implements OnInit {
   readonly sortOptions: SortOption[] = [
     { value: 'firstName', label: 'Nombre' },
     { value: 'lastName', label: 'Apellido' },
-    { value: 'identification', label: 'Documento' },
+    { value: 'documentId', label: 'Documento' },
   ];
 
   // ── Estilos por tipo de usuario ──────────────────────────────────────────
@@ -131,7 +133,7 @@ export class AdminUsersComponent implements OnInit {
     this.loading.set(true);
     this.errorCarga.set('');
     const sort = `${this.sortField()},${this.sortDirection()}`;
-    this.adminService.getSystemUsers(pageNumber, 9, sort).subscribe({
+    this.adminService.getSystemUsers(pageNumber, 6, sort).subscribe({
       next: (page) => {
         this.systemUsers.set(page.content);
         this.pagination.set({

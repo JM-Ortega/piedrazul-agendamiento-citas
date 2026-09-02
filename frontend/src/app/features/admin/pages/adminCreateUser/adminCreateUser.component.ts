@@ -16,6 +16,7 @@ import {
   LucideEyeOff,
   LucideMail,
   LucidePhone,
+  LucideStethoscope,
   LucideUser,
   LucideUserPlus,
 } from '@lucide/angular';
@@ -65,6 +66,7 @@ type Role = 'doctor' | 'scheduler';
     LucideCircleAlert,
     LucideCreditCard,
     LucideMail,
+    LucideStethoscope,
     LucideUser,
     LucideUserPlus,
     LucidePhone,
@@ -104,7 +106,7 @@ export class AdminCreateUserComponent implements OnInit {
 
   // ── Estado ────────────────────────────────────────────────────────────────
   showPassword = false;
-  selectedRoles: Role[] = ['doctor'];
+  selectedRoles: Role[] = ['scheduler'];
   errors: FormErrors = {};
   submitted = false;
   submitError: string | null = null;
@@ -229,6 +231,10 @@ export class AdminCreateUserComponent implements OnInit {
       this.selectedRoles = [...this.selectedRoles, role];
     }
     if (this.submitted) this.validateField('roles');
+    scrollToElementById('basic-info-section', {
+      behavior: 'smooth',
+      block: 'start',
+    });
   }
 
   /**

@@ -1,28 +1,28 @@
-<div class="min-h-screen bg-blue-50 py-8 px-4">
-  <div class="max-w-5xl mx-auto space-y-6">
+<div class="min-h-screen bg-blue-50 py-5 px-4 md:px-8">
+  <div class="max-w-[1600px] mx-auto space-y-5">
     <!-- Header -->
     <div
-      class="bg-linear-to-r from-[#163c63] to-[#215c98] text-white rounded-2xl p-7 shadow-lg"
+      class="bg-linear-to-r from-[#163c63] to-[#215c98] text-white rounded-xl px-7 py-5 shadow-md"
     >
       <div
         class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
         <div>
-          <h1 class="text-3xl font-bold flex items-center gap-3">
-            <svg lucideUsers [size]="34"></svg>
+          <h1 class="text-2xl font-bold flex items-center gap-3">
+            <svg lucideUsers [size]="28"></svg>
             Gestión de Usuarios Activos
           </h1>
-          <p class="text-[#a7c9ec] text-lg mt-2">
+          <p class="text-[#a7c9ec] text-base mt-1.5">
             Administre médicos y agendadores del sistema
           </p>
         </div>
         <app-button
           variant="secondary"
           class="shrink-0"
-          extraClass="!border-0 !bg-white hover:!bg-[#d9e9f8] !text-[#215c98] !px-6 !py-3 !rounded-xl !text-lg"
+          extraClass="!border-0 !bg-white hover:!bg-[#d9e9f8] !text-[#215c98] !px-5 !py-2.5 !rounded-lg !text-base"
           (buttonClick)="navigateToCreate()"
         >
-          <svg lucideUserPlus [size]="24"></svg>
+          <svg lucideUserPlus [size]="20"></svg>
           Crear Usuario
         </app-button>
       </div>
@@ -31,38 +31,46 @@
     <!-- Statistics -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div
-        class="bg-linear-to-br from-[#215c98] to-[#4e92d9] text-white rounded-xl shadow-lg p-6"
+        class="bg-linear-to-br from-[#215c98] to-[#4e92d9] text-white rounded-xl shadow-md p-5"
       >
-        <div class="flex items-center gap-3 mb-2">
-          <svg lucideStethoscope [size]="28"></svg>
+        <div class="flex items-center gap-2.5 mb-2">
+          <svg lucideStethoscope [size]="24"></svg>
           <p class="text-[#d9e9f8] text-base">Médicos</p>
         </div>
-        <p class="text-4xl font-bold">{{ doctors().length }}</p>
+        <p class="text-3xl font-bold">{{ doctors().length }}</p>
       </div>
       <div
-        class="bg-linear-to-br from-[#1f7a52] to-[#45b884] text-white rounded-xl shadow-lg p-6"
+        class="bg-linear-to-br from-[#1f7a52] to-[#45b884] text-white rounded-xl shadow-md p-5"
       >
-        <div class="flex items-center gap-3 mb-2">
-          <svg lucideCalendar [size]="28"></svg>
+        <div class="flex items-center gap-2.5 mb-2">
+          <svg lucideCalendar [size]="24"></svg>
           <p class="text-green-100 text-base">Agendadores</p>
         </div>
-        <p class="text-4xl font-bold">{{ schedulers().length }}</p>
+        <p class="text-3xl font-bold">{{ schedulers().length }}</p>
       </div>
       <div
-        class="bg-linear-to-br from-[#5a2992] to-[#9460d6] text-white rounded-xl shadow-lg p-6"
+        class="bg-linear-to-br from-[#5a2992] to-[#9460d6] text-white rounded-xl shadow-md p-5"
       >
-        <div class="flex items-center gap-3 mb-2">
-          <svg lucideUsers [size]="28"></svg>
+        <div class="flex items-center gap-2.5 mb-2">
+          <svg lucideUsers [size]="24"></svg>
           <p class="text-purple-100 text-base">Ambos Roles</p>
         </div>
-        <p class="text-4xl font-bold">{{ both().length }}</p>
+        <p class="text-3xl font-bold">{{ both().length }}</p>
       </div>
+    </div>
+
+    <!-- Nota informativa -->
+    <div class="flex items-center gap-2 text-gray-500 text-sm px-1">
+      <svg lucideInfo [size]="15" class="shrink-0"></svg>
+      <span>
+        Se muestran únicamente los médicos habilitados en el sistema.
+      </span>
     </div>
 
     <!-- Error de carga -->
     @if (errorCarga()) {
       <div
-        class="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-4 text-base"
+        class="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-base"
       >
         ⚠️ {{ errorCarga() }}
       </div>
@@ -70,8 +78,8 @@
 
     <!-- Empty -->
     @if (!loading() && systemUsers().length === 0) {
-      <div class="bg-white rounded-2xl shadow-md p-7">
-        <div class="text-center py-12 text-gray-500">
+      <div class="bg-white rounded-xl shadow-md p-6">
+        <div class="text-center py-10 text-gray-500 text-base">
           No hay usuarios registrados
         </div>
       </div>
@@ -79,13 +87,13 @@
 
     <!-- Lista unificada de usuarios -->
     @if (systemUsers().length > 0 || loading()) {
-      <div class="bg-white rounded-2xl shadow-md p-7">
-        <div class="mb-6 space-y-3">
-          <div class="flex items-center justify-between flex-wrap gap-4">
+      <div class="bg-white rounded-xl shadow-md p-5 md:p-6">
+        <div class="mb-5 space-y-3">
+          <div class="flex items-center justify-between flex-wrap gap-3">
             <h2
-              class="text-[#163c63] text-2xl font-semibold flex items-center gap-2"
+              class="text-[#163c63] text-xl font-semibold flex items-center gap-2"
             >
-              <svg lucideUsers [size]="26"></svg>
+              <svg lucideUsers [size]="22"></svg>
               Usuarios ({{
                 pagination()?.totalElements ?? systemUsers().length
               }})
@@ -110,13 +118,13 @@
           @if (loading()) {
             <div class="absolute inset-0 flex items-center justify-center z-10">
               <div
-                class="w-8 h-8 border-3 border-[#215c98] border-t-transparent rounded-full animate-spin"
+                class="w-7 h-7 border-3 border-[#215c98] border-t-transparent rounded-full animate-spin"
               ></div>
             </div>
           }
 
           <div
-            class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-6 transition-opacity duration-300"
+            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 transition-opacity duration-300"
             [class.opacity-40]="loading()"
             [class.pointer-events-none]="loading()"
           >
@@ -125,40 +133,40 @@
               <div
                 animate.enter="card-enter-animation"
                 [class]="
-                  'border-2 rounded-xl p-5 hover:shadow-lg transition-shadow ' +
+                  'border-2 rounded-xl p-4 hover:shadow-lg transition-shadow ' +
                   style.card
                 "
               >
-                <div class="flex items-center gap-3 flex-1 mb-3">
-                  <div [class]="'rounded-full p-3 shrink-0 ' + style.iconBg">
+                <div class="flex items-center gap-3 flex-1 mb-2.5">
+                  <div [class]="'rounded-full p-2.5 shrink-0 ' + style.iconBg">
                     @switch (style.icon) {
                       @case ('users') {
-                        <svg lucideUsers class="text-white" [size]="24"></svg>
+                        <svg lucideUsers class="text-white" [size]="20"></svg>
                       }
                       @case ('stethoscope') {
                         <svg
                           lucideStethoscope
                           class="text-white"
-                          [size]="24"
+                          [size]="20"
                         ></svg>
                       }
                       @case ('calendar') {
                         <svg
                           lucideCalendar
-                          [size]="24"
+                          [size]="20"
                           class="text-white"
                         ></svg>
                       }
                     }
                   </div>
-                  <div class="flex-1">
-                    <h3 [class]="'text-lg font-bold ' + style.title">
+                  <div class="flex-1 min-w-0">
+                    <h3 [class]="'text-base font-bold truncate ' + style.title">
                       {{ user.firstName }} {{ user.lastName }}
                     </h3>
-                    <div class="flex flex-wrap gap-1 mt-1">
+                    <div class="flex flex-wrap gap-1.5 mt-1.5">
                       @for (role of relevantRoles(user); track role) {
                         <span
-                          class="text-xs px-2 py-1 rounded-full font-medium"
+                          class="text-xs px-2 py-0.5 rounded-full font-medium"
                           [class.bg-[#d9e9f8]]="role.toUpperCase() === 'DOCTOR'"
                           [class.text-[#215c98]]="
                             role.toUpperCase() === 'DOCTOR'
@@ -175,11 +183,11 @@
                     </div>
                   </div>
                 </div>
-                <div class="space-y-2 text-sm text-gray-700 ml-14">
+                <div class="text-sm text-gray-700 ml-12">
                   <div class="flex items-center gap-2">
                     <svg
                       lucideCreditCard
-                      [size]="16"
+                      [size]="15"
                       [class]="style.docIcon"
                     ></svg>
                     <span class="font-medium">Doc:</span>
