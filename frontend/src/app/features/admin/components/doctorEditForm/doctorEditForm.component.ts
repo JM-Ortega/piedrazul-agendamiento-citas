@@ -201,7 +201,30 @@ export class DoctorEditFormComponent implements OnInit {
   updateField(field: keyof Doctor, value: Doctor[keyof Doctor]): void {
     const form = this.editForm();
     if (!form) return;
-    const updated = { ...form, [field]: value };
+
+    let daySchedules = form.daySchedules;
+
+    if (field === 'startTime' || field === 'endTime') {
+      daySchedules = { ...(form.daySchedules ?? {}) };
+      for (const day of form.workdays ?? []) {
+        if (this.customizingDays().has(day)) continue;
+
+        const ds = daySchedules[day];
+        if (!ds) continue;
+
+        const matchesOldDefault =
+          ds.startTime === form.startTime && ds.endTime === form.endTime;
+
+        if (matchesOldDefault) {
+          daySchedules[day] = {
+            startTime: field === 'startTime' ? (value as string) : ds.startTime,
+            endTime: field === 'endTime' ? (value as string) : ds.endTime,
+          };
+        }
+      }
+    }
+
+    const updated = { ...form, [field]: value, daySchedules };
     this.editForm.set(updated);
     this.errors.set(this.validationService.validateForm(updated));
   }

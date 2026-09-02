@@ -90,7 +90,7 @@
             </label>
             <app-select
               id="startTime"
-              [(ngModel)]="editForm()!.startTime"
+              [ngModel]="editForm()!.startTime"
               (ngModelChange)="updateField('startTime', $event)"
               name="startTime"
               [options]="timeOptions | toSelectOptions: false"
@@ -104,7 +104,7 @@
             </label>
             <app-select
               id="endTime"
-              [(ngModel)]="editForm()!.endTime"
+              [ngModel]="editForm()!.endTime"
               (ngModelChange)="updateField('endTime', $event)"
               name="endTime"
               [options]="timeOptions | toSelectOptions: false"
@@ -123,7 +123,7 @@
           <app-input
             id="appointmentInterval"
             type="number"
-            [(ngModel)]="editForm()!.appointmentInterval"
+            [ngModel]="editForm()!.appointmentInterval"
             (ngModelChange)="updateField('appointmentInterval', $event)"
             name="appointmentInterval"
             [min]="5"
@@ -156,7 +156,7 @@
         <app-input
           id="bookingWindowWeeks"
           type="number"
-          [(ngModel)]="editForm()!.bookingWindowWeeks"
+          [ngModel]="editForm()!.bookingWindowWeeks"
           (ngModelChange)="updateField('bookingWindowWeeks', $event)"
           name="bookingWindowWeeks"
           [min]="1"
