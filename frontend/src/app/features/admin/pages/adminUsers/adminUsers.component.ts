@@ -10,6 +10,7 @@ import { Router } from '@angular/router';
 import {
   LucideCalendar,
   LucideCreditCard,
+  LucideInfo,
   LucideStethoscope,
   LucideUserPlus,
   LucideUsers,
@@ -44,6 +45,7 @@ interface UserStyle {
   imports: [
     LucideCalendar,
     LucideCreditCard,
+    LucideInfo,
     LucideStethoscope,
     LucideUserPlus,
     LucideUsers,

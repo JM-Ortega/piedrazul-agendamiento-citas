@@ -26,6 +26,7 @@ import {
 } from '../../../../design-system/molecules/sortControl/sortControl.component';
 import { toggleInArray } from '../../../../shared/helpers/array-utils';
 import { PaginationMeta } from '../../../../shared/helpers/paginated-state';
+import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
 import {
   getSpecialtiesMeta,
   getSpecialtyMeta,
@@ -151,8 +152,11 @@ export class AdminDoctorsComponent implements OnInit {
     this.editingDoctorId.set(doctor.id);
     this.editingSpecialties.set([...doctor.specialties]);
     this.editingHasScheduler.set(doctor.roles.includes('SCHEDULER'));
+    scrollToElementById(`doctor-card-${doctor.id}`, {
+      behavior: 'smooth',
+      block: 'start',
+    });
   }
-
   handleCancel(): void {
     this.editingDoctorId.set(null);
     this.editingSpecialties.set([]);
