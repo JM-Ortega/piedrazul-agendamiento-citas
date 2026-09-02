@@ -109,7 +109,7 @@ export class NavbarComponent implements OnInit, AfterViewInit, OnDestroy {
   };
 
   ngOnInit(): void {
-    history.pushState(null, '', location.href);
+    history.pushState({ appGuard: true }, '', location.href);
 
     this.router.events.subscribe((event) => {
       if (
@@ -117,10 +117,12 @@ export class NavbarComponent implements OnInit, AfterViewInit, OnDestroy {
         event.navigationTrigger === 'popstate' &&
         this.appService.currentRole()
       ) {
-        // dejamos que el guard de esa ruta se encargue del popstate.
         if (this.isLeavingProtectedRoute()) return;
 
-        history.pushState(null, '', location.href);
+        const state = history.state as { appGuard?: boolean } | null;
+        if (!state?.appGuard) return;
+
+        history.pushState({ appGuard: true }, '', location.href);
         this.showLogoutModal.set(true);
       }
     });
