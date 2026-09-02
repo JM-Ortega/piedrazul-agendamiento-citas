@@ -1,10 +1,14 @@
 import {
+  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   computed,
+  ElementRef,
   inject,
+  OnDestroy,
   OnInit,
   signal,
+  viewChild,
 } from '@angular/core';
 import {
   NavigationStart,
@@ -60,11 +64,13 @@ import { ButtonComponent } from '../../../design-system/atoms/button/button.comp
     ButtonComponent,
   ],
 })
-export class NavbarComponent implements OnInit {
+export class NavbarComponent implements OnInit, AfterViewInit, OnDestroy {
   private keycloak = inject(Keycloak);
   appService = inject(AppService);
   private router = inject(Router);
   readonly exactMatch = { exact: true };
+  private topBar = viewChild.required<ElementRef<HTMLElement>>('topBar');
+  private resizeObserver?: ResizeObserver;
 
   menuOpen = signal(false);
   showLogoutModal = signal(false);
@@ -160,5 +166,24 @@ export class NavbarComponent implements OnInit {
   confirmLogout(): void {
     this.showLogoutModal.set(false);
     this.appService.logout();
+  }
+  ngAfterViewInit(): void {
+    this.updateNavbarHeightVar();
+    this.resizeObserver = new ResizeObserver(() =>
+      this.updateNavbarHeightVar()
+    );
+    this.resizeObserver.observe(this.topBar().nativeElement);
+  }
+
+  ngOnDestroy(): void {
+    this.resizeObserver?.disconnect();
+  }
+
+  private updateNavbarHeightVar(): void {
+    const height = this.topBar().nativeElement.offsetHeight;
+    document.documentElement.style.setProperty(
+      '--navbar-height',
+      `${height}px`
+    );
   }
 }
