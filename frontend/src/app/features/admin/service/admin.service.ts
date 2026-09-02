@@ -203,7 +203,7 @@ export class AdminService {
    */
   getSystemUsers(
     page = 0,
-    size = 9,
+    size = 6,
     sort = 'lastName,asc'
   ): Observable<PageResponse<SystemUser>> {
     return this.http.get<PageResponse<SystemUser>>(

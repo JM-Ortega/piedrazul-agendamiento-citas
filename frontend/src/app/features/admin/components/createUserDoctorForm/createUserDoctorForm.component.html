@@ -218,10 +218,10 @@
           <div>
             <label
               for="interval"
-              class="block text-gray-700 text-base font-medium mb-2"
+              class="text-gray-700 text-base font-medium mb-2 min-h-12 flex flex-col justify-start"
             >
-              Intervalo entre citas (min)
-              <span class="text-sm text-gray-500 font-normal ml-1">
+              <span>Intervalo entre citas (min)</span>
+              <span class="text-sm text-gray-500 font-normal">
                 máx. {{ maxInterval }} min
               </span>
             </label>
@@ -244,9 +244,9 @@
           <div>
             <label
               for="bookingWindowWeeks"
-              class="block text-gray-700 text-base font-medium mb-2"
+              class="text-gray-700 text-base font-medium mb-2 min-h-12 flex flex-col justify-start"
             >
-              Ventana de Reserva (semanas)
+              <span>Ventana de Reserva (semanas)</span>
             </label>
             <app-input
               id="bookingWindowWeeks"
@@ -265,7 +265,6 @@
             </app-input>
           </div>
         </div>
-
         <!-- Días de Atención -->
         <div>
           <p class="block text-gray-700 text-base font-medium mb-1">

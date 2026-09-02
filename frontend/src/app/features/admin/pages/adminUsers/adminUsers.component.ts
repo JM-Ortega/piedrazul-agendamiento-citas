@@ -133,7 +133,7 @@ export class AdminUsersComponent implements OnInit {
     this.loading.set(true);
     this.errorCarga.set('');
     const sort = `${this.sortField()},${this.sortDirection()}`;
-    this.adminService.getSystemUsers(pageNumber, 9, sort).subscribe({
+    this.adminService.getSystemUsers(pageNumber, 6, sort).subscribe({
       next: (page) => {
         this.systemUsers.set(page.content);
         this.pagination.set({

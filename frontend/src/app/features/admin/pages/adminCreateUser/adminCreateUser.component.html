@@ -34,8 +34,14 @@
       />
     </div>
 
-    <!-- Dos columnas: Información Básica (izq) + Información del Médico (der) -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+    <!-- Información Básica: full-width si es solo Agendador, 2 columnas si hay rol Médico -->
+    <div
+      [class]="
+        hasDoctorRole
+          ? 'grid grid-cols-1 lg:grid-cols-2 gap-4 items-start'
+          : 'grid grid-cols-1 gap-4 items-start'
+      "
+    >
       <!-- Columna izquierda: Información Básica -->
       <div
         id="basic-info-section"
@@ -46,7 +52,13 @@
         >
           Información Básica
         </h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div
+          [class]="
+            hasDoctorRole
+              ? 'grid grid-cols-1 sm:grid-cols-2 gap-4'
+              : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'
+          "
+        >
           <!-- Tipo de Documento -->
           <div>
             <label
@@ -204,7 +216,11 @@
           </div>
 
           <!-- Email (siempre visible) -->
-          <div class="sm:col-span-2">
+          <div
+            [class]="
+              hasDoctorRole ? 'sm:col-span-2' : 'sm:col-span-2 lg:col-span-3'
+            "
+          >
             <label
               for="email"
               class="block text-gray-700 text-base font-medium mb-2"
@@ -241,17 +257,6 @@
           (dataChange)="onDoctorFormChange($event)"
           (fieldBlurred)="validateField($any($event))"
         />
-      } @else {
-        <div
-          class="bg-white rounded-xl shadow-md p-5 h-full flex flex-col items-center justify-center text-center gap-2.5 min-h-70"
-        >
-          <svg lucideStethoscope [size]="32" class="text-gray-300"></svg>
-          <p class="text-gray-500 text-base max-w-xs">
-            Active el rol
-            <span class="font-semibold text-gray-600">Médico / Terapista</span>
-            arriba para configurar especialidades y horario de atención.
-          </p>
-        </div>
       }
     </div>
 
