@@ -246,7 +246,7 @@ export class AppointmentBookingComponent implements OnInit {
 
     const patientId = this.state.resolvePatientId() || null;
     const request$ = this.state.isPatientContext()
-      ? this.citaService.getDoctors(patientId)
+      ? this.citaService.getDoctors()
       : this.citaService.getSpecialtiesWithDoctor(patientId);
 
     request$.subscribe({

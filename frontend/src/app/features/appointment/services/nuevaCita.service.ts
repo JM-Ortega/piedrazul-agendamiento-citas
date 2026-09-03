@@ -37,10 +37,8 @@ export class NuevaCitaService {
     return this.http.get<SpecialtyDoctor[]>(url);
   }
 
-  getDoctors(patientId: string | null): Observable<SpecialtyDoctor[]> {
-    const url = patientId
-      ? `${this.apiUrl}/doctor/patients/doctors?patientId=${patientId}`
-      : `${this.apiUrl}/doctor/patients/doctors`;
+  getDoctors(): Observable<SpecialtyDoctor[]> {
+    const url = `${this.apiUrl}/doctor/neural-doctors`;
     return this.http.get<SpecialtyDoctor[]>(url);
   }
 
