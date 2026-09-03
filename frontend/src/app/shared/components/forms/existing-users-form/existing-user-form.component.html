@@ -1,4 +1,4 @@
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
   <div>
     <label for="sex" class="block text-gray-700 mb-1 text-sm font-medium">
       Sexo <span class="text-red-500">*</span>
@@ -25,7 +25,7 @@
     ></app-datepicker>
   </div>
 
-  <div class="sm:col-span-2">
+  <div>
     <label
       for="guardianPhone"
       class="block text-gray-700 mb-1 text-sm font-medium"
@@ -34,9 +34,9 @@
       @if (isMinor()) {
         <span class="text-red-500">*</span>
       } @else {
-        <span class="text-gray-400 text-sm"
-          >(requerido para menores de edad)</span
-        >
+        <span class="text-gray-400 text-sm">
+          (requerido para menores de edad)
+        </span>
       }
     </label>
     <app-input
