@@ -2,6 +2,8 @@ package co.edu.unicauca.piedrazul.backend.doctors.application;
 
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorDetailedResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorShortResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.*;
@@ -145,8 +147,22 @@ public class DoctorService implements DoctorProvisioningApi {
         doctorRepository.save(doctor);
     }
 
-    public List<Doctor> findAllDoctors() {
-        return doctorRepository.findAll();
+    @Transactional
+    public void changeSpecialties(UUID doctorId, List<SpecialtyCode> codigosNuevos) {
+
+        Doctor doctor = doctorRepository.findById(doctorId)
+                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado: " + doctorId));
+
+        Set<Specialty> nuevas = new HashSet<>(specialtyRepository.findAllById(codigosNuevos));
+        if (nuevas.size() != new HashSet<>(codigosNuevos).size()) {
+            throw new IllegalArgumentException("Alguna especialidad enviada no existe en el catálogo");
+        }
+
+        Set<Specialty> actuales = doctor.getSpecialties();
+        actuales.removeIf(s -> !nuevas.contains(s)); // quita las que ya no vienen
+        actuales.addAll(nuevas); // agrega las nuevas
+
+        doctorRepository.save(doctor);
     }
 
     public Page<DoctorDetailedResponse> findAllDoctorsDetailed(Pageable pageable, String search) {
@@ -156,6 +172,89 @@ public class DoctorService implements DoctorProvisioningApi {
         }
 
         return findAllDetailed(pageable);
+    }
+
+    public Doctor findByUserId(UUID keycloakId) {
+        Doctor doctor = doctorRepository.findByPersonId(personExternalService.findPersonIdByUserId(keycloakId));
+        if (doctor == null) {
+            throw new DoctorNotFoundException("Doctor no encontrado para el usuario autenticado");
+        }
+        return doctor;
+    }
+
+    public List<SpecialtyCode> getAllSpecialties (){
+        return Arrays.asList(SpecialtyCode.values());
+    }
+
+    public List<DoctorShortResponse> getNeuralDoctors(){
+        List<Doctor> doctors = findAllDoctors();
+
+        List<Doctor> neuralDoctors = doctors.stream()
+                .filter(Doctor::isStatus)
+                .filter(d -> d.getSpecialties().stream()
+                        .anyMatch(s -> s.getCode() == SpecialtyCode.TERAPIA_NEURAL))
+                .toList();
+
+        Map<UUID, String> names = personExternalService.getPersonNames(
+                neuralDoctors.stream()
+                        .map(Doctor::getPersonId)
+                        .toList()
+        );
+
+        return neuralDoctors.stream()
+                .map(d -> DoctorShortResponse.fromEntity(
+                        d,
+                        names.get(d.getPersonId())
+                ))
+                .toList();
+    }
+
+    public List<DoctorResponse> getActiveDoctors(UUID patientId) {
+        List<Doctor> doctors = findAllDoctors();
+
+        boolean isNewPatient = patientId != null && appointmentExternalService.isNewPatient(patientId);
+
+        if (isNewPatient) {
+            doctors = doctors.stream()
+                    .filter(d -> d.getSpecialties().stream()
+                            .anyMatch(s -> s.getCode() == SpecialtyCode.TERAPIA_NEURAL))
+                    .toList();
+        }
+
+        if (doctors.isEmpty()) {
+            throw new NoAvailableDoctorsException("No hay médicos activos disponibles");
+        }
+
+        List<Doctor> activeDoctors = doctors.stream()
+                .filter(Doctor::isStatus)
+                .toList();
+
+        Map<UUID, String> names = personExternalService.getPersonNames(
+                activeDoctors.stream()
+                        .map(Doctor::getPersonId)
+                        .toList()
+        );
+
+        return activeDoctors.stream()
+                .map(d -> DoctorResponse.fromEntity(
+                        d,
+                        names.get(d.getPersonId()),
+                        isNewPatient
+                ))
+                .toList();
+    }
+
+    public List<Doctor> findAllDoctors() {
+        return doctorRepository.findAll();
+    }
+
+    // PRIVATE
+    private void syncUserStatus(Doctor doctor) {
+        if (doctor.isStatus()) {
+            personExternalService.ensureDoctorRole(doctor.getPersonId());
+            return;
+        }
+        personExternalService.revokeDoctorRole(doctor.getPersonId());
     }
 
     private Page<DoctorDetailedResponse> findBySearchTermDetailed(String search, Pageable pageable) {
@@ -235,55 +334,6 @@ public class DoctorService implements DoctorProvisioningApi {
         }
     }
 
-    public Doctor findByUserId(UUID keycloakId) {
-        Doctor doctor = doctorRepository.findByPersonId(personExternalService.findPersonIdByUserId(keycloakId));
-        if (doctor == null) {
-            throw new DoctorNotFoundException("Doctor no encontrado para el usuario autenticado");
-        }
-        return doctor;
-    }
-
-    public List<Doctor> getDoctorBySpeciality(SpecialtyCode specialty) {
-        return doctorRepository.findBySpecialtiesCode(specialty);
-    }
-
-    public List<Doctor> getDoctorsById(List<UUID> doctorIds) {
-        return doctorRepository.findByPersonIdIn(doctorIds);
-    }
-
-    public List<SpecialtyCode> getSpecialties(UUID idPatient) {
-
-        List<SpecialtyCode> activeSpecialties = doctorRepository
-                .findAllDistinctSpecialtyCodesByActiveDoctors()
-                .stream()
-                .map(SpecialtyCode::valueOf)
-                .toList();
-
-        if (activeSpecialties.isEmpty()) {
-            throw new NoAvailableDoctorsException("No hay médicos activos disponibles");
-        }
-
-        if (idPatient == null || appointmentExternalService.isNewPatient(idPatient)) {
-            return activeSpecialties.contains(SpecialtyCode.MEDICINA_GENERAL)
-                    ? List.of(SpecialtyCode.MEDICINA_GENERAL)
-                    : Collections.emptyList();
-        }
-
-        return activeSpecialties;
-    }
-
-    public List<SpecialtyCode> getAllSpecialties (){
-        return Arrays.asList(SpecialtyCode.values());
-    }
-
-    private void syncUserStatus(Doctor doctor) {
-        if (doctor.isStatus()) {
-            personExternalService.ensureDoctorRole(doctor.getPersonId());
-            return;
-        }
-        personExternalService.revokeDoctorRole(doctor.getPersonId());
-    }
-
     private void validateLaborDateRange(LocalDate laborStart, LocalDate laborEnd) {
         if (laborStart == null) {
             throw new DoctorValidationException("La fecha de inicio es obligatoria");
@@ -295,23 +345,4 @@ public class DoctorService implements DoctorProvisioningApi {
             throw new DateConflictException("La fecha de finalización no puede ser anterior a la fecha de inicio");
         }
     }
-
-    @Transactional
-    public void changeSpecialties(UUID doctorId, List<SpecialtyCode> codigosNuevos) {
-
-        Doctor doctor = doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado: " + doctorId));
-
-        Set<Specialty> nuevas = new HashSet<>(specialtyRepository.findAllById(codigosNuevos));
-        if (nuevas.size() != new HashSet<>(codigosNuevos).size()) {
-            throw new IllegalArgumentException("Alguna especialidad enviada no existe en el catálogo");
-        }
-
-        Set<Specialty> actuales = doctor.getSpecialties();
-        actuales.removeIf(s -> !nuevas.contains(s)); // quita las que ya no vienen
-        actuales.addAll(nuevas); // agrega las nuevas
-
-        doctorRepository.save(doctor);
-    }
-
 }

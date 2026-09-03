@@ -3,6 +3,7 @@ package co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -17,12 +18,15 @@ public record DoctorResponse(
         int bookingWindowWeeks,
         List<Integer> workdays
 ) {
-    // Un método estático para convertir la entidad en DTO fácilmente
-    public static DoctorResponse fromEntity(Doctor doctor, String name) {
+    public static DoctorResponse fromEntity(Doctor doctor, String name, boolean isNewPatient) {
+        // Filtrar las especialidades a nivel de DTO sin tocar la entidad
+        List<String> specialties = doctor.getSpecialties().stream()
+                .filter(s -> !isNewPatient || s.getCode() == SpecialtyCode.TERAPIA_NEURAL)
+                .map(s -> s.getCode().name())
+                .toList();
+
         return new DoctorResponse(
-                doctor.getSpecialties().stream()
-                        .map(s -> s.getCode().name())
-                        .toList(),
+                specialties,
                 doctor.getPersonId(),
                 name,
                 doctor.getLaborEnd(),
@@ -38,6 +42,11 @@ public record DoctorResponse(
                         .sorted(Comparator.naturalOrder())
                         .toList()
         );
+    }
+
+    // Sobrecarga por defecto para mantener retrocompatibilidad
+    public static DoctorResponse fromEntity(Doctor doctor, String name) {
+        return fromEntity(doctor, name, false);
     }
 
     private static int toWorkdayNumber(Workday workday) {

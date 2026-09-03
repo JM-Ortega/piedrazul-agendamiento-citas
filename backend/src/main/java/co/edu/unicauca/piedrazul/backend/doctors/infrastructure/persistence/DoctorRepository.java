@@ -14,9 +14,6 @@ import java.util.UUID;
 
 
 public interface DoctorRepository extends JpaRepository<Doctor, UUID> {
-    // Buscar doctores por especialidad
-    List<Doctor> findBySpecialtiesCode(SpecialtyCode specialty);
-
     // Buscar solo los doctores que están activos
     List<Doctor> findByStatusTrue();
     
