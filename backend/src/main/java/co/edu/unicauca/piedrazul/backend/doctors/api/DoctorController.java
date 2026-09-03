@@ -5,9 +5,6 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorShortResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DateConflictException;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
-import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
 import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.shared.pagination.PageResponse;
@@ -22,9 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -40,15 +35,12 @@ import java.util.UUID;
 public class DoctorController {
     private final DoctorService doctorService;
     private final PersonExternalService personExternalService;
-    private final SecurityContextExtractor securityContextExtractor;
 
     public DoctorController(DoctorService doctorService, PersonExternalService personExternalService,
                             SecurityContextExtractor securityContextExtractor) {
         this.doctorService = doctorService;
         this.personExternalService = personExternalService;
-        this.securityContextExtractor = securityContextExtractor;
     }
-
 
     @GetMapping("/me")
     @PreAuthorize("hasRole('DOCTOR')")
@@ -69,39 +61,6 @@ public class DoctorController {
     }
 
     // No paginar
-    @GetMapping("/active-doctors")
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    @Operation(summary = "Listar todos los doctores",
-            description = "Devuelve la lista completa de doctores registrados en el sistema, incluyendo sus especialidades y nombre. La lista puede estar vacía si no hay doctores registrados.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Doctores obtenidos correctamente"),
-            @ApiResponse(responseCode = "401", description = "No autenticado"),
-            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar doctores")
-    })
-    public ResponseEntity<List<DoctorShortResponse>> getActiveDoctors() {
-        List<Doctor> doctors = doctorService.findAllDoctors();
-
-        List<Doctor> activeDoctors = doctors.stream()
-                .filter(Doctor::isStatus)
-                .toList();
-
-        Map<UUID, String> names = personExternalService.getPersonNames(
-                activeDoctors.stream()
-                        .map(Doctor::getPersonId)
-                        .toList()
-        );
-
-        List<DoctorShortResponse> responses = activeDoctors.stream()
-                .map(d -> DoctorShortResponse.fromEntity(
-                        d,
-                        names.get(d.getPersonId())
-                ))
-                .toList();
-
-        return ResponseEntity.ok(responses);
-    }
-
-    // No paginar
     @GetMapping("/neural-doctors")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     @Operation(summary = "Listar todos los doctores",
@@ -113,25 +72,48 @@ public class DoctorController {
             @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar doctores")
     })
     public ResponseEntity<List<DoctorShortResponse>> getNeuralDoctors() {
+        return ResponseEntity.ok(doctorService.getNeuralDoctors());
+    }
+
+    // No paginar
+    @GetMapping("/active-doctors")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
+    @Operation(summary = "Listar todos los doctores",
+            description = "Devuelve la lista completa de doctores registrados en el sistema junto con su " +
+                    "información detallada. La lista puede estar vacía si no hay doctores registrados. Si el paciente es " +
+                    "nuevo, solo envia medicos con la especialdiad de terapia neural y filtra las especialidades del " +
+                    "medico para que solo devuelva la de terapia neural")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Doctores obtenidos correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar doctores")
+    })
+    public ResponseEntity<List<DoctorResponse>> getActiveDoctors(UUID patientId) {
+        return ResponseEntity.ok(doctorService.getActiveDoctors(patientId));
+    }
+
+    // No paginar sirve para filtrar las citas por doctor
+    @GetMapping
+    @PreAuthorize("hasRole('SCHEDULER')")
+    @Operation(summary = "Listar todos los doctores",
+            description = "Devuelve la lista completa de doctores registrados en el sistema, incluyendo sus " +
+                    "especialidades y nombre. La lista puede estar vacía si no hay doctores registrados.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Doctores obtenidos correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar doctores")
+    })
+    public ResponseEntity<List<DoctorShortResponse>> getAllDoctors() {
         List<Doctor> doctors = doctorService.findAllDoctors();
 
-        List<Doctor> neuralDoctors = doctors.stream()
-                .filter(Doctor::isStatus)
-                .filter(d -> d.getSpecialties().stream()
-                        .anyMatch(s -> s.getCode() == SpecialtyCode.TERAPIA_NEURAL))
+        List<UUID> ids = doctors.stream()
+                .map(Doctor::getPersonId)
                 .toList();
 
-        Map<UUID, String> names = personExternalService.getPersonNames(
-                neuralDoctors.stream()
-                        .map(Doctor::getPersonId)
-                        .toList()
-        );
+        Map<UUID, String> names = personExternalService.getPersonNames(ids);
 
-        List<DoctorShortResponse> responses = neuralDoctors.stream()
-                .map(d -> DoctorShortResponse.fromEntity(
-                        d,
-                        names.get(d.getPersonId())
-                ))
+        List<DoctorShortResponse> responses = doctors.stream()
+                .map(d -> DoctorShortResponse.fromEntity(d,names.get(d.getPersonId())))
                 .toList();
 
         return ResponseEntity.ok(responses);
@@ -156,30 +138,6 @@ public class DoctorController {
         Page<DoctorDetailedResponse> doctors = doctorService.findAllDoctorsDetailed(pageable, search);
         return ResponseEntity.ok(PageResponse.from(doctors));
     }
-
-    @GetMapping("/patients/specialties")
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    @Operation(summary = "Listar especialidades disponibles para citas",
-            description = "Devuelve las especialidades disponibles para la asignación de citas. Si se proporciona un paciente, la lista se filtra según las reglas de negocio aplicables a dicho paciente.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Especialidades obtenidas correctamente"),
-            @ApiResponse(responseCode = "401", description = "No autenticado"),
-            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar especialidades")
-    })
-    public ResponseEntity<List<SpecialtyCode>> getSpecialties(
-            @Parameter(description = "Identificador del paciente para filtrar las especialidades disponibles. Opcional.")
-            @RequestParam(required = false) UUID patientId) {
-        UUID authenticatedActorId = UUID.fromString(securityContextExtractor.currentActorId());
-        String userRoles = securityContextExtractor.currentActorRoles();
-
-        if (userRoles.contains("PATIENT")) {
-            patientId = personExternalService.findPersonIdByUserId(authenticatedActorId);
-        }
-
-        List<SpecialtyCode> specialties = doctorService.getSpecialties(patientId);
-        return ResponseEntity.ok(specialties);
-    }
-
 
     @PutMapping("/{doctorId}/specialties")
     @PreAuthorize("hasRole('ADMIN')")
@@ -214,33 +172,6 @@ public class DoctorController {
         List<SpecialtyCode> specialties = doctorService.getAllSpecialties();
         return ResponseEntity.ok(specialties);
     }
-
-    @GetMapping("/specialty/{specialty}")
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    @Operation(summary = "Listar doctores por especialidad",
-            description = "Devuelve los doctores que atienden la especialidad indicada, incluyendo su nombre.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Doctores obtenidos correctamente"),
-            @ApiResponse(responseCode = "401", description = "No autenticado"),
-            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar doctores")
-    })
-    public ResponseEntity<List<DoctorResponse> > getDoctorsBySpecialty(
-            @Parameter(description = "Especialidad por la cual se filtrarán los doctores")
-            @PathVariable SpecialtyCode specialty) {
-        List<Doctor> doctors = doctorService.getDoctorBySpeciality(specialty);
-
-        List<UUID> ids = doctors.stream()
-                .map(Doctor::getPersonId)
-                .toList();
-
-        Map<UUID, String> names = personExternalService.getPersonNames(ids);
-
-        List<DoctorResponse> responses = doctors.stream()
-                .map(d -> DoctorResponse.fromEntity(d, names.get(d.getPersonId())))
-                .toList();
-        return ResponseEntity.ok(responses);
-    }
-
 
     @PutMapping("/{doctorId}/enable")
     @PreAuthorize("hasRole('ADMIN')")
