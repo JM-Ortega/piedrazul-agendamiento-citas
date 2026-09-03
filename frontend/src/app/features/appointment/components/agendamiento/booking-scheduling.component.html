@@ -105,7 +105,7 @@
           <legend class="block text-gray-600 text-sm mb-1 font-bold">
             Hora *
           </legend>
-          <div class="grid grid-cols-3 sm:grid-cols-4 gap-3">
+          <div class="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[330px] overflow-y-auto pr-2">
             @for (slot of state.availableSlots(); track slot) {
               <button
                 type="button"
