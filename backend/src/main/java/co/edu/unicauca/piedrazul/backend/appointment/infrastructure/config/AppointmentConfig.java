@@ -173,4 +173,19 @@ public class AppointmentConfig {
         return new GetAutonomousSchedulingContidionUseCaseImpl(appointmentConfigRepository);
     }
 
+    @Bean
+    public RegisterUnscheduledAttentionUseCase registerUnscheduledAttentionUseCase(
+            DoctorConfigConsultPort doctorConfigConsultPort,
+            ClinicalHistoryPort clinicalHistoryPort,
+            ManualPatientResolutionStrategy manualPatientResolutionStrategy,
+            AppointmentRepository appointmentRepository
+    ){
+        return new RegisterUnscheduledAttentionUseCaseImpl(
+                doctorConfigConsultPort,
+                clinicalHistoryPort,
+                manualPatientResolutionStrategy,
+                appointmentRepository
+        );
+    }
+
 }

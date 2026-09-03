@@ -18,7 +18,11 @@ public class ClinicalHistoryPortImpl implements ClinicalHistoryPort {
 
     @Override
     public void registerClinicalHistory(
-            UUID appointmentId, UUID idPatient, String doctorName, String description, LocalDate attendedAt) {
+            UUID appointmentId,
+            UUID idPatient,
+            String doctorName,
+            String description,
+            LocalDate attendedAt) {
         externalService.registerClinicalHistory(
             new ClinicalHistoryRequest(idPatient, appointmentId, description, doctorName, attendedAt)
         );

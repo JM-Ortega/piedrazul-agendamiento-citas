@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.domain.port.output;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -37,4 +38,6 @@ public interface DoctorConfigConsultPort {
 
     //obtiene el nombre de un doctor
     String getDoctorName(UUID idDoctor);
+
+    List<SpecialtyCode> getSpecialtiesByDoctor(UUID idDoctor);
 }
