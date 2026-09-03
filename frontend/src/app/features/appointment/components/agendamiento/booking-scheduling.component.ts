@@ -4,6 +4,7 @@ import {
   Component,
   computed,
   inject,
+  OnInit,
   output,
   signal,
 } from '@angular/core';
@@ -51,10 +52,14 @@ import { AppError } from '../../../../shared/models/interfaces/api-error.model';
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-scheduling.component.html',
 })
-export class BookingSchedulingComponent {
+export class BookingSchedulingComponent implements OnInit {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
   private calendarService = inject(CalendarService);
+
+  ngOnInit(): void {
+    window.scrollTo(0, 0);
+  }
 
   // Estado local: errores y disponibilidad de slots
   noSlotsAvailable = false;

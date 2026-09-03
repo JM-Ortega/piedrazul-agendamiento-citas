@@ -3,6 +3,7 @@ import {
   Component,
   inject,
   output,
+  OnInit,
 } from '@angular/core';
 import {
   LucideCheckCircle,
@@ -37,7 +38,7 @@ import { calcAge } from '../../../../shared/helpers/patient-validation';
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-confirm.component.html',
 })
-export class BookingConfirmComponent {
+export class BookingConfirmComponent implements OnInit {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
   formatLongDateEs = formatLongDateEs;
@@ -45,6 +46,10 @@ export class BookingConfirmComponent {
 
   confirmed = output<void>();
   back = output<void>();
+
+  ngOnInit(): void {
+    window.scrollTo(0, 0);
+  }
 
   /**
    * Envía la cita al backend. Todos los errores muestran

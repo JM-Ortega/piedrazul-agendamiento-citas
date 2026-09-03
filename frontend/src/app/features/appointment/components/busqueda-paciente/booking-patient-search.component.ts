@@ -4,6 +4,7 @@ import {
   Input,
   inject,
   output,
+  OnInit,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -48,11 +49,15 @@ const MIN_DOC_LENGTH = 6;
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-patient-search.component.html',
 })
-export class BookingPatientSearchComponent {
+export class BookingPatientSearchComponent implements OnInit {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
   formatLongDateEs = formatLongDateEs;
   calculateAge = calcAge;
+
+  ngOnInit(): void {
+    window.scrollTo(0, 0);
+  }
 
   /** Si llega un valor, precarga el documento y dispara la búsqueda exacta automáticamente. */
   @Input() set prefillDocument(value: string) {
