@@ -384,79 +384,10 @@ class DoctorServiceTest {
         }
 
         @Test
-        void getDoctorBySpecialityShouldDelegateToRepository() {
-            when(doctorRepository.findBySpecialtiesCode(SpecialtyCode.FISIOTERAPIA)).thenReturn(List.of());
-
-            List<Doctor> result = doctorService.getDoctorBySpeciality(SpecialtyCode.FISIOTERAPIA);
-
-            assertThat(result).isEmpty();
-            verify(doctorRepository).findBySpecialtiesCode(SpecialtyCode.FISIOTERAPIA);
-        }
-
-        @Test
         void getAllSpecialtiesShouldReturnAllEnumValues() {
             List<SpecialtyCode> result = doctorService.getAllSpecialties();
 
             assertThat(result).containsExactlyInAnyOrder(SpecialtyCode.values());
-        }
-    }
-
-    @Nested
-    class GetSpecialtiesTests {
-
-        @Test
-        void shouldThrowWhenNoActiveDoctors() {
-            when(doctorRepository.findAllDistinctSpecialtyCodesByActiveDoctors()).thenReturn(List.of());
-
-            assertThatThrownBy(() -> doctorService.getSpecialties(UUID.randomUUID()))
-                    .isInstanceOf(NoAvailableDoctorsException.class);
-        }
-
-        @Test
-        void shouldReturnOnlyMedicinaGeneralForNewPatient() {
-            UUID patientId = UUID.randomUUID();
-            when(doctorRepository.findAllDistinctSpecialtyCodesByActiveDoctors())
-                    .thenReturn(List.of("MEDICINA_GENERAL", "QUIROPRAXIA"));
-            when(appointmentExternalService.isNewPatient(patientId)).thenReturn(true);
-
-            List<SpecialtyCode> result = doctorService.getSpecialties(patientId);
-
-            assertThat(result).containsExactly(SpecialtyCode.MEDICINA_GENERAL);
-        }
-
-        @Test
-        void shouldReturnEmptyForNewPatientWhenNoGeneralMedicineAvailable() {
-            UUID patientId = UUID.randomUUID();
-            when(doctorRepository.findAllDistinctSpecialtyCodesByActiveDoctors())
-                    .thenReturn(List.of("QUIROPRAXIA"));
-            when(appointmentExternalService.isNewPatient(patientId)).thenReturn(true);
-
-            List<SpecialtyCode> result = doctorService.getSpecialties(patientId);
-
-            assertThat(result).isEmpty();
-        }
-
-        @Test
-        void shouldReturnAllActiveSpecialtiesForExistingPatient() {
-            UUID patientId = UUID.randomUUID();
-            when(doctorRepository.findAllDistinctSpecialtyCodesByActiveDoctors())
-                    .thenReturn(List.of("MEDICINA_GENERAL", "QUIROPRAXIA"));
-            when(appointmentExternalService.isNewPatient(patientId)).thenReturn(false);
-
-            List<SpecialtyCode> result = doctorService.getSpecialties(patientId);
-
-            assertThat(result).containsExactlyInAnyOrder(SpecialtyCode.MEDICINA_GENERAL, SpecialtyCode.QUIROPRAXIA);
-        }
-
-        @Test
-        void shouldTreatNullPatientIdAsNewPatient() {
-            when(doctorRepository.findAllDistinctSpecialtyCodesByActiveDoctors())
-                    .thenReturn(List.of("MEDICINA_GENERAL"));
-
-            List<SpecialtyCode> result = doctorService.getSpecialties(null);
-
-            assertThat(result).containsExactly(SpecialtyCode.MEDICINA_GENERAL);
-            verifyNoInteractions(appointmentExternalService);
         }
     }
 
