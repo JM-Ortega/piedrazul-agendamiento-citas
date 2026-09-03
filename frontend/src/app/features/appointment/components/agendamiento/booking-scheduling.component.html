@@ -56,7 +56,7 @@
         </p>
         @if (state.selectedDate()) {
           <div
-            class="flex items-center gap-2 bg-[#e6f0fa] rounded-xl px-2 py-1 text-[#163c63] mb-2"
+            class="w-fit mx-auto flex items-center gap-2 bg-[#e6f0fa] rounded-xl px-3 py-1 text-[#163c63] mb-2"
           >
             <svg lucideCalendar [size]="18"></svg>
             {{ state.confirmDate() }}
@@ -71,7 +71,7 @@
         }
 
         <div
-          class="w-[295px] h-[335px] border-2 border-[#a7c9ec] rounded-2xl overflow-hidden"
+          class="w-[295px] h-[335px] border-2 border-[#a7c9ec] rounded-2xl overflow-hidden mx-auto"
         >
           <div class="w-[340px] scale-85 origin-top-left">
             <mat-calendar
