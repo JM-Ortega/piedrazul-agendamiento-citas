@@ -74,7 +74,7 @@ class KeycloakUserServiceTest {
 	void findSchedulersShouldDelegateToClient() {
 		when(keycloakClient.findUsersByRole(Role.SCHEDULER)).thenReturn(List.of());
 
-		List<UserSummary> result = keycloakUserService.findSchedulers();
+		List<UserSummary> result = keycloakUserService.getSystemUsers();
 
 		assertTrue(result.isEmpty());
 		verify(keycloakClient).findUsersByRole(Role.SCHEDULER);

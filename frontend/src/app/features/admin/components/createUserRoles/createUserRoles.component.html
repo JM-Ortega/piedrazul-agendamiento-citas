@@ -1,94 +1,101 @@
-<div class="mb-8">
-  <h3 class="text-gray-700 text-xl font-semibold mb-1">Roles del Usuario</h3>
-  <p class="text-gray-500 text-base mb-4">
-    Seleccione uno o ambos roles. Al menos uno es requerido.
-  </p>
-  <div class="grid grid-cols-2 gap-4">
-    <!-- Médico -->
-    <app-button
-      variant="chip"
-      [active]="selectedRoles.includes('doctor')"
-      activeChipClasses="border-[#215c98] bg-[#d9e9f8] shadow-lg ring-2 ring-[#a7c9ec]"
-      extraClass="!p-6 !border-2 hover:!border-[#4e92d9]"
-      (buttonClick)="roleToggled.emit('doctor')"
-    >
-      <div class="flex flex-col items-center gap-3">
-        <div class="relative">
-          <svg
-            lucideStethoscope
-            [size]="40"
-            [class]="
-              selectedRoles.includes('doctor')
-                ? 'text-[#215c98]'
-                : 'text-gray-500'
-            "
-          ></svg>
-          @if (selectedRoles.includes('doctor')) {
-            <div
-              class="absolute -top-2 -right-2 bg-[#215c98] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
-            >
-              ✓
-            </div>
-          }
-        </div>
-        <span
-          [class]="
-            'text-lg font-semibold ' +
-            (selectedRoles.includes('doctor')
-              ? 'text-[#215c98]'
-              : 'text-gray-700')
-          "
-        >
-          Médico / Terapista
-        </span>
-      </div>
-    </app-button>
-
-    <!-- Agendador -->
-    <app-button
-      variant="chip"
-      [active]="selectedRoles.includes('scheduler')"
-      activeChipClasses="border-green-600 bg-green-50 shadow-lg ring-2 ring-green-200"
-      extraClass="!p-6 !border-2 hover:!border-green-400"
-      (buttonClick)="roleToggled.emit('scheduler')"
-    >
-      <div class="flex flex-col items-center gap-3">
-        <div class="relative">
-          <svg
-            lucideCalendar
-            [size]="40"
-            [class]="
-              selectedRoles.includes('scheduler')
-                ? 'text-green-600'
-                : 'text-gray-500'
-            "
-          ></svg>
-          @if (selectedRoles.includes('scheduler')) {
-            <div
-              class="absolute -top-2 -right-2 bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
-            >
-              ✓
-            </div>
-          }
-        </div>
-        <span
-          [class]="
-            'text-lg font-semibold ' +
-            (selectedRoles.includes('scheduler')
-              ? 'text-green-700'
-              : 'text-gray-700')
-          "
-        >
-          Agendador
-        </span>
-      </div>
-    </app-button>
+<div class="flex flex-col lg:flex-row lg:items-center gap-4">
+  <!-- Texto -->
+  <div class="lg:w-64 shrink-0">
+    <h3 class="text-gray-700 text-lg font-semibold mb-1">Roles del Usuario</h3>
+    <p class="text-gray-500 text-base">
+      Seleccione uno o ambos roles. Al menos uno es requerido.
+    </p>
   </div>
 
-  @if (errorRoles) {
-    <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
-      <svg lucideCircleAlert [size]="14"></svg>
-      {{ errorRoles }}
-    </p>
-  }
+  <!-- Botones de rol -->
+  <div class="flex-1">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <!-- Médico -->
+      <app-button
+        variant="chip"
+        [active]="selectedRoles.includes('doctor')"
+        activeChipClasses="border-[#215c98] bg-[#d9e9f8] shadow-lg ring-2 ring-[#a7c9ec]"
+        extraClass="!p-5 !border-2 hover:!border-[#4e92d9]"
+        (buttonClick)="roleToggled.emit('doctor')"
+      >
+        <div class="flex flex-col items-center gap-2.5">
+          <div class="relative">
+            <svg
+              lucideStethoscope
+              [size]="36"
+              [class]="
+                selectedRoles.includes('doctor')
+                  ? 'text-[#215c98]'
+                  : 'text-gray-500'
+              "
+            ></svg>
+            @if (selectedRoles.includes('doctor')) {
+              <div
+                class="absolute -top-2 -right-2 bg-[#215c98] text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold"
+              >
+                ✓
+              </div>
+            }
+          </div>
+          <span
+            [class]="
+              'text-base font-semibold ' +
+              (selectedRoles.includes('doctor')
+                ? 'text-[#215c98]'
+                : 'text-gray-700')
+            "
+          >
+            Médico / Terapista
+          </span>
+        </div>
+      </app-button>
+
+      <!-- Agendador -->
+      <app-button
+        variant="chip"
+        [active]="selectedRoles.includes('scheduler')"
+        activeChipClasses="border-green-600 bg-green-50 shadow-lg ring-2 ring-green-200"
+        extraClass="!p-5 !border-2 hover:!border-green-400"
+        (buttonClick)="roleToggled.emit('scheduler')"
+      >
+        <div class="flex flex-col items-center gap-2.5">
+          <div class="relative">
+            <svg
+              lucideCalendar
+              [size]="36"
+              [class]="
+                selectedRoles.includes('scheduler')
+                  ? 'text-green-600'
+                  : 'text-gray-500'
+              "
+            ></svg>
+            @if (selectedRoles.includes('scheduler')) {
+              <div
+                class="absolute -top-2 -right-2 bg-green-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold"
+              >
+                ✓
+              </div>
+            }
+          </div>
+          <span
+            [class]="
+              'text-base font-semibold ' +
+              (selectedRoles.includes('scheduler')
+                ? 'text-green-700'
+                : 'text-gray-700')
+            "
+          >
+            Agendador
+          </span>
+        </div>
+      </app-button>
+    </div>
+
+    @if (errorRoles) {
+      <p class="mt-2 text-sm text-red-600 flex items-center gap-1">
+        <svg lucideCircleAlert [size]="14"></svg>
+        {{ errorRoles }}
+      </p>
+    }
+  </div>
 </div>

@@ -13,10 +13,15 @@ import {
   LucideClipboardPlus,
   LucideFolderOpen,
   LucideSave,
+  LucideTriangleAlert,
 } from '@lucide/angular';
+import { CanComponentDeactivate } from '../../../core/guards/canDeactivate.guard';
 import { DoctorService } from '../../../core/services/doctor.service';
 import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
 import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
+import { ConfirmModalComponent } from '../../../design-system/organisms/confirm-modal/confirm-modal.component';
+import { calcAge } from '../../../shared/helpers/patient-validation';
+import { parseLocalDateString } from '../../../shared/helpers/transform-date-local';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 
@@ -26,6 +31,7 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LucideTriangleAlert,
     LucideClipboardPen,
     LucideClipboardPlus,
     LucideSave,
@@ -34,9 +40,12 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
     FormatoPipe,
     ButtonComponent,
     PaginationComponent,
+    ConfirmModalComponent,
   ],
 })
-export class DoctorMedicalHistoryComponent implements OnInit {
+export class DoctorMedicalHistoryComponent
+  implements OnInit, CanComponentDeactivate
+{
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   readonly doctorService = inject(DoctorService);
@@ -53,6 +62,7 @@ export class DoctorMedicalHistoryComponent implements OnInit {
   readonly medicalRecordsPagination =
     this.doctorService.medicalRecordsState.pagination;
   readonly patient = signal<Patient | undefined>(undefined);
+  readonly isLoadingPatient = signal(true);
   readonly newObservation = signal('');
   /** Caracteres restantes antes de llegar al límite, para mostrar en el contador del textarea. */
   readonly remainingObservationChars = computed(
@@ -62,6 +72,57 @@ export class DoctorMedicalHistoryComponent implements OnInit {
   readonly saveError = signal('');
   readonly isSaving = signal(false);
   readonly isLoadingRecords = this.doctorService.isLoadingRecords;
+
+  readonly patientBirthDateFormatted = computed(() => {
+    const p = this.patient();
+    if (!p?.birthDate) return 'No registra';
+    return parseLocalDateString(p.birthDate).toLocaleDateString('es-CO', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  });
+
+  readonly patientAge = computed(() => {
+    const p = this.patient();
+    if (!p?.birthDate) return null;
+    return calcAge(parseLocalDateString(p.birthDate));
+  });
+
+  // ── Salida de la ruta (CanDeactivate) ────────────────────────────────────
+  /** Modal de confirmación al intentar salir sin haber guardado la atención. */
+  readonly showExitConfirmModal = signal(false);
+  /** Se pone en true justo antes de navegar programáticamente tras guardar,
+   * para no mostrar el modal de confirmación en ese caso. */
+  private allowNavigation = false;
+  private exitResolver: ((value: boolean) => void) | null = null;
+
+  /**
+   * Invocado por `unsavedChangesGuard` al intentar salir de esta ruta,
+   * sin importar si la salida es por navegación programática, un enlace,
+   * o el botón "atrás" del navegador.
+   */
+  canDeactivate(): boolean | Promise<boolean> {
+    if (this.allowNavigation) return true;
+    return new Promise<boolean>((resolve) => {
+      this.exitResolver = resolve;
+      this.showExitConfirmModal.set(true);
+    });
+  }
+
+  /** El usuario confirma que desea salir: la cita queda sin atender. */
+  confirmExit(): void {
+    this.showExitConfirmModal.set(false);
+    this.exitResolver?.(true);
+    this.exitResolver = null;
+  }
+
+  /** El usuario cancela: permanece en el formulario, sin alterar la navegación. */
+  cancelExit(): void {
+    this.showExitConfirmModal.set(false);
+    this.exitResolver?.(false);
+    this.exitResolver = null;
+  }
 
   /**
    * Actualiza la observación truncándola a {@link OBSERVATION_MAX_LENGTH}
@@ -81,12 +142,16 @@ export class DoctorMedicalHistoryComponent implements OnInit {
 
     this.doctorService.resetMedicalRecords();
 
-    this.doctorService
-      .getPatientByAppointment(idAppointment)
-      .subscribe((patient) => {
+    this.doctorService.getPatientByAppointment(idAppointment).subscribe({
+      next: (patient) => {
         this.patient.set(patient);
+        this.isLoadingPatient.set(false);
         this.doctorService.loadMedicalRecordsByPatient(patient.id);
-      });
+      },
+      error: () => {
+        this.isLoadingPatient.set(false);
+      },
+    });
   }
 
   /**
@@ -116,6 +181,7 @@ export class DoctorMedicalHistoryComponent implements OnInit {
       .updateAppointmentAsAttended(idCita, observation)
       .subscribe({
         next: () => {
+          this.allowNavigation = true;
           this.doctorService.resetMedicalRecords();
           this.router.navigate(['/medico']);
         },

@@ -23,4 +23,6 @@ public interface AppointmentExternalService {
     boolean hasAvailableSlots(LocalDate date);
 
     boolean isNewPatient(UUID patientId);
+
+    boolean hasScheduledAppointments(UUID doctorID);
 }

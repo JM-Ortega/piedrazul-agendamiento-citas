@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { AuthGuard } from './core/guards/auth.guard';
+import { unsavedChangesGuard } from './core/guards/canDeactivate.guard';
 import { HomeComponent } from './design-system/pages/home/home.component';
 import { AdminCreateUserComponent } from './features/admin/pages/adminCreateUser/adminCreateUser.component';
 import { AdminDoctorsComponent } from './features/admin/pages/adminDoctors/adminDoctors.component';
@@ -84,7 +85,8 @@ export const routes: Routes = [
     path: 'medico/control-medico/:idAppointment',
     component: DoctorMedicalHistoryComponent,
     canActivate: [AuthGuard],
-    data: { role: 'DOCTOR' },
+    canDeactivate: [unsavedChangesGuard],
+    data: { role: 'DOCTOR', confirmExitLocally: true },
   },
   {
     path: 'paciente/agendar',

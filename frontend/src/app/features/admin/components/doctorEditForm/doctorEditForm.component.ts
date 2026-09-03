@@ -15,12 +15,14 @@ import {
   LucideChevronDown,
   LucideChevronUp,
   LucideClock,
+  LucidePencil,
   LucideSave,
 } from '@lucide/angular';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { InputComponent } from '../../../../design-system/atoms/input/input.component';
 import { SelectComponent } from '../../../../design-system/atoms/select/select.component';
 import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
+import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
 import { toIsoDateString } from '../../../../shared/helpers/transform-date-local';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
@@ -54,6 +56,7 @@ export interface DoctorSaveEvent {
     LucideChevronDown,
     LucideChevronUp,
     LucideClock,
+    LucidePencil,
     LucideSave,
     ButtonComponent,
     DatepickerComponent,
@@ -103,6 +106,8 @@ export class DoctorEditFormComponent implements OnInit {
   // ── Internal state ────────────────────────────────────────────────────────
   editForm = signal<Doctor | null>(null);
   showDaySchedules = signal(false);
+  /** Días cuyo editor de horario personalizado está abierto (por click del usuario). */
+  customizingDays = signal<Set<number>>(new Set());
   errors = signal<FormErrors>({
     horarioGlobal: '',
     fechas: '',
@@ -144,7 +149,17 @@ export class DoctorEditFormComponent implements OnInit {
     }
     return false;
   });
-
+  /** Abre/cierra el desplegable de horarios por día y, si se abre, hace scroll hasta él. */
+  toggleDaySchedules(): void {
+    const willOpen = !this.showDaySchedules();
+    this.showDaySchedules.set(willOpen);
+    if (willOpen) {
+      scrollToElementById(`day-schedules-${this.doctor().id}`, {
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }
+  }
   /** True si hay cambios, no hay errores pendientes y no se está guardando ya. */
   canSave = computed(() => {
     const errs = this.errors();
@@ -186,7 +201,30 @@ export class DoctorEditFormComponent implements OnInit {
   updateField(field: keyof Doctor, value: Doctor[keyof Doctor]): void {
     const form = this.editForm();
     if (!form) return;
-    const updated = { ...form, [field]: value };
+
+    let daySchedules = form.daySchedules;
+
+    if (field === 'startTime' || field === 'endTime') {
+      daySchedules = { ...(form.daySchedules ?? {}) };
+      for (const day of form.workdays ?? []) {
+        if (this.customizingDays().has(day)) continue;
+
+        const ds = daySchedules[day];
+        if (!ds) continue;
+
+        const matchesOldDefault =
+          ds.startTime === form.startTime && ds.endTime === form.endTime;
+
+        if (matchesOldDefault) {
+          daySchedules[day] = {
+            startTime: field === 'startTime' ? (value as string) : ds.startTime,
+            endTime: field === 'endTime' ? (value as string) : ds.endTime,
+          };
+        }
+      }
+    }
+
+    const updated = { ...form, [field]: value, daySchedules };
     this.editForm.set(updated);
     this.errors.set(this.validationService.validateForm(updated));
   }
@@ -199,7 +237,12 @@ export class DoctorEditFormComponent implements OnInit {
       ? form.workdays.filter((d) => d !== day)
       : [...(form.workdays ?? []), day].sort((a, b) => a - b);
     const daySchedules = { ...(form.daySchedules ?? {}) };
-    if (!days.includes(day)) delete daySchedules[day];
+    if (!days.includes(day)) {
+      delete daySchedules[day];
+      const set = new Set(this.customizingDays());
+      set.delete(day);
+      this.customizingDays.set(set);
+    }
     const updated = { ...form, workdays: days, daySchedules };
     this.editForm.set(updated);
     this.errors.set(this.validationService.validateForm(updated));
@@ -235,9 +278,32 @@ export class DoctorEditFormComponent implements OnInit {
     this.errors.set(this.validationService.validateForm(updated));
   }
 
-  /** True si el día tiene un horario propio distinto al general. */
+  /** True si el día tiene un horario propio que realmente difiere del general. */
   hasDayOverride(day: number): boolean {
-    return !!this.editForm()?.daySchedules?.[day];
+    const form = this.editForm();
+    const ds = form?.daySchedules?.[day];
+    if (!ds || !form) return false;
+    return ds.startTime !== form.startTime || ds.endTime !== form.endTime;
+  }
+
+  /** True si el editor de horario personalizado de un día debe mostrarse (abierto o ya tiene override). */
+  isCustomizingDay(day: number): boolean {
+    return this.customizingDays().has(day) || this.hasDayOverride(day);
+  }
+
+  /** Abre el editor de horario personalizado para un día. */
+  startCustomizeDay(day: number): void {
+    const set = new Set(this.customizingDays());
+    set.add(day);
+    this.customizingDays.set(set);
+  }
+
+  /** Cierra el editor de un día y vuelve al horario por defecto. */
+  collapseCustomizeDay(day: number): void {
+    const set = new Set(this.customizingDays());
+    set.delete(day);
+    this.customizingDays.set(set);
+    this.resetDaySchedule(day);
   }
 
   /** Valor a mostrar para un día: su horario propio o el horario general. */
@@ -250,11 +316,14 @@ export class DoctorEditFormComponent implements OnInit {
     );
   }
 
-  /** Cantidad de días con horario personalizado. */
+  /** Cantidad de días cuyo horario realmente difiere del general. */
   getEditFormDayScheduleCount(): number {
-    return Object.keys(this.editForm()?.daySchedules ?? {}).length;
+    const form = this.editForm();
+    if (!form) return 0;
+    return Object.keys(form.daySchedules ?? {}).filter((day) =>
+      this.hasDayOverride(Number(day))
+    ).length;
   }
-
   // ── Guardar ───────────────────────────────────────────────────────────────
 
   /** Calcula los días removidos y emite el evento `saved` con el diff completo. */

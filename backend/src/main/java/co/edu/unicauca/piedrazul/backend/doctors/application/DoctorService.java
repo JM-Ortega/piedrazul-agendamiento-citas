@@ -129,39 +129,19 @@ public class DoctorService implements DoctorProvisioningApi {
 
     //Deshabilitar medico
     @Transactional
-    public void disableDoctor(UUID idDoctor, boolean force) {
-        // 1. Buscar al doctor
+    public void disableDoctor(UUID idDoctor) {
         Doctor doctor = doctorRepository.findById(idDoctor)
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
-        LocalDate today = LocalDate.now();
-
-        // 2. Validación
-        // Si hoy es antes de que siquiera empiece a trabajar, lanzamos la advertencia
-        // Si da qeu si el front debe volver a enviar la peticino pero ahora con force true
-        if (today.isBefore(doctor.getLaborStart()) && !force) {
-            throw new DateConflictException(
-                    "El doctor aún no ha iniciado labores (Inicia: " + doctor.getLaborStart() +
-                            "). ¿Está seguro de que desea cancelar su contrato ahora?"
-            );
+        // Valida si el doctor aun tiene citas por atender
+        if(appointmentExternalService.hasScheduledAppointments(idDoctor)) {
+            throw new DoctorHasScheduledAppointments("No es posible deshabilitar el doctor porque aun tiene citas agendadas");
         }
 
-        // 3. Ajustar la fecha de fin
-        // Si hoy es antes del inicio (por el force), igualamos fin al inicio.
-        // De lo contrario, el fin es hoy.
-        if (today.isBefore(doctor.getLaborStart())) {
-            doctor.updateLaborPeriod(doctor.getLaborStart(), doctor.getLaborStart());
-        } else {
-            doctor.updateLaborPeriod(doctor.getLaborStart(), today);
-        }
-
-        // 4. Cambiar el estado del Doctor
         doctor.deactivate();
 
-        // 5. Desactivamos el usuario para que no pueda loguearse
         syncUserStatus(doctor);
 
-        // 6. Persistir cambios
         doctorRepository.save(doctor);
     }
 
@@ -204,7 +184,7 @@ public class DoctorService implements DoctorProvisioningApi {
         List<DoctorDetailedResponse> content = personPage.getContent().stream()
                 .map(person -> {
                     Doctor doctor = doctorsById.get(person.id());
-                    return doctor == null ? null : DoctorDetailedResponse.fromEntity(doctor, person.firstName()+person.lastName());
+                    return doctor == null ? null : DoctorDetailedResponse.fromEntity(doctor, person.firstName()+" "+person.lastName());
                 })
                 .filter(Objects::nonNull)
                 .toList();

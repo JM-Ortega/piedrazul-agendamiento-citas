@@ -3,11 +3,17 @@
     <div class="mb-6">
       <div class="flex items-center gap-3">
         <svg lucideClipboardPen [size]="40" class="text-[#163c63]"></svg>
-        <h3 class="text-2xl font-bold text-[#163c63]">Historia Clínica</h3>
+        <h3 class="text-2xl font-bold text-[#163c63]">Control Medico</h3>
       </div>
     </div>
 
-    @if (!patient()) {
+    @if (isLoadingPatient()) {
+      <div class="flex items-center justify-center py-12">
+        <div
+          class="w-8 h-8 border-3 border-[#215c98] border-t-transparent rounded-full animate-spin"
+        ></div>
+      </div>
+    } @else if (!patient()) {
       <div
         class="bg-red-50 border border-red-300 text-red-700 px-6 py-4 rounded-xl"
       >
@@ -63,7 +69,15 @@
                   >{{ patient()!.identification }}
                 </p>
                 <p>
-                  <strong class="text-[#163c63]">Género: </strong
+                  <strong class="text-[#163c63]">Fecha de nacimiento: </strong
+                  >{{ patientBirthDateFormatted() }}
+                </p>
+                <p>
+                  <strong class="text-[#163c63]">Edad: </strong
+                  >{{ patientAge() }} años
+                </p>
+                <p>
+                  <strong class="text-[#163c63]">Sexo: </strong
                   >{{ patient()!.sex | formato }}
                 </p>
                 <p>
@@ -173,4 +187,24 @@
       </div>
     }
   </div>
+  <!-- Modal: confirmar salida sin guardar -->
+  <app-confirm-modal
+    [visible]="showExitConfirmModal()"
+    title="¿Salir sin guardar?"
+    iconPosition="top"
+    [richMessage]="true"
+    maxWidth="max-w-md"
+    [fullWidthButtons]="true"
+    cancelLabel="Cancelar"
+    confirmLabel="Sí, salir"
+    confirmVariant="danger"
+    iconBg="bg-red-100"
+    (dismissed)="cancelExit()"
+    (confirmed)="confirmExit()"
+  >
+    <svg lucideTriangleAlert [size]="28" icon class="text-red-600"></svg>
+    <span message>
+      Los datos no guardados se perderán y la cita quedará sin atender.
+    </span>
+  </app-confirm-modal>
 </div>

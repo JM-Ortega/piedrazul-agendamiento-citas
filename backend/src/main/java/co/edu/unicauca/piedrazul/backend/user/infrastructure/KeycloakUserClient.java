@@ -23,12 +23,7 @@ import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Component
 public class KeycloakUserClient {
@@ -125,6 +120,24 @@ public class KeycloakUserClient {
                 .roles()
                 .get(role.name())
                 .getUserMembers();
+    }
+
+    public List<UserRepresentation> getSystemUsers() {
+        List<UserRepresentation> doctors = keycloak.realm(props.getRealm()).roles().get("DOCTOR").getUserMembers();
+        List<UserRepresentation> schedulers = keycloak.realm(props.getRealm()).roles().get("SCHEDULER").getUserMembers();
+
+        // Usamos LinkedHashMap para conservar el orden de inserción
+        Map<String, UserRepresentation> userMap = new LinkedHashMap<>();
+
+        // Agregamos ambas listas; si un ID ya existe, simplemente se sobreescribe
+        for (UserRepresentation user : doctors) {
+            userMap.put(user.getId(), user);
+        }
+        for (UserRepresentation user : schedulers) {
+            userMap.put(user.getId(), user);
+        }
+
+        return new ArrayList<>(userMap.values());
     }
 
     public Optional<UserRepresentation> findUserByUsername(String username) {

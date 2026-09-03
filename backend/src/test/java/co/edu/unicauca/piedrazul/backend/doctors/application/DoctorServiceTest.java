@@ -222,7 +222,8 @@ class DoctorServiceTest {
 
         @Test
         void shouldThrowWhenDoctorNotFound() {
-            when(doctorRepository.findById(personId)).thenReturn(Optional.empty());
+            when(doctorRepository.findById(personId))
+                    .thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> doctorService.enableDoctor(personId))
                     .isInstanceOf(DoctorNotFoundException.class);
@@ -230,10 +231,27 @@ class DoctorServiceTest {
 
         @Test
         void shouldActivateSaveAndSyncRoleWhenEligible() {
-            Doctor doctor = new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(3), 4, false, 30);
-            doctor.updateSchedule(Workday.LUNES, LocalTime.of(8, 0), LocalTime.of(12, 0));
-            doctor.addSpecialty(buildSpecialty(SpecialtyCode.MEDICINA_GENERAL));
-            when(doctorRepository.findById(personId)).thenReturn(Optional.of(doctor));
+            Doctor doctor = new Doctor(
+                    personId,
+                    LocalDate.now(),
+                    LocalDate.now().plusMonths(3),
+                    4,
+                    false,
+                    30
+            );
+
+            doctor.updateSchedule(
+                    Workday.LUNES,
+                    LocalTime.of(8, 0),
+                    LocalTime.of(12, 0)
+            );
+
+            doctor.addSpecialty(
+                    buildSpecialty(SpecialtyCode.MEDICINA_GENERAL)
+            );
+
+            when(doctorRepository.findById(personId))
+                    .thenReturn(Optional.of(doctor));
 
             doctorService.enableDoctor(personId);
 
@@ -244,14 +262,24 @@ class DoctorServiceTest {
 
         @Test
         void shouldPropagateExceptionWhenDoctorCannotBeActivated() {
-            Doctor doctor = new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(3), 4, false, 30);
-            // sin horarios ni especialidades -> no puede activarse
-            when(doctorRepository.findById(personId)).thenReturn(Optional.of(doctor));
+            Doctor doctor = new Doctor(
+                    personId,
+                    LocalDate.now(),
+                    LocalDate.now().plusMonths(3),
+                    4,
+                    false,
+                    30
+            );
+
+            // Sin horarios ni especialidades -> no puede activarse
+            when(doctorRepository.findById(personId))
+                    .thenReturn(Optional.of(doctor));
 
             assertThatThrownBy(() -> doctorService.enableDoctor(personId))
                     .isInstanceOf(DoctorValidationException.class);
 
             verify(doctorRepository, never()).save(any());
+            verify(personExternalService, never()).ensureDoctorRole(any());
         }
     }
 
@@ -260,50 +288,65 @@ class DoctorServiceTest {
 
         @Test
         void shouldThrowWhenDoctorNotFound() {
-            when(doctorRepository.findById(personId)).thenReturn(Optional.empty());
+            when(doctorRepository.findById(personId))
+                    .thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> doctorService.disableDoctor(personId, false))
+            assertThatThrownBy(() -> doctorService.disableDoctor(personId))
                     .isInstanceOf(DoctorNotFoundException.class);
         }
 
         @Test
-        void shouldThrowDateConflictWhenLaborNotStartedAndNotForced() {
-            Doctor doctor = new Doctor(personId, LocalDate.now().plusDays(10),
-                    LocalDate.now().plusMonths(3), 4, true, 30);
-            when(doctorRepository.findById(personId)).thenReturn(Optional.of(doctor));
+        void shouldDisableSaveAndSyncRoleWhenNoScheduledAppointments() {
+            Doctor doctor = new Doctor(
+                    personId,
+                    LocalDate.now(),
+                    LocalDate.now().plusMonths(3),
+                    4,
+                    true,
+                    30
+            );
 
-            assertThatThrownBy(() -> doctorService.disableDoctor(personId, false))
-                    .isInstanceOf(DateConflictException.class);
+            when(doctorRepository.findById(personId))
+                    .thenReturn(Optional.of(doctor));
 
-            verify(doctorRepository, never()).save(any());
-        }
+            when(appointmentExternalService.hasScheduledAppointments(personId))
+                    .thenReturn(false);
 
-        @Test
-        void shouldCollapsePeriodWhenLaborNotStartedButForced() {
-            LocalDate futureStart = LocalDate.now().plusDays(10);
-            Doctor doctor = new Doctor(personId, futureStart, LocalDate.now().plusMonths(3), 4, true, 30);
-            when(doctorRepository.findById(personId)).thenReturn(Optional.of(doctor));
+            doctorService.disableDoctor(personId);
 
-            doctorService.disableDoctor(personId, true);
-
-            assertThat(doctor.getLaborStart()).isEqualTo(futureStart);
-            assertThat(doctor.getLaborEnd()).isEqualTo(futureStart);
             assertThat(doctor.isStatus()).isFalse();
+            verify(appointmentExternalService)
+                    .hasScheduledAppointments(personId);
             verify(doctorRepository).save(doctor);
             verify(personExternalService).revokeDoctorRole(personId);
         }
 
         @Test
-        void shouldSetLaborEndToTodayWhenAlreadyWorking() {
-            Doctor doctor = new Doctor(personId, LocalDate.now().minusMonths(1),
-                    LocalDate.now().plusMonths(3), 4, true, 30);
-            when(doctorRepository.findById(personId)).thenReturn(Optional.of(doctor));
+        void shouldThrowWhenDoctorHasScheduledAppointments() {
+            Doctor doctor = new Doctor(
+                    personId,
+                    LocalDate.now(),
+                    LocalDate.now().plusMonths(3),
+                    4,
+                    true,
+                    30
+            );
 
-            doctorService.disableDoctor(personId, false);
+            when(doctorRepository.findById(personId))
+                    .thenReturn(Optional.of(doctor));
 
-            assertThat(doctor.getLaborEnd()).isEqualTo(LocalDate.now());
-            assertThat(doctor.isStatus()).isFalse();
-            verify(personExternalService).revokeDoctorRole(personId);
+            when(appointmentExternalService.hasScheduledAppointments(personId))
+                    .thenReturn(true);
+
+            assertThatThrownBy(() -> doctorService.disableDoctor(personId))
+                    .isInstanceOf(DoctorHasScheduledAppointments.class);
+
+            assertThat(doctor.isStatus()).isTrue();
+
+            verify(appointmentExternalService)
+                    .hasScheduledAppointments(personId);
+            verify(doctorRepository, never()).save(any());
+            verify(personExternalService, never()).revokeDoctorRole(any());
         }
     }
 

@@ -93,13 +93,12 @@ public class PatientService implements PatientModuleApi {
             String lastName,
             String phone,
             String email,
-            UUID userId,
             PatientSex sex,
             LocalDate birthDate,
             String guardianPhone
     ) {
         PersonSummary person = personExternalService.createPerson(
-                identificationType, identification, firstName, lastName, phone, email, userId
+                identificationType, identification, firstName, lastName, phone, email, null
         );
 
         Patient patient = PatientFactory.create(person, sex, birthDate, guardianPhone);

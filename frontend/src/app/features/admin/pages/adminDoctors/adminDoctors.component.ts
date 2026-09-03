@@ -26,9 +26,11 @@ import {
 } from '../../../../design-system/molecules/sortControl/sortControl.component';
 import { toggleInArray } from '../../../../shared/helpers/array-utils';
 import { PaginationMeta } from '../../../../shared/helpers/paginated-state';
+import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
 import {
-  getAllSpecialtiesMeta,
+  getSpecialtiesMeta,
   getSpecialtyMeta,
+  SpecialtyMeta,
 } from '../../../../shared/helpers/specialty-catalog';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { DoctorAdminDto } from '../../models/dtos/DoctorAdminDto';
@@ -56,7 +58,9 @@ export class AdminDoctorsComponent implements OnInit {
   public router = inject(Router);
   private appService = inject(AppService);
 
-  readonly specialtiesList = getAllSpecialtiesMeta();
+  specialtiesList = signal<SpecialtyMeta[]>([]);
+  loadingSpecialties = signal(false);
+  errorSpecialties = signal('');
   // ── State ─────────────────────────────────────────────────────────────────
   doctors = signal<DoctorAdminDto[]>([]);
   pagination = signal<PaginationMeta | null>(null);
@@ -75,12 +79,27 @@ export class AdminDoctorsComponent implements OnInit {
   readonly sortOptions: SortOption[] = [
     { value: 'firstName', label: 'Nombre' },
     { value: 'lastName', label: 'Apellido' },
-    { value: 'identification', label: 'Documento' },
+    { value: 'documentId', label: 'Documento' },
   ];
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.loadDoctors();
+    this.loadSpecialties();
+  }
+
+  private loadSpecialties(): void {
+    this.loadingSpecialties.set(true);
+    this.adminService.getAllSpecialties().subscribe({
+      next: (names) => {
+        this.specialtiesList.set(getSpecialtiesMeta(names));
+        this.loadingSpecialties.set(false);
+      },
+      error: () => {
+        this.errorSpecialties.set('No se pudieron cargar las especialidades.');
+        this.loadingSpecialties.set(false);
+      },
+    });
   }
 
   @HostListener('document:mousedown', ['$event'])
@@ -133,8 +152,11 @@ export class AdminDoctorsComponent implements OnInit {
     this.editingDoctorId.set(doctor.id);
     this.editingSpecialties.set([...doctor.specialties]);
     this.editingHasScheduler.set(doctor.roles.includes('SCHEDULER'));
+    scrollToElementById(`doctor-card-${doctor.id}`, {
+      behavior: 'smooth',
+      block: 'start',
+    });
   }
-
   handleCancel(): void {
     this.editingDoctorId.set(null);
     this.editingSpecialties.set([]);

@@ -24,10 +24,12 @@ import { InputComponent } from '../../../../design-system/atoms/input/input.comp
 import { SelectComponent } from '../../../../design-system/atoms/select/select.component';
 import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
 import { toggleInArray } from '../../../../shared/helpers/array-utils';
+import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
 import { toIsoDateString } from '../../../../shared/helpers/transform-date-local';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 import { DoctorFormData } from '../../models/interfaces/DoctorFormData';
+
 export interface SpecialtyOption {
   name: string;
   icon: LucideIcon;
@@ -125,8 +127,13 @@ export class CreateUserDoctorFormComponent {
   /** Alterna la apertura manual del panel de horario. */
   toggleSchedule(): void {
     this.scheduleOpened = !this.scheduleOpened;
+    if (this.scheduleOpened) {
+      scrollToElementById('error-anchor-workDays', {
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }
   }
-
   // ── Especialidades y Perido Laboral ───────────────────────────────────────
 
   /** True si la especialidad dada ya está seleccionada. */

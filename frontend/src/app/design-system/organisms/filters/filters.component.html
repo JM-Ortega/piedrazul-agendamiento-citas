@@ -33,18 +33,29 @@
   </p>
 
   @if (activeFilters().length) {
-    <div class="mt-4 flex flex-wrap gap-2 items-center">
-      <span class="text-md text-gray-600">
+    <div class="mt-4 flex flex-wrap gap-1.5 items-center">
+      <span class="text-sm text-gray-500">
         Filtros seleccionados{{ isDirty() ? ' (sin aplicar):' : ':' }}
       </span>
       @for (entry of activeFilters(); track entry.field.id) {
         <span
-          class="inline-flex items-center gap-1 bg-[#d9e9f8] text-[#215c98] px-3 py-1 rounded-lg text-sm"
+          class="inline-flex items-center gap-1.5 bg-[#eaf3fc] text-[#215c98] border border-[#a7c9ec]/60 pl-3 pr-1.5 py-1 rounded-full text-xs font-medium"
         >
           {{ displayValue(entry.field, entry.value) }}
-          <app-button variant="icon" (buttonClick)="clearValue(entry.field.id)"
-            >×</app-button
+          <app-button
+            variant="icon"
+            extraClass="!w-4 !h-4 !min-w-0 !p-0 !text-[#215c98]/60 hover:!text-[#215c98] hover:!bg-[#a7c9ec]/40 !rounded-full"
+            (buttonClick)="clearValue(entry.field.id)"
           >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path
+                d="M1 1l8 8M9 1l-8 8"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+            </svg>
+          </app-button>
         </span>
       }
     </div>
