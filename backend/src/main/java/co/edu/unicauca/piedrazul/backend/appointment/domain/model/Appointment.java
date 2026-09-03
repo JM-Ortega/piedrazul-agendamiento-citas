@@ -4,6 +4,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.inte
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -64,6 +65,26 @@ public class Appointment {
                 request,
                 SchedulingOrigin.AUTONOMO
         );
+    }
+
+    //Factory Method 3
+    public static Appointment registerUnscheduledAttention(UUID idDoctor, UUID idPatient, SpecialtyCode specialty) {
+        Objects.requireNonNull(idDoctor);
+        Objects.requireNonNull(idPatient);
+        Objects.requireNonNull(specialty);
+
+        Appointment appointment = new Appointment(
+                null,
+                idDoctor,
+                idPatient,
+                specialty,
+                LocalDate.now(),
+                AppointmentTime.withoutBusinessHoursRestriction(LocalTime.now()),
+                SchedulingOrigin.SIN_CITA);
+
+        appointment.appointmentState = AppointmentState.ATENDIDA;
+
+        return appointment;
     }
 
     private static Appointment schedule(

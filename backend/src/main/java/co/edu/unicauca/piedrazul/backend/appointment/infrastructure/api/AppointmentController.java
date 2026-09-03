@@ -12,12 +12,14 @@ import co.edu.unicauca.piedrazul.backend.appointment.exception.DoctorConfigIncon
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.ClinicalHistoryDescription;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.ListAppointmentFiltersRequest;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.RegisterUnscheduledAttentionRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.PageResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.CitaDtoMapper;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -46,6 +48,7 @@ public class AppointmentController {
     private final GetAppointmentStatesUseCase getAppointmentStatesUseCase;
     private final UpdateAutonomousSchedulingUseCase updateAutonomousSchedulingUseCase;
     private final GetAutonomousSchedulingContidionUseCase getAutonomousSchedulingContidionUseCase;
+    private final RegisterUnscheduledAttentionUseCase registerUnscheduledAttentionUseCase;
 
     private final AppointmentSchedulingService appointmentSchedulingService;
     private final ManualPatientResolutionStrategy manualPatientResolutionStrategy;
@@ -66,6 +69,7 @@ public class AppointmentController {
             GetAppointmentStatesUseCase getAppointmentStatesUseCase,
             UpdateAutonomousSchedulingUseCase updateAutonomousSchedulingUseCase,
             GetAutonomousSchedulingContidionUseCase getAutonomousSchedulingContidionUseCase,
+            RegisterUnscheduledAttentionUseCase registerUnscheduledAttentionUseCase,
             AppointmentSchedulingService appointmentSchedulingService,
             ManualPatientResolutionStrategy manualPatientResolutionStrategy,
             AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy,
@@ -82,6 +86,7 @@ public class AppointmentController {
         this.getAppointmentStatesUseCase = getAppointmentStatesUseCase;
         this.updateAutonomousSchedulingUseCase = updateAutonomousSchedulingUseCase;
         this.getAutonomousSchedulingContidionUseCase = getAutonomousSchedulingContidionUseCase;
+        this.registerUnscheduledAttentionUseCase = registerUnscheduledAttentionUseCase;
         this.appointmentSchedulingService = appointmentSchedulingService;
         this.manualPatientResolutionStrategy = manualPatientResolutionStrategy;
         this.autonomousPatientResolutionStrategy = autonomousPatientResolutionStrategy;
@@ -227,6 +232,28 @@ public class AppointmentController {
             );
         }
 
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+
+
+    // Crear cita no agendada + Medical Check up opcional
+    @PostMapping("/unscheduled")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<Void> registerUnscheduledAttention(
+            @RequestBody @Valid RegisterUnscheduledAttentionRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        UUID idDoctor = doctorConfigConsultPort.findByUserId(UUID.fromString(jwt.getSubject()))
+                .orElseThrow(() -> new DoctorConfigInconsistentException("Doctor no encontrado"));
+
+        PatientSchedulingContext patientContext = PatientSchedulingContext.manual(
+                request.getDocumentType(), request.getDocumentNumber(), request.getFirstName(),
+                request.getLastName(), request.getPhone(), request.getGender(),
+                request.getBirthDate(), request.getEmail(), request.getGuardianPhone()
+        );
+
+        registerUnscheduledAttentionUseCase.register(idDoctor, patientContext, request.getSpecialty(), request.getMedicalCheckup());
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 

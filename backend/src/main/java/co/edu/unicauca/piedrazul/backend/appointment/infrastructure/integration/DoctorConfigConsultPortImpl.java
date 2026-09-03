@@ -4,6 +4,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTim
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -70,5 +71,10 @@ public class DoctorConfigConsultPortImpl implements DoctorConfigConsultPort {
     @Override
     public Map<UUID, Integer> getIntervalMinutesByDoctorIds(List<UUID> doctorIds) {
         return doctorExternalService.intervalMinutesByDoctorIds(doctorIds);
+    }
+
+    @Override
+    public List<SpecialtyCode> getSpecialtiesByDoctor(UUID idDoctor) {
+        return doctorExternalService.findSpecialtiesByPersonIds(List.of(idDoctor)).getOrDefault(idDoctor, List.of());
     }
 }
