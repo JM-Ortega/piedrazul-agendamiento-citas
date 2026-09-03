@@ -181,7 +181,7 @@
 
           @if (patientStatus() === 'existing-user') {
             <app-user-data-form
-              #guardianForm
+              #existingUserForm
               [ngModel]="existingUsersForm()"
               (valueChange)="onExistingUsersFormChange($event)"
             ></app-user-data-form>
