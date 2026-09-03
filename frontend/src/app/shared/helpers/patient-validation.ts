@@ -27,14 +27,18 @@ const INVALID_EMAIL_CHARS = /['"<>()[\]\\,;:{}|^~`!#$%&*=?/]/;
 /**
  * Calcula la edad en años cumplidos a partir de una fecha de nacimiento.
  *
- * @param birthDate - Fecha de nacimiento como objeto `Date`.
+ * @param birthDate - Fecha de nacimiento como objeto `Date` o string `YYYY-MM-DD`.
  * @returns Edad en años cumplidos.
  */
-export function calcAge(birthDate: Date): number {
+export function calcAge(birthDate: Date | string): number {
+  const birth =
+    typeof birthDate === 'string'
+      ? new Date(`${birthDate}T12:00:00`)
+      : birthDate;
   const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const m = today.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
   return age;
 }
 

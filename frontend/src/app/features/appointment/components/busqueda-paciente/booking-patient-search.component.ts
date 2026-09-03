@@ -25,7 +25,7 @@ import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { formatLongDateEs } from '../../../../shared/helpers/date-format';
-import { calculateAge } from '../../../../shared/helpers/calculateAge';
+import { calcAge } from '../../../../shared/helpers/patient-validation';
 
 const MIN_CHARS = 3;
 const MAX_DOC_LENGTH = 20;
@@ -52,7 +52,7 @@ export class BookingPatientSearchComponent {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
   formatLongDateEs = formatLongDateEs;
-  calculateAge = calculateAge;
+  calculateAge = calcAge;
 
   /** Si llega un valor, precarga el documento y dispara la búsqueda exacta automáticamente. */
   @Input() set prefillDocument(value: string) {
