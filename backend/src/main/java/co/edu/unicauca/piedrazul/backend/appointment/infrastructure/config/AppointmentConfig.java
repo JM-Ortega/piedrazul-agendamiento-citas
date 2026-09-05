@@ -108,20 +108,6 @@ public class AppointmentConfig {
     }
 
     @Bean
-    public GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase(
-            AppointmentRepository appointmentRepository,
-            DoctorConfigConsultPort doctorConfigConsultPort,
-            SlotTimeService slotTimeService,
-            IsNewPatientUseCase isNewPatientUseCase) {
-        return new GetSpecialtiesWithDoctorUseCaseImpl(
-                appointmentRepository,
-                doctorConfigConsultPort,
-                slotTimeService,
-                isNewPatientUseCase
-        );
-    }
-
-    @Bean
     public ListMyAppointmentsUseCase listMyAppointmentsUseCase(
             AppointmentRepository appointmentRepository,
             PatientConsultPort patientConsultPort) {

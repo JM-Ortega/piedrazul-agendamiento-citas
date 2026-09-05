@@ -39,7 +39,6 @@ import java.util.UUID;
 public class AppointmentController {
     private final GetAvailableSlotsUseCase getAvailableSlotsUseCase;
     private final ListAppointmentsUseCase listAppointmentsUseCase;
-    private final GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase;
     private final CitaDtoMapper citaDtoMapper;
     private final ListMyAppointmentsUseCase listMyAppointmentsUseCase;
     private final IsNewPatientUseCase isNewPatientUseCase;
@@ -60,7 +59,6 @@ public class AppointmentController {
     public AppointmentController(
             GetAvailableSlotsUseCase getAvailableSlotsUseCase,
             ListAppointmentsUseCase listAppointmentsUseCase,
-            GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase,
             CitaDtoMapper citaDtoMapper,
             ListMyAppointmentsUseCase listMyAppointmentsUseCase,
             IsNewPatientUseCase isNewPatientUseCase,
@@ -77,7 +75,6 @@ public class AppointmentController {
             DoctorConfigConsultPort doctorConfigConsultPort) {
         this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
         this.listAppointmentsUseCase = listAppointmentsUseCase;
-        this.getSpecialtiesWithDoctorUseCase = getSpecialtiesWithDoctorUseCase;
         this.citaDtoMapper = citaDtoMapper;
         this.listMyAppointmentsUseCase = listMyAppointmentsUseCase;
         this.isNewPatientUseCase = isNewPatientUseCase;
@@ -235,8 +232,6 @@ public class AppointmentController {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-
-
     // Crear cita no agendada + Medical Check up opcional
     @PostMapping("/unscheduled")
     @PreAuthorize("hasRole('DOCTOR')")
@@ -255,13 +250,6 @@ public class AppointmentController {
 
         registerUnscheduledAttentionUseCase.register(idDoctor, patientContext, request.getSpecialty(), request.getMedicalCheckup());
         return ResponseEntity.status(HttpStatus.CREATED).build();
-    }
-
-    // Listar un médico por defecto para cada especialidad
-    @GetMapping("/specialties-with-doctor")
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<List<DoctorResponse>> getSpecialtiesWithDoctor(@RequestParam(required = false) UUID patientId) {
-        return ResponseEntity.ok(getSpecialtiesWithDoctorUseCase.getSpecialtiesWithDoctor(patientId));
     }
 
     // Actualizar el estado de una cita a atendida y crear su HC asociada
