@@ -221,7 +221,7 @@ CREATE TABLE piedrazul.patient (
 
     CONSTRAINT pk_patient PRIMARY KEY (person_id),
     CONSTRAINT fk_patient_person FOREIGN KEY (person_id) REFERENCES piedrazul.person(id),
-    CONSTRAINT ck_patient_sex CHECK (sex IN ('MASCULINO', 'FEMENINO'))
+    CONSTRAINT ck_patient_sex CHECK (sex IN ('MASCULINO', 'FEMENINO', 'OTRO'))
 );
 
 -- ---------------------------------------------------------------------
