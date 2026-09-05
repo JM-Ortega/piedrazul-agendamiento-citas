@@ -10,7 +10,7 @@ import { Router } from '@angular/router';
 import { LucideArrowLeft } from '@lucide/angular';
 import { AppService } from '../../../../core/services/app.service';
 import { PatientService } from '../../../../core/services/register.service';
-import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
+import { PatientAppointmentService } from '../../../../core/services/patient.service';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';

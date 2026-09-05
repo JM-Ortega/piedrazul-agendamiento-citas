@@ -16,7 +16,7 @@ import {
   LucideX,
 } from '@lucide/angular';
 import { AppService } from '../../../core/services/app.service';
-import { PatientAppointmentService } from '../../../core/services/patientAppointment.service';
+import { PatientAppointmentService } from '../../../core/services/patient.service';
 import { PatientService } from '../../../core/services/register.service';
 import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
 import { ConfirmModalComponent } from '../../../design-system/organisms/confirm-modal/confirm-modal.component';

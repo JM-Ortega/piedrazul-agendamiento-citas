@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { timer } from 'rxjs';
-import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
+import { PatientAppointmentService } from '../../../../core/services/patient.service';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { BookingSchedulingComponent } from '../../../appointment/components/agendamiento/booking-scheduling.component';
