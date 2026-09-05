@@ -1,0 +1,26 @@
+<div class="min-h-screen bg-blue-50 py-8 px-6">
+  <div class="max-w-4xl mx-auto space-y-6 bg-white rounded-2xl shadow-md p-6">
+    <h2 class="text-[#163c63] text-xl font-semibold mb-1">Atención sin cita</h2>
+    <app-search-suggestions
+      label="Buscar paciente por Número de Documento"
+      placeholder="Ingrese el número de documento"
+      inputMode="numeric"
+      [minSuggestionChars]="minSuggestionChars"
+      [minSearchLength]="minDocLength"
+      [maxLength]="maxDocLength"
+      [minLengthErrorMessage]="minLengthErrorMessage"
+      [suggestionsFn]="suggestionsFn"
+      [exactSearchFn]="exactSearchFn"
+      [suggestionToQuery]="suggestionToQuery"
+      [isNotFoundError]="isNotFoundError"
+      [prefillQuery]="prefillDocument"
+      (resultFound)="onFound($event)"
+      (resultNotFound)="onNotFound($event)"
+    >
+      <ng-template #suggestionItem let-s>
+        <span class="font-medium text-blue-800">{{ s.identification }}</span>
+        <span class="text-gray-500"> — {{ s.firstName }} {{ s.lastName }}</span>
+      </ng-template>
+    </app-search-suggestions>
+  </div>
+</div>
