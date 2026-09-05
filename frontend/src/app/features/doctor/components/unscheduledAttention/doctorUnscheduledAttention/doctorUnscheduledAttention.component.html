@@ -1,0 +1,25 @@
+@if (subStep() === 'search') {
+  <app-unscheduled-patient-search
+    [prefillDocument]="lastSearchedDocument()"
+    (found)="onFound($event)"
+    (notFound)="onNotFound($event)"
+  ></app-unscheduled-patient-search>
+}
+
+@if (subStep() === 'attend' && foundPatient(); as p) {
+  <app-unscheduled-patient-attend
+    [patient]="p"
+    [specialtyOptions]="specialtyOptions()"
+    (goBack)="onAttendGoBack()"
+    (advance)="onAttendAdvance($event)"
+  ></app-unscheduled-patient-attend>
+}
+
+@if (subStep() === 'register') {
+  <app-unscheduled-patient-register
+    [prefillDocument]="lastSearchedDocument()"
+    [specialtyOptions]="specialtyOptions()"
+    (goBack)="onRegisterGoBack()"
+    (advance)="onRegisterAdvance()"
+  ></app-unscheduled-patient-register>
+}
