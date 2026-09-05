@@ -2,13 +2,14 @@ package co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output;
 
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Workday;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 
 import java.time.LocalDate;
 import java.util.*;
 
 // Lo pidio Mar
+// Muere porque ahora el horario lo envia el back
 public record DoctorResponse(
         List<String> specialty,
         UUID id,
@@ -18,6 +19,7 @@ public record DoctorResponse(
         int bookingWindowWeeks,
         List<Integer> workdays
 ) {
+    // Si el paciente es nuevo solo muestra como especialida de doctor la de tera neural aunque tenga otras
     public static DoctorResponse fromEntity(Doctor doctor, String name, boolean isNewPatient) {
         // Filtrar las especialidades a nivel de DTO sin tocar la entidad
         List<String> specialties = doctor.getSpecialties().stream()
