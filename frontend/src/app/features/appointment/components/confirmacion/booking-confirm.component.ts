@@ -3,6 +3,7 @@ import {
   Component,
   inject,
   output,
+  OnInit,
 } from '@angular/core';
 import {
   LucideCheckCircle,
@@ -16,6 +17,8 @@ import { NewAppointment } from '../../models/dtos/newAppointment.dto';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { formatLongDateEs } from '../../../../shared/helpers/date-format';
+import { calcAge } from '../../../../shared/helpers/patient-validation';
 
 /**
  * Mostrar el resumen completo de la cita a confirmar
@@ -35,12 +38,18 @@ import { AppError } from '../../../../shared/models/interfaces/api-error.model';
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-confirm.component.html',
 })
-export class BookingConfirmComponent {
+export class BookingConfirmComponent implements OnInit {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
+  formatLongDateEs = formatLongDateEs;
+  calculateAge = calcAge;
 
   confirmed = output<void>();
   back = output<void>();
+
+  ngOnInit(): void {
+    window.scrollTo(0, 0);
+  }
 
   /**
    * Envía la cita al backend. Todos los errores muestran
@@ -48,7 +57,7 @@ export class BookingConfirmComponent {
    */
   confirm(): void {
     const date = this.state.selectedDate();
-    if (!date || !this.state.selectedTime() || !this.state.effectiveDoctorId())
+    if (!date || !this.state.selectedTime() || !this.state.selectedDoctorId())
       return;
 
     this.state.isLoading.set(true);
@@ -76,7 +85,7 @@ export class BookingConfirmComponent {
 
   private buildPayload(date: Date): NewAppointment {
     const base = {
-      doctorId: this.state.effectiveDoctorId(),
+      doctorId: this.state.selectedDoctorId(),
       specialty: this.state.selectedSpecialty(),
       date: this.state.formatLocalDate(date),
       startTime: this.state.selectedTime(),

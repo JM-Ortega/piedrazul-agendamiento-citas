@@ -4,6 +4,7 @@ import {
   Input,
   inject,
   output,
+  OnInit,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -24,6 +25,8 @@ import { PatientSuggestion } from '../../models/dtos/patient-suggestion.dto';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { formatLongDateEs } from '../../../../shared/helpers/date-format';
+import { calcAge } from '../../../../shared/helpers/patient-validation';
 
 const MIN_CHARS = 3;
 const MAX_DOC_LENGTH = 20;
@@ -46,9 +49,15 @@ const MIN_DOC_LENGTH = 6;
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-patient-search.component.html',
 })
-export class BookingPatientSearchComponent {
+export class BookingPatientSearchComponent implements OnInit {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
+  formatLongDateEs = formatLongDateEs;
+  calculateAge = calcAge;
+
+  ngOnInit(): void {
+    window.scrollTo(0, 0);
+  }
 
   /** Si llega un valor, precarga el documento y dispara la búsqueda exacta automáticamente. */
   @Input() set prefillDocument(value: string) {
@@ -59,7 +68,6 @@ export class BookingPatientSearchComponent {
 
   patientConfirmed = output<void>();
   patientMissing = output<void>();
-  changeMode = output<void>();
   showSuggestions = signal(false);
 
   docInputWarning = signal('');
@@ -172,11 +180,6 @@ export class BookingPatientSearchComponent {
 
   confirmPatient(): void {
     this.patientConfirmed.emit();
-  }
-
-  onChangeMode(): void {
-    this.state.resetSearchState();
-    this.changeMode.emit();
   }
 
   /**

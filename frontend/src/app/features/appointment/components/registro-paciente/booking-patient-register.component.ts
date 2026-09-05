@@ -9,10 +9,6 @@ import {
 import { FormsModule } from '@angular/forms';
 import { LucideArrowLeft, LucideAlertCircle } from '@lucide/angular';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
-import {
-  InputComponent,
-  SanitizeRule,
-} from '../../../../design-system/atoms/input/input.component';
 import { ConfirmModalComponent } from '../../../../design-system/organisms/confirm-modal/confirm-modal.component';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
@@ -20,16 +16,12 @@ import {
   PatientFormComponent,
   PatientFormData,
 } from '../../../../shared/components/forms/patient-form/patient-form.component';
-import {
-  DOCUMENT_RULES,
-  DEFAULT_DOCUMENT_MAX_LENGTH,
-  validateDocumentForType,
-} from '../../../../shared/helpers/document-validation';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 
 /**
  * Capturar y validar los datos de un paciente que no fue encontrado en el sistema para
- * que pueda ser registrado al confirmar la cita.
+ * que pueda ser registrado al confirmar la cita. El documento se captura y valida
+ * dentro de `PatientFormComponent` (vía `showDocumentNumber`).
  */
 @Component({
   selector: 'app-booking-patient-register',
@@ -39,7 +31,6 @@ import { AppError } from '../../../../shared/models/interfaces/api-error.model';
     LucideArrowLeft,
     LucideAlertCircle,
     ButtonComponent,
-    InputComponent,
     ConfirmModalComponent,
     PatientFormComponent,
   ],
@@ -55,81 +46,28 @@ export class BookingPatientRegisterComponent {
   documentAlreadyExists = output<string>();
 
   readonly maxBirthDate = new Date();
-  readonly documentInputMaxLength = DEFAULT_DOCUMENT_MAX_LENGTH;
 
-  documentNumber = signal(this.state.patientForm().identification);
-  documentError = signal('');
   globalErrorMessage = signal('');
   isChecking = signal(false);
 
   showExistsModal = signal(false);
   existingDocument = signal('');
 
-  documentSanitizeRule = computed<SanitizeRule>(() => {
-    const type = this.state.patientForm().identificationType;
-    if (!type) return 'alphanumeric';
-    return DOCUMENT_RULES[type]?.sanitize ?? 'alphanumeric';
-  });
-
-  patientFormValue = computed<PatientFormData>(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { identification, ...rest } = this.state.patientForm();
-    return rest;
-  });
-
-  onDocumentNumberChange(value: string | number | boolean | null): void {
-    const clean = String(value ?? '');
-    this.documentNumber.set(clean);
-    this.state.patientForm.update((f) => ({ ...f, identification: clean }));
-    this.revalidateDocumentNumber();
-  }
+  patientFormValue = computed<PatientFormData>(() => this.state.patientForm());
 
   onPatientFormChange(value: PatientFormData): void {
-    this.state.patientForm.update((f) => ({ ...f, ...value }));
-    this.revalidateDocumentNumber();
+    this.state.patientForm.set(value);
   }
 
   /**
-   * Revalida el documento contra la regla del tipo actualmente elegido
-   * mientras el usuario escribe o cambia el tipo.
-   */
-  private revalidateDocumentNumber(): void {
-    const type = this.state.patientForm().identificationType;
-    if (!type) {
-      this.documentError.set('');
-      return;
-    }
-
-    const doc = this.documentNumber().trim();
-    if (!doc) {
-      this.documentError.set('Este campo es obligatorio');
-      return;
-    }
-
-    this.documentError.set(validateDocumentForType(type, doc));
-  }
-
-  /**
-   * Valida formato de documento y resto del formulario
-   * Si todo es válido, verifica contra el backend si el
-   * documento ya existe antes de avanzar.
+   * Valida el formulario completo (incluyendo el documento). Si es válido,
+   * verifica contra el backend si el documento ya existe antes de avanzar.
    *
    * @param form - Referencia al organismo de datos del paciente, para invocar su validación.
    */
   onContinue(form: PatientFormComponent): void {
-    const docErr = this.getDocumentFormatError();
-    this.documentError.set(docErr);
-    const formOk = form.validate();
-    if (docErr || !formOk) return;
+    if (!form.validate()) return;
     this.checkDocumentExistsAndAdvance();
-  }
-
-  private getDocumentFormatError(): string {
-    const doc = this.documentNumber().trim();
-    if (!doc) return 'Este campo es obligatorio';
-
-    const type = this.state.patientForm().identificationType;
-    return validateDocumentForType(type, doc);
   }
 
   /**
@@ -138,7 +76,7 @@ export class BookingPatientRegisterComponent {
    * continúa con el registro con normalidad.
    */
   private checkDocumentExistsAndAdvance(): void {
-    const doc = this.documentNumber().trim();
+    const doc = this.state.patientForm().identification.trim();
     this.isChecking.set(true);
 
     this.citaService.getPatientByDocument(doc).subscribe({
