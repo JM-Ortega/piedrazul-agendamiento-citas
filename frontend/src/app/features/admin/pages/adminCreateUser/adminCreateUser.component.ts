@@ -16,7 +16,6 @@ import {
   LucideEyeOff,
   LucideMail,
   LucidePhone,
-  LucideStethoscope,
   LucideUser,
   LucideUserPlus,
 } from '@lucide/angular';
@@ -66,7 +65,6 @@ type Role = 'doctor' | 'scheduler';
     LucideCircleAlert,
     LucideCreditCard,
     LucideMail,
-    LucideStethoscope,
     LucideUser,
     LucideUserPlus,
     LucidePhone,

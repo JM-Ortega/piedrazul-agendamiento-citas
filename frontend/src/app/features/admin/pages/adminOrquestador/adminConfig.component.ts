@@ -71,8 +71,6 @@ export class AdminConfigComponent implements OnInit {
 
   showConfirmModal = signal(false);
   doctorToToggle = signal<Doctor | null>(null);
-  showForceModal = signal(false);
-  forceModalMessage = signal('');
   showErrorModal = signal(false);
   errorGuardado = signal('');
   toastMessage = signal('');
@@ -303,7 +301,8 @@ export class AdminConfigComponent implements OnInit {
         });
       return;
     }
-    this.adminService.disableDoctor(doctor.id, false).subscribe({
+
+    this.adminService.disableDoctor(doctor.id).subscribe({
       next: () => {
         this.doctors.update((list) =>
           list.map((d) => (d.id === doctor.id ? { ...d, status: false } : d))
@@ -311,35 +310,15 @@ export class AdminConfigComponent implements OnInit {
         this.onCloseToggleModal();
       },
       error: (err: AppError) => {
-        this.forceModalMessage.set(err.message);
-        this.showConfirmModal.set(false);
-        this.showForceModal.set(true);
-      },
-    });
-  }
-
-  onConfirmForceDisable(): void {
-    const target = this.doctorToToggle();
-    if (!target) return;
-    this.adminService.disableDoctor(target.id, true).subscribe({
-      next: () => {
-        this.doctors.update((list) =>
-          list.map((d) => (d.id === target.id ? { ...d, status: false } : d))
+        this.onCloseToggleModal();
+        this.errorGuardado.set(
+          err.errorCode === 'DOCTOR_SCHEDULED_APPOINTMENTS'
+            ? err.message
+            : err.message
         );
-        this.showForceModal.set(false);
-        this.forceModalMessage.set('');
-        this.doctorToToggle.set(null);
-      },
-      error: (err: AppError) => {
-        this.forceModalMessage.set(err.message);
+        this.showErrorModal.set(true);
       },
     });
-  }
-
-  onCancelForceDisable(): void {
-    this.showForceModal.set(false);
-    this.doctorToToggle.set(null);
-    this.forceModalMessage.set('');
   }
 
   onCloseErrorModal(): void {
