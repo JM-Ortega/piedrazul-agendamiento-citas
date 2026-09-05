@@ -1,21 +1,16 @@
 package co.edu.unicauca.piedrazul.backend.doctors;
 
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.WorkingSchedule;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.*;
 
 public interface DoctorExternalService {
 
     Optional<UUID> findByUserId(UUID userId);
 
-    List<LocalTime> getSlotsByDoctor(UUID idDoctor, LocalDate date);
-
     int getIntervalMinutesByDoctor(UUID idDoctor);
-
-    List<DoctorResponse> getActiveDoctors ();
 
     List<UUID> getActiveDoctorIds();
 
@@ -28,4 +23,7 @@ public interface DoctorExternalService {
     Map<UUID, Integer> bookingWindowWeeksByDoctorIds(List<UUID> doctorIds);
 
     Map<UUID, Integer> intervalMinutesByDoctorIds(List<UUID> doctorIds);
+
+    // Retorna las fechas y slots y el intervalo en las que el doctor trabaja
+    WorkingSchedule workingSchedule(UUID idDoctor);
 }
