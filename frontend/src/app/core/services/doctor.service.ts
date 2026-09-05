@@ -10,6 +10,8 @@ import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
 import { PageResponse } from '../../shared/models/dtos/pageResponse.dto';
 import { Doctor } from '../../shared/models/interfaces/doctor.model';
 import { Patient } from '../../shared/models/interfaces/patient.model';
+import { UnscheduledAttention } from '../../shared/models/dtos/unscheduledAttention.dto';
+import { PatientSuggestion } from '../../features/appointment/models/dtos/patient-suggestion.dto';
 
 @Injectable({ providedIn: 'root' })
 export class DoctorService {
@@ -201,6 +203,50 @@ export class DoctorService {
   getPatientByAppointment(appointmentId: string): Observable<Patient> {
     return this.http.get<Patient>(
       `${this.apiUrl}/patients/${appointmentId}/patient-attended`
+    );
+  }
+
+  /**
+   * Obtiene los datos completos de un paciente mediante su número de documento.
+   *
+   * @param {string} documentId - El número de documento del paciente.
+   * @returns {Observable<Patient | null>} Un Observable que emite el objeto del paciente si existe, o null si no se encuentra.
+   */
+  getPatientByDocument(documentId: string): Observable<Patient | null> {
+    return this.http.get<Patient>(
+      `${this.apiUrl}/patients/document/${documentId}`
+    );
+  }
+
+  /**
+   * Obtiene una lista de sugerencias de pacientes cuyo número de documento coincida con el prefijo ingresado.
+   *
+   * @param {string} documentPrefix - Prefijo o primeros dígitos del documento para realizar la búsqueda predictiva.
+   * @returns {Observable<PatientSuggestion[]>} Un Observable que emite un listado de sugerencias de pacientes coincidentes.
+   */
+  getPatientSuggestionsByDocument(
+    documentPrefix: string
+  ): Observable<PatientSuggestion[]> {
+    return this.http.get<PatientSuggestion[]>(
+      `${this.apiUrl}/patients/search/by-document-prefix`,
+      { params: { documentPrefix } }
+    );
+  }
+
+  /**
+   * Registra la atención de un paciente sin cita previa.
+   * Incluye sus datos completos (para el caso en que también deba registrarse como paciente nuevo),
+   * la especialidad y la observación clínica opcional.
+   *
+   * @param {UnscheduledAttention} request - Objeto con la información requerida para la atención no programada y datos del paciente.
+   * @returns {Observable<void>} Un Observable que se completa cuando la solicitud de registro es exitosa.
+   */
+  registerUnscheduledAttention(
+    request: UnscheduledAttention
+  ): Observable<void> {
+    return this.http.post<void>(
+      `${this.apiUrl}/appointments/unscheduled`,
+      request
     );
   }
 
