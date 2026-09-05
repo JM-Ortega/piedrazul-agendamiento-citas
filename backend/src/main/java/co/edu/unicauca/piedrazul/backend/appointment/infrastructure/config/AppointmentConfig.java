@@ -96,28 +96,14 @@ public class AppointmentConfig {
     }
 
     @Bean
-    public GetAvailableSlotsUseCase getAvailableSlotsUseCase(
+    public GetAvailableDatesAndSlotsUseCase getAvailableSlotsUseCase(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             SlotTimeService slotTimeService) {
-        return new GetAvailableSlotsUseCaseImpl(
+        return new GetAvailableDatesAndSlotsUseCaseImpl(
                 appointmentRepository,
                 doctorConfigConsultPort,
                 slotTimeService
-        );
-    }
-
-    @Bean
-    public GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase(
-            AppointmentRepository appointmentRepository,
-            DoctorConfigConsultPort doctorConfigConsultPort,
-            SlotTimeService slotTimeService,
-            IsNewPatientUseCase isNewPatientUseCase) {
-        return new GetSpecialtiesWithDoctorUseCaseImpl(
-                appointmentRepository,
-                doctorConfigConsultPort,
-                slotTimeService,
-                isNewPatientUseCase
         );
     }
 

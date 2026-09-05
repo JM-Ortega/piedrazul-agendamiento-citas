@@ -3,13 +3,12 @@ package co.edu.unicauca.piedrazul.backend.doctors.application;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.ScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleConflictException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleNotFoundException;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorScheduleValidationException;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
-import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
 import jakarta.transaction.Transactional;
 
 import java.time.LocalTime;

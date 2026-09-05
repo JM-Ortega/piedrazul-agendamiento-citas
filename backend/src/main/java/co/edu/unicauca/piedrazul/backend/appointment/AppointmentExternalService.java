@@ -3,7 +3,10 @@ package co.edu.unicauca.piedrazul.backend.appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSummary;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.SchedulerAppointmentSummary;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentExternalData;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.DoctorsAvailability;
 
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.time.LocalDate;
 import java.util.List;
@@ -25,4 +28,6 @@ public interface AppointmentExternalService {
     boolean isNewPatient(UUID patientId);
 
     boolean hasScheduledAppointments(UUID doctorID);
+
+    Set<UUID> calculateDoctorsAvailability(List<DoctorsAvailability> doctorsAvailability);
 }

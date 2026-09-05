@@ -8,6 +8,8 @@ import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.Doct
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.SpecialtyRepository;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
+import de.focus_shift.jollyday.core.HolidayManager;
+import de.focus_shift.jollyday.core.ManagerParameters;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -45,12 +47,25 @@ public class DoctorModuleConfig {
      * Bean para DoctorExternalServiceImpl
      */
     @Bean
+    public HolidayManager holidayManager() {
+        return HolidayManager.getInstance(
+                ManagerParameters.create("co")
+        );
+    }
+
+    @Bean
     public DoctorExternalServiceImpl doctorExternalServiceImpl(
             DoctorRepository doctorRepository,
             ScheduleService scheduleService,
-            PersonExternalService personExternalService
+            PersonExternalService personExternalService,
+            HolidayManager holidayManager
     ) {
-        return new DoctorExternalServiceImpl(doctorRepository, scheduleService, personExternalService);
+        return new DoctorExternalServiceImpl(
+                doctorRepository,
+                scheduleService,
+                personExternalService,
+                holidayManager
+        );
     }
 }
 

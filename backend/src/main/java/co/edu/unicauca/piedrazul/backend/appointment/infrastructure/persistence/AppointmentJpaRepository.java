@@ -1,6 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence;
 
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -28,4 +30,8 @@ public interface AppointmentJpaRepository extends JpaRepository<AppointmentEntit
 
     boolean existsByIdPatientAndAppointmentStateIn(UUID idPatient, Collection<AppointmentState> appointmentStates);
 
+    boolean existsByIdPatientAndSchedulingOriginAndDateBetween(UUID idPatient, SchedulingOrigin schedulingOrigin,
+                                                               LocalDate startDate, LocalDate endDate);
+
+    List<AppointmentEntity> findByIdDoctorAndDateBetween(UUID idDoctor, LocalDate dateStart, LocalDate dateEnd);
 }

@@ -2,11 +2,10 @@ package co.edu.unicauca.piedrazul.backend.doctors.api;
 
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Workday;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,10 +17,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 import static org.mockito.Mockito.verify;

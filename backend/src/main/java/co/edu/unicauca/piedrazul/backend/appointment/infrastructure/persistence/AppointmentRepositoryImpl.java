@@ -1,9 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PageQuery;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PagedResult;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
@@ -13,7 +10,6 @@ import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
@@ -102,6 +98,11 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
                 .toList();
     }
 
+    @Override
+    public boolean existsByIdPatientAndSchedulingOriginAndDateBetween(UUID idPatient, SchedulingOrigin schedulingOrigin,
+                                                                      LocalDate startDate, LocalDate endDate){
+        return jpaRepository.existsByIdPatientAndSchedulingOriginAndDateBetween(idPatient, schedulingOrigin, startDate, endDate);
+    }
 
     @Override
     public PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery) {
@@ -119,6 +120,19 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
                 entityPage.getTotalElements(),
                 entityPage.getTotalPages()
         );
+    }
+
+    @Override
+    public List<Appointment> findByDoctorAndDateBetween(
+            UUID idDoctor,
+            LocalDate dateStart,
+            LocalDate dateEnd
+    ) {
+        return jpaRepository
+                .findByIdDoctorAndDateBetween(idDoctor, dateStart, dateEnd)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 
     private Specification<AppointmentEntity> statePriorityOrder(PageQuery pageQuery) {
