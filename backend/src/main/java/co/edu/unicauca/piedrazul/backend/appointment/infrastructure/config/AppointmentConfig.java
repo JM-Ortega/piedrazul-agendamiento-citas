@@ -96,11 +96,11 @@ public class AppointmentConfig {
     }
 
     @Bean
-    public GetAvailableSlotsUseCase getAvailableSlotsUseCase(
+    public GetAvailableDatesAndSlotsUseCase getAvailableSlotsUseCase(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             SlotTimeService slotTimeService) {
-        return new GetAvailableSlotsUseCaseImpl(
+        return new GetAvailableDatesAndSlotsUseCaseImpl(
                 appointmentRepository,
                 doctorConfigConsultPort,
                 slotTimeService

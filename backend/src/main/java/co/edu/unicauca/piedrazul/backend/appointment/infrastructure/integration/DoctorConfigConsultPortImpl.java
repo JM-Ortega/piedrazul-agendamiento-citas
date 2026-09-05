@@ -1,14 +1,12 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.WorkingSchedule;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -25,15 +23,6 @@ public class DoctorConfigConsultPortImpl implements DoctorConfigConsultPort {
     @Override
     public Optional<UUID> findByUserId(UUID userId) {
         return doctorExternalService.findByUserId(userId);
-    }
-
-    @Override
-    public List<AppointmentTime> getSlotsByDoctor(UUID idDoctor, LocalDate date) {
-        List<LocalTime> slots = doctorExternalService.getSlotsByDoctor(idDoctor, date);
-
-        return slots.stream()
-                .map(AppointmentTime::new)
-                .toList();
     }
 
     @Override
@@ -76,5 +65,10 @@ public class DoctorConfigConsultPortImpl implements DoctorConfigConsultPort {
     @Override
     public List<SpecialtyCode> getSpecialtiesByDoctor(UUID idDoctor) {
         return doctorExternalService.findSpecialtiesByPersonIds(List.of(idDoctor)).getOrDefault(idDoctor, List.of());
+    }
+
+    @Override
+    public WorkingSchedule workingSchedule(UUID idDoctor){
+        return doctorExternalService.workingSchedule(idDoctor);
     }
 }

@@ -10,7 +10,6 @@ import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
@@ -121,6 +120,19 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
                 entityPage.getTotalElements(),
                 entityPage.getTotalPages()
         );
+    }
+
+    @Override
+    public List<Appointment> findByDoctorAndDateBetween(
+            UUID idDoctor,
+            LocalDate dateStart,
+            LocalDate dateEnd
+    ) {
+        return jpaRepository
+                .findByIdDoctorAndDateBetween(idDoctor, dateStart, dateEnd)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 
     private Specification<AppointmentEntity> statePriorityOrder(PageQuery pageQuery) {

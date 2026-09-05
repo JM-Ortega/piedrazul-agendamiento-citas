@@ -13,9 +13,10 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.inte
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.SchedulerAppointmentSummary;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAvailableSlotsUseCase;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAvailableDatesAndSlotsUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AvailableDateSlots;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.DoctorsAvailability;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.ScheduleAvailability;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
@@ -37,21 +38,19 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
 
     private final AppointmentRepository appointmentRepository;
     private final DoctorConfigConsultPort doctorConfigConsultPort;
-    private final GetAvailableSlotsUseCase getAvailableSlotsUseCase;
+    private final GetAvailableDatesAndSlotsUseCase getAvailableDatesAndSlotsUseCase;
     private final IsNewPatientUseCase isNewPatientUseCase;
     private final PatientConsultPort patientConsultPort;
-    private final SlotTimeService slotTimeService;
     private final BusySlotService busySlotService;
 
     public AppointmentExternalServiceImpl(AppointmentRepository appointmentRepository, DoctorConfigConsultPort doctorConfigConsultPort,
-                                          GetAvailableSlotsUseCase getAvailableSlotsUseCase, IsNewPatientUseCase isNewPatientUseCase,
-                                          PatientConsultPort patientConsultPort, SlotTimeService slotTimeService, BusySlotService busySlotService) {
+                                          GetAvailableDatesAndSlotsUseCase getAvailableDatesAndSlotsUseCase, IsNewPatientUseCase isNewPatientUseCase,
+                                          PatientConsultPort patientConsultPort, BusySlotService busySlotService) {
         this.appointmentRepository = appointmentRepository;
         this.doctorConfigConsultPort = doctorConfigConsultPort;
-        this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
+        this.getAvailableDatesAndSlotsUseCase = getAvailableDatesAndSlotsUseCase;
         this.isNewPatientUseCase = isNewPatientUseCase;
         this.patientConsultPort = patientConsultPort;
-        this.slotTimeService = slotTimeService;
         this.busySlotService = busySlotService;
     }
 
@@ -136,22 +135,27 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
     }
 
     @Override
-    public boolean hasAvailableSlots(LocalDate date){
+    public boolean hasAvailableSlots(LocalDate date) {
+
         if (date.isBefore(LocalDate.now())) {
             return false;
         }
 
-        List<UUID> idsActiveDoctors = doctorConfigConsultPort.getActiveDoctorIds();
-        for (UUID id : idsActiveDoctors){
-            try {
-                List<AppointmentTime> availableSlots = getAvailableSlotsUseCase.getAvailableSlots(id, date);
-                if (!availableSlots.isEmpty()) {
-                    return true;
-                }
-            } catch (RuntimeException e) {
-                // El doctor no trabaja este día. Ignoramos el error y el for pasa al siguiente doctor.
+        List<UUID> idsActiveDoctors =
+                doctorConfigConsultPort.getActiveDoctorIds();
+
+        for (UUID idDoctor : idsActiveDoctors) {
+
+            List<AvailableDateSlots> availableDatesAndSlots =
+                    getAvailableDatesAndSlotsUseCase
+                            .getAvailableDatesAndSlots(idDoctor);
+
+            if (availableDatesAndSlots.stream()
+                    .anyMatch(dateSlots -> dateSlots.date().equals(date))) {
+                return true;
             }
         }
+
         return false;
     }
 
