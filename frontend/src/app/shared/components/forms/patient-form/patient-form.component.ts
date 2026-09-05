@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
-import { PatientService } from '../../../../core/services/patient.service';
+import { PatientService } from '../../../../core/services/register.service';
 import { Patient } from '../../../models/interfaces/patient.model';
 import { FormatoPipe } from '../../../pipes/formatoPipe';
 import {
