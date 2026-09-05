@@ -18,7 +18,6 @@ import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -98,12 +97,16 @@ public class AppointmentSchedulingService {
         String doctorName = doctorConfigConsultPort.getDoctorName(idDoctor);
         List<Appointment> existingAppointments = appointmentRepository.findByDoctorIdAndDate(idDoctor, date);
 
-        // Srategy
+        // Srategy para manejar el paciente dependiendo del tipo de agendamiento
         ResolvedPatient resolvedPatient = patientResolutionStrategy.resolve(patientContext);
 
+        // Valida que si el paciente es nuevo su cita sea con Terapia Neural
         validateNewPatientFirstAppointmentSpecialty(resolvedPatient.idPatient(), specialty);
 
+        // Valida que no tenga más de una cita para esa misma especialidad
         validateUniqueScheduledAppointmentBySpecialty(resolvedPatient.idPatient(), specialty);
+
+        // Valida que no tenga otra cita en el horario de la cita que se esta agendando
         validateNoTimeConflictForPatient(resolvedPatient.idPatient(), date, startTime);
 
         PatientInfo patientInfo = resolvedPatient.patientInfo();
@@ -118,6 +121,11 @@ public class AppointmentSchedulingService {
                         date,
                         startTime
                 );
+
+        // Valdia que si el agendamiento es autonomo el paciente no tenga más de una cita para ese mes
+        if(!manualFlow && hasAutonomousAppointmentInCurrentMonth(resolvedPatient.idPatient())){
+            throw new OnlyOneAppointmentPerMonthException("No es posible agendar más de una cita al mes");
+        }
 
         Appointment appointment =
                 manualFlow
@@ -172,11 +180,30 @@ public class AppointmentSchedulingService {
 
     private void validateNewPatientFirstAppointmentSpecialty(UUID idPatient, SpecialtyCode specialty) {
         boolean isNewPatient = isNewPatientUseCase.isNewPatient(idPatient);
-        if (isNewPatient && specialty != SpecialtyCode.MEDICINA_GENERAL) {
-            throw new FirstAppointmentMustBeGeneralMedicineException(
-                    "La primera cita de un paciente nuevo debe ser con MEDICINA GENERAL"
+        if (isNewPatient && specialty != SpecialtyCode.TERAPIA_NEURAL) {
+            throw new FirstAppointmentMustBeNeuralTerapyException(
+                    "La primera cita de un paciente nuevo debe ser con TERAPIA NEURAL"
             );
         }
+    }
+
+    public boolean hasAutonomousAppointmentInCurrentMonth(UUID idPatient) {
+        // Obtenemos la fecha de hoy
+        LocalDate today = LocalDate.now();
+
+        // Calculamos el primer día de este mes
+        LocalDate startDate = today.withDayOfMonth(1);
+
+        // Calculamos el último día de este mes
+        LocalDate endDate = today.with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
+
+        // Enviamos el rango al repositorio
+        return appointmentRepository.existsByIdPatientAndSchedulingOriginAndDateBetween(
+                idPatient,
+                SchedulingOrigin.AUTONOMO,
+                startDate,
+                endDate
+        );
     }
 
     private void validateUniqueScheduledAppointmentBySpecialty(UUID idPatient, SpecialtyCode specialty) {

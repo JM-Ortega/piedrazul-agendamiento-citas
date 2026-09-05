@@ -34,7 +34,6 @@ public class AppointmentService {
             AppointmentSchedulingRequest request,
             int intervalMinutes,
             List<Appointment> existingAppointments) {
-
         validateSlot(
                 existingAppointments,
                 request.startTime(),

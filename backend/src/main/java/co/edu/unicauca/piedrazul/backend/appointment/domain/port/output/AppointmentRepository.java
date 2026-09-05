@@ -1,9 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.port.output;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PageQuery;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PagedResult;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
+
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -38,4 +36,6 @@ public interface AppointmentRepository {
     //Metodo unico para el caso de uso ListAppointmentsUseCase
     PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery);
 
+    boolean existsByIdPatientAndSchedulingOriginAndDateBetween(UUID idPatient, SchedulingOrigin schedulingOrigin,
+                                                               LocalDate startDate, LocalDate endDate);
 }

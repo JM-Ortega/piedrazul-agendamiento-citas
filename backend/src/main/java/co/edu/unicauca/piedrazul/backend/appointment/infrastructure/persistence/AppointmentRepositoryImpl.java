@@ -1,9 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PageQuery;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PagedResult;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
@@ -102,6 +99,11 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
                 .toList();
     }
 
+    @Override
+    public boolean existsByIdPatientAndSchedulingOriginAndDateBetween(UUID idPatient, SchedulingOrigin schedulingOrigin,
+                                                                      LocalDate startDate, LocalDate endDate){
+        return jpaRepository.existsByIdPatientAndSchedulingOriginAndDateBetween(idPatient, schedulingOrigin, startDate, endDate);
+    }
 
     @Override
     public PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery) {
