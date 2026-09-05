@@ -37,7 +37,7 @@
           <svg lucideStethoscope [size]="24"></svg>
           <p class="text-[#d9e9f8] text-base">Médicos</p>
         </div>
-        <p class="text-3xl font-bold">{{ doctors().length }}</p>
+        <p class="text-3xl font-bold">{{ doctorsCount() }}</p>
       </div>
       <div
         class="bg-linear-to-br from-[#1f7a52] to-[#45b884] text-white rounded-xl shadow-md p-5"
@@ -46,7 +46,7 @@
           <svg lucideCalendar [size]="24"></svg>
           <p class="text-green-100 text-base">Agendadores</p>
         </div>
-        <p class="text-3xl font-bold">{{ schedulers().length }}</p>
+        <p class="text-3xl font-bold">{{ schedulersCount() }}</p>
       </div>
       <div
         class="bg-linear-to-br from-[#5a2992] to-[#9460d6] text-white rounded-xl shadow-md p-5"
@@ -55,7 +55,7 @@
           <svg lucideUsers [size]="24"></svg>
           <p class="text-purple-100 text-base">Ambos Roles</p>
         </div>
-        <p class="text-3xl font-bold">{{ both().length }}</p>
+        <p class="text-3xl font-bold">{{ bothCount() }}</p>
       </div>
     </div>
 
