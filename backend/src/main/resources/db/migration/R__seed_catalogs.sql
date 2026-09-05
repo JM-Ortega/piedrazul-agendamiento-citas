@@ -19,8 +19,7 @@
 INSERT INTO piedrazul.specialty (code, name) VALUES
     ('FISIOTERAPIA', 'Fisioterapia'),
     ('TERAPIA_NEURAL', 'Terapia Neural'),
-    ('QUIROPRAXIA', 'Quiropraxia'),
-    ('MEDICINA_GENERAL', 'Medicina General')
+    ('QUIROPRAXIA', 'Quiropraxia')
 ON CONFLICT (code) DO NOTHING;
 
 

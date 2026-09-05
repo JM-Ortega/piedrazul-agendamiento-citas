@@ -125,7 +125,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
                         "Doctor123!"
                 ),
                 new CreateDoctorRequest(
-                        List.of(SpecialtyCode.MEDICINA_GENERAL),
+                        List.of(SpecialtyCode.TERAPIA_NEURAL),
                         LocalDate.of(2026, 1, 1),
                         LocalDate.of(2026, 12, 31),
                         10,

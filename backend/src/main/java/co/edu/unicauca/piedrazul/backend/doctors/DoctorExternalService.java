@@ -14,8 +14,6 @@ public interface DoctorExternalService {
 
     List<UUID> getActiveDoctorIds();
 
-    List<UUID> getActiveGeneralDoctorIds();
-
     List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
 
     Map<UUID, List<SpecialtyCode>> findSpecialtiesByPersonIds(Collection<UUID> personIds);

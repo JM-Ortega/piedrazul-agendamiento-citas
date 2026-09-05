@@ -276,7 +276,7 @@ class DoctorTest {
         @Test
         void shouldAddSpecialty() {
             Doctor doctor = buildDoctor(today, today.plusMonths(3), 4, 30);
-            Specialty specialty = buildSpecialty(SpecialtyCode.MEDICINA_GENERAL); // AJUSTAR constructor real
+            Specialty specialty = buildSpecialty(SpecialtyCode.TERAPIA_NEURAL); // AJUSTAR constructor real
 
             doctor.addSpecialty(specialty);
 
@@ -286,7 +286,7 @@ class DoctorTest {
         @Test
         void shouldReplaceSpecialtiesEntirely() {
             Doctor doctor = buildDoctor(today, today.plusMonths(3), 4, 30);
-            Specialty oldOne = buildSpecialty(SpecialtyCode.MEDICINA_GENERAL);
+            Specialty oldOne = buildSpecialty(SpecialtyCode.TERAPIA_NEURAL);
             doctor.addSpecialty(oldOne);
 
             Set<Specialty> newSpecialties = new HashSet<>(Set.of(buildSpecialty(SpecialtyCode.FISIOTERAPIA)));
@@ -298,9 +298,9 @@ class DoctorTest {
         @Test
         void shouldReportHasSpecialtyCorrectly() {
             Doctor doctor = buildDoctor(today, today.plusMonths(3), 4, 30);
-            doctor.addSpecialty(buildSpecialty(SpecialtyCode.MEDICINA_GENERAL));
+            doctor.addSpecialty(buildSpecialty(SpecialtyCode.TERAPIA_NEURAL));
 
-            assertThat(doctor.hasSpecialtie(SpecialtyCode.MEDICINA_GENERAL)).isTrue();
+            assertThat(doctor.hasSpecialtie(SpecialtyCode.TERAPIA_NEURAL)).isTrue();
             assertThat(doctor.hasSpecialtie(SpecialtyCode.FISIOTERAPIA)).isFalse();
         }
     }
@@ -311,7 +311,7 @@ class DoctorTest {
         private Doctor validDoctorReadyToActivate() {
             Doctor doctor = buildDoctor(today, today.plusMonths(3), 4, 30);
             doctor.updateSchedule(Workday.LUNES, LocalTime.of(8, 0), LocalTime.of(12, 0));
-            doctor.addSpecialty(buildSpecialty(SpecialtyCode.MEDICINA_GENERAL));
+            doctor.addSpecialty(buildSpecialty(SpecialtyCode.TERAPIA_NEURAL));
             return doctor;
         }
 
@@ -328,7 +328,7 @@ class DoctorTest {
         void shouldNotActivateWhenLaborEndInPast() {
             Doctor doctor = buildDoctor(today.minusMonths(2), today.minusDays(1), 4, 30);
             doctor.updateSchedule(Workday.LUNES, LocalTime.of(8, 0), LocalTime.of(12, 0));
-            doctor.addSpecialty(buildSpecialty(SpecialtyCode.MEDICINA_GENERAL));
+            doctor.addSpecialty(buildSpecialty(SpecialtyCode.TERAPIA_NEURAL));
 
             assertThatThrownBy(doctor::activate).isInstanceOf(DateConflictException.class);
         }
@@ -336,7 +336,7 @@ class DoctorTest {
         @Test
         void shouldNotActivateWithoutSchedules() {
             Doctor doctor = buildDoctor(today, today.plusMonths(3), 4, 30);
-            doctor.addSpecialty(buildSpecialty(SpecialtyCode.MEDICINA_GENERAL));
+            doctor.addSpecialty(buildSpecialty(SpecialtyCode.TERAPIA_NEURAL));
 
             assertThatThrownBy(doctor::activate).isInstanceOf(DoctorValidationException.class);
         }
@@ -353,7 +353,7 @@ class DoctorTest {
         void shouldNotActivateWithInvalidBookingWindow() {
             Doctor doctor = buildDoctor(today, today.plusMonths(3), 0, 30);
             doctor.updateSchedule(Workday.LUNES, LocalTime.of(8, 0), LocalTime.of(12, 0));
-            doctor.addSpecialty(buildSpecialty(SpecialtyCode.MEDICINA_GENERAL));
+            doctor.addSpecialty(buildSpecialty(SpecialtyCode.TERAPIA_NEURAL));
 
             assertThatThrownBy(doctor::activate).isInstanceOf(DoctorValidationException.class);
         }

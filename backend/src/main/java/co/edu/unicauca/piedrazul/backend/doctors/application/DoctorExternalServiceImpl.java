@@ -65,16 +65,6 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
                 .toList();
     }
 
-
-    @Override
-    public List<UUID> getActiveGeneralDoctorIds() {
-        return doctorRepository.findByStatusTrue()
-                .stream()
-                .filter(doctor -> doctor.hasSpecialtie(SpecialtyCode.MEDICINA_GENERAL))
-                .map(Doctor::getPersonId)
-                .toList();
-    }
-
     @Override
     @Transactional
     public List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds) {

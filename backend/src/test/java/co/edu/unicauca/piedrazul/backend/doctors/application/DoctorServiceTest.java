@@ -84,7 +84,7 @@ class DoctorServiceTest {
         @Test
         void shouldThrowWhenLaborStartIsNull() {
             CreateDoctorRequest request = new CreateDoctorRequest(
-                    List.of(SpecialtyCode.MEDICINA_GENERAL), null, LocalDate.now().plusMonths(1), 4, 30,
+                    List.of(SpecialtyCode.TERAPIA_NEURAL), null, LocalDate.now().plusMonths(1), 4, 30,
                     null);
 
             assertThatThrownBy(() -> doctorService.createDoctor(personId, request))
@@ -96,7 +96,7 @@ class DoctorServiceTest {
         @Test
         void shouldThrowWhenLaborEndBeforeLaborStart() {
             CreateDoctorRequest request = new CreateDoctorRequest(
-                    List.of(SpecialtyCode.MEDICINA_GENERAL),LocalDate.now(), LocalDate.now().minusDays(1), 4, 30,
+                    List.of(SpecialtyCode.TERAPIA_NEURAL),LocalDate.now(), LocalDate.now().minusDays(1), 4, 30,
                      null);
 
             assertThatThrownBy(() -> doctorService.createDoctor(personId, request))
@@ -120,11 +120,11 @@ class DoctorServiceTest {
         @Test
         void shouldCreateInactiveDoctorWhenNoSchedulesProvided() {
             CreateDoctorRequest request = new CreateDoctorRequest(
-                    List.of(SpecialtyCode.MEDICINA_GENERAL), LocalDate.now(), LocalDate.now().plusMonths(6), 4, 30,
+                    List.of(SpecialtyCode.TERAPIA_NEURAL), LocalDate.now(), LocalDate.now().plusMonths(6), 4, 30,
                      null);
 
-            Specialty specialty = buildSpecialty(SpecialtyCode.MEDICINA_GENERAL);
-            when(specialtyRepository.findById(SpecialtyCode.MEDICINA_GENERAL)).thenReturn(Optional.of(specialty));
+            Specialty specialty = buildSpecialty(SpecialtyCode.TERAPIA_NEURAL);
+            when(specialtyRepository.findById(SpecialtyCode.TERAPIA_NEURAL)).thenReturn(Optional.of(specialty));
 
             doctorService.createDoctor(personId, request);
 
@@ -141,11 +141,11 @@ class DoctorServiceTest {
         void shouldActivateDoctorWhenSchedulesMakeItEligible() {
             ScheduleRequest scheduleRequest = new ScheduleRequest(LocalTime.of(8, 0), LocalTime.of(12, 0), Workday.LUNES);
             CreateDoctorRequest request = new CreateDoctorRequest(
-                    List.of(SpecialtyCode.MEDICINA_GENERAL), LocalDate.now(), LocalDate.now().plusMonths(6), 4, 30,
+                    List.of(SpecialtyCode.TERAPIA_NEURAL), LocalDate.now(), LocalDate.now().plusMonths(6), 4, 30,
                      List.of(new ScheduleRequest(LocalTime.of(5, 0), LocalTime.of(9, 0), Workday.LUNES)));
 
-            Specialty specialty = buildSpecialty(SpecialtyCode.MEDICINA_GENERAL);
-            when(specialtyRepository.findById(SpecialtyCode.MEDICINA_GENERAL)).thenReturn(Optional.of(specialty));
+            Specialty specialty = buildSpecialty(SpecialtyCode.TERAPIA_NEURAL);
+            when(specialtyRepository.findById(SpecialtyCode.TERAPIA_NEURAL)).thenReturn(Optional.of(specialty));
 
             doctorService.createDoctor(personId, request);
 
@@ -247,7 +247,7 @@ class DoctorServiceTest {
             );
 
             doctor.addSpecialty(
-                    buildSpecialty(SpecialtyCode.MEDICINA_GENERAL)
+                    buildSpecialty(SpecialtyCode.TERAPIA_NEURAL)
             );
 
             when(doctorRepository.findById(personId))
@@ -399,7 +399,7 @@ class DoctorServiceTest {
             when(doctorRepository.findById(personId)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() ->
-                    doctorService.changeSpecialties(personId, List.of(SpecialtyCode.MEDICINA_GENERAL))
+                    doctorService.changeSpecialties(personId, List.of(SpecialtyCode.TERAPIA_NEURAL))
             ).isInstanceOf(DoctorNotFoundException.class);
         }
 
@@ -412,7 +412,7 @@ class DoctorServiceTest {
 
             assertThatThrownBy(() ->
                     doctorService.changeSpecialties(personId,
-                            List.of(SpecialtyCode.TERAPIA_NEURAL, SpecialtyCode.MEDICINA_GENERAL))
+                            List.of(SpecialtyCode.TERAPIA_NEURAL, SpecialtyCode.TERAPIA_NEURAL))
             ).isInstanceOf(IllegalArgumentException.class);
 
             verify(doctorRepository, never()).save(any());
@@ -421,7 +421,7 @@ class DoctorServiceTest {
         @Test
         void shouldReplaceSpecialtiesKeepingOnlyRequestedOnes() {
             Doctor doctor = new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(1), 4, false, 30);
-            Specialty oldSpecialty = buildSpecialty(SpecialtyCode.MEDICINA_GENERAL);
+            Specialty oldSpecialty = buildSpecialty(SpecialtyCode.TERAPIA_NEURAL);
             doctor.addSpecialty(oldSpecialty);
             when(doctorRepository.findById(personId)).thenReturn(Optional.of(doctor));
 

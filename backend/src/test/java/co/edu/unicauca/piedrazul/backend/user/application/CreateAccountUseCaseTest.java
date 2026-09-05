@@ -272,7 +272,7 @@ class CreateAccountUseCaseTest {
         );
 
         CreateDoctorRequest doctorRequest = new CreateDoctorRequest(
-                List.of(SpecialtyCode.MEDICINA_GENERAL),
+                List.of(SpecialtyCode.TERAPIA_NEURAL),
                 LocalDate.of(2024, 1, 1),
                 LocalDate.of(2024, 12, 31),
                 30,

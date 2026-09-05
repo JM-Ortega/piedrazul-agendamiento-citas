@@ -23,9 +23,6 @@ public interface DoctorConfigConsultPort {
     // Obtener IDs de medicos activos
     List<UUID> getActiveDoctorIds();
 
-    // Obtener IDs de medicos generales activos
-    List<UUID> getActiveGeneralDoctorIds();
-
     // Obtener información de medicos en una sola operación por sus IDs
     List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
 
