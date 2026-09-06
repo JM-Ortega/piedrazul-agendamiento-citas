@@ -124,20 +124,19 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
                                 schedule -> schedule.getWorkday().toDayOfWeek()
                         ));
 
+        LocalDate inicio = LocalDate.now();
+
         // Límite de agendamiento
         LocalDate limiteAgendamiento =
-                doctor.getLaborStart()
-                        .plusWeeks(doctor.getBookingWindowWeeks());
+                inicio.plusWeeks(doctor.getBookingWindowWeeks());
 
         if (limiteAgendamiento.isAfter(doctor.getLaborEnd())) {
             limiteAgendamiento = doctor.getLaborEnd();
         }
 
-        LocalDate inicio = LocalDate.now();
-
-                if (!inicio.isBefore(limiteAgendamiento.plusDays(1))) {
-                        return List.of();
-                }
+        if (!inicio.isBefore(limiteAgendamiento.plusDays(1)) || inicio.isBefore(doctor.getLaborStart())) {
+                return List.of();
+        }
 
         // Fechas disponibles quitando festivos y dias diferentes a los de atención
         List<LocalDate> fechas = inicio
