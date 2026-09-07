@@ -38,6 +38,7 @@
             [options]="specialtyOptions"
             [ngModel]="selectedSpecialty()"
             (valueChange)="onSpecialtyChange($event)"
+            [errorMessage]="specialtyError()"
           ></app-select>
         </div>
 

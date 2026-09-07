@@ -12,6 +12,7 @@ import {
   LucideArrowLeft,
   LucideSave,
   LucideAlertTriangle,
+  LucideAlertCircle,
 } from '@lucide/angular';
 import { ButtonComponent } from '../../../../../design-system/atoms/button/button.component';
 import {
@@ -41,6 +42,7 @@ const OBSERVATION_MAX_LENGTH = 300;
     LucideArrowLeft,
     LucideSave,
     LucideAlertTriangle,
+    LucideAlertCircle,
     ButtonComponent,
     SelectComponent,
     PatientFormComponent,
@@ -65,6 +67,7 @@ export class UnscheduledPatientRegisterComponent {
 
   patientFormValue = signal<PatientFormData>({ ...EMPTY_PATIENT_FORM });
   selectedSpecialty = signal('');
+  specialtyError = signal('');
   observation = signal('');
   saveError = signal('');
   isSaving = signal(false);
@@ -79,6 +82,7 @@ export class UnscheduledPatientRegisterComponent {
 
   onSpecialtyChange(value: string): void {
     this.selectedSpecialty.set(value);
+    if (value) this.specialtyError.set('');
   }
 
   onObservationChange(value: string): void {
@@ -112,7 +116,6 @@ export class UnscheduledPatientRegisterComponent {
         this.observation().trim().slice(0, this.observationMaxLength) || null,
     };
 
-    this.saveError.set('');
     this.isSaving.set(true);
 
     this.doctorService.registerUnscheduledAttention(request).subscribe({
