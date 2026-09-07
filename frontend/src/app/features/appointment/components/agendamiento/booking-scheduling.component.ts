@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   OnInit,
   output,
@@ -52,6 +53,20 @@ import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 export class BookingSchedulingComponent implements OnInit {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
+
+  /**
+   * Carga las fechas disponibles del médico apenas `selectedDoctorId` tiene
+   * un valor, sin importar si se seleccionó manualmente en el `<app-select>`
+   * o llegó precargado (contexto `doctor` vía `prefillDoctorId`).
+   */
+  constructor() {
+    effect(() => {
+      const doctorId = this.state.selectedDoctorId();
+      if (doctorId) {
+        this.loadAvailableDateSlots(doctorId);
+      }
+    });
+  }
 
   ngOnInit(): void {
     window.scrollTo(0, 0);
@@ -106,7 +121,6 @@ export class BookingSchedulingComponent implements OnInit {
   onDoctorChange(doctorId: string): void {
     this.state.selectDoctor(doctorId);
     this.resetSlotState();
-    this.loadAvailableDateSlots(doctorId);
   }
 
   onSpecialtyChange(specialty: string): void {
