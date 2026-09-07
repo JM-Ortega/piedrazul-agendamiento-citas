@@ -167,7 +167,6 @@ export class AdminConfigComponent implements OnInit {
     this.savedId.set(null);
     scrollToElementById(`doctor-card-${doctor.id}`, {
       behavior: 'smooth',
-      block: 'start',
     });
   }
 

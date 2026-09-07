@@ -231,7 +231,6 @@ export class AdminCreateUserComponent implements OnInit {
     if (this.submitted) this.validateField('roles');
     scrollToElementById('basic-info-section', {
       behavior: 'smooth',
-      block: 'start',
     });
   }
 

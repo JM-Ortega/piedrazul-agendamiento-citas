@@ -156,7 +156,6 @@ export class DoctorEditFormComponent implements OnInit {
     if (willOpen) {
       scrollToElementById(`day-schedules-${this.doctor().id}`, {
         behavior: 'smooth',
-        block: 'start',
       });
     }
   }

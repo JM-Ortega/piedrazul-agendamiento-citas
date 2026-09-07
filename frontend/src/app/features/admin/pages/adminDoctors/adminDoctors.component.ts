@@ -154,7 +154,6 @@ export class AdminDoctorsComponent implements OnInit {
     this.editingHasScheduler.set(doctor.roles.includes('SCHEDULER'));
     scrollToElementById(`doctor-card-${doctor.id}`, {
       behavior: 'smooth',
-      block: 'start',
     });
   }
   handleCancel(): void {

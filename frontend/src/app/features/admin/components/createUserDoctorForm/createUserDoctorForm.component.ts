@@ -130,7 +130,6 @@ export class CreateUserDoctorFormComponent {
     if (this.scheduleOpened) {
       scrollToElementById('error-anchor-workDays', {
         behavior: 'smooth',
-        block: 'start',
       });
     }
   }
