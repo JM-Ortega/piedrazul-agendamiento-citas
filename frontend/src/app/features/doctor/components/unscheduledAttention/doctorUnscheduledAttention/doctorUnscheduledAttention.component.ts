@@ -65,6 +65,11 @@ export class DoctorUnscheduledAttentionComponent implements OnInit {
     this.subStep.set('register');
   }
 
+  onExistingDocumentConfirmed(doc: string): void {
+    this.lastSearchedDocument.set(doc);
+    this.subStep.set('search');
+  }
+
   onRegisterGoBack(): void {
     this.lastSearchedDocument.set('');
     this.subStep.set('search');

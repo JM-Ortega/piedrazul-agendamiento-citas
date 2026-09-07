@@ -19,6 +19,7 @@ import {
   SelectComponent,
   SelectOption,
 } from '../../../../../design-system/atoms/select/select.component';
+import { ConfirmModalComponent } from '../../../../../design-system/organisms/confirm-modal/confirm-modal.component';
 import { DoctorService } from '../../../../../core/services/doctor.service';
 import {
   PatientFormComponent,
@@ -26,13 +27,13 @@ import {
   EMPTY_PATIENT_FORM,
 } from '../../../../../shared/components/forms/patient-form/patient-form.component';
 import { UnscheduledAttention } from '../../../../../shared/models/dtos/unscheduledAttention.dto';
+import { AppError } from '../../../../../shared/models/interfaces/api-error.model';
 
 const OBSERVATION_MAX_LENGTH = 300;
 
 /**
  * Registro de un paciente nuevo + captura de la observación clínica para
- * el flujo de atención sin cita previa. Guarda todo en una sola petición
- * vía `registerUnscheduledAttention` (no hay navegación a control médico).
+ * el flujo de atención sin cita previa.
  */
 @Component({
   selector: 'app-unscheduled-patient-register',
@@ -46,6 +47,7 @@ const OBSERVATION_MAX_LENGTH = 300;
     ButtonComponent,
     SelectComponent,
     PatientFormComponent,
+    ConfirmModalComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './unscheduledPatientRegister.component.html',
@@ -61,6 +63,7 @@ export class UnscheduledPatientRegisterComponent {
 
   goBack = output<void>();
   advance = output<void>();
+  documentAlreadyExists = output<string>();
 
   readonly maxBirthDate = new Date();
   readonly observationMaxLength = OBSERVATION_MAX_LENGTH;
@@ -71,6 +74,9 @@ export class UnscheduledPatientRegisterComponent {
   observation = signal('');
   saveError = signal('');
   isSaving = signal(false);
+
+  showExistsModal = signal(false);
+  existingDocument = signal('');
 
   readonly remainingObservationChars = computed(
     () => this.observationMaxLength - this.observation().length
@@ -93,13 +99,48 @@ export class UnscheduledPatientRegisterComponent {
     this.goBack.emit();
   }
 
+  /**
+   * Valida el formulario y la especialidad. Si ambos son válidos, verifica
+   * primero contra el backend si el documento ya existe (pudo ser editado
+   * en el formulario) antes de guardar la atención.
+   */
   onSave(form: PatientFormComponent): void {
     if (!form.validate()) return;
     if (!this.selectedSpecialty()) {
-      this.saveError.set('Debe seleccionar el tipo de atención.');
+      this.specialtyError.set('Debe seleccionar el tipo de atención.');
       return;
     }
+    this.specialtyError.set('');
+    this.checkDocumentAndSave();
+  }
 
+  private checkDocumentAndSave(): void {
+    const doc = this.patientFormValue().identification.trim();
+    this.saveError.set('');
+    this.isSaving.set(true);
+
+    this.doctorService.getPatientByDocument(doc).subscribe({
+      next: (patient) => {
+        this.isSaving.set(false);
+        if (patient) {
+          this.existingDocument.set(doc);
+          this.showExistsModal.set(true);
+          return;
+        }
+        this.saveUnscheduledAttention();
+      },
+      error: (err: AppError) => {
+        this.isSaving.set(false);
+        if (err.errorCode === 'PATIENT_NOT_FOUND') {
+          this.saveUnscheduledAttention();
+          return;
+        }
+        this.saveError.set(err.message);
+      },
+    });
+  }
+
+  private saveUnscheduledAttention(): void {
     const p = this.patientFormValue();
     const request: UnscheduledAttention = {
       documentType: p.identificationType,
@@ -130,5 +171,14 @@ export class UnscheduledPatientRegisterComponent {
         );
       },
     });
+  }
+
+  confirmExistingDocument(): void {
+    this.showExistsModal.set(false);
+    this.documentAlreadyExists.emit(this.existingDocument());
+  }
+
+  dismissExistsModal(): void {
+    this.showExistsModal.set(false);
   }
 }

@@ -13,5 +13,6 @@
     [specialtyOptions]="specialtyOptions()"
     (goBack)="onRegisterGoBack()"
     (advance)="onRegisterAdvance()"
+    (documentAlreadyExists)="onExistingDocumentConfirmed($event)"
   ></app-unscheduled-patient-register>
 }

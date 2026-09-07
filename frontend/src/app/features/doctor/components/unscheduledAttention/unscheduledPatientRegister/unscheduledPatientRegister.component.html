@@ -44,7 +44,7 @@
 
         <div class="bg-white rounded-2xl shadow-md p-6">
           <label
-            for="specialty"
+            for="observation"
             class="block text-gray-700 mb-1 text-sm font-medium"
           >
             Observación del control clínico
@@ -93,3 +93,20 @@
     </div>
   </div>
 </div>
+
+<app-confirm-modal
+  [visible]="showExistsModal()"
+  title="Este documento ya existe"
+  [message]="
+    'El paciente con el documento ' +
+    existingDocument() +
+    ' ya existe en el sistema. Será redirigido al paso de búsqueda para mostrar su información.'
+  "
+  confirmLabel="Aceptar"
+  cancelLabel="Cancelar"
+  confirmVariant="primary"
+  (dismissed)="dismissExistsModal()"
+  (confirmed)="confirmExistingDocument()"
+>
+  <svg icon lucideAlertCircle [size]="32" class="text-amber-500"></svg>
+</app-confirm-modal>
