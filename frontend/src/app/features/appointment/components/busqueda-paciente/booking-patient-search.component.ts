@@ -82,6 +82,12 @@ export class BookingPatientSearchComponent implements OnInit {
     this.patientMissing.emit();
   }
 
+  /** Oculta la tarjeta de resultado apenas el usuario vuelve a escribir en el buscador. */
+  onQueryChanged(): void {
+    this.state.foundPatient.set(null);
+    this.state.patientId.set(null);
+  }
+
   confirmPatient(): void {
     this.patientConfirmed.emit();
   }
