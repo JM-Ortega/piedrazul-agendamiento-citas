@@ -8,26 +8,27 @@ import {
 import { Router } from '@angular/router';
 import { DoctorService } from '../../../../../core/services/doctor.service';
 import { SelectOption } from '../../../../../design-system/atoms/select/select.component';
-import { Patient } from '../../../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../../../shared/pipes/formatoPipe';
-import { UnscheduledPatientSearchComponent } from '../unscheduledPatientSearch/unscheduledPatientSearch.component';
-import { UnscheduledPatientAttendComponent } from '../unscheduledPatientAttend/unscheduledPatientAttend.component';
+import {
+  UnscheduledAttendanceStart,
+  UnscheduledPatientSearchComponent,
+} from '../unscheduledPatientSearch/unscheduledPatientSearch.component';
 import { UnscheduledPatientRegisterComponent } from '../unscheduledPatientRegister/unscheduledPatientRegister.component';
 
-type SubStep = 'search' | 'attend' | 'register';
+type SubStep = 'search' | 'register';
 
 /**
  * Orquesta el flujo de atención de un paciente sin cita previa: búsqueda
- * por documento → (encontrado: seleccionar tipo de atención y continuar a
- * control médico) o (no encontrado: registrar paciente + tipo de atención
- * + observación, guardando la atención directamente).
+ * por documento → (encontrado: elige tipo de atención dentro del mismo
+ * buscador y continúa a control médico) o (no encontrado: registrar
+ * paciente + tipo de atención + observación, guardando la atención
+ * directamente).
  */
 @Component({
   selector: 'app-doctor-unscheduled-attention',
   standalone: true,
   imports: [
     UnscheduledPatientSearchComponent,
-    UnscheduledPatientAttendComponent,
     UnscheduledPatientRegisterComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -40,7 +41,6 @@ export class DoctorUnscheduledAttentionComponent implements OnInit {
 
   subStep = signal<SubStep>('search');
   lastSearchedDocument = signal('');
-  foundPatient = signal<Patient | null>(null);
   specialtyOptions = signal<SelectOption[]>([]);
 
   ngOnInit(): void {
@@ -54,29 +54,15 @@ export class DoctorUnscheduledAttentionComponent implements OnInit {
     });
   }
 
-  onFound(patient: Patient): void {
-    this.foundPatient.set(patient);
-    this.lastSearchedDocument.set(patient.identification);
-    this.subStep.set('attend');
+  onFound({ patient, specialty }: UnscheduledAttendanceStart): void {
+    this.router.navigate(['/medico/control-medico/sin-cita'], {
+      state: { documentNumber: patient.identification, specialty },
+    });
   }
 
   onNotFound(documentNumber: string): void {
-    this.foundPatient.set(null);
     this.lastSearchedDocument.set(documentNumber);
     this.subStep.set('register');
-  }
-
-  onAttendGoBack(): void {
-    this.foundPatient.set(null);
-    this.lastSearchedDocument.set('');
-    this.subStep.set('search');
-  }
-
-  onAttendAdvance(specialty: string): void {
-    const documentNumber = this.foundPatient()?.identification ?? '';
-    this.router.navigate(['/medico/control-medico/sin-cita'], {
-      state: { documentNumber, specialty },
-    });
   }
 
   onRegisterGoBack(): void {
