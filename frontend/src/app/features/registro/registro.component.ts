@@ -26,7 +26,7 @@ import { InputComponent } from '../../design-system/atoms/input/input.component'
 import {
   PatientPublicResponse,
   PatientService,
-} from '../../core/services/patient.service';
+} from '../../core/services/register.service';
 import {
   PatientFormData,
   EMPTY_PATIENT_FORM,

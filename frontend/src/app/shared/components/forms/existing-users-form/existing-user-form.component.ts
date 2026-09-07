@@ -101,10 +101,21 @@ export class ExistingUserFormComponent implements ControlValueAccessor {
     return this.value[field] ?? '';
   }
 
-  /** Actualiza un campo del formulario y notifica al `ControlValueAccessor` y al padre. */
+  /**
+   * Actualiza un campo del formulario, notifica al `ControlValueAccessor`/padre,
+   * y revalida en vivo cualquier error que ya estuviera mostrado para ese
+   * campo (y los que dependen de él) para que desaparezca apenas el valor
+   * deja de ser inválido.
+   */
   set<K extends keyof ExistingUserFormData>(field: K, val: string): void {
     this.value = { ...this.value, [field]: val };
     if (field === 'birthDate') this.birthDateSignal.set(val);
+
+    this.revalidateIfTouched(field);
+    if (field === 'birthDate') {
+      this.revalidateIfTouched('guardianPhone');
+    }
+
     this.onChange(this.value);
     this.valueChange.emit(this.value);
   }
@@ -130,19 +141,17 @@ export class ExistingUserFormComponent implements ControlValueAccessor {
    * @returns `true` si el formulario es válido en su totalidad.
    */
   validate(): boolean {
+    const fields: (keyof ExistingUserFormData)[] = [
+      'sex',
+      'birthDate',
+      'guardianPhone',
+    ];
+
     const e: Record<string, string> = {};
-    const f = this.value;
-
-    if (!f.sex) e['sex'] = 'Este campo es obligatorio';
-
-    const birth = validateBirthDate(f.birthDate);
-    if (birth) e['birthDate'] = birth;
-
-    const gPhone = validateGuardianPhone(
-      f.guardianPhone,
-      isMinorByBirthDate(f.birthDate)
-    );
-    if (gPhone) e['guardianPhone'] = gPhone;
+    for (const field of fields) {
+      const message = this.validateField(field, this.value[field]);
+      if (message) e[field] = message;
+    }
 
     this.errors.set(e);
     return Object.keys(e).length === 0;
@@ -164,5 +173,52 @@ export class ExistingUserFormComponent implements ControlValueAccessor {
 
   registerOnTouched(fn: () => void): void {
     this.onTouched = fn;
+  }
+
+  /**
+   * Valida un único campo. Única fuente de verdad usada tanto por
+   * {@link validate} (validación completa al continuar) como por
+   * {@link revalidateIfTouched} (revalidación en vivo mientras se escribe).
+   */
+  private validateField(
+    field: keyof ExistingUserFormData,
+    value: unknown
+  ): string {
+    const str = String(value ?? '');
+    switch (field) {
+      case 'sex':
+        return str ? '' : 'Este campo es obligatorio';
+      case 'birthDate':
+        return validateBirthDate(str) ?? '';
+      case 'guardianPhone':
+        return (
+          validateGuardianPhone(
+            str,
+            isMinorByBirthDate(this.value.birthDate)
+          ) ?? ''
+        );
+      default:
+        return '';
+    }
+  }
+
+  /**
+   * Si el campo indicado ya tiene un error mostrado, lo recalcula y lo
+   * actualiza (o lo limpia si ya es válido). No introduce errores nuevos
+   * para campos que el usuario aún no ha intentado enviar.
+   */
+  private revalidateIfTouched(field: keyof ExistingUserFormData): void {
+    if (!(field in this.errors())) return;
+
+    const message = this.validateField(field, this.value[field]);
+    this.errors.update((current) => {
+      const next = { ...current };
+      if (message) {
+        next[field] = message;
+      } else {
+        delete next[field];
+      }
+      return next;
+    });
   }
 }

@@ -204,7 +204,11 @@
   >
     <svg lucideTriangleAlert [size]="28" icon class="text-red-600"></svg>
     <span message>
-      Los datos no guardados se perderán y la cita quedará sin atender.
+      @if (isScheduledContext()) {
+        Los datos no guardados se perderán y la cita quedará sin atender.
+      } @else {
+        Los datos no guardados se perderán.
+      }
     </span>
   </app-confirm-modal>
 </div>

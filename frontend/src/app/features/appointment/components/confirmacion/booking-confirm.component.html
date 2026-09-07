@@ -1,7 +1,7 @@
 <div>
-  <h2 class="text-[#163c63] text-2xl mb-6">Confirmar Cita</h2>
+  <h2 class="text-[#163c63] text-xl mb-4">Confirmar Cita</h2>
 
-  <div class="space-y-4">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-10 w-full">
     <div class="bg-blue-50 rounded-xl p-5">
       <h3 class="text-[#163c63] font-semibold mb-3 flex items-center gap-2">
         <svg lucideUserSearch [size]="18"></svg>
@@ -21,7 +21,12 @@
         <p><strong>Celular:</strong> {{ state.confirmPhone() }}</p>
         <p><strong>Género:</strong> {{ state.confirmGender() | formato }}</p>
         <p>
-          <strong>Fecha de Nacimiento:</strong> {{ state.confirmBirthDate() }}
+          <strong>Fecha de Nacimiento:</strong>
+          {{ formatLongDateEs(state.confirmBirthDate()) }}
+        </p>
+        <p>
+          <strong>Edad:</strong>
+          {{ calculateAge(state.confirmBirthDate()) }} años
         </p>
       } @else {
         @if (state.confirmDocument()) {
@@ -35,12 +40,26 @@
         <svg lucideStethoscope [size]="18"></svg>
         Cita
       </h3>
+
       <p>
-        <strong>Especialidad:</strong> {{ state.selectedSpecialty() | formato }}
+        <strong>Tipo de atención:</strong>
+        {{ state.selectedSpecialty() | formato }}
       </p>
-      <p><strong>Médico:</strong> {{ state.confirmDoctorName() }}</p>
-      <p><strong>Fecha:</strong> {{ state.confirmDate() }}</p>
-      <p><strong>Hora:</strong> {{ state.selectedTime().slice(0, 5) }}</p>
+
+      <p>
+        <strong>Médico:</strong>
+        {{ state.selectedDoctorName() }}
+      </p>
+
+      <p>
+        <strong>Fecha:</strong>
+        {{ state.confirmDate() }}
+      </p>
+
+      <p>
+        <strong>Hora:</strong>
+        {{ state.selectedTime().slice(0, 5) }}
+      </p>
     </div>
   </div>
 
