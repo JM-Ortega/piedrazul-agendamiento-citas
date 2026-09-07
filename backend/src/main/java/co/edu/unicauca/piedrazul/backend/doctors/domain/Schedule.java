@@ -1,10 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.doctors.domain;
 
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorValidationException;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Workday;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 
 import java.time.LocalTime;
 import java.util.UUID;

@@ -9,7 +9,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.BusySlotService;
-import co.edu.unicauca.piedrazul.backend.appointment.exception.FirstAppointmentMustBeGeneralMedicineException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.FirstAppointmentMustBeNeuralTerapyException;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration.PatientConsultPortImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration.PatientProvisioningPortImpl;
@@ -190,7 +190,7 @@ class ManualSchedulingRollbackIT extends PostgresIntegrationSupport {
         // Patient no expone el documento; se compara el conteo antes y después.
         long patientCountBefore = patientRepository.count();
 
-        assertThrows(FirstAppointmentMustBeGeneralMedicineException.class,
+        assertThrows(FirstAppointmentMustBeNeuralTerapyException.class,
                 () -> scheduleWith(SpecialtyCode.FISIOTERAPIA));
 
         assertTrue(personRepository.findByIdentification(document).isEmpty(),

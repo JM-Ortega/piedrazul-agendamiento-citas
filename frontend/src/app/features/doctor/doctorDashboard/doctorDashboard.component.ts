@@ -15,6 +15,7 @@ import {
   LucideClock,
   LucideFileText,
   LucideUser,
+  LucideUserPlus,
   LucideUserX,
 } from '@lucide/angular';
 import { DoctorService } from '../../../core/services/doctor.service';
@@ -44,6 +45,7 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
     LucideClock,
     LucideFileText,
     LucideUser,
+    LucideUserPlus,
     LucideUserX,
     ButtonComponent,
     ConfirmModalComponent,
@@ -188,6 +190,10 @@ export class DoctorDashboardComponent implements OnInit {
     this.router.navigate(['/medico/nueva-cita'], {
       state: { documentNumber, specialty, idDoctor },
     });
+  }
+
+  goToUnscheduledAttention(): void {
+    this.router.navigate(['/medico/atencion-sin-cita']);
   }
 
   formatDate(dateStr: string): string {

@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { timer } from 'rxjs';
-import { PatientAppointmentService } from '../../../../core/services/patientAppointment.service';
+import { PatientAppointmentService } from '../../../../core/services/patient.service';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { BookingSchedulingComponent } from '../../../appointment/components/agendamiento/booking-scheduling.component';
@@ -77,9 +77,6 @@ export class AppointmentBookingComponent implements OnInit {
    */
   @Input() prefillSpecialty = '';
   @Input() prefillDoctorId = '';
-
-  /** Documento a precargar en el buscador tras confirmar un "documento ya existe". */
-  pendingSearchDocument = '';
 
   goBack = output<void>();
 
@@ -164,12 +161,6 @@ export class AppointmentBookingComponent implements OnInit {
     this.patientSubStep = 'register';
   }
 
-  onSearchChangeMode(): void {
-    this.patientSubStep = 'search';
-    this.pendingSearchDocument = '';
-    this.state.step.set(1);
-  }
-
   /**
    * Se dispara cuando el documento ingresado resulta pertenecer a un
    * paciente ya existente. Devuelve al paso de búsqueda con ese documento
@@ -178,7 +169,7 @@ export class AppointmentBookingComponent implements OnInit {
    * @param doc - Documento que ya existe en el sistema.
    */
   onExistingDocumentConfirmed(doc: string): void {
-    this.pendingSearchDocument = doc;
+    this.state.lastSearchedDocument.set(doc);
     this.patientSubStep = 'search';
   }
 
@@ -191,11 +182,7 @@ export class AppointmentBookingComponent implements OnInit {
 
   onRegisterGoBack(): void {
     this.patientSubStep = 'search';
-    this.pendingSearchDocument = '';
-    this.state.notFound.set(false);
-    this.state.searchQuery.set('');
-    this.state.searchSuggestions.set([]);
-    this.state.searchError.set('');
+    this.state.resetSearchState();
   }
 
   // Eventos de BookingScheduling

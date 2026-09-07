@@ -9,8 +9,8 @@ import {
 import Keycloak from 'keycloak-js';
 import { filter, map } from 'rxjs';
 import { DoctorService } from './doctor.service';
-import { PatientService } from './patient.service';
-import { PatientAppointmentService } from './patientAppointment.service';
+import { PatientService } from './register.service';
+import { PatientAppointmentService } from './patient.service';
 import { SchedulerService } from './scheduler.service';
 
 @Injectable({ providedIn: 'root' })

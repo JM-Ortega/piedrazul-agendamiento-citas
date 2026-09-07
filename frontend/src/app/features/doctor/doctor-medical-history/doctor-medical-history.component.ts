@@ -24,6 +24,9 @@ import { calcAge } from '../../../shared/helpers/patient-validation';
 import { parseLocalDateString } from '../../../shared/helpers/transform-date-local';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
+import { UnscheduledAttention } from '../../../shared/models/dtos/unscheduledAttention.dto';
+
+type MedicalHistoryContext = 'scheduled' | 'unscheduled';
 
 @Component({
   selector: 'app-doctor-medical-history',
@@ -52,6 +55,10 @@ export class DoctorMedicalHistoryComponent
 
   /** Longitud máxima permitida para la observación de la historia clínica. */
   readonly OBSERVATION_MAX_LENGTH = 300;
+
+  private readonly context = signal<MedicalHistoryContext>('scheduled');
+  readonly isScheduledContext = computed(() => this.context() === 'scheduled');
+  private readonly unscheduledSpecialty = signal<string>('');
 
   readonly mostrarInfo = signal(false);
   toggleInfo() {
@@ -136,21 +143,49 @@ export class DoctorMedicalHistoryComponent
   }
 
   ngOnInit(): void {
-    const idAppointment =
-      this.route.snapshot.paramMap.get('idAppointment') ?? '';
-    this.idAppointment.set(idAppointment);
-
     this.doctorService.resetMedicalRecords();
 
+    const idAppointment = this.route.snapshot.paramMap.get('idAppointment');
+    if (idAppointment) {
+      this.context.set('scheduled');
+      this.idAppointment.set(idAppointment);
+      this.loadPatientByAppointment(idAppointment);
+      return;
+    }
+
+    this.context.set('unscheduled');
+    const navigationState = (history.state ?? {}) as {
+      documentNumber?: string;
+      specialty?: string;
+    };
+    this.unscheduledSpecialty.set(navigationState.specialty ?? '');
+
+    if (!navigationState.documentNumber) {
+      this.isLoadingPatient.set(false);
+      return;
+    }
+    this.loadPatientByDocument(navigationState.documentNumber);
+  }
+
+  private loadPatientByAppointment(idAppointment: string): void {
     this.doctorService.getPatientByAppointment(idAppointment).subscribe({
       next: (patient) => {
         this.patient.set(patient);
         this.isLoadingPatient.set(false);
         this.doctorService.loadMedicalRecordsByPatient(patient.id);
       },
-      error: () => {
+      error: () => this.isLoadingPatient.set(false),
+    });
+  }
+
+  private loadPatientByDocument(documentNumber: string): void {
+    this.doctorService.getPatientByDocument(documentNumber).subscribe({
+      next: (patient) => {
+        this.patient.set(patient ?? undefined);
         this.isLoadingPatient.set(false);
+        if (patient) this.doctorService.loadMedicalRecordsByPatient(patient.id);
       },
+      error: () => this.isLoadingPatient.set(false),
     });
   }
 
@@ -167,31 +202,72 @@ export class DoctorMedicalHistoryComponent
   }
 
   confirmAttendanceAndExit(): void {
+    if (this.isScheduledContext()) {
+      this.saveScheduledAttendance();
+    } else {
+      this.saveUnscheduledAttendance();
+    }
+  }
+
+  private saveScheduledAttendance(): void {
     const idCita = this.idAppointment();
     if (!idCita) return;
-
-    const observation =
-      this.newObservation().trim().slice(0, this.OBSERVATION_MAX_LENGTH) ||
-      null;
 
     this.saveError.set('');
     this.isSaving.set(true);
 
     this.doctorService
-      .updateAppointmentAsAttended(idCita, observation)
+      .updateAppointmentAsAttended(idCita, this.trimmedObservation())
       .subscribe({
-        next: () => {
-          this.allowNavigation = true;
-          this.doctorService.resetMedicalRecords();
-          this.router.navigate(['/medico']);
-        },
-        error: (err) => {
-          this.isSaving.set(false);
-          this.saveError.set(
-            err?.error?.message ||
-              'Ocurrió un error al guardar la historia clínica'
-          );
-        },
+        next: () => this.finishAndExit(),
+        error: (err) => this.handleSaveError(err),
       });
+  }
+
+  private saveUnscheduledAttendance(): void {
+    const p = this.patient();
+    const specialty = this.unscheduledSpecialty();
+    if (!p || !specialty) return;
+
+    const request: UnscheduledAttention = {
+      documentType: p.identificationType,
+      documentNumber: p.identification,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      phone: p.phone,
+      gender: p.sex,
+      birthDate: p.birthDate,
+      email: p.email,
+      guardianPhone: p.guardianPhone,
+      specialty,
+      medicalCheckup: this.trimmedObservation(),
+    };
+
+    this.saveError.set('');
+    this.isSaving.set(true);
+
+    this.doctorService.registerUnscheduledAttention(request).subscribe({
+      next: () => this.finishAndExit(),
+      error: (err) => this.handleSaveError(err),
+    });
+  }
+
+  private trimmedObservation(): string | null {
+    return (
+      this.newObservation().trim().slice(0, this.OBSERVATION_MAX_LENGTH) || null
+    );
+  }
+
+  private finishAndExit(): void {
+    this.allowNavigation = true;
+    this.doctorService.resetMedicalRecords();
+    this.router.navigate(['/medico']);
+  }
+
+  private handleSaveError(err: { error?: { message?: string } }): void {
+    this.isSaving.set(false);
+    this.saveError.set(
+      err?.error?.message || 'Ocurrió un error al guardar la historia clínica'
+    );
   }
 }

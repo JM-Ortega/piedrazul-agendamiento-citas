@@ -12,11 +12,12 @@ import co.edu.unicauca.piedrazul.backend.appointment.exception.DoctorConfigIncon
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.ClinicalHistoryDescription;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.ListAppointmentFiltersRequest;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.RegisterUnscheduledAttentionRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentResponse;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AvailableDateSlots;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.PageResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.CitaDtoMapper;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -35,9 +36,8 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/appointments")
 public class AppointmentController {
-    private final GetAvailableSlotsUseCase getAvailableSlotsUseCase;
+    private final GetAvailableDatesAndSlotsUseCase getAvailableDatesAndSlotsUseCase;
     private final ListAppointmentsUseCase listAppointmentsUseCase;
-    private final GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase;
     private final CitaDtoMapper citaDtoMapper;
     private final ListMyAppointmentsUseCase listMyAppointmentsUseCase;
     private final IsNewPatientUseCase isNewPatientUseCase;
@@ -46,6 +46,7 @@ public class AppointmentController {
     private final GetAppointmentStatesUseCase getAppointmentStatesUseCase;
     private final UpdateAutonomousSchedulingUseCase updateAutonomousSchedulingUseCase;
     private final GetAutonomousSchedulingContidionUseCase getAutonomousSchedulingContidionUseCase;
+    private final RegisterUnscheduledAttentionUseCase registerUnscheduledAttentionUseCase;
 
     private final AppointmentSchedulingService appointmentSchedulingService;
     private final ManualPatientResolutionStrategy manualPatientResolutionStrategy;
@@ -55,9 +56,8 @@ public class AppointmentController {
 
 
     public AppointmentController(
-            GetAvailableSlotsUseCase getAvailableSlotsUseCase,
+            GetAvailableDatesAndSlotsUseCase getAvailableDatesAndSlotsUseCase,
             ListAppointmentsUseCase listAppointmentsUseCase,
-            GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase,
             CitaDtoMapper citaDtoMapper,
             ListMyAppointmentsUseCase listMyAppointmentsUseCase,
             IsNewPatientUseCase isNewPatientUseCase,
@@ -66,14 +66,14 @@ public class AppointmentController {
             GetAppointmentStatesUseCase getAppointmentStatesUseCase,
             UpdateAutonomousSchedulingUseCase updateAutonomousSchedulingUseCase,
             GetAutonomousSchedulingContidionUseCase getAutonomousSchedulingContidionUseCase,
+            RegisterUnscheduledAttentionUseCase registerUnscheduledAttentionUseCase,
             AppointmentSchedulingService appointmentSchedulingService,
             ManualPatientResolutionStrategy manualPatientResolutionStrategy,
             AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy,
             PatientConsultPort patientConsultPort,
             DoctorConfigConsultPort doctorConfigConsultPort) {
-        this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
+        this.getAvailableDatesAndSlotsUseCase = getAvailableDatesAndSlotsUseCase;
         this.listAppointmentsUseCase = listAppointmentsUseCase;
-        this.getSpecialtiesWithDoctorUseCase = getSpecialtiesWithDoctorUseCase;
         this.citaDtoMapper = citaDtoMapper;
         this.listMyAppointmentsUseCase = listMyAppointmentsUseCase;
         this.isNewPatientUseCase = isNewPatientUseCase;
@@ -82,6 +82,7 @@ public class AppointmentController {
         this.getAppointmentStatesUseCase = getAppointmentStatesUseCase;
         this.updateAutonomousSchedulingUseCase = updateAutonomousSchedulingUseCase;
         this.getAutonomousSchedulingContidionUseCase = getAutonomousSchedulingContidionUseCase;
+        this.registerUnscheduledAttentionUseCase = registerUnscheduledAttentionUseCase;
         this.appointmentSchedulingService = appointmentSchedulingService;
         this.manualPatientResolutionStrategy = manualPatientResolutionStrategy;
         this.autonomousPatientResolutionStrategy = autonomousPatientResolutionStrategy;
@@ -105,17 +106,16 @@ public class AppointmentController {
         return ResponseEntity.ok(enabled);
     }
 
-    // Franjas disponibles según el médico y la fecha
+    // Fechas y slots disponbles para agendar con el doctor
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    @GetMapping("/available-slots")
-    public ResponseEntity<List<AppointmentTime>> getAvailableSlots(
-            @RequestParam UUID doctorId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+    @GetMapping("/slots") 
+    public ResponseEntity<List<AvailableDateSlots>> getAvailableDateSlots(
+            @RequestParam UUID doctorId) {
 
-        List<AppointmentTime> slots = getAvailableSlotsUseCase
-                .getAvailableSlots(doctorId, date);
+        List<AvailableDateSlots> datesAndSlots = getAvailableDatesAndSlotsUseCase
+                .getAvailableDatesAndSlots(doctorId);
 
-        return ResponseEntity.ok(slots);
+        return ResponseEntity.ok(datesAndSlots);
     }
 
     // Un unico método para listar por idDoctor, idPatient, fecha, estado o combinaciones.
@@ -230,11 +230,24 @@ public class AppointmentController {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-    // Listar un médico por defecto para cada especialidad
-    @GetMapping("/specialties-with-doctor")
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<List<DoctorResponse>> getSpecialtiesWithDoctor(@RequestParam(required = false) UUID patientId) {
-        return ResponseEntity.ok(getSpecialtiesWithDoctorUseCase.getSpecialtiesWithDoctor(patientId));
+    // Crear cita no agendada + Medical Check up opcional
+    @PostMapping("/unscheduled")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<Void> registerUnscheduledAttention(
+            @RequestBody @Valid RegisterUnscheduledAttentionRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        UUID idDoctor = doctorConfigConsultPort.findByUserId(UUID.fromString(jwt.getSubject()))
+                .orElseThrow(() -> new DoctorConfigInconsistentException("Doctor no encontrado"));
+
+        PatientSchedulingContext patientContext = PatientSchedulingContext.manual(
+                request.getDocumentType(), request.getDocumentNumber(), request.getFirstName(),
+                request.getLastName(), request.getPhone(), request.getGender(),
+                request.getBirthDate(), request.getEmail(), request.getGuardianPhone()
+        );
+
+        registerUnscheduledAttentionUseCase.register(idDoctor, patientContext, request.getSpecialty(), request.getMedicalCheckup());
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     // Actualizar el estado de una cita a atendida y crear su HC asociada

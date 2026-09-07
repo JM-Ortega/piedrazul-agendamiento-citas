@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output;
 
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Workday;
 
 import java.time.LocalTime;
 import java.util.UUID;

@@ -1,6 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
+import co.edu.unicauca.piedrazul.backend.doctors.api.SchedulingOrigin;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.DoctorsAvailability;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorAvailableResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorDetailedResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorShortResponse;
@@ -186,47 +189,43 @@ public class DoctorService implements DoctorProvisioningApi {
         return Arrays.asList(SpecialtyCode.values());
     }
 
-    public List<DoctorShortResponse> getNeuralDoctors(){
-        List<Doctor> doctors = findAllDoctors();
+    public List<DoctorAvailableResponse> getSpecialtiesWithActiveDoctors(UUID patientId, SchedulingOrigin schedulingOrigin) {
+        // Obtiene los doctores activos
+        List<Doctor> activeDoctors = doctorRepository.findByStatusTrue();
 
-        List<Doctor> neuralDoctors = doctors.stream()
-                .filter(Doctor::isStatus)
-                .filter(d -> d.getSpecialties().stream()
-                        .anyMatch(s -> s.getCode() == SpecialtyCode.TERAPIA_NEURAL))
-                .toList();
+        if (activeDoctors.isEmpty()) {
+            throw new NoAvailableDoctorsException("No hay médicos activos disponibles");
+        }
 
-        Map<UUID, String> names = personExternalService.getPersonNames(
-                neuralDoctors.stream()
-                        .map(Doctor::getPersonId)
-                        .toList()
-        );
+        // Si no se envia el id del paciente es porque es nuevo
+        boolean isNewPatient = patientId == null || appointmentExternalService.isNewPatient(patientId);
 
-        return neuralDoctors.stream()
-                .map(d -> DoctorShortResponse.fromEntity(
-                        d,
-                        names.get(d.getPersonId())
-                ))
-                .toList();
-    }
+        // Por si entro por el origen de agendamiento
+        boolean onlyNeuralTherapy =
+                isNewPatient || schedulingOrigin == SchedulingOrigin.AUTONOMO;
 
-    public List<DoctorResponse> getActiveDoctors(UUID patientId) {
-        List<Doctor> doctors = findAllDoctors();
 
-        boolean isNewPatient = patientId != null && appointmentExternalService.isNewPatient(patientId);
-
-        if (isNewPatient) {
-            doctors = doctors.stream()
+        // Si el paciente es nuevo solo retorna los medicos de terapia neural
+        if (onlyNeuralTherapy) {
+            activeDoctors = activeDoctors.stream()
                     .filter(d -> d.getSpecialties().stream()
                             .anyMatch(s -> s.getCode() == SpecialtyCode.TERAPIA_NEURAL))
                     .toList();
         }
 
-        if (doctors.isEmpty()) {
-            throw new NoAvailableDoctorsException("No hay médicos activos disponibles");
-        }
+        // Valida la disponibilidad delos doctores activos, con la finalidad de no retornar
+        // medicos sin disponibilidad
+        List<DoctorsAvailability> doctorsAvailability = activeDoctors.stream()
+                .map(DoctorsAvailability::fromEntity)
+                .toList();
 
-        List<Doctor> activeDoctors = doctors.stream()
-                .filter(Doctor::isStatus)
+        Set<UUID> availableDoctorIds =
+                appointmentExternalService.calculateDoctorsAvailability(
+                        doctorsAvailability
+                );
+
+        activeDoctors = activeDoctors.stream()
+                .filter(d -> availableDoctorIds.contains(d.getPersonId()))
                 .toList();
 
         Map<UUID, String> names = personExternalService.getPersonNames(
@@ -235,11 +234,13 @@ public class DoctorService implements DoctorProvisioningApi {
                         .toList()
         );
 
+        // Si es nuevo o el agendamiento es autonomo retornara a los doces de terapia nerual con solo esa especialidad
+        // aunque tengan más
         return activeDoctors.stream()
-                .map(d -> DoctorResponse.fromEntity(
+                .map(d -> DoctorAvailableResponse.fromEntity(
                         d,
                         names.get(d.getPersonId()),
-                        isNewPatient
+                        onlyNeuralTherapy
                 ))
                 .toList();
     }

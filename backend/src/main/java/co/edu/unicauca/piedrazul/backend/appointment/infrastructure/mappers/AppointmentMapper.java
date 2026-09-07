@@ -36,7 +36,7 @@ public class AppointmentMapper {
             return null;
         }
 
-        AppointmentTime appointmentTime = new AppointmentTime(entity.getStartTime());
+        AppointmentTime appointmentTime = AppointmentTime.withoutBusinessHoursRestriction(entity.getStartTime());
 
         return Appointment.reconstruct(
                 entity.getIdAppointment(),

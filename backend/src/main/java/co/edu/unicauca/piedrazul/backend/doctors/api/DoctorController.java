@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.doctors.api;
 
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorAvailableResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorDetailedResponse;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorShortResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
@@ -60,44 +60,38 @@ public class DoctorController {
         return DoctorDetailedResponse.fromEntity(doctor, names.get(doctor.getPersonId()));
     }
 
-    // No paginar
-    @GetMapping("/neural-doctors")
+    // No paginar se usa en el agendamiento
+    // Metodo unico que retorna los doctores disponibles validando si el paciente es nuevo o no
+    @GetMapping("/specialties-with-active-doctors")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    @Operation(summary = "Listar todos los doctores",
-            description = "Devuelve la lista completa de doctores con especialidad de terapia neural registrados en el sistema, " +
-                    "incluyendo sus especialidades y nombre. La lista puede estar vacía si no hay doctores para terapia neural registrados.")
+    @Operation(
+            summary = "Listar todos los doctores",
+            description = "Devuelve la lista de los doctores con agendamiento disponible junto con sus especialidades. " +
+                    "Hace validaciones de negocio dependiendo de si el paciente es nuevo."
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Doctores obtenidos correctamente"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),
             @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar doctores")
     })
-    public ResponseEntity<List<DoctorShortResponse>> getNeuralDoctors() {
-        return ResponseEntity.ok(doctorService.getNeuralDoctors());
-    }
+    public ResponseEntity<List<DoctorAvailableResponse>> getSpecialtiesWithActiveDoctors(
+            @RequestParam(required = false) UUID patientId,
+            @RequestParam SchedulingOrigin schedulingOrigin) {
 
-    // No paginar
-    @GetMapping("/active-doctors")
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    @Operation(summary = "Listar todos los doctores",
-            description = "Devuelve la lista completa de doctores registrados en el sistema junto con su " +
-                    "información detallada. La lista puede estar vacía si no hay doctores registrados. Si el paciente es " +
-                    "nuevo, solo envia medicos con la especialdiad de terapia neural y filtra las especialidades del " +
-                    "medico para que solo devuelva la de terapia neural")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Doctores obtenidos correctamente"),
-            @ApiResponse(responseCode = "401", description = "No autenticado"),
-            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar doctores")
-    })
-    public ResponseEntity<List<DoctorResponse>> getActiveDoctors(UUID patientId) {
-        return ResponseEntity.ok(doctorService.getActiveDoctors(patientId));
+        return ResponseEntity.ok(
+                doctorService.getSpecialtiesWithActiveDoctors(
+                        patientId,
+                        schedulingOrigin
+                )
+        );
     }
 
     // No paginar sirve para filtrar las citas por doctor
     @GetMapping
     @PreAuthorize("hasRole('SCHEDULER')")
     @Operation(summary = "Listar todos los doctores",
-            description = "Devuelve la lista completa de doctores registrados en el sistema, incluyendo sus " +
-                    "especialidades y nombre. La lista puede estar vacía si no hay doctores registrados.")
+            description = "Devuelve la lista completa de doctores activos o inactivos registrados en el sistema, " +
+                    "incluyendo sus especialidades y nombre. La lista puede estar vacía si no hay doctores registrados.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Doctores obtenidos correctamente"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),

@@ -54,6 +54,7 @@ export class BookingStateService {
   notFound = signal<boolean>(false);
   patientId = signal<string | null>(null);
 
+  lastSearchedDocument = signal<string>('');
   searchQuery = signal<string>('');
   searchSuggestions = signal<PatientSuggestion[]>([]);
   searchLoading = signal<boolean>(false);
@@ -234,6 +235,7 @@ export class BookingStateService {
     this.foundPatient.set(null);
     this.notFound.set(false);
     this.patientId.set(null);
+    this.lastSearchedDocument.set('');
   }
 
   /** Limpia toda la selección de médico/especialidad/horario (usado al volver a buscar paciente). */

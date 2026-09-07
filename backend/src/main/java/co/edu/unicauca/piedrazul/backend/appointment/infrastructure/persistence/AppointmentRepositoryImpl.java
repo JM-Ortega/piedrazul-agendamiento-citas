@@ -1,17 +1,15 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PageQuery;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PagedResult;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Order;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
@@ -100,14 +98,18 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
                 .toList();
     }
 
+    @Override
+    public boolean existsByIdPatientAndSchedulingOriginAndDateBetween(UUID idPatient, SchedulingOrigin schedulingOrigin,
+                                                                      LocalDate startDate, LocalDate endDate){
+        return jpaRepository.existsByIdPatientAndSchedulingOriginAndDateBetween(idPatient, schedulingOrigin, startDate, endDate);
+    }
 
     @Override
     public PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery) {
-        Specification<AppointmentEntity> spec = buildSpecification(idDoctor, idPatient, date, state);
+        Specification<AppointmentEntity> spec = buildSpecification(idDoctor, idPatient, date, state).
+                and(statePriorityOrder(pageQuery));
 
-        Sort.Direction direction = pageQuery.ascending() ? Sort.Direction.ASC : Sort.Direction.DESC;
-        Sort sort = Sort.by(direction, pageQuery.sortBy());
-        Pageable pageable = PageRequest.of(pageQuery.page(), pageQuery.size(), sort);
+        Pageable pageable = PageRequest.of(pageQuery.page(), pageQuery.size());
 
         Page<AppointmentEntity> entityPage = jpaRepository.findAll(spec, pageable);
 
@@ -118,6 +120,37 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
                 entityPage.getTotalElements(),
                 entityPage.getTotalPages()
         );
+    }
+
+    @Override
+    public List<Appointment> findByDoctorAndDateBetween(
+            UUID idDoctor,
+            LocalDate dateStart,
+            LocalDate dateEnd
+    ) {
+        return jpaRepository
+                .findByIdDoctorAndDateBetween(idDoctor, dateStart, dateEnd)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    private Specification<AppointmentEntity> statePriorityOrder(PageQuery pageQuery) {
+        return (root, query, cb) -> {
+            Expression<Integer> priority = cb.<Integer>selectCase()
+                    .when(cb.equal(root.get("appointmentState"), AppointmentState.AGENDADA), 1)
+                    .when(cb.equal(root.get("appointmentState"), AppointmentState.ATENDIDA), 2)
+                    .when(cb.equal(root.get("appointmentState"), AppointmentState.NO_ASISTIO), 3)
+                    .when(cb.equal(root.get("appointmentState"), AppointmentState.CANCELADA), 4)
+                    .otherwise(5); // cubre REPROGRAMADA u otro estado futuro sin romper el orden
+
+            Order secondary = pageQuery.ascending()
+                    ? cb.asc(root.get(pageQuery.sortBy()))
+                    : cb.desc(root.get(pageQuery.sortBy()));
+
+            query.orderBy(cb.asc(priority), secondary);
+            return cb.conjunction(); // no filtra nada, solo aporta el ORDER BY
+        };
     }
 
     private Specification<AppointmentEntity> buildSpecification(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state) {

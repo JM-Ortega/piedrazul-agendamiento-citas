@@ -9,8 +9,8 @@ import {
 } from '@angular/core';
 import { LucideCalendarDays, LucideClock } from '@lucide/angular';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
-import { PatientAppointmentService } from '../../../core/services/patientAppointment.service';
-import { PatientService } from '../../../core/services/patient.service';
+import { PatientAppointmentService } from '../../../core/services/patient.service';
+import { PatientService } from '../../../core/services/register.service';
 import { getMonthShort } from '../../../shared/helpers/date-format';
 import {
   APPOINTMENT_STATUS_LABELS,

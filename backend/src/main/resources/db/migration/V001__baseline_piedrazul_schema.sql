@@ -221,7 +221,7 @@ CREATE TABLE piedrazul.patient (
 
     CONSTRAINT pk_patient PRIMARY KEY (person_id),
     CONSTRAINT fk_patient_person FOREIGN KEY (person_id) REFERENCES piedrazul.person(id),
-    CONSTRAINT ck_patient_sex CHECK (sex IN ('MASCULINO', 'FEMENINO'))
+    CONSTRAINT ck_patient_sex CHECK (sex IN ('MASCULINO', 'FEMENINO', 'OTRO'))
 );
 
 -- ---------------------------------------------------------------------
@@ -293,7 +293,7 @@ CREATE TABLE piedrazul.appointment (
     CONSTRAINT fk_appointment_doctor FOREIGN KEY (doctor_id) REFERENCES piedrazul.doctor(person_id),
     CONSTRAINT fk_appointment_specialty FOREIGN KEY (specialty_code) REFERENCES piedrazul.specialty(code),
     CONSTRAINT fk_appointment_state FOREIGN KEY (state_code) REFERENCES piedrazul.appointment_state(code),
-    CONSTRAINT ck_appointment_scheduling_origin CHECK (scheduling_origin IN ('MANUAL', 'AUTONOMO'))
+    CONSTRAINT ck_appointment_scheduling_origin CHECK (scheduling_origin IN ('MANUAL', 'AUTONOMO', 'SIN_CITA'))
 );
 
 CREATE INDEX idx_appointment_patient ON piedrazul.appointment (patient_id);

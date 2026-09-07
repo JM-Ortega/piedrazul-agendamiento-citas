@@ -96,28 +96,14 @@ public class AppointmentConfig {
     }
 
     @Bean
-    public GetAvailableSlotsUseCase getAvailableSlotsUseCase(
+    public GetAvailableDatesAndSlotsUseCase getAvailableSlotsUseCase(
             AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             SlotTimeService slotTimeService) {
-        return new GetAvailableSlotsUseCaseImpl(
+        return new GetAvailableDatesAndSlotsUseCaseImpl(
                 appointmentRepository,
                 doctorConfigConsultPort,
                 slotTimeService
-        );
-    }
-
-    @Bean
-    public GetSpecialtiesWithDoctorUseCase getSpecialtiesWithDoctorUseCase(
-            AppointmentRepository appointmentRepository,
-            DoctorConfigConsultPort doctorConfigConsultPort,
-            SlotTimeService slotTimeService,
-            IsNewPatientUseCase isNewPatientUseCase) {
-        return new GetSpecialtiesWithDoctorUseCaseImpl(
-                appointmentRepository,
-                doctorConfigConsultPort,
-                slotTimeService,
-                isNewPatientUseCase
         );
     }
 
@@ -171,6 +157,21 @@ public class AppointmentConfig {
     @Bean
     public GetAutonomousSchedulingContidionUseCase getAutonomousSchedulingContidionUseCase(AppointmentConfigRepository appointmentConfigRepository) {
         return new GetAutonomousSchedulingContidionUseCaseImpl(appointmentConfigRepository);
+    }
+
+    @Bean
+    public RegisterUnscheduledAttentionUseCase registerUnscheduledAttentionUseCase(
+            DoctorConfigConsultPort doctorConfigConsultPort,
+            ClinicalHistoryPort clinicalHistoryPort,
+            ManualPatientResolutionStrategy manualPatientResolutionStrategy,
+            AppointmentRepository appointmentRepository
+    ){
+        return new RegisterUnscheduledAttentionUseCaseImpl(
+                doctorConfigConsultPort,
+                clinicalHistoryPort,
+                manualPatientResolutionStrategy,
+                appointmentRepository
+        );
     }
 
 }

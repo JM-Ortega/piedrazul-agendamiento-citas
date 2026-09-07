@@ -3,6 +3,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.domain.service;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 
+import java.time.LocalTime;
 import java.util.List;
 
 public class BusySlotService {

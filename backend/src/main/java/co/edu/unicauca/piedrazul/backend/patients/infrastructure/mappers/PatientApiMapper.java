@@ -42,6 +42,7 @@ public final class PatientApiMapper {
         return switch (source) {
             case MASCULINO -> Sex.MASCULINO;
             case FEMENINO -> Sex.FEMENINO;
+            case OTRO -> Sex.OTRO;
         };
     }
 
@@ -53,6 +54,7 @@ public final class PatientApiMapper {
         return switch (source) {
             case MASCULINO -> PatientSex.MASCULINO;
             case FEMENINO -> PatientSex.FEMENINO;
+            case OTRO -> PatientSex.OTRO;
         };
     }
 }

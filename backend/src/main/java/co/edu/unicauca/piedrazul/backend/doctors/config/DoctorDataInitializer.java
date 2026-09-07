@@ -2,7 +2,7 @@ package co.edu.unicauca.piedrazul.backend.doctors.config;
 
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.ScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
@@ -125,7 +125,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
                         "Doctor123!"
                 ),
                 new CreateDoctorRequest(
-                        List.of(SpecialtyCode.MEDICINA_GENERAL),
+                        List.of(SpecialtyCode.TERAPIA_NEURAL),
                         LocalDate.of(2026, 1, 1),
                         LocalDate.of(2026, 12, 31),
                         10,

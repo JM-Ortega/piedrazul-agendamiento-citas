@@ -4,19 +4,28 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentSta
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.service.BusySlotService;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.NoAvailableDoctorsException;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentExternalData;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSummary;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.SchedulerAppointmentSummary;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAvailableSlotsUseCase;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAvailableDatesAndSlotsUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AvailableDateSlots;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.DoctorsAvailability;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.ScheduleAvailability;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Workday;
 import org.springframework.stereotype.Service;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,17 +38,20 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
 
     private final AppointmentRepository appointmentRepository;
     private final DoctorConfigConsultPort doctorConfigConsultPort;
-    private final GetAvailableSlotsUseCase getAvailableSlotsUseCase;
+    private final GetAvailableDatesAndSlotsUseCase getAvailableDatesAndSlotsUseCase;
     private final IsNewPatientUseCase isNewPatientUseCase;
     private final PatientConsultPort patientConsultPort;
+    private final BusySlotService busySlotService;
 
     public AppointmentExternalServiceImpl(AppointmentRepository appointmentRepository, DoctorConfigConsultPort doctorConfigConsultPort,
-                                          GetAvailableSlotsUseCase getAvailableSlotsUseCase, IsNewPatientUseCase isNewPatientUseCase, PatientConsultPort patientConsultPort) {
+                                          GetAvailableDatesAndSlotsUseCase getAvailableDatesAndSlotsUseCase, IsNewPatientUseCase isNewPatientUseCase,
+                                          PatientConsultPort patientConsultPort, BusySlotService busySlotService) {
         this.appointmentRepository = appointmentRepository;
         this.doctorConfigConsultPort = doctorConfigConsultPort;
-        this.getAvailableSlotsUseCase = getAvailableSlotsUseCase;
+        this.getAvailableDatesAndSlotsUseCase = getAvailableDatesAndSlotsUseCase;
         this.isNewPatientUseCase = isNewPatientUseCase;
         this.patientConsultPort = patientConsultPort;
+        this.busySlotService = busySlotService;
     }
 
     @Override
@@ -123,22 +135,27 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
     }
 
     @Override
-    public boolean hasAvailableSlots(LocalDate date){
+    public boolean hasAvailableSlots(LocalDate date) {
+
         if (date.isBefore(LocalDate.now())) {
             return false;
         }
 
-        List<UUID> idsActiveDoctors = doctorConfigConsultPort.getActiveDoctorIds();
-        for (UUID id : idsActiveDoctors){
-            try {
-                List<AppointmentTime> availableSlots = getAvailableSlotsUseCase.getAvailableSlots(id, date);
-                if (!availableSlots.isEmpty()) {
-                    return true;
-                }
-            } catch (RuntimeException e) {
-                // El doctor no trabaja este día. Ignoramos el error y el for pasa al siguiente doctor.
+        List<UUID> idsActiveDoctors =
+                doctorConfigConsultPort.getActiveDoctorIds();
+
+        for (UUID idDoctor : idsActiveDoctors) {
+
+            List<AvailableDateSlots> availableDatesAndSlots =
+                    getAvailableDatesAndSlotsUseCase
+                            .getAvailableDatesAndSlots(idDoctor);
+
+            if (availableDatesAndSlots.stream()
+                    .anyMatch(dateSlots -> dateSlots.date().equals(date))) {
+                return true;
             }
         }
+
         return false;
     }
 
@@ -151,5 +168,96 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
     @Override
     public boolean isNewPatient(UUID patientId){
         return isNewPatientUseCase.isNewPatient(patientId);
+    }
+
+    @Override
+    public Set<UUID> calculateDoctorsAvailability(
+            List<DoctorsAvailability> doctorsAvailability
+    ) {
+        Set<UUID> availableDoctors = doctorsAvailability.stream()
+                .filter(this::hasAvailableSlot)
+                .map(DoctorsAvailability::personId)
+                .collect(Collectors.toSet());
+
+        if (availableDoctors.isEmpty()) {
+            throw new NoAvailableDoctorsException(
+                    "No hay medicos con espacios disponibles para el agendamiento."
+            );
+        }
+
+        return availableDoctors;
+    }
+
+    //Auxiliares
+
+    private boolean hasAvailableSlot(DoctorsAvailability doctor) {
+        LocalDate from = LocalDate.now();
+        LocalDate to = from.plusWeeks(doctor.bookingWindowWeeks());
+
+        return from.datesUntil(to.plusDays(1))
+                .filter(this::isWeekday)
+                .anyMatch(date -> hasAvailableSlotForDay(doctor, date));
+    }
+
+    private boolean hasAvailableSlotForDay(
+            DoctorsAvailability doctor,
+            LocalDate date
+    ) {
+        List<Appointment> appointments =
+                appointmentRepository.findByDoctorIdAndDate(
+                        doctor.personId(),
+                        date
+                );
+
+        return doctor.schedules().stream()
+                .filter(schedule -> isScheduleForDate(schedule, date))
+                .anyMatch(schedule -> hasAvailableSlotInSchedule(
+                        schedule,
+                        appointments,
+                        doctor.appointmentInterval()
+                ));
+    }
+
+    private boolean hasAvailableSlotInSchedule(
+            ScheduleAvailability schedule,
+            List<Appointment> appointments,
+            int interval
+    ) {
+        LocalTime current = schedule.startTime();
+
+        // Porque el la fecha final es el fin de todo poojemplo si es 12:00 no hay mas turnos a partir de ahi
+        // no es valida una cita hasta las 12:30 por lo tanto si el intervalo es de 09:00 - 12:00 y el intervalo
+        // de atención es de 30 min, solo se muestran slots hasta las 11:30 para que se acabe la jornada a las 12:00
+        while (!current.isAfter(schedule.endTime())) {
+            AppointmentTime slot =
+                    AppointmentTime.withoutBusinessHoursRestriction(current);
+
+            if (!busySlotService.isBusy(appointments, slot, interval)) {
+                return true;
+            }
+
+            current = current.plusMinutes(interval);
+        }
+
+        return false;
+    }
+
+    private boolean isScheduleForDate(
+            ScheduleAvailability schedule,
+            LocalDate date
+    ) {
+        return switch (date.getDayOfWeek()) {
+            case MONDAY -> schedule.workday() == Workday.LUNES;
+            case TUESDAY -> schedule.workday() == Workday.MARTES;
+            case WEDNESDAY -> schedule.workday() == Workday.MIERCOLES;
+            case THURSDAY -> schedule.workday() == Workday.JUEVES;
+            case FRIDAY -> schedule.workday() == Workday.VIERNES;
+            default -> false;
+        };
+    }
+
+    private boolean isWeekday(LocalDate date) {
+        return date.getDayOfWeek() != DayOfWeek.SATURDAY
+                && date.getDayOfWeek() != DayOfWeek.SUNDAY;
     }
 }

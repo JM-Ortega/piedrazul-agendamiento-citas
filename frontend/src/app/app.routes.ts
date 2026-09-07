@@ -17,6 +17,7 @@ import { PatientDashboardComponent } from './features/patient/patient-dashboard/
 import { RegistroComponent } from './features/registro/registro.component';
 import { SchedulerDashboardComponent } from './features/scheduler/pages/scheduler-dashboard/scheduler-dashboard.component';
 import { SchedulerHistoryComponent } from './features/scheduler/pages/scheduler-history/scheduler-history.component';
+import { DoctorUnscheduledAttentionComponent } from './features/doctor/components/unscheduledAttention/doctorUnscheduledAttention/doctorUnscheduledAttention.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -80,6 +81,19 @@ export const routes: Routes = [
     component: NewAppointmentDoctorComponent,
     canActivate: [AuthGuard],
     data: { role: 'DOCTOR' },
+  },
+  {
+    path: 'medico/atencion-sin-cita',
+    component: DoctorUnscheduledAttentionComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'DOCTOR' },
+  },
+  {
+    path: 'medico/control-medico/sin-cita',
+    component: DoctorMedicalHistoryComponent,
+    canActivate: [AuthGuard],
+    canDeactivate: [unsavedChangesGuard],
+    data: { role: 'DOCTOR', confirmExitLocally: true },
   },
   {
     path: 'medico/control-medico/:idAppointment',
