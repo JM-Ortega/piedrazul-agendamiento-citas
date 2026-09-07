@@ -14,13 +14,76 @@
       [suggestionToQuery]="suggestionToQuery"
       [isNotFoundError]="isNotFoundError"
       [prefillQuery]="prefillDocument"
-      (resultFound)="onFound($event)"
-      (resultNotFound)="onNotFound($event)"
+      (resultFound)="onResultFound($event)"
+      (resultNotFound)="onResultNotFound($event)"
+      (queryChanged)="onQueryChanged()"
     >
       <ng-template #suggestionItem let-s>
         <span class="font-medium text-blue-800">{{ s.identification }}</span>
         <span class="text-gray-500"> — {{ s.firstName }} {{ s.lastName }}</span>
       </ng-template>
     </app-search-suggestions>
+
+    @if (foundPatient(); as p) {
+      <div class="bg-green-50 border-2 border-green-300 rounded-2xl p-6 mt-4">
+        <div class="flex items-center gap-3 mb-4">
+          <svg lucideCheckCircle class="text-green-500" [size]="28"></svg>
+          <h3 class="text-green-800 text-xl font-semibold">
+            Paciente Encontrado
+          </h3>
+        </div>
+        <div class="grid grid-cols-3 gap-4 text-gray-700">
+          <div>
+            <p class="text-gray-500 text-sm">Nombre</p>
+            <p class="font-medium">{{ p.firstName }} {{ p.lastName }}</p>
+          </div>
+          <div>
+            <p class="text-gray-500 text-sm">Documento</p>
+            <p class="font-medium">{{ p.identification }}</p>
+          </div>
+          <div>
+            <p class="text-gray-500 text-sm">Género</p>
+            <p class="font-medium">{{ p.sex | formato }}</p>
+          </div>
+          <div>
+            <p class="text-gray-500 text-sm">Fecha de nacimiento</p>
+            <p class="font-medium">{{ formatLongDateEs(p.birthDate) }}</p>
+          </div>
+          <div>
+            <p class="text-gray-500 text-sm">Edad</p>
+            <p class="font-medium">{{ calculateAge(p.birthDate) }} años</p>
+          </div>
+          <div>
+            <p class="text-gray-500 text-sm">Celular</p>
+            <p class="font-medium">{{ p.phone }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-end gap-4 mt-6">
+        <div class="flex-1">
+          <label
+            for="specialty"
+            class="block text-gray-700 mb-1 text-sm font-medium"
+          >
+            Tipo de atención <span class="text-red-500">*</span>
+          </label>
+          <app-select
+            [id]="'specialty'"
+            [options]="specialtyOptions"
+            [ngModel]="selectedSpecialty()"
+            (valueChange)="onSpecialtyChange($event)"
+          ></app-select>
+        </div>
+
+        <app-button
+          variant="primary"
+          [disabled]="!selectedSpecialty()"
+          (buttonClick)="onContinue()"
+        >
+          Continuar →
+        </app-button>
+      </div>
+    }
   </div>
 </div>
