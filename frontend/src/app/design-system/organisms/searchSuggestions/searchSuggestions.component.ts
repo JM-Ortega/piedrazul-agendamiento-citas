@@ -69,6 +69,7 @@ export class SearchSuggestionsComponent<TSuggestion, TResult> {
 
   resultFound = output<TResult>();
   resultNotFound = output<string>();
+  queryChanged = output<string>();
 
   searchQuery = signal('');
   searchLoading = signal(false);
@@ -129,6 +130,7 @@ export class SearchSuggestionsComponent<TSuggestion, TResult> {
     }
     this.searchQuery.set(clean);
     this.searchError.set('');
+    this.queryChanged.emit(clean);
     if (clean.trim().length < this.minSuggestionChars) {
       this.searchSuggestions.set([]);
       this.showSuggestions.set(false);
