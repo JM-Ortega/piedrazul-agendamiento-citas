@@ -154,9 +154,7 @@ export class DoctorEditFormComponent implements OnInit {
     const willOpen = !this.showDaySchedules();
     this.showDaySchedules.set(willOpen);
     if (willOpen) {
-      scrollToElementById(`day-schedules-${this.doctor().id}`, {
-        behavior: 'smooth',
-      });
+      scrollToElementById(`day-schedules-${this.doctor().id}`);
     }
   }
   /** True si hay cambios, no hay errores pendientes y no se está guardando ya. */

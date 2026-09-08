@@ -153,9 +153,7 @@ export class AdminDoctorsComponent implements OnInit {
     this.editingDoctorId.set(doctor.id);
     this.editingSpecialties.set([...doctor.specialties]);
     this.editingHasScheduler.set(doctor.roles.includes('SCHEDULER'));
-    scrollToElementById(`doctor-card-${doctor.id}`, {
-      behavior: 'smooth',
-    });
+    scrollToElementById(`doctor-card-${doctor.id}`);
   }
   handleCancel(): void {
     this.editingDoctorId.set(null);

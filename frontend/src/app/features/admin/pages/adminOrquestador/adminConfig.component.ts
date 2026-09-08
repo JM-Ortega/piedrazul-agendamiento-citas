@@ -165,9 +165,7 @@ export class AdminConfigComponent implements OnInit {
   startEdit(doctor: Doctor): void {
     this.editingId.set(doctor.id);
     this.savedId.set(null);
-    scrollToElementById(`doctor-card-${doctor.id}`, {
-      behavior: 'smooth',
-    });
+    scrollToElementById(`doctor-card-${doctor.id}`);
   }
 
   cancelEdit(): void {

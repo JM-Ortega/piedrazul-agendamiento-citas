@@ -128,9 +128,7 @@ export class CreateUserDoctorFormComponent {
   toggleSchedule(): void {
     this.scheduleOpened = !this.scheduleOpened;
     if (this.scheduleOpened) {
-      scrollToElementById('error-anchor-workDays', {
-        behavior: 'smooth',
-      });
+      scrollToElementById('error-anchor-workDays');
     }
   }
   // ── Especialidades y Perido Laboral ───────────────────────────────────────

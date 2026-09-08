@@ -199,9 +199,10 @@ export class AdminCreateUserComponent implements OnInit {
         this.cdr.markForCheck();
       },
       error: (err: AppError) => {
-        this.loadErrorSpecialties = err.message;
-        this.loadingSpecialties = false;
+        this.isSubmitting = false;
+        this.submitError = err.message;
         this.cdr.markForCheck();
+        scrollToElementById('submit-error-banner');
       },
     });
     this.loadingDocumentTypes = true;
@@ -229,11 +230,8 @@ export class AdminCreateUserComponent implements OnInit {
       this.selectedRoles = [...this.selectedRoles, role];
     }
     if (this.submitted) this.validateField('roles');
-    scrollToElementById('basic-info-section', {
-      behavior: 'smooth',
-    });
+    scrollToElementById('basic-info-section');
   }
-
   /**
    * Aplica el parche del sub-formulario de doctor a userForm. Si un campo
    * del grupo de horario cambió, revalida todo el grupo (son interdependientes).

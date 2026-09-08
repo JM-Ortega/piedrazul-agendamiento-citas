@@ -82,9 +82,8 @@ export class DoctorAllAppointmentsComponent {
   private appointmentsState = new PaginatedState<AppointmentsPatient>();
   pagination = this.appointmentsState.pagination;
   readonly PAGE_SIZE = 4;
-  /** Evita recargar datos en cada emisión de keycloakEvent; solo la primera vez. */
   private loaded = signal(false);
-
+  private todayAppointmentsState = signal<AppointmentsPatient[]>([]);
   filterDate = signal('');
   filterStatus = signal('');
   errorCarga = signal('');
@@ -137,22 +136,23 @@ export class DoctorAllAppointmentsComponent {
   };
 
   // ── Computed ──────────────────────────────────────────────────────────────
-  /** True si hay al menos una cita de hoy que no esté cancelada (habilita exportar). */
+  /** True si hay al menos una cita de hoy que no esté cancelada (independiente de la página mostrada). */
   hasTodayAppointments = computed(() =>
-    this.appointmentsState
-      .content()
-      .some((a) => a.date === this.today && a.appointmentState !== 'CANCELADA')
+    this.todayAppointmentsState().some(
+      (a) => a.appointmentState !== 'CANCELADA'
+    )
   );
+  /** True si el doctor tiene al menos una cita en total, sin importar la página mostrada. */
   hasAnyAppointments = computed(
-    () => this.appointmentsState.content().length > 0
+    () =>
+      (this.pagination()?.totalElements ??
+        this.appointmentsState.content().length) > 0
   );
 
-  /** Citas del día de hoy, para el modal de exportación. */
-  todayAppointmentsList = computed(() =>
-    this.appointmentsState.content().filter((a) => a.date === this.today)
-  );
+  /** Citas del día de hoy, para el modal de exportación (independiente de la página mostrada). */
+  todayAppointmentsList = computed(() => this.todayAppointmentsState());
 
-  /** Citas de la página actual, filtradas por fecha/estado y ordenadas de más reciente a más antigua. */
+  /** Citas de la página actual, filtradas por fecha/estado, en el mismo orden que las entrega el backend. */
   filteredAppointments = computed(() => {
     let result = this.appointmentsState.content();
 
@@ -162,10 +162,7 @@ export class DoctorAllAppointmentsComponent {
     if (this.filterDate())
       result = result.filter((a) => a.date === this.filterDate());
 
-    return [...result].sort((a, b) => {
-      const d = b.date.localeCompare(a.date);
-      return d !== 0 ? d : b.startTime.localeCompare(a.startTime);
-    });
+    return result;
   });
 
   stats = computed(() => ({
@@ -226,7 +223,7 @@ export class DoctorAllAppointmentsComponent {
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
-  /** Obtiene el doctor autenticado y luego sus citas paginadas. */
+  /** Obtiene el doctor autenticado y luego sus citas paginadas + las de hoy. */
   private loadData(pageNumber = 0): void {
     this.errorCarga.set('');
     this.doctorService.getMe().subscribe({
@@ -236,18 +233,39 @@ export class DoctorAllAppointmentsComponent {
           return;
         }
         this.currentDoctor.set(doctor);
+
         this.doctorService
           .getAppointmentsByDoctor(doctor.id, pageNumber, this.PAGE_SIZE)
           .subscribe({
             next: (response) => this.appointmentsState.set(response),
             error: (err: AppError) => this.errorCarga.set(err.message),
           });
+
+        this.loadTodayAppointments(doctor.id);
       },
       error: (err: AppError) => {
         this.errorCarga.set(err.message);
         this.router.navigate(['/']);
       },
     });
+  }
+
+  /**
+   * Carga las citas de hoy del doctor en una petición aparte, no ligada a la
+   * paginación de la tabla.
+   */
+  private loadTodayAppointments(doctorId: string): void {
+    const TODAY_FETCH_SIZE = 200;
+    this.doctorService
+      .getAppointmentsByDoctor(doctorId, 0, TODAY_FETCH_SIZE)
+      .subscribe({
+        next: (response) => {
+          this.todayAppointmentsState.set(
+            response.content.filter((a) => a.date === this.today)
+          );
+        },
+        error: () => this.todayAppointmentsState.set([]),
+      });
   }
 
   onPageChange(pageNumber: number): void {
