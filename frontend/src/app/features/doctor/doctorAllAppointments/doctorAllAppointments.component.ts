@@ -9,10 +9,12 @@ import {
 import { Router } from '@angular/router';
 import {
   LucideCalendar,
+  LucideChevronDown,
   LucideClock,
   LucideCreditCard,
   LucideDownload,
   LucideFileSpreadsheet,
+  LucideFilter,
 } from '@lucide/angular';
 import { KEYCLOAK_EVENT_SIGNAL } from 'keycloak-angular';
 import { DoctorService } from '../../../core/services/doctor.service';
@@ -31,6 +33,7 @@ import {
   getMonthShort,
 } from '../../../shared/helpers/date-format';
 import { PaginatedState } from '../../../shared/helpers/paginated-state';
+import { scrollToElementById } from '../../../shared/helpers/scroll-to-element';
 import { toIsoDateString } from '../../../shared/helpers/transform-date-local';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { AppError } from '../../../shared/models/interfaces/api-error.model';
@@ -59,9 +62,11 @@ interface ColumnDef {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideCalendar,
+    LucideChevronDown,
     LucideClock,
     LucideCreditCard,
     LucideDownload,
+    LucideFilter,
     LucideFileSpreadsheet,
     ExportModalComponent,
     PaginationComponent,
@@ -78,13 +83,15 @@ export class DoctorAllAppointmentsComponent {
   currentDoctor = signal<Doctor | null>(null);
   private appointmentsState = new PaginatedState<AppointmentsPatient>();
   pagination = this.appointmentsState.pagination;
-  readonly PAGE_SIZE = 3;
+  readonly PAGE_SIZE = 4;
   private loaded = signal(false);
 
   filterDate = signal('');
   filterStatus = signal('');
   errorCarga = signal('');
   showExportModal = signal(false);
+  /** Controla si el panel de filtros está desplegado. */
+  filtersOpen = signal(false);
   getMonthShort = getMonthShort;
   formatDate = formatLongDateEs;
 
@@ -173,6 +180,12 @@ export class DoctorAllAppointmentsComponent {
     status: this.filterStatus(),
   }));
 
+  /** Cantidad de filtros con un valor asignado actualmente. */
+  activeFilterCount = computed(
+    () => [this.filterDate(), this.filterStatus()].filter(Boolean).length
+  );
+  hasActiveFilters = computed(() => this.activeFilterCount() > 0);
+
   filterFields = computed<FilterFieldConfig[]>(() => {
     const statusOptions = [
       { value: 'AGENDADA', label: 'Agendadas' },
@@ -257,5 +270,16 @@ export class DoctorAllAppointmentsComponent {
   onApplyFilters(filters: FilterValues): void {
     this.filterDate.set(filters['date'] ?? '');
     this.filterStatus.set(filters['status'] ?? '');
+  }
+
+  /** Alterna la visibilidad del panel de filtros. */
+  toggleFilters(): void {
+    const willOpen = !this.filtersOpen();
+    this.filtersOpen.set(willOpen);
+    if (willOpen) {
+      scrollToElementById('filters-panel', {
+        offset: 12,
+      });
+    }
   }
 }
