@@ -20,18 +20,15 @@ import {
   SelectOption,
 } from '../../../../design-system/atoms/select/select.component';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+import { parseLocalDateString } from '../../../../shared/helpers/transform-date-local';
 import { BookingStateService } from '../../services/booking-state.service';
-import { CalendarService } from '../../services/calendar.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 
 /**
- * Pantalla única de agendamiento: reemplaza a los antiguos
- * booking-specialty-selector y booking-schedule-selector.
- *
- * Muestra, según el contexto, el selector de médico (y de especialidad
- * cuando aplica), y a medida que se completa cada dato va revelando el
- * calendario y luego las horas disponibles en la misma pantalla.
+ * Pantalla única de agendamiento. Dependiendo del contexto:
+ * - `MANUAL`: agendador/médico selecciona especialidad, médico, fecha y hora.
+ * - `AUTONOMO`: paciente selecciona médico, fecha y hora.
  */
 @Component({
   selector: 'app-booking-scheduling',
@@ -55,13 +52,11 @@ import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 export class BookingSchedulingComponent implements OnInit {
   protected state = inject(BookingStateService);
   private citaService = inject(NuevaCitaService);
-  private calendarService = inject(CalendarService);
 
   ngOnInit(): void {
     window.scrollTo(0, 0);
   }
 
-  // Estado local: errores y disponibilidad de slots
   noSlotsAvailable = false;
   errorMessageSlots = '';
   globalErrorMessageSlots = signal('');
@@ -80,27 +75,28 @@ export class BookingSchedulingComponent implements OnInit {
       .map((s) => ({ value: s, label: formatoPipe.transform(s) }));
   });
 
+  private readonly parsedAvailableDates = computed(() =>
+    this.state
+      .availableDateSlots()
+      .map((d) => parseLocalDateString(d.date))
+      .sort((a, b) => a.getTime() - b.getTime())
+  );
+
   readonly dateFilter = computed(() => {
-    const doctor = this.state.selectedDoctor();
-    if (!doctor) return () => false;
-    return this.calendarService.buildDateFilter(
-      doctor,
-      this.state.isSchedulerContext() || this.state.isDoctorContext()
-    );
+    const availableDates = this.state.availableDatesSet();
+    return (date: Date | null): boolean => {
+      if (!date) return false;
+      return availableDates.has(this.state.formatLocalDate(date));
+    };
   });
 
-  readonly minDate = computed(() => {
-    const doctor = this.state.selectedDoctor();
-    return this.calendarService.getMinDate(
-      doctor,
-      this.state.isSchedulerContext() || this.state.isDoctorContext()
-    );
-  });
+  readonly minDate = computed(
+    () => this.parsedAvailableDates()[0] ?? new Date()
+  );
 
   readonly maxDate = computed(() => {
-    const doctor = this.state.selectedDoctor();
-    if (!doctor) return this.calendarService.getMinDate(doctor);
-    return this.calendarService.getMaxDate(doctor);
+    const dates = this.parsedAvailableDates();
+    return dates.length ? dates[dates.length - 1] : new Date();
   });
 
   readonly startAt = computed(
@@ -110,6 +106,7 @@ export class BookingSchedulingComponent implements OnInit {
   onDoctorChange(doctorId: string): void {
     this.state.selectDoctor(doctorId);
     this.resetSlotState();
+    this.loadAvailableDateSlots(doctorId);
   }
 
   onSpecialtyChange(specialty: string): void {
@@ -124,31 +121,22 @@ export class BookingSchedulingComponent implements OnInit {
     if (!date) return;
 
     const dateStr = this.state.formatLocalDate(date);
+    let slots = this.state.slotsForDate(dateStr);
 
-    this.citaService
-      .getAvailableSlots(this.state.selectedDoctorId(), dateStr)
-      .subscribe({
-        next: (slots) => {
-          if (this.state.isSchedulerContext() || this.state.isDoctorContext()) {
-            const today = this.state.formatLocalDate(new Date());
-            if (dateStr === today) {
-              const cutoff = new Date(Date.now() + 10 * 60 * 1000);
-              const cutoffStr = `${String(cutoff.getHours()).padStart(2, '0')}:${String(cutoff.getMinutes()).padStart(2, '0')}`;
-              slots = slots.filter((s) => s >= cutoffStr);
-            }
-          }
-          this.state.availableSlots.set(slots);
-          if (!slots || slots.length === 0) {
-            this.noSlotsAvailable = true;
-            this.errorMessageSlots =
-              'No hay horarios disponibles para esta fecha.';
-          }
-        },
-        error: (err: AppError) => {
-          this.state.availableSlots.set([]);
-          this.globalErrorMessageSlots.set(err.message);
-        },
-      });
+    if (this.state.isSchedulerContext() || this.state.isDoctorContext()) {
+      const today = this.state.formatLocalDate(new Date());
+      if (dateStr === today) {
+        const cutoff = new Date(Date.now() + 10 * 60 * 1000);
+        const cutoffStr = `${String(cutoff.getHours()).padStart(2, '0')}:${String(cutoff.getMinutes()).padStart(2, '0')}`;
+        slots = slots.filter((s) => s >= cutoffStr);
+      }
+    }
+
+    this.state.availableSlots.set(slots);
+    if (!slots || slots.length === 0) {
+      this.noSlotsAvailable = true;
+      this.errorMessageSlots = 'No hay horarios disponibles para esta fecha.';
+    }
   }
 
   goToConfirm(): void {
@@ -157,6 +145,17 @@ export class BookingSchedulingComponent implements OnInit {
 
   goBack(): void {
     this.back.emit();
+  }
+
+  private loadAvailableDateSlots(doctorId: string): void {
+    if (!doctorId) return;
+    this.citaService.getAvailableDateSlots(doctorId).subscribe({
+      next: (slots) => this.state.availableDateSlots.set(slots),
+      error: (err: AppError) => {
+        this.state.availableDateSlots.set([]);
+        this.globalErrorMessageSlots.set(err.message);
+      },
+    });
   }
 
   private resetSlotState(): void {
