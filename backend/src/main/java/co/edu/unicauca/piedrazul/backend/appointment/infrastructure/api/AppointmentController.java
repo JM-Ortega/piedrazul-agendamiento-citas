@@ -15,12 +15,10 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.inpu
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.RegisterUnscheduledAttentionRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentResponse;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AvailableDateSlots;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.PageResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.CitaDtoMapper;
 
 import jakarta.validation.Valid;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,14 +27,12 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/appointments")
 public class AppointmentController {
-    private final GetAvailableDatesAndSlotsUseCase getAvailableDatesAndSlotsUseCase;
     private final ListAppointmentsUseCase listAppointmentsUseCase;
     private final CitaDtoMapper citaDtoMapper;
     private final ListMyAppointmentsUseCase listMyAppointmentsUseCase;
@@ -54,9 +50,7 @@ public class AppointmentController {
     private final PatientConsultPort patientConsultPort;
     private final DoctorConfigConsultPort doctorConfigConsultPort;
 
-
     public AppointmentController(
-            GetAvailableDatesAndSlotsUseCase getAvailableDatesAndSlotsUseCase,
             ListAppointmentsUseCase listAppointmentsUseCase,
             CitaDtoMapper citaDtoMapper,
             ListMyAppointmentsUseCase listMyAppointmentsUseCase,
@@ -72,7 +66,6 @@ public class AppointmentController {
             AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy,
             PatientConsultPort patientConsultPort,
             DoctorConfigConsultPort doctorConfigConsultPort) {
-        this.getAvailableDatesAndSlotsUseCase = getAvailableDatesAndSlotsUseCase;
         this.listAppointmentsUseCase = listAppointmentsUseCase;
         this.citaDtoMapper = citaDtoMapper;
         this.listMyAppointmentsUseCase = listMyAppointmentsUseCase;
@@ -90,7 +83,8 @@ public class AppointmentController {
         this.doctorConfigConsultPort = doctorConfigConsultPort;
     }
 
-    //Permite cambiar la condicion para el agendamiento autonomo. (Activo o no activo)
+    // Permite cambiar la condicion para el agendamiento autonomo. (Activo o no
+    // activo)
     @PutMapping("/config/autonomous-scheduling")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> setAutonomousSchedulingEnabled(@RequestParam boolean enabled) {
@@ -98,7 +92,8 @@ public class AppointmentController {
         return ResponseEntity.ok().build();
     }
 
-    // Obtener la condicion del estado del agendamiento autonomo (Activo o no activo)
+    // Obtener la condicion del estado del agendamiento autonomo (Activo o no
+    // activo)
     @GetMapping("/config/autonomous-scheduling")
     @PreAuthorize("hasAnyRole('ADMIN', 'SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<Boolean> getAutonomousSchedulingStatus() {
@@ -106,19 +101,8 @@ public class AppointmentController {
         return ResponseEntity.ok(enabled);
     }
 
-    // Fechas y slots disponbles para agendar con el doctor
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    @GetMapping("/slots") 
-    public ResponseEntity<List<AvailableDateSlots>> getAvailableDateSlots(
-            @RequestParam UUID doctorId) {
-
-        List<AvailableDateSlots> datesAndSlots = getAvailableDatesAndSlotsUseCase
-                .getAvailableDatesAndSlots(doctorId);
-
-        return ResponseEntity.ok(datesAndSlots);
-    }
-
-    // Un unico método para listar por idDoctor, idPatient, fecha, estado o combinaciones.
+    // Un unico método para listar por idDoctor, idPatient, fecha, estado o
+    // combinaciones.
     @GetMapping
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<PageResponse<AppointmentResponse>> list(
@@ -129,7 +113,8 @@ public class AppointmentController {
         UUID userId = UUID.fromString(jwt.getSubject());
 
         if (hasRole(authentication, "SCHEDULER")) {
-            // Sin restricción — puede filtrar libremente por cualquier doctor/paciente/fecha/estado
+            // Sin restricción — puede filtrar libremente por cualquier
+            // doctor/paciente/fecha/estado
         } else if (hasRole(authentication, "PATIENT")) {
             UUID idPatient = patientConsultPort.findByUserId(userId)
                     .map(PatientSnapshot::idPatient)
@@ -142,17 +127,16 @@ public class AppointmentController {
                             "Doctor no encontrado para el userId: " + userId));
             request.setIdDoctor(idDoctor);
         }
-        // SCHEDULER no se restringe: puede filtrar libremente por cualquier doctor/paciente
+        // SCHEDULER no se restringe: puede filtrar libremente por cualquier
+        // doctor/paciente
 
         PageQuery pageQuery = request.toPageQuery();
         PagedResult<Appointment> appointmentPage = listAppointmentsUseCase.listBy(
-                request.getIdDoctor(), request.getIdPatient(), request.getDate(), request.getState(), pageQuery
-        );
+                request.getIdDoctor(), request.getIdPatient(), request.getDate(), request.getState(), pageQuery);
 
         List<AppointmentResponse> content = citaDtoMapper.toResponseList(appointmentPage.content());
         return ResponseEntity.ok(PageResponse.from(appointmentPage, content));
     }
-
 
     @GetMapping("/me")
     @PreAuthorize("hasRole('PATIENT')")
@@ -165,12 +149,11 @@ public class AppointmentController {
                 listMyAppointmentsUseCase.execute(userId)
                         .stream()
                         .map(citaDtoMapper::toResponse)
-                        .toList()
-        );
+                        .toList());
     }
 
     // Sirve para saber si un paciente es nuevo
-    @GetMapping({"/{patientId}/is-new-patient"})
+    @GetMapping({ "/{patientId}/is-new-patient" })
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
     public ResponseEntity<Boolean> isNewPatient(@PathVariable UUID patientId) {
         return ResponseEntity.ok(isNewPatientUseCase.isNewPatient(patientId));
@@ -206,15 +189,13 @@ public class AppointmentController {
                             request.getGender(),
                             request.getBirthDate(),
                             request.getEmail(),
-                            request.getGuardianPhone()
-                    ),
+                            request.getGuardianPhone()),
                     request.getDoctorId(),
                     request.getSpecialty(),
                     request.getDate(),
                     new AppointmentTime(request.getStartTime()),
                     performedBy,
-                    manualPatientResolutionStrategy
-            );
+                    manualPatientResolutionStrategy);
 
             case AUTONOMO -> appointmentSchedulingService.scheduleAutonomous(
                     PatientSchedulingContext.autonomous(request.getPatientId()),
@@ -223,8 +204,7 @@ public class AppointmentController {
                     request.getDate(),
                     new AppointmentTime(request.getStartTime()),
                     performedBy,
-                    autonomousPatientResolutionStrategy
-            );
+                    autonomousPatientResolutionStrategy);
         }
 
         return ResponseEntity.status(HttpStatus.CREATED).build();
@@ -243,18 +223,18 @@ public class AppointmentController {
         PatientSchedulingContext patientContext = PatientSchedulingContext.manual(
                 request.getDocumentType(), request.getDocumentNumber(), request.getFirstName(),
                 request.getLastName(), request.getPhone(), request.getGender(),
-                request.getBirthDate(), request.getEmail(), request.getGuardianPhone()
-        );
+                request.getBirthDate(), request.getEmail(), request.getGuardianPhone());
 
-        registerUnscheduledAttentionUseCase.register(idDoctor, patientContext, request.getSpecialty(), request.getMedicalCheckup());
+        registerUnscheduledAttentionUseCase.register(idDoctor, patientContext, request.getSpecialty(),
+                request.getMedicalCheckup());
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     // Actualizar el estado de una cita a atendida y crear su HC asociada
     @PutMapping("/{appointmentId}/mark-as-attended")
     @PreAuthorize("hasRole('DOCTOR')")
-    public ResponseEntity<Void> markAppointmentAsAttended(@PathVariable UUID appointmentId
-        , @RequestBody(required = false) ClinicalHistoryDescription request) {
+    public ResponseEntity<Void> markAppointmentAsAttended(@PathVariable UUID appointmentId,
+            @RequestBody(required = false) ClinicalHistoryDescription request) {
         String description = (request != null) ? request.description() : null;
         updateAppointmentStatusUseCase.markAsAttended(appointmentId, description);
         return ResponseEntity.ok().build();
@@ -268,7 +248,7 @@ public class AppointmentController {
         return ResponseEntity.ok().build();
     }
 
-    //Cancelar una cita
+    // Cancelar una cita
     @PutMapping("/{appointmentId}/cancel")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT')")
     public ResponseEntity<Void> cancelAppointment(
@@ -278,7 +258,7 @@ public class AppointmentController {
 
         UUID patientId = null;
 
-        if(hasRole(authentication, "PATIENT")){
+        if (hasRole(authentication, "PATIENT")) {
             UUID userId = UUID.fromString(jwt.getSubject());
             patientId = patientConsultPort.findByUserId(userId)
                     .map(PatientSnapshot::idPatient)

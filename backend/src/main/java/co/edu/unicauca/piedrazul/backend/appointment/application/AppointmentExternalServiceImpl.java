@@ -5,7 +5,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.BusySlotService;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.service.SlotTimeService;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.NoAvailableDoctorsException;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentExternalData;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
@@ -16,7 +15,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTim
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAvailableDatesAndSlotsUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AvailableDateSlots;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.DoctorsAvailability;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.ScheduleAvailability;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
@@ -43,9 +41,10 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
     private final PatientConsultPort patientConsultPort;
     private final BusySlotService busySlotService;
 
-    public AppointmentExternalServiceImpl(AppointmentRepository appointmentRepository, DoctorConfigConsultPort doctorConfigConsultPort,
-                                          GetAvailableDatesAndSlotsUseCase getAvailableDatesAndSlotsUseCase, IsNewPatientUseCase isNewPatientUseCase,
-                                          PatientConsultPort patientConsultPort, BusySlotService busySlotService) {
+    public AppointmentExternalServiceImpl(AppointmentRepository appointmentRepository,
+            DoctorConfigConsultPort doctorConfigConsultPort,
+            GetAvailableDatesAndSlotsUseCase getAvailableDatesAndSlotsUseCase, IsNewPatientUseCase isNewPatientUseCase,
+            PatientConsultPort patientConsultPort, BusySlotService busySlotService) {
         this.appointmentRepository = appointmentRepository;
         this.doctorConfigConsultPort = doctorConfigConsultPort;
         this.getAvailableDatesAndSlotsUseCase = getAvailableDatesAndSlotsUseCase;
@@ -65,12 +64,11 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
                 doctorName,
                 appointment.getIdPatient(),
                 appointment.getAppointmentState().name(),
-                appointment.getDate()
-        );
+                appointment.getDate());
     }
 
     @Override
-    public List<AppointmentSummary> findByDoctorAndDate(UUID idDoctor, LocalDate date, String state){
+    public List<AppointmentSummary> findByDoctorAndDate(UUID idDoctor, LocalDate date, String state) {
 
         List<Appointment> appointments = (state != null)
                 ? appointmentRepository.findByDoctorIdAndDateAndState(idDoctor, date, state)
@@ -96,14 +94,13 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
                             a.getDate(),
                             a.getStartTime().getTime(),
                             a.getSpecialty().name(),
-                            a.getAppointmentState().name()
-                    );
+                            a.getAppointmentState().name());
                 }).toList();
 
     }
 
     @Override
-    public UUID getPattientIdByAppointmentId(UUID appointmentId){
+    public UUID getPattientIdByAppointmentId(UUID appointmentId) {
         return appointmentRepository.getPattientIdByAppointmentId(appointmentId);
     }
 
@@ -114,7 +111,8 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
                 .filter(a -> a.getAppointmentState() == AppointmentState.AGENDADA)
                 .toList();
 
-        // Aquí sí hay múltiples doctores distintos — usa el método en lote que YA existe en el puerto
+        // Aquí sí hay múltiples doctores distintos — usa el método en lote que YA
+        // existe en el puerto
         Set<UUID> doctorIds = appointments.stream().map(Appointment::getIdDoctor).collect(Collectors.toSet());
         Map<UUID, String> doctorNamesById = doctorConfigConsultPort.getDoctorInfoByIds(doctorIds.stream().toList())
                 .stream()
@@ -129,8 +127,7 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
                     return new SchedulerAppointmentSummary(
                             doctorNamesById.get(a.getIdDoctor()),
                             patient.getFirstName() + " " + patient.getLastName(),
-                            a.getStartTime().getTime()
-                    );
+                            a.getStartTime().getTime());
                 }).toList();
     }
 
@@ -141,17 +138,14 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
             return false;
         }
 
-        List<UUID> idsActiveDoctors =
-                doctorConfigConsultPort.getActiveDoctorIds();
+        List<UUID> idsActiveDoctors = doctorConfigConsultPort.getActiveDoctorIds();
 
         for (UUID idDoctor : idsActiveDoctors) {
 
-            List<AvailableDateSlots> availableDatesAndSlots =
-                    getAvailableDatesAndSlotsUseCase
-                            .getAvailableDatesAndSlots(idDoctor);
+            List<LocalDate> availableDates = getAvailableDatesAndSlotsUseCase
+                    .getAvailableDates(idDoctor);
 
-            if (availableDatesAndSlots.stream()
-                    .anyMatch(dateSlots -> dateSlots.date().equals(date))) {
+            if (availableDates.contains(date)) {
                 return true;
             }
         }
@@ -160,20 +154,19 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
     }
 
     @Override
-    public boolean hasScheduledAppointments(UUID doctorID){
+    public boolean hasScheduledAppointments(UUID doctorID) {
         List<Appointment> appointments = appointmentRepository.findByDoctorIdAndState(doctorID, "AGENDADA");
         return !appointments.isEmpty();
     }
 
     @Override
-    public boolean isNewPatient(UUID patientId){
+    public boolean isNewPatient(UUID patientId) {
         return isNewPatientUseCase.isNewPatient(patientId);
     }
 
     @Override
     public Set<UUID> calculateDoctorsAvailability(
-            List<DoctorsAvailability> doctorsAvailability
-    ) {
+            List<DoctorsAvailability> doctorsAvailability) {
         Set<UUID> availableDoctors = doctorsAvailability.stream()
                 .filter(this::hasAvailableSlot)
                 .map(DoctorsAvailability::personId)
@@ -181,14 +174,23 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
 
         if (availableDoctors.isEmpty()) {
             throw new NoAvailableDoctorsException(
-                    "No hay medicos con espacios disponibles para el agendamiento."
-            );
+                    "No hay medicos con espacios disponibles para el agendamiento.");
         }
 
         return availableDoctors;
     }
 
-    //Auxiliares
+    @Override
+    public List<LocalDate> getAvailableDates(UUID doctorId) {
+        return getAvailableDatesAndSlotsUseCase.getAvailableDates(doctorId);
+    }
+
+    @Override
+    public List<LocalTime> getAvailableSlots(UUID doctorId, LocalDate date) {
+        return getAvailableDatesAndSlotsUseCase.getAvailableSlots(doctorId, date);
+    }
+
+    // Auxiliares
 
     private boolean hasAvailableSlot(DoctorsAvailability doctor) {
         LocalDate from = LocalDate.now();
@@ -201,36 +203,33 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
 
     private boolean hasAvailableSlotForDay(
             DoctorsAvailability doctor,
-            LocalDate date
-    ) {
-        List<Appointment> appointments =
-                appointmentRepository.findByDoctorIdAndDate(
-                        doctor.personId(),
-                        date
-                );
+            LocalDate date) {
+        List<Appointment> appointments = appointmentRepository.findByDoctorIdAndDate(
+                doctor.personId(),
+                date);
 
         return doctor.schedules().stream()
                 .filter(schedule -> isScheduleForDate(schedule, date))
                 .anyMatch(schedule -> hasAvailableSlotInSchedule(
                         schedule,
                         appointments,
-                        doctor.appointmentInterval()
-                ));
+                        doctor.appointmentInterval()));
     }
 
     private boolean hasAvailableSlotInSchedule(
             ScheduleAvailability schedule,
             List<Appointment> appointments,
-            int interval
-    ) {
+            int interval) {
         LocalTime current = schedule.startTime();
 
-        // Porque el la fecha final es el fin de todo poojemplo si es 12:00 no hay mas turnos a partir de ahi
-        // no es valida una cita hasta las 12:30 por lo tanto si el intervalo es de 09:00 - 12:00 y el intervalo
-        // de atención es de 30 min, solo se muestran slots hasta las 11:30 para que se acabe la jornada a las 12:00
+        // Porque el la fecha final es el fin de todo poojemplo si es 12:00 no hay mas
+        // turnos a partir de ahi
+        // no es valida una cita hasta las 12:30 por lo tanto si el intervalo es de
+        // 09:00 - 12:00 y el intervalo
+        // de atención es de 30 min, solo se muestran slots hasta las 11:30 para que se
+        // acabe la jornada a las 12:00
         while (!current.isAfter(schedule.endTime())) {
-            AppointmentTime slot =
-                    AppointmentTime.withoutBusinessHoursRestriction(current);
+            AppointmentTime slot = AppointmentTime.withoutBusinessHoursRestriction(current);
 
             if (!busySlotService.isBusy(appointments, slot, interval)) {
                 return true;
@@ -244,8 +243,7 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
 
     private boolean isScheduleForDate(
             ScheduleAvailability schedule,
-            LocalDate date
-    ) {
+            LocalDate date) {
         return switch (date.getDayOfWeek()) {
             case MONDAY -> schedule.workday() == Workday.LUNES;
             case TUESDAY -> schedule.workday() == Workday.MARTES;
