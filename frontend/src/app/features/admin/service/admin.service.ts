@@ -130,18 +130,14 @@ export class AdminService {
    * Deshabilita a un médico en el sistema.
    *
    * @param doctorId - Identificador del médico.
-   * @param force - Si es `true`, fuerza la deshabilitación aunque el médico
-   * tenga citas u horarios pendientes asociados. Por defecto `false`.
    * @returns Observable que completa sin contenido si la deshabilitación fue exitosa.
    */
-  disableDoctor(doctorId: string, force = false): Observable<void> {
+  disableDoctor(doctorId: string): Observable<void> {
     return this.http.put<void>(
       `${this.apiUrl}/doctor/${doctorId}/disable`,
-      null,
-      { params: { force } }
+      null
     );
   }
-
   // ── Schedules ─────────────────────────────────────────────────────────────
 
   /**

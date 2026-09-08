@@ -90,7 +90,7 @@
             <div
               [id]="'doctor-card-' + doctor.id"
               animate.enter="card-enter-animation"
-              class="border rounded-xl transition-all scroll-mt-[calc(var(--navbar-height,80px)+12px)]"
+              class="border rounded-xl transition-all"
               [class]="containerClass(doctor)"
               [class.lg:col-span-2]="editingId() === doctor.id"
             >
@@ -170,10 +170,6 @@
     [doctorToToggle]="doctorToToggle()"
     (confirmToggle)="onConfirmToggle()"
     (closeToggleModal)="onCloseToggleModal()"
-    [showForceModal]="showForceModal()"
-    [forceModalMessage]="forceModalMessage()"
-    (confirmForceDisable)="onConfirmForceDisable()"
-    (cancelForceDisable)="onCancelForceDisable()"
     [showErrorModal]="showErrorModal()"
     [errorGuardado]="errorGuardado()"
     (closeErrorModal)="onCloseErrorModal()"

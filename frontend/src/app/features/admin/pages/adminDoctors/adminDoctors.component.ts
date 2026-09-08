@@ -18,6 +18,7 @@ import {
 import { forkJoin, Observable } from 'rxjs';
 import { AppService } from '../../../../core/services/app.service';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { TooltipDirective } from '../../../../design-system/atoms/tooltip/tooltip.directive';
 import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
 import {
   SortControlComponent,
@@ -51,6 +52,7 @@ import { AdminService } from '../../service/admin.service';
     ButtonComponent,
     PaginationComponent,
     SortControlComponent,
+    TooltipDirective,
   ],
 })
 export class AdminDoctorsComponent implements OnInit {
@@ -70,7 +72,6 @@ export class AdminDoctorsComponent implements OnInit {
   editingSpecialties = signal<string[]>([]);
   editingHasScheduler = signal(false);
   savingDoctorId = signal<string | null>(null);
-  hoveredDoctorId = signal<string | null>(null);
 
   // ── Ordenamiento ──────────────────────────────────────────────────────────
   sortField = signal('lastName');
@@ -152,10 +153,7 @@ export class AdminDoctorsComponent implements OnInit {
     this.editingDoctorId.set(doctor.id);
     this.editingSpecialties.set([...doctor.specialties]);
     this.editingHasScheduler.set(doctor.roles.includes('SCHEDULER'));
-    scrollToElementById(`doctor-card-${doctor.id}`, {
-      behavior: 'smooth',
-      block: 'start',
-    });
+    scrollToElementById(`doctor-card-${doctor.id}`);
   }
   handleCancel(): void {
     this.editingDoctorId.set(null);

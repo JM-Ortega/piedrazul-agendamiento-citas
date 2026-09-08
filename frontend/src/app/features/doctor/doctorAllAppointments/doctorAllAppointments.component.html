@@ -1,28 +1,30 @@
-<div class="max-w-6xl mx-auto px-4 py-8">
+<div class="max-w-275 mx-auto px-5 sm:px-8 lg:px-12 py-5">
   <!-- Header -->
-  <div class="mb-8">
-    <h1 class="text-[#163c63] text-3xl font-bold mb-2">Todas Mis Citas</h1>
-    <p class="text-gray-600 text-lg">Historial completo de sus citas médicas</p>
+  <div class="mb-4">
+    <h1 class="text-[#163c63] text-2xl font-bold mb-1">Todas Mis Citas</h1>
+    <p class="text-gray-600 text-base">
+      Historial completo de sus citas médicas
+    </p>
   </div>
   <!-- Export Section -->
   @if (hasAnyAppointments()) {
     @if (hasTodayAppointments()) {
       <div
-        class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200 mb-6"
+        class="bg-linear-to-r from-green-50 to-emerald-50 rounded-xl shadow-md p-3.5 border-2 border-green-200 mb-3.5"
       >
         <div
-          class="flex flex-col sm:flex-row items-center justify-between gap-4"
+          class="flex flex-col sm:flex-row items-center justify-between gap-3"
         >
           <div class="flex items-center gap-3">
-            <div class="bg-[#1f7a52] rounded-full p-3">
-              <svg lucideDownload class="text-white" [size]="28"></svg>
+            <div class="bg-[#1f7a52] rounded-full p-2">
+              <svg lucideDownload class="text-white" [size]="20"></svg>
             </div>
             <div>
-              <h3 class="text-green-800 text-xl font-bold">
+              <h3 class="text-green-800 text-base font-bold">
                 Exportar Reporte de Hoy
               </h3>
               <p class="text-green-600 text-sm flex items-center gap-1 mt-0.5">
-                <svg lucideCalendar [size]="14"></svg>
+                <svg lucideCalendar [size]="13"></svg>
                 Solo se exportan las citas del día de hoy ({{
                   formatDate(today)
                 }})
@@ -31,18 +33,18 @@
           </div>
           <button
             (click)="showExportModal.set(true)"
-            class="flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-colors shadow-lg cursor-pointer"
+            class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg text-base font-semibold transition-colors shadow-md cursor-pointer"
           >
-            <svg lucideFileSpreadsheet [size]="24"></svg>
+            <svg lucideFileSpreadsheet [size]="20"></svg>
             Exportar Citas
           </button>
         </div>
       </div>
     } @else {
       <div
-        class="bg-gray-50 border-2 border-gray-200 rounded-2xl p-5 text-center mb-6"
+        class="bg-gray-50 border-2 border-gray-200 rounded-xl p-3 text-center mb-3.5"
       >
-        <p class="text-gray-500 text-base">
+        <p class="text-gray-500 text-sm">
           No hay citas programadas para hoy, por lo que no es posible exportar
           un reporte.
         </p>
@@ -51,26 +53,24 @@
   }
   @if (errorCarga()) {
     <div
-      class="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-5 py-4 flex items-center gap-3 mb-6"
+      class="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-4 py-3 flex items-center gap-3 mb-3.5"
     >
-      <svg lucideCalendar [size]="20" class="shrink-0"></svg>
-      <p class="text-base">{{ errorCarga() }}</p>
+      <svg lucideCalendar [size]="18" class="shrink-0"></svg>
+      <p class="text-sm">{{ errorCarga() }}</p>
     </div>
   }
-  <!-- Filters -->
-  <div class="bg-white rounded-xl shadow-md border-2 border-blue-100 p-6 mb-6">
-    <app-filters
-      [fields]="filterFields()"
-      title="Filtros"
-      description="Selecciona los filtros y aplica los cambios"
-      [appliedValues]="appliedFilterValues()"
-      (apply)="onApplyFilters($event)"
-    ></app-filters>
-  </div>
+
+  <!-- Filtros: panel colapsable -->
+
+  <app-filters-panel
+    [fields]="filterFields()"
+    [appliedValues]="appliedFilterValues()"
+    (apply)="onApplyFilters($event)"
+  />
   <!-- Appointments List -->
-  <div class="bg-white rounded-xl shadow-md border-2 border-blue-100 p-6">
-    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
-      <h2 class="text-[#163c63] text-xl font-semibold">
+  <div class="bg-white rounded-xl shadow-md border-2 border-blue-100 p-4">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+      <h2 class="text-[#163c63] text-lg font-semibold">
         {{ filteredAppointments().length }}
         {{ filteredAppointments().length === 1 ? 'Cita' : 'Citas' }}
       </h2>
@@ -81,93 +81,90 @@
     </div>
 
     @if (filteredAppointments().length === 0) {
-      <div class="text-center py-16">
+      <div class="text-center py-12">
         <svg
           lucideCalendar
-          [size]="64"
-          class="mx-auto text-gray-300 mb-4"
+          [size]="48"
+          class="mx-auto text-gray-300 mb-3"
         ></svg>
-        <p class="text-gray-500 text-xl">
+        <p class="text-gray-500 text-lg">
           No hay citas que coincidan con los filtros seleccionados
         </p>
       </div>
     } @else {
-      <div class="space-y-4">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
         @for (apt of filteredAppointments(); track apt.idAppointment) {
           <div
             [class]="
-              'border-2 rounded-xl p-6 transition-all ' +
+              'border-2 rounded-xl p-3 transition-all ' +
               (apt.appointmentState === 'CANCELADA'
                 ? 'border-gray-200 bg-gray-50 opacity-70'
                 : 'border-blue-100 bg-blue-50/30 hover:shadow-lg')
             "
           >
-            <div
-              class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
-            >
-              <!-- Left: Date card + Patient Info -->
-              <div class="flex items-start gap-4">
+            <div class="flex items-center justify-between gap-3">
+              <!-- Left: Date badge + Patient Info -->
+              <div class="flex items-center gap-3 flex-1 min-w-0">
                 <div
                   [class]="
-                    'rounded-xl p-4 text-center min-w-22.5 ' +
+                    'flex flex-col items-center justify-center gap-1 rounded-xl w-17 py-2 shrink-0 shadow-sm ' +
                     (apt.appointmentState === 'CANCELADA'
                       ? 'bg-gray-300 text-gray-600'
                       : isPast(apt.date)
                         ? 'bg-[#a7c9ec] text-blue-800'
-                        : 'bg-[#4e92d9] text-white')
+                        : 'bg-linear-to-br from-[#4e92d9] to-[#215c98] text-white')
                   "
                 >
-                  <p class="text-2xl font-bold leading-none">
-                    {{ apt.date.split('-')[2] }}
-                  </p>
-                  <p class="text-xs uppercase mt-1">
-                    {{ getMonthShort(apt.date) }}
-                  </p>
-                  <p class="text-xs">{{ apt.date.split('-')[0] }}</p>
+                  <div class="flex items-baseline gap-1">
+                    <span class="text-xl font-extrabold leading-none">{{
+                      apt.date.split('-')[2]
+                    }}</span>
+                    <span class="text-[10px] font-semibold uppercase">{{
+                      getMonthShort(apt.date)
+                    }}</span>
+                  </div>
                   <div
-                    class="flex items-center justify-center gap-1 mt-2 pt-2 border-t border-current/30"
+                    class="flex items-center gap-1 bg-white/25 rounded-full px-2 py-0.5"
                   >
-                    <svg lucideClock [size]="14"></svg>
-                    <span class="text-sm font-semibold">{{
+                    <svg lucideClock [size]="11"></svg>
+                    <span class="text-[11px] font-semibold">{{
                       apt.startTime.slice(0, 5)
                     }}</span>
                   </div>
                 </div>
 
                 <!-- Patient Info -->
-                <div class="flex flex-col gap-1">
-                  <h3 class="text-[#163c63] text-xl font-semibold mb-2">
+                <div class="flex flex-col min-w-0">
+                  <h3 class="text-[#163c63] text-base font-semibold truncate">
                     {{ apt.patientFirstName }} {{ apt.patientLastName }}
+                    @if (
+                      isPast(apt.date) && apt.appointmentState !== 'CANCELADA'
+                    ) {
+                      <span class="text-xs text-gray-500 italic font-normal">
+                        (pasada)
+                      </span>
+                    }
                   </h3>
-                  <div class="flex items-center gap-2 text-gray-700">
+                  <div class="flex items-center gap-1.5 text-gray-700 text-sm">
                     <svg
                       lucideCreditCard
-                      [size]="16"
-                      class="text-[#4e92d9]"
+                      [size]="13"
+                      class="text-[#4e92d9] shrink-0"
                     ></svg>
                     <span class="text-[#163c63]"
                       >Doc: {{ apt.documentNumber }}</span
                     >
                   </div>
-                  @if (
-                    isPast(apt.date) && apt.appointmentState !== 'CANCELADA'
-                  ) {
-                    <span class="inline-block mt-2 text-sm text-gray-500 italic"
-                      >(Cita pasada)</span
-                    >
-                  }
                 </div>
               </div>
-              <div class="pt-2">
-                <span
-                  [class]="
-                    'px-4 py-2 rounded-lg border-2 text-base font-medium text-center ' +
-                    statusColor(apt.appointmentState)
-                  "
-                >
-                  {{ statusLabel(apt.appointmentState) }}
-                </span>
-              </div>
+              <span
+                [class]="
+                  'px-3 py-1.5 rounded-lg border-2 text-sm font-medium text-center shrink-0 ' +
+                  statusColor(apt.appointmentState)
+                "
+              >
+                {{ statusLabel(apt.appointmentState) }}
+              </span>
             </div>
           </div>
         }

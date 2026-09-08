@@ -32,29 +32,6 @@
   </span>
 </app-confirm-modal>
 
-<!-- Modal: Forzar Deshabilitación -->
-<app-confirm-modal
-  [visible]="showForceModal() && !!doctorToToggle()"
-  title="Atención"
-  [richMessage]="true"
-  maxWidth="max-w-md"
-  [fullWidthButtons]="true"
-  cancelLabel="Cancelar"
-  confirmLabel="Sí, forzar"
-  confirmVariant="danger"
-  iconBg="bg-red-100"
-  (dismissed)="cancelForceDisable.emit()"
-  (confirmed)="confirmForceDisable.emit()"
->
-  <svg lucidePowerOff [size]="24" icon class="text-red-600"></svg>
-  <span message>
-    <p class="text-gray-600 text-base mb-4">{{ forceModalMessage() }}</p>
-    <p class="text-gray-700 text-base font-semibold">
-      ¿Desea forzar la deshabilitación de
-      <strong>{{ doctorToToggle()?.name }}</strong> de todas formas?
-    </p>
-  </span>
-</app-confirm-modal>
 <!-- Modal: Error al Guardar -->
 <app-confirm-modal
   [visible]="showErrorModal()"
