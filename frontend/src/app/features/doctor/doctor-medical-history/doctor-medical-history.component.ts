@@ -56,6 +56,8 @@ export class DoctorMedicalHistoryComponent
   /** Longitud máxima permitida para la observación de la historia clínica. */
   readonly OBSERVATION_MAX_LENGTH = 300;
 
+  private readonly UNSCHEDULED_CONTEXT_KEY =
+    'doctor-unscheduled-attention-context';
   private readonly context = signal<MedicalHistoryContext>('scheduled');
   readonly isScheduledContext = computed(() => this.context() === 'scheduled');
   private readonly unscheduledSpecialty = signal<string>('');
@@ -120,6 +122,9 @@ export class DoctorMedicalHistoryComponent
   /** El usuario confirma que desea salir: la cita queda sin atender. */
   confirmExit(): void {
     this.showExitConfirmModal.set(false);
+    if (!this.isScheduledContext()) {
+      this.clearUnscheduledContext();
+    }
     this.exitResolver?.(true);
     this.exitResolver = null;
   }
@@ -158,13 +163,52 @@ export class DoctorMedicalHistoryComponent
       documentNumber?: string;
       specialty?: string;
     };
-    this.unscheduledSpecialty.set(navigationState.specialty ?? '');
 
-    if (!navigationState.documentNumber) {
+    let documentNumber = navigationState.documentNumber;
+    let specialty = navigationState.specialty;
+
+    if (documentNumber) {
+      this.persistUnscheduledContext(documentNumber, specialty ?? '');
+    } else {
+      const cached = this.readUnscheduledContext();
+      documentNumber = cached?.documentNumber;
+      specialty = cached?.specialty;
+    }
+
+    this.unscheduledSpecialty.set(specialty ?? '');
+
+    if (!documentNumber) {
       this.isLoadingPatient.set(false);
       return;
     }
-    this.loadPatientByDocument(navigationState.documentNumber);
+    this.loadPatientByDocument(documentNumber);
+  }
+
+  private persistUnscheduledContext(
+    documentNumber: string,
+    specialty: string
+  ): void {
+    sessionStorage.setItem(
+      this.UNSCHEDULED_CONTEXT_KEY,
+      JSON.stringify({ documentNumber, specialty })
+    );
+  }
+
+  private readUnscheduledContext(): {
+    documentNumber?: string;
+    specialty?: string;
+  } | null {
+    const raw = sessionStorage.getItem(this.UNSCHEDULED_CONTEXT_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  private clearUnscheduledContext(): void {
+    sessionStorage.removeItem(this.UNSCHEDULED_CONTEXT_KEY);
   }
 
   private loadPatientByAppointment(idAppointment: string): void {
@@ -261,6 +305,9 @@ export class DoctorMedicalHistoryComponent
   private finishAndExit(): void {
     this.allowNavigation = true;
     this.doctorService.resetMedicalRecords();
+    if (!this.isScheduledContext()) {
+      this.clearUnscheduledContext();
+    }
     this.router.navigate(['/medico']);
   }
 
