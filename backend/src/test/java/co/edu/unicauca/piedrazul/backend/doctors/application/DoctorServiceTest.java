@@ -1,8 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.doctors.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
+import co.edu.unicauca.piedrazul.backend.doctors.api.SchedulingOrigin;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.ScheduleRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.CreateDoctorRequest;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorAvailableResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Workday;
@@ -23,7 +25,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,402 +41,441 @@ import static org.mockito.Mockito.*;
  *
  * Supuestos (AJUSTAR si difieren de tu código real):
  * - CreateDoctorRequest es un record con:
- *     laborStart, laborEnd, bookingWindowWeeks, appointmentInterval,
- *     specialty() -> List<SpecialtyCode>, schedules() -> List<ScheduleRequest>
+ * laborStart, laborEnd, bookingWindowWeeks, appointmentInterval,
+ * specialty() -> List<SpecialtyCode>, schedules() -> List<ScheduleRequest>
  * - ScheduleRequest es un record con workday(), startTime(), endTime()
  * - PersonSummary es un record con id(), firstName(), lastName()
- * - DoctorDetailedResponse.fromEntity(Doctor, String nombreCompleto) existe como estático
+ * - DoctorDetailedResponse.fromEntity(Doctor, String nombreCompleto) existe
+ * como estático
  */
 @ExtendWith(MockitoExtension.class)
 class DoctorServiceTest {
 
-    @Mock
-    private DoctorRepository doctorRepository;
-    @Mock
-    private AppointmentExternalService appointmentExternalService;
-    @Mock
-    private PersonExternalService personExternalService;
-    @Mock
-    private SpecialtyRepository specialtyRepository;
+        @Mock
+        private DoctorRepository doctorRepository;
+        @Mock
+        private AppointmentExternalService appointmentExternalService;
+        @Mock
+        private PersonExternalService personExternalService;
+        @Mock
+        private SpecialtyRepository specialtyRepository;
 
-    private DoctorService doctorService;
+        private DoctorService doctorService;
 
-    private UUID personId;
+        private UUID personId;
 
-    @BeforeEach
-    void setUp() {
-        doctorService = new DoctorService(doctorRepository, appointmentExternalService,
-                personExternalService, specialtyRepository);
-        personId = UUID.randomUUID();
-    }
-
-    /**
-     * Specialty no expone constructor público ni setters (solo @Id code y name, con
-     * equals/hashCode basados únicamente en code). Se arma vía reflexión, asumiendo
-     * que tiene constructor sin argumentos (típico en una entidad JPA).
-     */
-    private Specialty buildSpecialty(SpecialtyCode code) {
-        Specialty specialty = new Specialty();
-        ReflectionTestUtils.setField(specialty, "code", code);
-        ReflectionTestUtils.setField(specialty, "name", code.name());
-        return specialty;
-    }
-
-    @Nested
-    class CreateDoctorTests {
-
-        @Test
-        void shouldThrowWhenLaborStartIsNull() {
-            CreateDoctorRequest request = new CreateDoctorRequest(
-                    List.of(SpecialtyCode.TERAPIA_NEURAL), null, LocalDate.now().plusMonths(1), 4, 30,
-                    null);
-
-            assertThatThrownBy(() -> doctorService.createDoctor(personId, request))
-                    .isInstanceOf(DoctorValidationException.class);
-
-            verifyNoInteractions(doctorRepository, personExternalService);
+        @BeforeEach
+        void setUp() {
+                doctorService = new DoctorService(doctorRepository, appointmentExternalService,
+                                personExternalService, specialtyRepository);
+                personId = UUID.randomUUID();
         }
 
-        @Test
-        void shouldThrowWhenLaborEndBeforeLaborStart() {
-            CreateDoctorRequest request = new CreateDoctorRequest(
-                    List.of(SpecialtyCode.TERAPIA_NEURAL),LocalDate.now(), LocalDate.now().minusDays(1), 4, 30,
-                     null);
-
-            assertThatThrownBy(() -> doctorService.createDoctor(personId, request))
-                    .isInstanceOf(DateConflictException.class);
+        /**
+         * Specialty no expone constructor público ni setters (solo @Id code y name, con
+         * equals/hashCode basados únicamente en code). Se arma vía reflexión, asumiendo
+         * que tiene constructor sin argumentos (típico en una entidad JPA).
+         */
+        private Specialty buildSpecialty(SpecialtyCode code) {
+                Specialty specialty = new Specialty();
+                ReflectionTestUtils.setField(specialty, "code", code);
+                ReflectionTestUtils.setField(specialty, "name", code.name());
+                return specialty;
         }
 
-        @Test
-        void shouldThrowWhenSpecialtyDoesNotExist() {
-            CreateDoctorRequest request = new CreateDoctorRequest(
-                    List.of(SpecialtyCode.QUIROPRAXIA), LocalDate.now(), LocalDate.now().plusMonths(1), 4, 30,
-                     null);
+        @Nested
+        class CreateDoctorTests {
 
-            when(specialtyRepository.findById(SpecialtyCode.QUIROPRAXIA)).thenReturn(Optional.empty());
+                @Test
+                void shouldThrowWhenLaborStartIsNull() {
+                        CreateDoctorRequest request = new CreateDoctorRequest(
+                                        List.of(SpecialtyCode.TERAPIA_NEURAL), null, LocalDate.now().plusMonths(1), 4,
+                                        30,
+                                        null);
 
-            assertThatThrownBy(() -> doctorService.createDoctor(personId, request))
-                    .isInstanceOf(DoctorInvalidSpecialty.class);
+                        assertThatThrownBy(() -> doctorService.createDoctor(personId, request))
+                                        .isInstanceOf(DoctorValidationException.class);
 
-            verify(doctorRepository, never()).save(any());
+                        verifyNoInteractions(doctorRepository, personExternalService);
+                }
+
+                @Test
+                void shouldThrowWhenLaborEndBeforeLaborStart() {
+                        CreateDoctorRequest request = new CreateDoctorRequest(
+                                        List.of(SpecialtyCode.TERAPIA_NEURAL), LocalDate.now(),
+                                        LocalDate.now().minusDays(1), 4, 30,
+                                        null);
+
+                        assertThatThrownBy(() -> doctorService.createDoctor(personId, request))
+                                        .isInstanceOf(DateConflictException.class);
+                }
+
+                @Test
+                void shouldThrowWhenSpecialtyDoesNotExist() {
+                        CreateDoctorRequest request = new CreateDoctorRequest(
+                                        List.of(SpecialtyCode.QUIROPRAXIA), LocalDate.now(),
+                                        LocalDate.now().plusMonths(1), 4, 30,
+                                        null);
+
+                        when(specialtyRepository.findById(SpecialtyCode.QUIROPRAXIA)).thenReturn(Optional.empty());
+
+                        assertThatThrownBy(() -> doctorService.createDoctor(personId, request))
+                                        .isInstanceOf(DoctorInvalidSpecialty.class);
+
+                        verify(doctorRepository, never()).save(any());
+                }
+
+                @Test
+                void shouldCreateInactiveDoctorWhenNoSchedulesProvided() {
+                        CreateDoctorRequest request = new CreateDoctorRequest(
+                                        List.of(SpecialtyCode.TERAPIA_NEURAL), LocalDate.now(),
+                                        LocalDate.now().plusMonths(6), 4, 30,
+                                        null);
+
+                        Specialty specialty = buildSpecialty(SpecialtyCode.TERAPIA_NEURAL);
+                        when(specialtyRepository.findById(SpecialtyCode.TERAPIA_NEURAL))
+                                        .thenReturn(Optional.of(specialty));
+
+                        doctorService.createDoctor(personId, request);
+
+                        ArgumentCaptor<Doctor> captor = ArgumentCaptor.forClass(Doctor.class);
+                        verify(doctorRepository).save(captor.capture());
+                        Doctor saved = captor.getValue();
+
+                        assertThat(saved.isStatus()).isFalse();
+                        verify(personExternalService).revokeDoctorRole(personId);
+                        verify(personExternalService, never()).ensureDoctorRole(any());
+                }
+
+                @Test
+                void shouldActivateDoctorWhenSchedulesMakeItEligible() {
+                        ScheduleRequest scheduleRequest = new ScheduleRequest(LocalTime.of(8, 0), LocalTime.of(12, 0),
+                                        Workday.LUNES);
+                        CreateDoctorRequest request = new CreateDoctorRequest(
+                                        List.of(SpecialtyCode.TERAPIA_NEURAL), LocalDate.now(),
+                                        LocalDate.now().plusMonths(6), 4, 30,
+                                        List.of(new ScheduleRequest(LocalTime.of(5, 0), LocalTime.of(9, 0),
+                                                        Workday.LUNES)));
+
+                        Specialty specialty = buildSpecialty(SpecialtyCode.TERAPIA_NEURAL);
+                        when(specialtyRepository.findById(SpecialtyCode.TERAPIA_NEURAL))
+                                        .thenReturn(Optional.of(specialty));
+
+                        doctorService.createDoctor(personId, request);
+
+                        ArgumentCaptor<Doctor> captor = ArgumentCaptor.forClass(Doctor.class);
+                        verify(doctorRepository).save(captor.capture());
+                        Doctor saved = captor.getValue();
+
+                        assertThat(saved.isStatus()).isTrue();
+                        verify(personExternalService).ensureDoctorRole(personId);
+                        verify(personExternalService, never()).revokeDoctorRole(any());
+                }
         }
 
-        @Test
-        void shouldCreateInactiveDoctorWhenNoSchedulesProvided() {
-            CreateDoctorRequest request = new CreateDoctorRequest(
-                    List.of(SpecialtyCode.TERAPIA_NEURAL), LocalDate.now(), LocalDate.now().plusMonths(6), 4, 30,
-                     null);
+        @Nested
+        class DeleteDoctorTests {
 
-            Specialty specialty = buildSpecialty(SpecialtyCode.TERAPIA_NEURAL);
-            when(specialtyRepository.findById(SpecialtyCode.TERAPIA_NEURAL)).thenReturn(Optional.of(specialty));
+                @Test
+                void shouldThrowWhenPersonIdIsNull() {
+                        assertThatThrownBy(() -> doctorService.deleteDoctor(null))
+                                        .isInstanceOf(DoctorValidationException.class);
 
-            doctorService.createDoctor(personId, request);
+                        verifyNoInteractions(doctorRepository);
+                }
 
-            ArgumentCaptor<Doctor> captor = ArgumentCaptor.forClass(Doctor.class);
-            verify(doctorRepository).save(captor.capture());
-            Doctor saved = captor.getValue();
+                @Test
+                void shouldDoNothingWhenDoctorNotFound() {
+                        when(doctorRepository.findById(personId)).thenReturn(Optional.empty());
 
-            assertThat(saved.isStatus()).isFalse();
-            verify(personExternalService).revokeDoctorRole(personId);
-            verify(personExternalService, never()).ensureDoctorRole(any());
+                        doctorService.deleteDoctor(personId);
+
+                        verify(doctorRepository, never()).delete(any());
+                }
+
+                @Test
+                void shouldDeleteWhenDoctorExists() {
+                        Doctor doctor = new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(1), 4, false,
+                                        30);
+                        when(doctorRepository.findById(personId)).thenReturn(Optional.of(doctor));
+
+                        doctorService.deleteDoctor(personId);
+
+                        verify(doctorRepository).delete(doctor);
+                }
         }
 
-        @Test
-        void shouldActivateDoctorWhenSchedulesMakeItEligible() {
-            ScheduleRequest scheduleRequest = new ScheduleRequest(LocalTime.of(8, 0), LocalTime.of(12, 0), Workday.LUNES);
-            CreateDoctorRequest request = new CreateDoctorRequest(
-                    List.of(SpecialtyCode.TERAPIA_NEURAL), LocalDate.now(), LocalDate.now().plusMonths(6), 4, 30,
-                     List.of(new ScheduleRequest(LocalTime.of(5, 0), LocalTime.of(9, 0), Workday.LUNES)));
+        @Nested
+        class UpdateDoctorInfoTests {
 
-            Specialty specialty = buildSpecialty(SpecialtyCode.TERAPIA_NEURAL);
-            when(specialtyRepository.findById(SpecialtyCode.TERAPIA_NEURAL)).thenReturn(Optional.of(specialty));
+                @Test
+                void shouldThrowWhenDoctorNotFound() {
+                        when(doctorRepository.findById(personId)).thenReturn(Optional.empty());
 
-            doctorService.createDoctor(personId, request);
+                        assertThatThrownBy(() -> doctorService.updateDoctorInfo(personId, LocalDate.now(),
+                                        LocalDate.now().plusMonths(1), 30, 4))
+                                        .isInstanceOf(DoctorNotFoundException.class);
+                }
 
-            ArgumentCaptor<Doctor> captor = ArgumentCaptor.forClass(Doctor.class);
-            verify(doctorRepository).save(captor.capture());
-            Doctor saved = captor.getValue();
+                @Test
+                void shouldUpdateAndSaveWhenDoctorExists() {
+                        Doctor doctor = new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(1), 4, false,
+                                        30);
+                        when(doctorRepository.findById(personId)).thenReturn(Optional.of(doctor));
+                        LocalDate newStart = LocalDate.now();
+                        LocalDate newEnd = LocalDate.now().plusMonths(3);
 
-            assertThat(saved.isStatus()).isTrue();
-            verify(personExternalService).ensureDoctorRole(personId);
-            verify(personExternalService, never()).revokeDoctorRole(any());
-        }
-    }
+                        doctorService.updateDoctorInfo(personId, newStart, newEnd, 45, 6);
 
-    @Nested
-    class DeleteDoctorTests {
-
-        @Test
-        void shouldThrowWhenPersonIdIsNull() {
-            assertThatThrownBy(() -> doctorService.deleteDoctor(null))
-                    .isInstanceOf(DoctorValidationException.class);
-
-            verifyNoInteractions(doctorRepository);
+                        assertThat(doctor.getLaborEnd()).isEqualTo(newEnd);
+                        assertThat(doctor.getAppointmentInterval()).isEqualTo(45);
+                        verify(doctorRepository).save(doctor);
+                }
         }
 
-        @Test
-        void shouldDoNothingWhenDoctorNotFound() {
-            when(doctorRepository.findById(personId)).thenReturn(Optional.empty());
+        @Nested
+        class EnableDoctorTests {
 
-            doctorService.deleteDoctor(personId);
+                @Test
+                void shouldThrowWhenDoctorNotFound() {
+                        when(doctorRepository.findById(personId))
+                                        .thenReturn(Optional.empty());
 
-            verify(doctorRepository, never()).delete(any());
+                        assertThatThrownBy(() -> doctorService.enableDoctor(personId))
+                                        .isInstanceOf(DoctorNotFoundException.class);
+                }
+
+                @Test
+                void shouldActivateSaveAndSyncRoleWhenEligible() {
+                        Doctor doctor = new Doctor(
+                                        personId,
+                                        LocalDate.now(),
+                                        LocalDate.now().plusMonths(3),
+                                        4,
+                                        false,
+                                        30);
+
+                        doctor.updateSchedule(
+                                        Workday.LUNES,
+                                        LocalTime.of(8, 0),
+                                        LocalTime.of(12, 0));
+
+                        doctor.addSpecialty(
+                                        buildSpecialty(SpecialtyCode.TERAPIA_NEURAL));
+
+                        when(doctorRepository.findById(personId))
+                                        .thenReturn(Optional.of(doctor));
+
+                        doctorService.enableDoctor(personId);
+
+                        assertThat(doctor.isStatus()).isTrue();
+                        verify(doctorRepository).save(doctor);
+                        verify(personExternalService).ensureDoctorRole(personId);
+                }
+
+                @Test
+                void shouldPropagateExceptionWhenDoctorCannotBeActivated() {
+                        Doctor doctor = new Doctor(
+                                        personId,
+                                        LocalDate.now(),
+                                        LocalDate.now().plusMonths(3),
+                                        4,
+                                        false,
+                                        30);
+
+                        // Sin horarios ni especialidades -> no puede activarse
+                        when(doctorRepository.findById(personId))
+                                        .thenReturn(Optional.of(doctor));
+
+                        assertThatThrownBy(() -> doctorService.enableDoctor(personId))
+                                        .isInstanceOf(DoctorValidationException.class);
+
+                        verify(doctorRepository, never()).save(any());
+                        verify(personExternalService, never()).ensureDoctorRole(any());
+                }
         }
 
-        @Test
-        void shouldDeleteWhenDoctorExists() {
-            Doctor doctor = new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(1), 4, false, 30);
-            when(doctorRepository.findById(personId)).thenReturn(Optional.of(doctor));
+        @Nested
+        class DisableDoctorTests {
 
-            doctorService.deleteDoctor(personId);
+                @Test
+                void shouldThrowWhenDoctorNotFound() {
+                        when(doctorRepository.findById(personId))
+                                        .thenReturn(Optional.empty());
 
-            verify(doctorRepository).delete(doctor);
-        }
-    }
+                        assertThatThrownBy(() -> doctorService.disableDoctor(personId))
+                                        .isInstanceOf(DoctorNotFoundException.class);
+                }
 
-    @Nested
-    class UpdateDoctorInfoTests {
+                @Test
+                void shouldDisableSaveAndSyncRoleWhenNoScheduledAppointments() {
+                        Doctor doctor = new Doctor(
+                                        personId,
+                                        LocalDate.now(),
+                                        LocalDate.now().plusMonths(3),
+                                        4,
+                                        true,
+                                        30);
 
-        @Test
-        void shouldThrowWhenDoctorNotFound() {
-            when(doctorRepository.findById(personId)).thenReturn(Optional.empty());
+                        when(doctorRepository.findById(personId))
+                                        .thenReturn(Optional.of(doctor));
 
-            assertThatThrownBy(() ->
-                    doctorService.updateDoctorInfo(personId, LocalDate.now(), LocalDate.now().plusMonths(1), 30, 4)
-            ).isInstanceOf(DoctorNotFoundException.class);
-        }
+                        when(appointmentExternalService.hasScheduledAppointments(personId))
+                                        .thenReturn(false);
 
-        @Test
-        void shouldUpdateAndSaveWhenDoctorExists() {
-            Doctor doctor = new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(1), 4, false, 30);
-            when(doctorRepository.findById(personId)).thenReturn(Optional.of(doctor));
-            LocalDate newStart = LocalDate.now();
-            LocalDate newEnd = LocalDate.now().plusMonths(3);
+                        doctorService.disableDoctor(personId);
 
-            doctorService.updateDoctorInfo(personId, newStart, newEnd, 45, 6);
+                        assertThat(doctor.isStatus()).isFalse();
+                        verify(appointmentExternalService)
+                                        .hasScheduledAppointments(personId);
+                        verify(doctorRepository).save(doctor);
+                        verify(personExternalService).revokeDoctorRole(personId);
+                }
 
-            assertThat(doctor.getLaborEnd()).isEqualTo(newEnd);
-            assertThat(doctor.getAppointmentInterval()).isEqualTo(45);
-            verify(doctorRepository).save(doctor);
-        }
-    }
+                @Test
+                void shouldThrowWhenDoctorHasScheduledAppointments() {
+                        Doctor doctor = new Doctor(
+                                        personId,
+                                        LocalDate.now(),
+                                        LocalDate.now().plusMonths(3),
+                                        4,
+                                        true,
+                                        30);
 
-    @Nested
-    class EnableDoctorTests {
+                        when(doctorRepository.findById(personId))
+                                        .thenReturn(Optional.of(doctor));
 
-        @Test
-        void shouldThrowWhenDoctorNotFound() {
-            when(doctorRepository.findById(personId))
-                    .thenReturn(Optional.empty());
+                        when(appointmentExternalService.hasScheduledAppointments(personId))
+                                        .thenReturn(true);
 
-            assertThatThrownBy(() -> doctorService.enableDoctor(personId))
-                    .isInstanceOf(DoctorNotFoundException.class);
-        }
+                        assertThatThrownBy(() -> doctorService.disableDoctor(personId))
+                                        .isInstanceOf(DoctorHasScheduledAppointments.class);
 
-        @Test
-        void shouldActivateSaveAndSyncRoleWhenEligible() {
-            Doctor doctor = new Doctor(
-                    personId,
-                    LocalDate.now(),
-                    LocalDate.now().plusMonths(3),
-                    4,
-                    false,
-                    30
-            );
+                        assertThat(doctor.isStatus()).isTrue();
 
-            doctor.updateSchedule(
-                    Workday.LUNES,
-                    LocalTime.of(8, 0),
-                    LocalTime.of(12, 0)
-            );
-
-            doctor.addSpecialty(
-                    buildSpecialty(SpecialtyCode.TERAPIA_NEURAL)
-            );
-
-            when(doctorRepository.findById(personId))
-                    .thenReturn(Optional.of(doctor));
-
-            doctorService.enableDoctor(personId);
-
-            assertThat(doctor.isStatus()).isTrue();
-            verify(doctorRepository).save(doctor);
-            verify(personExternalService).ensureDoctorRole(personId);
+                        verify(appointmentExternalService)
+                                        .hasScheduledAppointments(personId);
+                        verify(doctorRepository, never()).save(any());
+                        verify(personExternalService, never()).revokeDoctorRole(any());
+                }
         }
 
-        @Test
-        void shouldPropagateExceptionWhenDoctorCannotBeActivated() {
-            Doctor doctor = new Doctor(
-                    personId,
-                    LocalDate.now(),
-                    LocalDate.now().plusMonths(3),
-                    4,
-                    false,
-                    30
-            );
+        @Nested
+        class QueryTests {
 
-            // Sin horarios ni especialidades -> no puede activarse
-            when(doctorRepository.findById(personId))
-                    .thenReturn(Optional.of(doctor));
+                @Test
+                void getSpecialtiesWithActiveDoctorsShouldIncludeAvailableDates() {
+                        Doctor doctor = new Doctor(
+                                        personId,
+                                        LocalDate.now(),
+                                        LocalDate.now().plusMonths(1),
+                                        4,
+                                        true,
+                                        30);
+                        doctor.addSpecialty(buildSpecialty(SpecialtyCode.QUIROPRAXIA));
+                        LocalDate availableDate = LocalDate.now().plusDays(1);
 
-            assertThatThrownBy(() -> doctorService.enableDoctor(personId))
-                    .isInstanceOf(DoctorValidationException.class);
+                        when(doctorRepository.findByStatusTrue()).thenReturn(List.of(doctor));
+                        when(appointmentExternalService.isNewPatient(personId)).thenReturn(false);
+                        when(appointmentExternalService.calculateDoctorsAvailability(anyList()))
+                                        .thenReturn(Set.of(personId));
+                        when(personExternalService.getPersonNames(List.of(personId)))
+                                        .thenReturn(Map.of(personId, "Dr. Gomez"));
+                        when(appointmentExternalService.getAvailableDates(personId))
+                                        .thenReturn(List.of(availableDate));
 
-            verify(doctorRepository, never()).save(any());
-            verify(personExternalService, never()).ensureDoctorRole(any());
-        }
-    }
+                        List<DoctorAvailableResponse> result = doctorService
+                                        .getSpecialtiesWithActiveDoctors(personId, SchedulingOrigin.MANUAL);
 
-    @Nested
-    class DisableDoctorTests {
+                        assertThat(result).hasSize(1);
+                        assertThat(result.getFirst().id()).isEqualTo(personId);
+                        assertThat(result.getFirst().name()).isEqualTo("Dr. Gomez");
+                        assertThat(result.getFirst().availableDates()).containsExactly(availableDate);
+                        verify(appointmentExternalService).getAvailableDates(personId);
+                }
 
-        @Test
-        void shouldThrowWhenDoctorNotFound() {
-            when(doctorRepository.findById(personId))
-                    .thenReturn(Optional.empty());
+                @Test
+                void findAllDoctorsShouldDelegateToRepository() {
+                        List<Doctor> doctors = List.of(new Doctor(personId, LocalDate.now(),
+                                        LocalDate.now().plusMonths(1), 4, false, 30));
+                        when(doctorRepository.findAll()).thenReturn(doctors);
 
-            assertThatThrownBy(() -> doctorService.disableDoctor(personId))
-                    .isInstanceOf(DoctorNotFoundException.class);
-        }
+                        List<Doctor> result = doctorService.findAllDoctors();
 
-        @Test
-        void shouldDisableSaveAndSyncRoleWhenNoScheduledAppointments() {
-            Doctor doctor = new Doctor(
-                    personId,
-                    LocalDate.now(),
-                    LocalDate.now().plusMonths(3),
-                    4,
-                    true,
-                    30
-            );
+                        assertThat(result).isEqualTo(doctors);
+                }
 
-            when(doctorRepository.findById(personId))
-                    .thenReturn(Optional.of(doctor));
+                @Test
+                void findByUserIdShouldThrowWhenDoctorNotFound() {
+                        UUID keycloakId = UUID.randomUUID();
+                        when(personExternalService.findPersonIdByUserId(keycloakId)).thenReturn(personId);
+                        when(doctorRepository.findByPersonId(personId)).thenReturn(null);
 
-            when(appointmentExternalService.hasScheduledAppointments(personId))
-                    .thenReturn(false);
+                        assertThatThrownBy(() -> doctorService.findByUserId(keycloakId))
+                                        .isInstanceOf(DoctorNotFoundException.class);
+                }
 
-            doctorService.disableDoctor(personId);
+                @Test
+                void findByUserIdShouldReturnDoctorWhenFound() {
+                        UUID keycloakId = UUID.randomUUID();
+                        Doctor doctor = new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(1), 4, false,
+                                        30);
+                        when(personExternalService.findPersonIdByUserId(keycloakId)).thenReturn(personId);
+                        when(doctorRepository.findByPersonId(personId)).thenReturn(doctor);
 
-            assertThat(doctor.isStatus()).isFalse();
-            verify(appointmentExternalService)
-                    .hasScheduledAppointments(personId);
-            verify(doctorRepository).save(doctor);
-            verify(personExternalService).revokeDoctorRole(personId);
-        }
+                        assertThat(doctorService.findByUserId(keycloakId)).isEqualTo(doctor);
+                }
 
-        @Test
-        void shouldThrowWhenDoctorHasScheduledAppointments() {
-            Doctor doctor = new Doctor(
-                    personId,
-                    LocalDate.now(),
-                    LocalDate.now().plusMonths(3),
-                    4,
-                    true,
-                    30
-            );
+                @Test
+                void getAllSpecialtiesShouldReturnAllEnumValues() {
+                        List<SpecialtyCode> result = doctorService.getAllSpecialties();
 
-            when(doctorRepository.findById(personId))
-                    .thenReturn(Optional.of(doctor));
-
-            when(appointmentExternalService.hasScheduledAppointments(personId))
-                    .thenReturn(true);
-
-            assertThatThrownBy(() -> doctorService.disableDoctor(personId))
-                    .isInstanceOf(DoctorHasScheduledAppointments.class);
-
-            assertThat(doctor.isStatus()).isTrue();
-
-            verify(appointmentExternalService)
-                    .hasScheduledAppointments(personId);
-            verify(doctorRepository, never()).save(any());
-            verify(personExternalService, never()).revokeDoctorRole(any());
-        }
-    }
-
-    @Nested
-    class QueryTests {
-
-        @Test
-        void findAllDoctorsShouldDelegateToRepository() {
-            List<Doctor> doctors = List.of(new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(1), 4, false, 30));
-            when(doctorRepository.findAll()).thenReturn(doctors);
-
-            List<Doctor> result = doctorService.findAllDoctors();
-
-            assertThat(result).isEqualTo(doctors);
+                        assertThat(result).containsExactlyInAnyOrder(SpecialtyCode.values());
+                }
         }
 
-        @Test
-        void findByUserIdShouldThrowWhenDoctorNotFound() {
-            UUID keycloakId = UUID.randomUUID();
-            when(personExternalService.findPersonIdByUserId(keycloakId)).thenReturn(personId);
-            when(doctorRepository.findByPersonId(personId)).thenReturn(null);
+        @Nested
+        class ChangeSpecialtiesTests {
 
-            assertThatThrownBy(() -> doctorService.findByUserId(keycloakId))
-                    .isInstanceOf(DoctorNotFoundException.class);
+                @Test
+                void shouldThrowWhenDoctorNotFound() {
+                        when(doctorRepository.findById(personId)).thenReturn(Optional.empty());
+
+                        assertThatThrownBy(() -> doctorService.changeSpecialties(personId,
+                                        List.of(SpecialtyCode.TERAPIA_NEURAL)))
+                                        .isInstanceOf(DoctorNotFoundException.class);
+                }
+
+                @Test
+                void shouldThrowWhenSomeRequestedSpecialtyDoesNotExist() {
+                        Doctor doctor = new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(1), 4, false,
+                                        30);
+                        when(doctorRepository.findById(personId)).thenReturn(Optional.of(doctor));
+                        when(specialtyRepository.findAllById(anyList()))
+                                        .thenReturn(List.of(buildSpecialty(SpecialtyCode.TERAPIA_NEURAL)));
+                        assertThatThrownBy(() -> doctorService.changeSpecialties(personId,
+                                        List.of(SpecialtyCode.TERAPIA_NEURAL, SpecialtyCode.QUIROPRAXIA)))
+                                        .isInstanceOf(IllegalArgumentException.class);
+
+                        verify(doctorRepository, never()).save(any());
+                }
+
+                @Test
+                void shouldReplaceSpecialtiesKeepingOnlyRequestedOnes() {
+                        Doctor doctor = new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(1), 4, false,
+                                        30);
+                        Specialty oldSpecialty = buildSpecialty(SpecialtyCode.TERAPIA_NEURAL);
+                        doctor.addSpecialty(oldSpecialty);
+                        when(doctorRepository.findById(personId)).thenReturn(Optional.of(doctor));
+
+                        Specialty newSpecialty = buildSpecialty(SpecialtyCode.TERAPIA_NEURAL);
+                        when(specialtyRepository.findAllById(List.of(SpecialtyCode.TERAPIA_NEURAL)))
+                                        .thenReturn(List.of(newSpecialty));
+
+                        doctorService.changeSpecialties(personId, List.of(SpecialtyCode.TERAPIA_NEURAL));
+
+                        assertThat(doctor.getSpecialties()).containsExactly(newSpecialty);
+                        verify(doctorRepository).save(doctor);
+                }
         }
-
-        @Test
-        void findByUserIdShouldReturnDoctorWhenFound() {
-            UUID keycloakId = UUID.randomUUID();
-            Doctor doctor = new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(1), 4, false, 30);
-            when(personExternalService.findPersonIdByUserId(keycloakId)).thenReturn(personId);
-            when(doctorRepository.findByPersonId(personId)).thenReturn(doctor);
-
-            assertThat(doctorService.findByUserId(keycloakId)).isEqualTo(doctor);
-        }
-
-        @Test
-        void getAllSpecialtiesShouldReturnAllEnumValues() {
-            List<SpecialtyCode> result = doctorService.getAllSpecialties();
-
-            assertThat(result).containsExactlyInAnyOrder(SpecialtyCode.values());
-        }
-    }
-
-    @Nested
-    class ChangeSpecialtiesTests {
-
-        @Test
-        void shouldThrowWhenDoctorNotFound() {
-            when(doctorRepository.findById(personId)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() ->
-                    doctorService.changeSpecialties(personId, List.of(SpecialtyCode.TERAPIA_NEURAL))
-            ).isInstanceOf(DoctorNotFoundException.class);
-        }
-
-        @Test
-        void shouldThrowWhenSomeRequestedSpecialtyDoesNotExist() {
-            Doctor doctor = new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(1), 4, false, 30);
-            when(doctorRepository.findById(personId)).thenReturn(Optional.of(doctor));
-            when(specialtyRepository.findAllById(anyList()))
-                    .thenReturn(List.of(buildSpecialty(SpecialtyCode.TERAPIA_NEURAL))); // solo devuelve 1 de 2 pedidas
-
-            assertThatThrownBy(() ->
-                    doctorService.changeSpecialties(personId,
-                            List.of(SpecialtyCode.TERAPIA_NEURAL, SpecialtyCode.TERAPIA_NEURAL))
-            ).isInstanceOf(IllegalArgumentException.class);
-
-            verify(doctorRepository, never()).save(any());
-        }
-
-        @Test
-        void shouldReplaceSpecialtiesKeepingOnlyRequestedOnes() {
-            Doctor doctor = new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(1), 4, false, 30);
-            Specialty oldSpecialty = buildSpecialty(SpecialtyCode.TERAPIA_NEURAL);
-            doctor.addSpecialty(oldSpecialty);
-            when(doctorRepository.findById(personId)).thenReturn(Optional.of(doctor));
-
-            Specialty newSpecialty = buildSpecialty(SpecialtyCode.TERAPIA_NEURAL);
-            when(specialtyRepository.findAllById(List.of(SpecialtyCode.TERAPIA_NEURAL)))
-                    .thenReturn(List.of(newSpecialty));
-
-            doctorService.changeSpecialties(personId, List.of(SpecialtyCode.TERAPIA_NEURAL));
-
-            assertThat(doctor.getSpecialties()).containsExactly(newSpecialty);
-            verify(doctorRepository).save(doctor);
-        }
-    }
 }

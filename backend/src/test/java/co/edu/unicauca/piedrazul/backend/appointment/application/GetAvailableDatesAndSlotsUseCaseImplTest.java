@@ -163,6 +163,69 @@ class GetAvailableDatesAndSlotsUseCaseImplTest {
                 org.mockito.Mockito.verifyNoInteractions(appointmentRepository, slotTimeService);
         }
 
+        @Test
+        void getAvailableDatesShouldReturnOnlyDatesWithAvailableSlots() {
+                UUID idDoctor = UUID.randomUUID();
+                LocalDate firstDate = LocalDate.now().plusDays(1);
+                LocalDate secondDate = firstDate.plusDays(1);
+                List<WorkingDateSlots> workingDatesAndSlots = List.of(
+                                new WorkingDateSlots(firstDate, List.of(LocalTime.of(8, 0))),
+                                new WorkingDateSlots(secondDate, List.of(LocalTime.of(8, 30))));
+                WorkingSchedule workingSchedule = new WorkingSchedule(workingDatesAndSlots, 30);
+                List<Appointment> existingAppointments = List.of();
+
+                when(doctorConfigConsultPort.workingSchedule(idDoctor)).thenReturn(workingSchedule);
+                when(appointmentRepository.findByDoctorAndDateBetween(idDoctor, firstDate, secondDate))
+                                .thenReturn(existingAppointments);
+                when(slotTimeService.calculateAvailable(workingDatesAndSlots, existingAppointments, 30))
+                                .thenReturn(List.of(new AvailableDateSlots(firstDate, List.of(LocalTime.of(8, 0)))));
+
+                List<LocalDate> result = useCase.getAvailableDates(idDoctor);
+
+                assertThat(result).containsExactly(firstDate);
+        }
+
+        @Test
+        void getAvailableSlotsShouldCalculateOnlyTheRequestedDate() {
+                UUID idDoctor = UUID.randomUUID();
+                LocalDate requestedDate = LocalDate.now().plusDays(1);
+                WorkingDateSlots requestedDateSlots = new WorkingDateSlots(
+                                requestedDate,
+                                List.of(LocalTime.of(8, 0), LocalTime.of(8, 30)));
+                WorkingSchedule workingSchedule = new WorkingSchedule(
+                                List.of(requestedDateSlots),
+                                30);
+                List<Appointment> existingAppointments = List.of();
+
+                when(doctorConfigConsultPort.workingSchedule(idDoctor)).thenReturn(workingSchedule);
+                when(appointmentRepository.findByDoctorAndDateBetween(
+                                idDoctor, requestedDate, requestedDate)).thenReturn(existingAppointments);
+                when(slotTimeService.calculateAvailable(
+                                List.of(requestedDateSlots), existingAppointments, 30))
+                                .thenReturn(List.of(new AvailableDateSlots(
+                                                requestedDate,
+                                                List.of(LocalTime.of(8, 30)))));
+
+                List<LocalTime> result = useCase.getAvailableSlots(idDoctor, requestedDate);
+
+                assertThat(result).containsExactly(LocalTime.of(8, 30));
+        }
+
+        @Test
+        void getAvailableSlotsShouldReturnEmptyForDateOutsideWorkingSchedule() {
+                UUID idDoctor = UUID.randomUUID();
+                LocalDate configuredDate = LocalDate.now().plusDays(1);
+                LocalDate requestedDate = configuredDate.plusDays(1);
+                when(doctorConfigConsultPort.workingSchedule(idDoctor)).thenReturn(
+                                new WorkingSchedule(List.of(new WorkingDateSlots(
+                                                configuredDate, List.of(LocalTime.of(8, 0)))), 30));
+
+                List<LocalTime> result = useCase.getAvailableSlots(idDoctor, requestedDate);
+
+                assertThat(result).isEmpty();
+                org.mockito.Mockito.verifyNoInteractions(appointmentRepository, slotTimeService);
+        }
+
         // ─────────────────────────────────────────────
         // Fixture
         // ─────────────────────────────────────────────

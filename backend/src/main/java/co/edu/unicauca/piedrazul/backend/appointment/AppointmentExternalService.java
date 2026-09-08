@@ -5,10 +5,10 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.inte
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentExternalData;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.DoctorsAvailability;
 
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 public interface AppointmentExternalService {
@@ -16,11 +16,11 @@ public interface AppointmentExternalService {
     AppointmentExternalData getAppointmentData(UUID idAppointment);
 
     UUID getPattientIdByAppointmentId(UUID appointmentId);
-    
-    //Para el reporte de los medicos
+
+    // Para el reporte de los medicos
     List<AppointmentSummary> findByDoctorAndDate(UUID idDoctor, LocalDate date, String state);
 
-    //Para el reporte de los agendadores
+    // Para el reporte de los agendadores
     List<SchedulerAppointmentSummary> findAllByDate(LocalDate date);
 
     boolean hasAvailableSlots(LocalDate date);
@@ -30,4 +30,9 @@ public interface AppointmentExternalService {
     boolean hasScheduledAppointments(UUID doctorID);
 
     Set<UUID> calculateDoctorsAvailability(List<DoctorsAvailability> doctorsAvailability);
+
+    List<LocalDate> getAvailableDates(UUID doctorId);
+
+    List<LocalTime> getAvailableSlots(UUID doctorId, LocalDate date);
+
 }
