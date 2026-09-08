@@ -216,45 +216,34 @@ export class AppointmentBookingComponent implements OnInit {
     this.goBack.emit();
   }
 
-  // Carga de datos
-  /**
-   * Carga la lista de médicos para el contexto actual:
-   * - `patient`: `getDoctors`, sin filtrar por especialidad.
-   * - `doctor` / `scheduler`: `getSpecialtiesWithDoctor`, cada médico trae
-   *   sus propias especialidades.
-   *
-   * En contexto `doctor`, si llegó `prefillDoctorId`, intenta preseleccionar
-   * ese médico (y su especialidad) una vez cargada la lista.
-   */
   private loadDoctors(): void {
     this.state.noDoctorsFound.set(false);
     this.state.errorMessageDoctors.set('');
     this.state.globalErrorMessage.set('');
 
     const patientId = this.state.resolvePatientId() || null;
-    const request$ = this.state.isPatientContext()
-      ? this.citaService.getDoctors()
-      : this.citaService.getSpecialtiesWithDoctor(patientId);
 
-    request$.subscribe({
-      next: (docs) => {
-        this.state.doctors.set(docs);
-        if (this.state.isDoctorContext()) {
-          this.applyDoctorPrefill(docs);
-        }
-      },
-      error: (err: AppError) => {
-        if (
-          err.errorCode === 'NO_ACTIVE_DOCTORS' ||
-          err.errorCode === 'NO_AVAILABLE_DOCTORS'
-        ) {
-          this.state.noDoctorsFound.set(true);
-          this.state.errorMessageDoctors.set(err.message);
-        } else {
-          this.state.globalErrorMessage.set(err.message);
-        }
-      },
-    });
+    this.citaService
+      .getSpecialtiesWithActiveDoctors(patientId, this.state.schedulingOrigin())
+      .subscribe({
+        next: (docs) => {
+          this.state.doctors.set(docs);
+          if (this.state.isDoctorContext()) {
+            this.applyDoctorPrefill(docs);
+          }
+        },
+        error: (err: AppError) => {
+          if (
+            err.errorCode === 'NO_ACTIVE_DOCTORS' ||
+            err.errorCode === 'NO_AVAILABLE_DOCTORS'
+          ) {
+            this.state.noDoctorsFound.set(true);
+            this.state.errorMessageDoctors.set(err.message);
+          } else {
+            this.state.globalErrorMessage.set(err.message);
+          }
+        },
+      });
   }
 
   /**
