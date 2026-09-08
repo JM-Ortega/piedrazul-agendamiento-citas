@@ -34,8 +34,7 @@ public class DoctorService implements DoctorProvisioningApi {
     private final SpecialtyRepository specialtyRepository;
 
     public DoctorService(DoctorRepository doctorRepository, AppointmentExternalService appointmentExternalService,
-    PersonExternalService personExternalService, SpecialtyRepository specialtyRepository)
-    {
+            PersonExternalService personExternalService, SpecialtyRepository specialtyRepository) {
         this.doctorRepository = doctorRepository;
         this.appointmentExternalService = appointmentExternalService;
         this.personExternalService = personExternalService;
@@ -58,8 +57,7 @@ public class DoctorService implements DoctorProvisioningApi {
                 request.laborEnd(),
                 weeks,
                 false,
-                interval
-        );
+                interval);
 
         // Agregamos las especialidades
         for (SpecialtyCode code : request.specialty()) {
@@ -71,18 +69,14 @@ public class DoctorService implements DoctorProvisioningApi {
 
         // Agregamos horarios si hay
         if (request.schedules() != null) {
-            request.schedules().forEach(schedule ->
-                    doctor.updateSchedule(
-                            schedule.workday(),
-                            schedule.startTime(),
-                            schedule.endTime()
-                    )
-            );
+            request.schedules().forEach(schedule -> doctor.updateSchedule(
+                    schedule.workday(),
+                    schedule.startTime(),
+                    schedule.endTime()));
             doctor.activateIfPossible();
         }
 
         doctorRepository.save(doctor);
-
 
         if (doctor.isStatus()) {
             personExternalService.ensureDoctorRole(personId);
@@ -102,7 +96,7 @@ public class DoctorService implements DoctorProvisioningApi {
                 .orElse(null);
 
         if (doctor == null) {
-            return; 
+            return;
         }
 
         doctorRepository.delete(doctor);
@@ -110,7 +104,7 @@ public class DoctorService implements DoctorProvisioningApi {
 
     @Transactional
     public void updateDoctorInfo(UUID idDoctor, LocalDate laborStart, LocalDate laborEnd, int appointmentInterval,
-                                 int bookingWindowWeeks) {
+            int bookingWindowWeeks) {
         Doctor doctor = doctorRepository.findById(idDoctor)
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
@@ -132,15 +126,16 @@ public class DoctorService implements DoctorProvisioningApi {
         syncUserStatus(doctor);
     }
 
-    //Deshabilitar medico
+    // Deshabilitar medico
     @Transactional
     public void disableDoctor(UUID idDoctor) {
         Doctor doctor = doctorRepository.findById(idDoctor)
                 .orElseThrow(() -> new DoctorNotFoundException("Doctor no encontrado"));
 
         // Valida si el doctor aun tiene citas por atender
-        if(appointmentExternalService.hasScheduledAppointments(idDoctor)) {
-            throw new DoctorHasScheduledAppointments("No es posible deshabilitar el doctor porque aun tiene citas agendadas");
+        if (appointmentExternalService.hasScheduledAppointments(idDoctor)) {
+            throw new DoctorHasScheduledAppointments(
+                    "No es posible deshabilitar el doctor porque aun tiene citas agendadas");
         }
 
         doctor.deactivate();
@@ -185,11 +180,12 @@ public class DoctorService implements DoctorProvisioningApi {
         return doctor;
     }
 
-    public List<SpecialtyCode> getAllSpecialties (){
+    public List<SpecialtyCode> getAllSpecialties() {
         return Arrays.asList(SpecialtyCode.values());
     }
 
-    public List<DoctorAvailableResponse> getSpecialtiesWithActiveDoctors(UUID patientId, SchedulingOrigin schedulingOrigin) {
+    public List<DoctorAvailableResponse> getSpecialtiesWithActiveDoctors(UUID patientId,
+            SchedulingOrigin schedulingOrigin) {
         // Obtiene los doctores activos
         List<Doctor> activeDoctors = doctorRepository.findByStatusTrue();
 
@@ -201,9 +197,7 @@ public class DoctorService implements DoctorProvisioningApi {
         boolean isNewPatient = patientId == null || appointmentExternalService.isNewPatient(patientId);
 
         // Por si entro por el origen de agendamiento
-        boolean onlyNeuralTherapy =
-                isNewPatient || schedulingOrigin == SchedulingOrigin.AUTONOMO;
-
+        boolean onlyNeuralTherapy = isNewPatient || schedulingOrigin == SchedulingOrigin.AUTONOMO;
 
         // Si el paciente es nuevo solo retorna los medicos de terapia neural
         if (onlyNeuralTherapy) {
@@ -213,16 +207,15 @@ public class DoctorService implements DoctorProvisioningApi {
                     .toList();
         }
 
-        // Valida la disponibilidad delos doctores activos, con la finalidad de no retornar
+        // Valida la disponibilidad delos doctores activos, con la finalidad de no
+        // retornar
         // medicos sin disponibilidad
         List<DoctorsAvailability> doctorsAvailability = activeDoctors.stream()
                 .map(DoctorsAvailability::fromEntity)
                 .toList();
 
-        Set<UUID> availableDoctorIds =
-                appointmentExternalService.calculateDoctorsAvailability(
-                        doctorsAvailability
-                );
+        Set<UUID> availableDoctorIds = appointmentExternalService.calculateDoctorsAvailability(
+                doctorsAvailability);
 
         activeDoctors = activeDoctors.stream()
                 .filter(d -> availableDoctorIds.contains(d.getPersonId()))
@@ -231,17 +224,17 @@ public class DoctorService implements DoctorProvisioningApi {
         Map<UUID, String> names = personExternalService.getPersonNames(
                 activeDoctors.stream()
                         .map(Doctor::getPersonId)
-                        .toList()
-        );
+                        .toList());
 
-        // Si es nuevo o el agendamiento es autonomo retornara a los doces de terapia nerual con solo esa especialidad
+        // Si es nuevo o el agendamiento es autonomo retornara a los doces de terapia
+        // nerual con solo esa especialidad
         // aunque tengan más
         return activeDoctors.stream()
                 .map(d -> DoctorAvailableResponse.fromEntity(
                         d,
                         names.get(d.getPersonId()),
-                        onlyNeuralTherapy
-                ))
+                        onlyNeuralTherapy,
+                        appointmentExternalService.getAvailableDates(d.getPersonId())))
                 .toList();
     }
 
@@ -284,7 +277,8 @@ public class DoctorService implements DoctorProvisioningApi {
         List<DoctorDetailedResponse> content = personPage.getContent().stream()
                 .map(person -> {
                     Doctor doctor = doctorsById.get(person.id());
-                    return doctor == null ? null : DoctorDetailedResponse.fromEntity(doctor, person.firstName()+" "+person.lastName());
+                    return doctor == null ? null
+                            : DoctorDetailedResponse.fromEntity(doctor, person.firstName() + " " + person.lastName());
                 })
                 .filter(Objects::nonNull)
                 .toList();
@@ -309,8 +303,7 @@ public class DoctorService implements DoctorProvisioningApi {
             boolean isDescending = pageable.getSort().getOrderFor("name").isDescending();
             Comparator<DoctorDetailedResponse> nameComparator = Comparator.comparing(
                     d -> d.name() == null ? "" : d.name(),
-                    String.CASE_INSENSITIVE_ORDER
-            );
+                    String.CASE_INSENSITIVE_ORDER);
             if (isDescending) {
                 nameComparator = nameComparator.reversed();
             }
