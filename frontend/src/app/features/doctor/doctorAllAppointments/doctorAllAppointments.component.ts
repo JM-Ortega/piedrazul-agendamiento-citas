@@ -9,21 +9,16 @@ import {
 import { Router } from '@angular/router';
 import {
   LucideCalendar,
-  LucideChevronDown,
   LucideClock,
   LucideCreditCard,
   LucideDownload,
   LucideFileSpreadsheet,
-  LucideFilter,
 } from '@lucide/angular';
 import { KEYCLOAK_EVENT_SIGNAL } from 'keycloak-angular';
 import { DoctorService } from '../../../core/services/doctor.service';
 import { FilterFieldConfig } from '../../../design-system/molecules/filter-field/filterField.model';
 import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
-import {
-  FiltersComponent,
-  FilterValues,
-} from '../../../design-system/organisms/filters/filters.component';
+import { FilterValues } from '../../../design-system/organisms/filters/filters.component';
 import {
   APPOINTMENT_STATUS_CLASSES,
   APPOINTMENT_STATUS_LABELS,
@@ -33,12 +28,12 @@ import {
   getMonthShort,
 } from '../../../shared/helpers/date-format';
 import { PaginatedState } from '../../../shared/helpers/paginated-state';
-import { scrollToElementById } from '../../../shared/helpers/scroll-to-element';
 import { toIsoDateString } from '../../../shared/helpers/transform-date-local';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { AppError } from '../../../shared/models/interfaces/api-error.model';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { ExportModalComponent } from '../components/exportModal/exportModal.component';
+import { FiltersPanelComponent } from '../components/filtersPanel/filtersPanel.component';
 
 type ExportColumnKey =
   | 'date'
@@ -55,6 +50,11 @@ interface ColumnDef {
   label: string;
 }
 
+/**
+ * Página de historial de citas del médico. Carga las citas paginadas del
+ * doctor autenticado, permite filtrarlas por fecha/estado (vía
+ * app-filters-panel) y exportar un reporte de las citas de hoy.
+ */
 @Component({
   selector: 'app-doctor-all-appointments',
   templateUrl: './doctorAllAppointments.component.html',
@@ -62,15 +62,13 @@ interface ColumnDef {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideCalendar,
-    LucideChevronDown,
     LucideClock,
     LucideCreditCard,
     LucideDownload,
-    LucideFilter,
     LucideFileSpreadsheet,
     ExportModalComponent,
     PaginationComponent,
-    FiltersComponent,
+    FiltersPanelComponent,
   ],
 })
 export class DoctorAllAppointmentsComponent {
@@ -84,17 +82,17 @@ export class DoctorAllAppointmentsComponent {
   private appointmentsState = new PaginatedState<AppointmentsPatient>();
   pagination = this.appointmentsState.pagination;
   readonly PAGE_SIZE = 4;
+  /** Evita recargar datos en cada emisión de keycloakEvent; solo la primera vez. */
   private loaded = signal(false);
 
   filterDate = signal('');
   filterStatus = signal('');
   errorCarga = signal('');
   showExportModal = signal(false);
-  /** Controla si el panel de filtros está desplegado. */
-  filtersOpen = signal(false);
   getMonthShort = getMonthShort;
   formatDate = formatLongDateEs;
 
+  /** Columnas disponibles para el reporte exportable de citas de hoy. */
   readonly columnDefs: ColumnDef[] = [
     { key: 'date', label: 'Fecha de la Cita' },
     { key: 'time', label: 'Hora de la Cita' },
@@ -137,7 +135,9 @@ export class DoctorAllAppointmentsComponent {
       { value: 'ATENDIDA', label: 'Atendidas' },
     ],
   };
+
   // ── Computed ──────────────────────────────────────────────────────────────
+  /** True si hay al menos una cita de hoy que no esté cancelada (habilita exportar). */
   hasTodayAppointments = computed(() =>
     this.appointmentsState
       .content()
@@ -147,9 +147,12 @@ export class DoctorAllAppointmentsComponent {
     () => this.appointmentsState.content().length > 0
   );
 
+  /** Citas del día de hoy, para el modal de exportación. */
   todayAppointmentsList = computed(() =>
     this.appointmentsState.content().filter((a) => a.date === this.today)
   );
+
+  /** Citas de la página actual, filtradas por fecha/estado y ordenadas de más reciente a más antigua. */
   filteredAppointments = computed(() => {
     let result = this.appointmentsState.content();
 
@@ -175,17 +178,14 @@ export class DoctorAllAppointmentsComponent {
       .content()
       .filter((a) => a.appointmentState === 'ATENDIDA').length,
   }));
+
+  /** Valores actuales de filtro, en el shape que espera app-filters-panel. */
   appliedFilterValues = computed<FilterValues>(() => ({
     date: this.filterDate(),
     status: this.filterStatus(),
   }));
 
-  /** Cantidad de filtros con un valor asignado actualmente. */
-  activeFilterCount = computed(
-    () => [this.filterDate(), this.filterStatus()].filter(Boolean).length
-  );
-  hasActiveFilters = computed(() => this.activeFilterCount() > 0);
-
+  /** Configuración de campos del panel de filtros (fecha específica + estado). */
   filterFields = computed<FilterFieldConfig[]>(() => {
     const statusOptions = [
       { value: 'AGENDADA', label: 'Agendadas' },
@@ -213,7 +213,9 @@ export class DoctorAllAppointmentsComponent {
       },
     ];
   });
+
   // ── Constructor ───────────────────────────────────────────────────────────
+  /** Carga los datos una sola vez, tras la primera señal de Keycloak (usuario autenticado). */
   constructor() {
     effect(() => {
       this.keycloakEvent();
@@ -224,6 +226,7 @@ export class DoctorAllAppointmentsComponent {
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
+  /** Obtiene el doctor autenticado y luego sus citas paginadas. */
   private loadData(pageNumber = 0): void {
     this.errorCarga.set('');
     this.doctorService.getMe().subscribe({
@@ -252,7 +255,6 @@ export class DoctorAllAppointmentsComponent {
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-
   isPast(dateStr: string): boolean {
     return dateStr < this.today;
   }
@@ -267,19 +269,10 @@ export class DoctorAllAppointmentsComponent {
       ' border-current/20'
     );
   }
+
+  /** Recibe los valores confirmados desde app-filters-panel y actualiza el estado. */
   onApplyFilters(filters: FilterValues): void {
     this.filterDate.set(filters['date'] ?? '');
     this.filterStatus.set(filters['status'] ?? '');
-  }
-
-  /** Alterna la visibilidad del panel de filtros. */
-  toggleFilters(): void {
-    const willOpen = !this.filtersOpen();
-    this.filtersOpen.set(willOpen);
-    if (willOpen) {
-      scrollToElementById('filters-panel', {
-        offset: 12,
-      });
-    }
   }
 }
