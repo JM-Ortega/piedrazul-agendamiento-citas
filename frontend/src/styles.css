@@ -151,3 +151,55 @@
 html {
   overflow-anchor: none;
 }
+.app-tooltip {
+  position: absolute;
+  z-index: 9999;
+  background-color: #111827;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.2);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 0.15s ease-out,
+    transform 0.15s ease-out;
+}
+
+.app-tooltip-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.app-tooltip-arrow {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background-color: #111827;
+  transform: rotate(45deg);
+}
+
+.app-tooltip-arrow-bottom {
+  bottom: -4px;
+  left: 50%;
+  margin-left: -4px;
+}
+.app-tooltip-arrow-top {
+  top: -4px;
+  left: 50%;
+  margin-left: -4px;
+}
+.app-tooltip-arrow-left {
+  left: -4px;
+  top: 50%;
+  margin-top: -4px;
+}
+.app-tooltip-arrow-right {
+  right: -4px;
+  top: 50%;
+  margin-top: -4px;
+}

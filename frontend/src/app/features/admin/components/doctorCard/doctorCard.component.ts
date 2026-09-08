@@ -3,7 +3,6 @@ import {
   Component,
   input,
   output,
-  signal,
 } from '@angular/core';
 import {
   LucideCalendar,
@@ -14,6 +13,7 @@ import {
   LucidePowerOff,
 } from '@lucide/angular';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { TooltipDirective } from '../../../../design-system/atoms/tooltip/tooltip.directive';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
@@ -34,6 +34,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
     LucidePower,
     LucidePowerOff,
     ButtonComponent,
+    TooltipDirective,
   ],
 })
 export class DoctorCardComponent {
@@ -48,19 +49,15 @@ export class DoctorCardComponent {
   toggleModal = output<Doctor>();
 
   // ── Estado ────────────────────────────────────────────────────────────────
-  hoveredButton = signal(false);
-  hoveredStatus = signal(false);
   private formatoPipe = new FormatoPipe();
 
   // ── Eventos ───────────────────────────────────────────────────────────────
   /** Emite el doctor actual para que el padre abra el modo edición. */
   handleEdit(): void {
-    this.hoveredButton.set(false);
     this.edit.emit(this.doctor());
   }
   /** Emite el doctor actual para que el padre abra el modal de habilitar/deshabilitar. */
   handleToggle(): void {
-    this.hoveredStatus.set(false);
     this.toggleModal.emit(this.doctor());
   }
 
