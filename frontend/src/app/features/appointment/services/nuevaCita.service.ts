@@ -1,12 +1,13 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
+import { AvailableDateSlots } from '../models/dtos/availableDateSlots.dto';
 import { NewAppointment } from '../models/dtos/newAppointment.dto';
 import { PatientSuggestion } from '../models/dtos/patient-suggestion.dto';
 import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
+import { SchedulingOrigin } from '../models/types/schedulingOrigin.type';
 
 @Injectable({ providedIn: 'root' })
 export class NuevaCitaService {
@@ -28,26 +29,27 @@ export class NuevaCitaService {
     );
   }
 
-  getSpecialtiesWithDoctor(
-    patientId: string | null
+  /**
+   * Médicos con agendamiento disponible y sus especialidades.
+   */
+  getSpecialtiesWithActiveDoctors(
+    patientId: string | null,
+    schedulingOrigin: SchedulingOrigin
   ): Observable<SpecialtyDoctor[]> {
-    const url = patientId
-      ? `${this.apiUrl}/appointments/specialties-with-doctor?patientId=${patientId}`
-      : `${this.apiUrl}/appointments/specialties-with-doctor`;
-    return this.http.get<SpecialtyDoctor[]>(url);
+    let params = new HttpParams().set('schedulingOrigin', schedulingOrigin);
+    if (patientId) params = params.set('patientId', patientId);
+    return this.http.get<SpecialtyDoctor[]>(
+      `${this.apiUrl}/doctor/specialties-with-active-doctors`,
+      { params }
+    );
   }
 
-  getDoctors(): Observable<SpecialtyDoctor[]> {
-    const url = `${this.apiUrl}/doctor/neural-doctors`;
-    return this.http.get<SpecialtyDoctor[]>(url);
-  }
-
-  getAvailableSlots(doctorId: string, date: string): Observable<string[]> {
-    return this.http
-      .get<{ time: string }[]>(`${this.apiUrl}/appointments/available-slots`, {
-        params: { doctorId, date },
-      })
-      .pipe(map((slots) => slots.map((s) => s.time)));
+  /** Todas las fechas disponibles de un médico junto con sus horarios. */
+  getAvailableDateSlots(doctorId: string): Observable<AvailableDateSlots[]> {
+    return this.http.get<AvailableDateSlots[]>(
+      `${this.apiUrl}/appointments/slots`,
+      { params: { doctorId } }
+    );
   }
 
   addAppointment(data: NewAppointment): Observable<void> {

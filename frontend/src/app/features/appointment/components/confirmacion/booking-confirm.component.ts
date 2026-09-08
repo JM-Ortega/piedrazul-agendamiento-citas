@@ -96,13 +96,13 @@ export class BookingConfirmComponent implements OnInit {
       phone: this.state.confirmPhone(),
       gender: this.state.confirmGender(),
       birthDate: this.state.confirmBirthDate(),
+      schedulingOrigin: this.state.schedulingOrigin(),
     };
 
     if (this.state.isSchedulerContext() || this.state.isDoctorContext()) {
       const f = this.state.patientForm();
       return {
         ...base,
-        schedulingOrigin: 'MANUAL',
         ...(this.state.patientId()
           ? { patientId: this.state.patientId()! }
           : {
@@ -116,7 +116,6 @@ export class BookingConfirmComponent implements OnInit {
       ...base,
       patientId: this.state.patientSnapshot()?.id,
       email: this.state.patientSnapshot()?.email,
-      schedulingOrigin: 'AUTONOMO',
     };
   }
 }
