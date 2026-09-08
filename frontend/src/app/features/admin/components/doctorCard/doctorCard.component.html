@@ -35,29 +35,15 @@
   }
 
   @if (!isEditing()) {
-    <div class="relative shrink-0">
-      <app-button
-        variant="primary"
-        extraClass="!rounded-lg !px-3.5 !py-1.5 !text-sm"
-        (mouseenter)="hoveredButton.set(true)"
-        (mouseleave)="hoveredButton.set(false)"
-        (buttonClick)="handleEdit()"
-      >
-        <svg lucidePencil [size]="15"></svg>
-        Editar
-      </app-button>
-
-      @if (hoveredButton()) {
-        <div
-          class="absolute right-0 top-full mt-2 whitespace-nowrap bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg pointer-events-none z-10"
-        >
-          Editar configuración del médico
-          <div
-            class="absolute -top-1 right-4 w-2 h-2 bg-gray-900 rotate-45"
-          ></div>
-        </div>
-      }
-    </div>
+    <app-button
+      variant="primary"
+      extraClass="!rounded-lg !px-3.5 !py-1.5 !text-sm"
+      [appTooltip]="'Editar configuración del médico'"
+      (buttonClick)="handleEdit()"
+    >
+      <svg lucidePencil [size]="15"></svg>
+      Editar
+    </app-button>
   }
 </div>
 
@@ -105,41 +91,25 @@
       </div>
 
       <!-- Botón Habilitado/Deshabilitado alineado a la derecha -->
-      <div class="relative shrink-0">
-        <app-button
-          variant="chip"
-          [active]="doctor().status !== false"
-          activeChipClasses="bg-green-100 text-green-700 hover:bg-green-200 border-transparent"
-          inactiveChipClasses="bg-red-100 text-red-700 hover:bg-red-200 border-transparent"
-          extraClass="!w-auto !py-1 !px-3 !text-xs !rounded-lg !flex !items-center !gap-1.5"
-          (mouseenter)="hoveredStatus.set(true)"
-          (mouseleave)="hoveredStatus.set(false)"
-          (buttonClick)="handleToggle()"
-        >
-          @if (doctor().status !== false) {
-            <svg lucidePower [size]="14"></svg>
-            Habilitado
-          } @else {
-            <svg lucidePowerOff [size]="14"></svg>
-            Deshabilitado
-          }
-        </app-button>
-
-        @if (hoveredStatus()) {
-          <div
-            class="absolute right-0 top-full mt-2 whitespace-nowrap bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg pointer-events-none z-10"
-          >
-            {{
-              doctor().status !== false
-                ? 'Deshabilitar médico'
-                : 'Habilitar médico'
-            }}
-            <div
-              class="absolute -top-1 right-4 w-2 h-2 bg-gray-900 rotate-45"
-            ></div>
-          </div>
+      <app-button
+        variant="chip"
+        [active]="doctor().status !== false"
+        activeChipClasses="bg-green-100 text-green-700 hover:bg-green-200 border-transparent"
+        inactiveChipClasses="bg-red-100 text-red-700 hover:bg-red-200 border-transparent"
+        extraClass="!w-auto !py-1 !px-3 !text-xs !rounded-lg !flex !items-center !gap-1.5"
+        [appTooltip]="
+          doctor().status !== false ? 'Deshabilitar médico' : 'Habilitar médico'
+        "
+        (buttonClick)="handleToggle()"
+      >
+        @if (doctor().status !== false) {
+          <svg lucidePower [size]="14"></svg>
+          Habilitado
+        } @else {
+          <svg lucidePowerOff [size]="14"></svg>
+          Deshabilitado
         }
-      </div>
+      </app-button>
     </div>
 
     <div class="flex flex-wrap gap-2 text-xs text-gray-600">

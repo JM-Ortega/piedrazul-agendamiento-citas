@@ -18,10 +18,7 @@ import { KEYCLOAK_EVENT_SIGNAL } from 'keycloak-angular';
 import { DoctorService } from '../../../core/services/doctor.service';
 import { FilterFieldConfig } from '../../../design-system/molecules/filter-field/filterField.model';
 import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
-import {
-  FiltersComponent,
-  FilterValues,
-} from '../../../design-system/organisms/filters/filters.component';
+import { FilterValues } from '../../../design-system/organisms/filters/filters.component';
 import {
   APPOINTMENT_STATUS_CLASSES,
   APPOINTMENT_STATUS_LABELS,
@@ -36,6 +33,7 @@ import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dt
 import { AppError } from '../../../shared/models/interfaces/api-error.model';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { ExportModalComponent } from '../components/exportModal/exportModal.component';
+import { FiltersPanelComponent } from '../components/filtersPanel/filtersPanel.component';
 
 type ExportColumnKey =
   | 'date'
@@ -52,6 +50,11 @@ interface ColumnDef {
   label: string;
 }
 
+/**
+ * Página de historial de citas del médico. Carga las citas paginadas del
+ * doctor autenticado, permite filtrarlas por fecha/estado (vía
+ * app-filters-panel) y exportar un reporte de las citas de hoy.
+ */
 @Component({
   selector: 'app-doctor-all-appointments',
   templateUrl: './doctorAllAppointments.component.html',
@@ -65,7 +68,7 @@ interface ColumnDef {
     LucideFileSpreadsheet,
     ExportModalComponent,
     PaginationComponent,
-    FiltersComponent,
+    FiltersPanelComponent,
   ],
 })
 export class DoctorAllAppointmentsComponent {
@@ -78,9 +81,9 @@ export class DoctorAllAppointmentsComponent {
   currentDoctor = signal<Doctor | null>(null);
   private appointmentsState = new PaginatedState<AppointmentsPatient>();
   pagination = this.appointmentsState.pagination;
-  readonly PAGE_SIZE = 3;
+  readonly PAGE_SIZE = 4;
   private loaded = signal(false);
-
+  private todayAppointmentsState = signal<AppointmentsPatient[]>([]);
   filterDate = signal('');
   filterStatus = signal('');
   errorCarga = signal('');
@@ -88,6 +91,7 @@ export class DoctorAllAppointmentsComponent {
   getMonthShort = getMonthShort;
   formatDate = formatLongDateEs;
 
+  /** Columnas disponibles para el reporte exportable de citas de hoy. */
   readonly columnDefs: ColumnDef[] = [
     { key: 'date', label: 'Fecha de la Cita' },
     { key: 'time', label: 'Hora de la Cita' },
@@ -130,19 +134,25 @@ export class DoctorAllAppointmentsComponent {
       { value: 'ATENDIDA', label: 'Atendidas' },
     ],
   };
+
   // ── Computed ──────────────────────────────────────────────────────────────
+  /** True si hay al menos una cita de hoy que no esté cancelada (independiente de la página mostrada). */
   hasTodayAppointments = computed(() =>
-    this.appointmentsState
-      .content()
-      .some((a) => a.date === this.today && a.appointmentState !== 'CANCELADA')
+    this.todayAppointmentsState().some(
+      (a) => a.appointmentState !== 'CANCELADA'
+    )
   );
+  /** True si el doctor tiene al menos una cita en total, sin importar la página mostrada. */
   hasAnyAppointments = computed(
-    () => this.appointmentsState.content().length > 0
+    () =>
+      (this.pagination()?.totalElements ??
+        this.appointmentsState.content().length) > 0
   );
 
-  todayAppointmentsList = computed(() =>
-    this.appointmentsState.content().filter((a) => a.date === this.today)
-  );
+  /** Citas del día de hoy, para el modal de exportación (independiente de la página mostrada). */
+  todayAppointmentsList = computed(() => this.todayAppointmentsState());
+
+  /** Citas de la página actual, filtradas por fecha/estado, en el mismo orden que las entrega el backend. */
   filteredAppointments = computed(() => {
     let result = this.appointmentsState.content();
 
@@ -152,10 +162,7 @@ export class DoctorAllAppointmentsComponent {
     if (this.filterDate())
       result = result.filter((a) => a.date === this.filterDate());
 
-    return [...result].sort((a, b) => {
-      const d = b.date.localeCompare(a.date);
-      return d !== 0 ? d : b.startTime.localeCompare(a.startTime);
-    });
+    return result;
   });
 
   stats = computed(() => ({
@@ -168,11 +175,14 @@ export class DoctorAllAppointmentsComponent {
       .content()
       .filter((a) => a.appointmentState === 'ATENDIDA').length,
   }));
+
+  /** Valores actuales de filtro, en el shape que espera app-filters-panel. */
   appliedFilterValues = computed<FilterValues>(() => ({
     date: this.filterDate(),
     status: this.filterStatus(),
   }));
 
+  /** Configuración de campos del panel de filtros (fecha específica + estado). */
   filterFields = computed<FilterFieldConfig[]>(() => {
     const statusOptions = [
       { value: 'AGENDADA', label: 'Agendadas' },
@@ -200,7 +210,9 @@ export class DoctorAllAppointmentsComponent {
       },
     ];
   });
+
   // ── Constructor ───────────────────────────────────────────────────────────
+  /** Carga los datos una sola vez, tras la primera señal de Keycloak (usuario autenticado). */
   constructor() {
     effect(() => {
       this.keycloakEvent();
@@ -211,6 +223,7 @@ export class DoctorAllAppointmentsComponent {
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
+  /** Obtiene el doctor autenticado y luego sus citas paginadas + las de hoy. */
   private loadData(pageNumber = 0): void {
     this.errorCarga.set('');
     this.doctorService.getMe().subscribe({
@@ -220,12 +233,15 @@ export class DoctorAllAppointmentsComponent {
           return;
         }
         this.currentDoctor.set(doctor);
+
         this.doctorService
           .getAppointmentsByDoctor(doctor.id, pageNumber, this.PAGE_SIZE)
           .subscribe({
             next: (response) => this.appointmentsState.set(response),
             error: (err: AppError) => this.errorCarga.set(err.message),
           });
+
+        this.loadTodayAppointments(doctor.id);
       },
       error: (err: AppError) => {
         this.errorCarga.set(err.message);
@@ -234,12 +250,29 @@ export class DoctorAllAppointmentsComponent {
     });
   }
 
+  /**
+   * Carga las citas de hoy del doctor en una petición aparte, no ligada a la
+   * paginación de la tabla.
+   */
+  private loadTodayAppointments(doctorId: string): void {
+    const TODAY_FETCH_SIZE = 200;
+    this.doctorService
+      .getAppointmentsByDoctor(doctorId, 0, TODAY_FETCH_SIZE)
+      .subscribe({
+        next: (response) => {
+          this.todayAppointmentsState.set(
+            response.content.filter((a) => a.date === this.today)
+          );
+        },
+        error: () => this.todayAppointmentsState.set([]),
+      });
+  }
+
   onPageChange(pageNumber: number): void {
     this.loadData(pageNumber);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-
   isPast(dateStr: string): boolean {
     return dateStr < this.today;
   }
@@ -254,6 +287,8 @@ export class DoctorAllAppointmentsComponent {
       ' border-current/20'
     );
   }
+
+  /** Recibe los valores confirmados desde app-filters-panel y actualiza el estado. */
   onApplyFilters(filters: FilterValues): void {
     this.filterDate.set(filters['date'] ?? '');
     this.filterStatus.set(filters['status'] ?? '');

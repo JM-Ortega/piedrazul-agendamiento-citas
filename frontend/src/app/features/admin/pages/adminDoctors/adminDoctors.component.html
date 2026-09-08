@@ -88,7 +88,7 @@
               <div
                 [id]="'doctor-card-' + doctor.id"
                 animate.enter="card-enter-animation"
-                class="border border-[#a7c9ec] rounded-xl bg-[#d9e9f8]/30 edit-container hover:shadow-lg transition-shadow relative scroll-mt-[calc(var(--navbar-height,80px)+12px)]"
+                class="border border-[#a7c9ec] rounded-xl bg-[#d9e9f8]/30 edit-container hover:shadow-lg transition-shadow relative"
                 [class.lg:col-span-2]="isEditing(doctor.id)"
               >
                 <!-- ── MODO EDICIÓN ── -->
@@ -328,28 +328,16 @@
                       </div>
                     </div>
 
-                    <div class="relative shrink-0 edit-container">
+                    <div class="shrink-0 edit-container">
                       <app-button
                         variant="primary"
                         extraClass="!rounded-lg !px-3.5 !py-1.5 !text-sm"
-                        (mouseenter)="hoveredDoctorId.set(doctor.id)"
-                        (mouseleave)="hoveredDoctorId.set(null)"
+                        [appTooltip]="'Editar roles y especialidades'"
                         (buttonClick)="handleEdit(doctor)"
                       >
                         <svg lucideEdit3 [size]="15"></svg>
                         Editar
                       </app-button>
-
-                      @if (hoveredDoctorId() === doctor.id) {
-                        <div
-                          class="absolute right-0 top-full mt-2 whitespace-nowrap bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg animate-fade-in pointer-events-none z-10"
-                        >
-                          Editar roles y especialidades
-                          <div
-                            class="absolute -top-1 right-4 w-2 h-2 bg-gray-900 rotate-45"
-                          ></div>
-                        </div>
-                      }
                     </div>
                   </div>
                 }

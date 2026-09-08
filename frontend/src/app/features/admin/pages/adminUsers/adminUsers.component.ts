@@ -58,11 +58,19 @@ export class AdminUsersComponent implements OnInit {
   private adminService = inject(AdminService);
   private router = inject(Router);
 
-  // ── State ─────────────────────────────────────────────────────────────────
+  // ── Paginación ────────────────────────────────────────────────────────────
+  readonly PAGE_SIZE = 3;
+
+  // ── State: lista paginada (lo que se muestra en las cards) ────────────────
   systemUsers = signal<SystemUser[]>([]);
   pagination = signal<PaginationMeta | null>(null);
   loading = signal(false);
   errorCarga = signal('');
+
+  // ── State: totales del sistema (para las estadísticas, independiente de la página) ──
+  private allRoles = signal<string[][]>([]);
+  loadingStats = signal(false);
+
   // ── Ordenamiento ──────────────────────────────────────────────────────────
   sortField = signal('lastName');
   sortDirection = signal<SortDirection>('asc');
@@ -98,59 +106,84 @@ export class AdminUsersComponent implements OnInit {
     },
   };
 
-  // ── Computed (basado en la página actual) ────────────────────────────────
-  doctors = computed(() =>
-    this.systemUsers().filter(
-      (u) =>
-        u.roles.map((r) => r.toLowerCase()).includes('doctor') &&
-        !u.roles.map((r) => r.toLowerCase()).includes('scheduler')
-    )
+  // ── Computed de estadísticas (sobre TODOS los usuarios, no solo la página) ──
+  doctorsCount = computed(
+    () =>
+      this.allRoles().filter(
+        (roles) =>
+          this.hasRole(roles, 'doctor') && !this.hasRole(roles, 'scheduler')
+      ).length
   );
 
-  schedulers = computed(() =>
-    this.systemUsers().filter(
-      (u) =>
-        u.roles.map((r) => r.toLowerCase()).includes('scheduler') &&
-        !u.roles.map((r) => r.toLowerCase()).includes('doctor')
-    )
+  schedulersCount = computed(
+    () =>
+      this.allRoles().filter(
+        (roles) =>
+          this.hasRole(roles, 'scheduler') && !this.hasRole(roles, 'doctor')
+      ).length
   );
 
-  both = computed(() =>
-    this.systemUsers().filter(
-      (u) =>
-        u.roles.map((r) => r.toLowerCase()).includes('doctor') &&
-        u.roles.map((r) => r.toLowerCase()).includes('scheduler')
-    )
+  bothCount = computed(
+    () =>
+      this.allRoles().filter(
+        (roles) =>
+          this.hasRole(roles, 'doctor') && this.hasRole(roles, 'scheduler')
+      ).length
   );
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.loadUsers();
+    this.loadStats();
   }
 
-  // ── Data loading ──────────────────────────────────────────────────────────
+  // ── Data loading: lista paginada ─────────────────────────────────────────
   loadUsers(pageNumber = 0): void {
     this.loading.set(true);
     this.errorCarga.set('');
     const sort = `${this.sortField()},${this.sortDirection()}`;
-    this.adminService.getSystemUsers(pageNumber, 6, sort).subscribe({
+    this.adminService
+      .getSystemUsers(pageNumber, this.PAGE_SIZE, sort)
+      .subscribe({
+        next: (page) => {
+          this.systemUsers.set(page.content);
+          this.pagination.set({
+            pageNumber: page.pageNumber,
+            pageSize: page.pageSize,
+            totalElements: page.totalElements,
+            totalPages: page.totalPages,
+            first: page.first,
+            last: page.last,
+          });
+          this.loading.set(false);
+        },
+        error: (err: AppError) => {
+          this.errorCarga.set(err.message);
+          this.loading.set(false);
+        },
+      });
+  }
+
+  /**
+   * Carga los roles de TODOS los usuarios del sistema (una sola vez, en una
+   * página grande) para calcular las estadísticas totales, independientemente
+   * de qué página esté viendo el usuario en la lista.
+   */
+  private loadStats(): void {
+    this.loadingStats.set(true);
+    this.adminService.getSystemUsers(0, 1000).subscribe({
       next: (page) => {
-        this.systemUsers.set(page.content);
-        this.pagination.set({
-          pageNumber: page.pageNumber,
-          pageSize: page.pageSize,
-          totalElements: page.totalElements,
-          totalPages: page.totalPages,
-          first: page.first,
-          last: page.last,
-        });
-        this.loading.set(false);
+        this.allRoles.set(page.content.map((u) => u.roles));
+        this.loadingStats.set(false);
       },
-      error: (err: AppError) => {
-        this.errorCarga.set(err.message);
-        this.loading.set(false);
+      error: () => {
+        this.loadingStats.set(false);
       },
     });
+  }
+
+  private hasRole(roles: string[], role: string): boolean {
+    return roles.map((r) => r.toLowerCase()).includes(role);
   }
 
   onPageChange(pageNumber: number): void {

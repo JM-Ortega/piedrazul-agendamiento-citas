@@ -118,7 +118,7 @@ export class DoctorService {
   getAppointmentsByDoctor(
     doctorId: string,
     pageNumber = 0,
-    pageSize = 10
+    pageSize = 4
   ): Observable<PageResponse<AppointmentsPatient>> {
     const params = withPagination(
       new HttpParams().set('idDoctor', doctorId),
