@@ -1,5 +1,5 @@
 <div
-  id="filters-panel"
+  [id]="panelId()"
   class="bg-white rounded-xl shadow-md mb-3.5 overflow-hidden"
 >
   <button
@@ -31,7 +31,7 @@
           {{
             filtersOpen()
               ? 'Selecciona los filtros y aplica los cambios'
-              : 'Toca aquí para filtrar por médico, fecha o estado'
+              : closedHint()
           }}
         </p>
       </div>

@@ -29,25 +29,25 @@ export class FiltersPanelComponent {
   appliedValues = input.required<FilterValues>();
   apply = output<FilterValues>();
 
-  /** Controla si el panel de filtros está desplegado. */
+  //Id del contenedor, usado para el scroll al abrir.
+  panelId = input('filters-panel');
+  closedHint = input('Toca aquí para aplicar filtros');
+
   filtersOpen = signal(false);
 
-  /** Cantidad de filtros con un valor asignado, sin importar qué campos sean. */
   activeFilterCount = computed(
     () => Object.values(this.appliedValues()).filter(Boolean).length
   );
   hasActiveFilters = computed(() => this.activeFilterCount() > 0);
 
-  /** Alterna la visibilidad del panel y, al abrir, hace scroll hasta él. */
   toggleFilters(): void {
     const willOpen = !this.filtersOpen();
     this.filtersOpen.set(willOpen);
     if (willOpen) {
-      scrollToElementById('filters-panel', { offset: 12 });
+      scrollToElementById(this.panelId(), { offset: 12 });
     }
   }
 
-  /** Reenvía lo aplicado desde `app-filters` y cierra el panel. */
   onFiltersApply(values: FilterValues): void {
     this.apply.emit(values);
     this.filtersOpen.set(false);
