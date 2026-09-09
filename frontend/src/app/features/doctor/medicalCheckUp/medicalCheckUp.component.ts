@@ -10,8 +10,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import {
   LucideCalendar,
   LucideClipboardPen,
-  LucideClipboardPlus,
   LucideFolderOpen,
+  LucideUser,
   LucideSave,
   LucideTriangleAlert,
 } from '@lucide/angular';
@@ -36,10 +36,10 @@ type MedicalHistoryContext = 'scheduled' | 'unscheduled';
   imports: [
     LucideTriangleAlert,
     LucideClipboardPen,
-    LucideClipboardPlus,
     LucideSave,
     LucideFolderOpen,
     LucideCalendar,
+    LucideUser,
     FormatoPipe,
     ButtonComponent,
     PaginationComponent,

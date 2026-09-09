@@ -1,12 +1,5 @@
-<div class="min-h-screen bg-blue-50 py-8 px-6">
-  <div class="max-w-6xl mx-auto">
-    <div class="mb-6">
-      <div class="flex items-center gap-3">
-        <svg lucideClipboardPen [size]="40" class="text-[#163c63]"></svg>
-        <h3 class="text-2xl font-bold text-[#163c63]">Control Medico</h3>
-      </div>
-    </div>
-
+<div class="min-h-screen bg-blue-50 py-2 px-6">
+  <div class="max-w-8xl mx-auto">
     @if (isLoadingPatient()) {
       <div class="flex items-center justify-center py-12">
         <div
@@ -22,87 +15,131 @@
     }
 
     @if (patient()) {
+      <!-- Info paciente -->
+      <div
+        class="bg-white rounded-2xl shadow-md px-6 py-1 mb-3 border border-blue-100"
+      >
+        <!-- Encabezado con Avatar, Nombre y Botón de Desplegar -->
+        <div class="flex items-center justify-between flex-wrap">
+          <div class="flex items-center gap-2">
+            <!-- Icono del paciente -->
+            <div
+              class="bg-blue-100 rounded-full p-1 shrink-0 flex items-center justify-center"
+            >
+              <svg lucideUser [size]="28" class="text-[#215c98]"></svg>
+            </div>
+
+            <!-- Nombre del Paciente -->
+            <div>
+              <span
+                class="text-xs font-semibold uppercase tracking-wider text-gray-400"
+                >Paciente</span
+              >
+              <p class="text-[#163c63] text-sm font-semibold leading-tight">
+                {{ patient()!.firstName }} {{ patient()!.lastName }}
+              </p>
+            </div>
+          </div>
+          <!-- Botón desplegable -->
+          <button
+            (click)="toggleInfo()"
+            class="flex items-center text-sm font-medium text-[#215c98] border border-[#215c98]/30 rounded-lg px-4 py-1 hover:bg-[#215c98]/10 hover:border-[#215c98]/60 transition-all duration-200 select-none cursor-pointer"
+          >
+            <span>{{
+              mostrarInfo() ? 'Ocultar información' : 'Ver más información'
+            }}</span>
+            <svg
+              class="w-4 h-4 transition-transform duration-200"
+              [class.rotate-180]="mostrarInfo()"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Contenido Desplegable -->
+        @if (mostrarInfo()) {
+          <div
+            class="grid grid-cols-1 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-7 gap-5 mt-1 pt-2 border-t border-gray-100"
+          >
+            <div>
+              <p class="text-gray-400 text-xs font-medium tracking-wider mb-1">
+                {{ patient()!.identificationType | formato }}
+              </p>
+              <p class="text-gray-800 text-sm md:text-sm font-semibold">
+                {{ patient()!.identification }}
+              </p>
+            </div>
+            <div>
+              <p class="text-gray-400 text-xs font-medium tracking-wider mb-1">
+                Fecha de Nacimiento
+              </p>
+              <p class="text-gray-800 text-sm md:text-sm font-semibold">
+                {{ patientBirthDateFormatted() }}
+              </p>
+            </div>
+            <div>
+              <p class="text-gray-400 text-xs font-medium tracking-wider mb-1">
+                Edad
+              </p>
+              <p class="text-gray-800 text-sm md:text-sm font-semibold">
+                {{ patientAge() }} años
+              </p>
+            </div>
+            <div>
+              <p class="text-gray-400 text-xs font-medium tracking-wider mb-1">
+                Sexo
+              </p>
+              <p class="text-gray-800 text-sm md:text-sm font-semibold">
+                {{ patient()!.sex | formato }}
+              </p>
+            </div>
+            <div>
+              <p class="text-gray-400 text-xs font-medium tracking-wider mb-1">
+                Teléfono
+              </p>
+              <p class="text-gray-800 text-sm md:text-sm font-semibold">
+                {{ patient()!.phone }}
+              </p>
+            </div>
+            <div>
+              <p class="text-gray-400 text-xs font-medium tracking-wider mb-1">
+                Correo Electrónico
+              </p>
+              <p
+                class="text-gray-800 text-sm md:text-sm font-semibold truncate"
+                [title]="patient()!.email"
+              >
+                {{ patient()!.email || 'No registra' }}
+              </p>
+            </div>
+            <div>
+              <p class="text-gray-400 text-xs font-medium tracking-wider mb-1">
+                Teléfono Acudiente
+              </p>
+              <p class="text-gray-800 text-sm md:text-sm font-semibold">
+                {{ patient()!.guardianPhone || 'No registra' }}
+              </p>
+            </div>
+          </div>
+        }
+      </div>
       <!-- Layout de dos columnas -->
       <div class="flex flex-col lg:flex-row gap-6 items-start">
         <!-- Columna izquierda (más ancha): info paciente + nueva observación -->
         <div class="w-full lg:w-7/12 space-y-6">
-          <!-- Info paciente -->
-          <div class="bg-white rounded-2xl shadow-md p-6">
-            <div class="flex items-center justify-between flex-wrap gap-3">
-              <h1 class="text-gray-700 text-xl">
-                <strong class="text-[#163c63]">Paciente:</strong>
-                {{ patient()!.firstName }} {{ patient()!.lastName }}
-              </h1>
-
-              <button
-                (click)="toggleInfo()"
-                class="flex items-center gap-1.5 text-sm font-medium text-[#215c98] border border-[#215c98]/30 rounded-lg px-3 py-1.5 hover:bg-[#215c98]/8 hover:border-[#215c98]/60 transition-all duration-200 select-none cursor-pointer"
-              >
-                <span>{{
-                  mostrarInfo() ? 'Ocultar' : 'Ver más información'
-                }}</span>
-                <svg
-                  class="w-3.5 h-3.5 transition-transform duration-200"
-                  [class.rotate-180]="mostrarInfo()"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            @if (mostrarInfo()) {
-              <div
-                class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 pt-4 border-t border-[#215c98]/15"
-              >
-                <p>
-                  <strong class="text-[#163c63]">Tipo de documento: </strong
-                  >{{ patient()!.identificationType | formato }}
-                </p>
-                <p>
-                  <strong class="text-[#163c63]">Documento: </strong
-                  >{{ patient()!.identification }}
-                </p>
-                <p>
-                  <strong class="text-[#163c63]">Fecha de nacimiento: </strong
-                  >{{ patientBirthDateFormatted() }}
-                </p>
-                <p>
-                  <strong class="text-[#163c63]">Edad: </strong
-                  >{{ patientAge() }} años
-                </p>
-                <p>
-                  <strong class="text-[#163c63]">Sexo: </strong
-                  >{{ patient()!.sex | formato }}
-                </p>
-                <p>
-                  <strong class="text-[#163c63]">Teléfono: </strong
-                  >{{ patient()!.phone }}
-                </p>
-                <p>
-                  <strong class="text-[#163c63]">Correo electrónico: </strong
-                  >{{ patient()!.email || 'No registra' }}
-                </p>
-                <p>
-                  <strong class="text-[#163c63]"
-                    >Teléfono del acudiente: </strong
-                  >{{ patient()!.guardianPhone || 'No registra' }}
-                </p>
-              </div>
-            }
-          </div>
-
           <!-- Nueva observación -->
           <div class="bg-white rounded-2xl shadow-md p-6">
             <h5
               class="flex items-center gap-2 text-lg font-semibold text-[#163c63] mb-4"
             >
-              <svg lucideClipboardPlus [size]="30" class="text-[#163c63]"></svg>
+              <svg lucideClipboardPen [size]="30" class="text-[#163c63]"></svg>
               Agregar Observación
             </h5>
             <textarea
