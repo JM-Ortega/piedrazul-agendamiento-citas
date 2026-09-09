@@ -114,6 +114,19 @@ export class SchedulerHistoryComponent implements OnInit {
     this.doctors().find((d) => d.id === this.filterDoctor())
   );
 
+  historyDescription = computed(() => {
+    const parts: string[] = [];
+    if (this.filterDoctor()) parts.push(this.selectedDoctor()?.name ?? '');
+    if (this.filterDate()) parts.push(this.formatDate(this.filterDate()));
+    if (this.filterStatus())
+      parts.push(this.formatoPipe.transform(this.filterStatus()));
+
+    if (!parts.length) {
+      return 'Mostrando todas las citas de todos los médicos';
+    }
+    return parts.join(' — ');
+  });
+
   ngOnInit(): void {
     this.schedulerService
       .getDoctors()
