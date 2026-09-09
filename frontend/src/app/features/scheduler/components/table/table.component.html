@@ -12,31 +12,31 @@
         <tr class="bg-[#d9e9f8]/40">
           @if (view !== 'today') {
             <th
-              class="text-left px-4 py-3 text-[#163c63] text-base rounded-l-xl"
+              class="text-left px-4 py-1 text-[#163c63] text-base rounded-l-xl"
             >
               Fecha
             </th>
           }
           <th
             [class]="
-              'text-left px-4 py-3 text-[#163c63] text-base ' +
+              'text-left px-4 py-1 text-[#163c63] text-base ' +
               (view === 'today' ? 'rounded-l-xl' : '')
             "
           >
             Hora
           </th>
-          <th class="text-left px-4 py-3 text-[#163c63] text-base">Paciente</th>
+          <th class="text-left px-4 py-1 text-[#163c63] text-base">Paciente</th>
           <th
-            class="text-left px-4 py-3 text-[#163c63] text-base hidden md:table-cell"
+            class="text-left px-4 py-1 text-[#163c63] text-base hidden md:table-cell"
           >
             Médico
           </th>
           <th
-            class="text-left px-4 py-3 text-[#163c63] text-base hidden md:table-cell"
+            class="text-left px-4 py-1 text-[#163c63] text-base hidden md:table-cell"
           >
             Estado
           </th>
-          <th class="text-left px-4 py-3 text-[#163c63] text-base rounded-r-xl">
+          <th class="text-left px-4 py-1 text-[#163c63] text-base rounded-r-xl">
             Cancelar
           </th>
         </tr>
@@ -51,7 +51,7 @@
             "
           >
             @if (view !== 'today') {
-              <td class="px-4 py-4">
+              <td class="px-4 py-1">
                 <div class="flex items-center gap-2">
                   <svg
                     lucideCalendar
@@ -64,7 +64,7 @@
                 </div>
               </td>
             }
-            <td class="px-4 py-4">
+            <td class="px-4 py-1">
               <div class="flex items-center gap-2">
                 <svg
                   lucideClock
@@ -76,7 +76,7 @@
                 }}</span>
               </div>
             </td>
-            <td class="px-4 py-4">
+            <td class="px-4 py-1">
               <div class="flex items-center gap-3">
                 <div
                   class="bg-[#d9e9f8] rounded-full w-10 h-10 flex items-center justify-center shrink-0"
@@ -91,11 +91,11 @@
                 </div>
               </div>
             </td>
-            <td class="px-4 py-4 hidden md:table-cell">
+            <td class="px-4 py-1 hidden md:table-cell">
               <p class="text-gray-700 text-base">{{ apt.doctorName }}</p>
               <p class="text-gray-400 text-sm">{{ apt.specialty | formato }}</p>
             </td>
-            <td class="px-4 py-4 hidden md:table-cell">
+            <td class="px-4 py-1 hidden md:table-cell">
               <span
                 class="px-3 py-1.5 rounded-lg text-sm font-medium"
                 [class]="statusColor(apt.appointmentState)"
@@ -103,7 +103,7 @@
                 {{ statusLabel(apt.appointmentState) }}
               </span>
             </td>
-            <td class="px-4 py-4 rounded-lg text-sm font-medium">
+            <td class="px-4 py-1 rounded-lg text-sm font-medium">
               <div class="px-3 py-1.5">
                 @if (apt.appointmentState === 'AGENDADA') {
                   <app-button

@@ -21,7 +21,7 @@ export type FilterValues = Record<string, string>;
 export class FiltersComponent {
   /** Definición de los campos a renderizar, en el orden en que se muestran. */
   fields = input<FilterFieldConfig[]>([]);
-  title = input('Filtros');
+  title = input('');
   description = input('');
 
   /** Valores actualmente aplicados por el padre (última consulta ejecutada). */

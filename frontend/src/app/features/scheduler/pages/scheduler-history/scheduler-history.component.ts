@@ -16,10 +16,8 @@ import { ButtonComponent } from '../../../../design-system/atoms/button/button.c
 import { ToastComponent } from '../../../../design-system/molecules/toast-message/toast.component';
 import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
 import { AppointmentTableComponent } from '../../components/table/table.component';
-import {
-  FiltersComponent,
-  FilterValues,
-} from '../../../../design-system/organisms/filters/filters.component';
+import { FilterValues } from '../../../../design-system/organisms/filters/filters.component';
+import { FiltersPanelComponent } from '../../components/filtersPanel/filtersPanel.component';
 import { FilterFieldConfig } from '../../../../design-system/molecules/filter-field/filterField.model';
 import { SchedulerExportModalComponent } from '../../components/export-modal/export-modal.component';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
@@ -38,7 +36,7 @@ const PAGE_SIZE = 5;
     ConfirmModalComponent,
     ToastComponent,
     AppointmentTableComponent,
-    FiltersComponent,
+    FiltersPanelComponent,
     SchedulerExportModalComponent,
     ButtonComponent,
     PaginationComponent,
@@ -115,6 +113,19 @@ export class SchedulerHistoryComponent implements OnInit {
   selectedDoctor = computed(() =>
     this.doctors().find((d) => d.id === this.filterDoctor())
   );
+
+  historyDescription = computed(() => {
+    const parts: string[] = [];
+    if (this.filterDoctor()) parts.push(this.selectedDoctor()?.name ?? '');
+    if (this.filterDate()) parts.push(this.formatDate(this.filterDate()));
+    if (this.filterStatus())
+      parts.push(this.formatoPipe.transform(this.filterStatus()));
+
+    if (!parts.length) {
+      return 'Mostrando todas las citas de todos los médicos';
+    }
+    return parts.join(' — ');
+  });
 
   ngOnInit(): void {
     this.schedulerService

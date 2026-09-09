@@ -14,16 +14,14 @@ import { formatLongDateEs } from '../../../../shared/helpers/date-format';
 import { ConfirmModalComponent } from '../../../../design-system/organisms/confirm-modal/confirm-modal.component';
 import { ToastComponent } from '../../../../design-system/molecules/toast-message/toast.component';
 import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
-import {
-  FiltersComponent,
-  FilterValues,
-} from '../../../../design-system/organisms/filters/filters.component';
+import { FilterValues } from '../../../../design-system/organisms/filters/filters.component';
+import { FiltersPanelComponent } from '../../components/filtersPanel/filtersPanel.component';
 import { FilterFieldConfig } from '../../../../design-system/molecules/filter-field/filterField.model';
 import { AppointmentTableComponent } from '../../components/table/table.component';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 6;
 
 @Component({
   selector: 'app-scheduler-dashboard',
@@ -34,7 +32,7 @@ const PAGE_SIZE = 5;
     ConfirmModalComponent,
     ToastComponent,
     AppointmentTableComponent,
-    FiltersComponent,
+    FiltersPanelComponent,
     PaginationComponent,
   ],
   templateUrl: './scheduler-dashboard.component.html',

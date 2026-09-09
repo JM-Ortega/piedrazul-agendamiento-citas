@@ -1,5 +1,5 @@
-<div class="min-h-screen bg-blue-50 py-4 px-4">
-  <div class="max-w-5xl mx-auto space-y-6">
+<div class="min-h-screen bg-blue-50 py-2 px-2">
+  <div class="max-w-6xl mx-auto space-y-2">
     @if (errorMessage()) {
       <div
         class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"
@@ -9,56 +9,49 @@
     }
     <!-- ── Exportar ── -->
     <div
-      class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md p-6 border-2 border-green-200 mt-6"
+      class="bg-linear-to-r from-green-50 to-emerald-50 rounded-2xl shadow-md py-2 px-5 border-2 border-green-200 mt-2"
     >
       <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div class="flex items-center gap-3">
           <div class="bg-[#1f7a52] rounded-full p-3">
-            <svg lucideDownload [size]="28" class="text-white"></svg>
+            <svg lucideDownload [size]="18" class="text-white"></svg>
           </div>
           <div>
-            <h3 class="text-green-800 text-xl font-bold">Exportar Reporte</h3>
+            <h3 class="text-green-800 text-2sm font-bold">Exportar Reporte</h3>
             <p class="text-green-600 text-sm flex items-center gap-1 mt-0.5">
               <svg lucideCalendar [size]="14"></svg>
               Se exportarán las citas de la fecha seleccionada
             </p>
           </div>
         </div>
-        <app-button variant="success" (buttonClick)="exportModal.open()">
-          <svg lucideDownload [size]="20" class="text-white"></svg> Exportar
+        <app-button
+          variant="success"
+          size="sm"
+          (buttonClick)="exportModal.open()"
+        >
+          <svg lucideDownload [size]="18" class="text-white"></svg> Exportar
         </app-button>
       </div>
     </div>
-    <div class="bg-white rounded-2xl shadow-md p-7 mt-8">
-      <div class="pb-7">
-        <app-filters
+    <!-- ── Filtros ── -->
+    <div class="bg-white rounded-2xl shadow-md px-5 py-2">
+      <div>
+        <app-filters-panel
           [fields]="filterFields()"
-          title="Filtros Avanzados"
-          description="Selecciona los filtros y aplica los cambios"
           [appliedValues]="appliedFilterValues()"
+          closedHint="Toca aquí para filtrar por médico, fecha o estado"
           (apply)="onApplyFilters($event)"
-        ></app-filters>
+        ></app-filters-panel>
       </div>
       <div
-        class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-3"
+        class="flex flex-col md:flex-row md:items-center justify-between mb-2 gap-3"
       >
         <div>
-          <h2 class="text-[#163c63] text-2xl font-semibold">
+          <h2 class="text-[#163c63] text-lg font-semibold">
             Historial de Citas
           </h2>
-          <p class="text-gray-500 text-base mt-1">
-            @if (!filterDoctor() && !filterDate()) {
-              Mostrando todas las citas de todos los médicos
-            }
-            @if (filterDoctor() && !filterDate()) {
-              Mostrando todas las citas de {{ selectedDoctor()?.name }}
-            }
-            @if (!filterDoctor() && filterDate()) {
-              Mostrando citas del {{ formatDate(filterDate()) }}
-            }
-            @if (filterDoctor() && filterDate()) {
-              {{ selectedDoctor()?.name }} — {{ formatDate(filterDate()) }}
-            }
+          <p class="text-gray-500 text-sm mt-1">
+            {{ historyDescription() }}
           </p>
         </div>
         <div>
