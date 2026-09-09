@@ -1,5 +1,5 @@
-<div class="min-h-screen bg-blue-50 py-2 px-4">
-  <div class="max-w-5xl mx-auto space-y-2">
+<div class="min-h-screen bg-blue-50 py-2 px-2">
+  <div class="max-w-6xl mx-auto space-y-2">
     @if (errorMessage()) {
       <div
         class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"
@@ -34,7 +34,7 @@
       </div>
     </div>
     <!-- ── Filtros ── -->
-    <div class="bg-white rounded-2xl shadow-md px-5 py-3">
+    <div class="bg-white rounded-2xl shadow-md px-5 py-2">
       <div>
         <app-filters-panel
           [fields]="filterFields()"
@@ -43,10 +43,10 @@
         ></app-filters-panel>
       </div>
       <div
-        class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-3"
+        class="flex flex-col md:flex-row md:items-center justify-between mb-2 gap-3"
       >
         <div>
-          <h2 class="text-[#163c63] text-2xl font-semibold">
+          <h2 class="text-[#163c63] text-lg font-semibold">
             Historial de Citas
           </h2>
           <p class="text-gray-500 text-sm mt-1">
