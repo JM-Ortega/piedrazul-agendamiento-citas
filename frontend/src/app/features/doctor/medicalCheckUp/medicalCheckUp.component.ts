@@ -30,7 +30,7 @@ type MedicalHistoryContext = 'scheduled' | 'unscheduled';
 
 @Component({
   selector: 'app-doctor-medical-history',
-  templateUrl: './doctor-medical-history.component.html',
+  templateUrl: './medicalCheckUp.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
