@@ -39,6 +39,7 @@
         <app-filters-panel
           [fields]="filterFields()"
           [appliedValues]="appliedFilterValues()"
+          closedHint="Toca aquí para filtrar por médico, fecha o estado"
           (apply)="onApplyFilters($event)"
         ></app-filters-panel>
       </div>
