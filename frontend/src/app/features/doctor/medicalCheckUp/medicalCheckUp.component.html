@@ -1,4 +1,4 @@
-<div class="min-h-screen bg-blue-50 py-2 px-6">
+<div class="min-2h-screen py-2 px-6">
   <div class="max-w-8xl mx-auto">
     @if (isLoadingPatient()) {
       <div class="flex items-center justify-center py-12">
@@ -178,16 +178,24 @@
           </div>
         </div>
 
-        <!-- Columna derecha (más angosta): historial -->
+        <!-- Columna derecha: historial -->
         <div
           class="w-full lg:w-5/12 lg:max-h-[75vh] lg:overflow-y-auto lg:pr-1"
         >
-          <h5
-            class="flex items-center gap-2 text-lg font-semibold text-[#163c63] mb-4"
-          >
-            <svg lucideFolderOpen [size]="30" class="text-[#163c63]"></svg>
-            Historial de Consultas
-          </h5>
+          <div class="flex items-center justify-between flex-wrap">
+            <h5
+              class="flex items-center gap-2 text-2sm font-semibold text-[#163c63]"
+            >
+              <svg lucideFolderOpen [size]="28" class="text-[#163c63]"></svg>
+              Historial de Consultas
+            </h5>
+
+            <!-- Paginación alineada a la derecha del h5 -->
+            <app-pagination
+              [pagination]="medicalRecordsPagination()"
+              (pageChange)="onMedicalRecordsPageChange($event)"
+            ></app-pagination>
+          </div>
           @if (records().length === 0) {
             <div
               class="bg-blue-50 border border-blue-200 text-[#215c98] px-4 py-3 rounded-xl"
@@ -195,26 +203,24 @@
               Sin registros clínicos.
             </div>
           }
-          <app-pagination
-            [pagination]="medicalRecordsPagination()"
-            (pageChange)="onMedicalRecordsPageChange($event)"
-          ></app-pagination>
           @for (r of records(); track r.idClinicalHistory) {
-            <div class="bg-white rounded-2xl shadow-md p-6 mb-3">
-              <div class="flex flex-col gap-2 mb-1">
+            <div class="bg-white rounded-2xl shadow-md px-6 py-2 mb-2">
+              <div
+                class="flex items-center justify-between flex-wrap gap-2 pb-1 mb-2 border-b border-gray-100"
+              >
                 <span class="flex items-center gap-2 text-gray-700 text-sm">
-                  <svg lucideCalendar [size]="22" class="text-[#163c63]"></svg>
-                  <strong class="text-[#163c63]">Fecha:</strong
-                  >{{ r.attendedAt }}
+                  <svg lucideCalendar [size]="20" class="text-[#163c63]"></svg>
+                  <strong class="text-[#163c63]">Fecha:</strong>
+                  {{ r.attendedAt }}
                 </span>
-                <span
-                  class="flex items-center gap-2 text-gray-700 text-sm mt-2"
-                >
-                  <strong class="text-[#163c63]">Médico:</strong
-                  >{{ r.doctorName }}
+                <span class="flex items-center gap-2 text-gray-700 text-sm">
+                  <strong class="text-[#163c63]">Médico:</strong>
+                  {{ r.doctorName }}
                 </span>
               </div>
-              <p class="text-gray-700">{{ r.description }}</p>
+
+              <!-- Contenido de la descripción -->
+              <p class="text-gray-700 leading-relaxed">{{ r.description }}</p>
             </div>
           }
           @if (isLoadingRecords()) {
