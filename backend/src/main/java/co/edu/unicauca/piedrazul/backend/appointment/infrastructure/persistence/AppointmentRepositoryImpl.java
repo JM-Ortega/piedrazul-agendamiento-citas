@@ -10,6 +10,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
@@ -106,20 +107,33 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
 
     @Override
     public PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery) {
-        Specification<AppointmentEntity> spec = buildSpecification(idDoctor, idPatient, date, state).
-                and(statePriorityOrder(pageQuery));
+        Specification<AppointmentEntity> spec = buildSpecification(idDoctor, idPatient, date, state);
+
+        Pageable pageable = PageRequest.of(pageQuery.page(), pageQuery.size(), buildDeterministicSort(pageQuery));
+
+        Page<AppointmentEntity> entityPage = jpaRepository.findAll(spec, pageable);
+        return toPagedResult(entityPage);
+    }
+
+    private Sort buildDeterministicSort(PageQuery pageQuery) {
+        Sort.Direction direction = pageQuery.ascending() ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Sort primary = Sort.by(direction, pageQuery.sortBy());
+
+        if ("date".equals(pageQuery.sortBy())) {
+            return primary.and(Sort.by(Sort.Direction.ASC, "startTime"));
+        }
+        return primary.and(Sort.by(Sort.Direction.ASC, "date")).and(Sort.by(Sort.Direction.ASC, "startTime"));
+    }
+
+    @Override
+    public PagedResult<Appointment> ListDoctorDailyAgenda(UUID idDoctor, LocalDate date, AppointmentState state, PageQuery pageQuery) {
+        Specification<AppointmentEntity> specification = buildSpecification(idDoctor, null, date, state)
+                .and(byStatePriority());
 
         Pageable pageable = PageRequest.of(pageQuery.page(), pageQuery.size());
 
-        Page<AppointmentEntity> entityPage = jpaRepository.findAll(spec, pageable);
-
-        return new PagedResult<>(
-                entityPage.getContent().stream().map(mapper::toDomain).toList(),
-                entityPage.getNumber(),
-                entityPage.getSize(),
-                entityPage.getTotalElements(),
-                entityPage.getTotalPages()
-        );
+        Page<AppointmentEntity> entityPage = jpaRepository.findAll(specification, pageable);
+        return toPagedResult(entityPage);
     }
 
     @Override
@@ -133,24 +147,6 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
                 .stream()
                 .map(mapper::toDomain)
                 .toList();
-    }
-
-    private Specification<AppointmentEntity> statePriorityOrder(PageQuery pageQuery) {
-        return (root, query, cb) -> {
-            Expression<Integer> priority = cb.<Integer>selectCase()
-                    .when(cb.equal(root.get("appointmentState"), AppointmentState.AGENDADA), 1)
-                    .when(cb.equal(root.get("appointmentState"), AppointmentState.ATENDIDA), 2)
-                    .when(cb.equal(root.get("appointmentState"), AppointmentState.NO_ASISTIO), 3)
-                    .when(cb.equal(root.get("appointmentState"), AppointmentState.CANCELADA), 4)
-                    .otherwise(5); // cubre REPROGRAMADA u otro estado futuro sin romper el orden
-
-            Order secondary = pageQuery.ascending()
-                    ? cb.asc(root.get(pageQuery.sortBy()))
-                    : cb.desc(root.get(pageQuery.sortBy()));
-
-            query.orderBy(cb.asc(priority), secondary);
-            return cb.conjunction(); // no filtra nada, solo aporta el ORDER BY
-        };
     }
 
     private Specification<AppointmentEntity> buildSpecification(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state) {
@@ -170,6 +166,27 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
         }
 
         return Specification.allOf(specs);
+    }
+
+    private Specification<AppointmentEntity> byStatePriority() {
+        return (root, query, cb) -> {
+            Expression<Integer> priority = cb.<Integer>selectCase()
+                    .when(cb.equal(root.get("appointmentState"), AppointmentState.AGENDADA), 1)
+                    .when(cb.equal(root.get("appointmentState"), AppointmentState.ATENDIDA), 2)
+                    .when(cb.equal(root.get("appointmentState"), AppointmentState.NO_ASISTIO), 3)
+                    .when(cb.equal(root.get("appointmentState"), AppointmentState.CANCELADA), 4)
+                    .otherwise(5);
+
+            query.orderBy(cb.asc(priority), cb.asc(root.get("startTime")));
+            return cb.conjunction();
+        };
+    }
+
+    private PagedResult<Appointment> toPagedResult(Page<AppointmentEntity> entityPage) {
+        return new PagedResult<>(
+                entityPage.getContent().stream().map(mapper::toDomain).toList(),
+                entityPage.getNumber(), entityPage.getSize(), entityPage.getTotalElements(), entityPage.getTotalPages()
+        );
     }
 
 }

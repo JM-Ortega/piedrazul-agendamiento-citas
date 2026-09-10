@@ -118,6 +118,13 @@ public class AppointmentConfig {
     }
 
     @Bean
+    public GetDoctorDailyAgendaUseCase getDoctorDailyAgendaUseCase(
+            AppointmentRepository appointmentRepository
+    ) {
+        return new GetDoctorDailyAgendaUseCaseImpl(appointmentRepository);
+    }
+
+    @Bean
     public IsNewPatientUseCase isNewPatientUseCase(
             AppointmentRepository appointmentRepository,
             PatientConsultPort patientConsultPort) {

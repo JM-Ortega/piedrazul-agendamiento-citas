@@ -38,6 +38,8 @@ public interface AppointmentRepository {
     //Metodo unico para el caso de uso ListAppointmentsUseCase
     PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery);
 
+    PagedResult<Appointment> ListDoctorDailyAgenda(UUID idDoctor, LocalDate date, AppointmentState state, PageQuery pageQuery);
+
     boolean existsByIdPatientAndSchedulingOriginAndDateBetween(UUID idPatient, SchedulingOrigin schedulingOrigin,
                                                                LocalDate startDate, LocalDate endDate);
 }
