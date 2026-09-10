@@ -32,7 +32,7 @@ const MAX_DOC_LENGTH = 20;
     SearchSuggestionsComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './booking-patient-search.component.html',
+  templateUrl: './bookingPatientSearch.component.html',
 })
 export class BookingPatientSearchComponent implements OnInit {
   protected state = inject(BookingStateService);

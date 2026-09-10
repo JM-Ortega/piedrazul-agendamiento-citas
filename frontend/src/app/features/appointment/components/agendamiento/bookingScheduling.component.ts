@@ -47,7 +47,7 @@ import { AppError } from '../../../../shared/models/interfaces/api-error.model';
     { provide: DateAdapter, useClass: CustomDateAdapter },
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './booking-scheduling.component.html',
+  templateUrl: './bookingScheduling.component.html',
 })
 export class BookingSchedulingComponent implements OnInit {
   protected state = inject(BookingStateService);

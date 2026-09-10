@@ -35,7 +35,7 @@ import { AppError } from '../../../../shared/models/interfaces/api-error.model';
     PatientFormComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './booking-patient-register.component.html',
+  templateUrl: './bookingPatientRegister.component.html',
 })
 export class BookingPatientRegisterComponent {
   protected state = inject(BookingStateService);

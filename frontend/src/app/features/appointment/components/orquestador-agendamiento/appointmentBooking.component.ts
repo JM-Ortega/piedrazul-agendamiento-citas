@@ -13,14 +13,14 @@ import { timer } from 'rxjs';
 import { PatientAppointmentService } from '../../../../core/services/patient.service';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
-import { BookingSchedulingComponent } from '../../../appointment/components/agendamiento/booking-scheduling.component';
-import { BookingPatientSearchComponent } from '../../components/busqueda-paciente/booking-patient-search.component';
-import { BookingPatientRegisterComponent } from '../../components/registro-paciente/booking-patient-register.component';
+import { BookingSchedulingComponent } from '../agendamiento/bookingScheduling.component';
+import { BookingPatientSearchComponent } from '../busqueda-paciente/bookingPatientSearch.component';
+import { BookingPatientRegisterComponent } from '../registro-paciente/bookingPatientRegister.component';
 import { SpecialtyDoctor } from '../../models/dtos/specialtyDoctor.dto';
 import { BookingContext } from '../../models/types/bookingContext.type';
 import { BookingStateService } from '../../services/bookingState.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import { BookingConfirmComponent } from '../confirmacion/booking-confirm.component';
+import { BookingConfirmComponent } from '../confirmacion/bookingConfirm.component';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 
 /**
@@ -44,7 +44,7 @@ import { AppError } from '../../../../shared/models/interfaces/api-error.model';
     ButtonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './appointment-booking.component.html',
+  templateUrl: './appointmentBooking.component.html',
 })
 export class AppointmentBookingComponent implements OnInit {
   protected state = inject(BookingStateService);

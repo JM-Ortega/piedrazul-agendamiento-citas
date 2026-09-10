@@ -1,6 +1,6 @@
 import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
-import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointment-booking.component';
+import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointmentBooking.component';
 
 @Component({
   selector: 'app-new-appointment-scheduler',

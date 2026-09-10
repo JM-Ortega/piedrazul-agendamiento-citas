@@ -36,7 +36,7 @@ import { calcAge } from '../../../../shared/helpers/patient-validation';
     ButtonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './booking-confirm.component.html',
+  templateUrl: './bookingConfirm.component.html',
 })
 export class BookingConfirmComponent implements OnInit {
   protected state = inject(BookingStateService);
