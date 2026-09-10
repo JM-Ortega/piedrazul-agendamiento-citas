@@ -56,7 +56,7 @@ const EXT_MAP: Record<ExportFormat, string> = {
     DatepickerComponent,
     ConfirmModalComponent,
   ],
-  templateUrl: './export-modal.component.html',
+  templateUrl: './exportModal.component.html',
 })
 export class SchedulerExportModalComponent {
   private schedulerService = inject(SchedulerService);

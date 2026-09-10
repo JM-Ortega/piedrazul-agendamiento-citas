@@ -19,7 +19,7 @@ import { AppointmentTableComponent } from '../../components/table/table.componen
 import { FilterValues } from '../../../../design-system/organisms/filters/filters.component';
 import { FiltersPanelComponent } from '../../components/filtersPanel/filtersPanel.component';
 import { FilterFieldConfig } from '../../../../design-system/molecules/filter-field/filterField.model';
-import { SchedulerExportModalComponent } from '../../components/export-modal/export-modal.component';
+import { SchedulerExportModalComponent } from '../../components/exportModal/exportModal.component';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
@@ -41,7 +41,7 @@ const PAGE_SIZE = 5;
     ButtonComponent,
     PaginationComponent,
   ],
-  templateUrl: './scheduler-history.component.html',
+  templateUrl: './schedulerHistory.component.html',
 })
 export class SchedulerHistoryComponent implements OnInit {
   private schedulerService = inject(SchedulerService);

@@ -35,7 +35,7 @@ const PAGE_SIZE = 6;
     FiltersPanelComponent,
     PaginationComponent,
   ],
-  templateUrl: './scheduler-dashboard.component.html',
+  templateUrl: './schedulerDashboard.component.html',
 })
 export class SchedulerDashboardComponent implements OnInit {
   private schedulerService = inject(SchedulerService);

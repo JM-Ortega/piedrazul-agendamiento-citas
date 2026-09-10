@@ -15,8 +15,8 @@ import { DoctorDashboardComponent } from './features/doctor/doctorDashboard/doct
 import { PatientAppointmentHistoryComponent } from './features/patient/patientAppointmentHistory/patientAppointmentHistory.component';
 import { PatientDashboardComponent } from './features/patient/patientDashboard/patientDashboard.component';
 import { RegistroComponent } from './features/registro/registro.component';
-import { SchedulerDashboardComponent } from './features/scheduler/pages/scheduler-dashboard/scheduler-dashboard.component';
-import { SchedulerHistoryComponent } from './features/scheduler/pages/scheduler-history/scheduler-history.component';
+import { SchedulerDashboardComponent } from './features/scheduler/pages/schedulerDashboard/schedulerDashboard.component';
+import { SchedulerHistoryComponent } from './features/scheduler/pages/schedulerHistory/schedulerHistory.component';
 import { DoctorUnscheduledAttentionComponent } from './features/doctor/components/unscheduledAttention/doctorUnscheduledAttention/doctorUnscheduledAttention.component';
 
 export const routes: Routes = [
