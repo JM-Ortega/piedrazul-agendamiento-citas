@@ -10,8 +10,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import {
   LucideCalendar,
   LucideClipboardPen,
-  LucideClipboardPlus,
   LucideFolderOpen,
+  LucideUser,
   LucideSave,
   LucideTriangleAlert,
 } from '@lucide/angular';
@@ -30,16 +30,16 @@ type MedicalHistoryContext = 'scheduled' | 'unscheduled';
 
 @Component({
   selector: 'app-doctor-medical-history',
-  templateUrl: './doctor-medical-history.component.html',
+  templateUrl: './medicalCheckUp.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LucideTriangleAlert,
     LucideClipboardPen,
-    LucideClipboardPlus,
     LucideSave,
     LucideFolderOpen,
     LucideCalendar,
+    LucideUser,
     FormatoPipe,
     ButtonComponent,
     PaginationComponent,

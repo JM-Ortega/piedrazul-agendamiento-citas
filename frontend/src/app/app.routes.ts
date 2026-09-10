@@ -9,7 +9,7 @@ import { AdminUsersComponent } from './features/admin/pages/adminUsers/adminUser
 import { NewAppointmentSchedulerComponent } from './features/appointment/pages/agendador-agendar/new-appointment-scheduler.component';
 import { NewAppointmentDoctorComponent } from './features/appointment/pages/doctor-agendar/new-appointment-doctor.component';
 import { PatientNewAppointmentComponent } from './features/appointment/pages/paciente-agendar/patient-new-appointment.component';
-import { DoctorMedicalHistoryComponent } from './features/doctor/doctor-medical-history/doctor-medical-history.component';
+import { DoctorMedicalHistoryComponent } from './features/doctor/medicalCheckUp/medicalCheckUp.component';
 import { DoctorAllAppointmentsComponent } from './features/doctor/doctorAllAppointments/doctorAllAppointments.component';
 import { DoctorDashboardComponent } from './features/doctor/doctorDashboard/doctorDashboard.component';
 import { PatientAppointmentHistoryComponent } from './features/patient/patient-appointment-history/patient-appointment-history.component';

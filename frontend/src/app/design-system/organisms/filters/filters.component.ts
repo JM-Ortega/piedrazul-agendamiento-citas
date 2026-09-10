@@ -1,5 +1,4 @@
 import { Component, computed, input, output, signal } from '@angular/core';
-import { LucideSearch } from '@lucide/angular';
 import { ButtonComponent } from '../../atoms/button/button.component';
 import { FilterFieldComponent } from '../../molecules/filter-field/filterField.component';
 import { FilterFieldConfig } from '../../molecules/filter-field/filterField.model';
@@ -15,7 +14,7 @@ export type FilterValues = Record<string, string>;
 @Component({
   selector: 'app-filters',
   standalone: true,
-  imports: [LucideSearch, ButtonComponent, FilterFieldComponent],
+  imports: [ButtonComponent, FilterFieldComponent],
   templateUrl: './filters.component.html',
 })
 export class FiltersComponent {
