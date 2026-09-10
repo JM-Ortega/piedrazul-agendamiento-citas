@@ -5,7 +5,6 @@ import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
 import { BookingContext } from '../models/types/bookingContext.type';
 import { toIsoDateString } from '../../../shared/helpers/transform-date-local';
 import { formatLongDateEs } from '../../../shared/helpers/date-format';
-import { AvailableDateSlots } from '../models/dtos/availableDateSlots.dto';
 import { SchedulingOrigin } from '../models/types/schedulingOrigin.type';
 
 /** Especialidad fija con la que se agenda cuando el contexto es `patient`. */
@@ -82,7 +81,6 @@ export class BookingStateService {
   selectedDoctorId = signal<string>('');
   selectedDoctorName = signal<string>('');
   selectedSpecialty = signal<string>('');
-  availableDateSlots = signal<AvailableDateSlots[]>([]);
 
   noDoctorsFound = signal<boolean>(false);
   errorMessageDoctors = signal<string>('');
@@ -103,10 +101,6 @@ export class BookingStateService {
     if (this.isPatientContext()) return !!this.selectedDoctorId();
     return !!this.selectedDoctorId() && !!this.selectedSpecialty();
   });
-
-  readonly availableDatesSet = computed(
-    () => new Set(this.availableDateSlots().map((d) => d.date))
-  );
 
   // Estado de horario
   selectedDate = signal<Date | null>(null);
@@ -187,14 +181,6 @@ export class BookingStateService {
     return toIsoDateString(date);
   }
 
-  /** Horarios disponibles para una fecha ya cargada (sin nueva petición HTTP). */
-  slotsForDate(dateStr: string): string[] {
-    return (
-      this.availableDateSlots().find((d) => d.date === dateStr)
-        ?.availableSlots ?? []
-    );
-  }
-
   resolvePatientId(): string {
     if (this.isSchedulerContext() || this.isDoctorContext())
       return this.patientId() ?? '';
@@ -223,7 +209,6 @@ export class BookingStateService {
     this.selectedSpecialty.set(
       this.isPatientContext() ? PATIENT_DEFAULT_SPECIALTY : ''
     );
-    this.availableDateSlots.set([]);
     this.resetScheduleState();
   }
 
@@ -261,7 +246,6 @@ export class BookingStateService {
     }
     this.noDoctorsFound.set(false);
     this.errorMessageDoctors.set('');
-    this.availableDateSlots.set([]);
     this.resetScheduleState();
   }
 
