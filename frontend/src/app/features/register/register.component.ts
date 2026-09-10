@@ -21,7 +21,7 @@ import {
   LucideUserPlus,
 } from '@lucide/angular';
 import Keycloak from 'keycloak-js';
-import { ButtonComponent } from '../..//design-system/atoms/button/button.component';
+import { ButtonComponent } from '../../design-system/atoms/button/button.component';
 import { InputComponent } from '../../design-system/atoms/input/input.component';
 import {
   PatientPublicResponse,
@@ -88,9 +88,9 @@ type PatientStatus =
     FormatoPipe,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './registro.component.html',
+  templateUrl: './register.component.html',
 })
-export class RegistroComponent implements OnInit {
+export class RegisterComponent implements OnInit {
   ngOnInit(): void {
     this.patientService.loadDocumentTypes();
   }

@@ -14,7 +14,7 @@ import { DoctorAllAppointmentsComponent } from './features/doctor/doctorAllAppoi
 import { DoctorDashboardComponent } from './features/doctor/doctorDashboard/doctorDashboard.component';
 import { PatientAppointmentHistoryComponent } from './features/patient/patientAppointmentHistory/patientAppointmentHistory.component';
 import { PatientDashboardComponent } from './features/patient/patientDashboard/patientDashboard.component';
-import { RegistroComponent } from './features/registro/registro.component';
+import { RegisterComponent } from './features/register/register.component';
 import { SchedulerDashboardComponent } from './features/scheduler/pages/schedulerDashboard/schedulerDashboard.component';
 import { SchedulerHistoryComponent } from './features/scheduler/pages/schedulerHistory/schedulerHistory.component';
 import { DoctorUnscheduledAttentionComponent } from './features/doctor/components/unscheduledAttention/doctorUnscheduledAttention/doctorUnscheduledAttention.component';
@@ -120,7 +120,7 @@ export const routes: Routes = [
     canActivate: [AuthGuard],
     data: { role: 'PATIENT' },
   },
-  { path: 'registro', component: RegistroComponent },
+  { path: 'registro', component: RegisterComponent },
 
   { path: '**', redirectTo: '' },
 ];
