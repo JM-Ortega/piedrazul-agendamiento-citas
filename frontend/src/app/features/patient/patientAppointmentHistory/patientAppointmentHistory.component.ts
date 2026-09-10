@@ -27,7 +27,7 @@ const PAGE_SIZE = 5;
  */
 @Component({
   selector: 'app-patient-appointment-history',
-  templateUrl: './patient-appointment-history.component.html',
+  templateUrl: './patientAppointmentHistory.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [

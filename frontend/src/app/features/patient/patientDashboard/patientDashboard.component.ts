@@ -37,7 +37,7 @@ const PAGE_SIZE = 5;
  */
 @Component({
   selector: 'app-patient-dashboard',
-  templateUrl: './patient-dashboard.component.html',
+  templateUrl: './patientDashboard.component.html',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [

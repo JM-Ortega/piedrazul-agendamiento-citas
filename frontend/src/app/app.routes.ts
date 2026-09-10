@@ -12,8 +12,8 @@ import { PatientNewAppointmentComponent } from './features/appointment/pages/sch
 import { DoctorMedicalHistoryComponent } from './features/doctor/medicalCheckUp/medicalCheckUp.component';
 import { DoctorAllAppointmentsComponent } from './features/doctor/doctorAllAppointments/doctorAllAppointments.component';
 import { DoctorDashboardComponent } from './features/doctor/doctorDashboard/doctorDashboard.component';
-import { PatientAppointmentHistoryComponent } from './features/patient/patient-appointment-history/patient-appointment-history.component';
-import { PatientDashboardComponent } from './features/patient/patient-dashboard/patient-dashboard.component';
+import { PatientAppointmentHistoryComponent } from './features/patient/patientAppointmentHistory/patientAppointmentHistory.component';
+import { PatientDashboardComponent } from './features/patient/patientDashboard/patientDashboard.component';
 import { RegistroComponent } from './features/registro/registro.component';
 import { SchedulerDashboardComponent } from './features/scheduler/pages/scheduler-dashboard/scheduler-dashboard.component';
 import { SchedulerHistoryComponent } from './features/scheduler/pages/scheduler-history/scheduler-history.component';
