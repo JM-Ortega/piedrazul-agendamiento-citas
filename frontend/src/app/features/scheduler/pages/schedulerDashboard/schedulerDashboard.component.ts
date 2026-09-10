@@ -10,7 +10,7 @@ import { LucideX } from '@lucide/angular';
 import { SchedulerService } from '../../../../core/services/scheduler.service';
 import { PatientAppointmentService } from '../../../../core/services/patient.service';
 import { dtoDoctor } from '../../../../shared/models/dtos/doctor.dto';
-import { formatLongDateEs } from '../../../../shared/helpers/date-format';
+import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
 import { ConfirmModalComponent } from '../../../../designSystem/organisms/confirmModal/confirmModal.component';
 import { ToastComponent } from '../../../../designSystem/molecules/toastMessage/toast.component';
 import { PaginationComponent } from '../../../../designSystem/molecules/pagination/pagination.component';

@@ -24,7 +24,7 @@ import {
   DATE_INPUT_FORMAT_MARKER,
   DateFormatPreset,
 } from './customDateAdapter';
-import { parseLocalDateString } from '../../../shared/helpers/transform-date-local';
+import { parseLocalDateString } from '../../../shared/helpers/transformDateLocal';
 
 const APP_DATE_FORMATS = {
   parse: { dateInput: DATE_INPUT_FORMAT_MARKER },

@@ -18,11 +18,11 @@ import {
 import { SchedulerService } from '../../../../core/services/scheduler.service';
 import { AppointmentExportRequest } from '../../../../shared/models/dtos/AppointmentExportRequest.dto';
 import { ExportFormatBackend } from '../../../../shared/models/types/ExportFormatBackend.type';
-import { formatLongDateEs } from '../../../../shared/helpers/date-format';
+import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
 import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
 import { DatepickerComponent } from '../../../../designSystem/molecules/datepicker/datepicker.component';
 import { ConfirmModalComponent } from '../../../../designSystem/organisms/confirmModal/confirmModal.component';
-import { toIsoDateString } from '../../../../shared/helpers/transform-date-local';
+import { toIsoDateString } from '../../../../shared/helpers/transformDateLocal';
 
 type ExportFormat = 'excel' | 'pdf' | 'csv';
 

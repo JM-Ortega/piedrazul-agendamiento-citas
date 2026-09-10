@@ -25,10 +25,10 @@ import { SelectComponent } from '../../../../designSystem/atoms/select/select.co
 import {
   getDocumentIdMaxLength,
   getDocumentIdSanitize,
-} from '../../../../shared/helpers/document-validation';
-import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
-import { getSpecialtyMeta } from '../../../../shared/helpers/specialty-catalog';
-import { timeToMinutes } from '../../../../shared/helpers/time-utils';
+} from '../../../../shared/helpers/documentValidation';
+import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
+import { getSpecialtyMeta } from '../../../../shared/helpers/specialtyCatalog';
+import { timeToMinutes } from '../../../../shared/helpers/timeUtils';
 import { DAY_TO_WORKDAY } from '../../../../shared/helpers/workday.util';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';

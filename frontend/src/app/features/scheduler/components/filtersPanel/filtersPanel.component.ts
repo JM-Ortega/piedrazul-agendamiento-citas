@@ -12,7 +12,7 @@ import {
   FiltersComponent,
   FilterValues,
 } from '../../../../designSystem/organisms/filters/filters.component';
-import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
+import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
 
 /**
  * Panel colapsable de filtros para el historial de citas del agendador.

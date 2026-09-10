@@ -15,8 +15,8 @@ import {
   SelectOption,
 } from '../../../../../designSystem/atoms/select/select.component';
 import { DoctorService } from '../../../../../core/services/doctor.service';
-import { formatLongDateEs } from '../../../../../shared/helpers/date-format';
-import { calcAge } from '../../../../../shared/helpers/patient-validation';
+import { formatLongDateEs } from '../../../../../shared/helpers/dateFormat';
+import { calcAge } from '../../../../../shared/helpers/patientValidation';
 import { Patient } from '../../../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../../../shared/pipes/formatoPipe';
 import { PatientSuggestion } from '../../../../appointment/models/dtos/patientSuggestion.dto';

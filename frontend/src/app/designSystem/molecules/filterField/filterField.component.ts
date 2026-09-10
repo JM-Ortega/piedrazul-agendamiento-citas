@@ -5,7 +5,7 @@ import { DatepickerComponent } from '../datepicker/datepicker.component';
 import {
   parseLocalDateString,
   toIsoDateString,
-} from '../../../shared/helpers/transform-date-local';
+} from '../../../shared/helpers/transformDateLocal';
 import { FilterFieldConfig } from './filterField.model';
 
 /**

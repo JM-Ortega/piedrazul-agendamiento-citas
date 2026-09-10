@@ -4,8 +4,8 @@ import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { PageResponse } from '../../shared/models/dtos/pageResponse.dto';
-import { PaginatedState } from '../../shared/helpers/paginated-state';
-import { withPagination } from '../../shared/helpers/http-pagination';
+import { PaginatedState } from '../../shared/helpers/paginatedState';
+import { withPagination } from '../../shared/helpers/httpPagination';
 
 /**
  * Servicio de citas del paciente.

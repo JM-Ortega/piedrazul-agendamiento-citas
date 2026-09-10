@@ -22,8 +22,8 @@ import { ButtonComponent } from '../../../../designSystem/atoms/button/button.co
 import { InputComponent } from '../../../../designSystem/atoms/input/input.component';
 import { SelectComponent } from '../../../../designSystem/atoms/select/select.component';
 import { DatepickerComponent } from '../../../../designSystem/molecules/datepicker/datepicker.component';
-import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
-import { toIsoDateString } from '../../../../shared/helpers/transform-date-local';
+import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
+import { toIsoDateString } from '../../../../shared/helpers/transformDateLocal';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';

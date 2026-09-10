@@ -21,7 +21,7 @@ import { PatientService } from '../../../core/services/register.service';
 import { ButtonComponent } from '../../../designSystem/atoms/button/button.component';
 import { ConfirmModalComponent } from '../../../designSystem/organisms/confirmModal/confirmModal.component';
 import { ToastComponent } from '../../../designSystem/molecules/toastMessage/toast.component';
-import { getMonthShort } from '../../../shared/helpers/date-format';
+import { getMonthShort } from '../../../shared/helpers/dateFormat';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 import { AppError } from '../../../shared/models/interfaces/api-error.model';

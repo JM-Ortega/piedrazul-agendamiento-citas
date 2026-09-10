@@ -14,8 +14,8 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { PatientSuggestion } from '../../models/dtos/patientSuggestion.dto';
 import { BookingStateService } from '../../services/bookingState.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import { formatLongDateEs } from '../../../../shared/helpers/date-format';
-import { calcAge } from '../../../../shared/helpers/patient-validation';
+import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
+import { calcAge } from '../../../../shared/helpers/patientValidation';
 
 const MIN_SUGGESTION_CHARS = 3;
 const MIN_DOC_LENGTH = 6;

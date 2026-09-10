@@ -19,7 +19,7 @@ import {
   ToastComponent,
   ToastType,
 } from '../../../../designSystem/molecules/toastMessage/toast.component';
-import { PaginationMeta } from '../../../../shared/helpers/paginated-state';
+import { PaginationMeta } from '../../../../shared/helpers/paginatedState';
 import {
   DAY_TO_WORKDAY,
   workdayToNumber,
@@ -36,7 +36,7 @@ import { AdminModalsComponent } from '../../components/modals/modalHorarios/admi
 import { dtoSchedule } from '../../models/dtos/schedule.dto';
 import { AdminService } from '../../service/admin.service';
 // ── Imports ──
-import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
+import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
 
 @Component({
   selector: 'app-admin-config',

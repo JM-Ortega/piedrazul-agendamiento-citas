@@ -18,12 +18,12 @@ import { DatepickerComponent } from '../../../../designSystem/molecules/datepick
 import {
   parseLocalDateString,
   toIsoDateString,
-} from '../../../helpers/transform-date-local';
+} from '../../../helpers/transformDateLocal';
 import {
   isMinorByBirthDate,
   validateBirthDate,
   validateGuardianPhone,
-} from '../../../helpers/patient-validation';
+} from '../../../helpers/patientValidation';
 
 /**
  * Datos mínimos requeridos para completar el registro de paciente de alguien que ya tiene una

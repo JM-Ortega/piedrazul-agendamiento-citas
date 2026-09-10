@@ -23,9 +23,9 @@ import { ButtonComponent } from '../../../../designSystem/atoms/button/button.co
 import { InputComponent } from '../../../../designSystem/atoms/input/input.component';
 import { SelectComponent } from '../../../../designSystem/atoms/select/select.component';
 import { DatepickerComponent } from '../../../../designSystem/molecules/datepicker/datepicker.component';
-import { toggleInArray } from '../../../../shared/helpers/array-utils';
-import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
-import { toIsoDateString } from '../../../../shared/helpers/transform-date-local';
+import { toggleInArray } from '../../../../shared/helpers/arrayUtils';
+import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
+import { toIsoDateString } from '../../../../shared/helpers/transformDateLocal';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 import { DoctorFormData } from '../../models/interfaces/DoctorFormData';

@@ -9,8 +9,8 @@ import { ButtonComponent } from '../../../../designSystem/atoms/button/button.co
 import {
   APPOINTMENT_STATUS_CLASSES,
   APPOINTMENT_STATUS_LABELS,
-} from '../../../../shared/helpers/appointment-status';
-import { formatLongDateEs } from '../../../../shared/helpers/date-format';
+} from '../../../../shared/helpers/appointmentStatus';
+import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
 import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 

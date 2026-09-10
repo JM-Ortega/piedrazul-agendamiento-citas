@@ -3,7 +3,7 @@ import {
   AppError,
   ApiProblemDetails,
 } from '../../shared/models/interfaces/api-error.model';
-import { GLOBAL_ERROR_MESSAGES } from '../../shared/helpers/error-messages';
+import { GLOBAL_ERROR_MESSAGES } from '../../shared/helpers/errorMessages';
 
 /**
  * Traduce cualquier `HttpErrorResponse` a un `AppError` consistente,

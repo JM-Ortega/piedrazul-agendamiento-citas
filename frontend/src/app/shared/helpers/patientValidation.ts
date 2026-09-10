@@ -1,4 +1,4 @@
-import { parseLocalDateString } from './transform-date-local';
+import { parseLocalDateString } from './transformDateLocal';
 
 /**
  * Tipos de documento que, por definición, corresponden a un menor de edad.

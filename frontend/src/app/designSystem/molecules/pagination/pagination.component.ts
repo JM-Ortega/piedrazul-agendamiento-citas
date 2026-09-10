@@ -5,7 +5,7 @@ import {
   output,
 } from '@angular/core';
 import { LucideChevronLeft, LucideChevronRight } from '@lucide/angular';
-import { PaginationMeta } from '../../../shared/helpers/paginated-state';
+import { PaginationMeta } from '../../../shared/helpers/paginatedState';
 
 @Component({
   selector: 'app-pagination',

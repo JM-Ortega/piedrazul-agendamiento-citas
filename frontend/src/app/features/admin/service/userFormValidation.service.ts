@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
-import { validateDocumentForType } from '../../../shared/helpers/document-validation';
-import { timeToMinutes } from '../../../shared/helpers/time-utils';
+import { validateDocumentForType } from '../../../shared/helpers/documentValidation';
+import { timeToMinutes } from '../../../shared/helpers/timeUtils';
 import { FormErrors } from '../models/interfaces/FormErrors';
 import { UserForm } from '../models/interfaces/UserForm';
 

@@ -17,8 +17,8 @@ import { NewAppointment } from '../../models/dtos/newAppointment.dto';
 import { BookingStateService } from '../../services/bookingState.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
-import { formatLongDateEs } from '../../../../shared/helpers/date-format';
-import { calcAge } from '../../../../shared/helpers/patient-validation';
+import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
+import { calcAge } from '../../../../shared/helpers/patientValidation';
 
 /**
  * Mostrar el resumen completo de la cita a confirmar

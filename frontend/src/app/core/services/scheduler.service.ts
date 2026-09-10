@@ -6,8 +6,8 @@ import { AppointmentExportRequest } from '../../shared/models/dtos/AppointmentEx
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
 import { PageResponse } from '../../shared/models/dtos/pageResponse.dto';
-import { PaginatedState } from '../../shared/helpers/paginated-state';
-import { withPagination } from '../../shared/helpers/http-pagination';
+import { PaginatedState } from '../../shared/helpers/paginatedState';
+import { withPagination } from '../../shared/helpers/httpPagination';
 
 @Injectable({ providedIn: 'root' })
 export class SchedulerService {

@@ -25,14 +25,14 @@ import {
   SortDirection,
   SortOption,
 } from '../../../../designSystem/molecules/sortControl/sortControl.component';
-import { toggleInArray } from '../../../../shared/helpers/array-utils';
-import { PaginationMeta } from '../../../../shared/helpers/paginated-state';
-import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
+import { toggleInArray } from '../../../../shared/helpers/arrayUtils';
+import { PaginationMeta } from '../../../../shared/helpers/paginatedState';
+import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
 import {
   getSpecialtiesMeta,
   getSpecialtyMeta,
   SpecialtyMeta,
-} from '../../../../shared/helpers/specialty-catalog';
+} from '../../../../shared/helpers/specialtyCatalog';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { DoctorAdminDto } from '../../models/dtos/DoctorAdminDto';
 import { AdminService } from '../../service/admin.service';

@@ -22,13 +22,13 @@ import { FilterValues } from '../../../designSystem/organisms/filters/filters.co
 import {
   APPOINTMENT_STATUS_CLASSES,
   APPOINTMENT_STATUS_LABELS,
-} from '../../../shared/helpers/appointment-status';
+} from '../../../shared/helpers/appointmentStatus';
 import {
   formatLongDateEs,
   getMonthShort,
-} from '../../../shared/helpers/date-format';
-import { PaginatedState } from '../../../shared/helpers/paginated-state';
-import { toIsoDateString } from '../../../shared/helpers/transform-date-local';
+} from '../../../shared/helpers/dateFormat';
+import { PaginatedState } from '../../../shared/helpers/paginatedState';
+import { toIsoDateString } from '../../../shared/helpers/transformDateLocal';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { AppError } from '../../../shared/models/interfaces/api-error.model';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';

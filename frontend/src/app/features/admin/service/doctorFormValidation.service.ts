@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { timeToMinutes } from '../../../shared/helpers/time-utils';
+import { timeToMinutes } from '../../../shared/helpers/timeUtils';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 
 export interface FormErrors {

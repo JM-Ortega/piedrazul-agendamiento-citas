@@ -11,11 +11,11 @@ import { LucideCalendarDays, LucideClock } from '@lucide/angular';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { PatientAppointmentService } from '../../../core/services/patient.service';
 import { PatientService } from '../../../core/services/register.service';
-import { getMonthShort } from '../../../shared/helpers/date-format';
+import { getMonthShort } from '../../../shared/helpers/dateFormat';
 import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_STATUS_CLASSES,
-} from '../../../shared/helpers/appointment-status';
+} from '../../../shared/helpers/appointmentStatus';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 import { AppError } from '../../../shared/models/interfaces/api-error.model';
 import { PaginationComponent } from '../../../designSystem/molecules/pagination/pagination.component';

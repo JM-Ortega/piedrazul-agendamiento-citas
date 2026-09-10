@@ -27,7 +27,7 @@ import { DatepickerComponent } from '../../../../designSystem/molecules/datepick
 import {
   parseLocalDateString,
   toIsoDateString,
-} from '../../../helpers/transform-date-local';
+} from '../../../helpers/transformDateLocal';
 import {
   EMAIL_MAX_DEFAULT,
   NAME_MAX_DEFAULT,
@@ -38,12 +38,12 @@ import {
   validateGuardianPhone,
   validateName,
   validatePhone,
-} from '../../../helpers/patient-validation';
+} from '../../../helpers/patientValidation';
 import {
   DEFAULT_DOCUMENT_MAX_LENGTH,
   DOCUMENT_RULES,
   validateDocumentForType,
-} from '../../../helpers/document-validation';
+} from '../../../helpers/documentValidation';
 
 export type PatientFormData = Omit<Patient, 'id'>;
 

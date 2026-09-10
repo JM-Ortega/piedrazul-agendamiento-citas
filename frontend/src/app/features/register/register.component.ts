@@ -43,7 +43,7 @@ import {
   DOCUMENT_RULES,
   DEFAULT_DOCUMENT_MAX_LENGTH,
   validateDocumentForType,
-} from '../../shared/helpers/document-validation';
+} from '../../shared/helpers/documentValidation';
 import { AppError } from '../../shared/models/interfaces/api-error.model';
 
 type RegistroStep = 1 | 2 | 3;

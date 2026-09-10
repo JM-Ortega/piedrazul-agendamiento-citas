@@ -3,8 +3,8 @@ import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { PatientSuggestion } from '../models/dtos/patientSuggestion.dto';
 import { SpecialtyDoctor } from '../models/dtos/specialtyDoctor.dto';
 import { BookingContext } from '../models/types/bookingContext.type';
-import { toIsoDateString } from '../../../shared/helpers/transform-date-local';
-import { formatLongDateEs } from '../../../shared/helpers/date-format';
+import { toIsoDateString } from '../../../shared/helpers/transformDateLocal';
+import { formatLongDateEs } from '../../../shared/helpers/dateFormat';
 import { SchedulingOrigin } from '../models/types/schedulingOrigin.type';
 
 /** Especialidad fija con la que se agenda cuando el contexto es `patient`. */
