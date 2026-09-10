@@ -3,7 +3,6 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
-import { AvailableDateSlots } from '../models/dtos/availableDateSlots.dto';
 import { NewAppointment } from '../models/dtos/newAppointment.dto';
 import { PatientSuggestion } from '../models/dtos/patient-suggestion.dto';
 import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
@@ -44,11 +43,11 @@ export class NuevaCitaService {
     );
   }
 
-  /** Todas las fechas disponibles de un médico junto con sus horarios. */
-  getAvailableDateSlots(doctorId: string): Observable<AvailableDateSlots[]> {
-    return this.http.get<AvailableDateSlots[]>(
-      `${this.apiUrl}/appointments/slots`,
-      { params: { doctorId } }
+  /** Horarios disponibles de un médico para una fecha puntual. */
+  getAvailableSlots(doctorId: string, date: string): Observable<string[]> {
+    return this.http.get<string[]>(
+      `${this.apiUrl}/doctor/${doctorId}/available-slots`,
+      { params: { date } }
     );
   }
 
