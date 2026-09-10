@@ -20,7 +20,7 @@ import { AppointmentBookingComponent } from '../../components/orquestador-agenda
   standalone: true,
   imports: [LucideArrowLeft, AppointmentBookingComponent, ButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './patient-new-appointment.component.html',
+  templateUrl: './patientNewAppointment.component.html',
 })
 export class PatientNewAppointmentComponent implements OnInit {
   protected appService = inject(AppService);

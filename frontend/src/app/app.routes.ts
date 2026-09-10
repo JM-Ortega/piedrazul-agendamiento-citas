@@ -6,9 +6,9 @@ import { AdminCreateUserComponent } from './features/admin/pages/adminCreateUser
 import { AdminDoctorsComponent } from './features/admin/pages/adminDoctors/adminDoctors.component';
 import { AdminConfigComponent } from './features/admin/pages/adminOrquestador/adminConfig.component';
 import { AdminUsersComponent } from './features/admin/pages/adminUsers/adminUsers.component';
-import { NewAppointmentSchedulerComponent } from './features/appointment/pages/agendador-agendar/new-appointment-scheduler.component';
-import { NewAppointmentDoctorComponent } from './features/appointment/pages/doctor-agendar/new-appointment-doctor.component';
-import { PatientNewAppointmentComponent } from './features/appointment/pages/paciente-agendar/patient-new-appointment.component';
+import { NewAppointmentSchedulerComponent } from './features/appointment/pages/agendador-agendar/newAppointmentScheduler.component';
+import { NewAppointmentDoctorComponent } from './features/appointment/pages/doctor-agendar/newAppointmentDoctor.component';
+import { PatientNewAppointmentComponent } from './features/appointment/pages/paciente-agendar/patientNewAppointment.component';
 import { DoctorMedicalHistoryComponent } from './features/doctor/medicalCheckUp/medicalCheckUp.component';
 import { DoctorAllAppointmentsComponent } from './features/doctor/doctorAllAppointments/doctorAllAppointments.component';
 import { DoctorDashboardComponent } from './features/doctor/doctorDashboard/doctorDashboard.component';

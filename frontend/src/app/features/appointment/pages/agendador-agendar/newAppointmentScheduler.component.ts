@@ -7,7 +7,7 @@ import { AppointmentBookingComponent } from '../../components/orquestador-agenda
   standalone: true,
   imports: [AppointmentBookingComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './new-appointment-scheduler.component.html',
+  templateUrl: './newAppointmentScheduler.component.html',
 })
 export class NewAppointmentSchedulerComponent {
   private router = inject(Router);

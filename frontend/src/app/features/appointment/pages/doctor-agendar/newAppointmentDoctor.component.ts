@@ -32,7 +32,7 @@ interface NewAppointmentDoctorNavState {
   standalone: true,
   imports: [LucideArrowLeft, AppointmentBookingComponent, ButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './new-appointment-doctor.component.html',
+  templateUrl: './newAppointmentDoctor.component.html',
 })
 export class NewAppointmentDoctorComponent implements OnInit {
   private router = inject(Router);
