@@ -19,7 +19,7 @@ import { formatLongDateEs } from '../../../../../shared/helpers/date-format';
 import { calcAge } from '../../../../../shared/helpers/patient-validation';
 import { Patient } from '../../../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../../../shared/pipes/formatoPipe';
-import { PatientSuggestion } from '../../../../appointment/models/dtos/patient-suggestion.dto';
+import { PatientSuggestion } from '../../../../appointment/models/dtos/patientSuggestion.dto';
 
 const MIN_SUGGESTION_CHARS = 3;
 const MIN_DOC_LENGTH = 6;
