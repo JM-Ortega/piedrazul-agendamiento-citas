@@ -8,12 +8,12 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideCheckCircle } from '@lucide/angular';
-import { SearchSuggestionsComponent } from '../../../../../design-system/organisms/searchSuggestions/searchSuggestions.component';
-import { ButtonComponent } from '../../../../../design-system/atoms/button/button.component';
+import { SearchSuggestionsComponent } from '../../../../../designSystem/organisms/searchSuggestions/searchSuggestions.component';
+import { ButtonComponent } from '../../../../../designSystem/atoms/button/button.component';
 import {
   SelectComponent,
   SelectOption,
-} from '../../../../../design-system/atoms/select/select.component';
+} from '../../../../../designSystem/atoms/select/select.component';
 import { DoctorService } from '../../../../../core/services/doctor.service';
 import { formatLongDateEs } from '../../../../../shared/helpers/date-format';
 import { calcAge } from '../../../../../shared/helpers/patient-validation';

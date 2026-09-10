@@ -6,9 +6,9 @@ import {
   output,
   OnInit,
 } from '@angular/core';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
 import { LucideCheckCircle } from '@lucide/angular';
-import { SearchSuggestionsComponent } from '../../../../design-system/organisms/searchSuggestions/searchSuggestions.component';
+import { SearchSuggestionsComponent } from '../../../../designSystem/organisms/searchSuggestions/searchSuggestions.component';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { PatientSuggestion } from '../../models/dtos/patientSuggestion.dto';

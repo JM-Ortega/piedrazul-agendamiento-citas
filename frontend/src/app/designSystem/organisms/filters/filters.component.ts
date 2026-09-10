@@ -1,7 +1,7 @@
 import { Component, computed, input, output, signal } from '@angular/core';
 import { ButtonComponent } from '../../atoms/button/button.component';
-import { FilterFieldComponent } from '../../molecules/filter-field/filterField.component';
-import { FilterFieldConfig } from '../../molecules/filter-field/filterField.model';
+import { FilterFieldComponent } from '../../molecules/filterField/filterField.component';
+import { FilterFieldConfig } from '../../molecules/filterField/filterField.model';
 
 export type FilterValues = Record<string, string>;
 

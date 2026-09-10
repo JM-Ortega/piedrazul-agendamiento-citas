@@ -27,7 +27,7 @@ import { ButtonComponent } from '../../atoms/button/button.component';
     ButtonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './appointment-modal.component.html',
+  templateUrl: './appointmentModal.component.html',
 })
 export class AppointmentModalComponent {
   @Output() finish = new EventEmitter<void>();

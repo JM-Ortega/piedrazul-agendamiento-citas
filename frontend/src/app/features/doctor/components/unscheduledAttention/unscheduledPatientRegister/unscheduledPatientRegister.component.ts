@@ -14,12 +14,12 @@ import {
   LucideAlertTriangle,
   LucideAlertCircle,
 } from '@lucide/angular';
-import { ButtonComponent } from '../../../../../design-system/atoms/button/button.component';
+import { ButtonComponent } from '../../../../../designSystem/atoms/button/button.component';
 import {
   SelectComponent,
   SelectOption,
-} from '../../../../../design-system/atoms/select/select.component';
-import { ConfirmModalComponent } from '../../../../../design-system/organisms/confirm-modal/confirm-modal.component';
+} from '../../../../../designSystem/atoms/select/select.component';
+import { ConfirmModalComponent } from '../../../../../designSystem/organisms/confirmModal/confirmModal.component';
 import { DoctorService } from '../../../../../core/services/doctor.service';
 import {
   PatientFormComponent,

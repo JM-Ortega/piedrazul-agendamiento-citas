@@ -18,12 +18,12 @@ import { FormatoPipe } from '../../../pipes/formatoPipe';
 import {
   InputComponent,
   SanitizeRule,
-} from '../../../../design-system/atoms/input/input.component';
+} from '../../../../designSystem/atoms/input/input.component';
 import {
   SelectComponent,
   SelectOption,
-} from '../../../../design-system/atoms/select/select.component';
-import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
+} from '../../../../designSystem/atoms/select/select.component';
+import { DatepickerComponent } from '../../../../designSystem/molecules/datepicker/datepicker.component';
 import {
   parseLocalDateString,
   toIsoDateString,

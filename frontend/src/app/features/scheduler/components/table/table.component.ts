@@ -5,7 +5,7 @@ import {
   LucideUser,
   LucideX,
 } from '@lucide/angular';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
 import {
   APPOINTMENT_STATUS_CLASSES,
   APPOINTMENT_STATUS_LABELS,

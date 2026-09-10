@@ -21,8 +21,8 @@ import {
   LucideUserPlus,
 } from '@lucide/angular';
 import Keycloak from 'keycloak-js';
-import { ButtonComponent } from '../../design-system/atoms/button/button.component';
-import { InputComponent } from '../../design-system/atoms/input/input.component';
+import { ButtonComponent } from '../../designSystem/atoms/button/button.component';
+import { InputComponent } from '../../designSystem/atoms/input/input.component';
 import {
   PatientPublicResponse,
   PatientService,
@@ -38,7 +38,7 @@ import {
   ExistingUserFormComponent,
 } from '../../shared/components/forms/existing-users-form/existing-user-form.component';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
-import { SanitizeRule } from '../../design-system/atoms/input/input.component';
+import { SanitizeRule } from '../../designSystem/atoms/input/input.component';
 import {
   DOCUMENT_RULES,
   DEFAULT_DOCUMENT_MAX_LENGTH,

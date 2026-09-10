@@ -16,9 +16,9 @@ import {
 } from '@lucide/angular';
 import { KEYCLOAK_EVENT_SIGNAL } from 'keycloak-angular';
 import { DoctorService } from '../../../core/services/doctor.service';
-import { FilterFieldConfig } from '../../../design-system/molecules/filter-field/filterField.model';
-import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
-import { FilterValues } from '../../../design-system/organisms/filters/filters.component';
+import { FilterFieldConfig } from '../../../designSystem/molecules/filterField/filterField.model';
+import { PaginationComponent } from '../../../designSystem/molecules/pagination/pagination.component';
+import { FilterValues } from '../../../designSystem/organisms/filters/filters.component';
 import {
   APPOINTMENT_STATUS_CLASSES,
   APPOINTMENT_STATUS_LABELS,

@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 import { AuthGuard } from './core/guards/auth.guard';
 import { unsavedChangesGuard } from './core/guards/canDeactivate.guard';
-import { HomeComponent } from './design-system/pages/home/home.component';
+import { HomeComponent } from './designSystem/pages/home/home.component';
 import { AdminCreateUserComponent } from './features/admin/pages/adminCreateUser/adminCreateUser.component';
 import { AdminDoctorsComponent } from './features/admin/pages/adminDoctors/adminDoctors.component';
 import { AdminConfigComponent } from './features/admin/pages/adminOrquestador/adminConfig.component';

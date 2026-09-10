@@ -19,9 +19,9 @@ import { SchedulerService } from '../../../../core/services/scheduler.service';
 import { AppointmentExportRequest } from '../../../../shared/models/dtos/AppointmentExportRequest.dto';
 import { ExportFormatBackend } from '../../../../shared/models/types/ExportFormatBackend.type';
 import { formatLongDateEs } from '../../../../shared/helpers/date-format';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
-import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
-import { ConfirmModalComponent } from '../../../../design-system/organisms/confirm-modal/confirm-modal.component';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
+import { DatepickerComponent } from '../../../../designSystem/molecules/datepicker/datepicker.component';
+import { ConfirmModalComponent } from '../../../../designSystem/organisms/confirmModal/confirmModal.component';
 import { toIsoDateString } from '../../../../shared/helpers/transform-date-local';
 
 type ExportFormat = 'excel' | 'pdf' | 'csv';

@@ -8,17 +8,17 @@ import {
 } from '@angular/core';
 import { LucidePencil, LucideSettings } from '@lucide/angular';
 import { finalize, forkJoin, Observable } from 'rxjs';
-import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
-import { SearchInputComponent } from '../../../../design-system/molecules/searchInput/searchInput.component';
+import { PaginationComponent } from '../../../../designSystem/molecules/pagination/pagination.component';
+import { SearchInputComponent } from '../../../../designSystem/molecules/searchInput/searchInput.component';
 import {
   SortControlComponent,
   SortDirection,
   SortOption,
-} from '../../../../design-system/molecules/sortControl/sortControl.component';
+} from '../../../../designSystem/molecules/sortControl/sortControl.component';
 import {
   ToastComponent,
   ToastType,
-} from '../../../../design-system/molecules/toast-message/toast.component';
+} from '../../../../designSystem/molecules/toastMessage/toast.component';
 import { PaginationMeta } from '../../../../shared/helpers/paginated-state';
 import {
   DAY_TO_WORKDAY,

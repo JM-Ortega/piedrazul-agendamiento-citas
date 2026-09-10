@@ -13,12 +13,12 @@ import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
 import { DateAdapter } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { LucideCalendar } from '@lucide/angular';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
-import { CustomDateAdapter } from '../../../../design-system/molecules/datepicker/customDateAdapter';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
+import { CustomDateAdapter } from '../../../../designSystem/molecules/datepicker/customDateAdapter';
 import {
   SelectComponent,
   SelectOption,
-} from '../../../../design-system/atoms/select/select.component';
+} from '../../../../designSystem/atoms/select/select.component';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { parseLocalDateString } from '../../../../shared/helpers/transform-date-local';
 import { BookingStateService } from '../../services/bookingState.service';

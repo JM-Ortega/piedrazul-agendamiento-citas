@@ -18,7 +18,7 @@ import {
 } from '../../../shared/helpers/appointment-status';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 import { AppError } from '../../../shared/models/interfaces/api-error.model';
-import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
+import { PaginationComponent } from '../../../designSystem/molecules/pagination/pagination.component';
 
 const PAGE_SIZE = 5;
 

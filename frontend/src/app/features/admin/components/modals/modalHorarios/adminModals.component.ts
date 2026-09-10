@@ -6,7 +6,7 @@ import {
 } from '@angular/core';
 import { LucideCircleAlert, LucideSave } from '@lucide/angular';
 
-import { ConfirmModalComponent } from '../../../../../design-system/organisms/confirm-modal/confirm-modal.component';
+import { ConfirmModalComponent } from '../../../../../designSystem/organisms/confirmModal/confirmModal.component';
 import { Doctor } from '../../../../../shared/models/interfaces/doctor.model';
 
 @Component({

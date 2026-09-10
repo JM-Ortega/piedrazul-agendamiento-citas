@@ -8,7 +8,7 @@ import {
   selector: 'app-confirm-modal',
   standalone: true,
   imports: [ButtonComponent, CommonModule],
-  templateUrl: './confirm-modal.component.html',
+  templateUrl: './confirmModal.component.html',
 })
 export class ConfirmModalComponent {
   @Input() visible = false;

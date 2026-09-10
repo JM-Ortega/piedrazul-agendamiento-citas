@@ -12,8 +12,8 @@ import {
   LucidePower,
   LucidePowerOff,
 } from '@lucide/angular';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
-import { TooltipDirective } from '../../../../design-system/atoms/tooltip/tooltip.directive';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
+import { TooltipDirective } from '../../../../designSystem/atoms/tooltip/tooltip.directive';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 

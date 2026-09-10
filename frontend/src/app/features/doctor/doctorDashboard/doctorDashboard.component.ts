@@ -19,9 +19,9 @@ import {
   LucideUserX,
 } from '@lucide/angular';
 import { DoctorService } from '../../../core/services/doctor.service';
-import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
-import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
-import { ConfirmModalComponent } from '../../../design-system/organisms/confirm-modal/confirm-modal.component';
+import { ButtonComponent } from '../../../designSystem/atoms/button/button.component';
+import { PaginationComponent } from '../../../designSystem/molecules/pagination/pagination.component';
+import { ConfirmModalComponent } from '../../../designSystem/organisms/confirmModal/confirmModal.component';
 import { PaginatedState } from '../../../shared/helpers/paginated-state';
 import {
   parseLocalDateString,

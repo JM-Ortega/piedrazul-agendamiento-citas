@@ -13,8 +13,7 @@ import {
 } from '@lucide/angular';
 import Keycloak from 'keycloak-js';
 import { ButtonComponent } from '../../atoms/button/button.component';
-
-import { AppointmentModalComponent } from '../../organisms/appointment-modal/appointment-modal.component';
+import { AppointmentModalComponent } from '../../organisms/appointment-modal/appointmentModal.component';
 
 @Component({
   selector: 'app-home',

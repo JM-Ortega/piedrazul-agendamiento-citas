@@ -20,7 +20,7 @@ import {
 } from 'rxjs';
 import { catchError, filter, tap } from 'rxjs/operators';
 import { Observable } from 'rxjs';
-import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
+import { ButtonComponent } from '../../atoms/button/button.component';
 import { AppError } from '../../../shared/models/interfaces/api-error.model';
 
 /**

@@ -10,7 +10,7 @@ import {
   LucideStethoscope,
   LucideUserSearch,
 } from '@lucide/angular';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
 import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { NewAppointment } from '../../models/dtos/newAppointment.dto';

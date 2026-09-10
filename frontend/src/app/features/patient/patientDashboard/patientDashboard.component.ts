@@ -18,14 +18,14 @@ import {
 import { AppService } from '../../../core/services/app.service';
 import { PatientAppointmentService } from '../../../core/services/patient.service';
 import { PatientService } from '../../../core/services/register.service';
-import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
-import { ConfirmModalComponent } from '../../../design-system/organisms/confirm-modal/confirm-modal.component';
-import { ToastComponent } from '../../../design-system/molecules/toast-message/toast.component';
+import { ButtonComponent } from '../../../designSystem/atoms/button/button.component';
+import { ConfirmModalComponent } from '../../../designSystem/organisms/confirmModal/confirmModal.component';
+import { ToastComponent } from '../../../designSystem/molecules/toastMessage/toast.component';
 import { getMonthShort } from '../../../shared/helpers/date-format';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 import { AppError } from '../../../shared/models/interfaces/api-error.model';
-import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
+import { PaginationComponent } from '../../../designSystem/molecules/pagination/pagination.component';
 
 const PAGE_SIZE = 5;
 
