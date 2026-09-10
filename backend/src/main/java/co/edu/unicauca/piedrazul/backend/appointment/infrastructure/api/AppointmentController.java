@@ -148,7 +148,6 @@ public class AppointmentController {
     @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<PageResponse<AppointmentResponse>> getDoctorDailyAgenda(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestParam(required = false) AppointmentState state,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
             @AuthenticationPrincipal Jwt jwt) {
@@ -158,7 +157,7 @@ public class AppointmentController {
 
         PageQuery pageQuery = new PageQuery(Math.max(page, 0), Math.min(Math.max(size, 1), 100), "date", true);
 
-        PagedResult<Appointment> result = getDoctorDailyAgendaUseCase.execute(idDoctor, date, state, pageQuery);
+        PagedResult<Appointment> result = getDoctorDailyAgendaUseCase.execute(idDoctor, date, pageQuery);
         List<AppointmentResponse> content = citaDtoMapper.toResponseList(result.content());
 
         return ResponseEntity.ok(PageResponse.from(result, content));

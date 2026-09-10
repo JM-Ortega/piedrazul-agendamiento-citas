@@ -18,7 +18,7 @@ public class GetDoctorDailyAgendaUseCaseImpl implements GetDoctorDailyAgendaUseC
     }
 
     @Override
-    public PagedResult<Appointment> execute(UUID idDoctor, LocalDate date, AppointmentState state, PageQuery pageQuery) {
-        return appointmentRepository.ListDoctorDailyAgenda(idDoctor, date, state, pageQuery);
+    public PagedResult<Appointment> execute(UUID idDoctor, LocalDate date, PageQuery pageQuery) {
+        return appointmentRepository.ListDoctorDailyAgenda(idDoctor, date, pageQuery);
     }
 }

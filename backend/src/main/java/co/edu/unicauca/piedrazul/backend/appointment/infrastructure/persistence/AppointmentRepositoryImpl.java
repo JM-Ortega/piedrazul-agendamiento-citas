@@ -126,8 +126,8 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     }
 
     @Override
-    public PagedResult<Appointment> ListDoctorDailyAgenda(UUID idDoctor, LocalDate date, AppointmentState state, PageQuery pageQuery) {
-        Specification<AppointmentEntity> specification = buildSpecification(idDoctor, null, date, state)
+    public PagedResult<Appointment> ListDoctorDailyAgenda(UUID idDoctor, LocalDate date, PageQuery pageQuery) {
+        Specification<AppointmentEntity> specification = buildSpecification(idDoctor, null, date, null)
                 .and(byStatePriority());
 
         Pageable pageable = PageRequest.of(pageQuery.page(), pageQuery.size());
