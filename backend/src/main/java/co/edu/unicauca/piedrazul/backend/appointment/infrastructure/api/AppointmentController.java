@@ -19,6 +19,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.outp
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.CitaDtoMapper;
 
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,6 +28,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -43,6 +45,7 @@ public class AppointmentController {
     private final UpdateAutonomousSchedulingUseCase updateAutonomousSchedulingUseCase;
     private final GetAutonomousSchedulingContidionUseCase getAutonomousSchedulingContidionUseCase;
     private final RegisterUnscheduledAttentionUseCase registerUnscheduledAttentionUseCase;
+    private final GetDoctorDailyAgendaUseCase getDoctorDailyAgendaUseCase;
 
     private final AppointmentSchedulingService appointmentSchedulingService;
     private final ManualPatientResolutionStrategy manualPatientResolutionStrategy;
@@ -60,7 +63,7 @@ public class AppointmentController {
             GetAppointmentStatesUseCase getAppointmentStatesUseCase,
             UpdateAutonomousSchedulingUseCase updateAutonomousSchedulingUseCase,
             GetAutonomousSchedulingContidionUseCase getAutonomousSchedulingContidionUseCase,
-            RegisterUnscheduledAttentionUseCase registerUnscheduledAttentionUseCase,
+            RegisterUnscheduledAttentionUseCase registerUnscheduledAttentionUseCase, GetDoctorDailyAgendaUseCase getDoctorDailyAgendaUseCase,
             AppointmentSchedulingService appointmentSchedulingService,
             ManualPatientResolutionStrategy manualPatientResolutionStrategy,
             AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy,
@@ -76,6 +79,7 @@ public class AppointmentController {
         this.updateAutonomousSchedulingUseCase = updateAutonomousSchedulingUseCase;
         this.getAutonomousSchedulingContidionUseCase = getAutonomousSchedulingContidionUseCase;
         this.registerUnscheduledAttentionUseCase = registerUnscheduledAttentionUseCase;
+        this.getDoctorDailyAgendaUseCase = getDoctorDailyAgendaUseCase;
         this.appointmentSchedulingService = appointmentSchedulingService;
         this.manualPatientResolutionStrategy = manualPatientResolutionStrategy;
         this.autonomousPatientResolutionStrategy = autonomousPatientResolutionStrategy;
@@ -136,6 +140,28 @@ public class AppointmentController {
 
         List<AppointmentResponse> content = citaDtoMapper.toResponseList(appointmentPage.content());
         return ResponseEntity.ok(PageResponse.from(appointmentPage, content));
+    }
+
+
+    //Permite listar las citas del dia de un doctor organizadas por prioridad de estado
+    @GetMapping("/doctor-daily-agenda")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public ResponseEntity<PageResponse<AppointmentResponse>> getDoctorDailyAgenda(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) AppointmentState state,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        UUID idDoctor = doctorConfigConsultPort.findByUserId(UUID.fromString(jwt.getSubject()))
+                .orElseThrow(() -> new DoctorConfigInconsistentException("Doctor no encontrado"));
+
+        PageQuery pageQuery = new PageQuery(Math.max(page, 0), Math.min(Math.max(size, 1), 100), "date", true);
+
+        PagedResult<Appointment> result = getDoctorDailyAgendaUseCase.execute(idDoctor, date, state, pageQuery);
+        List<AppointmentResponse> content = citaDtoMapper.toResponseList(result.content());
+
+        return ResponseEntity.ok(PageResponse.from(result, content));
     }
 
     @GetMapping("/me")
