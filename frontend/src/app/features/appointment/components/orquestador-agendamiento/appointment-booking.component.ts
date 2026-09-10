@@ -16,7 +16,7 @@ import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { BookingSchedulingComponent } from '../../../appointment/components/agendamiento/booking-scheduling.component';
 import { BookingPatientSearchComponent } from '../../components/busqueda-paciente/booking-patient-search.component';
 import { BookingPatientRegisterComponent } from '../../components/registro-paciente/booking-patient-register.component';
-import { SpecialtyDoctor } from '../../models/dtos/specialty-doctor.dto';
+import { SpecialtyDoctor } from '../../models/dtos/specialtyDoctor.dto';
 import { BookingContext } from '../../models/types/bookingContext.type';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';

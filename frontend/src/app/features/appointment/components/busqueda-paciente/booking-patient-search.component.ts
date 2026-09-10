@@ -11,7 +11,7 @@ import { LucideCheckCircle } from '@lucide/angular';
 import { SearchSuggestionsComponent } from '../../../../design-system/organisms/searchSuggestions/searchSuggestions.component';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
-import { PatientSuggestion } from '../../models/dtos/patient-suggestion.dto';
+import { PatientSuggestion } from '../../models/dtos/patientSuggestion.dto';
 import { BookingStateService } from '../../services/booking-state.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { formatLongDateEs } from '../../../../shared/helpers/date-format';

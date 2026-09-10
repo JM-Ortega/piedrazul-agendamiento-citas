@@ -1,7 +1,7 @@
 import { computed, Injectable, signal } from '@angular/core';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
-import { PatientSuggestion } from '../models/dtos/patient-suggestion.dto';
-import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
+import { PatientSuggestion } from '../models/dtos/patientSuggestion.dto';
+import { SpecialtyDoctor } from '../models/dtos/specialtyDoctor.dto';
 import { BookingContext } from '../models/types/bookingContext.type';
 import { toIsoDateString } from '../../../shared/helpers/transform-date-local';
 import { formatLongDateEs } from '../../../shared/helpers/date-format';
