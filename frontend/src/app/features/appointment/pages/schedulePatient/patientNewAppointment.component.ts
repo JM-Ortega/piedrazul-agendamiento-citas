@@ -13,7 +13,7 @@ import { PatientService } from '../../../../core/services/register.service';
 import { PatientAppointmentService } from '../../../../core/services/patient.service';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
-import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointmentBooking.component';
+import { AppointmentBookingComponent } from '../../components/schedulingOrchestrator/appointmentBooking.component';
 
 @Component({
   selector: 'app-patient-new-appointment',

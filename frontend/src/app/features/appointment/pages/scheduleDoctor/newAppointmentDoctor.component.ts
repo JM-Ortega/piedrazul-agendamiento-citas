@@ -8,7 +8,7 @@ import {
 import { Router } from '@angular/router';
 import { LucideArrowLeft } from '@lucide/angular';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
-import { AppointmentBookingComponent } from '../../components/orquestador-agendamiento/appointmentBooking.component';
+import { AppointmentBookingComponent } from '../../components/schedulingOrchestrator/appointmentBooking.component';
 
 interface NewAppointmentDoctorNavState {
   documentNumber?: string;
