@@ -10,7 +10,7 @@ import { FormsModule } from '@angular/forms';
 import { LucideArrowLeft, LucideAlertCircle } from '@lucide/angular';
 import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
 import { ConfirmModalComponent } from '../../../../design-system/organisms/confirm-modal/confirm-modal.component';
-import { BookingStateService } from '../../services/booking-state.service';
+import { BookingStateService } from '../../services/bookingState.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import {
   PatientFormComponent,

@@ -21,7 +21,7 @@ import {
 } from '../../../../design-system/atoms/select/select.component';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { parseLocalDateString } from '../../../../shared/helpers/transform-date-local';
-import { BookingStateService } from '../../services/booking-state.service';
+import { BookingStateService } from '../../services/bookingState.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 

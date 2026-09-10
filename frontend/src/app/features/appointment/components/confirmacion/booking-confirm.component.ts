@@ -14,7 +14,7 @@ import { ButtonComponent } from '../../../../design-system/atoms/button/button.c
 import { ErroresPipe } from '../../../../shared/pipes/erroresPipe';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { NewAppointment } from '../../models/dtos/newAppointment.dto';
-import { BookingStateService } from '../../services/booking-state.service';
+import { BookingStateService } from '../../services/bookingState.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 import { formatLongDateEs } from '../../../../shared/helpers/date-format';

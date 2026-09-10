@@ -12,7 +12,7 @@ import { SearchSuggestionsComponent } from '../../../../design-system/organisms/
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { PatientSuggestion } from '../../models/dtos/patientSuggestion.dto';
-import { BookingStateService } from '../../services/booking-state.service';
+import { BookingStateService } from '../../services/bookingState.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { formatLongDateEs } from '../../../../shared/helpers/date-format';
 import { calcAge } from '../../../../shared/helpers/patient-validation';
