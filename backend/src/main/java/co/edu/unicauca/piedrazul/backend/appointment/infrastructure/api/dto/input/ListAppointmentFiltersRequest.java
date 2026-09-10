@@ -19,7 +19,7 @@ public class ListAppointmentFiltersRequest {
     private int page = 0;      // Valor por defecto
     private int size = 5;     // Valor por defecto
     private String sortBy = "date";
-    private String sortDirection = "DESC";
+    private String sortDirection = "ASC";
 
     // Lista blanca de campos permitidos para ordenamiento
     private static final List<String> ALLOWED_SORT_FIELDS = List.of(
