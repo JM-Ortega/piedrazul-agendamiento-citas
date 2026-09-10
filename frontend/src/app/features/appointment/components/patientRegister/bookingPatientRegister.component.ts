@@ -15,7 +15,7 @@ import { NuevaCitaService } from '../../services/nuevaCita.service';
 import {
   PatientFormComponent,
   PatientFormData,
-} from '../../../../shared/components/forms/patient-form/patient-form.component';
+} from '../../../../shared/components/forms/patientForm/patientForm.component';
 import { AppError } from '../../../../shared/models/interfaces/api-error.model';
 
 /**

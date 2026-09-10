@@ -65,7 +65,7 @@ const SEX_OPTIONS: SelectOption[] = [
       multi: true,
     },
   ],
-  templateUrl: './existing-user-form.component.html',
+  templateUrl: './existingUserForm.component.html',
 })
 export class ExistingUserFormComponent implements ControlValueAccessor {
   /** Fecha máxima seleccionable en el datepicker de fecha de nacimiento (por defecto, hoy). */

@@ -31,12 +31,12 @@ import {
   PatientFormData,
   EMPTY_PATIENT_FORM,
   PatientFormComponent,
-} from '../../shared/components/forms/patient-form/patient-form.component';
+} from '../../shared/components/forms/patientForm/patientForm.component';
 import {
   ExistingUserFormData,
   EMPTY_GUARDIAN_FORM,
   ExistingUserFormComponent,
-} from '../../shared/components/forms/existing-users-form/existing-user-form.component';
+} from '../../shared/components/forms/existingUsersForm/existingUserForm.component';
 import { FormatoPipe } from '../../shared/pipes/formatoPipe';
 import { SanitizeRule } from '../../designSystem/atoms/input/input.component';
 import {

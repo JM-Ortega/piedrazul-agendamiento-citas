@@ -83,7 +83,7 @@ const SEX_OPTIONS: SelectOption[] = [
       multi: true,
     },
   ],
-  templateUrl: './patient-form.component.html',
+  templateUrl: './patientForm.component.html',
 })
 export class PatientFormComponent implements ControlValueAccessor, OnInit {
   protected patientService = inject(PatientService);

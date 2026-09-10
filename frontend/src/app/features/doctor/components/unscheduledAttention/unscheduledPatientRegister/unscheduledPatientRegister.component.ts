@@ -25,7 +25,7 @@ import {
   PatientFormComponent,
   PatientFormData,
   EMPTY_PATIENT_FORM,
-} from '../../../../../shared/components/forms/patient-form/patient-form.component';
+} from '../../../../../shared/components/forms/patientForm/patientForm.component';
 import { UnscheduledAttention } from '../../../../../shared/models/dtos/unscheduledAttention.dto';
 import { AppError } from '../../../../../shared/models/interfaces/api-error.model';
 
