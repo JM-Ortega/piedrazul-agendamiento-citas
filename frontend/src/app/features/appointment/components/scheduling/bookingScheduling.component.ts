@@ -23,7 +23,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { parseLocalDateString } from '../../../../shared/helpers/transformDateLocal';
 import { BookingStateService } from '../../services/bookingState.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 
 /**
  * Pantalla única de agendamiento. Dependiendo del contexto:

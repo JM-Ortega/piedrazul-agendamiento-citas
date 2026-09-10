@@ -21,7 +21,7 @@ import {
 import { catchError, filter, tap } from 'rxjs/operators';
 import { Observable } from 'rxjs';
 import { ButtonComponent } from '../../atoms/button/button.component';
-import { AppError } from '../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../shared/models/interfaces/apiError.model';
 
 /**
  * Búsqueda genérica con autocompletado. Recibe las funciones de

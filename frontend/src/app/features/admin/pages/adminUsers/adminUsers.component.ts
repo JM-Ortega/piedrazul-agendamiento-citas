@@ -23,7 +23,7 @@ import {
   SortOption,
 } from '../../../../designSystem/molecules/sortControl/sortControl.component';
 import { PaginationMeta } from '../../../../shared/helpers/paginatedState';
-import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { SystemUser } from '../../models/interfaces/systemUser.model';
 import { AdminService } from '../../service/admin.service';
 

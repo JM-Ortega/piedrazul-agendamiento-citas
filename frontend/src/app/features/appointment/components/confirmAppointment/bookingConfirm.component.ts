@@ -16,7 +16,7 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { NewAppointment } from '../../models/dtos/newAppointment.dto';
 import { BookingStateService } from '../../services/bookingState.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
-import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
 import { calcAge } from '../../../../shared/helpers/patientValidation';
 

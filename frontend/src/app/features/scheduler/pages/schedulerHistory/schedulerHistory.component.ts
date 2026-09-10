@@ -20,7 +20,7 @@ import { FilterValues } from '../../../../designSystem/organisms/filters/filters
 import { FiltersPanelComponent } from '../../components/filtersPanel/filtersPanel.component';
 import { FilterFieldConfig } from '../../../../designSystem/molecules/filterField/filterField.model';
 import { SchedulerExportModalComponent } from '../../components/exportModal/exportModal.component';
-import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
 const PAGE_SIZE = 5;

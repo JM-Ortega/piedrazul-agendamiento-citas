@@ -27,7 +27,7 @@ import {
   EMPTY_PATIENT_FORM,
 } from '../../../../../shared/components/forms/patientForm/patientForm.component';
 import { UnscheduledAttention } from '../../../../../shared/models/dtos/unscheduledAttention.dto';
-import { AppError } from '../../../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../../../shared/models/interfaces/apiError.model';
 
 const OBSERVATION_MAX_LENGTH = 300;
 

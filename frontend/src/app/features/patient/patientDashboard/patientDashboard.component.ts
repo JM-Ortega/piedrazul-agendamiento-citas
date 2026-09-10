@@ -24,7 +24,7 @@ import { ToastComponent } from '../../../designSystem/molecules/toastMessage/toa
 import { getMonthShort } from '../../../shared/helpers/dateFormat';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
-import { AppError } from '../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../shared/models/interfaces/apiError.model';
 import { PaginationComponent } from '../../../designSystem/molecules/pagination/pagination.component';
 
 const PAGE_SIZE = 5;

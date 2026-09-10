@@ -21,7 +21,7 @@ import { BookingContext } from '../../models/types/bookingContext.type';
 import { BookingStateService } from '../../services/bookingState.service';
 import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { BookingConfirmComponent } from '../confirmAppointment/bookingConfirm.component';
-import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 
 /**
  * Coordina el flujo de agendamiento componiendo los

@@ -28,7 +28,7 @@ import {
   toIsoDateString,
 } from '../../../shared/helpers/transformDateLocal';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
-import { AppError } from '../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../shared/models/interfaces/apiError.model';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 

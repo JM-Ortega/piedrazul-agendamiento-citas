@@ -30,7 +30,7 @@ import { scrollToElementById } from '../../../../shared/helpers/scrollToElement'
 import { getSpecialtyMeta } from '../../../../shared/helpers/specialtyCatalog';
 import { timeToMinutes } from '../../../../shared/helpers/timeUtils';
 import { DAY_TO_WORKDAY } from '../../../../shared/helpers/workday.util';
-import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 import {
   CreateUserDoctorFormComponent,

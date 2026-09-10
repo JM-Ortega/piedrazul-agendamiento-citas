@@ -17,7 +17,7 @@ import {
   APPOINTMENT_STATUS_CLASSES,
 } from '../../../shared/helpers/appointmentStatus';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
-import { AppError } from '../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../shared/models/interfaces/apiError.model';
 import { PaginationComponent } from '../../../designSystem/molecules/pagination/pagination.component';
 
 const PAGE_SIZE = 5;

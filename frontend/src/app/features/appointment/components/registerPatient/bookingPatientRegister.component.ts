@@ -16,7 +16,7 @@ import {
   PatientFormComponent,
   PatientFormData,
 } from '../../../../shared/components/forms/patientForm/patientForm.component';
-import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 
 /**
  * Capturar y validar los datos de un paciente que no fue encontrado en el sistema para

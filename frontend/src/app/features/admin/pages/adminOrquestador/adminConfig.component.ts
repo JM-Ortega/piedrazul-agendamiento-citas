@@ -24,7 +24,7 @@ import {
   DAY_TO_WORKDAY,
   workdayToNumber,
 } from '../../../../shared/helpers/workday.util';
-import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { DoctorCardComponent } from '../../components/doctorCard/doctorCard.component';

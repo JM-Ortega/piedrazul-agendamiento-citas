@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import {
   AppError,
   ApiProblemDetails,
-} from '../../shared/models/interfaces/api-error.model';
+} from '../../shared/models/interfaces/apiError.model';
 import { GLOBAL_ERROR_MESSAGES } from '../../shared/helpers/errorMessages';
 
 /**

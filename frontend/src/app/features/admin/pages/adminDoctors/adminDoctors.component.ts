@@ -33,7 +33,7 @@ import {
   getSpecialtyMeta,
   SpecialtyMeta,
 } from '../../../../shared/helpers/specialtyCatalog';
-import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { DoctorAdminDto } from '../../models/dtos/DoctorAdminDto';
 import { AdminService } from '../../service/admin.service';
 

@@ -44,7 +44,7 @@ import {
   DEFAULT_DOCUMENT_MAX_LENGTH,
   validateDocumentForType,
 } from '../../shared/helpers/documentValidation';
-import { AppError } from '../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../shared/models/interfaces/apiError.model';
 
 type RegistroStep = 1 | 2 | 3;
 
