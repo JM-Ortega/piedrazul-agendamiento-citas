@@ -2,16 +2,15 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { map, Observable, of, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { withPagination } from '../../shared/helpers/httpPagination';
-import { PaginatedState } from '../../shared/helpers/paginatedState';
-import { toIsoDateString } from '../../shared/helpers/transformDateLocal';
+import { PatientSuggestion } from '../../features/appointment/models/dtos/patient-suggestion.dto';
+import { withPagination } from '../../shared/helpers/http-pagination';
+import { PaginatedState } from '../../shared/helpers/paginated-state';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
 import { PageResponse } from '../../shared/models/dtos/pageResponse.dto';
+import { UnscheduledAttention } from '../../shared/models/dtos/unscheduledAttention.dto';
 import { Doctor } from '../../shared/models/interfaces/doctor.model';
 import { Patient } from '../../shared/models/interfaces/patient.model';
-import { UnscheduledAttention } from '../../shared/models/dtos/unscheduledAttention.dto';
-import { PatientSuggestion } from '../../features/appointment/models/dtos/patientSuggestion.dto';
 
 @Injectable({ providedIn: 'root' })
 export class DoctorService {
@@ -82,27 +81,32 @@ export class DoctorService {
   }
 
   /**
-   * Obtiene una página de citas del día actual (fecha local del cliente)
-   * para un doctor específico.
+   * Obtiene la agenda diaria del doctor autenticado (resuelto vía JWT en backend),
+   * organizada por prioridad de estado. Reemplaza al antiguo endpoint de citas
+   * filtradas manualmente por `idDoctor` + `date`.
    *
-   * @param doctorId - ID del doctor cuyas citas de hoy se quieren consultar.
+   * @param date - Fecha (ISO `yyyy-MM-dd`) de la agenda a consultar.
    * @param pageNumber - Índice de página (base 0). Por defecto 0.
    * @param pageSize - Cantidad de citas por página. Por defecto 10.
+   * @param state - (Opcional) Filtrar por un estado de cita específico.
    * @returns Observable con la respuesta paginada completa (content + metadata).
    */
-  getTodayAppointmentsByDoctor(
-    doctorId: string,
+  getDoctorDailyAgenda(
+    date: string,
     pageNumber = 0,
-    pageSize = 10
+    pageSize = 10,
+    state?: string
   ): Observable<PageResponse<AppointmentsPatient>> {
-    const today = toIsoDateString(new Date());
-    const params = withPagination(
-      new HttpParams().set('idDoctor', doctorId).set('date', today),
+    let params = withPagination(
+      new HttpParams().set('date', date),
       pageNumber,
       pageSize
     );
+    if (state) {
+      params = params.set('state', state);
+    }
     return this.http.get<PageResponse<AppointmentsPatient>>(
-      `${this.apiUrl}/appointments`,
+      `${this.apiUrl}/appointments/doctor-daily-agenda`,
       { params }
     );
   }
