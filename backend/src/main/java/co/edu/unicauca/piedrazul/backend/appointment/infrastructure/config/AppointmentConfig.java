@@ -13,7 +13,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentConfigRepositoryImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
-import co.edu.unicauca.piedrazul.backend.appointment.application.ListMyAppointmentsUseCaseImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.CancelAppointmentUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.application.CancelAppointmentUseCaseImpl;
 import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
@@ -104,16 +103,6 @@ public class AppointmentConfig {
                 appointmentRepository,
                 doctorConfigConsultPort,
                 slotTimeService
-        );
-    }
-
-    @Bean
-    public ListMyAppointmentsUseCase listMyAppointmentsUseCase(
-            AppointmentRepository appointmentRepository,
-            PatientConsultPort patientConsultPort) {
-        return new ListMyAppointmentsUseCaseImpl(
-                appointmentRepository,
-                patientConsultPort
         );
     }
 
