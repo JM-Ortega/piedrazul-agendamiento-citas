@@ -59,7 +59,7 @@ export class AdminUsersComponent implements OnInit {
   private router = inject(Router);
 
   // ── Paginación ────────────────────────────────────────────────────────────
-  readonly PAGE_SIZE = 3;
+  readonly PAGE_SIZE = 6;
 
   // ── State: lista paginada (lo que se muestra en las cards) ────────────────
   systemUsers = signal<SystemUser[]>([]);
