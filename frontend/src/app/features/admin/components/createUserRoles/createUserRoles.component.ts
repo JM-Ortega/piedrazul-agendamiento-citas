@@ -10,7 +10,7 @@ import {
   LucideCircleAlert,
   LucideStethoscope,
 } from '@lucide/angular';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
 
 type Role = 'doctor' | 'scheduler';
 

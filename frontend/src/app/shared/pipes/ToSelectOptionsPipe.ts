@@ -1,6 +1,6 @@
 // to-select-options.pipe.ts
 import { Pipe, PipeTransform } from '@angular/core';
-import { SelectOption } from '../../design-system/atoms/select/select.component';
+import { SelectOption } from '../../designSystem/atoms/select/select.component';
 import { FormatoPipe } from './formatoPipe';
 
 @Pipe({

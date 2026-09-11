@@ -5,12 +5,12 @@ import {
   LucideUser,
   LucideX,
 } from '@lucide/angular';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
 import {
   APPOINTMENT_STATUS_CLASSES,
   APPOINTMENT_STATUS_LABELS,
-} from '../../../../shared/helpers/appointment-status';
-import { formatLongDateEs } from '../../../../shared/helpers/date-format';
+} from '../../../../shared/helpers/appointmentStatus';
+import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
 import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 

@@ -8,23 +8,23 @@ import {
 } from '@angular/core';
 import { LucidePencil, LucideSettings } from '@lucide/angular';
 import { finalize, forkJoin, Observable } from 'rxjs';
-import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
-import { SearchInputComponent } from '../../../../design-system/molecules/searchInput/searchInput.component';
+import { PaginationComponent } from '../../../../designSystem/molecules/pagination/pagination.component';
+import { SearchInputComponent } from '../../../../designSystem/molecules/searchInput/searchInput.component';
 import {
   SortControlComponent,
   SortDirection,
   SortOption,
-} from '../../../../design-system/molecules/sortControl/sortControl.component';
+} from '../../../../designSystem/molecules/sortControl/sortControl.component';
 import {
   ToastComponent,
   ToastType,
-} from '../../../../design-system/molecules/toast-message/toast.component';
-import { PaginationMeta } from '../../../../shared/helpers/paginated-state';
+} from '../../../../designSystem/molecules/toastMessage/toast.component';
+import { PaginationMeta } from '../../../../shared/helpers/paginatedState';
 import {
   DAY_TO_WORKDAY,
   workdayToNumber,
 } from '../../../../shared/helpers/workday.util';
-import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { DoctorCardComponent } from '../../components/doctorCard/doctorCard.component';
@@ -36,7 +36,7 @@ import { AdminModalsComponent } from '../../components/modals/modalHorarios/admi
 import { dtoSchedule } from '../../models/dtos/schedule.dto';
 import { AdminService } from '../../service/admin.service';
 // ── Imports ──
-import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
+import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
 
 @Component({
   selector: 'app-admin-config',

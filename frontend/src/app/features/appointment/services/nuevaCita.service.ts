@@ -4,8 +4,8 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { NewAppointment } from '../models/dtos/newAppointment.dto';
-import { PatientSuggestion } from '../models/dtos/patient-suggestion.dto';
-import { SpecialtyDoctor } from '../models/dtos/specialty-doctor.dto';
+import { PatientSuggestion } from '../models/dtos/patientSuggestion.dto';
+import { SpecialtyDoctor } from '../models/dtos/specialtyDoctor.dto';
 import { SchedulingOrigin } from '../models/types/schedulingOrigin.type';
 
 @Injectable({ providedIn: 'root' })

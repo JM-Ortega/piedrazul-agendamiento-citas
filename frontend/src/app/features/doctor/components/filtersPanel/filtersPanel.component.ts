@@ -7,12 +7,12 @@ import {
   signal,
 } from '@angular/core';
 import { LucideChevronDown, LucideFilter } from '@lucide/angular';
-import { FilterFieldConfig } from '../../../../design-system/molecules/filter-field/filterField.model';
+import { FilterFieldConfig } from '../../../../designSystem/molecules/filterField/filterField.model';
 import {
   FiltersComponent,
   FilterValues,
-} from '../../../../design-system/organisms/filters/filters.component';
-import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
+} from '../../../../designSystem/organisms/filters/filters.component';
+import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
 
 /**
  * Panel colapsable de filtros. Encapsula su propio estado de apertura,

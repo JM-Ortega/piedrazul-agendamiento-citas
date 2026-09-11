@@ -18,12 +18,12 @@ import {
   LucidePencil,
   LucideSave,
 } from '@lucide/angular';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
-import { InputComponent } from '../../../../design-system/atoms/input/input.component';
-import { SelectComponent } from '../../../../design-system/atoms/select/select.component';
-import { DatepickerComponent } from '../../../../design-system/molecules/datepicker/datepicker.component';
-import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
-import { toIsoDateString } from '../../../../shared/helpers/transform-date-local';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
+import { InputComponent } from '../../../../designSystem/atoms/input/input.component';
+import { SelectComponent } from '../../../../designSystem/atoms/select/select.component';
+import { DatepickerComponent } from '../../../../designSystem/molecules/datepicker/datepicker.component';
+import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
+import { toIsoDateString } from '../../../../shared/helpers/transformDateLocal';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';

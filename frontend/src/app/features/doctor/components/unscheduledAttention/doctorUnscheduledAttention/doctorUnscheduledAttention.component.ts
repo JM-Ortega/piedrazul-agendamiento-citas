@@ -7,7 +7,7 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { DoctorService } from '../../../../../core/services/doctor.service';
-import { SelectOption } from '../../../../../design-system/atoms/select/select.component';
+import { SelectOption } from '../../../../../designSystem/atoms/select/select.component';
 import { FormatoPipe } from '../../../../../shared/pipes/formatoPipe';
 import {
   UnscheduledAttendanceStart,

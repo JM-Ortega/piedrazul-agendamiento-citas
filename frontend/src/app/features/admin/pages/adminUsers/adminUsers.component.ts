@@ -15,15 +15,15 @@ import {
   LucideUserPlus,
   LucideUsers,
 } from '@lucide/angular';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
-import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
+import { PaginationComponent } from '../../../../designSystem/molecules/pagination/pagination.component';
 import {
   SortControlComponent,
   SortDirection,
   SortOption,
-} from '../../../../design-system/molecules/sortControl/sortControl.component';
-import { PaginationMeta } from '../../../../shared/helpers/paginated-state';
-import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+} from '../../../../designSystem/molecules/sortControl/sortControl.component';
+import { PaginationMeta } from '../../../../shared/helpers/paginatedState';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { SystemUser } from '../../models/interfaces/systemUser.model';
 import { AdminService } from '../../service/admin.service';
 

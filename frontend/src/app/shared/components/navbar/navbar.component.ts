@@ -36,7 +36,7 @@ import {
 } from '@lucide/angular';
 import Keycloak from 'keycloak-js';
 import { AppService } from '../../../core/services/app.service';
-import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
+import { ButtonComponent } from '../../../designSystem/atoms/button/button.component';
 
 @Component({
   selector: 'app-navbar',

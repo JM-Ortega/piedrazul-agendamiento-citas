@@ -2,16 +2,16 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { map, Observable, of, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { withPagination } from '../../shared/helpers/http-pagination';
-import { PaginatedState } from '../../shared/helpers/paginated-state';
-import { toIsoDateString } from '../../shared/helpers/transform-date-local';
+import { withPagination } from '../../shared/helpers/httpPagination';
+import { PaginatedState } from '../../shared/helpers/paginatedState';
+import { toIsoDateString } from '../../shared/helpers/transformDateLocal';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
 import { PageResponse } from '../../shared/models/dtos/pageResponse.dto';
 import { Doctor } from '../../shared/models/interfaces/doctor.model';
 import { Patient } from '../../shared/models/interfaces/patient.model';
 import { UnscheduledAttention } from '../../shared/models/dtos/unscheduledAttention.dto';
-import { PatientSuggestion } from '../../features/appointment/models/dtos/patient-suggestion.dto';
+import { PatientSuggestion } from '../../features/appointment/models/dtos/patientSuggestion.dto';
 
 @Injectable({ providedIn: 'root' })
 export class DoctorService {

@@ -12,7 +12,7 @@ import {
   LucideUserPlus,
   LucideX,
 } from '@lucide/angular';
-import { ButtonComponent } from '../../../../../design-system/atoms/button/button.component';
+import { ButtonComponent } from '../../../../../designSystem/atoms/button/button.component';
 import { FormatoPipe } from '../../../../../shared/pipes/formatoPipe';
 import { FormErrors } from '../../../models/interfaces/FormErrors';
 import { UserForm } from '../../../models/interfaces/UserForm';
