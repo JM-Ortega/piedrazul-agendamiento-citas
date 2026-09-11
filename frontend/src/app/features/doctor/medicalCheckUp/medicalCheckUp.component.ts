@@ -17,11 +17,11 @@ import {
 } from '@lucide/angular';
 import { CanComponentDeactivate } from '../../../core/guards/canDeactivate.guard';
 import { DoctorService } from '../../../core/services/doctor.service';
-import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
-import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
-import { ConfirmModalComponent } from '../../../design-system/organisms/confirm-modal/confirm-modal.component';
-import { calcAge } from '../../../shared/helpers/patient-validation';
-import { parseLocalDateString } from '../../../shared/helpers/transform-date-local';
+import { ButtonComponent } from '../../../designSystem/atoms/button/button.component';
+import { PaginationComponent } from '../../../designSystem/molecules/pagination/pagination.component';
+import { ConfirmModalComponent } from '../../../designSystem/organisms/confirmModal/confirmModal.component';
+import { calcAge } from '../../../shared/helpers/patientValidation';
+import { parseLocalDateString } from '../../../shared/helpers/transformDateLocal';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 import { UnscheduledAttention } from '../../../shared/models/dtos/unscheduledAttention.dto';

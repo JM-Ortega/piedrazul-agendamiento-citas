@@ -17,23 +17,23 @@ import {
 } from '@lucide/angular';
 import { forkJoin, Observable } from 'rxjs';
 import { AppService } from '../../../../core/services/app.service';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
-import { TooltipDirective } from '../../../../design-system/atoms/tooltip/tooltip.directive';
-import { PaginationComponent } from '../../../../design-system/molecules/pagination/pagination.component';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
+import { TooltipDirective } from '../../../../designSystem/atoms/tooltip/tooltip.directive';
+import { PaginationComponent } from '../../../../designSystem/molecules/pagination/pagination.component';
 import {
   SortControlComponent,
   SortDirection,
   SortOption,
-} from '../../../../design-system/molecules/sortControl/sortControl.component';
-import { toggleInArray } from '../../../../shared/helpers/array-utils';
-import { PaginationMeta } from '../../../../shared/helpers/paginated-state';
-import { scrollToElementById } from '../../../../shared/helpers/scroll-to-element';
+} from '../../../../designSystem/molecules/sortControl/sortControl.component';
+import { toggleInArray } from '../../../../shared/helpers/arrayUtils';
+import { PaginationMeta } from '../../../../shared/helpers/paginatedState';
+import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
 import {
   getSpecialtiesMeta,
   getSpecialtyMeta,
   SpecialtyMeta,
-} from '../../../../shared/helpers/specialty-catalog';
-import { AppError } from '../../../../shared/models/interfaces/api-error.model';
+} from '../../../../shared/helpers/specialtyCatalog';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { DoctorAdminDto } from '../../models/dtos/DoctorAdminDto';
 import { AdminService } from '../../service/admin.service';
 

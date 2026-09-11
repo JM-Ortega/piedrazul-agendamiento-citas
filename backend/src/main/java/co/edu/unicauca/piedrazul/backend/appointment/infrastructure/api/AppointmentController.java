@@ -37,7 +37,6 @@ import java.util.UUID;
 public class AppointmentController {
     private final ListAppointmentsUseCase listAppointmentsUseCase;
     private final CitaDtoMapper citaDtoMapper;
-    private final ListMyAppointmentsUseCase listMyAppointmentsUseCase;
     private final IsNewPatientUseCase isNewPatientUseCase;
     private final UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase;
     private final CancelAppointmentUseCase cancelAppointmentUseCase;
@@ -56,7 +55,6 @@ public class AppointmentController {
     public AppointmentController(
             ListAppointmentsUseCase listAppointmentsUseCase,
             CitaDtoMapper citaDtoMapper,
-            ListMyAppointmentsUseCase listMyAppointmentsUseCase,
             IsNewPatientUseCase isNewPatientUseCase,
             UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase,
             CancelAppointmentUseCase cancelAppointmentUseCase,
@@ -71,7 +69,6 @@ public class AppointmentController {
             DoctorConfigConsultPort doctorConfigConsultPort) {
         this.listAppointmentsUseCase = listAppointmentsUseCase;
         this.citaDtoMapper = citaDtoMapper;
-        this.listMyAppointmentsUseCase = listMyAppointmentsUseCase;
         this.isNewPatientUseCase = isNewPatientUseCase;
         this.updateAppointmentStatusUseCase = updateAppointmentStatusUseCase;
         this.cancelAppointmentUseCase = cancelAppointmentUseCase;
@@ -148,7 +145,6 @@ public class AppointmentController {
     @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<PageResponse<AppointmentResponse>> getDoctorDailyAgenda(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestParam(required = false) AppointmentState state,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
             @AuthenticationPrincipal Jwt jwt) {
@@ -158,25 +154,13 @@ public class AppointmentController {
 
         PageQuery pageQuery = new PageQuery(Math.max(page, 0), Math.min(Math.max(size, 1), 100), "date", true);
 
-        PagedResult<Appointment> result = getDoctorDailyAgendaUseCase.execute(idDoctor, date, state, pageQuery);
+        PagedResult<Appointment> result = getDoctorDailyAgendaUseCase.execute(idDoctor, date, pageQuery);
         List<AppointmentResponse> content = citaDtoMapper.toResponseList(result.content());
 
         return ResponseEntity.ok(PageResponse.from(result, content));
     }
 
-    @GetMapping("/me")
-    @PreAuthorize("hasRole('PATIENT')")
-    public ResponseEntity<List<AppointmentResponse>> listMyAppointments(
-            @AuthenticationPrincipal Jwt jwt) {
 
-        UUID userId = UUID.fromString(jwt.getSubject());
-
-        return ResponseEntity.ok(
-                listMyAppointmentsUseCase.execute(userId)
-                        .stream()
-                        .map(citaDtoMapper::toResponse)
-                        .toList());
-    }
 
     // Sirve para saber si un paciente es nuevo
     @GetMapping({ "/{patientId}/is-new-patient" })

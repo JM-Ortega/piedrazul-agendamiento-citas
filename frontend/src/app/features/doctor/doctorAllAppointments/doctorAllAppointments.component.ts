@@ -16,21 +16,21 @@ import {
 } from '@lucide/angular';
 import { KEYCLOAK_EVENT_SIGNAL } from 'keycloak-angular';
 import { DoctorService } from '../../../core/services/doctor.service';
-import { FilterFieldConfig } from '../../../design-system/molecules/filter-field/filterField.model';
-import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
-import { FilterValues } from '../../../design-system/organisms/filters/filters.component';
+import { FilterFieldConfig } from '../../../designSystem/molecules/filterField/filterField.model';
+import { PaginationComponent } from '../../../designSystem/molecules/pagination/pagination.component';
+import { FilterValues } from '../../../designSystem/organisms/filters/filters.component';
 import {
   APPOINTMENT_STATUS_CLASSES,
   APPOINTMENT_STATUS_LABELS,
-} from '../../../shared/helpers/appointment-status';
+} from '../../../shared/helpers/appointmentStatus';
 import {
   formatLongDateEs,
   getMonthShort,
-} from '../../../shared/helpers/date-format';
-import { PaginatedState } from '../../../shared/helpers/paginated-state';
-import { toIsoDateString } from '../../../shared/helpers/transform-date-local';
+} from '../../../shared/helpers/dateFormat';
+import { PaginatedState } from '../../../shared/helpers/paginatedState';
+import { toIsoDateString } from '../../../shared/helpers/transformDateLocal';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
-import { AppError } from '../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../shared/models/interfaces/apiError.model';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { ExportModalComponent } from '../components/exportModal/exportModal.component';
 import { FiltersPanelComponent } from '../components/filtersPanel/filtersPanel.component';

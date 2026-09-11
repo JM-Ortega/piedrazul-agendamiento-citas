@@ -9,5 +9,5 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 public interface GetDoctorDailyAgendaUseCase {
-    PagedResult<Appointment> execute(UUID idDoctor, LocalDate date, AppointmentState state, PageQuery pageQuery);
+    PagedResult<Appointment> execute(UUID idDoctor, LocalDate date, PageQuery pageQuery);
 }

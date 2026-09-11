@@ -8,18 +8,18 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LucideCheckCircle } from '@lucide/angular';
-import { SearchSuggestionsComponent } from '../../../../../design-system/organisms/searchSuggestions/searchSuggestions.component';
-import { ButtonComponent } from '../../../../../design-system/atoms/button/button.component';
+import { SearchSuggestionsComponent } from '../../../../../designSystem/organisms/searchSuggestions/searchSuggestions.component';
+import { ButtonComponent } from '../../../../../designSystem/atoms/button/button.component';
 import {
   SelectComponent,
   SelectOption,
-} from '../../../../../design-system/atoms/select/select.component';
+} from '../../../../../designSystem/atoms/select/select.component';
 import { DoctorService } from '../../../../../core/services/doctor.service';
-import { formatLongDateEs } from '../../../../../shared/helpers/date-format';
-import { calcAge } from '../../../../../shared/helpers/patient-validation';
+import { formatLongDateEs } from '../../../../../shared/helpers/dateFormat';
+import { calcAge } from '../../../../../shared/helpers/patientValidation';
 import { Patient } from '../../../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../../../shared/pipes/formatoPipe';
-import { PatientSuggestion } from '../../../../appointment/models/dtos/patient-suggestion.dto';
+import { PatientSuggestion } from '../../../../appointment/models/dtos/patientSuggestion.dto';
 
 const MIN_SUGGESTION_CHARS = 3;
 const MIN_DOC_LENGTH = 6;

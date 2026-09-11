@@ -14,20 +14,20 @@ import {
   LucideAlertTriangle,
   LucideAlertCircle,
 } from '@lucide/angular';
-import { ButtonComponent } from '../../../../../design-system/atoms/button/button.component';
+import { ButtonComponent } from '../../../../../designSystem/atoms/button/button.component';
 import {
   SelectComponent,
   SelectOption,
-} from '../../../../../design-system/atoms/select/select.component';
-import { ConfirmModalComponent } from '../../../../../design-system/organisms/confirm-modal/confirm-modal.component';
+} from '../../../../../designSystem/atoms/select/select.component';
+import { ConfirmModalComponent } from '../../../../../designSystem/organisms/confirmModal/confirmModal.component';
 import { DoctorService } from '../../../../../core/services/doctor.service';
 import {
   PatientFormComponent,
   PatientFormData,
   EMPTY_PATIENT_FORM,
-} from '../../../../../shared/components/forms/patient-form/patient-form.component';
+} from '../../../../../shared/components/forms/patientForm/patientForm.component';
 import { UnscheduledAttention } from '../../../../../shared/models/dtos/unscheduledAttention.dto';
-import { AppError } from '../../../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../../../shared/models/interfaces/apiError.model';
 
 const OBSERVATION_MAX_LENGTH = 300;
 

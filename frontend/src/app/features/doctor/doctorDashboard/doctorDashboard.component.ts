@@ -19,16 +19,16 @@ import {
   LucideUserX,
 } from '@lucide/angular';
 import { DoctorService } from '../../../core/services/doctor.service';
-import { ButtonComponent } from '../../../design-system/atoms/button/button.component';
-import { PaginationComponent } from '../../../design-system/molecules/pagination/pagination.component';
-import { ConfirmModalComponent } from '../../../design-system/organisms/confirm-modal/confirm-modal.component';
-import { PaginatedState } from '../../../shared/helpers/paginated-state';
+import { ButtonComponent } from '../../../designSystem/atoms/button/button.component';
+import { PaginationComponent } from '../../../designSystem/molecules/pagination/pagination.component';
+import { ConfirmModalComponent } from '../../../designSystem/organisms/confirmModal/confirmModal.component';
+import { PaginatedState } from '../../../shared/helpers/paginatedState';
 import {
   parseLocalDateString,
   toIsoDateString,
-} from '../../../shared/helpers/transform-date-local';
+} from '../../../shared/helpers/transformDateLocal';
 import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
-import { AppError } from '../../../shared/models/interfaces/api-error.model';
+import { AppError } from '../../../shared/models/interfaces/apiError.model';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 

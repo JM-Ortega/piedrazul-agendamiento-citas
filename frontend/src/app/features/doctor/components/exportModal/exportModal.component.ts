@@ -23,7 +23,7 @@ import {
   type LucideIcon,
 } from '@lucide/angular';
 import { SchedulerService } from '../../../../core/services/scheduler.service';
-import { ButtonComponent } from '../../../../design-system/atoms/button/button.component';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
 import { AppointmentExportRequest } from '../../../../shared/models/dtos/AppointmentExportRequest.dto';
 import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
 import { ExportColumnBackend } from '../../../../shared/models/types/ExportColumnBackend.type';

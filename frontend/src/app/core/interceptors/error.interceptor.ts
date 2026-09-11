@@ -3,7 +3,7 @@ import { inject } from '@angular/core';
 import Keycloak from 'keycloak-js';
 import { catchError, tap, throwError } from 'rxjs';
 import { AppHealthService } from '../services/app-health.service';
-import { normalizeHttpError } from './normalize-http-error';
+import { normalizeHttpError } from './normalizeHttpError';
 
 /**
  * Interceptor HTTP global de manejo de errores.

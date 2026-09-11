@@ -1,22 +1,22 @@
 import { Routes } from '@angular/router';
 import { AuthGuard } from './core/guards/auth.guard';
 import { unsavedChangesGuard } from './core/guards/canDeactivate.guard';
-import { HomeComponent } from './design-system/pages/home/home.component';
+import { HomeComponent } from './designSystem/pages/home/home.component';
 import { AdminCreateUserComponent } from './features/admin/pages/adminCreateUser/adminCreateUser.component';
 import { AdminDoctorsComponent } from './features/admin/pages/adminDoctors/adminDoctors.component';
 import { AdminConfigComponent } from './features/admin/pages/adminOrquestador/adminConfig.component';
 import { AdminUsersComponent } from './features/admin/pages/adminUsers/adminUsers.component';
-import { NewAppointmentSchedulerComponent } from './features/appointment/pages/agendador-agendar/new-appointment-scheduler.component';
-import { NewAppointmentDoctorComponent } from './features/appointment/pages/doctor-agendar/new-appointment-doctor.component';
-import { PatientNewAppointmentComponent } from './features/appointment/pages/paciente-agendar/patient-new-appointment.component';
+import { NewAppointmentSchedulerComponent } from './features/appointment/pages/scheduleScheduler/newAppointmentScheduler.component';
+import { NewAppointmentDoctorComponent } from './features/appointment/pages/scheduleDoctor/newAppointmentDoctor.component';
+import { PatientNewAppointmentComponent } from './features/appointment/pages/schedulePatient/patientNewAppointment.component';
 import { DoctorMedicalHistoryComponent } from './features/doctor/medicalCheckUp/medicalCheckUp.component';
 import { DoctorAllAppointmentsComponent } from './features/doctor/doctorAllAppointments/doctorAllAppointments.component';
 import { DoctorDashboardComponent } from './features/doctor/doctorDashboard/doctorDashboard.component';
-import { PatientAppointmentHistoryComponent } from './features/patient/patient-appointment-history/patient-appointment-history.component';
-import { PatientDashboardComponent } from './features/patient/patient-dashboard/patient-dashboard.component';
-import { RegistroComponent } from './features/registro/registro.component';
-import { SchedulerDashboardComponent } from './features/scheduler/pages/scheduler-dashboard/scheduler-dashboard.component';
-import { SchedulerHistoryComponent } from './features/scheduler/pages/scheduler-history/scheduler-history.component';
+import { PatientAppointmentHistoryComponent } from './features/patient/patientAppointmentHistory/patientAppointmentHistory.component';
+import { PatientDashboardComponent } from './features/patient/patientDashboard/patientDashboard.component';
+import { RegisterComponent } from './features/register/register.component';
+import { SchedulerDashboardComponent } from './features/scheduler/pages/schedulerDashboard/schedulerDashboard.component';
+import { SchedulerHistoryComponent } from './features/scheduler/pages/schedulerHistory/schedulerHistory.component';
 import { DoctorUnscheduledAttentionComponent } from './features/doctor/components/unscheduledAttention/doctorUnscheduledAttention/doctorUnscheduledAttention.component';
 
 export const routes: Routes = [
@@ -120,7 +120,7 @@ export const routes: Routes = [
     canActivate: [AuthGuard],
     data: { role: 'PATIENT' },
   },
-  { path: 'registro', component: RegistroComponent },
+  { path: 'registro', component: RegisterComponent },
 
   { path: '**', redirectTo: '' },
 ];
