@@ -104,7 +104,9 @@ public class AppointmentSchedulingService {
         validateNewPatientFirstAppointmentSpecialty(resolvedPatient.idPatient(), specialty);
 
         // Valida que no tenga más de una cita para esa misma especialidad
-        validateUniqueScheduledAppointmentBySpecialty(resolvedPatient.idPatient(), specialty);
+        if(!manualFlow){
+            validateUniqueScheduledAppointmentBySpecialty(resolvedPatient.idPatient(), specialty);
+        }
 
         // Valida que no tenga otra cita en el horario de la cita que se esta agendando
         validateNoTimeConflictForPatient(resolvedPatient.idPatient(), date, startTime);
