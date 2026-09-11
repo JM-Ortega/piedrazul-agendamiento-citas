@@ -37,7 +37,6 @@ import java.util.UUID;
 public class AppointmentController {
     private final ListAppointmentsUseCase listAppointmentsUseCase;
     private final CitaDtoMapper citaDtoMapper;
-    private final ListMyAppointmentsUseCase listMyAppointmentsUseCase;
     private final IsNewPatientUseCase isNewPatientUseCase;
     private final UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase;
     private final CancelAppointmentUseCase cancelAppointmentUseCase;
@@ -56,7 +55,6 @@ public class AppointmentController {
     public AppointmentController(
             ListAppointmentsUseCase listAppointmentsUseCase,
             CitaDtoMapper citaDtoMapper,
-            ListMyAppointmentsUseCase listMyAppointmentsUseCase,
             IsNewPatientUseCase isNewPatientUseCase,
             UpdateAppointmentStatusUseCase updateAppointmentStatusUseCase,
             CancelAppointmentUseCase cancelAppointmentUseCase,
@@ -71,7 +69,6 @@ public class AppointmentController {
             DoctorConfigConsultPort doctorConfigConsultPort) {
         this.listAppointmentsUseCase = listAppointmentsUseCase;
         this.citaDtoMapper = citaDtoMapper;
-        this.listMyAppointmentsUseCase = listMyAppointmentsUseCase;
         this.isNewPatientUseCase = isNewPatientUseCase;
         this.updateAppointmentStatusUseCase = updateAppointmentStatusUseCase;
         this.cancelAppointmentUseCase = cancelAppointmentUseCase;
@@ -163,19 +160,7 @@ public class AppointmentController {
         return ResponseEntity.ok(PageResponse.from(result, content));
     }
 
-    @GetMapping("/me")
-    @PreAuthorize("hasRole('PATIENT')")
-    public ResponseEntity<List<AppointmentResponse>> listMyAppointments(
-            @AuthenticationPrincipal Jwt jwt) {
 
-        UUID userId = UUID.fromString(jwt.getSubject());
-
-        return ResponseEntity.ok(
-                listMyAppointmentsUseCase.execute(userId)
-                        .stream()
-                        .map(citaDtoMapper::toResponse)
-                        .toList());
-    }
 
     // Sirve para saber si un paciente es nuevo
     @GetMapping({ "/{patientId}/is-new-patient" })
