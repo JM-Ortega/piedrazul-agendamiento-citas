@@ -28,7 +28,11 @@ import {
 } from '../../../../shared/helpers/documentValidation';
 import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
 import { getSpecialtyMeta } from '../../../../shared/helpers/specialtyCatalog';
-import { timeToMinutes } from '../../../../shared/helpers/timeUtils';
+import {
+  generateTimeOptions,
+  generateTimeSelectOptions,
+  timeToMinutes,
+} from '../../../../shared/helpers/timeUtils';
 import { DAY_TO_WORKDAY } from '../../../../shared/helpers/workday.util';
 import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
@@ -89,19 +93,11 @@ export class AdminCreateUserComponent implements OnInit {
     { value: 4, label: 'Jueves' },
     { value: 5, label: 'Viernes' },
   ];
-  /** Opciones de hora de 07:00 a 12:00 en pasos de 5 minutos. */
-  readonly timeOptions: string[] = (() => {
-    const opts: string[] = [];
-    for (let h = 7; h <= 12; h++)
-      for (let m = 0; m < 60; m += 5) {
-        if (h === 12 && m > 0) break;
-        opts.push(
-          `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-        );
-      }
-    return opts;
-  })();
+  /** Opciones de hora de 06:00 a 13:00 en pasos de 5 minutos (valor en 24h). */
+  readonly timeOptions: string[] = generateTimeOptions();
 
+  /** timeOptions con label en formato 12h (ej: "13:00" se muestra como "1:00"). */
+  readonly timeSelectOptions = generateTimeSelectOptions();
   // ── Estado ────────────────────────────────────────────────────────────────
   showPassword = false;
   selectedRoles: Role[] = ['scheduler'];

@@ -23,10 +23,13 @@ import { InputComponent } from '../../../../designSystem/atoms/input/input.compo
 import { SelectComponent } from '../../../../designSystem/atoms/select/select.component';
 import { DatepickerComponent } from '../../../../designSystem/molecules/datepicker/datepicker.component';
 import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
+import {
+  generateTimeOptions,
+  generateTimeSelectOptions,
+} from '../../../../shared/helpers/timeUtils';
 import { toIsoDateString } from '../../../../shared/helpers/transformDateLocal';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
-import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 import {
   DoctorFormValidationService,
   FormErrors,
@@ -60,7 +63,6 @@ export interface DoctorSaveEvent {
     LucideSave,
     ButtonComponent,
     DatepickerComponent,
-    ToSelectOptionsPipe,
     SelectComponent,
     InputComponent,
   ],
@@ -83,20 +85,11 @@ export class DoctorEditFormComponent implements OnInit {
   /** Días hábiles seleccionables (lunes a viernes). */
   readonly weekDays = [1, 2, 3, 4, 5];
 
-  /** Opciones de hora de 07:00 a 12:00 en pasos de 5 minutos. */
-  readonly timeOptions: string[] = (() => {
-    const opts: string[] = [];
-    for (let h = 7; h <= 12; h++) {
-      for (let m = 0; m < 60; m += 5) {
-        if (h === 12 && m > 0) break;
-        opts.push(
-          `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
-        );
-      }
-    }
-    return opts;
-  })();
+  /** Opciones de hora de 06:00 a 13:00 en pasos de 5 minutos (valor en 24h). */
+  readonly timeOptions: string[] = generateTimeOptions();
 
+  /** timeOptions con label en formato 12h (ej: "13:00" se muestra como "1:00"). */
+  readonly timeSelectOptions = generateTimeSelectOptions();
   // ── Inputs / Outputs ──────────────────────────────────────────────────────
   doctor = input.required<Doctor>();
   isSaving = input(false);
