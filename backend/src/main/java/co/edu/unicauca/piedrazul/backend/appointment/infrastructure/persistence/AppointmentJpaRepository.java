@@ -31,4 +31,6 @@ public interface AppointmentJpaRepository extends JpaRepository<AppointmentEntit
     boolean existsByIdPatientAndAppointmentStateIn(UUID idPatient, Collection<AppointmentState> appointmentStates);
 
     List<AppointmentEntity> findByIdDoctorAndDateBetween(UUID idDoctor, LocalDate dateStart, LocalDate dateEnd);
+
+    long countByDateAndAppointmentState(LocalDate date, AppointmentState state);
 }

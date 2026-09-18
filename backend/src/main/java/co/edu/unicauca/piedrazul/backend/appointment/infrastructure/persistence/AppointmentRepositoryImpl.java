@@ -36,6 +36,11 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     }
 
     @Override
+    public long countByDateAndState(LocalDate date,  AppointmentState state) {
+        return jpaRepository.countByDateAndAppointmentState(date, state);
+    }
+
+    @Override
     public List<Appointment> findByPatientId(UUID idPatient) {
         return jpaRepository.findByIdPatient(idPatient).stream().map(mapper::toDomain).toList();
     }
