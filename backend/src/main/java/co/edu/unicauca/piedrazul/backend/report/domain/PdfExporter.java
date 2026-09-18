@@ -28,7 +28,7 @@ public class PdfExporter {
     public final byte[] export(DailyReportDto report, List<ReportColumn> columnas) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
-            Document doc = new Document(PageSize.A4.rotate(), 30, 30, 40, 30);
+            Document doc = new Document(PageSize.A4, 30, 30, 40, 30);
             PdfWriter.getInstance(doc, out);
             doc.open();
 
@@ -115,7 +115,7 @@ public class PdfExporter {
     public byte[] exportScheduler(List<DoctorDailyScheduleDto> schedules, LocalDate date, boolean hasAvailableSlots) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
-            Document doc = new Document(PageSize.A4.rotate(), 30, 30, 40, 30);
+            Document doc = new Document(PageSize.A4, 30, 30, 40, 30);
             PdfWriter.getInstance(doc, out);
             doc.open();
 

@@ -4,6 +4,7 @@ import co.edu.unicauca.piedrazul.backend.report.application.ReportService;
 import co.edu.unicauca.piedrazul.backend.report.dtos.ExportRequestDto;
 import co.edu.unicauca.piedrazul.backend.report.dtos.*;
 import co.edu.unicauca.piedrazul.backend.report.dtos.output.AvailabilityResponseDto;
+import co.edu.unicauca.piedrazul.backend.report.dtos.output.ErrorResponseDto;
 import co.edu.unicauca.piedrazul.backend.report.exception.NoAppointmentsTodayException;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
@@ -81,8 +82,13 @@ public class ReportController {
         return ResponseEntity.ok().headers(headers).body(archivo);
     }
 
+    // ReportController — cambiar el handler
     @ExceptionHandler(NoAppointmentsTodayException.class)
-    public ResponseEntity<Void> handleNoAppointments() {
-        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    public ResponseEntity<ErrorResponseDto> handleNoAppointments(
+            NoAppointmentsTodayException ex) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new ErrorResponseDto(ex.getMessage()));
     }
 }
