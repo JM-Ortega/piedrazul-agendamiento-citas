@@ -30,8 +30,5 @@ public interface AppointmentJpaRepository extends JpaRepository<AppointmentEntit
 
     boolean existsByIdPatientAndAppointmentStateIn(UUID idPatient, Collection<AppointmentState> appointmentStates);
 
-    boolean existsByIdPatientAndSchedulingOriginAndDateBetween(UUID idPatient, SchedulingOrigin schedulingOrigin,
-                                                               LocalDate startDate, LocalDate endDate);
-
     List<AppointmentEntity> findByIdDoctorAndDateBetween(UUID idDoctor, LocalDate dateStart, LocalDate dateEnd);
 }

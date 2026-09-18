@@ -100,12 +100,6 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     }
 
     @Override
-    public boolean existsByIdPatientAndSchedulingOriginAndDateBetween(UUID idPatient, SchedulingOrigin schedulingOrigin,
-                                                                      LocalDate startDate, LocalDate endDate){
-        return jpaRepository.existsByIdPatientAndSchedulingOriginAndDateBetween(idPatient, schedulingOrigin, startDate, endDate);
-    }
-
-    @Override
     public PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery) {
         Specification<AppointmentEntity> spec = buildSpecification(idDoctor, idPatient, date, state);
 

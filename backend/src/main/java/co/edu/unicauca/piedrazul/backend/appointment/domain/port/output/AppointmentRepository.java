@@ -39,7 +39,4 @@ public interface AppointmentRepository {
     PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery);
 
     PagedResult<Appointment> ListDoctorDailyAgenda(UUID idDoctor, LocalDate date, PageQuery pageQuery);
-
-    boolean existsByIdPatientAndSchedulingOriginAndDateBetween(UUID idPatient, SchedulingOrigin schedulingOrigin,
-                                                               LocalDate startDate, LocalDate endDate);
 }
