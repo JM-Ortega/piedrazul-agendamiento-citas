@@ -45,6 +45,7 @@ public class AppointmentController {
     private final GetAutonomousSchedulingContidionUseCase getAutonomousSchedulingContidionUseCase;
     private final RegisterUnscheduledAttentionUseCase registerUnscheduledAttentionUseCase;
     private final GetDoctorDailyAgendaUseCase getDoctorDailyAgendaUseCase;
+    private final CountScheduledAppointmentsUseCase countScheduledAppointmentsUseCase;
 
     private final AppointmentSchedulingService appointmentSchedulingService;
     private final ManualPatientResolutionStrategy manualPatientResolutionStrategy;
@@ -61,7 +62,7 @@ public class AppointmentController {
             GetAppointmentStatesUseCase getAppointmentStatesUseCase,
             UpdateAutonomousSchedulingUseCase updateAutonomousSchedulingUseCase,
             GetAutonomousSchedulingContidionUseCase getAutonomousSchedulingContidionUseCase,
-            RegisterUnscheduledAttentionUseCase registerUnscheduledAttentionUseCase, GetDoctorDailyAgendaUseCase getDoctorDailyAgendaUseCase,
+            RegisterUnscheduledAttentionUseCase registerUnscheduledAttentionUseCase, GetDoctorDailyAgendaUseCase getDoctorDailyAgendaUseCase, CountScheduledAppointmentsUseCase countScheduledAppointmentsUseCase,
             AppointmentSchedulingService appointmentSchedulingService,
             ManualPatientResolutionStrategy manualPatientResolutionStrategy,
             AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy,
@@ -77,6 +78,7 @@ public class AppointmentController {
         this.getAutonomousSchedulingContidionUseCase = getAutonomousSchedulingContidionUseCase;
         this.registerUnscheduledAttentionUseCase = registerUnscheduledAttentionUseCase;
         this.getDoctorDailyAgendaUseCase = getDoctorDailyAgendaUseCase;
+        this.countScheduledAppointmentsUseCase = countScheduledAppointmentsUseCase;
         this.appointmentSchedulingService = appointmentSchedulingService;
         this.manualPatientResolutionStrategy = manualPatientResolutionStrategy;
         this.autonomousPatientResolutionStrategy = autonomousPatientResolutionStrategy;
@@ -287,6 +289,15 @@ public class AppointmentController {
     public ResponseEntity<List<AppointmentState>> listAppointmentStates() {
         List<AppointmentState> states = getAppointmentStatesUseCase.getAppointmentStates();
         return ResponseEntity.ok(states);
+    }
+
+    //Obtiene la cantidad de citas (en numero) con estado agendadas.
+    @GetMapping("/countScheduledAppointments")
+    @PreAuthorize("hasAnyRole('SCHEDULER')")
+    public ResponseEntity<Long> countScheduledAppointments(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        return ResponseEntity.ok(countScheduledAppointmentsUseCase.execute(date));
     }
 
     // Helper methods

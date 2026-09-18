@@ -189,23 +189,22 @@ public class AppointmentSchedulingService {
         }
     }
 
-    public boolean hasAutonomousAppointmentInCurrentMonth(UUID idPatient) {
-        // Obtenemos la fecha de hoy
+    private boolean hasAutonomousAppointmentInCurrentMonth(UUID idPatient) {
         LocalDate today = LocalDate.now();
-
-        // Calculamos el primer día de este mes
         LocalDate startDate = today.withDayOfMonth(1);
-
-        // Calculamos el último día de este mes
         LocalDate endDate = today.with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
 
-        // Enviamos el rango al repositorio
-        return appointmentRepository.existsByIdPatientAndSchedulingOriginAndDateBetween(
-                idPatient,
-                SchedulingOrigin.AUTONOMO,
-                startDate,
-                endDate
-        );
+        return appointmentRepository.findByPatientId(idPatient).stream()
+                .anyMatch(appointment ->
+                        appointment.getSchedulingOrigin() == SchedulingOrigin.AUTONOMO
+                                && !appointment.getDate().isBefore(startDate)
+                                && !appointment.getDate().isAfter(endDate)
+                                && blocksMonthlyQuota(appointment.getAppointmentState())
+                );
+    }
+
+    private boolean blocksMonthlyQuota(AppointmentState state) {
+        return state == AppointmentState.AGENDADA || state == AppointmentState.ATENDIDA;
     }
 
     private void validateUniqueScheduledAppointmentBySpecialty(UUID idPatient, SpecialtyCode specialty) {

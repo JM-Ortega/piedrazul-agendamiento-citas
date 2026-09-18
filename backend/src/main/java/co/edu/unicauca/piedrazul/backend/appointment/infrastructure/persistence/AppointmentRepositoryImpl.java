@@ -36,6 +36,11 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     }
 
     @Override
+    public long countByDateAndState(LocalDate date,  AppointmentState state) {
+        return jpaRepository.countByDateAndAppointmentState(date, state);
+    }
+
+    @Override
     public List<Appointment> findByPatientId(UUID idPatient) {
         return jpaRepository.findByIdPatient(idPatient).stream().map(mapper::toDomain).toList();
     }
@@ -97,12 +102,6 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
         return jpaRepository.findByAppointmentStateAndDateBefore(AppointmentState.AGENDADA, date)
                 .stream().map(mapper::toDomain)
                 .toList();
-    }
-
-    @Override
-    public boolean existsByIdPatientAndSchedulingOriginAndDateBetween(UUID idPatient, SchedulingOrigin schedulingOrigin,
-                                                                      LocalDate startDate, LocalDate endDate){
-        return jpaRepository.existsByIdPatientAndSchedulingOriginAndDateBetween(idPatient, schedulingOrigin, startDate, endDate);
     }
 
     @Override

@@ -170,4 +170,9 @@ public class AppointmentConfig {
         );
     }
 
+    @Bean
+    public CountScheduledAppointmentsUseCase countScheduledAppointmentsUseCase(AppointmentRepository appointmentRepository) {
+        return new CountScheduledAppointmentsUseCaseImpl(appointmentRepository);
+    }
+
 }
