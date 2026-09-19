@@ -85,6 +85,11 @@ public class KeycloakUserService implements UserModuleApi {
         keycloakClient.assignRoleIfMissing(userId, Role.PATIENT);
     }
 
+    @Override
+    public void updateUserIdentity(UUID userId, String username, String firstName, String lastName, String email) {
+        keycloakClient.updateUser(userId, username, firstName, lastName, email);
+    }
+
     private UserSummary toUserSummary(org.keycloak.representations.idm.UserRepresentation user) {
         return new UserSummary(
                 UUID.fromString(user.getId()),

@@ -25,6 +25,8 @@ public interface PersonRepository extends JpaRepository<Person, UUID> {
 
     boolean existsByIdentification(String identification);
 
+    boolean existsByIdentificationAndIdNot(String identification, UUID id);
+
     boolean existsByUserId(UUID userId);
 
     @Query("""

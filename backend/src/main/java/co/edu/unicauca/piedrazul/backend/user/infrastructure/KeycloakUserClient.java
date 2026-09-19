@@ -11,9 +11,11 @@ import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
 import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsException;
+import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
+import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -200,6 +202,109 @@ public class KeycloakUserClient {
         } catch (Exception ex) {
             return "[]";
         }
+    }
+
+    /**
+     * Actualiza username, nombres y correo de una cuenta existente.
+     *
+     * <p>Cambiar el username exige {@code editUsernameAllowed} en el realm. Sin
+     * él, Keycloak 26 rechaza la actualización completa con 400
+     * ({@code error-user-attribute-read-only}) y no aplica nada; aquí se traduce a
+     * un error que lo dice. Además, si el username cambia se relee la cuenta para
+     * comprobar que se aplicó, por si alguna versión lo ignorara en silencio: en
+     * ese caso se restauran los demás datos y se falla, para no dejar la cuenta
+     * a medias.
+     */
+    public void updateUser(UUID keycloakId, String username, String firstName, String lastName, String email) {
+        UserResource resource = keycloak.realm(props.getRealm())
+                .users()
+                .get(keycloakId.toString());
+
+        UserRepresentation user;
+        try {
+            user = resource.toRepresentation();
+        } catch (WebApplicationException ex) {
+            throw translateUpdateFailure(ex);
+        }
+
+        String previousUsername = user.getUsername();
+        String previousFirstName = user.getFirstName();
+        String previousLastName = user.getLastName();
+        String previousEmail = user.getEmail();
+
+        applyIdentity(user, username, firstName, lastName, email);
+
+        try {
+            resource.update(user);
+        } catch (WebApplicationException ex) {
+            throw translateUpdateFailure(ex);
+        }
+
+        // Keycloak normaliza el username a minúsculas, por eso no se compara con equals.
+        if (username.equalsIgnoreCase(previousUsername)) {
+            return;
+        }
+
+        String appliedUsername = resource.toRepresentation().getUsername();
+        if (!username.equalsIgnoreCase(appliedUsername)) {
+            try {
+                applyIdentity(user, previousUsername, previousFirstName, previousLastName, previousEmail);
+                resource.update(user);
+            } catch (RuntimeException restoreFailure) {
+                log.error("No se pudo restaurar la cuenta {} tras un cambio de username no aplicado",
+                        keycloakId, restoreFailure);
+            }
+            throw new IdentityProviderException(
+                    "el proveedor no aplicó el cambio de nombre de usuario; "
+                            + "verifique que el realm tenga habilitada la edición de username");
+        }
+    }
+
+    private static void applyIdentity(
+            UserRepresentation user, String username, String firstName, String lastName, String email) {
+        user.setUsername(username);
+        user.setFirstName(firstName != null ? firstName : "");
+        user.setLastName(lastName != null ? lastName : "");
+        user.setEmail(email != null ? email : "");
+    }
+
+    private static String readBody(WebApplicationException ex) {
+        try {
+            return ex.getResponse().hasEntity() ? ex.getResponse().readEntity(String.class) : "";
+        } catch (RuntimeException readFailure) {
+            return "";
+        }
+    }
+
+    private RuntimeException translateUpdateFailure(WebApplicationException ex) {
+        int status = ex.getResponse().getStatus();
+
+        if (status == Response.Status.NOT_FOUND.getStatusCode()) {
+            return new IdentityProviderException("la cuenta de usuario no existe en el proveedor de identidad");
+        }
+
+        if (status == Response.Status.CONFLICT.getStatusCode()) {
+            // El conflicto puede ser por username o por correo.
+            return new UserAlreadyExistsException(
+                    "Ya existe otra cuenta con ese nombre de usuario o correo electrónico");
+        }
+
+        if (status == Response.Status.BAD_REQUEST.getStatusCode()) {
+            String body = readBody(ex);
+
+            if (body.contains("error-user-attribute-read-only") && body.contains("username")) {
+                log.error("Keycloak rechazó el cambio de username: el realm no tiene editUsernameAllowed");
+                return new IdentityProviderException(
+                        "el proveedor de identidad no permite modificar el nombre de usuario; "
+                                + "habilite la edición de username en el realm");
+            }
+
+            log.warn("Datos inválidos en Keycloak al actualizar usuario: {}", body);
+            return new InvalidUserDataException("Datos inválidos para actualizar el usuario");
+        }
+
+        log.error("Error Keycloak al actualizar usuario", ex);
+        return new IdentityProviderException("No se pudo actualizar el usuario");
     }
 
     /**
