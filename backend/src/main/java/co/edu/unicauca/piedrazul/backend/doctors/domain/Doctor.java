@@ -78,7 +78,7 @@ public class Doctor {
                         "La hora final debe ser posterior a la inicial");
             }
 
-            if(startTime.isBefore(LocalTime.of(6,0)) || endTime.isAfter(LocalTime.of(1,0))) {
+            if(startTime.isBefore(LocalTime.of(6,0)) || endTime.isAfter(LocalTime.of(13,0))) {
                 throw new DoctorValidationException(
                         "El horario de de los doctores va de 6AM a 1PM");
             }
