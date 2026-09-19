@@ -61,7 +61,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
                         )
                 ),
                         null,
-                        List.of(Role.DOCTOR))
+                        List.of(Role.DOCTOR, Role.SCHEDULER, Role.ADMIN))
         );
 
 
@@ -117,7 +117,7 @@ public class DoctorDataInitializer implements ApplicationRunner {
                         )
                 ),
                 null,
-                List.of(Role.DOCTOR)
+                List.of(Role.DOCTOR, Role.SCHEDULER, Role.ADMIN)
         ));
 
         userProvisioningApi.createUser(new CreateSystemUserPayload(
