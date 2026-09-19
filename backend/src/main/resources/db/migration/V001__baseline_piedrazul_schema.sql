@@ -199,7 +199,7 @@ CREATE TABLE piedrazul.person (
     CONSTRAINT uq_person_user_id UNIQUE (user_id),
     CONSTRAINT uq_person_identification UNIQUE (identification),
     CONSTRAINT ck_person_identification_type CHECK (
-        identification_type IN ('CEDULA', 'TARJETA_IDENTIDAD', 'REGISTRO_NACIMIENTO', 'PASAPORTE')
+        identification_type IN ('CEDULA', 'TARJETA_IDENTIDAD', 'REGISTRO_NACIMIENTO', 'PASAPORTE', 'CEDULA_EXTRANJERIA')
     )
 );
 

@@ -4,5 +4,6 @@ public enum IdentificationType {
     CEDULA,
     TARJETA_IDENTIDAD,
     REGISTRO_NACIMIENTO,
-    PASAPORTE
+    PASAPORTE,
+    CEDULA_EXTRANJERIA
 }
