@@ -6,15 +6,21 @@ import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.ConfirmLinkUserA
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.CreatePatientRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.RequestLinkUserAccountCodeRequest;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.UpdateOwnPatientRequest;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.UpdatePatientRequest;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientPublicResponse;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientResponse;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientSummaryResponse;
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientService;
+import co.edu.unicauca.piedrazul.backend.patients.application.PatientUpdateService;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
+import co.edu.unicauca.piedrazul.backend.shared.pagination.PageResponse;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -28,13 +34,16 @@ import java.util.UUID;
 public class PatientController {
 
     private final PatientService patientService;
+    private final PatientUpdateService patientUpdateService;
     private final AppointmentExternalService appointmentExternalService;
     private final SecurityContextExtractor securityContextExtractor;
     private final PersonExternalService personExternalService;
 
-    public PatientController(PatientService patientService, AppointmentExternalService appointmentExternalService,
+    public PatientController(PatientService patientService, PatientUpdateService patientUpdateService,
+                             AppointmentExternalService appointmentExternalService,
                              SecurityContextExtractor securityContextExtractor, PersonExternalService personExternalService) {
         this.patientService = patientService;
+        this.patientUpdateService = patientUpdateService;
         this.appointmentExternalService = appointmentExternalService;
         this.securityContextExtractor = securityContextExtractor;
         this.personExternalService = personExternalService;
@@ -136,13 +145,32 @@ public class PatientController {
                 .toList();
     }
 
+    /**
+     * Página de pacientes ordenada por nombre. {@code search} filtra por nombre
+     * completo o número de documento; el orden no es configurable.
+     */
     @GetMapping
     @PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR')")
-    public List<PatientSummaryResponse> findAll() {
-        return patientService.findAll()
-                .stream()
-                .map(this::toSummaryResponse)
-                .toList();
+    public PageResponse<PatientSummaryResponse> findAll(
+            @PageableDefault(size = 10) Pageable pageable,
+            @RequestParam(required = false) String search
+    ) {
+        return PageResponse.from(patientService.search(search, pageable));
+    }
+
+    /** Reemplaza todos los datos del paciente, incluido el documento. Solo doctores. */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('DOCTOR')")
+    public PatientResponse update(@PathVariable UUID id, @Valid @RequestBody UpdatePatientRequest request) {
+        return toResponse(patientUpdateService.updatePatient(id, request.toCommand()));
+    }
+
+    /** El paciente reemplaza sus propios datos. No puede cambiar su documento. */
+    @PutMapping("/me")
+    @PreAuthorize("hasRole('PATIENT')")
+    public PatientResponse updateMe(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UpdateOwnPatientRequest request) {
+        UUID keycloakId = UUID.fromString(jwt.getSubject());
+        return toResponse(patientUpdateService.updateOwnPatient(keycloakId, request.toCommand()));
     }
 
     @GetMapping("/{id}/exists")
