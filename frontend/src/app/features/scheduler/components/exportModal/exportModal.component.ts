@@ -23,6 +23,7 @@ import { ButtonComponent } from '../../../../designSystem/atoms/button/button.co
 import { DatepickerComponent } from '../../../../designSystem/molecules/datepicker/datepicker.component';
 import { ConfirmModalComponent } from '../../../../designSystem/organisms/confirmModal/confirmModal.component';
 import { toIsoDateString } from '../../../../shared/helpers/transformDateLocal';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 
 type ExportFormat = 'excel' | 'pdf' | 'csv';
 
@@ -140,6 +141,12 @@ export class SchedulerExportModalComponent {
     return date ? formatLongDateEs(toIsoDateString(date)) : '';
   }
 
+  onDateChange(date: Date | null): void {
+    this.selectedDate.set(date);
+    this.dateRequiredError.set(false);
+    this.exportError.set(null);
+  }
+
   open(): void {
     this.selectedDate.set(null);
     this.dateRequiredError.set(false);
@@ -151,6 +158,7 @@ export class SchedulerExportModalComponent {
   closeExportModal(): void {
     this.showExportModal.set(false);
     this.exportError.set(null);
+    this.dateRequiredError.set(false);
   }
 
   handleExportClick(): void {
@@ -216,10 +224,8 @@ export class SchedulerExportModalComponent {
         this.closeExportModal();
         this.exported.emit();
       },
-      error: () => {
-        this.exportError.set(
-          'Ocurrió un error al generar el reporte. Intente nuevamente.'
-        );
+      error: (err: AppError) => {
+        this.exportError.set(err.message);
         this.isExporting.set(false);
       },
     });

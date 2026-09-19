@@ -34,7 +34,7 @@
           <app-datepicker
             [id]="'exportDate'"
             [ngModel]="selectedDate()"
-            (valueChange)="selectedDate.set($event)"
+            (valueChange)="onDateChange($event)"
             [errorMessage]="
               dateRequiredError() ? 'Debe seleccionar una fecha' : undefined
             "
