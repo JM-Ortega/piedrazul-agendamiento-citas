@@ -80,7 +80,7 @@ public class CreateAccountUseCase implements UserProvisioningApi {
                     user.firstName(),
                     user.lastName(),
                     payload.user().phone(),
-                    user.email(),
+                    user.email().toLowerCase(),
                     user.id()
             );
 

@@ -13,7 +13,7 @@ import jakarta.validation.constraints.*;
 public record CreateSystemUserRequest(
         @NotBlank(message = "La identificación es obligatoria")
         @Size(min = 4, max = 50)
-        @Pattern(regexp = "*^[A-Za-z0-9._-]{4,50}$*")
+        @Pattern(regexp = "^[A-Za-z0-9._-]{4,50}$*")
         @Sanitize
         String identification,
 
@@ -22,14 +22,14 @@ public record CreateSystemUserRequest(
 
         @NotBlank(message = "El nombre es obligatorio")
         @Size(min = 2, max = 60)
-        @Pattern(regexp = "*^[\\p{L} '-]{2,60}$*")
+        @Pattern(regexp = "^[\\p{L} '-]{2,60}$*")
         @Sanitize
         @NormalizeName
         String firstName,
 
         @NotBlank(message = "El apellido es obligatorio")
         @Size(min = 2, max = 60)
-        @Pattern(regexp = "*^[\\p{L} '-]{2,60}$*")
+        @Pattern(regexp = "^[\\p{L} '-]{2,60}$*")
         @Sanitize
         @NormalizeName
         String lastName,
@@ -41,7 +41,7 @@ public record CreateSystemUserRequest(
         String email,
 
         // Número Colombiano
-        @Pattern(regexp = "*^[0-9]{10}$*")
+        @Pattern(regexp = "^[0-9]{10}$*")
         @NotBlank(message = "El teléfono es obligatorio")
         @Sanitize
         String phone,
