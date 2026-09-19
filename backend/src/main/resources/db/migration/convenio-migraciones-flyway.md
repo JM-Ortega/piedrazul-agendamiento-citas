@@ -363,6 +363,7 @@ el código actual no protege pero que la base de datos nueva sí debería cerrar
 - [ ] ¿Se identificaron condiciones de carrera reales en el código que ameriten un `UNIQUE` o índice único parcial nuevo?
 - [ ] Si el rediseño reemplaza un sistema existente, ¿se verificaron las decisiones clave contra el código real, no solo contra diagramas?
 - [ ] ¿Si se activó una extensión, se usó `SCHEMA extensions` explícito, sin `IF NOT EXISTS`, y se verificó si sus funciones necesitan un wrapper `IMMUTABLE` para poder indexarlas?
+- [ ] ¿Ninguna migración escribe el nombre de un rol de conexión a mano? (sección 16)
 
 ---
 
@@ -422,6 +423,35 @@ del sistema, va en un bloque inicial de la migración baseline (antes de los
 catálogos). Si es para una funcionalidad agregada después, va en la migración
 versionada que introduce esa funcionalidad — igual que cualquier otro cambio
 estructural nuevo.
+
+---
+
+## 16. Nombres de rol en migraciones: siempre por placeholder
+
+Los nombres de los roles de conexión no son constantes del esquema, son
+configuración del ambiente: `infra/postgres/init/01-init-databases.sh` los crea
+a partir de `APP_DB_USERNAME` (obligatoria, sin valor por defecto) y la
+aplicación se conecta con ese mismo valor. Una migración que escribe
+`piedrazul_app` a mano solo funciona en los ambientes donde el rol se llama
+así, y falla en cualquier otro, incluido un PostgreSQL limpio de pruebas.
+
+**Regla:** un `GRANT`, `REVOKE` o cualquier referencia a un rol de conexión usa el
+placeholder de Flyway y va entre comillas dobles, igual que el init
+(`:"app_role"`), para que el nombre se interprete tal cual y no en minúsculas:
+
+```sql
+REVOKE UPDATE, DELETE ON piedrazul.audit_event FROM "${app_role}";
+```
+
+El valor se define en `spring.flyway.placeholders.app_role`
+(`application.yaml`, alimentado por `APP_DB_USERNAME`). Si el placeholder no
+tiene valor, Flyway falla al migrar; es intencional: es preferible detener el
+despliegue a omitir en silencio un control de seguridad.
+
+**Consecuencia para los tests:** el contenedor de `PostgresIntegrationSupport`
+crea un rol propio y lo pasa por el mismo placeholder, de modo que la migración
+real se ejecuta sin modificaciones y se puede comprobar que el rol no puede
+modificar la bitácora (`AuditEventImmutabilityIT`).
 
 ---
 

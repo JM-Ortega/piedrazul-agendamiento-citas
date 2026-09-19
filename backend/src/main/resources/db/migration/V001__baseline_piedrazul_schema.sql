@@ -574,9 +574,15 @@ CREATE INDEX idx_audit_event_correlation_id
 -- Refuerzo de integridad sobre piedrazul.audit_event: prohíbe UPDATE y
 -- DELETE tanto a nivel de permisos de rol como con un trigger de
 -- defensa en profundidad.
+--
+-- El rol de la aplicación se toma del placeholder de Flyway ${app_role}
+-- (spring.flyway.placeholders.app_role, que sale de APP_DB_USERNAME, la misma
+-- variable con la que infra/postgres/init crea el rol y con la que la
+-- aplicación se conecta). Va entre comillas dobles para respetar mayúsculas
+-- igual que el init. Ver sección 16 del convenio.
 -- =====================================================================
-REVOKE UPDATE, DELETE ON piedrazul.audit_event FROM piedrazul_app;
-GRANT SELECT, INSERT ON piedrazul.audit_event TO piedrazul_app;
+REVOKE UPDATE, DELETE ON piedrazul.audit_event FROM "${app_role}";
+GRANT SELECT, INSERT ON piedrazul.audit_event TO "${app_role}";
 
 CREATE FUNCTION piedrazul.prevent_audit_event_mutation()
     RETURNS TRIGGER
