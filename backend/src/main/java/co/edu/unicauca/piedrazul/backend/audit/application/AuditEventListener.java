@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.audit.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.events.ScheduledAppointmentEvent;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.events.ClinicalHistoryCreatedEvent;
+import co.edu.unicauca.piedrazul.backend.patients.events.PatientUpdatedEvent;
 import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEvent;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEventRepository;
@@ -45,6 +46,18 @@ public class AuditEventListener {
                 .target("HistoriaClinica", event.clinicalHistoryId().toString())
                 .outcome(AuditOutcome.EXITOSO)
                 .correlationId(event.correlationId())
+                .build());
+    }
+
+    @ApplicationModuleListener
+    void on(PatientUpdatedEvent event) {
+        repository.save(AuditEvent.builder()
+                .actor(event.performedBy(), event.performedByRole())
+                .action(AuditAction.PACIENTE_MODIFICADO)
+                .target("Paciente", event.patientId())
+                .outcome(AuditOutcome.EXITOSO)
+                .correlationId(event.correlationId())
+                .states(event.beforeState(), event.afterState())
                 .build());
     }
 
