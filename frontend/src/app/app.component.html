@@ -60,7 +60,39 @@
   }
 
   @case ('ready') {
-    <app-navbar />
-    <router-outlet />
+    <div class="contents" [attr.inert]="sessionExpired() ? '' : null">
+      <app-navbar />
+      <router-outlet />
+    </div>
   }
+}
+
+@if (sessionExpired()) {
+  <div class="fixed inset-0 z-[100] backdrop-blur-sm">
+    <app-confirm-modal
+      [visible]="true"
+      title="Sesión expirada"
+      message="Su sesión ha expirado por inactividad. Por su seguridad, debe iniciar sesión nuevamente para continuar."
+      confirmLabel="Aceptar"
+      confirmVariant="primary"
+      iconBg="bg-blue-100"
+      [showCancel]="false"
+      (confirmed)="onSessionExpiredAccepted()"
+    >
+      <svg
+        icon
+        class="w-8 h-8 text-[#215c98]"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </svg>
+    </app-confirm-modal>
+  </div>
 }
