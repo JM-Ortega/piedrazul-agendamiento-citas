@@ -1,12 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.clinicalHistory.application;
 
-import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
-import co.edu.unicauca.piedrazul.backend.appointment.events.ScheduledAppointmentEvent;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentExternalData;
+import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.intput.CheckUpUpdateRequest;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.events.ClinicalHistoryCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
-import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
-import co.edu.unicauca.piedrazul.backend.audit.infrastructure.aop.Auditable;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.ClinicalHistoryExternalService;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.internal.ClinicalHistoryRequest;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.output.ClinicalHistoryResponse;
@@ -18,21 +14,19 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Service
 public class ClinicalHistoryExternalServiceImpl implements ClinicalHistoryExternalService {
     private final ClinicalHistoryRepository repository;
-    private final AppointmentExternalService appointmentExternalService;
     private final ApplicationEventPublisher eventPublisher;
     private final SecurityContextExtractor securityExtractor;
 
     public ClinicalHistoryExternalServiceImpl(ClinicalHistoryRepository repository,
-                                              AppointmentExternalService appointmentExternalService,
                                               ApplicationEventPublisher eventPublisher,
                                               SecurityContextExtractor securityExtractor) {
         this.repository = repository;
-        this.appointmentExternalService = appointmentExternalService;
         this.eventPublisher = eventPublisher;
         this.securityExtractor = securityExtractor;
     }
@@ -65,23 +59,32 @@ public class ClinicalHistoryExternalServiceImpl implements ClinicalHistoryExtern
         );
     }
 
-
-    public Page<ClinicalHistoryResponse> getHistoryByPatient(
-            UUID idPatient,
-            Pageable pageable) {
-
+    @Override
+    public Page<ClinicalHistoryResponse> getHistoryByPatient(UUID idPatient, Pageable pageable) {
         return repository.findByIdPatient(idPatient, pageable)
-                .map(ch -> {
-                    AppointmentExternalData appointmentData =
-                            appointmentExternalService
-                                    .getAppointmentData(ch.getIdAppointment());
-
-                    return toResponse(ch, appointmentData.doctorName());
-                });
+                .map(ch -> toResponse(ch, ch.getDoctor_name()));
     }
 
-    private ClinicalHistoryResponse toResponse(ClinicalHistory ch,
-                                               String doctorName) {
+    @Override
+    public ClinicalHistoryResponse updateCheckUp(UUID idClinicalHistory,
+                                                 CheckUpUpdateRequest request) {
+
+        ClinicalHistory clinicalHistory = repository.findById(idClinicalHistory)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No existe una historia clínica con el id: " + idClinicalHistory));
+
+        if (!clinicalHistory.getAttendedAt().equals(LocalDate.now())) {
+            throw new IllegalStateException(
+                    "Solo se puede editar una historia clínica del día actual");
+        }
+
+        clinicalHistory.updateDescription(request.description());
+        ClinicalHistory saved = repository.save(clinicalHistory);
+
+        return toResponse(saved, saved.getDoctor_name());
+    }
+
+    private ClinicalHistoryResponse toResponse(ClinicalHistory ch, String doctorName) {
         return new ClinicalHistoryResponse(
                 ch.getId(),
                 ch.getAttendedAt(),

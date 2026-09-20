@@ -30,7 +30,7 @@ public class ClinicalHistory {
     @Column(name = "doctor_name", nullable = false, updatable = false, length = 200)
     private String doctor_name;
 
-    @Column(name = "description", nullable = false, updatable = false, length = 500)
+    @Column(name = "description", nullable = false, length = 500)
     private String description;
 
     public ClinicalHistory(UUID idPatient, UUID idAppointment, LocalDate attendedAt, String doctor_name, String description) {
@@ -38,6 +38,13 @@ public class ClinicalHistory {
         this.idAppointment = idAppointment;
         this.attendedAt = attendedAt;
         this.doctor_name = doctor_name;
+        this.description = description;
+    }
+
+    public void updateDescription(String description) {
+        if (description == null || description.isBlank()) {
+            throw new IllegalArgumentException("La descripción no puede estar vacía");
+        }
         this.description = description;
     }
 }

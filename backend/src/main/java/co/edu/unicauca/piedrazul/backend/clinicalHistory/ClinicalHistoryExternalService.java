@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.clinicalHistory;
 
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.internal.ClinicalHistoryRequest;
+import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.intput.CheckUpUpdateRequest;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.output.ClinicalHistoryResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,5 +17,9 @@ public interface ClinicalHistoryExternalService {
     //Solo necesita saber qué puede pedirle
 
     void registerClinicalHistory(ClinicalHistoryRequest request);
+
+    Page<ClinicalHistoryResponse> getHistoryByPatient(UUID idPatient, Pageable pageable);
+
+    ClinicalHistoryResponse updateCheckUp(UUID idClinicalHistory, CheckUpUpdateRequest request);
 }
 

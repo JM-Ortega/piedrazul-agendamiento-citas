@@ -1,10 +1,12 @@
 package co.edu.unicauca.piedrazul.backend.clinicalHistory.api;
 
 import co.edu.unicauca.piedrazul.backend.audit.infrastructure.aop.Auditable;
+import co.edu.unicauca.piedrazul.backend.clinicalHistory.ClinicalHistoryExternalService;
+import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.intput.CheckUpUpdateRequest;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.output.ClinicalHistoryResponse;
-import co.edu.unicauca.piedrazul.backend.clinicalHistory.application.ClinicalHistoryExternalServiceImpl;
 import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.shared.pagination.PageResponse;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.data.domain.Page;
@@ -20,9 +22,9 @@ import java.util.UUID;
 @RequestMapping("/api/clinical-history")
 @PreAuthorize("hasRole('DOCTOR')")
 public class ClinicalHistoryController {
-    private final ClinicalHistoryExternalServiceImpl service;
+    private final ClinicalHistoryExternalService service;
 
-    public ClinicalHistoryController(ClinicalHistoryExternalServiceImpl service) {
+    public ClinicalHistoryController(ClinicalHistoryExternalService service) {
         this.service = service;
     }
 
@@ -43,5 +45,18 @@ public class ClinicalHistoryController {
                 service.getHistoryByPatient(idPatient, pageable);
 
         return ResponseEntity.ok(PageResponse.from(history));
+    }
+
+    @PostMapping("/updateCheckup/{idClinicalHistory}")
+    @Auditable(
+            action = AuditAction.HISTORIA_CLINICA_CONSULTADA,
+            targetEntityType = "HistoriaClinica",
+            targetIdExpression = "#idClinicalHistory"
+    )
+    public ResponseEntity<ClinicalHistoryResponse> updateCheckup(
+            @PathVariable @NotNull(message = "El id de la historia clínica es obligatorio") UUID idClinicalHistory,
+            @RequestBody @Valid CheckUpUpdateRequest request) {
+        ClinicalHistoryResponse response = service.updateCheckUp(idClinicalHistory, request);
+        return ResponseEntity.ok(response);
     }
 }
