@@ -2,10 +2,10 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { withPagination } from '../../shared/helpers/httpPagination';
+import { PaginatedState } from '../../shared/helpers/paginatedState';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { PageResponse } from '../../shared/models/dtos/pageResponse.dto';
-import { PaginatedState } from '../../shared/helpers/paginatedState';
-import { withPagination } from '../../shared/helpers/httpPagination';
 
 /**
  * Servicio de citas del paciente.
@@ -91,6 +91,16 @@ export class PatientAppointmentService {
     return this.http.put<void>(
       `${this.apiUrl}/appointments/${appointmentId}/cancel`,
       {}
+    );
+  }
+  /**
+   * Consulta si el agendamiento autónomo de pacientes está habilitado.
+   *
+   * @returns Observable con el estado actual (true = habilitado).
+   */
+  getAutonomousSchedulingStatus(): Observable<boolean> {
+    return this.http.get<boolean>(
+      `${this.apiUrl}/appointments/config/autonomous-scheduling`
     );
   }
 }
