@@ -20,6 +20,7 @@ import {
 } from '@lucide/angular';
 import { DoctorService } from '../../../core/services/doctor.service';
 import { ButtonComponent } from '../../../designSystem/atoms/button/button.component';
+import { TooltipDirective } from '../../../designSystem/atoms/tooltip/tooltip.directive';
 import { PaginationComponent } from '../../../designSystem/molecules/pagination/pagination.component';
 import { ConfirmModalComponent } from '../../../designSystem/organisms/confirmModal/confirmModal.component';
 import { PaginatedState } from '../../../shared/helpers/paginatedState';
@@ -58,6 +59,7 @@ import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
     ButtonComponent,
     ConfirmModalComponent,
     PaginationComponent,
+    TooltipDirective,
   ],
 })
 export class DoctorDashboardComponent implements OnInit {
@@ -283,7 +285,18 @@ export class DoctorDashboardComponent implements OnInit {
       state: { documentNumber, specialty, idDoctor },
     });
   }
-
+  /**
+   * Navega al detalle de control médico de una cita ya atendida, en modo
+   * edición: precarga la observación más reciente para modificarla, en
+   * vez de agregar una nueva.
+   *
+   * @param appointmentId - ID de la cita atendida.
+   */
+  goToControlMedico(appointmentId: string): void {
+    this.router.navigate(['/medico/control-medico', appointmentId], {
+      queryParams: { modo: 'editar' },
+    });
+  }
   /** Navega al flujo de atención de un paciente sin cita previa. */
   goToUnscheduledAttention(): void {
     this.router.navigate(['/medico/atencion-sin-cita']);

@@ -139,7 +139,7 @@
               class="flex items-center gap-2 text-2sm font-semibold text-[#163c63] mb-4"
             >
               <svg lucideClipboardPen [size]="28" class="text-[#163c63]"></svg>
-              Agregar Observación
+              {{ isEditMode() ? 'Editar Observación' : 'Agregar Observación' }}
             </h5>
 
             <!-- Textarea con mayor altura (rows="7") y altura mínima personalizada -->
@@ -148,8 +148,12 @@
               (input)="onObservationChange($any($event.target).value)"
               rows="7"
               maxlength="300"
-              placeholder="Escriba las observaciones detalladas de la consulta..."
-              class="w-full min-h-[200px] border-2 border-[#d9e9f8] focus:border-[#a7c9ec] rounded-xl px-4 py-3 outline-none transition-colors resize-y leading-relaxed text-gray-700"
+              [placeholder]="
+                isEditMode()
+                  ? 'Edite la observación registrada para esta cita...'
+                  : 'Escriba las observaciones detalladas de la consulta...'
+              "
+              class="w-full min-h-50 border-2 border-[#d9e9f8] focus:border-[#a7c9ec] rounded-xl px-4 py-3 outline-none transition-colors resize-y leading-relaxed text-gray-700"
             ></textarea>
 
             <p class="text-sm text-gray-500 text-right mt-1 mb-3">
@@ -177,7 +181,7 @@
                   Guardando...
                 } @else {
                   <svg lucideSave [size]="25" class="text-white"></svg>
-                  Guardar y salir
+                  {{ isEditMode() ? 'Guardar cambios' : 'Guardar y salir' }}
                 }
               </app-button>
             </div>
@@ -200,14 +204,14 @@
               (pageChange)="onMedicalRecordsPageChange($event)"
             ></app-pagination>
           </div>
-          @if (records().length === 0) {
+          @if (visibleRecords().length === 0) {
             <div
               class="bg-blue-50 border border-blue-200 text-[#215c98] px-4 py-3 rounded-xl"
             >
               Sin registros clínicos.
             </div>
           }
-          @for (r of records(); track r.idClinicalHistory) {
+          @for (r of visibleRecords(); track r.idClinicalHistory) {
             <div class="bg-white rounded-2xl shadow-md px-6 py-2 mb-2">
               <div
                 class="flex items-center justify-between flex-wrap gap-2 pb-1 mb-2 border-b border-gray-100"
