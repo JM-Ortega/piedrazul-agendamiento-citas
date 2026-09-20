@@ -4,6 +4,7 @@ import Keycloak from 'keycloak-js';
 import { catchError, tap, throwError } from 'rxjs';
 import { AppHealthService } from '../services/app-health.service';
 import { normalizeHttpError } from './normalizeHttpError';
+import { SessionInactivityService } from '../services/sessionInactivity.service';
 
 /**
  * Interceptor HTTP global de manejo de errores.
@@ -22,12 +23,14 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const keycloak = inject(Keycloak);
   const appHealth = inject(AppHealthService);
 
+  const inactivity = inject(SessionInactivityService);
+
   return next(req).pipe(
     tap(() => appHealth.reportReachable()),
     catchError((error: HttpErrorResponse) => {
       const appError = normalizeHttpError(error);
 
-      if (appError.errorCode === 'UNAUTHORIZED') {
+      if (appError.errorCode === 'UNAUTHORIZED' && !inactivity.expired()) {
         keycloak.login({ redirectUri: window.location.href });
       }
 
