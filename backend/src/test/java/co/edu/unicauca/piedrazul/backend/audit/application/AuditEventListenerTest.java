@@ -6,6 +6,7 @@ import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEventRepository;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditOutcome;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.events.ClinicalHistoryCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
+import co.edu.unicauca.piedrazul.backend.user.events.UserAccountStatusChangedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserRoleAssignedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserRoleRevokedEvent;
@@ -133,5 +134,32 @@ class AuditEventListenerTest {
         assertThat(revokedAudit.getAction()).isEqualTo(AuditAction.ROL_REVOCADO);
         assertThat(revokedAudit.getBeforeState()).isEqualTo("[\"DOCTOR\",\"PATIENT\"]");
         assertThat(revokedAudit.getAfterState()).isEqualTo("[\"DOCTOR\"]");
+    }
+
+    @Test
+    void onUserAccountStatusChangedShouldAuditActivationAndDeactivationOfThePatientAccountByPatientId() {
+        listener.on(UserAccountStatusChangedEvent.of("patient-10", "admin-01", "[ADMIN]", "corr-on", false, true));
+        listener.on(UserAccountStatusChangedEvent.of("patient-11", "admin-01", "[ADMIN]", "corr-off", true, false));
+
+        verify(repository, times(2)).save(auditCaptor.capture());
+        var savedEvents = auditCaptor.getAllValues();
+
+        AuditEvent activation = savedEvents.get(0);
+        assertThat(activation.getAction()).isEqualTo(AuditAction.USUARIO_ACTIVADO);
+        assertThat(activation.getActorId()).isEqualTo("admin-01");
+        assertThat(activation.getActorRole()).isEqualTo("[ADMIN]");
+        assertThat(activation.getTargetEntityType()).isEqualTo("Paciente");
+        assertThat(activation.getTargetEntityId()).isEqualTo("patient-10");
+        assertThat(activation.getOutcome()).isEqualTo(AuditOutcome.EXITOSO);
+        assertThat(activation.getCorrelationId()).isEqualTo("corr-on");
+        assertThat(activation.getBeforeState()).isEqualTo("{\"enabled\":false}");
+        assertThat(activation.getAfterState()).isEqualTo("{\"enabled\":true}");
+
+        AuditEvent deactivation = savedEvents.get(1);
+        assertThat(deactivation.getAction()).isEqualTo(AuditAction.USUARIO_DESACTIVADO);
+        assertThat(deactivation.getTargetEntityType()).isEqualTo("Paciente");
+        assertThat(deactivation.getTargetEntityId()).isEqualTo("patient-11");
+        assertThat(deactivation.getBeforeState()).isEqualTo("{\"enabled\":true}");
+        assertThat(deactivation.getAfterState()).isEqualTo("{\"enabled\":false}");
     }
 }

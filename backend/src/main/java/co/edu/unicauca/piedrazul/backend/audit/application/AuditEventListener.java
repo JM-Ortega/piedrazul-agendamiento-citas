@@ -7,6 +7,7 @@ import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEvent;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEventRepository;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditOutcome;
+import co.edu.unicauca.piedrazul.backend.user.events.UserAccountStatusChangedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserRoleAssignedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserRoleRevokedEvent;
@@ -74,6 +75,26 @@ public class AuditEventListener {
                 .outcome(AuditOutcome.EXITOSO)
                 .correlationId(event.correlationId())
                 .build());
+    }
+
+    @ApplicationModuleListener
+    void on(UserAccountStatusChangedEvent event) {
+        AuditAction action = event.enabledAfter()
+                ? AuditAction.USUARIO_ACTIVADO
+                : AuditAction.USUARIO_DESACTIVADO;
+
+        repository.save(AuditEvent.builder()
+                .actor(event.performedBy(), event.performedByRole())
+                .action(action)
+                .target("Paciente", event.patientId())
+                .outcome(AuditOutcome.EXITOSO)
+                .correlationId(event.correlationId())
+                .states(enabledJson(event.enabledBefore()), enabledJson(event.enabledAfter()))
+                .build());
+    }
+
+    private static String enabledJson(boolean enabled) {
+        return "{\"enabled\":" + enabled + "}";
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
