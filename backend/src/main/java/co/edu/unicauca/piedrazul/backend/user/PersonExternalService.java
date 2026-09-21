@@ -30,6 +30,36 @@ public interface PersonExternalService {
      */
     void requireIdentificationAvailable(String identification);
 
+    /**
+     * Igual que {@link #requireIdentificationAvailable(String)}, pero ignora a la
+     * persona {@code personId}: sirve para validar un cambio de identificación sin
+     * que la propia persona cuente como conflicto.
+     *
+     * @throws co.edu.unicauca.piedrazul.backend.user.exception.PersonAlreadyExistsException
+     * si otra persona ya usa esa identificación
+     */
+    void requireIdentificationAvailableFor(UUID personId, String identification);
+
+    /**
+     * Reemplaza los datos maestros de la persona. No modifica {@code id} ni
+     * {@code userId}, y no toca la cuenta del proveedor de identidad: sincronizarla
+     * es responsabilidad de quien orquesta el cambio.
+     *
+     * @throws co.edu.unicauca.piedrazul.backend.user.exception.PersonNotFoundException
+     * si la persona no existe
+     * @throws co.edu.unicauca.piedrazul.backend.user.exception.PersonAlreadyExistsException
+     * si otra persona ya usa esa identificación
+     */
+    PersonSummary updatePerson(
+            UUID personId,
+            IdentificationType identificationType,
+            String identification,
+            String firstName,
+            String lastName,
+            String phone,
+            String email
+    );
+
     void deletePerson(UUID personId);
 
     void linkUserId(UUID personId, UUID userId);

@@ -40,6 +40,7 @@ public final class PatientInfoMapper {
             case TARJETA_IDENTIDAD -> DocumentType.TARJETA_IDENTIDAD;
             case REGISTRO_NACIMIENTO -> DocumentType.REGISTRO_NACIMIENTO;
             case PASAPORTE -> DocumentType.PASAPORTE;
+            case CEDULA_EXTRANJERIA -> DocumentType.CEDULA_EXTRANJERIA;
         };
     }
 

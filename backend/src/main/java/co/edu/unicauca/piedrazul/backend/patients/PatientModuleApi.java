@@ -21,8 +21,6 @@ public interface PatientModuleApi {
 
     boolean existsById(UUID id);
 
-    List<PatientData> findAll();
-
     PatientData createPatient(
             IdentificationType identificationType,
             String identification,

@@ -18,6 +18,9 @@ spring:
     clean-disabled: true
     validate-on-migrate: true
     baseline-on-migrate: false
+    placeholders:
+      # Mismo rol con el que se conecta la aplicación y que crea infra/postgres/init.
+      app_role: ${APP_DB_USERNAME:piedrazul_app}
 
   jpa:
     hibernate:

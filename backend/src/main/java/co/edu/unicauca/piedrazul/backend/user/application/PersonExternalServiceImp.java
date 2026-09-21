@@ -18,6 +18,7 @@ import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,20 +48,7 @@ public class PersonExternalServiceImp implements PersonExternalService {
             String email,
             UUID userId
     ) {
-        if (identificationType == null)
-            throw new InvalidUserDataException("El tipo de identificación es requerido");
-
-        if (identification == null || identification.isBlank())
-            throw new InvalidUserDataException("La identificación es requerida");
-
-        if (firstName == null || firstName.isBlank())
-            throw new InvalidUserDataException("El nombre es requerido");
-
-        if (lastName == null || lastName.isBlank())
-            throw new InvalidUserDataException("El apellido es requerido");
-
-        if (phone == null || phone.isBlank())
-            throw new InvalidUserDataException("El número de celular es requerido");
+        requirePersonData(identificationType, identification, firstName, lastName, phone);
 
         if (personRepository.existsByIdentification(identification)) {
             throw new PersonAlreadyExistsException("Ya existe una persona con identificación '" + identification + "'");
@@ -93,6 +81,61 @@ public class PersonExternalServiceImp implements PersonExternalService {
         if (personRepository.existsByIdentification(identification)) {
             throw new PersonAlreadyExistsException(
                     "Ya existe una persona con esa identificación");
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void requireIdentificationAvailableFor(UUID personId, String identification) {
+        if (personId == null) {
+            throw new InvalidUserDataException("El id de la persona es requerido");
+        }
+
+        if (identification == null || identification.isBlank()) {
+            throw new InvalidUserDataException("La identificación es requerida");
+        }
+
+        if (personRepository.existsByIdentificationAndIdNot(identification, personId)) {
+            throw new PersonAlreadyExistsException(
+                    "Ya existe una persona con esa identificación");
+        }
+    }
+
+    @Transactional
+    @Override
+    public PersonSummary updatePerson(
+            UUID personId,
+            IdentificationType identificationType,
+            String identification,
+            String firstName,
+            String lastName,
+            String phone,
+            String email
+    ) {
+        if (personId == null) {
+            throw new InvalidUserDataException("El id de la persona es requerido");
+        }
+
+        requirePersonData(identificationType, identification, firstName, lastName, phone);
+
+        Person person = personRepository.findById(personId)
+                .orElseThrow(() -> new PersonNotFoundException("No se encontró una persona con id: " + personId));
+
+        requireIdentificationAvailableFor(personId, identification);
+
+        person.setIdentificationType(identificationType);
+        person.setIdentification(identification);
+        person.setFirstName(firstName);
+        person.setLastName(lastName);
+        person.setPhone(phone);
+        person.setEmail(email);
+
+        try {
+            // flush para que un conflicto de unicidad concurrente se detecte aquí y
+            // no al confirmar la transacción de quien llama.
+            return PersonApiMapper.toSummary(personRepository.saveAndFlush(person));
+        } catch (DataIntegrityViolationException ex) {
+            throw new PersonAlreadyExistsException("Ya existe una persona con esa identificación");
         }
     }
 
@@ -205,6 +248,29 @@ public class PersonExternalServiceImp implements PersonExternalService {
     @Override
     public UUID findPersonIdByUserId(UUID userId){
         return personRepository.getPersonIdByUserId(userId);
+    }
+
+    private static void requirePersonData(
+            IdentificationType identificationType,
+            String identification,
+            String firstName,
+            String lastName,
+            String phone
+    ) {
+        if (identificationType == null)
+            throw new InvalidUserDataException("El tipo de identificación es requerido");
+
+        if (identification == null || identification.isBlank())
+            throw new InvalidUserDataException("La identificación es requerida");
+
+        if (firstName == null || firstName.isBlank())
+            throw new InvalidUserDataException("El nombre es requerido");
+
+        if (lastName == null || lastName.isBlank())
+            throw new InvalidUserDataException("El apellido es requerido");
+
+        if (phone == null || phone.isBlank())
+            throw new InvalidUserDataException("El número de celular es requerido");
     }
 
     @Override

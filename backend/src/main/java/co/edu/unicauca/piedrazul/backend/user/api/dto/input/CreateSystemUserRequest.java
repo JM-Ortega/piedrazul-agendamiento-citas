@@ -11,41 +11,42 @@ import jakarta.validation.constraints.*;
         typeField = "identificationType"
 )
 public record CreateSystemUserRequest(
-        @NotBlank
+        @NotBlank(message = "La identificación es obligatoria")
         @Size(min = 4, max = 50)
-        @Pattern(regexp = "^[A-Za-z0-9._-]{4,50}$")
+        @Pattern(regexp = "^[A-Za-z0-9._-]{4,50}$*")
         @Sanitize
         String identification,
 
         @NotNull
         IdentificationType identificationType,
 
-        @NotBlank
+        @NotBlank(message = "El nombre es obligatorio")
         @Size(min = 2, max = 60)
-        @Pattern(regexp = "^[\\p{L} '-]{2,60}$")
+        @Pattern(regexp = "^[\\p{L} '-]{2,60}$*")
         @Sanitize
         @NormalizeName
         String firstName,
 
-        @NotBlank
+        @NotBlank(message = "El apellido es obligatorio")
         @Size(min = 2, max = 60)
-        @Pattern(regexp = "^[\\p{L} '-]{2,60}$")
+        @Pattern(regexp = "^[\\p{L} '-]{2,60}$*")
         @Sanitize
         @NormalizeName
         String lastName,
 
+        @NotBlank(message = "El correo es obligatorio")
         @Email
         @Size(max = 120)
         @Sanitize
         String email,
 
         // Número Colombiano
-        @Pattern(regexp = "^[0-9]{10}$")
-        @NotBlank
+        @Pattern(regexp = "^[0-9]{10}$*")
+        @NotBlank(message = "El teléfono es obligatorio")
         @Sanitize
         String phone,
 
-        @NotBlank
+        @NotBlank(message = "La contraseña es obligatoria")
         @Size(min = 6, max = 100)
         String password
 ) {
