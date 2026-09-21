@@ -68,9 +68,7 @@ ON CONFLICT (code) DO NOTHING;
 -- ---------------------------------------------------------------------
 INSERT INTO piedrazul.audit_action (code, name, audit_module_code) VALUES
     ('CITA_AGENDADA',              'Cita agendada',                       'CITAS'),
-    ('CITA_REAGENDADA',            'Cita reagendada',                     'CITAS'),
     ('USUARIO_CREADO',             'Usuario creado',                      'USUARIOS'),
-    ('USUARIO_MODIFICADO',         'Usuario modificado',                  'USUARIOS'),
     ('USUARIO_DESACTIVADO',        'Usuario desactivado',                 'USUARIOS'),
     ('USUARIO_ACTIVADO',           'Usuario activado',                    'USUARIOS'),
     ('PACIENTE_MODIFICADO',        'Paciente modificado',                 'PACIENTES'),
