@@ -1,12 +1,17 @@
 package co.edu.unicauca.piedrazul.backend.user.application;
 
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
+import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemDoctorResponse;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
 import co.edu.unicauca.piedrazul.backend.user.exception.DoctorRoleRequiredException;
+import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
+import co.edu.unicauca.piedrazul.backend.user.exception.PatientWithoutUserException;
+import co.edu.unicauca.piedrazul.backend.user.exception.PersonNotFoundException;
 import co.edu.unicauca.piedrazul.backend.user.exception.UserNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,12 +27,14 @@ public class UserService {
     private final KeycloakUserService keycloakUserService;
     private final DoctorExternalService doctorExternalService;
     private final PersonExternalServiceImp personExternalServiceImp;
+    private final PatientModuleApi patientModuleApi;
 
     public UserService(KeycloakUserService keycloakUserService, DoctorExternalService doctorExternalService
-    , PersonExternalServiceImp personExternalServiceImp) {
+    , PersonExternalServiceImp personExternalServiceImp, PatientModuleApi patientModuleApi) {
         this.keycloakUserService = keycloakUserService;
         this.doctorExternalService = doctorExternalService;
         this.personExternalServiceImp = personExternalServiceImp;
+        this.patientModuleApi = patientModuleApi;
     }
 
     public Page<SystemUserResponse> getSystemUsers(Pageable pageable) {
@@ -171,6 +178,39 @@ public class UserService {
         }else{
             throw new DoctorRoleRequiredException("Solo se puede revocar el rol de Agendador a un usuario de tipo Doctor");
         }
+    }
+
+    /**
+     * Activa el usuario de Keycloak del paciente. {@code patientId} es el id de la
+     * persona del paciente; el usuario se resuelve a partir de ella.
+     */
+    public void activatePatientUser(UUID patientId) {
+        keycloakUserService.activateUser(requirePatientUserId(patientId), patientId);
+    }
+
+    /** Desactiva el usuario de Keycloak del paciente. Ver {@link #activatePatientUser(UUID)}. */
+    public void deactivatePatientUser(UUID patientId) {
+        keycloakUserService.deactivateUser(requirePatientUserId(patientId), patientId);
+    }
+
+    private UUID requirePatientUserId(UUID patientId) {
+        if (patientId == null) {
+            throw new InvalidUserDataException("El id del paciente es requerido");
+        }
+
+        // Una persona que no es paciente (por ejemplo, solo doctor) no es un destino válido.
+        if (!patientModuleApi.existsById(patientId)) {
+            throw new PersonNotFoundException("No se encontró un paciente con id: " + patientId);
+        }
+
+        PersonSummary person = personExternalServiceImp.findById(patientId)
+                .orElseThrow(() -> new PersonNotFoundException("No se encontró un paciente con id: " + patientId));
+
+        if (person.userId() == null) {
+            throw new PatientWithoutUserException(patientId);
+        }
+
+        return person.userId();
     }
 
     private boolean hasRole(UUID userId, Role role) {

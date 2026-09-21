@@ -85,6 +85,14 @@ public class KeycloakUserService implements UserModuleApi {
         keycloakClient.assignRoleIfMissing(userId, Role.PATIENT);
     }
 
+    public void activateUser(UUID userId, UUID patientId) {
+        keycloakClient.setEnabled(userId, true, patientId);
+    }
+
+    public void deactivateUser(UUID userId, UUID patientId) {
+        keycloakClient.setEnabled(userId, false, patientId);
+    }
+
     @Override
     public void updateUserIdentity(UUID userId, String username, String firstName, String lastName, String email) {
         keycloakClient.updateUser(userId, username, firstName, lastName, email);

@@ -3,6 +3,7 @@ package co.edu.unicauca.piedrazul.backend.user.infrastructure;
 import co.edu.unicauca.piedrazul.backend.config.security.KeycloakProperties;
 import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
+import co.edu.unicauca.piedrazul.backend.user.events.UserAccountStatusChangedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserRoleAssignedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserRoleRevokedEvent;
@@ -258,6 +259,47 @@ public class KeycloakUserClient {
                     "el proveedor no aplicó el cambio de nombre de usuario; "
                             + "verifique que el realm tenga habilitada la edición de username");
         }
+    }
+
+    /**
+     * Activa o desactiva la cuenta (el indicador {@code enabled}). Es idempotente: si la
+     * cuenta ya está en ese estado no cambia nada y no publica evento de auditoría.
+     *
+     * <p>{@code patientId} no interviene en Keycloak: es el objeto que la auditoría
+     * registra como afectado (el paciente, no su cuenta).
+     */
+    @Transactional
+    public void setEnabled(UUID keycloakId, boolean enabled, UUID patientId) {
+        UserResource resource = keycloak.realm(props.getRealm())
+                .users()
+                .get(keycloakId.toString());
+
+        UserRepresentation user;
+        try {
+            user = resource.toRepresentation();
+        } catch (WebApplicationException ex) {
+            throw translateUpdateFailure(ex);
+        }
+
+        boolean before = Boolean.TRUE.equals(user.isEnabled());
+        if (before == enabled) {
+            return;
+        }
+
+        user.setEnabled(enabled);
+        try {
+            resource.update(user);
+        } catch (WebApplicationException ex) {
+            throw translateUpdateFailure(ex);
+        }
+
+        eventPublisher.publishEvent(UserAccountStatusChangedEvent.of(
+                patientId.toString(),
+                securityExtractor.currentActorId(),
+                securityExtractor.currentActorRoles(),
+                MDC.get("correlationId"),
+                before,
+                enabled));
     }
 
     private static void applyIdentity(
