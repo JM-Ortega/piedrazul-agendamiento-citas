@@ -7,9 +7,9 @@ import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEvent;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEventRepository;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditOutcome;
-import co.edu.unicauca.piedrazul.backend.user.events.UserActivatedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserCreatedEvent;
-import co.edu.unicauca.piedrazul.backend.user.events.UserDeactivatedEvent;
+import co.edu.unicauca.piedrazul.backend.user.events.UserRoleAssignedEvent;
+import co.edu.unicauca.piedrazul.backend.user.events.UserRoleRevokedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserRoleAuditEvent;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
@@ -80,8 +80,8 @@ public class AuditEventListener {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     void on(UserRoleAuditEvent event) {
         AuditAction action = switch (event) {
-            case UserActivatedEvent e -> AuditAction.USUARIO_ACTIVADO;
-            case UserDeactivatedEvent e -> AuditAction.USUARIO_DESACTIVADO;
+            case UserRoleAssignedEvent e -> AuditAction.ROL_ASIGNADO;
+            case UserRoleRevokedEvent e -> AuditAction.ROL_REVOCADO;
         };
 
         repository.save(AuditEvent.builder()

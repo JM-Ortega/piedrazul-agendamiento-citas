@@ -71,6 +71,8 @@ INSERT INTO piedrazul.audit_action (code, name, audit_module_code) VALUES
     ('USUARIO_CREADO',             'Usuario creado',                      'USUARIOS'),
     ('USUARIO_DESACTIVADO',        'Usuario desactivado',                 'USUARIOS'),
     ('USUARIO_ACTIVADO',           'Usuario activado',                    'USUARIOS'),
+    ('ROL_ASIGNADO',               'Rol asignado',                        'USUARIOS'),
+    ('ROL_REVOCADO',               'Rol revocado',                        'USUARIOS'),
     ('PACIENTE_MODIFICADO',        'Paciente modificado',                 'PACIENTES'),
     ('HISTORIA_CLINICA_CREADA',    'Historia clínica creada',             'HISTORIAS_CLINICAS'),
     ('HISTORIA_CLINICA_CONSULTADA','Historia clínica consultada',         'HISTORIAS_CLINICAS'),

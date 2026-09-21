@@ -3,9 +3,9 @@ package co.edu.unicauca.piedrazul.backend.user.infrastructure;
 import co.edu.unicauca.piedrazul.backend.config.security.KeycloakProperties;
 import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
-import co.edu.unicauca.piedrazul.backend.user.events.UserActivatedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserCreatedEvent;
-import co.edu.unicauca.piedrazul.backend.user.events.UserDeactivatedEvent;
+import co.edu.unicauca.piedrazul.backend.user.events.UserRoleAssignedEvent;
+import co.edu.unicauca.piedrazul.backend.user.events.UserRoleRevokedEvent;
 import co.edu.unicauca.piedrazul.backend.user.exception.IdentityProviderException;
 import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -166,7 +166,7 @@ public class KeycloakUserClient {
 
         List<String> after = getUserRoles(keycloakId.toString());
 
-        eventPublisher.publishEvent(UserActivatedEvent.of(
+        eventPublisher.publishEvent(UserRoleAssignedEvent.of(
                 keycloakId.toString(),
                 securityExtractor.currentActorId(),
                 securityExtractor.currentActorRoles(),
@@ -187,7 +187,7 @@ public class KeycloakUserClient {
 
         List<String> after = getUserRoles(keycloakId.toString());
 
-        eventPublisher.publishEvent(UserDeactivatedEvent.of(
+        eventPublisher.publishEvent(UserRoleRevokedEvent.of(
                 keycloakId.toString(),
                 securityExtractor.currentActorId(),
                 securityExtractor.currentActorRoles(),
