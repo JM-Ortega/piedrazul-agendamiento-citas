@@ -2,6 +2,9 @@ package co.edu.unicauca.piedrazul.backend.clinicalHistory.application;
 
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.intput.CheckUpUpdateRequest;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.events.ClinicalHistoryCreatedEvent;
+import co.edu.unicauca.piedrazul.backend.clinicalHistory.exception.MedicalCheckupAlreadyExistsException;
+import co.edu.unicauca.piedrazul.backend.clinicalHistory.exception.MedicalCheckupNotEditableException;
+import co.edu.unicauca.piedrazul.backend.clinicalHistory.exception.MedicalCheckupNotFoundException;
 import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.ClinicalHistoryExternalService;
 import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.internal.ClinicalHistoryRequest;
@@ -35,7 +38,7 @@ public class ClinicalHistoryExternalServiceImpl implements ClinicalHistoryExtern
     public void registerClinicalHistory(ClinicalHistoryRequest request) {
 
         if (repository.existsByIdAppointment(request.appointmentId())) {
-            throw new RuntimeException("Esta cita ya tiene una historia clínica registrada");
+            throw new MedicalCheckupAlreadyExistsException("Esta cita ya tiene un control medico registrado");
         }
 
         ClinicalHistory save = repository.save(new ClinicalHistory(
@@ -70,12 +73,10 @@ public class ClinicalHistoryExternalServiceImpl implements ClinicalHistoryExtern
                                                  CheckUpUpdateRequest request) {
 
         ClinicalHistory clinicalHistory = repository.findById(idClinicalHistory)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "No existe una historia clínica con el id: " + idClinicalHistory));
+                .orElseThrow(() -> new MedicalCheckupNotFoundException(idClinicalHistory.toString()));
 
         if (!clinicalHistory.getAttendedAt().equals(LocalDate.now())) {
-            throw new IllegalStateException(
-                    "Solo se puede editar una historia clínica del día actual");
+            throw new MedicalCheckupNotEditableException("Solo se puede editar una historia clínica del día actual");
         }
 
         clinicalHistory.updateDescription(request.description());

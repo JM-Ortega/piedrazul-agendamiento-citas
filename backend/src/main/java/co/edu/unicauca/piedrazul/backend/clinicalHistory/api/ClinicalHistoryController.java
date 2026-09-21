@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/clinical-history")
+@RequestMapping("/api/medical-check-up")
 @PreAuthorize("hasRole('DOCTOR')")
 public class ClinicalHistoryController {
     private final ClinicalHistoryExternalService service;
@@ -47,16 +47,17 @@ public class ClinicalHistoryController {
         return ResponseEntity.ok(PageResponse.from(history));
     }
 
-    @PostMapping("/updateCheckup/{idClinicalHistory}")
+    //permite editar la descripcion de un control medico.
+    @PostMapping("/updateCheckup/{idCheckUp}")
     @Auditable(
             action = AuditAction.HISTORIA_CLINICA_CONSULTADA,
             targetEntityType = "HistoriaClinica",
             targetIdExpression = "#idClinicalHistory"
     )
     public ResponseEntity<ClinicalHistoryResponse> updateCheckup(
-            @PathVariable @NotNull(message = "El id de la historia clínica es obligatorio") UUID idClinicalHistory,
+            @PathVariable @NotNull(message = "El id de la historia clínica es obligatorio") UUID idCheckUp,
             @RequestBody @Valid CheckUpUpdateRequest request) {
-        ClinicalHistoryResponse response = service.updateCheckUp(idClinicalHistory, request);
+        ClinicalHistoryResponse response = service.updateCheckUp(idCheckUp, request);
         return ResponseEntity.ok(response);
     }
 }
