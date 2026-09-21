@@ -1,9 +1,9 @@
-package co.edu.unicauca.piedrazul.backend.clinicalHistory.api;
+package co.edu.unicauca.piedrazul.backend.medicalCheckup.api;
 
 import co.edu.unicauca.piedrazul.backend.audit.infrastructure.aop.Auditable;
-import co.edu.unicauca.piedrazul.backend.clinicalHistory.ClinicalHistoryExternalService;
-import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.intput.CheckUpUpdateRequest;
-import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.output.ClinicalHistoryResponse;
+import co.edu.unicauca.piedrazul.backend.medicalCheckup.MedicalCheckupExternalService;
+import co.edu.unicauca.piedrazul.backend.medicalCheckup.api.dto.intput.CheckupUpdateRequest;
+import co.edu.unicauca.piedrazul.backend.medicalCheckup.api.dto.output.MedicalCheckupResponse;
 import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.shared.pagination.PageResponse;
 import jakarta.validation.Valid;
@@ -21,10 +21,10 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/medical-check-up")
 @PreAuthorize("hasRole('DOCTOR')")
-public class ClinicalHistoryController {
-    private final ClinicalHistoryExternalService service;
+public class MedicalCheckupController {
+    private final MedicalCheckupExternalService service;
 
-    public ClinicalHistoryController(ClinicalHistoryExternalService service) {
+    public MedicalCheckupController(MedicalCheckupExternalService service) {
         this.service = service;
     }
 
@@ -35,13 +35,13 @@ public class ClinicalHistoryController {
             targetEntityType = "HistoriaClinica",
             targetIdExpression = "#idPatient"
     )
-    public ResponseEntity<PageResponse<ClinicalHistoryResponse>> getByPatient(
+    public ResponseEntity<PageResponse<MedicalCheckupResponse>> getByPatient(
             @PathVariable @NotNull(message = "El id del paciente a consultar es obligatorio") UUID idPatient,
             @RequestParam(defaultValue = "0") @Min(0) @NotNull(message = "El número de pagina es obligatorio") int page) {
 
         Pageable pageable = PageRequest.of(page, 5);
 
-        Page<ClinicalHistoryResponse> history =
+        Page<MedicalCheckupResponse> history =
                 service.getHistoryByPatient(idPatient, pageable);
 
         return ResponseEntity.ok(PageResponse.from(history));
@@ -54,10 +54,10 @@ public class ClinicalHistoryController {
             targetEntityType = "HistoriaClinica",
             targetIdExpression = "#idClinicalHistory"
     )
-    public ResponseEntity<ClinicalHistoryResponse> updateCheckup(
-            @PathVariable @NotNull(message = "El id de la historia clínica es obligatorio") UUID idCheckUp,
-            @RequestBody @Valid CheckUpUpdateRequest request) {
-        ClinicalHistoryResponse response = service.updateCheckUp(idCheckUp, request);
+    public ResponseEntity<MedicalCheckupResponse> updateCheckup(
+            @PathVariable @NotNull(message = "El id del control medico es obligatorio") UUID idCheckUp,
+            @RequestBody @Valid CheckupUpdateRequest request) {
+        MedicalCheckupResponse response = service.updateCheckUp(idCheckUp, request);
         return ResponseEntity.ok(response);
     }
 }

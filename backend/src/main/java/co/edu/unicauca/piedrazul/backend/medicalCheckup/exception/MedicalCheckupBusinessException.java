@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.clinicalHistory.exception;
+package co.edu.unicauca.piedrazul.backend.medicalCheckup.exception;
 
 import co.edu.unicauca.piedrazul.backend.shared.BusinessException;
 import org.springframework.http.HttpStatus;

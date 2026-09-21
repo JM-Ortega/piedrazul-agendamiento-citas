@@ -4,7 +4,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.events.ScheduledAppointment
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEvent;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEventRepository;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditOutcome;
-import co.edu.unicauca.piedrazul.backend.clinicalHistory.events.ClinicalHistoryCreatedEvent;
+import co.edu.unicauca.piedrazul.backend.medicalCheckup.events.ClinicalHistoryCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.user.events.UserActivatedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserCreatedEvent;

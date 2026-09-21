@@ -1,6 +1,6 @@
-package co.edu.unicauca.piedrazul.backend.clinicalHistory.exception;
+package co.edu.unicauca.piedrazul.backend.medicalCheckup.exception;
 
-import co.edu.unicauca.piedrazul.backend.clinicalHistory.api.ClinicalHistoryController;
+import co.edu.unicauca.piedrazul.backend.medicalCheckup.api.MedicalCheckupController;
 import co.edu.unicauca.piedrazul.backend.shared.BaseExceptionHandler;
 import co.edu.unicauca.piedrazul.backend.shared.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,7 +14,7 @@ import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(basePackageClasses = ClinicalHistoryController.class)
+@RestControllerAdvice(basePackageClasses = MedicalCheckupController.class)
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j
 public class MedicalCheckupExceptionHandler extends BaseExceptionHandler {

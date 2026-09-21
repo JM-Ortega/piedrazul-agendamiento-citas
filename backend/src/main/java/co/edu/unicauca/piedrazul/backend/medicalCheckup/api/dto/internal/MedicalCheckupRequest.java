@@ -1,9 +1,9 @@
-package co.edu.unicauca.piedrazul.backend.clinicalHistory.api.dto.internal;
+package co.edu.unicauca.piedrazul.backend.medicalCheckup.api.dto.internal;
 
 import java.time.LocalDate;
 import java.util.UUID;
 
-public record ClinicalHistoryRequest(
+public record MedicalCheckupRequest(
         UUID patientId,
         UUID appointmentId,
         String description,

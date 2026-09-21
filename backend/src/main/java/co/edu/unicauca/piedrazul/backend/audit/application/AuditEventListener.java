@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.audit.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.events.ScheduledAppointmentEvent;
-import co.edu.unicauca.piedrazul.backend.clinicalHistory.events.ClinicalHistoryCreatedEvent;
+import co.edu.unicauca.piedrazul.backend.medicalCheckup.events.ClinicalHistoryCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEvent;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEventRepository;
