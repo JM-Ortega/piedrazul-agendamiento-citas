@@ -19,6 +19,10 @@ import {
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
 import { AppError } from '../../../shared/models/interfaces/apiError.model';
 import { PaginationComponent } from '../../../designSystem/molecules/pagination/pagination.component';
+import {
+  SortControlComponent,
+  SortDirection,
+} from '../../../designSystem/molecules/sortControl/sortControl.component';
 
 const PAGE_SIZE = 5;
 
@@ -36,6 +40,7 @@ const PAGE_SIZE = 5;
     CommonModule,
     FormatoPipe,
     PaginationComponent,
+    SortControlComponent,
   ],
 })
 export class PatientAppointmentHistoryComponent implements OnInit {
@@ -48,6 +53,7 @@ export class PatientAppointmentHistoryComponent implements OnInit {
   readonly statusLabels = APPOINTMENT_STATUS_LABELS;
   readonly statusClasses = APPOINTMENT_STATUS_CLASSES;
   private readonly patientId = signal<string | null>(null);
+  readonly sortDirection = signal<SortDirection>('asc');
 
   /** Citas de la página actualmente cargada (todos los estados, sin filtrar). */
   readonly appointments = computed<AppointmentsPatient[]>(() =>
@@ -88,10 +94,16 @@ export class PatientAppointmentHistoryComponent implements OnInit {
     const idPatient = this.patientId();
     if (!idPatient) return;
 
+    this.errorMessage.set('');
     this.isLoading.set(true);
 
     this.appointmentService
-      .loadAppointments({ idPatient, pageNumber, pageSize: PAGE_SIZE })
+      .loadAppointments({
+        idPatient,
+        pageNumber,
+        pageSize: PAGE_SIZE,
+        sortDirection: this.sortDirection(),
+      })
       .subscribe({
         next: () => this.isLoading.set(false),
         error: () => {
@@ -111,5 +123,15 @@ export class PatientAppointmentHistoryComponent implements OnInit {
    */
   getMonthShort(dateStr: string): string {
     return getMonthShort(dateStr);
+  }
+
+  /**
+   * Cambia la dirección de orden del historial y vuelve a la primera página.
+   *
+   * @param direction nueva dirección a aplicar ('asc' o 'desc')
+   */
+  onSortDirectionChange(direction: SortDirection): void {
+    this.sortDirection.set(direction);
+    this.loadPage(0);
   }
 }

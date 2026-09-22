@@ -14,6 +14,21 @@
           <svg lucideClock [size]="28" class="text-[#4e92d9]"></svg>
           Historial de Citas
         </h2>
+      </div>
+
+      <div class="flex justify-between items-end gap-6">
+        <div class="flex flex-col gap-1 mb-3">
+          <span
+            class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+          >
+            Ordenar por fecha
+          </span>
+          <app-sort-control
+            [direction]="sortDirection()"
+            [disabled]="isLoading()"
+            (directionChange)="onSortDirectionChange($event)"
+          />
+        </div>
         <app-pagination
           [pagination]="pagination()"
           (pageChange)="loadPage($event)"

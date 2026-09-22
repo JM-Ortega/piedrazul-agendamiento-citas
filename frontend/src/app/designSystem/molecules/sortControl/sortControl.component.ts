@@ -26,9 +26,10 @@ export type SortDirection = 'asc' | 'desc';
   templateUrl: './sortControl.component.html',
 })
 export class SortControlComponent {
-  options = input.required<SortOption[]>();
-  field = input.required<string>();
+  options = input<SortOption[]>([]);
+  field = input<string>('');
   direction = input<SortDirection>('asc');
+  disabled = input(false);
 
   fieldChange = output<string>();
   directionChange = output<SortDirection>();
