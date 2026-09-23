@@ -20,6 +20,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/user")
 @PreAuthorize("hasRole('ADMIN')")
@@ -117,6 +119,46 @@ public class    UserController {
             @PathVariable
             String document) {
         userService.revokeDoctorSchedulerRole(document);
+        return ResponseEntity.noContent().build();
+    }
+
+
+    @PutMapping("/patients/{patientId}/activate")
+    @Operation(summary = "Activar el usuario de un paciente",
+            description = "Activa el usuario de Keycloak asociado al paciente, identificado por el id de su persona. "
+                    + "No cambia nada si ya estaba activo.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Usuario activado correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para activar usuarios"),
+            @ApiResponse(responseCode = "404", description = "No existe un paciente con ese id"),
+            @ApiResponse(responseCode = "409", description = "El paciente no tiene una cuenta de usuario")
+    })
+    public ResponseEntity<Void> activatePatientUser(
+            @Parameter(description = "Id del paciente (UUID de su persona)")
+            @PathVariable
+            UUID patientId) {
+        userService.activatePatientUser(patientId);
+        return ResponseEntity.noContent().build();
+    }
+
+
+    @PutMapping("/patients/{patientId}/deactivate")
+    @Operation(summary = "Desactivar el usuario de un paciente",
+            description = "Desactiva el usuario de Keycloak asociado al paciente, identificado por el id de su persona. "
+                    + "No cambia nada si ya estaba desactivado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Usuario desactivado correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para desactivar usuarios"),
+            @ApiResponse(responseCode = "404", description = "No existe un paciente con ese id"),
+            @ApiResponse(responseCode = "409", description = "El paciente no tiene una cuenta de usuario")
+    })
+    public ResponseEntity<Void> deactivatePatientUser(
+            @Parameter(description = "Id del paciente (UUID de su persona)")
+            @PathVariable
+            UUID patientId) {
+        userService.deactivatePatientUser(patientId);
         return ResponseEntity.noContent().build();
     }
 }

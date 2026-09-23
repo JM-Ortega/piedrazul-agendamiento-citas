@@ -79,6 +79,11 @@ public class ValidDocumentValidator implements ConstraintValidator<ValidDocument
             case "CEDULA" -> new ValidationResult(documentNumber.matches("^[0-9]{6,10}$"), documentField,
                     "La cédula debe contener entre 6 y 10 dígitos numéricos");
 
+            case "CEDULA_EXTRANJERIA" -> new ValidationResult(
+                    documentNumber.matches("^[0-9]{6,10}$"),
+                    documentField,
+                    "La cédula de extranjería debe contener entre 6 y 10 dígitos numéricos");
+
             case "TARJETA_IDENTIDAD" -> new ValidationResult(documentNumber.matches("^[0-9]{10,11}$"), documentField,
                     "La tarjeta de identidad debe contener entre 10 y 11 dígitos numéricos");
 

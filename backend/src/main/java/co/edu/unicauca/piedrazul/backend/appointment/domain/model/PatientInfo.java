@@ -113,6 +113,7 @@ public class PatientInfo {
             case TARJETA_IDENTIDAD -> documentNumber.matches("^[0-9]{10,11}$");
             case REGISTRO_NACIMIENTO -> documentNumber.matches("^[0-9]{8,20}$");
             case PASAPORTE -> documentNumber.matches("^[A-Za-z0-9]{6,9}$");
+            case CEDULA_EXTRANJERIA -> documentNumber.matches("^[0-9]{6,10}$");
         };
 
         if (!valid) {
@@ -121,6 +122,7 @@ public class PatientInfo {
                 case TARJETA_IDENTIDAD -> "La tarjeta de identidad debe contener entre 10 y 11 dígitos numéricos";
                 case REGISTRO_NACIMIENTO -> "El registro de nacimiento debe contener entre 8 y 20 dígitos numéricos";
                 case PASAPORTE -> "El pasaporte debe contener entre 6 y 9 caracteres alfanuméricos";
+                case CEDULA_EXTRANJERIA -> "La cédula de extranjería debe contener entre 6 y 10 dígitos numéricos";
             });
         }
     }

@@ -23,7 +23,13 @@ public abstract class PostgresIntegrationSupport {
 
     // Mismo major que la imagen de producción (infra/postgres/Dockerfile).
     private static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer(DockerImageName.parse("postgres:16-alpine"));
+            new PostgreSQLContainer(DockerImageName.parse("postgres:16-alpine"))
+                    // Rol que hace de "rol de la aplicación" (ver APP_ROLE): en producción lo
+                    // crea el init de infra/postgres; aquí lo crea este script.
+                    .withInitScript("db/test-roles.sql");
+
+    /** Debe coincidir con el rol que crea {@code db/test-roles.sql}. */
+    public static final String APP_ROLE = "piedrazul_app_test";
 
     static {
         POSTGRES.start();
@@ -46,6 +52,10 @@ public abstract class PostgresIntegrationSupport {
         registry.add("spring.flyway.user", POSTGRES::getUsername);
         registry.add("spring.flyway.password", POSTGRES::getPassword);
         registry.add("spring.flyway.enabled", () -> "true");
+
+        // Las migraciones no llevan el nombre del rol de la aplicación escrito: lo reciben
+        // por placeholder, igual que en producción (APP_DB_USERNAME).
+        registry.add("spring.flyway.placeholders.app_role", () -> APP_ROLE);
 
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
     }

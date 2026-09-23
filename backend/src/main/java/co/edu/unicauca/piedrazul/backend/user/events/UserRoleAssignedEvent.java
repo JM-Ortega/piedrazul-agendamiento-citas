@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.user.events;
 
-public record UserActivatedEvent(
+public record UserRoleAssignedEvent(
         String userId,
         String performedBy,
         String performedByRole,
@@ -9,13 +9,13 @@ public record UserActivatedEvent(
         String rolesAfter
 ) implements UserRoleAuditEvent {
 
-    public static UserActivatedEvent of(
+    public static UserRoleAssignedEvent of(
             String userId,
             String performedBy,
             String performedByRole,
             String correlationId,
             String rolesBefore,
             String rolesAfter) {
-        return new UserActivatedEvent(userId, performedBy, performedByRole, correlationId, rolesBefore, rolesAfter);
+        return new UserRoleAssignedEvent(userId, performedBy, performedByRole, correlationId, rolesBefore, rolesAfter);
     }
 }

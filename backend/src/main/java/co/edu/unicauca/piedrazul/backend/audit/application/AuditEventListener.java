@@ -6,9 +6,10 @@ import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEvent;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEventRepository;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditOutcome;
-import co.edu.unicauca.piedrazul.backend.user.events.UserActivatedEvent;
+import co.edu.unicauca.piedrazul.backend.user.events.UserAccountStatusChangedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserCreatedEvent;
-import co.edu.unicauca.piedrazul.backend.user.events.UserDeactivatedEvent;
+import co.edu.unicauca.piedrazul.backend.user.events.UserRoleAssignedEvent;
+import co.edu.unicauca.piedrazul.backend.user.events.UserRoleRevokedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserRoleAuditEvent;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
@@ -48,6 +49,18 @@ public class AuditEventListener {
                 .build());
     }
 
+    @ApplicationModuleListener
+    void on(PatientUpdatedEvent event) {
+        repository.save(AuditEvent.builder()
+                .actor(event.performedBy(), event.performedByRole())
+                .action(AuditAction.PACIENTE_MODIFICADO)
+                .target("Paciente", event.patientId())
+                .outcome(AuditOutcome.EXITOSO)
+                .correlationId(event.correlationId())
+                .states(event.beforeState(), event.afterState())
+                .build());
+    }
+
     // Es diferente porque depende de keycloack, esta anotación asegura que la
     // auditoría solo se guarde si la operación
     // principal ya fue confirmada correctamente
@@ -63,12 +76,32 @@ public class AuditEventListener {
                 .build());
     }
 
+    @ApplicationModuleListener
+    void on(UserAccountStatusChangedEvent event) {
+        AuditAction action = event.enabledAfter()
+                ? AuditAction.USUARIO_ACTIVADO
+                : AuditAction.USUARIO_DESACTIVADO;
+
+        repository.save(AuditEvent.builder()
+                .actor(event.performedBy(), event.performedByRole())
+                .action(action)
+                .target("Paciente", event.patientId())
+                .outcome(AuditOutcome.EXITOSO)
+                .correlationId(event.correlationId())
+                .states(enabledJson(event.enabledBefore()), enabledJson(event.enabledAfter()))
+                .build());
+    }
+
+    private static String enabledJson(boolean enabled) {
+        return "{\"enabled\":" + enabled + "}";
+    }
+
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     void on(UserRoleAuditEvent event) {
         AuditAction action = switch (event) {
-            case UserActivatedEvent e -> AuditAction.USUARIO_ACTIVADO;
-            case UserDeactivatedEvent e -> AuditAction.USUARIO_DESACTIVADO;
+            case UserRoleAssignedEvent e -> AuditAction.ROL_ASIGNADO;
+            case UserRoleRevokedEvent e -> AuditAction.ROL_REVOCADO;
         };
 
         repository.save(AuditEvent.builder()

@@ -48,6 +48,23 @@ public class Patient {
         this.guardianPhone = guardianPhone;
     }
 
+    /**
+     * Reemplaza los datos propios del paciente. Las reglas que dependen del tipo
+     * de documento las aplica {@link PatientRegistrationPolicy}, porque ese dato
+     * pertenece a la persona.
+     */
+    public void update(Sex sex, LocalDate birthDate, String guardianPhone) {
+        if (sex == null)
+            throw new InvalidPatientDataException("sex is required");
+
+        if (birthDate == null)
+            throw new InvalidPatientDataException("birthDate is required");
+
+        this.sex = sex;
+        this.birthDate = birthDate;
+        this.guardianPhone = guardianPhone;
+    }
+
     public UUID getPersonId() {
         return personId;
     }

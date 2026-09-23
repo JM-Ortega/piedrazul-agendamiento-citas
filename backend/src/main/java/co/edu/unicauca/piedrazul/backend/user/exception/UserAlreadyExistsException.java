@@ -11,4 +11,8 @@ public class UserAlreadyExistsException extends UserBusinessException {
                 HttpStatus.CONFLICT
         );
     }
+
+    public UserAlreadyExistsException(String message) {
+        super(message, "USER_ALREADY_EXISTS", HttpStatus.CONFLICT);
+    }
 }

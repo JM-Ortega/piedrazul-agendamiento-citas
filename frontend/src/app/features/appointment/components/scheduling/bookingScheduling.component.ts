@@ -110,6 +110,9 @@ export class BookingSchedulingComponent implements OnInit {
 
   onDoctorChange(doctorId: string): void {
     this.state.selectDoctor(doctorId);
+    const doctor = this.state.selectedDoctor();
+    const firstSpecialty = doctor?.specialty?.[0] ?? '';
+    this.state.selectSpecialty(firstSpecialty);
     this.resetSlotState();
   }
 

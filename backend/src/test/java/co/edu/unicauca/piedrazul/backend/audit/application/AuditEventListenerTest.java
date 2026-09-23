@@ -6,9 +6,10 @@ import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEventRepository;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditOutcome;
 import co.edu.unicauca.piedrazul.backend.medicalCheckup.events.ClinicalHistoryCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
-import co.edu.unicauca.piedrazul.backend.user.events.UserActivatedEvent;
+import co.edu.unicauca.piedrazul.backend.user.events.UserAccountStatusChangedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserCreatedEvent;
-import co.edu.unicauca.piedrazul.backend.user.events.UserDeactivatedEvent;
+import co.edu.unicauca.piedrazul.backend.user.events.UserRoleAssignedEvent;
+import co.edu.unicauca.piedrazul.backend.user.events.UserRoleRevokedEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -99,39 +100,66 @@ class AuditEventListenerTest {
     }
 
     @Test
-    void onUserRoleAuditEventShouldPersistActivationAndDeactivationAuditWithStates() {
-        UserActivatedEvent activated = UserActivatedEvent.of(
+    void onUserRoleAuditEventShouldPersistRoleAssignmentAndRevocationAuditWithStates() {
+        UserRoleAssignedEvent assigned = UserRoleAssignedEvent.of(
                 "user-88",
                 "admin-02",
                 "ADMIN",
-                "corr-activated",
+                "corr-assigned",
                 "[\"DOCTOR\"]",
                 "[\"DOCTOR\",\"PATIENT\"]");
 
-        listener.on(activated);
+        listener.on(assigned);
 
-        UserDeactivatedEvent deactivated = UserDeactivatedEvent.of(
+        UserRoleRevokedEvent revoked = UserRoleRevokedEvent.of(
                 "user-99",
                 "admin-03",
                 "ADMIN",
-                "corr-deactivated",
+                "corr-revoked",
                 "[\"DOCTOR\",\"PATIENT\"]",
                 "[\"DOCTOR\"]");
 
-        listener.on(deactivated);
+        listener.on(revoked);
 
         verify(repository, times(2)).save(auditCaptor.capture());
         var savedEvents = auditCaptor.getAllValues();
 
-        AuditEvent activatedAudit = savedEvents.get(0);
-        assertThat(activatedAudit.getAction()).isEqualTo(AuditAction.USUARIO_ACTIVADO);
-        assertThat(activatedAudit.getActorId()).isEqualTo("admin-02");
-        assertThat(activatedAudit.getBeforeState()).isEqualTo("[\"DOCTOR\"]");
-        assertThat(activatedAudit.getAfterState()).isEqualTo("[\"DOCTOR\",\"PATIENT\"]");
+        AuditEvent assignedAudit = savedEvents.get(0);
+        assertThat(assignedAudit.getAction()).isEqualTo(AuditAction.ROL_ASIGNADO);
+        assertThat(assignedAudit.getActorId()).isEqualTo("admin-02");
+        assertThat(assignedAudit.getBeforeState()).isEqualTo("[\"DOCTOR\"]");
+        assertThat(assignedAudit.getAfterState()).isEqualTo("[\"DOCTOR\",\"PATIENT\"]");
 
-        AuditEvent deactivatedAudit = savedEvents.get(1);
-        assertThat(deactivatedAudit.getAction()).isEqualTo(AuditAction.USUARIO_DESACTIVADO);
-        assertThat(deactivatedAudit.getBeforeState()).isEqualTo("[\"DOCTOR\",\"PATIENT\"]");
-        assertThat(deactivatedAudit.getAfterState()).isEqualTo("[\"DOCTOR\"]");
+        AuditEvent revokedAudit = savedEvents.get(1);
+        assertThat(revokedAudit.getAction()).isEqualTo(AuditAction.ROL_REVOCADO);
+        assertThat(revokedAudit.getBeforeState()).isEqualTo("[\"DOCTOR\",\"PATIENT\"]");
+        assertThat(revokedAudit.getAfterState()).isEqualTo("[\"DOCTOR\"]");
+    }
+
+    @Test
+    void onUserAccountStatusChangedShouldAuditActivationAndDeactivationOfThePatientAccountByPatientId() {
+        listener.on(UserAccountStatusChangedEvent.of("patient-10", "admin-01", "[ADMIN]", "corr-on", false, true));
+        listener.on(UserAccountStatusChangedEvent.of("patient-11", "admin-01", "[ADMIN]", "corr-off", true, false));
+
+        verify(repository, times(2)).save(auditCaptor.capture());
+        var savedEvents = auditCaptor.getAllValues();
+
+        AuditEvent activation = savedEvents.get(0);
+        assertThat(activation.getAction()).isEqualTo(AuditAction.USUARIO_ACTIVADO);
+        assertThat(activation.getActorId()).isEqualTo("admin-01");
+        assertThat(activation.getActorRole()).isEqualTo("[ADMIN]");
+        assertThat(activation.getTargetEntityType()).isEqualTo("Paciente");
+        assertThat(activation.getTargetEntityId()).isEqualTo("patient-10");
+        assertThat(activation.getOutcome()).isEqualTo(AuditOutcome.EXITOSO);
+        assertThat(activation.getCorrelationId()).isEqualTo("corr-on");
+        assertThat(activation.getBeforeState()).isEqualTo("{\"enabled\":false}");
+        assertThat(activation.getAfterState()).isEqualTo("{\"enabled\":true}");
+
+        AuditEvent deactivation = savedEvents.get(1);
+        assertThat(deactivation.getAction()).isEqualTo(AuditAction.USUARIO_DESACTIVADO);
+        assertThat(deactivation.getTargetEntityType()).isEqualTo("Paciente");
+        assertThat(deactivation.getTargetEntityId()).isEqualTo("patient-11");
+        assertThat(deactivation.getBeforeState()).isEqualTo("{\"enabled\":true}");
+        assertThat(deactivation.getAfterState()).isEqualTo("{\"enabled\":false}");
     }
 }

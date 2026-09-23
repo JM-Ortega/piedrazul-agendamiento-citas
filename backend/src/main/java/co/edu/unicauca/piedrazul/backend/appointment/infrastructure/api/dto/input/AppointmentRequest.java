@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input;
 
+import co.edu.unicauca.piedrazul.backend.jackson.normalization.NormalizeName;
 import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
 import co.edu.unicauca.piedrazul.backend.jackson.validation.ValidDocument;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
@@ -53,12 +54,12 @@ public class AppointmentRequest {
 
     @Size(min = 2, max = 60)
     @Pattern(regexp = "^[\\p{L} '-]{2,60}$")
-    @Sanitize
+    @NormalizeName
     private String firstName;
 
     @Size(min = 2, max = 60)
     @Pattern(regexp = "^[\\p{L} '-]{2,60}$")
-    @Sanitize
+    @NormalizeName
     private String lastName;
 
     @Pattern(regexp = "^[0-9]{7,15}$")
@@ -72,7 +73,7 @@ public class AppointmentRequest {
     @Email
     @Size(max = 120)
     @Sanitize
-    private String email;        // opcional
+    private String email;
 
     @Pattern(regexp = "^[0-9]{7,15}$")
     @Sanitize

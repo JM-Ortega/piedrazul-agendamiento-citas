@@ -7,6 +7,14 @@ import { PageResponse } from '../../shared/models/dtos/pageResponse.dto';
 import { PaginatedState } from '../../shared/helpers/paginatedState';
 import { withPagination } from '../../shared/helpers/httpPagination';
 
+interface LoadAppointmentsParams {
+  idPatient: string;
+  state?: string;
+  pageNumber?: number;
+  pageSize?: number;
+  sortDirection?: 'asc' | 'desc';
+}
+
 /**
  * Servicio de citas del paciente.
  */
@@ -29,21 +37,19 @@ export class PatientAppointmentService {
   }
 
   /**
-   * Carga una página de citas del paciente indicado
-   * opcionalmente filtradas por estado.
+   * Carga una página de citas del paciente indicado, opcionalmente
+   * filtradas por estado y ordenadas por fecha.
    *
    * @param params.idPatient id del paciente a consultar
    * @param params.state estado de la cita a filtrar (ej. 'AGENDADA'); si se omite, trae todos los estados
    * @param params.pageNumber número de página a solicitar, base 0 (por defecto 0)
    * @param params.pageSize cantidad de citas por página (por defecto 5)
+   * @param params.sortDirection orden ascendente o descendente; si se omite, aplica el del backend
    * @returns Observable con la respuesta paginada completa del backend
    */
-  loadAppointments(params: {
-    idPatient: string;
-    state?: string;
-    pageNumber?: number;
-    pageSize?: number;
-  }): Observable<PageResponse<AppointmentsPatient>> {
+  loadAppointments(
+    params: LoadAppointmentsParams
+  ): Observable<PageResponse<AppointmentsPatient>> {
     return this.getAppointments(params).pipe(
       tap((page) => this.appointmentsState.set(page))
     );
@@ -55,14 +61,16 @@ export class PatientAppointmentService {
    * @param params filtros y parámetros de paginación
    * @returns Observable con la respuesta cruda del backend (`PageResponse<AppointmentsPatient>`)
    */
-  private getAppointments(params: {
-    idPatient: string;
-    state?: string;
-    pageNumber?: number;
-    pageSize?: number;
-  }): Observable<PageResponse<AppointmentsPatient>> {
+  private getAppointments(
+    params: LoadAppointmentsParams
+  ): Observable<PageResponse<AppointmentsPatient>> {
     let httpParams = new HttpParams().set('idPatient', params.idPatient);
     if (params.state) httpParams = httpParams.set('state', params.state);
+    if (params.sortDirection)
+      httpParams = httpParams.set(
+        'sortDirection',
+        params.sortDirection.toUpperCase()
+      );
     httpParams = withPagination(httpParams, params.pageNumber, params.pageSize);
 
     return this.http.get<PageResponse<AppointmentsPatient>>(

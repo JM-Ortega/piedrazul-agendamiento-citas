@@ -5,6 +5,7 @@ import co.edu.unicauca.piedrazul.backend.patients.api.PatientSex;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.RegisterPatientCommand;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientPublicResponse;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientSummaryResponse;
 import co.edu.unicauca.piedrazul.backend.patients.domain.Patient;
 import co.edu.unicauca.piedrazul.backend.patients.domain.PatientRegistrationPolicy;
 import co.edu.unicauca.piedrazul.backend.patients.exception.InvalidPatientDataException;
@@ -12,6 +13,7 @@ import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyLinked
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.mappers.PatientApiMapper;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientRepository;
+import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientSummaryProjection;
 import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
@@ -23,6 +25,9 @@ import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.verification.VerificationModuleApi;
 import co.edu.unicauca.piedrazul.backend.verification.api.VerificationPurpose;
 import co.edu.unicauca.piedrazul.backend.verification.api.VerifiedCode;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +44,10 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class PatientService implements PatientModuleApi {
+
+    private static final int DEFAULT_PAGE_SIZE = 10;
+    private static final int MAX_PAGE_SIZE = 50;
+    private static final int MAX_SEARCH_LENGTH = 100;
 
     private final PatientRepository patientRepository;
     private final PersonExternalService personExternalService;
@@ -362,20 +371,25 @@ public class PatientService implements PatientModuleApi {
                         .map(patient -> toData(patient, person)));
     }
 
-    @Override
+    /**
+     * Página de pacientes ordenada por nombre. Sin {@code search} lista todos; con
+     * {@code search} filtra por nombre completo (sin distinguir mayúsculas ni
+     * tildes) o por número de documento, en ambos casos por coincidencia parcial.
+     *
+     * <p>El orden es fijo y el tamaño de página se limita: es una lista con datos
+     * personales, no se deja al cliente decidir cuánto se descarga.
+     */
     @Transactional(readOnly = true)
-    public List<PatientData> findAll() {
-        List<Patient> patients = patientRepository.findAll();
+    public Page<PatientSummaryResponse> search(String search, Pageable pageable) {
+        Pageable page = boundedPage(pageable);
+        String term = normalizeSearch(search);
 
-        Set<UUID> personIds = patients.stream()
-                .map(Patient::getPersonId)
-                .collect(Collectors.toSet());
+        Page<PatientSummaryProjection> result = term == null
+                ? patientRepository.findAllSummaries(page)
+                : patientRepository.searchSummaries(escapeLike(term), page);
 
-        Map<UUID, PersonSummary> persons = personExternalService.findByIds(personIds);
-
-        return patients.stream()
-                .map(patient -> toData(patient, persons.get(patient.getPersonId())))
-                .toList();
+        return result.map(row -> new PatientSummaryResponse(
+                row.getId(), row.getIdentification(), row.getFirstName(), row.getLastName()));
     }
 
     @Override
@@ -452,6 +466,39 @@ public class PatientService implements PatientModuleApi {
                 .map(person -> patientRepository.findById(person.id()).map(patient -> toData(patient, person)))
                 .flatMap(Optional::stream)
                 .toList();
+    }
+
+    private Pageable boundedPage(Pageable pageable) {
+        if (pageable == null || pageable.isUnpaged()) {
+            return PageRequest.of(0, DEFAULT_PAGE_SIZE);
+        }
+
+        return PageRequest.of(pageable.getPageNumber(), Math.min(pageable.getPageSize(), MAX_PAGE_SIZE));
+    }
+
+    private String normalizeSearch(String search) {
+        if (search == null) {
+            return null;
+        }
+
+        String normalized = search.trim().replaceAll("\\s+", " ");
+        if (normalized.isEmpty()) {
+            return null;
+        }
+
+        if (normalized.length() > MAX_SEARCH_LENGTH) {
+            throw new InvalidPatientDataException(
+                    "La búsqueda no puede superar " + MAX_SEARCH_LENGTH + " caracteres");
+        }
+
+        return normalized;
+    }
+
+    private String escapeLike(String term) {
+        return term
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 
     public List<IdentificationType> getAllDocumentTypes() {

@@ -80,7 +80,7 @@ public class CreateAccountUseCase implements UserProvisioningApi {
                     user.firstName(),
                     user.lastName(),
                     payload.user().phone(),
-                    user.email(),
+                    user.email().toLowerCase(),
                     user.id()
             );
 
@@ -167,7 +167,9 @@ public class CreateAccountUseCase implements UserProvisioningApi {
                 Set.of(Role.SCHEDULER),
                 Set.of(Role.DOCTOR, Role.SCHEDULER),
                 Set.of(Role.DOCTOR, Role.PATIENT),
-                Set.of(Role.DOCTOR, Role.SCHEDULER, Role.PATIENT)
+                Set.of(Role.DOCTOR, Role.SCHEDULER, Role.PATIENT),
+                Set.of(Role.DOCTOR, Role.SCHEDULER, Role.ADMIN),
+                Set.of(Role.DOCTOR, Role.SCHEDULER, Role.ADMIN, Role.PATIENT)
         );
 
         if (!validCombinations.contains(roleSet)) {
