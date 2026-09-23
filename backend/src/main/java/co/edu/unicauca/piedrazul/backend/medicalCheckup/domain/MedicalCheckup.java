@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.clinicalHistory.domain;
+package co.edu.unicauca.piedrazul.backend.medicalCheckup.domain;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -11,7 +11,7 @@ import java.util.UUID;
 @Entity
 @RequiredArgsConstructor
 @Table(name = "clinical_history")
-public class ClinicalHistory {
+public class MedicalCheckup {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -30,14 +30,21 @@ public class ClinicalHistory {
     @Column(name = "doctor_name", nullable = false, updatable = false, length = 200)
     private String doctor_name;
 
-    @Column(name = "description", nullable = false, updatable = false, length = 500)
+    @Column(name = "description", nullable = false, length = 500)
     private String description;
 
-    public ClinicalHistory(UUID idPatient, UUID idAppointment, LocalDate attendedAt, String doctor_name, String description) {
+    public MedicalCheckup(UUID idPatient, UUID idAppointment, LocalDate attendedAt, String doctor_name, String description) {
         this.idPatient = idPatient;
         this.idAppointment = idAppointment;
         this.attendedAt = attendedAt;
         this.doctor_name = doctor_name;
+        this.description = description;
+    }
+
+    public void updateDescription(String description) {
+        if (description == null || description.isBlank()) {
+            throw new IllegalArgumentException("La descripción no puede estar vacía");
+        }
         this.description = description;
     }
 }
