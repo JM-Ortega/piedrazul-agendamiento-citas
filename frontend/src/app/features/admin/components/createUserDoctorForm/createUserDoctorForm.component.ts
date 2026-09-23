@@ -27,7 +27,6 @@ import { toggleInArray } from '../../../../shared/helpers/arrayUtils';
 import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
 import { toIsoDateString } from '../../../../shared/helpers/transformDateLocal';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
-import { ToSelectOptionsPipe } from '../../../../shared/pipes/ToSelectOptionsPipe';
 import { DoctorFormData } from '../../models/interfaces/DoctorFormData';
 
 export interface SpecialtyOption {
@@ -57,7 +56,6 @@ export interface SpecialtyOption {
     InputComponent,
     ButtonComponent,
     SelectComponent,
-    ToSelectOptionsPipe,
     DatepickerComponent,
     LucideChevronDown,
     LucideChevronUp,
@@ -69,7 +67,7 @@ export class CreateUserDoctorFormComponent {
   @Input() data!: DoctorFormData;
   @Input() specialtyOptions: SpecialtyOption[] = [];
   @Input() loadingSpecialties = false;
-  @Input() timeOptions: string[] = [];
+  @Input() timeSelectOptions: { value: string; label: string }[] = [];
   @Input() maxInterval = 300;
   @Input() daysOfWeek: { value: number; label: string }[] = [];
   @Input() errors: Partial<Record<string, string>> = {};

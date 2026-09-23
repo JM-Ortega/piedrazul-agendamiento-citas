@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   OnInit,
   signal,
@@ -11,9 +12,9 @@ import {
   LucideCalendar,
   LucideClipboardPen,
   LucideFolderOpen,
-  LucideUser,
   LucideSave,
   LucideTriangleAlert,
+  LucideUser,
 } from '@lucide/angular';
 import { CanComponentDeactivate } from '../../../core/guards/canDeactivate.guard';
 import { DoctorService } from '../../../core/services/doctor.service';
@@ -21,10 +22,14 @@ import { ButtonComponent } from '../../../designSystem/atoms/button/button.compo
 import { PaginationComponent } from '../../../designSystem/molecules/pagination/pagination.component';
 import { ConfirmModalComponent } from '../../../designSystem/organisms/confirmModal/confirmModal.component';
 import { calcAge } from '../../../shared/helpers/patientValidation';
-import { parseLocalDateString } from '../../../shared/helpers/transformDateLocal';
+import {
+  parseLocalDateString,
+  toIsoDateString,
+} from '../../../shared/helpers/transformDateLocal';
+import { MedicalRecord } from '../../../shared/models/dtos/medicalRecord.dto';
+import { UnscheduledAttention } from '../../../shared/models/dtos/unscheduledAttention.dto';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
-import { UnscheduledAttention } from '../../../shared/models/dtos/unscheduledAttention.dto';
 
 type MedicalHistoryContext = 'scheduled' | 'unscheduled';
 
@@ -52,6 +57,7 @@ export class DoctorMedicalHistoryComponent
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   readonly doctorService = inject(DoctorService);
+  private readonly today = toIsoDateString(new Date());
 
   /** Longitud máxima permitida para la observación de la historia clínica. */
   readonly OBSERVATION_MAX_LENGTH = 300;
@@ -66,6 +72,21 @@ export class DoctorMedicalHistoryComponent
   toggleInfo() {
     this.mostrarInfo.update((v) => !v);
   }
+
+  /** True si se navegó en modo edición (?modo=editar) sobre una cita ya atendida. */
+  private readonly editModeRequested = signal(false);
+  readonly isEditMode = computed(
+    () => this.isScheduledContext() && this.editModeRequested()
+  );
+
+  /** ID del registro clínico que se está editando (se oculta del historial). */
+  readonly editingRecordId = signal<string | null>(null);
+  private readonly editObservationInitialized = signal(false);
+
+  /** Historial visible: excluye el registro que se está editando actualmente. */
+  readonly visibleRecords = computed(() =>
+    this.records().filter((r) => r.idClinicalHistory !== this.editingRecordId())
+  );
 
   readonly records = this.doctorService.medicalRecordsState.content;
   readonly medicalRecordsPagination =
@@ -105,7 +126,28 @@ export class DoctorMedicalHistoryComponent
    * para no mostrar el modal de confirmación en ese caso. */
   private allowNavigation = false;
   private exitResolver: ((value: boolean) => void) | null = null;
+  constructor() {
+    effect(
+      () => {
+        const records = this.records();
+        if (
+          this.isEditMode() &&
+          !this.editObservationInitialized() &&
+          records.length > 0
+        ) {
+          const todaysRecord = this.findTodaysRecord(records);
+          if (!todaysRecord) return;
 
+          this.editingRecordId.set(todaysRecord.idClinicalHistory);
+          this.newObservation.set(
+            todaysRecord.description.slice(0, this.OBSERVATION_MAX_LENGTH)
+          );
+          this.editObservationInitialized.set(true);
+        }
+      },
+      { allowSignalWrites: true }
+    );
+  }
   /**
    * Invocado por `unsavedChangesGuard` al intentar salir de esta ruta,
    * sin importar si la salida es por navegación programática, un enlace,
@@ -148,6 +190,10 @@ export class DoctorMedicalHistoryComponent
   }
 
   ngOnInit(): void {
+    this.editModeRequested.set(
+      this.route.snapshot.queryParamMap.get('modo') === 'editar'
+    );
+
     this.doctorService.resetMedicalRecords();
 
     const idAppointment = this.route.snapshot.paramMap.get('idAppointment');
@@ -246,6 +292,10 @@ export class DoctorMedicalHistoryComponent
   }
 
   confirmAttendanceAndExit(): void {
+    if (this.isEditMode()) {
+      this.saveEditedObservation();
+      return;
+    }
     if (this.isScheduledContext()) {
       this.saveScheduledAttendance();
     } else {
@@ -253,6 +303,19 @@ export class DoctorMedicalHistoryComponent
     }
   }
 
+  /**
+   * Guarda la observación editada de una cita ya atendida.
+   *
+   * TODO: reemplazar por la llamada real al backend cuando exista el
+   * endpoint de edición de observación (ej. PUT a la historia clínica
+   * por `editingRecordId()`). Por ahora solo simula el guardado y navega
+   * de vuelta, para dejar el flujo de UI completo a la espera del endpoint.
+   */
+  private saveEditedObservation(): void {
+    this.saveError.set('');
+    this.isSaving.set(true);
+    this.finishAndExit();
+  }
   private saveScheduledAttendance(): void {
     const idCita = this.idAppointment();
     if (!idCita) return;
@@ -301,7 +364,16 @@ export class DoctorMedicalHistoryComponent
       this.newObservation().trim().slice(0, this.OBSERVATION_MAX_LENGTH) || null
     );
   }
-
+  /**
+   * Busca, dentro de una página de registros, el correspondiente a la
+   * fecha de hoy (compara solo `yyyy-MM-dd`, ignorando la hora si
+   * `attendedAt` trae timestamp completo).
+   */
+  private findTodaysRecord(
+    records: MedicalRecord[]
+  ): MedicalRecord | undefined {
+    return records.find((r) => r.attendedAt?.slice(0, 10) === this.today);
+  }
   private finishAndExit(): void {
     this.allowNavigation = true;
     this.doctorService.resetMedicalRecords();

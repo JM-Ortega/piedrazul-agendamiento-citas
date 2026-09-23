@@ -6,23 +6,26 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
-import { LucideX, LucideDownload, LucideCalendar } from '@lucide/angular';
-import { SchedulerService } from '../../../../core/services/scheduler.service';
+import { LucideCalendar, LucideDownload, LucideX } from '@lucide/angular';
 import { PatientAppointmentService } from '../../../../core/services/patient.service';
-import { dtoDoctor } from '../../../../shared/models/dtos/doctor.dto';
-import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
-import { ConfirmModalComponent } from '../../../../designSystem/organisms/confirmModal/confirmModal.component';
+import { SchedulerService } from '../../../../core/services/scheduler.service';
 import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
-import { ToastComponent } from '../../../../designSystem/molecules/toastMessage/toast.component';
-import { PaginationComponent } from '../../../../designSystem/molecules/pagination/pagination.component';
-import { AppointmentTableComponent } from '../../components/table/table.component';
-import { FilterValues } from '../../../../designSystem/organisms/filters/filters.component';
-import { FiltersPanelComponent } from '../../components/filtersPanel/filtersPanel.component';
 import { FilterFieldConfig } from '../../../../designSystem/molecules/filterField/filterField.model';
-import { SchedulerExportModalComponent } from '../../components/exportModal/exportModal.component';
+import { PaginationComponent } from '../../../../designSystem/molecules/pagination/pagination.component';
+import { ToastComponent } from '../../../../designSystem/molecules/toastMessage/toast.component';
+import { ConfirmModalComponent } from '../../../../designSystem/organisms/confirmModal/confirmModal.component';
+import { FilterValues } from '../../../../designSystem/organisms/filters/filters.component';
+import { PatientQuickSearchComponent } from '../../../../designSystem/organisms/patientQuickSearch/patientQuickSearch.component';
+import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
+import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
+import { dtoDoctor } from '../../../../shared/models/dtos/doctor.dto';
+import { PatientQuickResult } from '../../../../shared/models/dtos/patientQuickResult.dto';
 import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
-
+import { SchedulerExportModalComponent } from '../../components/exportModal/exportModal.component';
+import { FiltersPanelComponent } from '../../components/filtersPanel/filtersPanel.component';
+import { AppointmentTableComponent } from '../../components/table/table.component';
+import { PatientQuickSearchMockService } from '../../service/patientQuickSearch.mock.service';
 const PAGE_SIZE = 5;
 
 @Component({
@@ -40,6 +43,7 @@ const PAGE_SIZE = 5;
     SchedulerExportModalComponent,
     ButtonComponent,
     PaginationComponent,
+    PatientQuickSearchComponent,
   ],
   templateUrl: './schedulerHistory.component.html',
 })
@@ -109,6 +113,53 @@ export class SchedulerHistoryComponent implements OnInit {
   readonly pagination = computed(() => this.schedulerService.pagination());
   /** Citas de la página actual.*/
   readonly results = computed(() => this.schedulerService.appointments());
+  private patientQuickSearchService = inject(PatientQuickSearchMockService);
+
+  patientSearchResults = signal<PatientQuickResult[]>([]);
+  patientSearchLoading = signal(false);
+  selectedPatient = signal<PatientQuickResult | null>(null);
+  patientAppointments = signal<AppointmentsPatient[]>([]);
+  loadingPatientAppointments = signal(false);
+
+  /** Fuente de datos que consume la tabla: la búsqueda normal, o las citas del paciente filtrado. */
+  readonly tableResults = computed(() =>
+    this.selectedPatient() ? this.patientAppointments() : this.results()
+  );
+
+  onPatientSearch(term: string): void {
+    if (!term) {
+      this.patientSearchResults.set([]);
+      return;
+    }
+    this.patientSearchLoading.set(true);
+    this.patientQuickSearchService.searchPatients(term).subscribe({
+      next: (r) => {
+        this.patientSearchResults.set(r);
+        this.patientSearchLoading.set(false);
+      },
+      error: () => this.patientSearchLoading.set(false),
+    });
+  }
+
+  onPatientSelected(patient: PatientQuickResult): void {
+    this.selectedPatient.set(patient);
+    this.patientSearchResults.set([]);
+    this.loadingPatientAppointments.set(true);
+    this.patientQuickSearchService
+      .getAppointmentsByPatient(patient.id)
+      .subscribe({
+        next: (a) => {
+          this.patientAppointments.set(a);
+          this.loadingPatientAppointments.set(false);
+        },
+        error: () => this.loadingPatientAppointments.set(false),
+      });
+  }
+
+  onClearPatientFilter(): void {
+    this.selectedPatient.set(null);
+    this.patientAppointments.set([]);
+  }
 
   selectedDoctor = computed(() =>
     this.doctors().find((d) => d.id === this.filterDoctor())

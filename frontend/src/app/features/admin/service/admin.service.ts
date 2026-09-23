@@ -232,6 +232,31 @@ export class AdminService {
       specialties
     );
   }
+  // ── Agendamiento autónomo ────────────────────────────────────────────────
+  /**
+   * Consulta si el agendamiento autónomo de pacientes está habilitado.
+   *
+   * @returns Observable con el estado actual (true = habilitado).
+   */
+  getAutonomousSchedulingStatus(): Observable<boolean> {
+    return this.http.get<boolean>(
+      `${this.apiUrl}/appointments/config/autonomous-scheduling`
+    );
+  }
+
+  /**
+   * Habilita o deshabilita el agendamiento autónomo de pacientes.
+   *
+   * @param enabled - Nuevo estado deseado.
+   * @returns Observable que completa sin contenido si la actualización fue exitosa.
+   */
+  setAutonomousSchedulingStatus(enabled: boolean): Observable<void> {
+    return this.http.put<void>(
+      `${this.apiUrl}/appointments/config/autonomous-scheduling`,
+      null,
+      { params: { enabled } }
+    );
+  }
   // ── Document Types ────────────────────────────────────────────────────────
   /**
    * Obtiene el listado de tipos de documento de identidad soportados

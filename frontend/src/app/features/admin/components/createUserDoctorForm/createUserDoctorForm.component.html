@@ -176,7 +176,7 @@
                 fieldBlurred.emit('endTime')
               "
               name="startTime"
-              [options]="timeOptions | toSelectOptions: false"
+              [options]="timeSelectOptions"
               placeholder="-- Seleccionar --"
               [errorMessage]="errors['startTime']"
               [hasSuffix]="true"
@@ -191,7 +191,7 @@
             >
               Hora de Fin
               <span class="text-sm text-gray-500 font-normal ml-1"
-                >máx. 12:00 pm</span
+                >máx. 1:00 pm</span
               >
             </label>
             <app-select
@@ -203,7 +203,7 @@
                 fieldBlurred.emit('startTime')
               "
               name="endTime"
-              [options]="timeOptions | toSelectOptions: false"
+              [options]="timeSelectOptions"
               placeholder="-- Seleccionar --"
               [errorMessage]="errors['endTime']"
               [hasSuffix]="true"

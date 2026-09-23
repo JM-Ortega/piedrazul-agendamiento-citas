@@ -6,8 +6,16 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
-import { LucidePencil, LucideSettings } from '@lucide/angular';
+import {
+  LucideCalendarCheck,
+  LucideCheck,
+  LucideDynamicIcon,
+  LucidePencil,
+  LucideSettings,
+  LucideX,
+} from '@lucide/angular';
 import { finalize, forkJoin, Observable } from 'rxjs';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
 import { PaginationComponent } from '../../../../designSystem/molecules/pagination/pagination.component';
 import { SearchInputComponent } from '../../../../designSystem/molecules/searchInput/searchInput.component';
 import {
@@ -19,7 +27,9 @@ import {
   ToastComponent,
   ToastType,
 } from '../../../../designSystem/molecules/toastMessage/toast.component';
+import { ConfirmModalComponent } from '../../../../designSystem/organisms/confirmModal/confirmModal.component';
 import { PaginationMeta } from '../../../../shared/helpers/paginatedState';
+import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
 import {
   DAY_TO_WORKDAY,
   workdayToNumber,
@@ -35,8 +45,6 @@ import {
 import { AdminModalsComponent } from '../../components/modals/modalHorarios/adminModals.component';
 import { dtoSchedule } from '../../models/dtos/schedule.dto';
 import { AdminService } from '../../service/admin.service';
-// ── Imports ──
-import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
 
 @Component({
   selector: 'app-admin-config',
@@ -53,6 +61,10 @@ import { scrollToElementById } from '../../../../shared/helpers/scrollToElement'
     PaginationComponent,
     SortControlComponent,
     SearchInputComponent,
+    LucideCalendarCheck,
+    ConfirmModalComponent,
+    LucideDynamicIcon,
+    ButtonComponent,
   ],
 })
 export class AdminConfigComponent implements OnInit {
@@ -75,11 +87,19 @@ export class AdminConfigComponent implements OnInit {
   errorGuardado = signal('');
   toastMessage = signal('');
   toastType = signal<ToastType | null>(null);
+
+  readonly Check = LucideCheck;
+  readonly X = LucideX;
   // ── Paginacion ──────────────────────────────────────────────────────────────
   currentPage = signal(0);
   totalPages = signal(0);
   totalElements = signal(0);
   readonly PAGE_SIZE = 4;
+
+  // ── Agendamiento autónomo ────────────────────────────────────────────────
+  /** Estado del agendamiento autónomo de pacientes. TODO: cargar del backend cuando exista el endpoint. */
+  autonomousBookingEnabled = signal(true);
+  showAutonomousBookingModal = signal(false);
   // ── Ordenamiento ──────────────────────────────────────────────────────────
   sortField = signal('appointmentInterval');
   sortDirection = signal<SortDirection>('asc');
@@ -108,6 +128,7 @@ export class AdminConfigComponent implements OnInit {
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.loadDoctors();
+    this.loadAutonomousSchedulingStatus();
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -160,7 +181,15 @@ export class AdminConfigComponent implements OnInit {
         },
       });
   }
-
+  private loadAutonomousSchedulingStatus(): void {
+    this.adminService.getAutonomousSchedulingStatus().subscribe({
+      next: (enabled) => this.autonomousBookingEnabled.set(enabled),
+      error: () => {
+        // Si falla la carga, se mantiene el valor por defecto (true)
+        // y el usuario puede intentar cambiarlo igualmente.
+      },
+    });
+  }
   // ── Edit handlers ─────────────────────────────────────────────────────────
   startEdit(doctor: Doctor): void {
     this.editingId.set(doctor.id);
@@ -260,6 +289,34 @@ export class AdminConfigComponent implements OnInit {
 
     this.doctorToToggle.set(doctor);
     this.showConfirmModal.set(true);
+  }
+  openAutonomousBookingModal(): void {
+    this.showAutonomousBookingModal.set(true);
+  }
+
+  onCloseAutonomousBookingModal(): void {
+    this.showAutonomousBookingModal.set(false);
+  }
+
+  onConfirmAutonomousBookingToggle(): void {
+    const next = !this.autonomousBookingEnabled();
+    this.adminService.setAutonomousSchedulingStatus(next).subscribe({
+      next: () => {
+        this.autonomousBookingEnabled.set(next);
+        this.onCloseAutonomousBookingModal();
+        this.showToast(
+          'success',
+          next
+            ? 'Agendamiento autónomo habilitado.'
+            : 'Agendamiento autónomo deshabilitado.'
+        );
+      },
+      error: (err: AppError) => {
+        this.onCloseAutonomousBookingModal();
+        this.errorGuardado.set(err.message);
+        this.showErrorModal.set(true);
+      },
+    });
   }
   /** True si el médico tiene todos los datos mínimos de horario para poder habilitarse. */
   private hasScheduleConfigured(doctor: Doctor): boolean {
