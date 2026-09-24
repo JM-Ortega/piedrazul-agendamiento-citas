@@ -52,6 +52,8 @@ public class AppointmentController {
     private final RegisterUnscheduledAttentionUseCase registerUnscheduledAttentionUseCase;
     private final GetDoctorDailyAgendaUseCase getDoctorDailyAgendaUseCase;
     private final CountScheduledAppointmentsUseCase countScheduledAppointmentsUseCase;
+    private final CheckExistenceByDocAndStateUseCase checkExistenceByDocAndStateUseCase;
+
 
     private final AppointmentSchedulingService appointmentSchedulingService;
     private final ManualPatientResolutionStrategy manualPatientResolutionStrategy;
@@ -68,7 +70,10 @@ public class AppointmentController {
             GetAppointmentStatesUseCase getAppointmentStatesUseCase,
             UpdateAutonomousSchedulingUseCase updateAutonomousSchedulingUseCase,
             GetAutonomousSchedulingContidionUseCase getAutonomousSchedulingContidionUseCase,
-            RegisterUnscheduledAttentionUseCase registerUnscheduledAttentionUseCase, GetDoctorDailyAgendaUseCase getDoctorDailyAgendaUseCase, CountScheduledAppointmentsUseCase countScheduledAppointmentsUseCase,
+            RegisterUnscheduledAttentionUseCase registerUnscheduledAttentionUseCase,
+            GetDoctorDailyAgendaUseCase getDoctorDailyAgendaUseCase,
+            CountScheduledAppointmentsUseCase countScheduledAppointmentsUseCase,
+            CheckExistenceByDocAndStateUseCase checkExistenceByDocAndStateUseCase,
             AppointmentSchedulingService appointmentSchedulingService,
             ManualPatientResolutionStrategy manualPatientResolutionStrategy,
             AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy,
@@ -85,6 +90,7 @@ public class AppointmentController {
         this.registerUnscheduledAttentionUseCase = registerUnscheduledAttentionUseCase;
         this.getDoctorDailyAgendaUseCase = getDoctorDailyAgendaUseCase;
         this.countScheduledAppointmentsUseCase = countScheduledAppointmentsUseCase;
+        this.checkExistenceByDocAndStateUseCase = checkExistenceByDocAndStateUseCase;
         this.appointmentSchedulingService = appointmentSchedulingService;
         this.manualPatientResolutionStrategy = manualPatientResolutionStrategy;
         this.autonomousPatientResolutionStrategy = autonomousPatientResolutionStrategy;
@@ -393,6 +399,24 @@ public class AppointmentController {
     ) {
         return ResponseEntity.ok(countScheduledAppointmentsUseCase.execute(date));
     }
+
+    @GetMapping("/checkExistenceByDoctorAndState")
+    @PreAuthorize("hasAnyRole('DOCTOR')")
+    @Operation(summary = "Verificar existencia de citas por doctor y estado",
+            description = "Este endpoint permite al doctor verificar si existen citas con un estado específico asociadas a su perfil.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Existencia verificada correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar esta información")
+    })
+    public ResponseEntity<Boolean> checkExistenceByDoctorAndState(
+            @Parameter(description = "Identificador único (UUID) del doctor")
+            @RequestParam UUID idDoctor,
+            @Parameter(description = "Estado de la cita")
+            @RequestParam AppointmentState state) {
+        return ResponseEntity.ok(checkExistenceByDocAndStateUseCase.execute(idDoctor, state));
+    }
+
 
     // Helper methods
     private UUID resolvePerformedBy(Jwt jwt) {

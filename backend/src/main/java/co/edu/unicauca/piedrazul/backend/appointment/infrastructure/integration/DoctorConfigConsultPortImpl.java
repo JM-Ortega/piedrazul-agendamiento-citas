@@ -47,16 +47,6 @@ public class DoctorConfigConsultPortImpl implements DoctorConfigConsultPort {
     }
 
     @Override
-    public Map<UUID, Integer> getBookingWindowWeeksByDoctorIds(List<UUID> doctorIds) {
-        return doctorExternalService.bookingWindowWeeksByDoctorIds(doctorIds);
-    }
-
-    @Override
-    public Map<UUID, Integer> getIntervalMinutesByDoctorIds(List<UUID> doctorIds) {
-        return doctorExternalService.intervalMinutesByDoctorIds(doctorIds);
-    }
-
-    @Override
     public List<SpecialtyCode> getSpecialtiesByDoctor(UUID idDoctor) {
         return doctorExternalService.findSpecialtiesByPersonIds(List.of(idDoctor)).getOrDefault(idDoctor, List.of());
     }
