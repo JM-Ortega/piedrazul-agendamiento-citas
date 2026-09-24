@@ -17,7 +17,6 @@ import { ConfirmModalComponent } from '../../../../designSystem/organisms/confir
 import { FilterValues } from '../../../../designSystem/organisms/filters/filters.component';
 import { PatientQuickSearchComponent } from '../../../../designSystem/organisms/patientQuickSearch/patientQuickSearch.component';
 import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
-import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../../../shared/models/dtos/doctor.dto';
 import { PatientQuickResult } from '../../../../shared/models/dtos/patientQuickResult.dto';
 import { AppError } from '../../../../shared/models/interfaces/apiError.model';
@@ -25,7 +24,6 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { SchedulerExportModalComponent } from '../../components/exportModal/exportModal.component';
 import { FiltersPanelComponent } from '../../components/filtersPanel/filtersPanel.component';
 import { AppointmentTableComponent } from '../../components/table/table.component';
-import { PatientQuickSearchMockService } from '../../service/patientQuickSearch.mock.service';
 const PAGE_SIZE = 5;
 
 @Component({
@@ -108,57 +106,54 @@ export class SchedulerHistoryComponent implements OnInit {
   readonly toastType = signal<'success' | 'error' | null>(null);
 
   errorMessage = signal('');
+  loadingPatientAppointments = signal(false);
 
   /** Metadata de paginación de la última carga, provista por el servicio. */
   readonly pagination = computed(() => this.schedulerService.pagination());
-  /** Citas de la página actual.*/
+  /**
+   * Citas de la página actual. Es la misma fuente sin importar si se está
+   * mostrando el listado filtrado por médico/fecha/estado, o las citas de
+   * un paciente específico — la diferencia está solo en qué parámetros se
+   * mandaron en la última llamada a `loadAllAppointments`.
+   */
   readonly results = computed(() => this.schedulerService.appointments());
-  private patientQuickSearchService = inject(PatientQuickSearchMockService);
 
-  patientSearchResults = signal<PatientQuickResult[]>([]);
-  patientSearchLoading = signal(false);
   selectedPatient = signal<PatientQuickResult | null>(null);
-  patientAppointments = signal<AppointmentsPatient[]>([]);
-  loadingPatientAppointments = signal(false);
-
-  /** Fuente de datos que consume la tabla: la búsqueda normal, o las citas del paciente filtrado. */
-  readonly tableResults = computed(() =>
-    this.selectedPatient() ? this.patientAppointments() : this.results()
-  );
-
-  onPatientSearch(term: string): void {
-    if (!term) {
-      this.patientSearchResults.set([]);
-      return;
-    }
-    this.patientSearchLoading.set(true);
-    this.patientQuickSearchService.searchPatients(term).subscribe({
-      next: (r) => {
-        this.patientSearchResults.set(r);
-        this.patientSearchLoading.set(false);
-      },
-      error: () => this.patientSearchLoading.set(false),
-    });
-  }
 
   onPatientSelected(patient: PatientQuickResult): void {
     this.selectedPatient.set(patient);
-    this.patientSearchResults.set([]);
-    this.loadingPatientAppointments.set(true);
-    this.patientQuickSearchService
-      .getAppointmentsByPatient(patient.id)
-      .subscribe({
-        next: (a) => {
-          this.patientAppointments.set(a);
-          this.loadingPatientAppointments.set(false);
-        },
-        error: () => this.loadingPatientAppointments.set(false),
-      });
+    this.pageNumber.set(0);
+    this.loadPatientAppointments(patient.id, 0);
   }
 
   onClearPatientFilter(): void {
     this.selectedPatient.set(null);
-    this.patientAppointments.set([]);
+    this.pageNumber.set(0);
+    this.loadAppointments(
+      this.filterDoctor(),
+      this.filterDate(),
+      this.filterStatus(),
+      0
+    );
+  }
+
+  private loadPatientAppointments(patientId: string, pageNumber: number): void {
+    this.loadingPatientAppointments.set(true);
+    this.schedulerService
+      .loadAllAppointments({
+        idPatient: patientId,
+        pageNumber,
+        pageSize: PAGE_SIZE,
+      })
+      .subscribe({
+        next: () => this.loadingPatientAppointments.set(false),
+        error: (err: AppError) => {
+          this.loadingPatientAppointments.set(false);
+          this.errorMessage.set(
+            'No se pudieron cargar las citas del paciente: ' + err.message
+          );
+        },
+      });
   }
 
   selectedDoctor = computed(() =>
@@ -203,11 +198,18 @@ export class SchedulerHistoryComponent implements OnInit {
   }
 
   /**
-   * Navega a la página indicada manteniendo los filtros actuales.
+   * Navega a la página indicada, respetando el modo actual: si hay un
+   * paciente filtrado, pagina sus citas; si no, pagina el listado normal
+   * con los filtros de médico/fecha/estado vigentes.
    * Conectado al evento `pageChange` de `app-pagination`.
    */
   onPageChange(pageNumber: number): void {
     this.pageNumber.set(pageNumber);
+    const patient = this.selectedPatient();
+    if (patient) {
+      this.loadPatientAppointments(patient.id, pageNumber);
+      return;
+    }
     this.loadAppointments(
       this.filterDoctor(),
       this.filterDate(),
@@ -252,12 +254,17 @@ export class SchedulerHistoryComponent implements OnInit {
     this.patientAppointmentService.cancelAppointment(appointmentId).subscribe({
       next: () => {
         this.showToast('La cita fue cancelada exitosamente', 'success');
-        this.loadAppointments(
-          this.filterDoctor(),
-          this.filterDate(),
-          this.filterStatus(),
-          this.pageNumber()
-        );
+        const patient = this.selectedPatient();
+        if (patient) {
+          this.loadPatientAppointments(patient.id, this.pageNumber());
+        } else {
+          this.loadAppointments(
+            this.filterDoctor(),
+            this.filterDate(),
+            this.filterStatus(),
+            this.pageNumber()
+          );
+        }
       },
       error: (err: AppError) =>
         this.showToast(

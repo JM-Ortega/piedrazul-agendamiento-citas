@@ -2,12 +2,13 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable, of, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { withPagination } from '../../shared/helpers/httpPagination';
+import { PaginatedState } from '../../shared/helpers/paginatedState';
 import { AppointmentExportRequest } from '../../shared/models/dtos/AppointmentExportRequest.dto';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { dtoDoctor } from '../../shared/models/dtos/doctor.dto';
 import { PageResponse } from '../../shared/models/dtos/pageResponse.dto';
-import { PaginatedState } from '../../shared/helpers/paginatedState';
-import { withPagination } from '../../shared/helpers/httpPagination';
+import { PatientQuickResult } from '../../shared/models/dtos/patientQuickResult.dto';
 
 @Injectable({ providedIn: 'root' })
 export class SchedulerService {
@@ -67,6 +68,7 @@ export class SchedulerService {
    */
   loadAllAppointments(params?: {
     idDoctor?: string;
+    idPatient?: string;
     date?: string;
     state?: string;
     pageNumber?: number;
@@ -76,13 +78,13 @@ export class SchedulerService {
       tap((page) => this.appointmentsState.set(page))
     );
   }
-
   /**
    * Realiza la petición HTTP GET paginada de citas al backend, aplicando
    * los filtros opcionales de doctor, fecha y estado.
    */
   private getAllAppointments(params?: {
     idDoctor?: string;
+    idPatient?: string;
     date?: string;
     state?: string;
     pageNumber?: number;
@@ -91,6 +93,8 @@ export class SchedulerService {
     let httpParams = new HttpParams();
     if (params?.idDoctor)
       httpParams = httpParams.set('idDoctor', params.idDoctor);
+    if (params?.idPatient)
+      httpParams = httpParams.set('idPatient', params.idPatient);
     if (params?.date) httpParams = httpParams.set('date', params.date);
     if (params?.state) httpParams = httpParams.set('state', params.state);
     httpParams = withPagination(
@@ -104,7 +108,6 @@ export class SchedulerService {
       { params: httpParams }
     );
   }
-
   exportAppointments(payload: AppointmentExportRequest): Observable<Blob> {
     return this.http.post(
       `${this.apiUrl}/reports/appointments/export`,
@@ -135,5 +138,27 @@ export class SchedulerService {
   clearAllData(): void {
     this.doctorsCache.clear();
     this.appointmentsState.clear();
+  }
+  /**
+   * Busca pacientes por nombre completo o número de documento.
+   *
+   * @param search término de búsqueda (nombre o documento)
+   * @param page número de página, base 0 (por defecto 0)
+   * @param size cantidad de resultados por página (por defecto 10)
+   */
+  searchPatients(
+    search: string,
+    page = 0,
+    size = 10
+  ): Observable<PageResponse<PatientQuickResult>> {
+    const httpParams = new HttpParams()
+      .set('search', search)
+      .set('page', page)
+      .set('size', size);
+
+    return this.http.get<PageResponse<PatientQuickResult>>(
+      `${this.apiUrl}/patients`,
+      { params: httpParams }
+    );
   }
 }
