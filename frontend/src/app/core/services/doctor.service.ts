@@ -110,25 +110,31 @@ export class DoctorService {
       { params }
     );
   }
-
+  // Después
   /**
-   * Obtiene una página de citas de un médico específico.
+   * Obtiene una página de citas de un médico específico, opcionalmente
+   * filtradas por paciente, fecha o estado.
    *
    * @param doctorId - ID del médico.
    * @param pageNumber - Índice de página (base 0). Por defecto 0.
    * @param pageSize - Cantidad de citas por página. Por defecto 10.
+   * @param filters.patientId - Filtra además por un paciente específico (opcional).
+   * @param filters.date - Filtra por fecha, formato `YYYY-MM-DD` (opcional).
+   * @param filters.state - Filtra por estado de cita (opcional).
    * @returns Observable con la respuesta paginada completa (content + metadata).
    */
   getAppointmentsByDoctor(
     doctorId: string,
     pageNumber = 0,
-    pageSize = 4
+    pageSize = 4,
+    filters?: { patientId?: string; date?: string; state?: string }
   ): Observable<PageResponse<AppointmentsPatient>> {
-    const params = withPagination(
-      new HttpParams().set('idDoctor', doctorId),
-      pageNumber,
-      pageSize
-    );
+    let params = new HttpParams().set('idDoctor', doctorId);
+    if (filters?.patientId) params = params.set('idPatient', filters.patientId);
+    if (filters?.date) params = params.set('date', filters.date);
+    if (filters?.state) params = params.set('state', filters.state);
+    params = withPagination(params, pageNumber, pageSize);
+
     return this.http.get<PageResponse<AppointmentsPatient>>(
       `${this.apiUrl}/appointments`,
       { params }

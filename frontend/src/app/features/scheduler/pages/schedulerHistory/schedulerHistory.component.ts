@@ -123,13 +123,8 @@ export class SchedulerHistoryComponent implements OnInit {
   onPatientSelected(patient: PatientQuickResult): void {
     this.selectedPatient.set(patient);
     this.pageNumber.set(0);
-    this.loadPatientAppointments(patient.id, 0);
-  }
-
-  onClearPatientFilter(): void {
-    this.selectedPatient.set(null);
-    this.pageNumber.set(0);
     this.loadAppointments(
+      patient.id,
       this.filterDoctor(),
       this.filterDate(),
       this.filterStatus(),
@@ -137,23 +132,16 @@ export class SchedulerHistoryComponent implements OnInit {
     );
   }
 
-  private loadPatientAppointments(patientId: string, pageNumber: number): void {
-    this.loadingPatientAppointments.set(true);
-    this.schedulerService
-      .loadAllAppointments({
-        idPatient: patientId,
-        pageNumber,
-        pageSize: PAGE_SIZE,
-      })
-      .subscribe({
-        next: () => this.loadingPatientAppointments.set(false),
-        error: (err: AppError) => {
-          this.loadingPatientAppointments.set(false);
-          this.errorMessage.set(
-            'No se pudieron cargar las citas del paciente: ' + err.message
-          );
-        },
-      });
+  onClearPatientFilter(): void {
+    this.selectedPatient.set(null);
+    this.pageNumber.set(0);
+    this.loadAppointments(
+      null,
+      this.filterDoctor(),
+      this.filterDate(),
+      this.filterStatus(),
+      0
+    );
   }
 
   selectedDoctor = computed(() =>
@@ -180,16 +168,22 @@ export class SchedulerHistoryComponent implements OnInit {
     this.schedulerService
       .getStates()
       .subscribe((data) => this.states.set(data));
-    this.loadAppointments('', '', '', 0);
+    this.loadAppointments(null, '', '', '', 0);
   }
 
-  /** Se conecta al evento (apply) del componente de filtros. */
+  /**
+   * Se conecta al evento (apply) del componente de filtros. Si hay un
+   * paciente seleccionado, los filtros se aplican dentro de sus citas
+   * (no reemplazan la búsqueda por paciente); si no, filtran el listado
+   * general.
+   */
   onApplyFilters(filters: FilterValues): void {
     this.filterDoctor.set(filters['doctor'] ?? '');
     this.filterDate.set(filters['date'] ?? '');
     this.filterStatus.set(filters['status'] ?? '');
     this.pageNumber.set(0);
     this.loadAppointments(
+      this.selectedPatient()?.id ?? null,
       filters['doctor'] ?? '',
       filters['date'] ?? '',
       filters['status'] ?? '',
@@ -199,18 +193,14 @@ export class SchedulerHistoryComponent implements OnInit {
 
   /**
    * Navega a la página indicada, respetando el modo actual: si hay un
-   * paciente filtrado, pagina sus citas; si no, pagina el listado normal
-   * con los filtros de médico/fecha/estado vigentes.
+   * paciente filtrado, pagina sus citas (con los filtros vigentes
+   * aplicados también); si no, pagina el listado general.
    * Conectado al evento `pageChange` de `app-pagination`.
    */
   onPageChange(pageNumber: number): void {
     this.pageNumber.set(pageNumber);
-    const patient = this.selectedPatient();
-    if (patient) {
-      this.loadPatientAppointments(patient.id, pageNumber);
-      return;
-    }
     this.loadAppointments(
+      this.selectedPatient()?.id ?? null,
       this.filterDoctor(),
       this.filterDate(),
       this.filterStatus(),
@@ -218,14 +208,23 @@ export class SchedulerHistoryComponent implements OnInit {
     );
   }
 
+  /**
+   * Carga las citas combinando, si aplica, el paciente seleccionado con
+   * los filtros de médico/fecha/estado vigentes. Es el único punto de
+   * entrada a `loadAllAppointments`, para que ambos criterios (paciente
+   * y filtros) nunca se pisen entre sí.
+   */
   private loadAppointments(
+    patientId: string | null,
     doctorId: string,
     date: string,
     status: string,
     pageNumber: number
   ): void {
+    if (patientId) this.loadingPatientAppointments.set(true);
     this.schedulerService
       .loadAllAppointments({
+        idPatient: patientId || undefined,
         idDoctor: doctorId || undefined,
         date: date || undefined,
         state: status || undefined,
@@ -233,7 +232,11 @@ export class SchedulerHistoryComponent implements OnInit {
         pageSize: PAGE_SIZE,
       })
       .subscribe({
+        next: () => {
+          if (patientId) this.loadingPatientAppointments.set(false);
+        },
         error: (err: AppError) => {
+          if (patientId) this.loadingPatientAppointments.set(false);
           this.errorMessage.set(
             'No se pudieron cargar las citas: ' + err.message
           );
@@ -254,17 +257,13 @@ export class SchedulerHistoryComponent implements OnInit {
     this.patientAppointmentService.cancelAppointment(appointmentId).subscribe({
       next: () => {
         this.showToast('La cita fue cancelada exitosamente', 'success');
-        const patient = this.selectedPatient();
-        if (patient) {
-          this.loadPatientAppointments(patient.id, this.pageNumber());
-        } else {
-          this.loadAppointments(
-            this.filterDoctor(),
-            this.filterDate(),
-            this.filterStatus(),
-            this.pageNumber()
-          );
-        }
+        this.loadAppointments(
+          this.selectedPatient()?.id ?? null,
+          this.filterDoctor(),
+          this.filterDate(),
+          this.filterStatus(),
+          this.pageNumber()
+        );
       },
       error: (err: AppError) =>
         this.showToast(
