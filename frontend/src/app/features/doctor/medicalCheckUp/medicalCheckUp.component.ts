@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
+  LucideArrowLeft,
   LucideCalendar,
   LucideClipboardPen,
   LucideFolderOpen,
@@ -49,6 +50,7 @@ type MedicalHistoryContext = 'scheduled' | 'unscheduled';
     ButtonComponent,
     PaginationComponent,
     ConfirmModalComponent,
+    LucideArrowLeft,
   ],
 })
 export class DoctorMedicalHistoryComponent
@@ -303,19 +305,22 @@ export class DoctorMedicalHistoryComponent
     }
   }
 
-  /**
-   * Guarda la observación editada de una cita ya atendida.
-   *
-   * TODO: reemplazar por la llamada real al backend cuando exista el
-   * endpoint de edición de observación (ej. PUT a la historia clínica
-   * por `editingRecordId()`). Por ahora solo simula el guardado y navega
-   * de vuelta, para dejar el flujo de UI completo a la espera del endpoint.
-   */
+  /** Guarda la observación editada de un control médico ya existente. */
   private saveEditedObservation(): void {
+    const idCheckUp = this.editingRecordId();
+    if (!idCheckUp) return;
+
     this.saveError.set('');
     this.isSaving.set(true);
-    this.finishAndExit();
+
+    this.doctorService
+      .updateCheckup(idCheckUp, this.trimmedObservation())
+      .subscribe({
+        next: () => this.finishAndExit(),
+        error: (err) => this.handleSaveError(err),
+      });
   }
+
   private saveScheduledAttendance(): void {
     const idCita = this.idAppointment();
     if (!idCita) return;
@@ -388,5 +393,9 @@ export class DoctorMedicalHistoryComponent
     this.saveError.set(
       err?.error?.message || 'Ocurrió un error al guardar la historia clínica'
     );
+  }
+  /** Navega de vuelta a las citas de hoy del doctor, respetando el guard de cambios sin guardar. */
+  goBack(): void {
+    this.router.navigate(['/medico']);
   }
 }

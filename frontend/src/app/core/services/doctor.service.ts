@@ -192,7 +192,7 @@ export class DoctorService {
 
     this.http
       .get<PageResponse<MedicalRecord>>(
-        `${this.apiUrl}/clinical-history/patient/${patientId}`,
+        `${this.apiUrl}/medical-check-up/patient/${patientId}`,
         { params }
       )
       .subscribe({
@@ -204,6 +204,22 @@ export class DoctorService {
       });
   }
 
+  /**
+   * Actualiza la descripción/observación de un control médico ya existente.
+   *
+   * @param idCheckUp - ID del control médico a actualizar.
+   * @param description - Nueva descripción/observación a guardar.
+   * @returns Observable con el control médico actualizado.
+   */
+  updateCheckup(
+    idCheckUp: string,
+    description: string | null
+  ): Observable<MedicalRecord> {
+    return this.http.post<MedicalRecord>(
+      `${this.apiUrl}/medical-check-up/updateCheckup/${idCheckUp}`,
+      { description }
+    );
+  }
   /**
    * Obtiene los datos del paciente asociado a una cita específica.
    *

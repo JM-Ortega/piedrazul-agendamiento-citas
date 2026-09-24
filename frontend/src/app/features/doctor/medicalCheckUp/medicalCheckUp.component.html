@@ -15,9 +15,19 @@
     }
 
     @if (patient()) {
+      @if (isEditMode()) {
+        <app-button
+          variant="plain"
+          extraClass="!mb-5 !mt-1 !ml-1"
+          (buttonClick)="goBack()"
+        >
+          <svg lucideArrowLeft [size]="18"></svg>
+          Volver a Citas de Hoy
+        </app-button>
+      }
       <!-- Info paciente -->
       <div
-        class="bg-white rounded-2xl shadow-md px-6 py-1 mb-3 border border-blue-100"
+        class="bg-white rounded-2xl shadow-md px-6 py-3 mb-3 border border-blue-100"
       >
         <!-- Encabezado con Avatar, Nombre y Botón de Desplegar -->
         <div class="flex items-center justify-between flex-wrap">
