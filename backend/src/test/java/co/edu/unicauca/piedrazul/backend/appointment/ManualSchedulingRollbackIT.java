@@ -14,6 +14,8 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.inte
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration.PatientConsultPortImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration.PatientProvisioningPortImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentConfigJpaRepository;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentConfigRepositoryImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientLinkFinalizer;
@@ -67,6 +69,7 @@ import static org.mockito.Mockito.when;
         AppointmentMapper.class,
         PatientConsultPortImpl.class,
         PatientProvisioningPortImpl.class,
+        SecurityContextExtractor.class,
         ManualSchedulingRollbackIT.SchedulingBeans.class,
         // Módulo de pacientes y sus colaboradores reales
         PatientService.class,
@@ -116,6 +119,11 @@ class ManualSchedulingRollbackIT extends PostgresIntegrationSupport {
         ManualPatientResolutionStrategy manualPatientResolutionStrategy(
                 PatientProvisioningPort patientProvisioningPort) {
             return new ManualPatientResolutionStrategy(patientProvisioningPort);
+        }
+
+        @Bean
+        AppointmentConfigRepository appointmentConfigRepository(AppointmentConfigJpaRepository jpaRepository) {
+            return new AppointmentConfigRepositoryImpl(jpaRepository);
         }
 
         @Bean

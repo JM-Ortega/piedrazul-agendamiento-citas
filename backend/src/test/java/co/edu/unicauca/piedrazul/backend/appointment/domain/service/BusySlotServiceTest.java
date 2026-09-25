@@ -71,14 +71,14 @@ class BusySlotServiceTest {
     }
 
     @Test
-    void isBusyShouldReturnTrueWhenReprogramadaAppointmentCollidesWithNewSlot() {
-        // REPROGRAMADA también es activa → debe bloquear el slot
-        Appointment reprogramada = buildAppointmentWithState(
-                LocalTime.of(10, 0), AppointmentState.REPROGRAMADA
+    void isBusyShouldReturnTrueWhenOnlyAtendidaAppointmentExistsAtSameTime() {
+        // ATENDIDA también se considera activa/ocupante del slot
+        Appointment atendida = buildAppointmentWithState(
+                LocalTime.of(9, 0), AppointmentState.ATENDIDA
         );
-        AppointmentTime newSlot = new AppointmentTime(LocalTime.of(10, 0));
+        AppointmentTime newSlot = new AppointmentTime(LocalTime.of(9, 0));
 
-        boolean result = busySlotService.isBusy(List.of(reprogramada), newSlot, 30);
+        boolean result = busySlotService.isBusy(List.of(atendida), newSlot, 30);
 
         assertThat(result).isTrue();
     }
@@ -116,18 +116,6 @@ class BusySlotServiceTest {
     }
 
     @Test
-    void isBusyShouldReturnFalseWhenOnlyAtendidaAppointmentExistsAtSameTime() {
-        Appointment atendida = buildAppointmentWithState(
-                LocalTime.of(9, 0), AppointmentState.ATENDIDA
-        );
-        AppointmentTime newSlot = new AppointmentTime(LocalTime.of(9, 0));
-
-        boolean result = busySlotService.isBusy(List.of(atendida), newSlot, 30);
-
-        assertThat(result).isFalse();
-    }
-
-    @Test
     void isBusyShouldReturnFalseWhenOnlyNoAsistioAppointmentExistsAtSameTime() {
         Appointment noAsistio = buildAppointmentWithState(
                 LocalTime.of(9, 0), AppointmentState.NO_ASISTIO
@@ -135,6 +123,19 @@ class BusySlotServiceTest {
         AppointmentTime newSlot = new AppointmentTime(LocalTime.of(9, 0));
 
         boolean result = busySlotService.isBusy(List.of(noAsistio), newSlot, 30);
+
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void isBusyShouldReturnFalseWhenOnlyReprogramadaAppointmentExistsAtSameTime() {
+        // REPROGRAMADA no se considera activa: no bloquea el slot
+        Appointment reprogramada = buildAppointmentWithState(
+                LocalTime.of(10, 0), AppointmentState.REPROGRAMADA
+        );
+        AppointmentTime newSlot = new AppointmentTime(LocalTime.of(10, 0));
+
+        boolean result = busySlotService.isBusy(List.of(reprogramada), newSlot, 30);
 
         assertThat(result).isFalse();
     }

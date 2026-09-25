@@ -15,9 +15,11 @@ import java.util.EnumSet;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -25,7 +27,7 @@ class IsNewPatientUseCaseImplTest {
 
     @Mock
     private AppointmentRepository appointmentRepository;
-    
+
     @Mock
     private PatientConsultPort patientConsultPort;
 
@@ -37,9 +39,9 @@ class IsNewPatientUseCaseImplTest {
     }
 
     @Test
-    void isNewPatientShouldReturnFalseWhenPatientHasScheduledOrAttendedAppointment() {
+    void isNewPatientShouldReturnFalseWhenPatientHasAttendedAppointment() {
         UUID patientId = UUID.randomUUID();
-        Collection<AppointmentState> expectedStates = EnumSet.of(AppointmentState.AGENDADA, AppointmentState.ATENDIDA);
+        Collection<AppointmentState> expectedStates = EnumSet.of(AppointmentState.ATENDIDA);
 
         when(patientConsultPort.existsById(patientId)).thenReturn(true);
         when(appointmentRepository.existsByPatientIdAndStates(patientId, expectedStates)).thenReturn(true);
@@ -50,13 +52,13 @@ class IsNewPatientUseCaseImplTest {
 
         ArgumentCaptor<Collection<AppointmentState>> statesCaptor = ArgumentCaptor.forClass(Collection.class);
         verify(appointmentRepository).existsByPatientIdAndStates(eq(patientId), statesCaptor.capture());
-        assertThat(statesCaptor.getValue()).containsExactlyInAnyOrder(AppointmentState.AGENDADA, AppointmentState.ATENDIDA);
+        assertThat(statesCaptor.getValue()).containsExactly(AppointmentState.ATENDIDA);
     }
 
     @Test
-    void isNewPatientShouldReturnTrueWhenPatientHasNoScheduledOrAttendedAppointments() {
+    void isNewPatientShouldReturnTrueWhenPatientHasNoAttendedAppointment() {
         UUID patientId = UUID.randomUUID();
-        Collection<AppointmentState> expectedStates = EnumSet.of(AppointmentState.AGENDADA, AppointmentState.ATENDIDA);
+        Collection<AppointmentState> expectedStates = EnumSet.of(AppointmentState.ATENDIDA);
 
         when(patientConsultPort.existsById(patientId)).thenReturn(true);
         when(appointmentRepository.existsByPatientIdAndStates(patientId, expectedStates)).thenReturn(false);
@@ -67,12 +69,22 @@ class IsNewPatientUseCaseImplTest {
     }
 
     @Test
-    void isNewPatientShouldPropagatePatientNotFoundWhenPatientDoesNotExist() {
+    void isNewPatientShouldReturnTrueWhenPatientDoesNotExistInPatientModule() {
         UUID patientId = UUID.randomUUID();
 
         when(patientConsultPort.existsById(patientId)).thenReturn(false);
 
         boolean result = useCase.isNewPatient(patientId);
+
         assertThat(result).isTrue();
+        verify(appointmentRepository, never()).existsByPatientIdAndStates(any(), any());
+    }
+
+    @Test
+    void isNewPatientShouldReturnTrueWhenPatientIdIsNull() {
+        boolean result = useCase.isNewPatient(null);
+
+        assertThat(result).isTrue();
+        verifyNoInteractions(appointmentRepository, patientConsultPort);
     }
 }

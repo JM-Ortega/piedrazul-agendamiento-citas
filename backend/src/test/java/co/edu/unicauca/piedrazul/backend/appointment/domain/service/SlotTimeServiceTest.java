@@ -4,6 +4,8 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AvailableDateSlots;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.WorkingDateSlots;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,7 +17,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/*
 class SlotTimeServiceTest {
 
     private SlotTimeService slotTimeService;
@@ -28,22 +29,22 @@ class SlotTimeServiceTest {
     }
 
     // ─────────────────────────────────────────────
-    // Sin citas existentes — todos los slots del médico están disponibles
+    // Sin citas existentes — todas las franjas del médico están disponibles
     // ─────────────────────────────────────────────
 
     @Test
     void calculateAvailableShouldReturnAllSlotsWhenNoAppointmentsExist() {
-        List<AppointmentTime> doctorSlots = List.of(
-                new AppointmentTime(LocalTime.of(7, 0)),
-                new AppointmentTime(LocalTime.of(7, 30)),
-                new AppointmentTime(LocalTime.of(8, 0))
+        LocalDate date = LocalDate.now().plusDays(1);
+        WorkingDateSlots workingDateSlots = new WorkingDateSlots(
+                date, List.of(LocalTime.of(7, 0), LocalTime.of(7, 30), LocalTime.of(8, 0)));
+
+        List<AvailableDateSlots> available = slotTimeService.calculateAvailable(
+                List.of(workingDateSlots), List.of(), 30
         );
 
-        List<AppointmentTime> available = slotTimeService.calculateAvailable(
-                doctorSlots, List.of(), 30
+        assertThat(available).containsExactly(
+                new AvailableDateSlots(date, List.of(LocalTime.of(7, 0), LocalTime.of(7, 30), LocalTime.of(8, 0)))
         );
-
-        assertThat(available).containsExactlyInAnyOrderElementsOf(doctorSlots);
     }
 
     // ─────────────────────────────────────────────
@@ -52,7 +53,7 @@ class SlotTimeServiceTest {
 
     @Test
     void calculateAvailableShouldReturnEmptyWhenDoctorHasNoSlots() {
-        List<AppointmentTime> available = slotTimeService.calculateAvailable(
+        List<AvailableDateSlots> available = slotTimeService.calculateAvailable(
                 List.of(), List.of(), 30
         );
 
@@ -65,48 +66,61 @@ class SlotTimeServiceTest {
 
     @Test
     void calculateAvailableShouldExcludeSlotOccupiedByActiveAppointment() {
-        AppointmentTime slotAt7   = new AppointmentTime(LocalTime.of(7, 0));
-        AppointmentTime slotAt730 = new AppointmentTime(LocalTime.of(7, 30));
-        AppointmentTime slotAt8   = new AppointmentTime(LocalTime.of(8, 0));
-
-        List<AppointmentTime> doctorSlots = List.of(slotAt7, slotAt730, slotAt8);
+        LocalDate date = LocalDate.now().plusDays(1);
+        LocalTime slotAt7 = LocalTime.of(7, 0);
+        LocalTime slotAt730 = LocalTime.of(7, 30);
+        LocalTime slotAt8 = LocalTime.of(8, 0);
+        WorkingDateSlots workingDateSlots = new WorkingDateSlots(date, List.of(slotAt7, slotAt730, slotAt8));
 
         // Cita activa ocupa las 7:30
-        Appointment cita730 = buildAppointmentWithState(
-                LocalTime.of(7, 30), AppointmentState.AGENDADA
+        Appointment cita730 = buildAppointmentWithState(date, LocalTime.of(7, 30), AppointmentState.AGENDADA);
+
+        List<AvailableDateSlots> available = slotTimeService.calculateAvailable(
+                List.of(workingDateSlots), List.of(cita730), 30
         );
 
-        List<AppointmentTime> available = slotTimeService.calculateAvailable(
-                doctorSlots, List.of(cita730), 30
-        );
-
-        assertThat(available)
+        assertThat(available).hasSize(1);
+        assertThat(available.getFirst().availableSlots())
                 .containsExactlyInAnyOrder(slotAt7, slotAt8)
                 .doesNotContain(slotAt730);
+    }
+
+    @Test
+    void calculateAvailableShouldExcludeSlotOccupiedByAtendidaAppointment() {
+        // ATENDIDA también se considera ocupante del slot (igual que AGENDADA)
+        LocalDate date = LocalDate.now().plusDays(1);
+        LocalTime slotAt9 = LocalTime.of(9, 0);
+        WorkingDateSlots workingDateSlots = new WorkingDateSlots(date, List.of(slotAt9));
+
+        Appointment atendida = buildAppointmentWithState(date, LocalTime.of(9, 0), AppointmentState.ATENDIDA);
+
+        List<AvailableDateSlots> available = slotTimeService.calculateAvailable(
+                List.of(workingDateSlots), List.of(atendida), 30
+        );
+
+        assertThat(available).isEmpty();
     }
 
     @Test
     void calculateAvailableShouldExcludeSlotCollidingWithinInterval() {
         // Médico tiene franja a las 9:15 — cita activa a las 9:00 — intervalo 30 min
         // 9:15 - 9:00 = 15 min < 30 → franja bloqueada
-        AppointmentTime slotAt9   = new AppointmentTime(LocalTime.of(9, 0));
-        AppointmentTime slotAt915 = new AppointmentTime(LocalTime.of(9, 15));
-        AppointmentTime slotAt930 = new AppointmentTime(LocalTime.of(9, 30));
+        LocalDate date = LocalDate.now().plusDays(1);
+        LocalTime slotAt9 = LocalTime.of(9, 0);
+        LocalTime slotAt915 = LocalTime.of(9, 15);
+        LocalTime slotAt930 = LocalTime.of(9, 30);
+        WorkingDateSlots workingDateSlots = new WorkingDateSlots(date, List.of(slotAt9, slotAt915, slotAt930));
 
-        List<AppointmentTime> doctorSlots = List.of(slotAt9, slotAt915, slotAt930);
+        Appointment citaAt9 = buildAppointmentWithState(date, LocalTime.of(9, 0), AppointmentState.AGENDADA);
 
-        Appointment citaAt9 = buildAppointmentWithState(
-                LocalTime.of(9, 0), AppointmentState.AGENDADA
-        );
-
-        List<AppointmentTime> available = slotTimeService.calculateAvailable(
-                doctorSlots, List.of(citaAt9), 30
+        List<AvailableDateSlots> available = slotTimeService.calculateAvailable(
+                List.of(workingDateSlots), List.of(citaAt9), 30
         );
 
         // 9:00 bloqueada por colisión exacta, 9:15 bloqueada por intervalo, 9:30 libre
-        assertThat(available)
-                .containsExactly(slotAt930)
-                .doesNotContain(slotAt9, slotAt915);
+        assertThat(available).hasSize(1);
+        assertThat(available.getFirst().availableSlots())
+                .containsExactly(slotAt930);
     }
 
     // ─────────────────────────────────────────────
@@ -115,92 +129,94 @@ class SlotTimeServiceTest {
 
     @Test
     void calculateAvailableShouldNotExcludeSlotOccupiedOnlyByCanceledAppointment() {
-        AppointmentTime slotAt9 = new AppointmentTime(LocalTime.of(9, 0));
-        List<AppointmentTime> doctorSlots = List.of(slotAt9);
+        LocalDate date = LocalDate.now().plusDays(1);
+        LocalTime slotAt9 = LocalTime.of(9, 0);
+        WorkingDateSlots workingDateSlots = new WorkingDateSlots(date, List.of(slotAt9));
 
-        Appointment cancelada = buildAppointmentWithState(
-                LocalTime.of(9, 0), AppointmentState.CANCELADA
+        Appointment cancelada = buildAppointmentWithState(date, LocalTime.of(9, 0), AppointmentState.CANCELADA);
+
+        List<AvailableDateSlots> available = slotTimeService.calculateAvailable(
+                List.of(workingDateSlots), List.of(cancelada), 30
         );
 
-        List<AppointmentTime> available = slotTimeService.calculateAvailable(
-                doctorSlots, List.of(cancelada), 30
-        );
-
-        assertThat(available).containsExactly(slotAt9);
-    }
-
-    @Test
-    void calculateAvailableShouldNotExcludeSlotOccupiedOnlyByAtendidaAppointment() {
-        AppointmentTime slotAt9 = new AppointmentTime(LocalTime.of(9, 0));
-        List<AppointmentTime> doctorSlots = List.of(slotAt9);
-
-        Appointment atendida = buildAppointmentWithState(
-                LocalTime.of(9, 0), AppointmentState.ATENDIDA
-        );
-
-        List<AppointmentTime> available = slotTimeService.calculateAvailable(
-                doctorSlots, List.of(atendida), 30
-        );
-
-        assertThat(available).containsExactly(slotAt9);
+        assertThat(available).containsExactly(new AvailableDateSlots(date, List.of(slotAt9)));
     }
 
     // ─────────────────────────────────────────────
-    // Todas las franjas ocupadas
+    // Todas las franjas de la fecha ocupadas — la fecha desaparece del resultado
     // ─────────────────────────────────────────────
 
     @Test
-    void calculateAvailableShouldReturnEmptyWhenAllSlotsAreOccupied() {
-        AppointmentTime slotAt7   = new AppointmentTime(LocalTime.of(7, 0));
-        AppointmentTime slotAt730 = new AppointmentTime(LocalTime.of(7, 30));
+    void calculateAvailableShouldOmitDateEntirelyWhenAllItsSlotsAreOccupied() {
+        LocalDate date = LocalDate.now().plusDays(1);
+        LocalTime slotAt7 = LocalTime.of(7, 0);
+        LocalTime slotAt730 = LocalTime.of(7, 30);
+        WorkingDateSlots workingDateSlots = new WorkingDateSlots(date, List.of(slotAt7, slotAt730));
 
-        List<AppointmentTime> doctorSlots = List.of(slotAt7, slotAt730);
+        Appointment cita7 = buildAppointmentWithState(date, LocalTime.of(7, 0), AppointmentState.AGENDADA);
+        Appointment cita730 = buildAppointmentWithState(date, LocalTime.of(7, 30), AppointmentState.AGENDADA);
 
-        Appointment cita7   = buildAppointmentWithState(LocalTime.of(7, 0),  AppointmentState.AGENDADA);
-        Appointment cita730 = buildAppointmentWithState(LocalTime.of(7, 30), AppointmentState.AGENDADA);
-
-        List<AppointmentTime> available = slotTimeService.calculateAvailable(
-                doctorSlots, List.of(cita7, cita730), 30
+        List<AvailableDateSlots> available = slotTimeService.calculateAvailable(
+                List.of(workingDateSlots), List.of(cita7, cita730), 30
         );
 
+        // No debe aparecer ni siquiera como AvailableDateSlots con lista vacía
         assertThat(available).isEmpty();
     }
-
-    // ─────────────────────────────────────────────
-    // Cita activa y cancelada en el mismo horario — la activa sigue bloqueando
-    // ─────────────────────────────────────────────
 
     @Test
     void calculateAvailableShouldBlockSlotWhenActiveAndCanceledAppointmentsCoexist() {
-        AppointmentTime slotAt9 = new AppointmentTime(LocalTime.of(9, 0));
-        List<AppointmentTime> doctorSlots = List.of(slotAt9);
+        LocalDate date = LocalDate.now().plusDays(1);
+        LocalTime slotAt9 = LocalTime.of(9, 0);
+        WorkingDateSlots workingDateSlots = new WorkingDateSlots(date, List.of(slotAt9));
 
-        Appointment cancelada = buildAppointmentWithState(LocalTime.of(9, 0), AppointmentState.CANCELADA);
-        Appointment activa    = buildAppointmentWithState(LocalTime.of(9, 0), AppointmentState.AGENDADA);
+        Appointment cancelada = buildAppointmentWithState(date, LocalTime.of(9, 0), AppointmentState.CANCELADA);
+        Appointment activa = buildAppointmentWithState(date, LocalTime.of(9, 0), AppointmentState.AGENDADA);
 
-        List<AppointmentTime> available = slotTimeService.calculateAvailable(
-                doctorSlots, List.of(cancelada, activa), 30
+        List<AvailableDateSlots> available = slotTimeService.calculateAvailable(
+                List.of(workingDateSlots), List.of(cancelada, activa), 30
         );
 
         assertThat(available).isEmpty();
+    }
+
+    // ─────────────────────────────────────────────
+    // Agrupamiento por fecha — una fecha ocupada no afecta a las demás
+    // ─────────────────────────────────────────────
+
+    @Test
+    void calculateAvailableShouldKeepOtherDatesUnaffectedWhenAppointmentOnlyBlocksOneDate() {
+        LocalDate busyDate = LocalDate.now().plusDays(1);
+        LocalDate freeDate = busyDate.plusDays(1);
+        LocalTime slot = LocalTime.of(9, 0);
+
+        WorkingDateSlots busyDateSlots = new WorkingDateSlots(busyDate, List.of(slot));
+        WorkingDateSlots freeDateSlots = new WorkingDateSlots(freeDate, List.of(slot));
+
+        Appointment appointmentOnBusyDate = buildAppointmentWithState(busyDate, slot, AppointmentState.AGENDADA);
+
+        List<AvailableDateSlots> available = slotTimeService.calculateAvailable(
+                List.of(busyDateSlots, freeDateSlots), List.of(appointmentOnBusyDate), 30
+        );
+
+        // La fecha ocupada desaparece del resultado; la fecha libre conserva su franja intacta
+        assertThat(available).containsExactly(new AvailableDateSlots(freeDate, List.of(slot)));
     }
 
     // ─────────────────────────────────────────────
     // Fixture helper
     // ─────────────────────────────────────────────
 
-    private Appointment buildAppointmentWithState(LocalTime time, AppointmentState state) {
+    private Appointment buildAppointmentWithState(LocalDate date, LocalTime time, AppointmentState state) {
         return Appointment.reconstruct(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 SpecialtyCode.FISIOTERAPIA,
                 state,
-                LocalDate.now().plusDays(1),
+                date,
                 new AppointmentTime(time),
                 SchedulingOrigin.MANUAL
         );
     }
 }
-
- */
