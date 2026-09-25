@@ -1,11 +1,10 @@
-package co.edu.unicauca.piedrazul.backend.appointment;
+package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientRegistrationData;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientSnapshot;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientProvisioningPort;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration.PatientProvisioningPortImpl;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientSex;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;

@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment;
+package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration;
 
 import co.edu.unicauca.piedrazul.backend.appointment.application.AppointmentSchedulingService;
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.AutonomousPatientResolutionStrategy;
@@ -14,8 +14,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentScheduled
 import co.edu.unicauca.piedrazul.backend.appointment.events.ScheduledAppointmentEvent;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentSchedulingDisableException;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration.PatientConsultPortImpl;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration.PatientProvisioningPortImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;

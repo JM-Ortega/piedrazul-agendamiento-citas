@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment;
+package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
@@ -6,7 +6,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTim
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.ClinicalHistoryPort;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration.ClinicalHistoryPortImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;

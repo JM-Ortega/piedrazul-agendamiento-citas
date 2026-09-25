@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment;
+package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration;
 
 import co.edu.unicauca.piedrazul.backend.appointment.application.AppointmentSchedulingService;
 import co.edu.unicauca.piedrazul.backend.appointment.application.IsNewPatientUseCaseImpl;
@@ -11,8 +11,6 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentS
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.BusySlotService;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.FirstAppointmentMustBeNeuralTerapyException;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration.PatientConsultPortImpl;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration.PatientProvisioningPortImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentConfigJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentConfigRepositoryImpl;

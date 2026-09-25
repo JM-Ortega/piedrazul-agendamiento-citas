@@ -1,7 +1,6 @@
-package co.edu.unicauca.piedrazul.backend.appointment;
+package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration.DoctorConfigConsultPortImpl;
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorExternalServiceImpl;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;

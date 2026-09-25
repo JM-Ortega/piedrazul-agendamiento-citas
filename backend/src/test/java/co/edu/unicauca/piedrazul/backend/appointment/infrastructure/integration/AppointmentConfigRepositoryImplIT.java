@@ -1,4 +1,4 @@
-package co.edu.unicauca.piedrazul.backend.appointment;
+package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentConfigRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentConfigJpaRepository;

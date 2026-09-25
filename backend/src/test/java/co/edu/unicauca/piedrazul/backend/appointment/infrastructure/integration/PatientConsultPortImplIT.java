@@ -1,9 +1,8 @@
-package co.edu.unicauca.piedrazul.backend.appointment;
+package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentPatientNotFoundException;
-import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration.PatientConsultPortImpl;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientSex;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
