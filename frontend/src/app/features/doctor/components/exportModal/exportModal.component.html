@@ -66,22 +66,37 @@
           <select
             [value]="exportStatusFilter()"
             (change)="exportStatusFilter.set($any($event.target).value)"
-            class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            [disabled]="checkingExistence()"
+            class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60 disabled:cursor-not-allowed"
           >
             @for (status of statusOptions; track status) {
               <option [value]="status">
-                {{ statusLabels[status] }} ({{ statusCounts()[status] }})
+                {{ statusLabels[status] }}
               </option>
             }
           </select>
         </div>
 
-        @if (selectedCount() > 0) {
+        @if (checkingExistence()) {
+          <div
+            class="mb-4 bg-gray-50 border border-gray-300 text-gray-600 px-4 py-3 rounded-lg text-sm flex items-center gap-2"
+          >
+            <span
+              class="inline-block w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"
+            ></span>
+            Verificando disponibilidad de citas...
+          </div>
+        } @else if (availabilityError()) {
+          <div
+            class="mb-4 bg-red-50 border border-red-300 text-red-800 px-4 py-3 rounded-lg text-sm"
+          >
+            {{ availabilityError() }}
+          </div>
+        } @else if (hasAvailability()) {
           <div
             class="mb-4 bg-green-50 border border-green-300 text-green-800 px-4 py-3 rounded-lg text-sm"
           >
-            Se exportarán <strong>{{ selectedCount() }}</strong>
-            {{ selectedCount() === 1 ? 'cita' : 'citas' }} con este filtro.
+            Hay citas de hoy disponibles con este filtro.
           </div>
         } @else {
           <div
@@ -103,10 +118,10 @@
           </app-button>
           <button
             (click)="goToStep2()"
-            [disabled]="selectedCount() === 0"
+            [disabled]="!hasAvailability() || checkingExistence()"
             [class]="
               'flex-1 px-6 py-3.5 rounded-lg text-base font-semibold transition-colors ' +
-              (selectedCount() > 0
+              (hasAvailability() && !checkingExistence()
                 ? colors().button + ' text-white'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed')
             "
@@ -236,8 +251,7 @@
               Generando reporte...
             } @else {
               <svg lucideDownload [size]="20"></svg>
-              Exportar {{ selectedCount() }}
-              {{ selectedCount() === 1 ? 'cita' : 'citas' }}
+              Exportar Citas
             }
           </button>
         </div>

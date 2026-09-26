@@ -11,14 +11,17 @@
       [id]="id"
       [disabled]="disabled"
       [class]="computedSelectClasses"
-      [value]="value"
       (change)="handleChange($event)"
       (blur)="handleBlur($event)"
       (focus)="handleFocus($event)"
     >
-      <option value="">{{ loading ? loadingText : placeholder }}</option>
+      <option value="" [selected]="!value">
+        {{ loading ? loadingText : placeholder }}
+      </option>
       @for (opt of options; track opt.value) {
-        <option [value]="opt.value">{{ opt.label }}</option>
+        <option [value]="opt.value" [selected]="opt.value === value">
+          {{ opt.label }}
+        </option>
       }
     </select>
     @if (hasSuffix) {
