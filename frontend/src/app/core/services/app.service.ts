@@ -47,7 +47,7 @@ export class AppService {
     if (!this.keycloak.authenticated) return [];
     const roles = this.keycloak.realmAccess?.roles ?? [];
     return roles.filter((r) =>
-      ['ADMIN', 'SCHEDULER', 'DOCTOR', 'PATIENT'].includes(r)
+      ['ADMIN', 'SCHEDULER', 'DOCTOR', 'PATIENT', 'AUDITOR'].includes(r)
     );
   });
 
@@ -69,6 +69,8 @@ export class AppService {
     if (url.startsWith('/medico') && roles.includes('DOCTOR')) return 'DOCTOR';
     if (url.startsWith('/paciente') && roles.includes('PATIENT'))
       return 'PATIENT';
+    if (url.startsWith('/auditor') && roles.includes('AUDITOR'))
+      return 'AUDITOR';
     return roles[0];
   });
 
@@ -105,6 +107,7 @@ export class AppService {
       SCHEDULER: '/agendador',
       DOCTOR: '/medico',
       PATIENT: '/paciente',
+      AUDITOR: '/auditor/auditoria-citas',
     };
     this.router.navigate([routeMap[role] ?? '/']);
   }
@@ -116,6 +119,7 @@ export class AppService {
     if (url.startsWith('/agendador')) return 'Agendador';
     if (url.startsWith('/paciente')) return 'Paciente';
     if (url.startsWith('/medico')) return 'Médico';
+    if (url.startsWith('/auditor')) return 'Auditor';
     return this.roleLabelFor(this.currentRole() ?? '');
   });
 
@@ -125,6 +129,7 @@ export class AppService {
       SCHEDULER: 'Agendador',
       DOCTOR: 'Médico',
       PATIENT: 'Paciente',
+      AUDITOR: 'Auditor',
     };
     return map[role] ?? '';
   }
