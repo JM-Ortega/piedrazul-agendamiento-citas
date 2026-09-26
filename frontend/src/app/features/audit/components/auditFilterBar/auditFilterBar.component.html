@@ -1,0 +1,38 @@
+<div class="flex flex-wrap gap-3 mb-5">
+  <div class="relative flex-1 min-w-[220px]">
+    <input
+      type="text"
+      [ngModel]="filters().search"
+      (ngModelChange)="patch({ search: $event })"
+      placeholder="Buscar por nombre de quien realizó la acción..."
+      class="w-full pl-4 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-white"
+    />
+  </div>
+
+  <select
+    [ngModel]="filters().status"
+    (ngModelChange)="patch({ status: $event })"
+    class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-white"
+  >
+    <option value="all">Todos los estados</option>
+    <option value="success">Solo Exitosos</option>
+    <option value="failed">Solo Fallidos</option>
+  </select>
+
+  <input
+    type="date"
+    [ngModel]="filters().date"
+    (ngModelChange)="patch({ date: $event })"
+    class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-white"
+  />
+
+  @if (hasFilters()) {
+    <button
+      type="button"
+      (click)="filters.set(EMPTY_AUDIT_FILTERS)"
+      class="px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+    >
+      Limpiar
+    </button>
+  }
+</div>
