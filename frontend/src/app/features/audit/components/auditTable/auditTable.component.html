@@ -1,0 +1,107 @@
+@if (rows().length === 0) {
+  <div class="text-center py-16">
+    <div
+      class="bg-gray-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4"
+    >
+      <svg lucideSearch [size]="28" class="text-gray-400"></svg>
+    </div>
+    <p class="text-gray-500 font-semibold">No se encontraron registros</p>
+    <p class="text-gray-400 text-sm mt-1">
+      Intente ajustar los filtros de búsqueda
+    </p>
+  </div>
+} @else {
+  <div class="overflow-x-auto rounded-xl border border-gray-200">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="{{ headClass() }}">
+          <th
+            class="text-left px-4 py-3 font-bold {{
+              headTextClass()
+            }} whitespace-nowrap rounded-tl-xl"
+          >
+            Nombre y Rol
+          </th>
+          <th
+            class="text-left px-4 py-3 font-bold {{
+              headTextClass()
+            }} whitespace-nowrap"
+          >
+            Id de usuario
+          </th>
+          <th
+            class="text-left px-4 py-3 font-bold {{
+              headTextClass()
+            }} whitespace-nowrap"
+          >
+            Fecha y Hora
+          </th>
+          <th
+            class="text-left px-4 py-3 font-bold {{
+              headTextClass()
+            }} whitespace-nowrap"
+          >
+            Acción
+          </th>
+          <th
+            class="text-left px-4 py-3 font-bold {{
+              headTextClass()
+            }} whitespace-nowrap"
+          >
+            Resultado
+          </th>
+          <th
+            class="text-left px-4 py-3 font-bold {{
+              headTextClass()
+            }} whitespace-nowrap rounded-tr-xl"
+          >
+            Id de objeto afectado
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track row.id; let idx = $index) {
+          <tr
+            class="border-t border-gray-100 hover:brightness-95 transition-all"
+            [class.bg-red-50]="row.status === 'failed'"
+            [class.bg-white]="row.status !== 'failed' && idx % 2 === 0"
+            [class.bg-gray-50\/60]="row.status !== 'failed' && idx % 2 !== 0"
+          >
+            <td class="px-4 py-3">
+              <p class="font-semibold text-gray-800 leading-tight">
+                {{ row.name }}
+              </p>
+              <div class="mt-1"><app-role-badge [role]="row.role" /></div>
+            </td>
+            <td class="px-4 py-3">
+              <span
+                class="font-mono text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-lg"
+                >{{ row.userId }}</span
+              >
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap">
+              <p class="text-gray-700 font-medium">
+                {{ formatDate(row.timestamp) }}
+              </p>
+              <p class="text-gray-400 text-xs mt-0.5">
+                {{ formatTime(row.timestamp) }}
+              </p>
+            </td>
+            <td class="px-4 py-3">
+              <app-action-badge [action]="row.action" />
+            </td>
+            <td class="px-4 py-3">
+              <app-status-badge [status]="row.status" />
+            </td>
+            <td class="px-4 py-3">
+              <span
+                class="font-mono text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-lg"
+                >{{ row.id }}</span
+              >
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
