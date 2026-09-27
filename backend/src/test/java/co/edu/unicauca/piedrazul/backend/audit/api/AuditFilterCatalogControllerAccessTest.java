@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.audit.api;
 
-import co.edu.unicauca.piedrazul.backend.audit.application.AuditActionCatalogService;
+import co.edu.unicauca.piedrazul.backend.audit.application.AuditFilterCatalogService;
+import co.edu.unicauca.piedrazul.backend.audit.application.AuditFilterCatalog;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,27 +23,27 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(SpringExtension.class)
-@ContextConfiguration(classes = AuditActionCatalogControllerAccessTest.Config.class)
-class AuditActionCatalogControllerAccessTest {
+@ContextConfiguration(classes = AuditFilterCatalogControllerAccessTest.Config.class)
+class AuditFilterCatalogControllerAccessTest {
 
     @Configuration
     @EnableMethodSecurity
     static class Config {
         @Bean
-        AuditActionCatalogService auditActionCatalogService() {
-            AuditActionCatalogService service = mock(AuditActionCatalogService.class);
-            when(service.listAll()).thenReturn(List.of());
+        AuditFilterCatalogService auditFilterCatalogService() {
+            AuditFilterCatalogService service = mock(AuditFilterCatalogService.class);
+            when(service.filters()).thenReturn(new AuditFilterCatalog(List.of(), List.of(), List.of(), List.of(), 90, 100));
             return service;
         }
 
         @Bean
-        AuditActionCatalogController auditActionCatalogController(AuditActionCatalogService service) {
-            return new AuditActionCatalogController(service);
+        AuditFilterCatalogController auditFilterCatalogController(AuditFilterCatalogService service) {
+            return new AuditFilterCatalogController(service);
         }
     }
 
     @Autowired
-    private AuditActionCatalogController controller;
+    private AuditFilterCatalogController controller;
 
     @AfterEach
     void clearSecurityContext() {
@@ -55,19 +56,19 @@ class AuditActionCatalogControllerAccessTest {
     }
 
     @Test
-    void anAuditorCanListTheActionCatalog() {
+    void anAuditorCanGetTheFilterOptions() {
         loggedInAs("AUDITOR");
 
-        assertThatCode(controller::getActions).doesNotThrowAnyException();
+        assertThatCode(controller::getFilters).doesNotThrowAnyException();
     }
 
     @Test
     void everyOtherRoleIsDeniedIncludingAdmin() {
-        // Este catálogo solo alimenta el filtro de la consulta de auditoría, exclusiva del rol AUDITOR.
+        // Este catálogo solo alimenta los filtros de la consulta de auditoría, exclusiva del rol AUDITOR.
         for (String role : new String[]{"ADMIN", "DOCTOR", "SCHEDULER", "PATIENT"}) {
             loggedInAs(role);
 
-            assertThatThrownBy(controller::getActions).as("listar como " + role).isInstanceOf(AccessDeniedException.class);
+            assertThatThrownBy(controller::getFilters).as("filtros como " + role).isInstanceOf(AccessDeniedException.class);
         }
     }
 }

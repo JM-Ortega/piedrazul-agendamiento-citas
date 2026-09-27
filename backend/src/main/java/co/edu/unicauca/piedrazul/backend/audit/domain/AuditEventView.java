@@ -14,7 +14,7 @@ import java.util.UUID;
  *
  * <p>{@code action} y {@code outcome} van como texto para que un código que ya no exista en
  * el enum no impida listar el resto. {@code moduleCode} y {@code moduleName} son los del
- * módulo del catálogo al que pertenece {@code action} (ver {@code GET /api/audit/catalog/actions}).
+ * módulo del catálogo al que pertenece {@code action} (ver {@code GET /api/audit/catalog/filters}).
  */
 public record AuditEventView(
         UUID id,

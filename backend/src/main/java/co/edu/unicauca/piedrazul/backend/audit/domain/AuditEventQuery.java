@@ -12,7 +12,7 @@ import java.time.Instant;
  * acción, sin distinguir mayúsculas ni tildes. Cada palabra debe aparecer, en cualquier orden.
  *
  * <p>{@code moduleCode} filtra por el módulo al que pertenece la acción (el mismo código que
- * devuelve {@code GET /api/audit/catalog/actions} en {@code moduleCode}), por ejemplo
+ * devuelve {@code GET /api/audit/catalog/filters} en {@code modules}), por ejemplo
  * {@code PACIENTES} o {@code USUARIOS}.
  */
 public record AuditEventQuery(

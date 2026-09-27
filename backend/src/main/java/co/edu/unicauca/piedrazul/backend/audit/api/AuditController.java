@@ -45,8 +45,8 @@ public class AuditController {
                     + "son los datos vigentes de la persona dueña de la cuenta `actorId`, por lo que se actualizan "
                     + "también en los registros antiguos; son nulos si la cuenta no tiene persona asociada. "
                     + "Cada registro incluye el módulo de su acción (`moduleCode`/`moduleName`), y `moduleCode` "
-                    + "también sirve como filtro; el catálogo con los códigos está en "
-                    + "`GET /api/audit/catalog/actions`. Los estados antes y después del cambio no se exponen.")
+                    + "también sirve como filtro. Las opciones y los límites de todos los filtros están en "
+                    + "`GET /api/audit/catalog/filters`. Los estados antes y después del cambio no se exponen.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Registros obtenidos correctamente"),
             @ApiResponse(responseCode = "400", description = "Filtros inválidos: fecha mal formada, rango invertido o "
@@ -61,11 +61,11 @@ public class AuditController {
             @Parameter(description = "Fin del rango de fechas, inclusive. ISO-8601 con zona horaria.",
                     example = "2026-09-26T23:59:59-05:00")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-            @Parameter(description = "Acción auditada. El listado completo, con sus nombres, está en "
-                    + "`GET /api/audit/catalog/actions`.")
+            @Parameter(description = "Acción auditada. El listado completo, con sus nombres, está en `actions` de "
+                    + "`GET /api/audit/catalog/filters`.")
             @RequestParam(required = false) AuditAction action,
-            @Parameter(description = "Código del módulo al que pertenece la acción (`moduleCode` en "
-                    + "`GET /api/audit/catalog/actions`). Coincidencia exacta.", example = "PACIENTES")
+            @Parameter(description = "Código del módulo al que pertenece la acción (`modules` en "
+                    + "`GET /api/audit/catalog/filters`). Coincidencia exacta.", example = "PACIENTES")
             @RequestParam(required = false) String moduleCode,
             @Parameter(description = "Resultado de la acción: `EXITOSO`, `FALLIDO` (falló dentro de la operación) "
                     + "o `DENEGADO` (rechazada por falta de rol).")

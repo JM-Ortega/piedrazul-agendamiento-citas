@@ -43,7 +43,7 @@ public record AuditEventResponse(
         String action,
 
         @Schema(description = "Código del módulo al que pertenece la acción, del catálogo "
-                + "`GET /api/audit/catalog/actions`", example = "PACIENTES")
+                + "`GET /api/audit/catalog/filters`", example = "PACIENTES")
         String moduleCode,
 
         @Schema(description = "Nombre del módulo al que pertenece la acción", example = "Pacientes")
