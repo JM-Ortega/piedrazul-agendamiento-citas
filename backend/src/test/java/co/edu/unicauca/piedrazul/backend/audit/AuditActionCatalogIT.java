@@ -1,5 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.audit;
 
+import co.edu.unicauca.piedrazul.backend.audit.infrastructure.persistence.AuditModuleJpaEntity;
+import co.edu.unicauca.piedrazul.backend.audit.infrastructure.persistence.AuditModuleJpaRepository;
 import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.support.PostgresIntegrationSupport;
 import org.junit.jupiter.api.Test;
@@ -24,6 +26,9 @@ class AuditActionCatalogIT extends PostgresIntegrationSupport {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private AuditModuleJpaRepository moduleRepository;
+
     @Test
     void everyAuditActionHasACatalogRow() {
         List<String> catalog = jdbcTemplate.queryForList("SELECT code FROM piedrazul.audit_action", String.class);
@@ -38,5 +43,11 @@ class AuditActionCatalogIT extends PostgresIntegrationSupport {
                 String.class);
 
         assertThat(module).isEqualTo("PACIENTES");
+    }
+
+    @Test
+    void theModuleCatalogListsEverySeededModule() {
+        assertThat(moduleRepository.findAll()).extracting(AuditModuleJpaEntity::getCode)
+                .contains("CITAS", "USUARIOS", "PACIENTES", "CONTROLES_MEDICOS", "SEGURIDAD");
     }
 }

@@ -9,6 +9,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -21,10 +23,12 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * Es seguridad por método, así que se prueba con un contexto de Spring con
@@ -86,7 +90,7 @@ class UserControllerAccessTest {
 
     @Test
     void everyOtherRoleIsDenied() {
-        for (String role : new String[]{"DOCTOR", "SCHEDULER", "PATIENT"}) {
+        for (String role : new String[]{"DOCTOR", "SCHEDULER", "PATIENT", "AUDITOR"}) {
             loggedInAs(role);
 
             assertThatThrownBy(() -> controller.activatePatientUser(PATIENT_ID))
@@ -94,6 +98,27 @@ class UserControllerAccessTest {
             assertThatThrownBy(() -> controller.deactivatePatientUser(PATIENT_ID))
                     .as("desactivar como " + role).isInstanceOf(AccessDeniedException.class);
         }
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    void anAdminCanListPatientsWithAccount() {
+        loggedInAs("ADMIN");
+        when(userService.getPatientsWithAccount(any(), any())).thenReturn(Page.empty());
+
+        assertThatCode(() -> controller.getPatientsWithAccount(PageRequest.of(0, 10), "ana"))
+                .doesNotThrowAnyException();
+
+        verify(userService).getPatientsWithAccount("ana", PageRequest.of(0, 10));
+    }
+
+    @Test
+    void anAuditorCannotListPatientsWithAccountEitherBecauseThisIsUserManagementNotAuditing() {
+        loggedInAs("AUDITOR");
+
+        assertThatThrownBy(() -> controller.getPatientsWithAccount(PageRequest.of(0, 10), null))
+                .isInstanceOf(AccessDeniedException.class);
 
         verifyNoInteractions(userService);
     }

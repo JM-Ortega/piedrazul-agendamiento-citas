@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.medicalCheckup.application;
 
 import co.edu.unicauca.piedrazul.backend.medicalCheckup.api.dto.intput.CheckupUpdateRequest;
-import co.edu.unicauca.piedrazul.backend.medicalCheckup.events.ClinicalHistoryCreatedEvent;
+import co.edu.unicauca.piedrazul.backend.medicalCheckup.events.MedicalCheckupCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.medicalCheckup.exception.MedicalCheckupAlreadyExistsException;
 import co.edu.unicauca.piedrazul.backend.medicalCheckup.exception.MedicalCheckupNotEditableException;
 import co.edu.unicauca.piedrazul.backend.medicalCheckup.exception.MedicalCheckupNotFoundException;
@@ -53,7 +53,7 @@ public class MedicalCheckupExternalServiceImpl implements MedicalCheckupExternal
         String actorRoles = securityExtractor.currentActorRoles();
 
         eventPublisher.publishEvent(
-                ClinicalHistoryCreatedEvent.of(
+                MedicalCheckupCreatedEvent.of(
                         save.getId(),
                         actorId,
                         actorRoles,

@@ -165,6 +165,7 @@ public class CreateAccountUseCase implements UserProvisioningApi {
                 Set.of(Role.ADMIN),
                 Set.of(Role.DOCTOR),
                 Set.of(Role.SCHEDULER),
+                Set.of(Role.AUDITOR),
                 Set.of(Role.DOCTOR, Role.SCHEDULER),
                 Set.of(Role.DOCTOR, Role.PATIENT),
                 Set.of(Role.DOCTOR, Role.SCHEDULER, Role.PATIENT),

@@ -28,6 +28,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
+import co.edu.unicauca.piedrazul.backend.shared.audit.AuditTargetType;
+import co.edu.unicauca.piedrazul.backend.shared.audit.Auditable;
+import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 
 @RestController
 @RequestMapping("/api/patients")
@@ -121,7 +124,7 @@ public class PatientController {
     }
 
     @GetMapping("/document/{documentNumber}")
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR', 'ADMIN')")
     public PatientResponse findByDocument(@PathVariable String documentNumber) {
         UUID authenticatedActorId = UUID.fromString(securityContextExtractor.currentActorId());
         String userRoles = securityContextExtractor.currentActorRoles();
@@ -150,7 +153,7 @@ public class PatientController {
      * completo o número de documento; el orden no es configurable.
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR')")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR', 'ADMIN')")
     public PageResponse<PatientSummaryResponse> findAll(
             @PageableDefault(size = 10) Pageable pageable,
             @RequestParam(required = false) String search
@@ -161,6 +164,7 @@ public class PatientController {
     /** Reemplaza todos los datos del paciente, incluido el documento. Solo doctores. */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('DOCTOR')")
+    @Auditable(action = AuditAction.PACIENTE_MODIFICADO, targetEntityType = AuditTargetType.PACIENTE, targetIdExpression = "#id", onlyDenied = true)
     public PatientResponse update(@PathVariable UUID id, @Valid @RequestBody UpdatePatientRequest request) {
         return toResponse(patientUpdateService.updatePatient(id, request.toCommand()));
     }
@@ -168,6 +172,7 @@ public class PatientController {
     /** El paciente reemplaza sus propios datos. No puede cambiar su documento. */
     @PutMapping("/me")
     @PreAuthorize("hasRole('PATIENT')")
+    @Auditable(action = AuditAction.PACIENTE_MODIFICADO, targetEntityType = AuditTargetType.PACIENTE, onlyDenied = true)
     public PatientResponse updateMe(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UpdateOwnPatientRequest request) {
         UUID keycloakId = UUID.fromString(jwt.getSubject());
         return toResponse(patientUpdateService.updateOwnPatient(keycloakId, request.toCommand()));

@@ -4,4 +4,6 @@ import java.util.List;
 
 public interface AuditActionCatalogRepository {
     List<AuditActionCatalogEntry> findAll();
+
+    List<AuditModuleCatalogEntry> findAllModules();
 }
