@@ -52,6 +52,12 @@ class AuditableAspectTest {
         }
 
         @PreAuthorize("hasRole('ADMIN')")
+        @Auditable(action = AuditAction.ROL_ASIGNADO, targetEntityType = "Usuario", targetIdExpression = "#id", onlyDenied = true)
+        public void onlyDenied(String id, boolean fail) {
+            if (fail) throw new IllegalStateException("error de negocio");
+        }
+
+        @PreAuthorize("hasRole('ADMIN')")
         @Auditable(action = AuditAction.USUARIO_CREADO, targetEntityType = "Usuario", targetIdExpression = "#missing.id")
         public void brokenExpression() {
         }
@@ -130,10 +136,42 @@ class AuditableAspectTest {
         assertThat(event.getTargetEntityId()).isEqualTo("user-9");
     }
 
+    @Test
+    void aRoleRejectionIsRecordedAlsoWhenOnlyDeniedAttemptsAreRequested() {
+        loggedInAs("PATIENT");
+
+        assertThatThrownBy(() -> target.onlyDenied("user-9", false)).isInstanceOf(AccessDeniedException.class);
+
+        AuditEvent event = recorded();
+        assertThat(event.getOutcome()).isEqualTo(AuditOutcome.DENEGADO);
+        assertThat(event.getAction()).isEqualTo(AuditAction.ROL_ASIGNADO);
+    }
+
+    // ---- solo rechazos ---------------------------------------------------------
+
+    @Test
+    void onlyDeniedRecordsNothingWhenTheOperationSucceeds() {
+        loggedInAs("ADMIN");
+
+        target.onlyDenied("user-9", false);
+
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void onlyDeniedRecordsNothingWhenTheOperationFailsInternallyAndStillPropagatesTheError() {
+        loggedInAs("ADMIN");
+
+        assertThatThrownBy(() -> target.onlyDenied("user-9", true))
+                .isInstanceOf(IllegalStateException.class).hasMessage("error de negocio");
+
+        verifyNoInteractions(repository);
+    }
+
     // ---- comportamiento completo (el que ya existía) ---------------------------
 
     @Test
-    void successIsRecordedAsExitoso() {
+    void withoutOnlyDeniedSuccessIsRecordedAsExitoso() {
         loggedInAs("ADMIN");
 
         target.everyOutcome("user-9", false);
@@ -142,7 +180,7 @@ class AuditableAspectTest {
     }
 
     @Test
-    void anInternalFailureIsRecordedAsFallidoAndPropagated() {
+    void withoutOnlyDeniedAnInternalFailureIsRecordedAsFallidoAndPropagated() {
         loggedInAs("ADMIN");
 
         assertThatThrownBy(() -> target.everyOutcome("user-9", true)).isInstanceOf(IllegalStateException.class);

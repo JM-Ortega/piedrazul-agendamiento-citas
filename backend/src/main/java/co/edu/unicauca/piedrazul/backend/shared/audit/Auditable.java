@@ -22,4 +22,13 @@ public @interface Auditable {
      * Si se omite, no se registra targetEntityId.
      */
     String targetIdExpression() default "";
+
+    /**
+     * Si es {@code true}, solo se registra el rechazo por permisos ({@code DENEGADO}).
+     * El éxito y los fallos internos no se registran aquí.
+     *
+     * <p>Sirve para las acciones cuyo éxito ya audita un evento de dominio: registrar
+     * el éxito también aquí lo duplicaría.
+     */
+    boolean onlyDenied() default false;
 }

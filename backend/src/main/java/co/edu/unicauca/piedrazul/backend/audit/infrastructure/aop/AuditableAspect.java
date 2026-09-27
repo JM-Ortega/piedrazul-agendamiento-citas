@@ -58,13 +58,17 @@ public class AuditableAspect implements Ordered {
 
         try {
             Object result = pjp.proceed();
-            save(actorId, actorRole, auditable, targetId, AuditOutcome.EXITOSO);
+            if (!auditable.onlyDenied()) {
+                save(actorId, actorRole, auditable, targetId, AuditOutcome.EXITOSO);
+            }
             return result;
         } catch (org.springframework.security.access.AccessDeniedException ex) {
             save(actorId, actorRole, auditable, targetId, AuditOutcome.DENEGADO);
             throw ex;
         } catch (Exception ex) {
-            save(actorId, actorRole, auditable, targetId, AuditOutcome.FALLIDO);
+            if (!auditable.onlyDenied()) {
+                save(actorId, actorRole, auditable, targetId, AuditOutcome.FALLIDO);
+            }
             throw ex;
         }
     }
