@@ -3,8 +3,7 @@ package co.edu.unicauca.piedrazul.backend.audit.application;
 import co.edu.unicauca.piedrazul.backend.audit.exception.InvalidAuditCriteriaException;
 import org.junit.jupiter.api.Test;
 
-import java.time.Duration;
-import java.time.Instant;
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -12,9 +11,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AuditEventCriteriaTest {
 
-    private static final Instant NOW = Instant.parse("2026-09-26T12:00:00Z");
+    private static final LocalDate TODAY = LocalDate.parse("2026-09-26");
 
-    private static AuditEventCriteria between(Instant from, Instant to) {
+    private static AuditEventCriteria between(LocalDate from, LocalDate to) {
         return new AuditEventCriteria(from, to, null, null, null, null, null, null, null, 0, 20);
     }
 
@@ -33,25 +32,30 @@ class AuditEventCriteriaTest {
 
     @Test
     void aSingleBoundIsValidAndIsNotSubjectToTheRangeLimit() {
-        assertThatCode(() -> between(NOW.minus(Duration.ofDays(3000)), null)).doesNotThrowAnyException();
-        assertThatCode(() -> between(null, NOW)).doesNotThrowAnyException();
+        assertThatCode(() -> between(TODAY.minusDays(3000), null)).doesNotThrowAnyException();
+        assertThatCode(() -> between(null, TODAY)).doesNotThrowAnyException();
     }
 
     @Test
-    void theRangeCanBeExactlyNinetyDays() {
-        assertThatCode(() -> between(NOW.minus(Duration.ofDays(90)), NOW)).doesNotThrowAnyException();
+    void theSameDayOnBothEndsIsASingleDayRange() {
+        assertThatCode(() -> between(TODAY, TODAY)).doesNotThrowAnyException();
     }
 
     @Test
-    void aRangeLongerThanNinetyDaysIsRejected() {
-        assertThatThrownBy(() -> between(NOW.minus(Duration.ofDays(90)).minusSeconds(1), NOW))
+    void theRangeCanSpanExactlyNinetyDaysCountingBothEnds() {
+        assertThatCode(() -> between(TODAY.minusDays(89), TODAY)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void aRangeOfMoreThanNinetyDaysIsRejected() {
+        assertThatThrownBy(() -> between(TODAY.minusDays(90), TODAY))
                 .isInstanceOf(InvalidAuditCriteriaException.class)
                 .hasMessageContaining("90");
     }
 
     @Test
     void aStartAfterTheEndIsRejected() {
-        assertThatThrownBy(() -> between(NOW, NOW.minusSeconds(1)))
+        assertThatThrownBy(() -> between(TODAY, TODAY.minusDays(1)))
                 .isInstanceOf(InvalidAuditCriteriaException.class)
                 .hasMessageContaining("posterior");
     }

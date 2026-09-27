@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -106,8 +107,8 @@ class AuditControllerWebTest {
     @Test
     void everyFilterIsReadFromItsParameter() throws Exception {
         mvc.perform(get("/api/audit")
-                        .param("from", "2026-09-26T00:00:00-05:00")
-                        .param("to", "2026-09-27T00:00:00-05:00")
+                        .param("from", "2026-09-26")
+                        .param("to", "2026-09-27")
                         .param("action", "PACIENTE_MODIFICADO")
                         .param("moduleCode", "PACIENTES")
                         .param("outcome", "DENEGADO")
@@ -120,8 +121,8 @@ class AuditControllerWebTest {
                 .andExpect(status().isOk());
 
         AuditEventCriteria criteria = capturedCriteria();
-        assertThat(criteria.from()).isEqualTo(Instant.parse("2026-09-26T05:00:00Z"));
-        assertThat(criteria.to()).isEqualTo(Instant.parse("2026-09-27T05:00:00Z"));
+        assertThat(criteria.from()).isEqualTo(LocalDate.parse("2026-09-26"));
+        assertThat(criteria.to()).isEqualTo(LocalDate.parse("2026-09-27"));
         assertThat(criteria.action()).isEqualTo(AuditAction.PACIENTE_MODIFICADO);
         assertThat(criteria.moduleCode()).isEqualTo("PACIENTES");
         assertThat(criteria.outcome()).isEqualTo(AuditOutcome.DENEGADO);
@@ -159,10 +160,17 @@ class AuditControllerWebTest {
     }
 
     @Test
+    void aDateWithTimeIsABadRequest() throws Exception {
+        mvc.perform(get("/api/audit").param("from", "2026-09-26T00:00:00-05:00"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_AUDIT_PARAMETER"));
+    }
+
+    @Test
     void aStartAfterTheEndIsABadRequest() throws Exception {
         mvc.perform(get("/api/audit")
-                        .param("from", "2026-09-27T00:00:00Z")
-                        .param("to", "2026-09-26T00:00:00Z"))
+                        .param("from", "2026-09-27")
+                        .param("to", "2026-09-26"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_AUDIT_CRITERIA"));
 
@@ -172,8 +180,8 @@ class AuditControllerWebTest {
     @Test
     void aRangeLongerThanNinetyDaysIsABadRequest() throws Exception {
         mvc.perform(get("/api/audit")
-                        .param("from", "2026-01-01T00:00:00Z")
-                        .param("to", "2026-09-26T00:00:00Z"))
+                        .param("from", "2026-01-01")
+                        .param("to", "2026-09-26"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("90")));
     }

@@ -111,9 +111,9 @@ public class AuditEventRepositoryAdapter implements AuditEventRepository {
             conditions.add("a.occurred_at >= :from");
             params.put("from", query.from());
         }
-        if (query.to() != null) {
-            conditions.add("a.occurred_at <= :to");
-            params.put("to", query.to());
+        if (query.toExclusive() != null) {
+            conditions.add("a.occurred_at < :toExclusive");
+            params.put("toExclusive", query.toExclusive());
         }
         if (query.action() != null) {
             conditions.add("a.action_code = :action");

@@ -4,19 +4,21 @@ import co.edu.unicauca.piedrazul.backend.audit.domain.AuditOutcome;
 import co.edu.unicauca.piedrazul.backend.audit.exception.InvalidAuditCriteriaException;
 import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 
-import java.time.Duration;
-import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 
 /**
  * Criterios de la consulta de auditoría, ya validados.
  *
- * <p>Las fechas son opcionales. Si vienen las dos, el rango no puede ser inválido ni superar
- * {@value #MAX_RANGE_DAYS} días. Si viene solo una, el rango queda abierto por el otro
- * extremo y no se aplica ese tope.
+ * <p>Las fechas son días completos, sin hora, y las dos se incluyen: {@code from} y {@code to}
+ * iguales buscan un solo día. Son opcionales. Si vienen las dos, {@code from} no puede ser
+ * posterior a {@code to} y el rango no puede abarcar más de {@value #MAX_RANGE_DAYS} días,
+ * contando ambos extremos. Si viene solo una, el rango queda abierto por el otro extremo y no
+ * se aplica ese tope.
  */
 public record AuditEventCriteria(
-        Instant from,
-        Instant to,
+        LocalDate from,
+        LocalDate to,
         AuditAction action,
         String moduleCode,
         AuditOutcome outcome,
@@ -35,7 +37,7 @@ public record AuditEventCriteria(
             if (from.isAfter(to)) {
                 throw new InvalidAuditCriteriaException("La fecha inicial no puede ser posterior a la fecha final");
             }
-            if (Duration.between(from, to).compareTo(Duration.ofDays(MAX_RANGE_DAYS)) > 0) {
+            if (ChronoUnit.DAYS.between(from, to) + 1 > MAX_RANGE_DAYS) {
                 throw new InvalidAuditCriteriaException(
                         "El rango de fechas no puede superar " + MAX_RANGE_DAYS + " días");
             }

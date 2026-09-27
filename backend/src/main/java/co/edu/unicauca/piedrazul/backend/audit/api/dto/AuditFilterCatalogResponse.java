@@ -20,7 +20,8 @@ public record AuditFilterCatalogResponse(
         @Schema(description = "Valores del filtro `targetEntityType`")
         List<Option> targetEntityTypes,
 
-        @Schema(description = "Días máximos entre `from` y `to` cuando se envían los dos", example = "90")
+        @Schema(description = "Días máximos que puede abarcar el rango cuando se envían `from` y `to`, "
+                + "contando los dos", example = "90")
         int maxRangeDays,
 
         @Schema(description = "Caracteres máximos del filtro `search`", example = "100")

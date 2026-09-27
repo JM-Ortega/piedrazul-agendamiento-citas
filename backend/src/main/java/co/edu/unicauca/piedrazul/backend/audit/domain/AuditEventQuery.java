@@ -8,6 +8,8 @@ import java.time.Instant;
  * Filtros de la consulta de auditoría. Todos son opcionales: sin ninguno se devuelve todo,
  * de lo más reciente a lo más antiguo.
  *
+ * <p>El rango de fechas es semiabierto: incluye {@code from} y excluye {@code toExclusive}.
+ *
  * <p>{@code search} busca por nombre completo o número de documento de quien ejecutó la
  * acción, sin distinguir mayúsculas ni tildes. Cada palabra debe aparecer, en cualquier orden.
  *
@@ -17,7 +19,7 @@ import java.time.Instant;
  */
 public record AuditEventQuery(
         Instant from,
-        Instant to,
+        Instant toExclusive,
         AuditAction action,
         String moduleCode,
         AuditOutcome outcome,

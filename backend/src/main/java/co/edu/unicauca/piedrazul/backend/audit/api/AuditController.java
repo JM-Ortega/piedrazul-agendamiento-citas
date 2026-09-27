@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Instant;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/audit")
@@ -39,8 +39,10 @@ public class AuditController {
     @Operation(summary = "Listar registros de auditoría",
             description = "Devuelve una página de registros de auditoría, del más reciente al más antiguo. "
                     + "Todos los filtros son opcionales y se combinan entre sí; sin ninguno se devuelve todo el historial. "
-                    + "Si se envían `from` y `to`, el rango no puede superar 90 días; con una sola fecha el rango queda "
-                    + "abierto por el otro extremo. `search` busca por el nombre completo o por el usuario (número de "
+                    + "`from` y `to` son fechas sin hora (`AAAA-MM-DD`) y ambas se incluyen completas, en la hora de "
+                    + "Colombia; para buscar un solo día se envía la misma fecha en las dos. Si se envían las dos, "
+                    + "el rango no puede abarcar más de 90 días; con una sola fecha el rango queda abierto por el "
+                    + "otro extremo. `search` busca por el nombre completo o por el usuario (número de "
                     + "documento) de quien ejecutó la acción, sin distinguir mayúsculas ni tildes. El nombre y el usuario "
                     + "son los datos vigentes de la persona dueña de la cuenta `actorId`, por lo que se actualizan "
                     + "también en los registros antiguos; son nulos si la cuenta no tiene persona asociada. "
@@ -55,12 +57,12 @@ public class AuditController {
             @ApiResponse(responseCode = "403", description = "No tiene permisos: solo el rol AUDITOR puede consultar la auditoría")
     })
     public ResponseEntity<PageResponse<AuditEventResponse>> search(
-            @Parameter(description = "Inicio del rango de fechas, inclusive. ISO-8601 con zona horaria.",
-                    example = "2026-09-26T00:00:00-05:00")
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
-            @Parameter(description = "Fin del rango de fechas, inclusive. ISO-8601 con zona horaria.",
-                    example = "2026-09-26T23:59:59-05:00")
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @Parameter(description = "Primer día del rango, incluido completo. Formato `AAAA-MM-DD`.",
+                    example = "2026-09-01")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @Parameter(description = "Último día del rango, incluido completo. Formato `AAAA-MM-DD`. Igual a "
+                    + "`from` para buscar un solo día.", example = "2026-09-26")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @Parameter(description = "Acción auditada. El listado completo, con sus nombres, está en `actions` de "
                     + "`GET /api/audit/catalog/filters`.")
             @RequestParam(required = false) AuditAction action,
