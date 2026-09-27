@@ -21,6 +21,7 @@ export const environment = {
       SCHEDULER: 480,
       DOCTOR: 480,
       ADMIN: 480,
+      AUDITOR: 15,
       default: 15,
     } as Record<string, number>,
   },
