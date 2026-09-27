@@ -39,7 +39,8 @@ class AuditControllerWebTest {
                 UUID.fromString("11111111-1111-1111-1111-111111111111"),
                 Instant.parse("2026-09-26T17:00:00Z"),
                 "kc-1", "[ADMIN, DOCTOR]", "Ana Ruiz", "1002003004",
-                "PACIENTE_MODIFICADO", "DENEGADO", "Paciente", "p-9", "corr-1")), 0, 20, 1));
+                "PACIENTE_MODIFICADO", "DENEGADO", "Paciente", "p-9", "corr-1",
+                "PACIENTES", "Pacientes")), 0, 20, 1));
 
         mvc = MockMvcBuilders.standaloneSetup(new AuditController(service, new AuditEventMapper()))
                 .setControllerAdvice(new AuditExceptionHandler())
@@ -64,6 +65,8 @@ class AuditControllerWebTest {
                 .andExpect(jsonPath("$.content[0].actorRoles[0]").value("ADMIN"))
                 .andExpect(jsonPath("$.content[0].actorRoles[1]").value("DOCTOR"))
                 .andExpect(jsonPath("$.content[0].action").value("PACIENTE_MODIFICADO"))
+                .andExpect(jsonPath("$.content[0].moduleCode").value("PACIENTES"))
+                .andExpect(jsonPath("$.content[0].moduleName").value("Pacientes"))
                 .andExpect(jsonPath("$.content[0].outcome").value("DENEGADO"))
                 .andExpect(jsonPath("$.content[0].targetEntityType").value("Paciente"))
                 .andExpect(jsonPath("$.content[0].targetEntityId").value("p-9"))
@@ -80,6 +83,12 @@ class AuditControllerWebTest {
     }
 
     @Test
+    void theCorrelationIdIsNeverExposed() throws Exception {
+        mvc.perform(get("/api/audit"))
+                .andExpect(jsonPath("$.content[0].correlationId").doesNotExist());
+    }
+
+    @Test
     void withoutAnyParameterThereAreNoFiltersAndTheDefaultPageIsUsed() throws Exception {
         mvc.perform(get("/api/audit")).andExpect(status().isOk());
 
@@ -87,6 +96,7 @@ class AuditControllerWebTest {
         assertThat(criteria.from()).isNull();
         assertThat(criteria.to()).isNull();
         assertThat(criteria.action()).isNull();
+        assertThat(criteria.moduleCode()).isNull();
         assertThat(criteria.outcome()).isNull();
         assertThat(criteria.search()).isNull();
         assertThat(criteria.page()).isZero();
@@ -99,6 +109,7 @@ class AuditControllerWebTest {
                         .param("from", "2026-09-26T00:00:00-05:00")
                         .param("to", "2026-09-27T00:00:00-05:00")
                         .param("action", "PACIENTE_MODIFICADO")
+                        .param("moduleCode", "PACIENTES")
                         .param("outcome", "DENEGADO")
                         .param("search", "  ana   ruiz ")
                         .param("actorId", "kc-1")
@@ -112,6 +123,7 @@ class AuditControllerWebTest {
         assertThat(criteria.from()).isEqualTo(Instant.parse("2026-09-26T05:00:00Z"));
         assertThat(criteria.to()).isEqualTo(Instant.parse("2026-09-27T05:00:00Z"));
         assertThat(criteria.action()).isEqualTo(AuditAction.PACIENTE_MODIFICADO);
+        assertThat(criteria.moduleCode()).isEqualTo("PACIENTES");
         assertThat(criteria.outcome()).isEqualTo(AuditOutcome.DENEGADO);
         assertThat(criteria.search()).isEqualTo("ana ruiz");
         assertThat(criteria.actorId()).isEqualTo("kc-1");

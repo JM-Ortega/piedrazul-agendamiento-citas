@@ -19,7 +19,8 @@ class AuditEventMapperTest {
                 UUID.fromString("11111111-1111-1111-1111-111111111111"),
                 Instant.parse("2026-09-26T12:00:00Z"),
                 "kc-1", roles, name, username,
-                "PACIENTE_MODIFICADO", "DENEGADO", "Paciente", "p-9", "corr-1");
+                "PACIENTE_MODIFICADO", "DENEGADO", "Paciente", "p-9", "corr-1",
+                "PACIENTES", "Pacientes");
     }
 
     @Test
@@ -33,10 +34,21 @@ class AuditEventMapperTest {
         assertThat(response.actorId()).isEqualTo("kc-1");
         assertThat(response.actorRoles()).containsExactly("ADMIN", "DOCTOR");
         assertThat(response.action()).isEqualTo("PACIENTE_MODIFICADO");
+        assertThat(response.moduleCode()).isEqualTo("PACIENTES");
+        assertThat(response.moduleName()).isEqualTo("Pacientes");
         assertThat(response.outcome()).isEqualTo("DENEGADO");
         assertThat(response.targetEntityType()).isEqualTo("Paciente");
         assertThat(response.targetEntityId()).isEqualTo("p-9");
-        assertThat(response.correlationId()).isEqualTo("corr-1");
+    }
+
+    @Test
+    void theResponseNeverExposesTheCorrelationId() {
+        // correlationId es un dato interno de rastreo; no tiene getter en el response.
+        AuditEventResponse response = mapper.toResponse(view("[ADMIN]", "Ana Ruiz", "1002003004"));
+
+        assertThat(response.getClass().getRecordComponents())
+                .extracting(java.lang.reflect.RecordComponent::getName)
+                .doesNotContain("correlationId");
     }
 
     @Test

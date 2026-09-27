@@ -10,6 +10,9 @@ import java.util.UUID;
  * Un registro de auditoría. {@code actorName} y {@code actorUsername} son los datos vigentes de
  * la persona dueña de la cuenta {@code actorId}; son nulos si la cuenta no tiene persona
  * asociada.
+ *
+ * <p>No incluye {@code correlationId}: es un dato interno para rastrear la petición en los
+ * registros del servidor, no algo que el frontend necesite mostrar.
  */
 @Schema(description = "Registro de auditoría")
 public record AuditEventResponse(
@@ -39,6 +42,13 @@ public record AuditEventResponse(
         @Schema(description = "Acción realizada", example = "PACIENTE_MODIFICADO")
         String action,
 
+        @Schema(description = "Código del módulo al que pertenece la acción, del catálogo "
+                + "`GET /api/audit/catalog/actions`", example = "PACIENTES")
+        String moduleCode,
+
+        @Schema(description = "Nombre del módulo al que pertenece la acción", example = "Pacientes")
+        String moduleName,
+
         @Schema(description = "Resultado de la acción", example = "DENEGADO",
                 allowableValues = {"EXITOSO", "FALLIDO", "DENEGADO"})
         String outcome,
@@ -48,9 +58,5 @@ public record AuditEventResponse(
 
         @Schema(description = "Id del objeto afectado. `N/A` cuando la acción no tiene un objeto identificable",
                 example = "9b8f2d64-1c3e-4f0a-a7d5-5e6b8c9d0e12", nullable = true)
-        String targetEntityId,
-
-        @Schema(description = "Identificador de correlación de la petición, para rastrearla en los registros",
-                example = "b1946ac9-2f3d-4c1e-8a7b-9c0d1e2f3a4b", nullable = true)
-        String correlationId
+        String targetEntityId
 ) { }

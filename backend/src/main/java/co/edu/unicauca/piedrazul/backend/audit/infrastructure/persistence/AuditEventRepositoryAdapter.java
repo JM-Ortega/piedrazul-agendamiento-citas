@@ -35,6 +35,16 @@ public class AuditEventRepositoryAdapter implements AuditEventRepository {
             "LEFT JOIN piedrazul.person p ON CAST(p.user_id AS text) = a.actor_id ";
 
     /**
+     * El módulo de cada acción viene del catálogo, no de la fila de auditoría. Es {@code JOIN}, no
+     * {@code LEFT JOIN}, porque {@code audit_event.action_code} tiene clave foránea a
+     * {@code audit_action}: toda fila referencia una acción del catálogo (ver
+     * {@code AuditActionCatalogIT}).
+     */
+    private static final String JOIN_ACTION_MODULE =
+            "JOIN piedrazul.audit_action aa ON aa.code = a.action_code "
+                    + "JOIN piedrazul.audit_module am ON am.code = aa.audit_module_code ";
+
+    /**
      * Cada palabra de la búsqueda debe aparecer en el nombre completo o en el documento, en cualquier
      * orden y sin que estén seguidas: "jose garcia" encuentra a "José Ignacio García". El marcador
      * {@code :search} se numera por palabra.
@@ -69,10 +79,10 @@ public class AuditEventRepositoryAdapter implements AuditEventRepository {
         String where = where(query, params);
 
         Query select = entityManager.createNativeQuery(
-                "SELECT a.id, a.occurred_at, a.actor_id, a.actor_role, a.action_code, a.outcome, "
-                        + "a.target_entity_type, a.target_entity_id, a.correlation_id, "
+                "SELECT a.id, a.occurred_at, a.actor_id, a.actor_role, a.action_code, am.code, am.name, "
+                        + "a.outcome, a.target_entity_type, a.target_entity_id, a.correlation_id, "
                         + "p.first_name, p.last_name, p.identification "
-                        + "FROM piedrazul.audit_event a " + JOIN_PERSON + where
+                        + "FROM piedrazul.audit_event a " + JOIN_ACTION_MODULE + JOIN_PERSON + where
                         + " ORDER BY a.occurred_at DESC, a.id DESC");
         params.forEach(select::setParameter);
         select.setFirstResult(query.page() * query.size());
@@ -83,9 +93,10 @@ public class AuditEventRepositoryAdapter implements AuditEventRepository {
             content.add(toView((Object[]) row));
         }
 
-        // El cruce con person solo hace falta para contar cuando se busca por nombre o documento.
+        // El cruce con person solo hace falta para contar cuando se busca por nombre o documento;
+        // el del catálogo de acciones siempre, porque el filtro por módulo lo necesita.
         Query count = entityManager.createNativeQuery(
-                "SELECT COUNT(*) FROM piedrazul.audit_event a "
+                "SELECT COUNT(*) FROM piedrazul.audit_event a " + JOIN_ACTION_MODULE
                         + (query.search() != null ? JOIN_PERSON : "") + where);
         params.forEach(count::setParameter);
         long total = ((Number) count.getSingleResult()).longValue();
@@ -107,6 +118,10 @@ public class AuditEventRepositoryAdapter implements AuditEventRepository {
         if (query.action() != null) {
             conditions.add("a.action_code = :action");
             params.put("action", query.action().name());
+        }
+        if (query.moduleCode() != null) {
+            conditions.add("am.code = :moduleCode");
+            params.put("moduleCode", query.moduleCode());
         }
         if (query.outcome() != null) {
             conditions.add("a.outcome = :outcome");
@@ -143,8 +158,8 @@ public class AuditEventRepositoryAdapter implements AuditEventRepository {
     }
 
     private static AuditEventView toView(Object[] row) {
-        String firstName = (String) row[9];
-        String lastName = (String) row[10];
+        String firstName = (String) row[11];
+        String lastName = (String) row[12];
         String actorName = firstName == null ? null : (firstName + " " + lastName).trim();
 
         return new AuditEventView(
@@ -153,12 +168,14 @@ public class AuditEventRepositoryAdapter implements AuditEventRepository {
                 (String) row[2],
                 (String) row[3],
                 actorName,
-                (String) row[11],
+                (String) row[13],
                 (String) row[4],
-                (String) row[5],
-                (String) row[6],
                 (String) row[7],
-                (String) row[8]
+                (String) row[8],
+                (String) row[9],
+                (String) row[10],
+                (String) row[5],
+                (String) row[6]
         );
     }
 

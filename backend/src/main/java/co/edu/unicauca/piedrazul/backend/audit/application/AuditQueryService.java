@@ -21,6 +21,7 @@ public class AuditQueryService {
                 criteria.from(),
                 criteria.to(),
                 criteria.action(),
+                criteria.moduleCode(),
                 criteria.outcome(),
                 criteria.search(),
                 criteria.actorId(),

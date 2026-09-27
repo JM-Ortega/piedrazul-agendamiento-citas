@@ -12,11 +12,12 @@ public class AuditEventMapper {
     public AuditEventResponse toResponse(AuditEventView e) {
         return new AuditEventResponse(
                 e.id(), e.timestamp(), e.actorName(), e.actorUsername(), e.actorId(),
-                parseRoles(e.actorRoles()), e.action(), e.outcome(),
-                e.targetEntityType(), e.targetEntityId(), e.correlationId()
+                parseRoles(e.actorRoles()), e.action(), e.moduleCode(), e.moduleName(), e.outcome(),
+                e.targetEntityType(), e.targetEntityId()
         );
-        // Nota: beforeState/afterState se omiten deliberadamente del
-        // response (pueden contener datos personales o clínicos sensibles).
+        // Nota: beforeState/afterState se omiten deliberadamente del response (pueden contener
+        // datos personales o clínicos sensibles), y correlationId es un dato interno de rastreo,
+        // no algo que el frontend necesite.
     }
 
     /**

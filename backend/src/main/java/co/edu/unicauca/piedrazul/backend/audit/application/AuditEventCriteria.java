@@ -18,6 +18,7 @@ public record AuditEventCriteria(
         Instant from,
         Instant to,
         AuditAction action,
+        String moduleCode,
         AuditOutcome outcome,
         String search,
         String actorId,
@@ -41,6 +42,7 @@ public record AuditEventCriteria(
         }
 
         search = normalizeSearch(search);
+        moduleCode = blankToNull(moduleCode);
         actorId = blankToNull(actorId);
         targetEntityType = blankToNull(targetEntityType);
         targetEntityId = blankToNull(targetEntityId);

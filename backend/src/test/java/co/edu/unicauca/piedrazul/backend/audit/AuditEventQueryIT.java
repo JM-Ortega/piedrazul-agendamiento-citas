@@ -91,7 +91,11 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
 
     private static AuditEventQuery query(Instant from, Instant to, AuditAction action, AuditOutcome outcome,
                                          String search, String actorId, int page, int size) {
-        return new AuditEventQuery(from, to, action, outcome, search, actorId, null, null, page, size);
+        return new AuditEventQuery(from, to, action, null, outcome, search, actorId, null, null, page, size);
+    }
+
+    private static AuditEventQuery queryByModule(Instant from, Instant to, String moduleCode, int page, int size) {
+        return new AuditEventQuery(from, to, null, moduleCode, null, null, null, null, null, page, size);
     }
 
     /** Ventana que abarca solo los cinco registros de este test. */
@@ -281,6 +285,8 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
         assertThat(view.targetEntityType()).isEqualTo("Paciente");
         assertThat(view.targetEntityId()).isEqualTo("p-1");
         assertThat(view.correlationId()).isEqualTo("corr-2");
+        assertThat(view.moduleCode()).isEqualTo("PACIENTES");
+        assertThat(view.moduleName()).isEqualTo("Pacientes");
         assertThat(view.timestamp()).isEqualTo(BASE.plus(Duration.ofHours(2)));
     }
 
@@ -319,6 +325,35 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
                 "ana nunez", null, 0, 50)).content()).isEmpty();
         assertThat(repository.findByCriteria(query(window().from(), window().to(), null, null,
                 anaDocument, null, 0, 50)).content()).isEmpty();
+    }
+
+    // ---- módulo ------------------------------------------------------------------
+
+    @Test
+    void itFiltersByModule() {
+        var citas = repository.findByCriteria(queryByModule(window().from(), window().to(), "CITAS", 0, 50));
+        var usuarios = repository.findByCriteria(queryByModule(window().from(), window().to(), "USUARIOS", 0, 50));
+        var pacientes = repository.findByCriteria(queryByModule(window().from(), window().to(), "PACIENTES", 0, 50));
+
+        assertThat(ids(citas)).containsExactly(r1);
+        assertThat(ids(usuarios)).containsExactly(r5, r4, r2);
+        assertThat(ids(pacientes)).containsExactly(r3);
+    }
+
+    @Test
+    void aModuleWithNoMatchingActionsInTheWindowIsEmpty() {
+        var page = repository.findByCriteria(queryByModule(window().from(), window().to(), "CONTROLES_MEDICOS", 0, 50));
+
+        assertThat(page.content()).isEmpty();
+        assertThat(page.totalElements()).isZero();
+    }
+
+    @Test
+    void theModuleFilterCombinesWithTheOtherFilters() {
+        var query = new AuditEventQuery(window().from(), window().to(), null, "USUARIOS", AuditOutcome.DENEGADO,
+                null, null, null, null, 0, 50);
+
+        assertThat(ids(repository.findByCriteria(query))).containsExactly(r4);
     }
 
     // ---- paginación ------------------------------------------------------------

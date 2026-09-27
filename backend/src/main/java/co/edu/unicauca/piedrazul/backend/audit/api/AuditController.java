@@ -44,7 +44,9 @@ public class AuditController {
                     + "documento) de quien ejecutó la acción, sin distinguir mayúsculas ni tildes. El nombre y el usuario "
                     + "son los datos vigentes de la persona dueña de la cuenta `actorId`, por lo que se actualizan "
                     + "también en los registros antiguos; son nulos si la cuenta no tiene persona asociada. "
-                    + "Los estados antes y después del cambio no se exponen.")
+                    + "Cada registro incluye el módulo de su acción (`moduleCode`/`moduleName`), y `moduleCode` "
+                    + "también sirve como filtro; el catálogo con los códigos está en "
+                    + "`GET /api/audit/catalog/actions`. Los estados antes y después del cambio no se exponen.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Registros obtenidos correctamente"),
             @ApiResponse(responseCode = "400", description = "Filtros inválidos: fecha mal formada, rango invertido o "
@@ -62,6 +64,9 @@ public class AuditController {
             @Parameter(description = "Acción auditada. El listado completo, con sus nombres, está en "
                     + "`GET /api/audit/catalog/actions`.")
             @RequestParam(required = false) AuditAction action,
+            @Parameter(description = "Código del módulo al que pertenece la acción (`moduleCode` en "
+                    + "`GET /api/audit/catalog/actions`). Coincidencia exacta.", example = "PACIENTES")
+            @RequestParam(required = false) String moduleCode,
             @Parameter(description = "Resultado de la acción: `EXITOSO`, `FALLIDO` (falló dentro de la operación) "
                     + "o `DENEGADO` (rechazada por falta de rol).")
             @RequestParam(required = false) AuditOutcome outcome,
@@ -83,7 +88,7 @@ public class AuditController {
             @Parameter(description = "Registros por página, de 1 a 200. Fuera de ese rango se usa 50.", example = "20")
             @RequestParam(defaultValue = "20") int size) {
 
-        var criteria = new AuditEventCriteria(from, to, action, outcome, search, actorId,
+        var criteria = new AuditEventCriteria(from, to, action, moduleCode, outcome, search, actorId,
                 targetEntityType, targetEntityId, page, size);
         var result = queryService.search(criteria);
         var content = result.content().stream().map(mapper::toResponse).toList();

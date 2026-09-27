@@ -13,7 +13,8 @@ import java.util.UUID;
  * coincide con el número de documento de la persona.
  *
  * <p>{@code action} y {@code outcome} van como texto para que un código que ya no exista en
- * el enum no impida listar el resto.
+ * el enum no impida listar el resto. {@code moduleCode} y {@code moduleName} son los del
+ * módulo del catálogo al que pertenece {@code action} (ver {@code GET /api/audit/catalog/actions}).
  */
 public record AuditEventView(
         UUID id,
@@ -26,6 +27,8 @@ public record AuditEventView(
         String outcome,
         String targetEntityType,
         String targetEntityId,
-        String correlationId
+        String correlationId,
+        String moduleCode,
+        String moduleName
 ) {
 }
