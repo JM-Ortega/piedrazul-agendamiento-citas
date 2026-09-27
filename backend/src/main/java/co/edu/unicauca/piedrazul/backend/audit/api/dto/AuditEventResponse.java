@@ -28,8 +28,9 @@ public record AuditEventResponse(
                 + "persona. Nulo si la cuenta no tiene persona asociada", example = "1002003004", nullable = true)
         String actorUsername,
 
-        @Schema(description = "Id de la cuenta de Keycloak de quien ejecutó la acción. Es `anonymous` en acciones "
-                + "sin sesión", example = "3f2c1d0e-8a41-4b6e-9d57-2b1e6f0a7c11")
+        @Schema(description = "Id de la cuenta de Keycloak de quien ejecutó la acción. En un flujo público, como el "
+                + "registro de un paciente, es la propia cuenta afectada. Es `system` cuando la acción la hace el "
+                + "sistema, por ejemplo al arrancar la aplicación", example = "3f2c1d0e-8a41-4b6e-9d57-2b1e6f0a7c11")
         String actorId,
 
         @Schema(description = "Roles que tenía quien ejecutó la acción en ese momento", example = "[\"DOCTOR\"]")

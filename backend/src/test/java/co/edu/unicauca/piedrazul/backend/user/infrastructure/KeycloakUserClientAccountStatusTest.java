@@ -64,8 +64,8 @@ class KeycloakUserClientAccountStatusTest {
         when(keycloak.realm("piedrazul")).thenReturn(realmResource);
         when(realmResource.users()).thenReturn(usersResource);
         when(usersResource.get(USER_ID.toString())).thenReturn(userResource);
-        lenient().when(securityExtractor.currentActorId()).thenReturn("admin-1");
-        lenient().when(securityExtractor.currentActorRoles()).thenReturn("[ADMIN]");
+        lenient().when(securityExtractor.currentActorId(USER_ID.toString())).thenReturn("admin-1");
+        lenient().when(securityExtractor.currentActorRoles(USER_ID.toString())).thenReturn("[ADMIN]");
         MDC.put("correlationId", "corr-1");
     }
 

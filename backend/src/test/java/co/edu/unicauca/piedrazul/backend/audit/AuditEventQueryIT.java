@@ -67,7 +67,7 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
         r2 = event(1, carlosAccount.toString(), "[ADMIN]", "USUARIO_CREADO", "EXITOSO", "Usuario", "u-1");
         r3 = event(2, anaAccount.toString(), "[DOCTOR]", "PACIENTE_MODIFICADO", "DENEGADO", "Paciente", "p-1");
         r4 = event(3, accountWithoutPerson.toString(), "[ADMIN]", "ROL_ASIGNADO", "DENEGADO", "Usuario", "N/A");
-        r5 = event(4, "anonymous", "N/A", "USUARIO_CREADO", "EXITOSO", "Usuario", "u-2");
+        r5 = event(4, "system", "[SYSTEM]", "USUARIO_CREADO", "EXITOSO", "Usuario", "u-2");
     }
 
     private void person(UUID account, String document, String firstName, String lastName) {
@@ -199,7 +199,7 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
 
     @Test
     void aSearchNeverMatchesActorsWithoutPerson() {
-        var page = repository.findByCriteria(query(window().from(), window().to(), null, null, "anonymous", null, 0, 50));
+        var page = repository.findByCriteria(query(window().from(), window().to(), null, null, "system", null, 0, 50));
 
         assertThat(page.content()).isEmpty();
         assertThat(page.totalElements()).isZero();
@@ -285,7 +285,7 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
     }
 
     @Test
-    void anAccountWithoutPersonOrAnAnonymousActorHasNoNameNorUsername() {
+    void anAccountWithoutPersonOrTheSystemActorHasNoNameNorUsername() {
         var page = repository.findByCriteria(window());
 
         for (UUID id : List.of(r4, r5)) {

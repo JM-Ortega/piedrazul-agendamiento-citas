@@ -106,8 +106,9 @@ public class KeycloakUserClient {
 
         user.setId(keycloakId);
 
-        String actorId = securityExtractor.currentActorId();
-        String actorRoles = securityExtractor.currentActorRoles();
+        // Sin usuario autenticado (el registro público de un paciente), quien actúa es la propia cuenta.
+        String actorId = securityExtractor.currentActorId(keycloakId);
+        String actorRoles = securityExtractor.currentActorRoles(keycloakId);
 
         eventPublisher.publishEvent(
                 UserCreatedEvent.of(
@@ -169,8 +170,8 @@ public class KeycloakUserClient {
 
         eventPublisher.publishEvent(UserRoleAssignedEvent.of(
                 keycloakId.toString(),
-                securityExtractor.currentActorId(),
-                securityExtractor.currentActorRoles(),
+                securityExtractor.currentActorId(keycloakId.toString()),
+                securityExtractor.currentActorRoles(keycloakId.toString()),
                 MDC.get("correlationId"),
                 toJson(before),
                 toJson(after)));
@@ -190,8 +191,8 @@ public class KeycloakUserClient {
 
         eventPublisher.publishEvent(UserRoleRevokedEvent.of(
                 keycloakId.toString(),
-                securityExtractor.currentActorId(),
-                securityExtractor.currentActorRoles(),
+                securityExtractor.currentActorId(keycloakId.toString()),
+                securityExtractor.currentActorRoles(keycloakId.toString()),
                 MDC.get("correlationId"),
                 toJson(before),
                 toJson(after)));
@@ -295,8 +296,8 @@ public class KeycloakUserClient {
 
         eventPublisher.publishEvent(UserAccountStatusChangedEvent.of(
                 patientId.toString(),
-                securityExtractor.currentActorId(),
-                securityExtractor.currentActorRoles(),
+                securityExtractor.currentActorId(keycloakId.toString()),
+                securityExtractor.currentActorRoles(keycloakId.toString()),
                 MDC.get("correlationId"),
                 before,
                 enabled));
