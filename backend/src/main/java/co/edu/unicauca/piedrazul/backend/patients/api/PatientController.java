@@ -124,7 +124,7 @@ public class PatientController {
     }
 
     @GetMapping("/document/{documentNumber}")
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR', 'ADMIN')")
     public PatientResponse findByDocument(@PathVariable String documentNumber) {
         UUID authenticatedActorId = UUID.fromString(securityContextExtractor.currentActorId());
         String userRoles = securityContextExtractor.currentActorRoles();
@@ -153,7 +153,7 @@ public class PatientController {
      * completo o número de documento; el orden no es configurable.
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR')")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR', 'ADMIN')")
     public PageResponse<PatientSummaryResponse> findAll(
             @PageableDefault(size = 10) Pageable pageable,
             @RequestParam(required = false) String search
