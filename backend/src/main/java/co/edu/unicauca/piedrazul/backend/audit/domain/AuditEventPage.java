@@ -7,7 +7,7 @@ import java.util.List;
  * Resultado paginado, propio del dominio, no depende de Spring Data.
  */
 public record AuditEventPage(
-        List<AuditEvent> content,
+        List<AuditEventView> content,
         int page,
         int size,
         long totalElements
