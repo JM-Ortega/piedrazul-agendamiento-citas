@@ -8,7 +8,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/audit/catalog/actions")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('AUDITOR')")
 public class AuditActionCatalogController {
 
     private final AuditActionCatalogService service;

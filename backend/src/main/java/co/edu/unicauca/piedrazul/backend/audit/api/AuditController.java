@@ -23,8 +23,8 @@ import java.time.Instant;
 
 @RestController
 @RequestMapping("/api/audit")
-@PreAuthorize("hasRole('ADMIN')")
-@Tag(name = "Auditoría", description = "Consulta de la bitácora de auditoría del sistema. Solo administradores")
+@PreAuthorize("hasRole('AUDITOR')")
+@Tag(name = "Auditoría", description = "Consulta de la bitácora de auditoría del sistema. Solo el rol AUDITOR")
 public class AuditController {
 
     private final AuditQueryService queryService;
@@ -50,7 +50,7 @@ public class AuditController {
             @ApiResponse(responseCode = "400", description = "Filtros inválidos: fecha mal formada, rango invertido o "
                     + "mayor a 90 días, acción o resultado inexistentes, o búsqueda de más de 100 caracteres"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),
-            @ApiResponse(responseCode = "403", description = "No tiene permisos: solo el rol ADMIN puede consultar la auditoría")
+            @ApiResponse(responseCode = "403", description = "No tiene permisos: solo el rol AUDITOR puede consultar la auditoría")
     })
     public ResponseEntity<PageResponse<AuditEventResponse>> search(
             @Parameter(description = "Inicio del rango de fechas, inclusive. ISO-8601 con zona horaria.",
