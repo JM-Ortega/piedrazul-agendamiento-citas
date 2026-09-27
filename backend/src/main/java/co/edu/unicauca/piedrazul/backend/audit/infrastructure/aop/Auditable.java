@@ -7,7 +7,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-// Para lo repetitivo (accesos a historia clínica, CRUD de usuarios)
+// Para lo repetitivo (accesos a controles médicos, CRUD de usuarios)
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Auditable {
