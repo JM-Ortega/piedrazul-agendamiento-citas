@@ -2,11 +2,13 @@ package co.edu.unicauca.piedrazul.backend.user.application;
 
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientAccountSummary;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemDoctorResponse;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemPatientResponse;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
 import co.edu.unicauca.piedrazul.backend.user.exception.DoctorRoleRequiredException;
 import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
@@ -156,6 +158,29 @@ public class UserService {
         }
 
         return new PageImpl<>(content, pageable, total);
+    }
+
+    /**
+     * Página de pacientes que tienen cuenta de usuario, ordenada por nombre, indicando si
+     * su cuenta está activada o desactivada. {@code search} filtra por nombre completo o
+     * número de documento; el orden no es configurable, lo fija la consulta.
+     */
+    public Page<SystemPatientResponse> getPatientsWithAccount(String search, Pageable pageable) {
+        Page<PatientAccountSummary> patients = patientModuleApi.searchPatientsWithAccount(search, pageable);
+
+        Set<UUID> userIds = patients.getContent().stream()
+                .map(PatientAccountSummary::userId)
+                .collect(Collectors.toSet());
+
+        Map<UUID, Boolean> enabledByUserId = keycloakUserService.getAccountsEnabledStatus(userIds);
+
+        return patients.map(patient -> new SystemPatientResponse(
+                patient.personId(),
+                patient.firstName(),
+                patient.lastName(),
+                patient.identification(),
+                Boolean.TRUE.equals(enabledByUserId.get(patient.userId()))
+        ));
     }
 
     public void giveDoctorScheduleRole(String username){

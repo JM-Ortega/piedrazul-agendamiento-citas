@@ -93,6 +93,11 @@ public class KeycloakUserService implements UserModuleApi {
         keycloakClient.setEnabled(userId, false, patientId);
     }
 
+    /** Si una cuenta está activada o desactivada, por su id. */
+    public Map<UUID, Boolean> getAccountsEnabledStatus(Collection<UUID> userIds) {
+        return keycloakClient.getEnabledStatusByIds(userIds);
+    }
+
     @Override
     public void updateUserIdentity(UUID userId, String username, String firstName, String lastName, String email) {
         keycloakClient.updateUser(userId, username, firstName, lastName, email);

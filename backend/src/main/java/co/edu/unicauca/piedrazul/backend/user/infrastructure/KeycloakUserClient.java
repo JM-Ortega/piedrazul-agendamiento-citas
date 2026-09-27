@@ -386,6 +386,32 @@ public class KeycloakUserClient {
         }
     }
 
+    /**
+     * El indicador {@code enabled} de cada cuenta. Una cuenta que ya no existe en el
+     * proveedor de identidad (dato inconsistente: la persona conserva un {@code userId}
+     * que Keycloak ya no tiene) se reporta como desactivada en vez de romper el listado.
+     */
+    public Map<UUID, Boolean> getEnabledStatusByIds(Collection<UUID> keycloakIds) {
+        Map<UUID, Boolean> enabledByUserId = new LinkedHashMap<>();
+
+        for (UUID keycloakId : keycloakIds) {
+            boolean enabled;
+            try {
+                UserRepresentation user = keycloak.realm(props.getRealm())
+                        .users()
+                        .get(keycloakId.toString())
+                        .toRepresentation();
+                enabled = Boolean.TRUE.equals(user.isEnabled());
+            } catch (WebApplicationException ex) {
+                log.warn("No se pudo leer el estado de la cuenta {} en el proveedor de identidad", keycloakId, ex);
+                enabled = false;
+            }
+            enabledByUserId.put(keycloakId, enabled);
+        }
+
+        return enabledByUserId;
+    }
+
     public List<String> getUserRoles(String keycloakId) {
         return keycloak.realm(props.getRealm())
                 .users()

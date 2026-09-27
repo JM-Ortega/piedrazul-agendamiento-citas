@@ -3,6 +3,7 @@ package co.edu.unicauca.piedrazul.backend.user.api;
 import co.edu.unicauca.piedrazul.backend.shared.pagination.PageResponse;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemDoctorResponse;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemPatientResponse;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
 import co.edu.unicauca.piedrazul.backend.user.application.CreateAccountUseCase;
 import co.edu.unicauca.piedrazul.backend.user.application.UserService;
@@ -69,6 +70,28 @@ public class    UserController {
             Pageable pageable) {
         Page<SystemDoctorResponse> doctors = userService.getSystemDoctors(pageable);
         return ResponseEntity.ok(PageResponse.from(doctors));
+    }
+
+
+    @GetMapping("/patients")
+    @Operation(summary = "Listar pacientes con cuenta de usuario",
+            description = "Devuelve una página de pacientes que tienen cuenta de usuario, indicando si está "
+                    + "activada o desactivada. `search` filtra por nombre completo o número de documento; el "
+                    + "orden (por nombre) no es configurable.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Pacientes obtenidos correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar pacientes")
+    })
+    public ResponseEntity<PageResponse<SystemPatientResponse>> getPatientsWithAccount(
+            @Parameter(description = "Parámetros de paginación")
+            @PageableDefault(page = 0, size = 10)
+            Pageable pageable,
+            @Parameter(description = "Nombre completo o número de documento a buscar", example = "ana ruiz")
+            @RequestParam(required = false)
+            String search) {
+        Page<SystemPatientResponse> patients = userService.getPatientsWithAccount(search, pageable);
+        return ResponseEntity.ok(PageResponse.from(patients));
     }
 
 
