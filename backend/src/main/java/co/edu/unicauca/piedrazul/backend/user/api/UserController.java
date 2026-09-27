@@ -22,6 +22,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+import co.edu.unicauca.piedrazul.backend.shared.audit.AuditTargetType;
 import co.edu.unicauca.piedrazul.backend.shared.audit.Auditable;
 import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 
@@ -96,7 +97,7 @@ public class    UserController {
 
 
     @PostMapping("/users")
-    @Auditable(action = AuditAction.USUARIO_CREADO, targetEntityType = "Usuario", onlyDenied = true)
+    @Auditable(action = AuditAction.USUARIO_CREADO, targetEntityType = AuditTargetType.USUARIO, onlyDenied = true)
     @Operation(summary = "Crear usuario del sistema",
             description = "Registra un nuevo usuario del sistema a partir de los datos enviados en el cuerpo de la solicitud.")
     @ApiResponses({
@@ -116,7 +117,7 @@ public class    UserController {
 
 
     @PostMapping("/{document}/give-doctor-scheduler")
-    @Auditable(action = AuditAction.ROL_ASIGNADO, targetEntityType = "Usuario", onlyDenied = true)
+    @Auditable(action = AuditAction.ROL_ASIGNADO, targetEntityType = AuditTargetType.USUARIO, onlyDenied = true)
     @Operation(summary = "Asignar rol scheduler a un doctor",
             description = "Otorga el rol scheduler al usuario identificado por el número de documento recibido en la ruta.")
     @ApiResponses({
@@ -134,7 +135,7 @@ public class    UserController {
 
 
     @DeleteMapping("/{document}/revoke-doctor-scheduler")
-    @Auditable(action = AuditAction.ROL_REVOCADO, targetEntityType = "Usuario", onlyDenied = true)
+    @Auditable(action = AuditAction.ROL_REVOCADO, targetEntityType = AuditTargetType.USUARIO, onlyDenied = true)
     @Operation(summary = "Revocar rol scheduler a un doctor",
             description = "Revoca el rol scheduler del usuario identificado por el número de documento recibido en la ruta.")
     @ApiResponses({
@@ -152,7 +153,7 @@ public class    UserController {
 
 
     @PutMapping("/patients/{patientId}/activate")
-    @Auditable(action = AuditAction.USUARIO_ACTIVADO, targetEntityType = "Paciente", targetIdExpression = "#patientId", onlyDenied = true)
+    @Auditable(action = AuditAction.USUARIO_ACTIVADO, targetEntityType = AuditTargetType.PACIENTE, targetIdExpression = "#patientId", onlyDenied = true)
     @Operation(summary = "Activar el usuario de un paciente",
             description = "Activa el usuario de Keycloak asociado al paciente, identificado por el id de su persona. "
                     + "No cambia nada si ya estaba activo.")
@@ -173,7 +174,7 @@ public class    UserController {
 
 
     @PutMapping("/patients/{patientId}/deactivate")
-    @Auditable(action = AuditAction.USUARIO_DESACTIVADO, targetEntityType = "Paciente", targetIdExpression = "#patientId", onlyDenied = true)
+    @Auditable(action = AuditAction.USUARIO_DESACTIVADO, targetEntityType = AuditTargetType.PACIENTE, targetIdExpression = "#patientId", onlyDenied = true)
     @Operation(summary = "Desactivar el usuario de un paciente",
             description = "Desactiva el usuario de Keycloak asociado al paciente, identificado por el id de su persona. "
                     + "No cambia nada si ya estaba desactivado.")

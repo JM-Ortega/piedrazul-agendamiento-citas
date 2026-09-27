@@ -3,6 +3,7 @@ package co.edu.unicauca.piedrazul.backend.audit.application;
 import co.edu.unicauca.piedrazul.backend.appointment.events.ScheduledAppointmentEvent;
 import co.edu.unicauca.piedrazul.backend.medicalCheckup.events.MedicalCheckupCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.patients.events.PatientUpdatedEvent;
+import co.edu.unicauca.piedrazul.backend.shared.audit.AuditTargetType;
 import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEvent;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEventRepository;
@@ -33,7 +34,7 @@ public class AuditEventListener {
         repository.save(AuditEvent.builder()
                 .actor(event.username(), event.rol())
                 .action(AuditAction.CITA_AGENDADA)
-                .target("Cita", event.citaId().toString())
+                .target(AuditTargetType.CITA, event.citaId().toString())
                 .outcome(AuditOutcome.EXITOSO)
                 .correlationId(event.correlationId())
                 .build());
@@ -44,7 +45,7 @@ public class AuditEventListener {
         repository.save(AuditEvent.builder()
                 .actor(event.username(), event.rol())
                 .action(AuditAction.CONTROL_MEDICO_CREADO)
-                .target("ControlMedico", event.medicalCheckupId().toString())
+                .target(AuditTargetType.CONTROL_MEDICO, event.medicalCheckupId().toString())
                 .outcome(AuditOutcome.EXITOSO)
                 .correlationId(event.correlationId())
                 .build());
@@ -55,7 +56,7 @@ public class AuditEventListener {
         repository.save(AuditEvent.builder()
                 .actor(event.performedBy(), event.performedByRole())
                 .action(AuditAction.PACIENTE_MODIFICADO)
-                .target("Paciente", event.patientId())
+                .target(AuditTargetType.PACIENTE, event.patientId())
                 .outcome(AuditOutcome.EXITOSO)
                 .correlationId(event.correlationId())
                 .states(event.beforeState(), event.afterState())
@@ -71,7 +72,7 @@ public class AuditEventListener {
         repository.save(AuditEvent.builder()
                 .actor(event.createdBy(), event.creatorRole())
                 .action(AuditAction.USUARIO_CREADO)
-                .target("Usuario", event.userId())
+                .target(AuditTargetType.USUARIO, event.userId())
                 .outcome(AuditOutcome.EXITOSO)
                 .correlationId(event.correlationId())
                 .build());
@@ -86,7 +87,7 @@ public class AuditEventListener {
         repository.save(AuditEvent.builder()
                 .actor(event.performedBy(), event.performedByRole())
                 .action(action)
-                .target("Paciente", event.patientId())
+                .target(AuditTargetType.PACIENTE, event.patientId())
                 .outcome(AuditOutcome.EXITOSO)
                 .correlationId(event.correlationId())
                 .states(enabledJson(event.enabledBefore()), enabledJson(event.enabledAfter()))
@@ -108,7 +109,7 @@ public class AuditEventListener {
         repository.save(AuditEvent.builder()
                 .actor(event.performedBy(), event.performedByRole())
                 .action(action)
-                .target("Usuario", event.userId())
+                .target(AuditTargetType.USUARIO, event.userId())
                 .outcome(AuditOutcome.EXITOSO)
                 .correlationId(event.correlationId())
                 .states(event.rolesBefore(), event.rolesAfter())
