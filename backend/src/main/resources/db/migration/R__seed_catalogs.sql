@@ -76,6 +76,7 @@ INSERT INTO piedrazul.audit_action (code, name, audit_module_code) VALUES
     ('PACIENTE_MODIFICADO',        'Paciente modificado',                 'PACIENTES'),
     ('CONTROL_MEDICO_CREADO',      'Control médico creado',               'CONTROLES_MEDICOS'),
     ('CONTROL_MEDICO_CONSULTADO',  'Control médico consultado',           'CONTROLES_MEDICOS'),
+    ('CONTROL_MEDICO_MODIFICADO',  'Control médico modificado',           'CONTROLES_MEDICOS'),
     ('LOGIN_EXITOSO',              'Inicio de sesión exitoso',            'SEGURIDAD'),
     ('LOGIN_FALLIDO',              'Intento de inicio de sesión fallido', 'SEGURIDAD')
 ON CONFLICT (code) DO NOTHING;

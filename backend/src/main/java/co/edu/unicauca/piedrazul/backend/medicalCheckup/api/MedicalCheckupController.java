@@ -64,7 +64,7 @@ public class MedicalCheckupController {
 
     @PostMapping("/updateCheckup/{idCheckUp}")
     @Auditable(
-            action = AuditAction.CONTROL_MEDICO_CONSULTADO,
+            action = AuditAction.CONTROL_MEDICO_MODIFICADO,
             targetEntityType = "ControlMedico",
             targetIdExpression = "#idCheckUp"
     )
