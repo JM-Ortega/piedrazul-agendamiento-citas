@@ -1,6 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.medicalCheckup.api;
 
-import co.edu.unicauca.piedrazul.backend.audit.infrastructure.aop.Auditable;
+import co.edu.unicauca.piedrazul.backend.shared.audit.Auditable;
 import co.edu.unicauca.piedrazul.backend.medicalCheckup.MedicalCheckupExternalService;
 import co.edu.unicauca.piedrazul.backend.medicalCheckup.api.dto.intput.CheckupUpdateRequest;
 import co.edu.unicauca.piedrazul.backend.medicalCheckup.api.dto.output.MedicalCheckupResponse;
