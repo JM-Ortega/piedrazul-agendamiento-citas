@@ -90,7 +90,7 @@ class UserControllerAccessTest {
 
     @Test
     void everyOtherRoleIsDenied() {
-        for (String role : new String[]{"DOCTOR", "SCHEDULER", "PATIENT"}) {
+        for (String role : new String[]{"DOCTOR", "SCHEDULER", "PATIENT", "AUDITOR"}) {
             loggedInAs(role);
 
             assertThatThrownBy(() -> controller.activatePatientUser(PATIENT_ID))
@@ -113,4 +113,13 @@ class UserControllerAccessTest {
         verify(userService).getPatientsWithAccount("ana", PageRequest.of(0, 10));
     }
 
+    @Test
+    void anAuditorCannotListPatientsWithAccountEitherBecauseThisIsUserManagementNotAuditing() {
+        loggedInAs("AUDITOR");
+
+        assertThatThrownBy(() -> controller.getPatientsWithAccount(PageRequest.of(0, 10), null))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verifyNoInteractions(userService);
+    }
 }
