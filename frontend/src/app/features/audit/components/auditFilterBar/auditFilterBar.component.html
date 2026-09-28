@@ -1,38 +1,69 @@
-<div class="flex flex-wrap gap-3 mb-5">
+<div class="flex flex-wrap items-end gap-3 mb-5">
   <div class="relative flex-1 min-w-[220px]">
     <input
       type="text"
-      [ngModel]="filters().search"
+      [ngModel]="draft().search"
       (ngModelChange)="patch({ search: $event })"
-      placeholder="Buscar por nombre de quien realizó la acción..."
+      (keydown.enter)="submit()"
+      [attr.maxlength]="catalog()?.maxSearchLength ?? null"
+      placeholder="Buscar por nombre o documento de quien realizó la acción..."
       class="w-full pl-4 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-white"
     />
   </div>
 
+  <label class="flex flex-col gap-1 text-xs text-gray-500">
+    Desde
+    <input
+      type="date"
+      [ngModel]="draft().from"
+      (ngModelChange)="patch({ from: $event })"
+      [attr.max]="draft().to || null"
+      class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400 bg-white"
+    />
+  </label>
+
+  <label class="flex flex-col gap-1 text-xs text-gray-500">
+    Hasta
+    <input
+      type="date"
+      [ngModel]="draft().to"
+      (ngModelChange)="patch({ to: $event })"
+      [attr.min]="draft().from || null"
+      class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400 bg-white"
+    />
+  </label>
+
   <select
-    [ngModel]="filters().status"
-    (ngModelChange)="patch({ status: $event })"
+    [ngModel]="draft().outcome"
+    (ngModelChange)="patch({ outcome: $event })"
     class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-white"
   >
-    <option value="all">Todos los estados</option>
-    <option value="success">Solo Exitosos</option>
-    <option value="failed">Solo Fallidos</option>
+    <option value="">Todos los resultados</option>
+    @for (option of catalog()?.outcomes ?? []; track option.code) {
+      <option [value]="option.code">{{ option.name }}</option>
+    }
   </select>
 
-  <input
-    type="date"
-    [ngModel]="filters().date"
-    (ngModelChange)="patch({ date: $event })"
-    class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-white"
-  />
+  <button
+    type="button"
+    (click)="submit()"
+    [disabled]="!!rangeError()"
+    class="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#215c98] hover:bg-[#4e92d9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+  >
+    Buscar
+  </button>
 
   @if (hasFilters()) {
     <button
       type="button"
-      (click)="filters.set(EMPTY_AUDIT_FILTERS)"
+      (click)="clear()"
       class="px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
     >
       Limpiar
     </button>
   }
 </div>
+
+@if (rangeError(); as error) {
+  <p class="text-sm text-red-600 -mt-3 mb-4">{{ error }}</p>
+}
