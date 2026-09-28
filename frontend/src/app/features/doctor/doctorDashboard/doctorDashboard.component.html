@@ -182,22 +182,34 @@
                     </div>
                   }
 
-                  <!-- Botón "Nueva cita": solo cuando la cita ya fue ATENDIDA -->
+                  <!-- Acciones cuando la cita ya fue ATENDIDA: ver/editar historial + nueva cita -->
                   @if (apt.appointmentState === 'ATENDIDA') {
-                    <app-button
-                      variant="primary"
-                      extraClass="!px-4 !py-2"
-                      (buttonClick)="
-                        scheduleNewAppointment(
-                          apt.documentNumber,
-                          apt.specialty,
-                          currentDoctor()?.id
-                        )
-                      "
-                    >
-                      <svg lucideCalendar [size]="16"></svg>
-                      Nueva cita
-                    </app-button>
+                    <div class="flex items-center gap-6">
+                      <app-button
+                        variant="plain"
+                        extraClass="!flex !items-center !gap-1.5 !text-base !px-0"
+                        [appTooltip]="'Ver el historial clínico y editar la observación de esta cita'"
+                        (buttonClick)="goToControlMedico(apt.idAppointment)"
+                      >
+                        <svg lucideFileText [size]="16"></svg>
+                        Ver y editar
+                      </app-button>
+                      <app-button
+                        variant="primary"
+                        extraClass="!px-4 !py-2 !text-base"
+                        [appTooltip]="'Agendar una nueva cita para este paciente'"
+                        (buttonClick)="
+                          scheduleNewAppointment(
+                            apt.documentNumber,
+                            apt.specialty,
+                            currentDoctor()?.id
+                          )
+                        "
+                      >
+                        <svg lucideCalendar [size]="16"></svg>
+                        Nueva cita
+                      </app-button>
+                    </div>
                   }
                 </div>
               </div>

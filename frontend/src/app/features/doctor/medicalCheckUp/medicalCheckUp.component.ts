@@ -2,29 +2,43 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   OnInit,
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
+  LucideArrowLeft,
   LucideCalendar,
   LucideClipboardPen,
   LucideFolderOpen,
-  LucideUser,
+  LucidePencil,
   LucideSave,
   LucideTriangleAlert,
+  LucideUser,
 } from '@lucide/angular';
 import { CanComponentDeactivate } from '../../../core/guards/canDeactivate.guard';
 import { DoctorService } from '../../../core/services/doctor.service';
 import { ButtonComponent } from '../../../designSystem/atoms/button/button.component';
+import { TooltipDirective } from '../../../designSystem/atoms/tooltip/tooltip.directive';
 import { PaginationComponent } from '../../../designSystem/molecules/pagination/pagination.component';
+import {
+  ToastComponent,
+  ToastType,
+} from '../../../designSystem/molecules/toastMessage/toast.component';
 import { ConfirmModalComponent } from '../../../designSystem/organisms/confirmModal/confirmModal.component';
 import { calcAge } from '../../../shared/helpers/patientValidation';
-import { parseLocalDateString } from '../../../shared/helpers/transformDateLocal';
+import {
+  parseLocalDateString,
+  toIsoDateString,
+} from '../../../shared/helpers/transformDateLocal';
+import { MedicalRecord } from '../../../shared/models/dtos/medicalRecord.dto';
+import { UnscheduledAttention } from '../../../shared/models/dtos/unscheduledAttention.dto';
+import { AppError } from '../../../shared/models/interfaces/apiError.model';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
-import { UnscheduledAttention } from '../../../shared/models/dtos/unscheduledAttention.dto';
+import { PatientEditPanelComponent } from '../components/patientEditPanel/patientEditPanel.component';
 
 type MedicalHistoryContext = 'scheduled' | 'unscheduled';
 
@@ -40,10 +54,15 @@ type MedicalHistoryContext = 'scheduled' | 'unscheduled';
     LucideFolderOpen,
     LucideCalendar,
     LucideUser,
+    LucidePencil,
     FormatoPipe,
     ButtonComponent,
     PaginationComponent,
     ConfirmModalComponent,
+    LucideArrowLeft,
+    TooltipDirective,
+    ToastComponent,
+    PatientEditPanelComponent,
   ],
 })
 export class DoctorMedicalHistoryComponent
@@ -52,36 +71,62 @@ export class DoctorMedicalHistoryComponent
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   readonly doctorService = inject(DoctorService);
+  private readonly today = toIsoDateString(new Date());
 
+  // ── Constantes ────────────────────────────────────────────────────────────
   /** Longitud máxima permitida para la observación de la historia clínica. */
   readonly OBSERVATION_MAX_LENGTH = 300;
-
   private readonly UNSCHEDULED_CONTEXT_KEY =
     'doctor-unscheduled-attention-context';
+
+  // ── Estado: contexto (cita programada vs. atención no programada) ──────────
   private readonly context = signal<MedicalHistoryContext>('scheduled');
   readonly isScheduledContext = computed(() => this.context() === 'scheduled');
   private readonly unscheduledSpecialty = signal<string>('');
+  private readonly idAppointment = signal<string>('');
 
+  /** True si se navegó en modo edición (?modo=editar) sobre una cita ya atendida. */
+  private readonly editModeRequested = signal(false);
+  readonly isEditMode = computed(
+    () => this.isScheduledContext() && this.editModeRequested()
+  );
+
+  // ── Estado: paciente ─────────────────────────────────────────────────────
+  readonly patient = signal<Patient | undefined>(undefined);
+  readonly isLoadingPatient = signal(true);
   readonly mostrarInfo = signal(false);
-  toggleInfo() {
-    this.mostrarInfo.update((v) => !v);
-  }
 
+  // ── Estado: edición de paciente ──────────────────────────────────────────
+  readonly isEditingPatient = signal(false);
+  /** Toast de éxito exclusivo del flujo de edición de paciente. */
+  readonly toastMessage = signal('');
+  readonly toastType = signal<ToastType | null>(null);
+  private toastTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // ── Estado: historial clínico ────────────────────────────────────────────
   readonly records = this.doctorService.medicalRecordsState.content;
   readonly medicalRecordsPagination =
     this.doctorService.medicalRecordsState.pagination;
-  readonly patient = signal<Patient | undefined>(undefined);
-  readonly isLoadingPatient = signal(true);
+  readonly isLoadingRecords = this.doctorService.isLoadingRecords;
+
+  /** ID del registro clínico que se está editando (se oculta del historial). */
+  readonly editingRecordId = signal<string | null>(null);
+  private readonly editObservationInitialized = signal(false);
+
+  /** Historial visible: excluye el registro que se está editando actualmente. */
+  readonly visibleRecords = computed(() =>
+    this.records().filter((r) => r.idClinicalHistory !== this.editingRecordId())
+  );
+
+  // ── Estado: observación / guardado de la atención ───────────────────────
   readonly newObservation = signal('');
-  /** Caracteres restantes antes de llegar al límite, para mostrar en el contador del textarea. */
   readonly remainingObservationChars = computed(
     () => this.OBSERVATION_MAX_LENGTH - this.newObservation().length
   );
-  private readonly idAppointment = signal<string>('');
   readonly saveError = signal('');
   readonly isSaving = signal(false);
-  readonly isLoadingRecords = this.doctorService.isLoadingRecords;
 
+  // ── Computed: datos derivados del paciente ───────────────────────────────
   readonly patientBirthDateFormatted = computed(() => {
     const p = this.patient();
     if (!p?.birthDate) return 'No registra';
@@ -98,56 +143,42 @@ export class DoctorMedicalHistoryComponent
     return calcAge(parseLocalDateString(p.birthDate));
   });
 
-  // ── Salida de la ruta (CanDeactivate) ────────────────────────────────────
-  /** Modal de confirmación al intentar salir sin haber guardado la atención. */
+  // ── Estado: salida de la ruta (CanDeactivate) ────────────────────────────
   readonly showExitConfirmModal = signal(false);
-  /** Se pone en true justo antes de navegar programáticamente tras guardar,
-   * para no mostrar el modal de confirmación en ese caso. */
+  /** Se activa justo antes de navegar programáticamente tras guardar, para
+   * no mostrar el modal de confirmación en ese caso. */
   private allowNavigation = false;
   private exitResolver: ((value: boolean) => void) | null = null;
 
-  /**
-   * Invocado por `unsavedChangesGuard` al intentar salir de esta ruta,
-   * sin importar si la salida es por navegación programática, un enlace,
-   * o el botón "atrás" del navegador.
-   */
-  canDeactivate(): boolean | Promise<boolean> {
-    if (this.allowNavigation) return true;
-    return new Promise<boolean>((resolve) => {
-      this.exitResolver = resolve;
-      this.showExitConfirmModal.set(true);
-    });
+  constructor() {
+    effect(
+      () => {
+        const records = this.records();
+        if (
+          this.isEditMode() &&
+          !this.editObservationInitialized() &&
+          records.length > 0
+        ) {
+          const todaysRecord = this.findTodaysRecord(records);
+          if (!todaysRecord) return;
+
+          this.editingRecordId.set(todaysRecord.idClinicalHistory);
+          this.newObservation.set(
+            todaysRecord.description.slice(0, this.OBSERVATION_MAX_LENGTH)
+          );
+          this.editObservationInitialized.set(true);
+        }
+      },
+      { allowSignalWrites: true }
+    );
   }
 
-  /** El usuario confirma que desea salir: la cita queda sin atender. */
-  confirmExit(): void {
-    this.showExitConfirmModal.set(false);
-    if (!this.isScheduledContext()) {
-      this.clearUnscheduledContext();
-    }
-    this.exitResolver?.(true);
-    this.exitResolver = null;
-  }
-
-  /** El usuario cancela: permanece en el formulario, sin alterar la navegación. */
-  cancelExit(): void {
-    this.showExitConfirmModal.set(false);
-    this.exitResolver?.(false);
-    this.exitResolver = null;
-  }
-
-  /**
-   * Actualiza la observación truncándola a {@link OBSERVATION_MAX_LENGTH}
-   * caracteres, para evitar que el usuario supere el límite incluso si
-   * pega texto largo.
-   *
-   * @param value - Valor crudo emitido por el evento `input` del textarea.
-   */
-  onObservationChange(value: string): void {
-    this.newObservation.set(value.slice(0, this.OBSERVATION_MAX_LENGTH));
-  }
-
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
+    this.editModeRequested.set(
+      this.route.snapshot.queryParamMap.get('modo') === 'editar'
+    );
+
     this.doctorService.resetMedicalRecords();
 
     const idAppointment = this.route.snapshot.paramMap.get('idAppointment');
@@ -184,6 +215,12 @@ export class DoctorMedicalHistoryComponent
     this.loadPatientByDocument(documentNumber);
   }
 
+  // ── UI: sección de información del paciente ──────────────────────────────
+  toggleInfo(): void {
+    this.mostrarInfo.update((v) => !v);
+  }
+
+  // ── Contexto no programado (persistencia en sessionStorage) ──────────────
   private persistUnscheduledContext(
     documentNumber: string,
     specialty: string
@@ -211,6 +248,7 @@ export class DoctorMedicalHistoryComponent
     sessionStorage.removeItem(this.UNSCHEDULED_CONTEXT_KEY);
   }
 
+  // ── Carga de datos del paciente ───────────────────────────────────────────
   private loadPatientByAppointment(idAppointment: string): void {
     this.doctorService.getPatientByAppointment(idAppointment).subscribe({
       next: (patient) => {
@@ -233,11 +271,8 @@ export class DoctorMedicalHistoryComponent
     });
   }
 
-  /**
-   * Maneja el cambio de página emitido por `<app-pagination>` para el historial clínico del paciente actual.
-   *
-   * @param page - Número de página (base 0) al que se quiere navegar.
-   */
+  // ── Historial clínico ─────────────────────────────────────────────────────
+  /** Cambia de página el historial clínico del paciente actual. */
   onMedicalRecordsPageChange(page: number): void {
     const patientId = this.patient()?.id;
     if (patientId) {
@@ -245,7 +280,31 @@ export class DoctorMedicalHistoryComponent
     }
   }
 
+  /** Busca, en una página de registros, el correspondiente a la fecha de hoy. */
+  private findTodaysRecord(
+    records: MedicalRecord[]
+  ): MedicalRecord | undefined {
+    return records.find((r) => r.attendedAt?.slice(0, 10) === this.today);
+  }
+
+  // ── Observación clínica ───────────────────────────────────────────────────
+  /** Trunca la observación al límite permitido para evitar pegar texto largo. */
+  onObservationChange(value: string): void {
+    this.newObservation.set(value.slice(0, this.OBSERVATION_MAX_LENGTH));
+  }
+
+  private trimmedObservation(): string | null {
+    return (
+      this.newObservation().trim().slice(0, this.OBSERVATION_MAX_LENGTH) || null
+    );
+  }
+
+  // ── Guardado de la atención ───────────────────────────────────────────────
   confirmAttendanceAndExit(): void {
+    if (this.isEditMode()) {
+      this.saveEditedObservation();
+      return;
+    }
     if (this.isScheduledContext()) {
       this.saveScheduledAttendance();
     } else {
@@ -253,6 +312,23 @@ export class DoctorMedicalHistoryComponent
     }
   }
 
+  /** Actualiza la observación de un control médico ya existente. */
+  private saveEditedObservation(): void {
+    const idCheckUp = this.editingRecordId();
+    if (!idCheckUp) return;
+
+    this.saveError.set('');
+    this.isSaving.set(true);
+
+    this.doctorService
+      .updateCheckup(idCheckUp, this.trimmedObservation())
+      .subscribe({
+        next: () => this.finishAndExit(),
+        error: (err: AppError) => this.handleSaveError(err),
+      });
+  }
+
+  /** Marca la cita programada como atendida. */
   private saveScheduledAttendance(): void {
     const idCita = this.idAppointment();
     if (!idCita) return;
@@ -264,10 +340,11 @@ export class DoctorMedicalHistoryComponent
       .updateAppointmentAsAttended(idCita, this.trimmedObservation())
       .subscribe({
         next: () => this.finishAndExit(),
-        error: (err) => this.handleSaveError(err),
+        error: (err: AppError) => this.handleSaveError(err),
       });
   }
 
+  /** Registra la atención de un paciente sin cita previa. */
   private saveUnscheduledAttendance(): void {
     const p = this.patient();
     const specialty = this.unscheduledSpecialty();
@@ -292,16 +369,11 @@ export class DoctorMedicalHistoryComponent
 
     this.doctorService.registerUnscheduledAttention(request).subscribe({
       next: () => this.finishAndExit(),
-      error: (err) => this.handleSaveError(err),
+      error: (err: AppError) => this.handleSaveError(err),
     });
   }
 
-  private trimmedObservation(): string | null {
-    return (
-      this.newObservation().trim().slice(0, this.OBSERVATION_MAX_LENGTH) || null
-    );
-  }
-
+  /** Limpia el estado local y vuelve a la lista de citas del día. */
   private finishAndExit(): void {
     this.allowNavigation = true;
     this.doctorService.resetMedicalRecords();
@@ -311,10 +383,74 @@ export class DoctorMedicalHistoryComponent
     this.router.navigate(['/medico']);
   }
 
-  private handleSaveError(err: { error?: { message?: string } }): void {
+  /** Muestra el mensaje real del backend (vía `AppError.message`) en el banner inline. */
+  private handleSaveError(err: AppError): void {
     this.isSaving.set(false);
-    this.saveError.set(
-      err?.error?.message || 'Ocurrió un error al guardar la historia clínica'
-    );
+    this.saveError.set(err.message);
+  }
+
+  // ── Edición de datos del paciente ───────────────────────────────────────
+  startEditPatient(): void {
+    this.isEditingPatient.set(true);
+  }
+
+  /** Descarta la edición sin guardar y vuelve a la vista de solo lectura. */
+  cancelEditPatient(): void {
+    this.isEditingPatient.set(false);
+  }
+
+  /** Recibe el paciente ya actualizado por el backend y muestra el toast de éxito. */
+  onPatientSaved(updated: Patient): void {
+    this.patient.set(updated);
+    this.isEditingPatient.set(false);
+    this.showToast('Datos del paciente actualizados correctamente.', 'success');
+  }
+
+  /** Muestra el toast (solo usado por la edición de paciente) y lo oculta a los 3.5s. */
+  private showToast(message: string, type: ToastType): void {
+    if (this.toastTimeout) clearTimeout(this.toastTimeout);
+    this.toastMessage.set(message);
+    this.toastType.set(type);
+    this.toastTimeout = setTimeout(() => {
+      this.toastMessage.set('');
+      this.toastType.set(null);
+    }, 3500);
+  }
+
+  // ── Salida de la ruta (CanDeactivate) ────────────────────────────────────
+  /**
+   * Invocado por `unsavedChangesGuard` al intentar salir de esta ruta,
+   * sin importar si la salida es por navegación programática, un enlace,
+   * o el botón "atrás" del navegador.
+   */
+  canDeactivate(): boolean | Promise<boolean> {
+    if (this.allowNavigation) return true;
+    return new Promise<boolean>((resolve) => {
+      this.exitResolver = resolve;
+      this.showExitConfirmModal.set(true);
+    });
+  }
+
+  /** El usuario confirma que desea salir: la cita queda sin atender. */
+  confirmExit(): void {
+    this.showExitConfirmModal.set(false);
+    if (!this.isScheduledContext()) {
+      this.clearUnscheduledContext();
+    }
+    this.exitResolver?.(true);
+    this.exitResolver = null;
+  }
+
+  /** El usuario cancela: permanece en el formulario, sin alterar la navegación. */
+  cancelExit(): void {
+    this.showExitConfirmModal.set(false);
+    this.exitResolver?.(false);
+    this.exitResolver = null;
+  }
+
+  // ── Navegación ────────────────────────────────────────────────────────────
+  /** Vuelve a las citas de hoy del doctor, respetando el guard de cambios sin guardar. */
+  goBack(): void {
+    this.router.navigate(['/medico']);
   }
 }

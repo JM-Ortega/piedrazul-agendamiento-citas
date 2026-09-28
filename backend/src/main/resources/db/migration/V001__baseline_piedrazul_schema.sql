@@ -96,32 +96,6 @@ CREATE TABLE piedrazul.verification_purpose (
     CONSTRAINT pk_verification_purpose PRIMARY KEY (code)
 );
 
-/*
--- ---------------------------------------------------------------------
--- Catálogo: audit_action
--- Acción registrada en la bitácora de auditoría. Catálogo porque puede
--- crecer con el tiempo a medida que se instrumenten más acciones.
--- ---------------------------------------------------------------------
-CREATE TABLE piedrazul.audit_action (
-    code   VARCHAR(60)  NOT NULL,
-    name   VARCHAR(150) NOT NULL,
-
-    CONSTRAINT pk_audit_action PRIMARY KEY (code)
-);
-
--- ---------------------------------------------------------------------
--- Catálogo: audit_module
--- Módulo del sistema al que pertenece una acción auditada. Catálogo
--- porque puede crecer con nuevos módulos.
--- ---------------------------------------------------------------------
-CREATE TABLE piedrazul.audit_module (
-    code   VARCHAR(40)  NOT NULL,
-    name   VARCHAR(100) NOT NULL,
-
-    CONSTRAINT pk_audit_module PRIMARY KEY (code)
-);
- */
-
 -- =====================================================================
 -- Tabla: audit_module
 -- Catálogo de módulos de negocio que pueden generar eventos de auditoría

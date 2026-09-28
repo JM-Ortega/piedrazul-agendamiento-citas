@@ -93,7 +93,7 @@
               [ngModel]="editForm()!.startTime"
               (ngModelChange)="updateField('startTime', $event)"
               name="startTime"
-              [options]="timeOptions | toSelectOptions: false"
+              [options]="timeSelectOptions"
               placeholder="--"
               [errorMessage]="errors().horarioGlobal"
             />
@@ -107,7 +107,7 @@
               [ngModel]="editForm()!.endTime"
               (ngModelChange)="updateField('endTime', $event)"
               name="endTime"
-              [options]="timeOptions | toSelectOptions: false"
+              [options]="timeSelectOptions"
               placeholder="--"
               [errorMessage]="errors().horarioGlobal"
             />
@@ -300,7 +300,7 @@
                             updateDaySchedule(day, 'startTime', $event)
                           "
                           name="startTime-{{ day }}"
-                          [options]="timeOptions | toSelectOptions: false"
+                          [options]="timeSelectOptions"
                           [errorMessage]="errors().horariosDia[day]"
                         />
                       </div>
@@ -318,7 +318,7 @@
                             updateDaySchedule(day, 'endTime', $event)
                           "
                           name="endTime-{{ day }}"
-                          [options]="timeOptions | toSelectOptions: false"
+                          [options]="timeSelectOptions"
                           [errorMessage]="errors().horariosDia[day]"
                         />
                       </div>

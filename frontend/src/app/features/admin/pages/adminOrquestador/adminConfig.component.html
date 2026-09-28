@@ -4,13 +4,41 @@
     <div
       class="bg-linear-to-r from-[#163c63] to-[#215c98] text-white rounded-xl px-20 py-4 shadow-md"
     >
-      <h1 class="text-xl font-bold flex items-center gap-2">
-        <svg lucideSettings [size]="22"></svg>
-        Panel de Configuracion de Horarios
-      </h1>
-      <p class="text-[#a7c9ec] text-sm mt-1">
-        Configure los parámetros del sistema de agendamiento
-      </p>
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 class="text-xl font-bold flex items-center gap-2">
+            <svg lucideSettings [size]="22"></svg>
+            Panel de Configuracion de Horarios
+          </h1>
+          <p class="text-[#a7c9ec] text-sm mt-1">
+            Configure los parámetros del sistema de agendamiento
+          </p>
+        </div>
+
+        <app-button
+          variant="plain"
+          plainTextClass="text-white"
+          extraClass="!gap-2.5 !bg-white/10 hover:!bg-white/15 !border !border-white/25 !rounded-lg !px-3.5 !py-2 !text-sm !mx-0 !my-0 !shadow-none"
+          (buttonClick)="openAutonomousBookingModal()"
+        >
+          <svg lucideCalendarCheck [size]="16"></svg>
+          <span>Agendamiento autónomo</span>
+          <span
+            [class]="
+              'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ' +
+              (autonomousBookingEnabled()
+                ? 'bg-green-500/20 text-green-200'
+                : 'bg-red-500/20 text-red-200')
+            "
+          >
+            <svg
+              [lucideIcon]="autonomousBookingEnabled() ? Check : X"
+              [size]="12"
+            ></svg>
+            {{ autonomousBookingEnabled() ? 'Habilitado' : 'Deshabilitado' }}
+          </span>
+        </app-button>
+      </div>
     </div>
 
     <!-- Error de carga -->
@@ -175,3 +203,39 @@
     (closeErrorModal)="onCloseErrorModal()"
   />
 </div>
+<!-- Modal: Agendamiento autónomo -->
+<app-confirm-modal
+  [visible]="showAutonomousBookingModal()"
+  title="Confirmar Cambio"
+  [richMessage]="true"
+  maxWidth="max-w-md"
+  [fullWidthButtons]="true"
+  cancelLabel="Cancelar"
+  [confirmLabel]="
+    'Sí, ' + (autonomousBookingEnabled() ? 'Deshabilitar' : 'Habilitar')
+  "
+  [confirmVariant]="autonomousBookingEnabled() ? 'danger' : 'success'"
+  [iconBg]="autonomousBookingEnabled() ? 'bg-red-100' : 'bg-green-100'"
+  (dismissed)="onCloseAutonomousBookingModal()"
+  (confirmed)="onConfirmAutonomousBookingToggle()"
+>
+  <svg
+    lucideCalendarCheck
+    [size]="24"
+    icon
+    [class]="autonomousBookingEnabled() ? 'text-red-600' : 'text-green-600'"
+  ></svg>
+  <span message>
+    ¿Está seguro de que desea
+    <strong>{{
+      autonomousBookingEnabled() ? 'deshabilitar' : 'habilitar'
+    }}</strong>
+    el agendamiento autónomo?
+    @if (autonomousBookingEnabled()) {
+      Los pacientes no podrán agendar citas por sí mismos hasta que se vuelva a
+      habilitar.
+    } @else {
+      Los pacientes podrán volver a agendar citas por sí mismos.
+    }
+  </span>
+</app-confirm-modal>

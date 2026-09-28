@@ -31,6 +31,9 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import co.edu.unicauca.piedrazul.backend.shared.audit.AuditTargetType;
+import co.edu.unicauca.piedrazul.backend.shared.audit.Auditable;
+import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 
 @Tag(name = "Doctores", description = "Operaciones de consulta y administración de doctores")
 @RestController
@@ -204,6 +207,7 @@ public class DoctorController {
 
         @PutMapping("/{doctorId}/enable")
         @PreAuthorize("hasRole('ADMIN')")
+        @Auditable(action = AuditAction.ROL_ASIGNADO, targetEntityType = AuditTargetType.DOCTOR, targetIdExpression = "#doctorId", onlyDenied = true)
         @Operation(summary = "Habilitar un doctor", description = "Habilita un doctor previamente deshabilitado. La activación solo se realiza si el doctor "
                         +
                         "cumple todas las condiciones necesarias para prestar atención.")
@@ -245,6 +249,7 @@ public class DoctorController {
 
         @PutMapping("/{doctorId}/disable")
         @PreAuthorize("hasRole('ADMIN')")
+        @Auditable(action = AuditAction.ROL_REVOCADO, targetEntityType = AuditTargetType.DOCTOR, targetIdExpression = "#doctorId", onlyDenied = true)
         @Operation(summary = "Deshabilitar un doctor", description = "Deshabilita un doctor. La desactivación solo se realiza si el doctor aun tiene citas.")
         @ApiResponses({
                         @ApiResponse(responseCode = "204", description = "Doctor deshabilitado correctamente"),

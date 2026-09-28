@@ -175,4 +175,9 @@ public class AppointmentConfig {
         return new CountScheduledAppointmentsUseCaseImpl(appointmentRepository);
     }
 
+    @Bean
+    public CheckExistenceByDocAndStateUseCase checkExistenceByDocAndStateUseCase(AppointmentRepository appointmentRepository) {
+        return new CheckExistenceByDocAndStateUseCaseImpl(appointmentRepository);
+    }
+
 }

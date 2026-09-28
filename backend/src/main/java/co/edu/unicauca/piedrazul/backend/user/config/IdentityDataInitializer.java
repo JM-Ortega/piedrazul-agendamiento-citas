@@ -30,6 +30,7 @@ public class IdentityDataInitializer {
 
             seedAdmin(userProvisioningApi, properties.getAdmin());
             seedDemoSchedulers(userProvisioningApi);
+            seedAuditor(userProvisioningApi);
         };
     }
 
@@ -94,6 +95,26 @@ public class IdentityDataInitializer {
                                 null,
                                 List.of(Role.SCHEDULER)
                         )
+                )
+        );
+    }
+
+    private void seedAuditor(UserProvisioningApi userProvisioningApi) {
+        createIfNotExists(
+                userProvisioningApi,
+                new CreateSystemUserPayload(
+                        new CreateSystemUserRequest(
+                                "9700001",
+                                IdentificationType.CEDULA,
+                                "Libardo",
+                                "Pantoja",
+                                "wpantoja@unicauca.edu.co",
+                                "3001112266", // No se que numero poner xd
+                                "Auditor123!"
+                        ),
+                        null,
+                        null,
+                        List.of(Role.AUDITOR)
                 )
         );
     }

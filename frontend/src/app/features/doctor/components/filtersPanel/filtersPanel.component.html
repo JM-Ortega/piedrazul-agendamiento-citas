@@ -54,10 +54,11 @@
   >
     <div class="overflow-hidden">
       <div class="px-5 pb-5 pt-1 border-t-2 border-blue-50">
+        <!-- Después -->
         <app-filters
           [fields]="fields()"
           [appliedValues]="appliedValues()"
-          (apply)="apply.emit($event)"
+          (apply)="onFiltersApply($event)"
         ></app-filters>
       </div>
     </div>

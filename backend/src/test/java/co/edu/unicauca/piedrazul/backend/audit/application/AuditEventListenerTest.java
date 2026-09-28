@@ -4,7 +4,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.events.ScheduledAppointment
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEvent;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEventRepository;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditOutcome;
-import co.edu.unicauca.piedrazul.backend.clinicalHistory.events.ClinicalHistoryCreatedEvent;
+import co.edu.unicauca.piedrazul.backend.medicalCheckup.events.MedicalCheckupCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.user.events.UserAccountStatusChangedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserCreatedEvent;
@@ -59,8 +59,8 @@ class AuditEventListenerTest {
     }
 
     @Test
-    void onClinicalHistoryCreatedEventShouldPersistClinicalHistoryAudit() {
-        ClinicalHistoryCreatedEvent event = new ClinicalHistoryCreatedEvent(
+    void onMedicalCheckupCreatedEventShouldPersistMedicalCheckupAudit() {
+        MedicalCheckupCreatedEvent event = new MedicalCheckupCreatedEvent(
                 UUID.fromString("22222222-2222-2222-2222-222222222222"),
                 "medico-02",
                 "DOCTOR",
@@ -71,8 +71,8 @@ class AuditEventListenerTest {
         verify(repository).save(auditCaptor.capture());
         AuditEvent saved = auditCaptor.getValue();
 
-        assertThat(saved.getAction()).isEqualTo(AuditAction.HISTORIA_CLINICA_CREADA);
-        assertThat(saved.getTargetEntityType()).isEqualTo("HistoriaClinica");
+        assertThat(saved.getAction()).isEqualTo(AuditAction.CONTROL_MEDICO_CREADO);
+        assertThat(saved.getTargetEntityType()).isEqualTo("ControlMedico");
         assertThat(saved.getTargetEntityId()).isEqualTo("22222222-2222-2222-2222-222222222222");
         assertThat(saved.getCorrelationId()).isEqualTo("corr-clinical-history");
     }

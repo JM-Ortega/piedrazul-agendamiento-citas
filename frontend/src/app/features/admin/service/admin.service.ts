@@ -4,10 +4,11 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { PageResponse } from '../../../shared/models/dtos/pageResponse.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
+import { Patient } from '../../../shared/models/interfaces/patient.model';
+import { SystemPatient } from '../../../shared/models/interfaces/systemPatient.model';
 import { CreateUserRequestDto } from '../models/dtos/CreateUserRequestDto';
-import { dtoSchedule } from '../models/dtos/schedule.dto';
-
 import { DoctorAdminDto } from '../models/dtos/DoctorAdminDto';
+import { dtoSchedule } from '../models/dtos/schedule.dto';
 import { SystemUser } from '../models/interfaces/systemUser.model';
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -232,6 +233,31 @@ export class AdminService {
       specialties
     );
   }
+  // ── Agendamiento autónomo ────────────────────────────────────────────────
+  /**
+   * Consulta si el agendamiento autónomo de pacientes está habilitado.
+   *
+   * @returns Observable con el estado actual (true = habilitado).
+   */
+  getAutonomousSchedulingStatus(): Observable<boolean> {
+    return this.http.get<boolean>(
+      `${this.apiUrl}/appointments/config/autonomous-scheduling`
+    );
+  }
+
+  /**
+   * Habilita o deshabilita el agendamiento autónomo de pacientes.
+   *
+   * @param enabled - Nuevo estado deseado.
+   * @returns Observable que completa sin contenido si la actualización fue exitosa.
+   */
+  setAutonomousSchedulingStatus(enabled: boolean): Observable<void> {
+    return this.http.put<void>(
+      `${this.apiUrl}/appointments/config/autonomous-scheduling`,
+      null,
+      { params: { enabled } }
+    );
+  }
   // ── Document Types ────────────────────────────────────────────────────────
   /**
    * Obtiene el listado de tipos de documento de identidad soportados
@@ -265,6 +291,76 @@ export class AdminService {
   revokeDoctorSchedulerRole(username: string): Observable<void> {
     return this.http.delete<void>(
       `${this.apiUrl}/user/${username}/revoke-doctor-scheduler`
+    );
+  }
+  // ── Patients ──────────────────────────────────────────────────────────────
+
+  /**
+   * Busca pacientes por nombre completo o número de documento para el panel
+   * de administración. A diferencia del buscador del agendador, esta
+   * respuesta incluye el estado de la cuenta (`accountEnabled`).
+   *
+   * Refleja `GET /user/patients?search=...&page=...&size=...`.
+   *
+   * @param search - Texto de búsqueda (nombre completo o documento).
+   * @param page - Índice de página (base 0). Por defecto 0.
+   * @param size - Cantidad de resultados por página. Por defecto 10.
+   * @returns Observable con la respuesta paginada de coincidencias.
+   */
+  searchPatients(
+    search: string,
+    page = 0,
+    size = 7
+  ): Observable<PageResponse<SystemPatient>> {
+    return this.http.get<PageResponse<SystemPatient>>(
+      `${this.apiUrl}/user/patients`,
+      { params: { search, page, size } }
+    );
+  }
+
+  /**
+   * Obtiene el perfil completo de un paciente a partir de su número de
+   * documento, para el panel de detalle de administración.
+   *
+   * NOTA: reutiliza el mismo recurso que `DoctorService.getPatientByDocument`
+   * (`GET /patients/document/{documentId}`). Se asume que también está
+   * autorizado para el rol ADMIN; si el backend lo restringe solo a DOCTOR,
+   * habrá que pedir/usar un endpoint específico de administración.
+   *
+   * @param documentId - Número de documento del paciente.
+   * @returns Observable con los datos completos del paciente.
+   */
+  getPatientDetail(documentId: string): Observable<Patient> {
+    return this.http.get<Patient>(
+      `${this.apiUrl}/patients/document/${documentId}`
+    );
+  }
+
+  /**
+   * Activa el usuario asociado a un paciente, devolviéndole el acceso para
+   * reservar o agendar citas en línea. No cambia nada si ya estaba activo.
+   *
+   * @param patientId - ID del paciente (UUID de su persona).
+   * @returns Observable que completa sin contenido (204) si la operación fue exitosa.
+   */
+  activatePatient(patientId: string): Observable<void> {
+    return this.http.put<void>(
+      `${this.apiUrl}/user/patients/${patientId}/activate`,
+      null
+    );
+  }
+
+  /**
+   * Desactiva el usuario asociado a un paciente, revocando su acceso para
+   * reservar o agendar citas en línea. No cambia nada si ya estaba desactivado.
+   *
+   * @param patientId - ID del paciente (UUID de su persona).
+   * @returns Observable que completa sin contenido (204) si la operación fue exitosa.
+   */
+  deactivatePatient(patientId: string): Observable<void> {
+    return this.http.put<void>(
+      `${this.apiUrl}/user/patients/${patientId}/deactivate`,
+      null
     );
   }
 }

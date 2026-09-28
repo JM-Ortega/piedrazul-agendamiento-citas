@@ -13,8 +13,6 @@ import java.util.List;
 
 public interface AppointmentExternalService {
 
-    AppointmentExternalData getAppointmentData(UUID idAppointment);
-
     UUID getPattientIdByAppointmentId(UUID appointmentId);
 
     // Para el reporte de los medicos

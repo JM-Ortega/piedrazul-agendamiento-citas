@@ -5,19 +5,20 @@ import { HomeComponent } from './designSystem/pages/home/home.component';
 import { AdminCreateUserComponent } from './features/admin/pages/adminCreateUser/adminCreateUser.component';
 import { AdminDoctorsComponent } from './features/admin/pages/adminDoctors/adminDoctors.component';
 import { AdminConfigComponent } from './features/admin/pages/adminOrquestador/adminConfig.component';
+import { AdminPatientsComponent } from './features/admin/pages/adminPatients/adminPatients.component';
 import { AdminUsersComponent } from './features/admin/pages/adminUsers/adminUsers.component';
-import { NewAppointmentSchedulerComponent } from './features/appointment/pages/scheduleScheduler/newAppointmentScheduler.component';
 import { NewAppointmentDoctorComponent } from './features/appointment/pages/scheduleDoctor/newAppointmentDoctor.component';
 import { PatientNewAppointmentComponent } from './features/appointment/pages/schedulePatient/patientNewAppointment.component';
-import { DoctorMedicalHistoryComponent } from './features/doctor/medicalCheckUp/medicalCheckUp.component';
+import { NewAppointmentSchedulerComponent } from './features/appointment/pages/scheduleScheduler/newAppointmentScheduler.component';
+import { DoctorUnscheduledAttentionComponent } from './features/doctor/components/unscheduledAttention/doctorUnscheduledAttention/doctorUnscheduledAttention.component';
 import { DoctorAllAppointmentsComponent } from './features/doctor/doctorAllAppointments/doctorAllAppointments.component';
 import { DoctorDashboardComponent } from './features/doctor/doctorDashboard/doctorDashboard.component';
+import { DoctorMedicalHistoryComponent } from './features/doctor/medicalCheckUp/medicalCheckUp.component';
 import { PatientAppointmentHistoryComponent } from './features/patient/patientAppointmentHistory/patientAppointmentHistory.component';
 import { PatientDashboardComponent } from './features/patient/patientDashboard/patientDashboard.component';
 import { RegisterComponent } from './features/register/register.component';
 import { SchedulerDashboardComponent } from './features/scheduler/pages/schedulerDashboard/schedulerDashboard.component';
 import { SchedulerHistoryComponent } from './features/scheduler/pages/schedulerHistory/schedulerHistory.component';
-import { DoctorUnscheduledAttentionComponent } from './features/doctor/components/unscheduledAttention/doctorUnscheduledAttention/doctorUnscheduledAttention.component';
 import { AppointmentAuditComponent } from './features/audit/pages/appointmentAudit/appointmentAudit.component';
 import { MedicalCheckupAuditComponent } from './features/audit/pages/medicalCheckupAudit/medicalCheckupAudit.component';
 import { UserAuditComponent } from './features/audit/pages/userAudit/userAudit.component';
@@ -64,6 +65,12 @@ export const routes: Routes = [
   {
     path: 'admin/medicos',
     component: AdminDoctorsComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'ADMIN' },
+  },
+  {
+    path: 'admin/pacientes',
+    component: AdminPatientsComponent,
     canActivate: [AuthGuard],
     data: { role: 'ADMIN' },
   },

@@ -8,6 +8,7 @@ import { PaginatedState } from '../../shared/helpers/paginatedState';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
 import { PageResponse } from '../../shared/models/dtos/pageResponse.dto';
+import { PatientUpdatePayload } from '../../shared/models/dtos/PatientUpdatePayload';
 import { UnscheduledAttention } from '../../shared/models/dtos/unscheduledAttention.dto';
 import { Doctor } from '../../shared/models/interfaces/doctor.model';
 import { Patient } from '../../shared/models/interfaces/patient.model';
@@ -110,25 +111,31 @@ export class DoctorService {
       { params }
     );
   }
-
+  // Después
   /**
-   * Obtiene una página de citas de un médico específico.
+   * Obtiene una página de citas de un médico específico, opcionalmente
+   * filtradas por paciente, fecha o estado.
    *
    * @param doctorId - ID del médico.
    * @param pageNumber - Índice de página (base 0). Por defecto 0.
    * @param pageSize - Cantidad de citas por página. Por defecto 10.
+   * @param filters.patientId - Filtra además por un paciente específico (opcional).
+   * @param filters.date - Filtra por fecha, formato `YYYY-MM-DD` (opcional).
+   * @param filters.state - Filtra por estado de cita (opcional).
    * @returns Observable con la respuesta paginada completa (content + metadata).
    */
   getAppointmentsByDoctor(
     doctorId: string,
     pageNumber = 0,
-    pageSize = 4
+    pageSize = 4,
+    filters?: { patientId?: string; date?: string; state?: string }
   ): Observable<PageResponse<AppointmentsPatient>> {
-    const params = withPagination(
-      new HttpParams().set('idDoctor', doctorId),
-      pageNumber,
-      pageSize
-    );
+    let params = new HttpParams().set('idDoctor', doctorId);
+    if (filters?.patientId) params = params.set('idPatient', filters.patientId);
+    if (filters?.date) params = params.set('date', filters.date);
+    if (filters?.state) params = params.set('state', filters.state);
+    params = withPagination(params, pageNumber, pageSize);
+
     return this.http.get<PageResponse<AppointmentsPatient>>(
       `${this.apiUrl}/appointments`,
       { params }
@@ -186,7 +193,7 @@ export class DoctorService {
 
     this.http
       .get<PageResponse<MedicalRecord>>(
-        `${this.apiUrl}/clinical-history/patient/${patientId}`,
+        `${this.apiUrl}/medical-check-up/patient/${patientId}`,
         { params }
       )
       .subscribe({
@@ -198,6 +205,22 @@ export class DoctorService {
       });
   }
 
+  /**
+   * Actualiza la descripción/observación de un control médico ya existente.
+   *
+   * @param idCheckUp - ID del control médico a actualizar.
+   * @param description - Nueva descripción/observación a guardar.
+   * @returns Observable con el control médico actualizado.
+   */
+  updateCheckup(
+    idCheckUp: string,
+    description: string | null
+  ): Observable<MedicalRecord> {
+    return this.http.post<MedicalRecord>(
+      `${this.apiUrl}/medical-check-up/updateCheckup/${idCheckUp}`,
+      { description }
+    );
+  }
   /**
    * Obtiene los datos del paciente asociado a una cita específica.
    *
@@ -255,6 +278,29 @@ export class DoctorService {
   }
 
   /**
+   * Verifica si el doctor autenticado tiene al menos una cita (de hoy) en el
+   * estado indicado. Se usa para habilitar/deshabilitar el paso 2 del modal
+   * de exportación sin depender de un conteo local sobre datos paginados.
+   *
+   * @param doctorId - ID del doctor a consultar.
+   * @param state - Estado de cita a verificar (ej. `'AGENDADA'`).
+   * @returns Observable<boolean> - `true` si existe al menos una cita de hoy con ese estado.
+   */
+  checkExistenceByDoctorAndState(
+    doctorId: string,
+    state: string
+  ): Observable<boolean> {
+    const params = new HttpParams()
+      .set('idDoctor', doctorId)
+      .set('state', state);
+
+    return this.http.get<boolean>(
+      `${this.apiUrl}/appointments/checkExistenceByDoctorAndState`,
+      { params }
+    );
+  }
+
+  /**
    * Limpia el caché en memoria de `getMe()`, forzando que la próxima
    * llamada consulte al backend en lugar de devolver el dato cacheado.
    * Útil tras editar el perfil del doctor o al cerrar sesión.
@@ -271,7 +317,20 @@ export class DoctorService {
   resetMedicalRecords(): void {
     this.medicalRecordsState.clear();
   }
-
+  /**
+   * Reemplaza todos los datos de un paciente (incluido su documento).
+   * Solo lo puede invocar un doctor.
+   *
+   * @param patientId - ID del paciente a actualizar.
+   * @param data - Datos completos del paciente.
+   * @returns Observable con el paciente ya actualizado.
+   */
+  updatePatient(
+    patientId: string,
+    data: PatientUpdatePayload
+  ): Observable<Patient> {
+    return this.http.put<Patient>(`${this.apiUrl}/patients/${patientId}`, data);
+  }
   /**
    * Limpia todo el estado en memoria del doctor
    * (perfil, historial clínico, paginación).

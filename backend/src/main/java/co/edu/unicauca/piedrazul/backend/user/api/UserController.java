@@ -3,6 +3,7 @@ package co.edu.unicauca.piedrazul.backend.user.api;
 import co.edu.unicauca.piedrazul.backend.shared.pagination.PageResponse;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemDoctorResponse;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemPatientResponse;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
 import co.edu.unicauca.piedrazul.backend.user.application.CreateAccountUseCase;
 import co.edu.unicauca.piedrazul.backend.user.application.UserService;
@@ -21,6 +22,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+import co.edu.unicauca.piedrazul.backend.shared.audit.AuditTargetType;
+import co.edu.unicauca.piedrazul.backend.shared.audit.Auditable;
+import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 
 @RestController
 @RequestMapping("/api/user")
@@ -70,7 +74,30 @@ public class    UserController {
     }
 
 
+    @GetMapping("/patients")
+    @Operation(summary = "Listar pacientes con cuenta de usuario",
+            description = "Devuelve una página de pacientes que tienen cuenta de usuario, indicando si está "
+                    + "activada o desactivada. `search` filtra por nombre completo o número de documento; el "
+                    + "orden (por nombre) no es configurable.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Pacientes obtenidos correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar pacientes")
+    })
+    public ResponseEntity<PageResponse<SystemPatientResponse>> getPatientsWithAccount(
+            @Parameter(description = "Parámetros de paginación")
+            @PageableDefault(page = 0, size = 10)
+            Pageable pageable,
+            @Parameter(description = "Nombre completo o número de documento a buscar", example = "ana ruiz")
+            @RequestParam(required = false)
+            String search) {
+        Page<SystemPatientResponse> patients = userService.getPatientsWithAccount(search, pageable);
+        return ResponseEntity.ok(PageResponse.from(patients));
+    }
+
+
     @PostMapping("/users")
+    @Auditable(action = AuditAction.USUARIO_CREADO, targetEntityType = AuditTargetType.USUARIO, onlyDenied = true)
     @Operation(summary = "Crear usuario del sistema",
             description = "Registra un nuevo usuario del sistema a partir de los datos enviados en el cuerpo de la solicitud.")
     @ApiResponses({
@@ -90,6 +117,7 @@ public class    UserController {
 
 
     @PostMapping("/{document}/give-doctor-scheduler")
+    @Auditable(action = AuditAction.ROL_ASIGNADO, targetEntityType = AuditTargetType.USUARIO, onlyDenied = true)
     @Operation(summary = "Asignar rol scheduler a un doctor",
             description = "Otorga el rol scheduler al usuario identificado por el número de documento recibido en la ruta.")
     @ApiResponses({
@@ -107,6 +135,7 @@ public class    UserController {
 
 
     @DeleteMapping("/{document}/revoke-doctor-scheduler")
+    @Auditable(action = AuditAction.ROL_REVOCADO, targetEntityType = AuditTargetType.USUARIO, onlyDenied = true)
     @Operation(summary = "Revocar rol scheduler a un doctor",
             description = "Revoca el rol scheduler del usuario identificado por el número de documento recibido en la ruta.")
     @ApiResponses({
@@ -124,6 +153,7 @@ public class    UserController {
 
 
     @PutMapping("/patients/{patientId}/activate")
+    @Auditable(action = AuditAction.USUARIO_ACTIVADO, targetEntityType = AuditTargetType.PACIENTE, targetIdExpression = "#patientId", onlyDenied = true)
     @Operation(summary = "Activar el usuario de un paciente",
             description = "Activa el usuario de Keycloak asociado al paciente, identificado por el id de su persona. "
                     + "No cambia nada si ya estaba activo.")
@@ -144,6 +174,7 @@ public class    UserController {
 
 
     @PutMapping("/patients/{patientId}/deactivate")
+    @Auditable(action = AuditAction.USUARIO_DESACTIVADO, targetEntityType = AuditTargetType.PACIENTE, targetIdExpression = "#patientId", onlyDenied = true)
     @Operation(summary = "Desactivar el usuario de un paciente",
             description = "Desactiva el usuario de Keycloak asociado al paciente, identificado por el id de su persona. "
                     + "No cambia nada si ya estaba desactivado.")

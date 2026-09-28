@@ -29,6 +29,7 @@ import {
   LucideSettings,
   LucideStethoscope,
   LucideUser,
+  LucideUserCheck,
   LucideUserCog,
   LucideUsers,
   LucideX,
@@ -58,6 +59,7 @@ import { ButtonComponent } from '../../../designSystem/atoms/button/button.compo
     LucideStethoscope,
     LucideFileText,
     LucideUser,
+    LucideUserCheck,
     LucideUserCog,
     LucideUsers,
     LucideX,
@@ -136,11 +138,6 @@ export class NavbarComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  /**
-   * True si la ruta activa actual (antes de procesar esta navegación)
-   * está marcada con `data: { confirmExitLocally: true }`, indicando que
-   * el propio componente controla la confirmación de salida.
-   */
   private isLeavingProtectedRoute(): boolean {
     let route = this.router.routerState.snapshot.root;
     while (route.firstChild) route = route.firstChild;

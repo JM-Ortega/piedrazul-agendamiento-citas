@@ -7,10 +7,10 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { LucideArrowLeft } from '@lucide/angular';
+import { LucideArrowLeft, LucideCalendarOff } from '@lucide/angular';
 import { AppService } from '../../../../core/services/app.service';
-import { PatientService } from '../../../../core/services/register.service';
 import { PatientAppointmentService } from '../../../../core/services/patient.service';
+import { PatientService } from '../../../../core/services/register.service';
 import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { AppointmentBookingComponent } from '../../components/schedulingOrchestrator/appointmentBooking.component';
@@ -18,7 +18,12 @@ import { AppointmentBookingComponent } from '../../components/schedulingOrchestr
 @Component({
   selector: 'app-patient-new-appointment',
   standalone: true,
-  imports: [LucideArrowLeft, AppointmentBookingComponent, ButtonComponent],
+  imports: [
+    LucideArrowLeft,
+    LucideCalendarOff,
+    AppointmentBookingComponent,
+    ButtonComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './patientNewAppointment.component.html',
 })
@@ -29,6 +34,8 @@ export class PatientNewAppointmentComponent implements OnInit {
   private router = inject(Router);
   private currentPatient = signal<Patient | null>(null);
   protected isNewPatient = signal<boolean>(false);
+  protected autonomousSchedulingEnabled = signal(true);
+  protected isLoadingConfig = signal(true);
 
   /**
    * Snapshot que se pasa al componente atómico.
@@ -50,6 +57,17 @@ export class PatientNewAppointmentComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.appointmentService.getAutonomousSchedulingStatus().subscribe({
+      next: (enabled) => {
+        this.autonomousSchedulingEnabled.set(enabled);
+        this.isLoadingConfig.set(false);
+      },
+      error: () => {
+        this.autonomousSchedulingEnabled.set(true);
+        this.isLoadingConfig.set(false);
+      },
+    });
+
     this.patientService.getMe().subscribe({
       next: (patient) => {
         this.currentPatient.set(patient);
@@ -66,7 +84,6 @@ export class PatientNewAppointmentComponent implements OnInit {
       },
     });
   }
-
   goBack(): void {
     this.router.navigate(['/paciente']);
   }

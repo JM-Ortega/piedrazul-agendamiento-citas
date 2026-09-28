@@ -79,6 +79,12 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     }
 
     @Override
+    public boolean existsByDoctorAndState(UUID idDoctor, AppointmentState state) {
+        LocalDate localDate = LocalDate.now();
+        return jpaRepository.existsByIdDoctorAndAppointmentStateAndDate(idDoctor, state, localDate);
+    }
+
+    @Override
     public Appointment findById(UUID appointmentId) {
         return jpaRepository.findById(appointmentId)
                 .map(mapper::toDomain)
