@@ -63,20 +63,25 @@
         @for (row of rows(); track row.id; let idx = $index) {
           <tr
             class="border-t border-gray-100 hover:brightness-95 transition-all"
-            [class.bg-red-50]="row.status === 'failed'"
-            [class.bg-white]="row.status !== 'failed' && idx % 2 === 0"
-            [class.bg-gray-50\/60]="row.status !== 'failed' && idx % 2 !== 0"
+            [class.bg-red-50]="row.outcome === 'FALLIDO'"
+            [class.bg-amber-50]="row.outcome === 'DENEGADO'"
+            [class.bg-white]="row.outcome === 'EXITOSO' && idx % 2 === 0"
+            [class.bg-gray-50\/60]="row.outcome === 'EXITOSO' && idx % 2 !== 0"
           >
             <td class="px-4 py-3">
               <p class="font-semibold text-gray-800 leading-tight">
-                {{ row.name }}
+                {{ actorLabel(row) }}
               </p>
-              <div class="mt-1"><app-role-badge [role]="row.role" /></div>
+              <div class="mt-1 flex flex-wrap gap-1">
+                @for (role of row.actorRoles; track role) {
+                  <app-role-badge [role]="role" />
+                }
+              </div>
             </td>
             <td class="px-4 py-3">
               <span
                 class="font-mono text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-lg"
-                >{{ row.userId }}</span
+                >{{ row.actorUsername ?? '—' }}</span
               >
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
@@ -88,15 +93,17 @@
               </p>
             </td>
             <td class="px-4 py-3">
-              <app-action-badge [action]="row.action" />
+              <app-action-badge
+                [label]="actionNames()[row.action] ?? row.action"
+              />
             </td>
             <td class="px-4 py-3">
-              <app-status-badge [status]="row.status" />
+              <app-status-badge [status]="row.outcome" />
             </td>
             <td class="px-4 py-3">
               <span
                 class="font-mono text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-lg"
-                >{{ row.id }}</span
+                >{{ row.targetEntityId ?? 'N/A' }}</span
               >
             </td>
           </tr>
