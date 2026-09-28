@@ -12,6 +12,7 @@ import { DoctorService } from './doctor.service';
 import { PatientService } from './register.service';
 import { PatientAppointmentService } from './patient.service';
 import { SchedulerService } from './scheduler.service';
+import { AuditService } from '../../features/audit/service/audit.service';
 
 @Injectable({ providedIn: 'root' })
 export class AppService {
@@ -22,6 +23,7 @@ export class AppService {
   private patientService = inject(PatientService);
   private patientAppointmentService = inject(PatientAppointmentService);
   private schedulerService = inject(SchedulerService);
+  private AuditService = inject(AuditService);
 
   private currentUrl = toSignal(
     this.router.events.pipe(
@@ -147,6 +149,7 @@ export class AppService {
     this.patientService.clearAllData();
     this.patientAppointmentService.clearAllData();
     this.schedulerService.clearAllData();
+    this.AuditService.clearAllData();
     // 2. Limpieza de storages del navegador (tokens locales, flags de sesión, etc.)
     localStorage.clear();
     sessionStorage.clear();
