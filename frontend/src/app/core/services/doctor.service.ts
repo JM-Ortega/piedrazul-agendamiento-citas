@@ -278,6 +278,29 @@ export class DoctorService {
   }
 
   /**
+   * Verifica si el doctor autenticado tiene al menos una cita (de hoy) en el
+   * estado indicado. Se usa para habilitar/deshabilitar el paso 2 del modal
+   * de exportación sin depender de un conteo local sobre datos paginados.
+   *
+   * @param doctorId - ID del doctor a consultar.
+   * @param state - Estado de cita a verificar (ej. `'AGENDADA'`).
+   * @returns Observable<boolean> - `true` si existe al menos una cita de hoy con ese estado.
+   */
+  checkExistenceByDoctorAndState(
+    doctorId: string,
+    state: string
+  ): Observable<boolean> {
+    const params = new HttpParams()
+      .set('idDoctor', doctorId)
+      .set('state', state);
+
+    return this.http.get<boolean>(
+      `${this.apiUrl}/appointments/checkExistenceByDoctorAndState`,
+      { params }
+    );
+  }
+
+  /**
    * Limpia el caché en memoria de `getMe()`, forzando que la próxima
    * llamada consulte al backend en lugar de devolver el dato cacheado.
    * Útil tras editar el perfil del doctor o al cerrar sesión.
