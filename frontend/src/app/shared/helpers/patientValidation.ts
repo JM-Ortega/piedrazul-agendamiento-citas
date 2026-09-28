@@ -152,20 +152,20 @@ export function validateBirthDate(value: string, documentType = ''): string {
 }
 
 /**
- * Valida un correo electrónico opcional: longitud, caracteres no permitidos y estructura general.
- * Un valor vacío se considera válido, ya que el correo es un campo opcional.
+ * Valida el correo electrónico: obligatoriedad, longitud, caracteres no permitidos y estructura general.
  *
  * @param value - Correo ingresado por el usuario.
  * @param max - Longitud máxima permitida (por defecto {@link EMAIL_MAX_DEFAULT}).
  * @returns Mensaje de error, o cadena vacía si es válido.
  */
 export function validateEmail(value: string, max = EMAIL_MAX_DEFAULT): string {
-  if (!value) return '';
-  if (value.length > max)
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return 'Este campo es obligatorio';
+  if (trimmed.length > max)
     return `El correo no puede superar los ${max} caracteres`;
-  if (INVALID_EMAIL_CHARS.test(value))
+  if (INVALID_EMAIL_CHARS.test(trimmed))
     return 'No se permiten caracteres especiales como \', ", <, >, (, ), [, ], etc.';
-  if (!VALID_EMAIL_REGEX.test(value))
+  if (!VALID_EMAIL_REGEX.test(trimmed))
     return 'La estructura del correo no es válida. Ejemplo: nombre@dominio.com';
   return '';
 }
