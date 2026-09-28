@@ -5,18 +5,32 @@ import {
   input,
 } from '@angular/core';
 
-const ROLE_CLS: Record<string, string> = {
-  paciente: 'bg-sky-100 text-sky-700 border-sky-200',
-  doctor: 'bg-blue-100 text-blue-700 border-blue-200',
-  agendador: 'bg-teal-100 text-teal-700 border-teal-200',
-  auditor: 'bg-orange-100 text-orange-700 border-orange-200',
-  administrador: 'bg-purple-100 text-purple-700 border-purple-200',
+interface RoleCfg {
+  label: string;
+  cls: string;
+}
+
+const ROLE_CFG: Record<string, RoleCfg> = {
+  ADMIN: {
+    label: 'Administrador',
+    cls: 'bg-purple-100 text-purple-700 border-purple-200',
+  },
+  SCHEDULER: {
+    label: 'Agendador',
+    cls: 'bg-teal-100 text-teal-700 border-teal-200',
+  },
+  DOCTOR: { label: 'Médico', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
+  PATIENT: { label: 'Paciente', cls: 'bg-sky-100 text-sky-700 border-sky-200' },
+  AUDITOR: {
+    label: 'Auditor',
+    cls: 'bg-orange-100 text-orange-700 border-orange-200',
+  },
 };
 
 /**
- * Badge de rol para las tablas de auditoría. Resuelve el color a partir de
- * `ROLE_CLS` (comparando en minúsculas); si el rol no está en el mapa, cae a
- * un estilo gris genérico.
+ * Badge de rol para las tablas de auditoría. Traduce el código de rol de Keycloak
+ * a su nombre en español y le asigna color; si el rol no está en `ROLE_CFG`, muestra
+ * el código tal cual con un estilo gris genérico.
  */
 @Component({
   selector: 'app-role-badge',
@@ -25,11 +39,13 @@ const ROLE_CLS: Record<string, string> = {
   templateUrl: './roleBadge.component.html',
 })
 export class RoleBadgeComponent {
-  /** Rol de quien realizó la acción (ej. 'doctor', 'paciente', 'auditor'). */
+  /** Código del rol (ej. 'DOCTOR', 'PATIENT'). */
   role = input.required<string>();
-  protected cls = computed(
+  protected cfg = computed<RoleCfg>(
     () =>
-      ROLE_CLS[this.role().toLowerCase()] ??
-      'bg-gray-100 text-gray-700 border-gray-200'
+      ROLE_CFG[this.role()] ?? {
+        label: this.role(),
+        cls: 'bg-gray-100 text-gray-700 border-gray-200',
+      }
   );
 }
