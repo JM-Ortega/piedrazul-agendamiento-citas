@@ -1,5 +1,13 @@
 <div class="min-h-screen bg-blue-50 py-4 px-4">
   <div class="max-w-7xl mx-auto space-y-6">
+    @if (errorMessage()) {
+      <div
+        class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2 text-sm"
+      >
+        ⚠️ {{ errorMessage() }}
+      </div>
+    }
+
     <div class="bg-white rounded-2xl shadow-md p-6">
       <div class="flex items-center gap-3 mb-5">
         <svg lucideUsers [size]="24" class="text-[#163c63]"></svg>
@@ -11,18 +19,25 @@
             Creación, cambios y desactivaciones
           </p>
         </div>
+        <div class="ml-auto">
+          <app-pagination
+            [pagination]="pagination()"
+            (pageChange)="onPageChange($event)"
+          ></app-pagination>
+        </div>
       </div>
 
       <app-audit-filter-bar
-        [filters]="filters()"
-        (filtersChange)="filters.set($event)"
-      />
+        [catalog]="catalog()"
+        (apply)="onApplyFilters($event)"
+      ></app-audit-filter-bar>
 
       <app-audit-table
-        [rows]="rows()"
+        [rows]="events()"
+        [actionNames]="actionNames()"
         headClass="bg-purple-50"
         headTextClass="text-purple-800"
-      />
+      ></app-audit-table>
     </div>
 
     <div

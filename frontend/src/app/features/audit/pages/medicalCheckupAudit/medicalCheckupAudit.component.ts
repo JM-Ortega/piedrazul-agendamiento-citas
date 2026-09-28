@@ -1,23 +1,24 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  computed,
   inject,
+  OnInit,
   signal,
 } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { map } from 'rxjs';
 import { LucideShield, LucideFileText } from '@lucide/angular';
-import { AuditFilters, EMPTY_AUDIT_FILTERS } from '../../models/audit.model';
-import { toRecordRow } from '../../models/audit.dto';
+import {
+  AUDIT_MODULE,
+  AUDIT_PAGE_SIZE,
+  AuditFilters,
+  EMPTY_AUDIT_FILTERS,
+} from '../../models/audit.model';
 import { AuditTableComponent } from '../../components/auditTable/auditTable.component';
 import { AuditFilterBarComponent } from '../../components/auditFilterBar/auditFilterBar.component';
+import { PaginationComponent } from '../../../../designSystem/molecules/pagination/pagination.component';
 import { AuditService } from '../../service/audit.service';
 
 /**
- * Page de auditoría de control médico: trae los logs de `AuditService`, los
- * normaliza a `AuditRow` con `toRecordRow` y aplica los filtros de
- * `AuditFilterBarComponent` antes de pasarlos a `AuditTableComponent`.
+ * Page de auditoría de control médico: consulta a `AuditService` los registros del módulo `AUDIT_MODULE.medicalCheckup`
  */
 @Component({
   selector: 'app-medical-checkup-audit',
@@ -27,33 +28,60 @@ import { AuditService } from '../../service/audit.service';
     LucideFileText,
     AuditTableComponent,
     AuditFilterBarComponent,
+    PaginationComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './medicalCheckupAudit.component.html',
 })
-export class MedicalCheckupAuditComponent {
+export class MedicalCheckupAuditComponent implements OnInit {
   private auditService = inject(AuditService);
 
-  /** Filtros activos de búsqueda/estado/fecha, controlados por la filter bar. */
-  protected filters = signal<AuditFilters>(EMPTY_AUDIT_FILTERS);
+  protected readonly events = this.auditService.events;
+  protected readonly pagination = this.auditService.pagination;
+  protected readonly catalog = this.auditService.catalog;
+  protected readonly actionNames = this.auditService.actionNames;
 
-  /** Logs de auditoría de control médico, ya normalizados a `AuditRow`. */
-  private recordLogs = toSignal(
+  protected errorMessage = signal('');
+
+  /** Filtros aplicados. Se conservan al cambiar de página; la barra mantiene aparte los que el usuario está editando. */
+  private filters = signal<AuditFilters>(EMPTY_AUDIT_FILTERS);
+
+  ngOnInit(): void {
+    this.auditService.clearEvents();
+    this.auditService.loadCatalog().subscribe({
+      error: (err: { message: string }) =>
+        this.errorMessage.set(
+          'No se pudieron cargar los filtros: ' + err.message
+        ),
+    });
+    this.loadEvents(0);
+  }
+
+  /** Aplica los filtros recibidos y vuelve a la primera página. */
+  protected onApplyFilters(filters: AuditFilters): void {
+    this.filters.set(filters);
+    this.loadEvents(0);
+  }
+
+  /** Navega a la página indicada manteniendo los filtros aplicados. */
+  protected onPageChange(pageNumber: number): void {
+    this.loadEvents(pageNumber);
+  }
+
+  private loadEvents(pageNumber: number): void {
+    this.errorMessage.set('');
     this.auditService
-      .getMedicalRecordLogs()
-      .pipe(map((logs) => logs.map(toRecordRow))),
-    { initialValue: [] }
-  );
-
-  /** Filas a mostrar en la tabla: `recordLogs` filtradas por `filters`. */
-  protected rows = computed(() => {
-    const f = this.filters();
-    const q = f.search.toLowerCase();
-    return this.recordLogs().filter(
-      (row) =>
-        (!q || row.name.toLowerCase().includes(q)) &&
-        (f.status === 'all' || row.status === f.status) &&
-        (!f.date || row.timestamp.startsWith(f.date))
-    );
-  });
+      .loadEvents({
+        ...this.filters(),
+        moduleCode: AUDIT_MODULE.medicalCheckup,
+        pageNumber,
+        pageSize: AUDIT_PAGE_SIZE,
+      })
+      .subscribe({
+        error: (err: { message: string }) =>
+          this.errorMessage.set(
+            'No se pudieron cargar los registros: ' + err.message
+          ),
+      });
+  }
 }
