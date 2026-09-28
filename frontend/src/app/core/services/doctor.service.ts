@@ -8,6 +8,7 @@ import { PaginatedState } from '../../shared/helpers/paginatedState';
 import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
 import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
 import { PageResponse } from '../../shared/models/dtos/pageResponse.dto';
+import { PatientUpdatePayload } from '../../shared/models/dtos/PatientUpdatePayload';
 import { UnscheduledAttention } from '../../shared/models/dtos/unscheduledAttention.dto';
 import { Doctor } from '../../shared/models/interfaces/doctor.model';
 import { Patient } from '../../shared/models/interfaces/patient.model';
@@ -293,7 +294,20 @@ export class DoctorService {
   resetMedicalRecords(): void {
     this.medicalRecordsState.clear();
   }
-
+  /**
+   * Reemplaza todos los datos de un paciente (incluido su documento).
+   * Solo lo puede invocar un doctor.
+   *
+   * @param patientId - ID del paciente a actualizar.
+   * @param data - Datos completos del paciente.
+   * @returns Observable con el paciente ya actualizado.
+   */
+  updatePatient(
+    patientId: string,
+    data: PatientUpdatePayload
+  ): Observable<Patient> {
+    return this.http.put<Patient>(`${this.apiUrl}/patients/${patientId}`, data);
+  }
   /**
    * Limpia todo el estado en memoria del doctor
    * (perfil, historial clínico, paginación).

@@ -1,4 +1,6 @@
 <div class="min-2h-screen py-2 px-6">
+  <app-toast [message]="toastMessage()" [type]="toastType()"></app-toast>
+
   <div class="max-w-8xl mx-auto">
     @if (isLoadingPatient()) {
       <div class="flex items-center justify-center py-12">
@@ -29,7 +31,7 @@
       <div
         class="bg-white rounded-2xl shadow-md px-6 py-3 mb-3 border border-blue-100"
       >
-        <!-- Encabezado con Avatar, Nombre y Botón de Desplegar -->
+        <!-- Encabezado con Avatar, Nombre y Botones -->
         <div class="flex items-center justify-between flex-wrap">
           <div class="flex items-center gap-2">
             <!-- Icono del paciente -->
@@ -50,94 +52,136 @@
               </p>
             </div>
           </div>
-          <!-- Botón desplegable -->
-          <button
-            (click)="toggleInfo()"
-            class="flex items-center text-sm font-medium text-[#215c98] border border-[#215c98]/30 rounded-lg px-4 py-1 hover:bg-[#215c98]/10 hover:border-[#215c98]/60 transition-all duration-200 select-none cursor-pointer"
-          >
-            <span>{{
-              mostrarInfo() ? 'Ocultar información' : 'Ver más información'
-            }}</span>
-            <svg
-              class="w-4 h-4 transition-transform duration-200"
-              [class.rotate-180]="mostrarInfo()"
-              viewBox="0 0 20 20"
-              fill="currentColor"
+
+          <div class="flex items-center gap-2">
+            <!-- Editar paciente: ícono con tooltip, visible solo con info desplegada y fuera de edición -->
+            @if (mostrarInfo() && !isEditingPatient()) {
+              <button
+                (click)="startEditPatient()"
+                appTooltip="Editar paciente"
+                appTooltipPosition="top"
+                class="flex items-center justify-center w-9 h-9 rounded-lg border border-[#215c98]/30 text-[#215c98] hover:bg-[#215c98]/10 hover:border-[#215c98]/60 transition-all duration-200 select-none cursor-pointer"
+              >
+                <svg lucidePencil [size]="16"></svg>
+              </button>
+            }
+
+            <!-- Botón desplegable -->
+            <button
+              (click)="toggleInfo()"
+              [disabled]="isEditingPatient()"
+              class="flex items-center text-sm font-medium text-[#215c98] border border-[#215c98]/30 rounded-lg px-4 py-1 hover:bg-[#215c98]/10 hover:border-[#215c98]/60 transition-all duration-200 select-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <path
-                fill-rule="evenodd"
-                d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-                clip-rule="evenodd"
-              />
-            </svg>
-          </button>
+              <span>{{
+                mostrarInfo() ? 'Ocultar información' : 'Ver más información'
+              }}</span>
+              <svg
+                class="w-4 h-4 transition-transform duration-200"
+                [class.rotate-180]="mostrarInfo()"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <!-- Contenido Desplegable -->
         @if (mostrarInfo()) {
-          <div
-            class="grid grid-cols-1 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-7 gap-5 mt-1 pt-2 pb-3 border-t border-gray-100"
-          >
-            <div>
-              <p class="text-gray-400 text-xs font-medium tracking-wider mb-1">
-                {{ patient()!.identificationType | formato }}
-              </p>
-              <p class="text-gray-800 text-sm md:text-sm font-semibold">
-                {{ patient()!.identification }}
-              </p>
+          @if (isEditingPatient()) {
+            <!-- Panel de edición de paciente (componente separado) -->
+            <div class="mt-1 pt-3 pb-1 border-t border-gray-100">
+              <app-patient-edit-panel
+                [patient]="patient()!"
+                (saved)="onPatientSaved($event)"
+                (cancelled)="cancelEditPatient()"
+              ></app-patient-edit-panel>
             </div>
-            <div>
-              <p class="text-gray-400 text-xs font-medium tracking-wider mb-1">
-                Fecha de Nacimiento
-              </p>
-              <p class="text-gray-800 text-sm md:text-sm font-semibold">
-                {{ patientBirthDateFormatted() }}
-              </p>
+          } @else {
+            <!-- Vista de solo lectura -->
+            <div
+              class="grid grid-cols-1 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-7 gap-5 mt-1 pt-2 pb-3 border-t border-gray-100"
+            >
+              <div>
+                <p
+                  class="text-gray-400 text-xs font-medium tracking-wider mb-1"
+                >
+                  {{ patient()!.identificationType | formato }}
+                </p>
+                <p class="text-gray-800 text-sm md:text-sm font-semibold">
+                  {{ patient()!.identification }}
+                </p>
+              </div>
+              <div>
+                <p
+                  class="text-gray-400 text-xs font-medium tracking-wider mb-1"
+                >
+                  Fecha de Nacimiento
+                </p>
+                <p class="text-gray-800 text-sm md:text-sm font-semibold">
+                  {{ patientBirthDateFormatted() }}
+                </p>
+              </div>
+              <div>
+                <p
+                  class="text-gray-400 text-xs font-medium tracking-wider mb-1"
+                >
+                  Edad
+                </p>
+                <p class="text-gray-800 text-sm md:text-sm font-semibold">
+                  {{ patientAge() }} años
+                </p>
+              </div>
+              <div>
+                <p
+                  class="text-gray-400 text-xs font-medium tracking-wider mb-1"
+                >
+                  Sexo
+                </p>
+                <p class="text-gray-800 text-sm md:text-sm font-semibold">
+                  {{ patient()!.sex | formato }}
+                </p>
+              </div>
+              <div>
+                <p
+                  class="text-gray-400 text-xs font-medium tracking-wider mb-1"
+                >
+                  Teléfono
+                </p>
+                <p class="text-gray-800 text-sm md:text-sm font-semibold">
+                  {{ patient()!.phone }}
+                </p>
+              </div>
+              <div>
+                <p
+                  class="text-gray-400 text-xs font-medium tracking-wider mb-1"
+                >
+                  Correo Electrónico
+                </p>
+                <p
+                  class="text-gray-800 text-sm md:text-sm font-semibold truncate"
+                  [title]="patient()!.email"
+                >
+                  {{ patient()!.email || 'No registra' }}
+                </p>
+              </div>
+              <div>
+                <p
+                  class="text-gray-400 text-xs font-medium tracking-wider mb-1"
+                >
+                  Teléfono Acudiente
+                </p>
+                <p class="text-gray-800 text-sm md:text-sm font-semibold">
+                  {{ patient()!.guardianPhone || 'No registra' }}
+                </p>
+              </div>
             </div>
-            <div>
-              <p class="text-gray-400 text-xs font-medium tracking-wider mb-1">
-                Edad
-              </p>
-              <p class="text-gray-800 text-sm md:text-sm font-semibold">
-                {{ patientAge() }} años
-              </p>
-            </div>
-            <div>
-              <p class="text-gray-400 text-xs font-medium tracking-wider mb-1">
-                Sexo
-              </p>
-              <p class="text-gray-800 text-sm md:text-sm font-semibold">
-                {{ patient()!.sex | formato }}
-              </p>
-            </div>
-            <div>
-              <p class="text-gray-400 text-xs font-medium tracking-wider mb-1">
-                Teléfono
-              </p>
-              <p class="text-gray-800 text-sm md:text-sm font-semibold">
-                {{ patient()!.phone }}
-              </p>
-            </div>
-            <div>
-              <p class="text-gray-400 text-xs font-medium tracking-wider mb-1">
-                Correo Electrónico
-              </p>
-              <p
-                class="text-gray-800 text-sm md:text-sm font-semibold truncate"
-                [title]="patient()!.email"
-              >
-                {{ patient()!.email || 'No registra' }}
-              </p>
-            </div>
-            <div>
-              <p class="text-gray-400 text-xs font-medium tracking-wider mb-1">
-                Teléfono Acudiente
-              </p>
-              <p class="text-gray-800 text-sm md:text-sm font-semibold">
-                {{ patient()!.guardianPhone || 'No registra' }}
-              </p>
-            </div>
-          </div>
+          }
         }
       </div>
       <!-- Layout de dos columnas -->
@@ -152,7 +196,6 @@
               {{ isEditMode() ? 'Editar Observación' : 'Agregar Observación' }}
             </h5>
 
-            <!-- Textarea con mayor altura (rows="7") y altura mínima personalizada -->
             <textarea
               [value]="newObservation()"
               (input)="onObservationChange($any($event.target).value)"
@@ -172,12 +215,12 @@
 
             @if (saveError()) {
               <div
-                class="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-xl mb-3"
+                class="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-xl mb-3 flex items-center gap-2"
               >
-                ⚠️ {{ saveError() }}
+                <svg lucideTriangleAlert [size]="18" class="shrink-0"></svg>
+                <span>{{ saveError() }}</span>
               </div>
             }
-
             <div>
               <app-button
                 variant="primary"
