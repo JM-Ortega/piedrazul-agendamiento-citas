@@ -1,172 +1,111 @@
-import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
-import { delay } from 'rxjs/operators';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { Observable, of, tap } from 'rxjs';
+import { environment } from '../../../../environments/environment';
+import { PaginatedState } from '../../../shared/helpers/paginatedState';
+import { PageResponse } from '../../../shared/models/dtos/pageResponse.dto';
+import { withPagination } from '../../../shared/helpers/httpPagination';
 import {
-  AppointmentAuditLog,
-  UserManagementAuditLog,
-  MedicalRecordAuditLog,
+  AuditEventResponse,
+  AuditFilterCatalog,
+  AuditQueryParams,
 } from '../models/audit.dto';
 
-const MOCK_APPOINTMENT_LOGS: AppointmentAuditLog[] = [
-  {
-    id: 'apt-001',
-    timestamp: '2026-09-18T08:15:00',
-    name: 'Camila Restrepo',
-    role: 'agendador',
-    userId: '1085647123',
-    action: 'scheduled',
-    status: 'success',
-  },
-  {
-    id: 'apt-002',
-    timestamp: '2026-09-18T10:42:00',
-    name: 'Camila Restrepo',
-    role: 'agendador',
-    userId: '1085647123',
-    action: 'scheduled',
-    status: 'success',
-  },
-  {
-    id: 'apt-003',
-    timestamp: '2026-09-19T14:05:00',
-    name: 'Jorge Salazar',
-    role: 'paciente',
-    userId: '1098234567',
-    action: 'cancelled',
-    status: 'success',
-  },
-  {
-    id: 'apt-004',
-    timestamp: '2026-09-20T09:00:00',
-    name: 'Laura Gómez',
-    role: 'agendador',
-    userId: '1085612345',
-    action: 'scheduled',
-    status: 'failed',
-  },
-  {
-    id: 'apt-005',
-    timestamp: '2026-09-21T16:30:00',
-    name: 'Andrés Pardo',
-    role: 'doctor',
-    userId: '1091234789',
-    action: 'cancelled',
-    status: 'failed',
-  },
-];
-
-const MOCK_USER_LOGS: UserManagementAuditLog[] = [
-  {
-    id: 'usr-001',
-    timestamp: '2026-09-10T09:00:00',
-    name: 'Diana Martínez',
-    role: 'administrador',
-    userId: '1075632112',
-    action: 'created',
-    status: 'success',
-  },
-  {
-    id: 'usr-002',
-    timestamp: '2026-09-12T11:20:00',
-    name: 'Diana Martínez',
-    role: 'administrador',
-    userId: '1075632112',
-    action: 'modified',
-    status: 'success',
-  },
-  {
-    id: 'usr-003',
-    timestamp: '2026-09-14T15:45:00',
-    name: 'Diana Martínez',
-    role: 'administrador',
-    userId: '1075632112',
-    action: 'deactivated',
-    status: 'success',
-  },
-  {
-    id: 'usr-004',
-    timestamp: '2026-09-17T08:30:00',
-    name: 'Sebastián Rojas',
-    role: 'administrador',
-    userId: '1091223344',
-    action: 'activated',
-    status: 'failed',
-  },
-  {
-    id: 'usr-005',
-    timestamp: '2026-09-21T13:10:00',
-    name: 'Diana Martínez',
-    role: 'administrador',
-    userId: '1075632112',
-    action: 'modified',
-    status: 'success',
-  },
-];
-
-const MOCK_RECORD_LOGS: MedicalRecordAuditLog[] = [
-  {
-    id: 'rec-001',
-    timestamp: '2026-09-11T10:00:00',
-    name: 'Andrés Pardo',
-    role: 'doctor',
-    userId: '1091234789',
-    action: 'created',
-    status: 'success',
-  },
-  {
-    id: 'rec-002',
-    timestamp: '2026-09-13T09:15:00',
-    name: 'Andrés Pardo',
-    role: 'doctor',
-    userId: '1091234789',
-    action: 'created',
-    status: 'success',
-  },
-  {
-    id: 'rec-003',
-    timestamp: '2026-09-16T12:40:00',
-    name: 'Valentina Torres',
-    role: 'doctor',
-    userId: '1093456712',
-    action: 'created',
-    status: 'success',
-  },
-  {
-    id: 'rec-004',
-    timestamp: '2026-09-19T17:05:00',
-    name: 'Valentina Torres',
-    role: 'doctor',
-    userId: '1093456712',
-    action: 'created',
-    status: 'failed',
-  },
-  {
-    id: 'rec-005',
-    timestamp: '2026-09-21T08:50:00',
-    name: 'Andrés Pardo',
-    role: 'doctor',
-    userId: '1091234789',
-    action: 'created',
-    status: 'failed',
-  },
-];
-
-/**
- * Servicio mock: misma forma que tendrá el servicio real contra el backend
- * (un Observable por cada uno de los 3 logs). Reemplazar los `of(...)` por
- * las llamadas HTTP correspondientes cuando el endpoint exista.
- */
 @Injectable({ providedIn: 'root' })
 export class AuditService {
-  getAppointmentLogs(): Observable<AppointmentAuditLog[]> {
-    return of(MOCK_APPOINTMENT_LOGS).pipe(delay(300));
+  private http = inject(HttpClient);
+  private apiUrl = environment.apiUrl;
+
+  /** Registros de auditoría cargados de forma paginada (contenido + metadata). */
+  private readonly eventsState = new PaginatedState<AuditEventResponse>();
+  /** Registros de la página actualmente cargada.*/
+  readonly events = this.eventsState.content;
+  /** Metadata de paginación de la última carga. */
+  readonly pagination = this.eventsState.pagination;
+
+  private readonly _catalog = signal<AuditFilterCatalog | null>(null);
+  /** Catálogo de filtros del backend. */
+  readonly catalog = this._catalog.asReadonly();
+  /** Nombre legible de cada acción, indexado por su código. */
+  readonly actionNames = computed<Record<string, string>>(() =>
+    Object.fromEntries(
+      (this._catalog()?.actions ?? []).map((a) => [a.code, a.name])
+    )
+  );
+
+  /**
+   * Carga el catálogo de filtros y lo deja en el signal `catalog`.
+   */
+  loadCatalog(): Observable<AuditFilterCatalog> {
+    const cached = this._catalog();
+    if (cached) {
+      return of(cached);
+    }
+    return this.http
+      .get<AuditFilterCatalog>(`${this.apiUrl}/audit/catalog/filters`)
+      .pipe(tap((catalog) => this._catalog.set(catalog)));
   }
 
-  getUserManagementLogs(): Observable<UserManagementAuditLog[]> {
-    return of(MOCK_USER_LOGS).pipe(delay(300));
+  /**
+   * Carga una página de registros de auditoría según los filtros dados y
+   * actualiza los signals `events`/`pagination` con el resultado.
+   *
+   * @param params.from primer día del rango, `YYYY-MM-DD` (opcional)
+   * @param params.to último día del rango, `YYYY-MM-DD` (opcional)
+   * @param params.moduleCode módulo al que pertenecen las acciones (opcional)
+   * @param params.outcome resultado de la acción (opcional)
+   * @param params.search texto a buscar en nombre o documento del actor (opcional)
+   * @param params.pageNumber número de página a solicitar, base 0
+   * @param params.pageSize cantidad de registros por página
+   */
+  loadEvents(
+    params?: AuditQueryParams
+  ): Observable<PageResponse<AuditEventResponse>> {
+    return this.getEvents(params).pipe(
+      tap((page) => this.eventsState.set(page))
+    );
   }
 
-  getMedicalRecordLogs(): Observable<MedicalRecordAuditLog[]> {
-    return of(MOCK_RECORD_LOGS).pipe(delay(300));
+  /**
+   * Realiza la petición HTTP GET paginada de registros de auditoría,
+   * enviando solo los filtros que tienen valor.
+   */
+  private getEvents(
+    params?: AuditQueryParams
+  ): Observable<PageResponse<AuditEventResponse>> {
+    let httpParams = new HttpParams();
+    if (params?.from) httpParams = httpParams.set('from', params.from);
+    if (params?.to) httpParams = httpParams.set('to', params.to);
+    if (params?.moduleCode)
+      httpParams = httpParams.set('moduleCode', params.moduleCode);
+    if (params?.outcome) httpParams = httpParams.set('outcome', params.outcome);
+    if (params?.search?.trim())
+      httpParams = httpParams.set('search', params.search.trim());
+    httpParams = withPagination(
+      httpParams,
+      params?.pageNumber,
+      params?.pageSize
+    );
+
+    return this.http.get<PageResponse<AuditEventResponse>>(
+      `${this.apiUrl}/audit`,
+      { params: httpParams }
+    );
+  }
+
+  /**
+   * Vacía los registros cargados. Se usa al entrar a una page de auditoría
+   * para no mostrar por un instante los registros de otra.
+   */
+  clearEvents(): void {
+    this.eventsState.clear();
+  }
+
+  /**
+   * Borra toda la caché en memoria al cerrar sesión
+   */
+  clearAllData(): void {
+    this.eventsState.clear();
+    this._catalog.set(null);
   }
 }
