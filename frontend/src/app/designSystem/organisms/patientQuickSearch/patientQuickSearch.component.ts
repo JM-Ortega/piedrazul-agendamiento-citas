@@ -13,7 +13,9 @@ import {
   LucideX,
 } from '@lucide/angular';
 import { SchedulerService } from '../../../core/services/scheduler.service';
+import { PaginatedState } from '../../../shared/helpers/paginatedState';
 import { PatientQuickResult } from '../../../shared/models/dtos/patientQuickResult.dto';
+import { PaginationComponent } from '../../molecules/pagination/pagination.component';
 import { SearchInputComponent } from '../../molecules/searchInput/searchInput.component';
 
 @Component({
@@ -25,6 +27,7 @@ import { SearchInputComponent } from '../../molecules/searchInput/searchInput.co
     LucideX,
     LucideArrowRight,
     LucideFileText,
+    PaginationComponent,
   ],
   templateUrl: './patientQuickSearch.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -36,26 +39,38 @@ export class PatientQuickSearchComponent {
 
   patientSelected = output<PatientQuickResult>();
   cleared = output<void>();
-
-  results = signal<PatientQuickResult[]>([]);
   loading = signal(false);
   showDropdown = false;
 
+  private readonly searchState = new PaginatedState<PatientQuickResult>();
+  readonly results = this.searchState.content;
+  readonly pagination = this.searchState.pagination;
+  private currentTerm = '';
+
   onSearchChange(term: string): void {
+    this.currentTerm = term;
     if (!term) {
-      this.results.set([]);
+      this.searchState.clear();
       this.showDropdown = false;
       return;
     }
     this.showDropdown = true;
+    this.loadPage(0);
+  }
+
+  onPageChange(page: number): void {
+    this.loadPage(page);
+  }
+
+  private loadPage(page: number): void {
     this.loading.set(true);
-    this.schedulerService.searchPatients(term).subscribe({
-      next: (page) => {
-        this.results.set(page.content);
+    this.schedulerService.searchPatients(this.currentTerm, page, 7).subscribe({
+      next: (res) => {
+        this.searchState.set(res);
         this.loading.set(false);
       },
       error: () => {
-        this.results.set([]);
+        this.searchState.clear();
         this.loading.set(false);
       },
     });

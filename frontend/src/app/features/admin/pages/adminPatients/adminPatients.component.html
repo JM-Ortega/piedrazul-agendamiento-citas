@@ -35,14 +35,20 @@
         </div>
 
         @if (searched()) {
-          <p
-            class="text-gray-400 text-xs font-semibold uppercase tracking-wide mb-2"
-          >
-            {{ results().length }} resultado{{
-              results().length === 1 ? '' : 's'
-            }}
-            encontrado{{ results().length === 1 ? '' : 's' }}
-          </p>
+          @let total = pagination()?.totalElements ?? results().length;
+          <div class="flex items-center justify-between mb-2">
+            <p
+              class="text-gray-400 text-xs font-semibold uppercase tracking-wide"
+            >
+              {{ total }} resultado{{ total === 1 ? '' : 's' }} encontrado{{
+                total === 1 ? '' : 's'
+              }}
+            </p>
+            <app-pagination
+              [pagination]="pagination()"
+              (pageChange)="onPageChange($event)"
+            ></app-pagination>
+          </div>
 
           @if (results().length === 0 && !loading()) {
             <p class="text-gray-400 text-sm py-6 text-center">

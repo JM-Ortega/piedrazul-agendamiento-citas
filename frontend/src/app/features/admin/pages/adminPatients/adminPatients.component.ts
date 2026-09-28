@@ -15,7 +15,9 @@ import {
   LucideUser,
   LucideX,
 } from '@lucide/angular';
+import { PaginationComponent } from '../../../../designSystem/molecules/pagination/pagination.component';
 import { SearchInputComponent } from '../../../../designSystem/molecules/searchInput/searchInput.component';
+import { PaginatedState } from '../../../../shared/helpers/paginatedState';
 import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { SystemPatient } from '../../../../shared/models/interfaces/systemPatient.model';
@@ -61,6 +63,7 @@ type AccountAction = 'deactivate' | 'activate';
     LucideCircleCheck,
     LucideShieldAlert,
     LucideX,
+    PaginationComponent,
   ],
 })
 export class AdminPatientsComponent {
@@ -70,6 +73,9 @@ export class AdminPatientsComponent {
   results = signal<SystemPatient[]>([]);
   loading = signal(false);
   searched = signal(false);
+  private readonly searchState = new PaginatedState<SystemPatient>();
+  readonly pagination = this.searchState.pagination;
+  private currentTerm = '';
 
   // ── Selección + detalle ──────────────────────────────────────────────────
   selectedPatient = signal<SystemPatient | null>(null);
@@ -96,20 +102,32 @@ export class AdminPatientsComponent {
 
   // ── Búsqueda ──────────────────────────────────────────────────────────────
   onSearchChange(term: string): void {
+    this.currentTerm = term;
     if (!term) {
       this.results.set([]);
+      this.searchState.clear();
       this.searched.set(false);
       return;
     }
     this.searched.set(true);
+    this.loadSearchPage(0);
+  }
+
+  onPageChange(page: number): void {
+    this.loadSearchPage(page);
+  }
+
+  private loadSearchPage(page: number): void {
     this.loading.set(true);
-    this.adminService.searchPatients(term).subscribe({
-      next: (page) => {
-        this.results.set(page.content);
+    this.adminService.searchPatients(this.currentTerm, page).subscribe({
+      next: (res) => {
+        this.searchState.set(res);
+        this.results.set(res.content);
         this.loading.set(false);
       },
       error: () => {
         this.results.set([]);
+        this.searchState.clear();
         this.loading.set(false);
       },
     });

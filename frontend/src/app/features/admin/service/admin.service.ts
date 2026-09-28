@@ -310,7 +310,7 @@ export class AdminService {
   searchPatients(
     search: string,
     page = 0,
-    size = 10
+    size = 7
   ): Observable<PageResponse<SystemPatient>> {
     return this.http.get<PageResponse<SystemPatient>>(
       `${this.apiUrl}/user/patients`,
