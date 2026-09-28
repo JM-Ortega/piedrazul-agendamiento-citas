@@ -75,7 +75,7 @@
                         >
                           {{ p.firstName }} {{ p.lastName }}
                         </p>
-                        @if (bannedPatientIds().has(p.id)) {
+                        @if (!p.accountEnabled) {
                           <span
                             class="text-red-700 bg-red-100 text-[11px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
                           >
@@ -93,7 +93,7 @@
                         class="text-gray-500 text-xs flex items-center gap-1 mt-0.5"
                       >
                         <svg lucideFileText [size]="12"></svg>
-                        Doc: {{ p.identification }}
+                        Doc: {{ p.documentId }}
                       </p>
                     </div>
                   </div>
@@ -117,7 +117,7 @@
 
       <!-- Columna derecha: detalle del paciente -->
       <div
-        class="bg-white rounded-xl shadow-md border border-[#d9e9f8] p-4 md:p-5 min-h-[320px]"
+        class="bg-white rounded-xl shadow-md border border-[#d9e9f8] p-4 md:p-5 min-h-80"
       >
         @if (!selectedPatient()) {
           <div
@@ -193,7 +193,7 @@
             <div
               class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 flex items-center gap-2 text-sm mb-4"
             >
-              <svg lucideAlertCircle [size]="18" class="shrink-0"></svg>
+              <svg lucideCircleAlert [size]="18" class="shrink-0"></svg>
               {{ detailError() }}
             </div>
           } @else if (patientDetail(); as detail) {
@@ -253,7 +253,7 @@
             <div class="bg-red-50 border border-red-200 rounded-xl p-4">
               <div class="flex items-start gap-2.5 mb-3">
                 <svg
-                  lucideAlertCircle
+                  lucideCircleAlert
                   [size]="18"
                   class="text-red-500 mt-0.5 shrink-0"
                 ></svg>
@@ -262,33 +262,41 @@
                     Control de Acceso y Estado del Paciente
                   </p>
                   <p class="text-red-600 text-xs mt-0.5">
-                    Al bloquear al paciente se revocará su acceso a reservar o
-                    agendar citas en línea en la plataforma web.
+                    @if (isBanned()) {
+                      Este paciente no puede reservar ni agendar citas en línea.
+                      Puede reactivar su acceso en cualquier momento.
+                    } @else {
+                      Al bloquear al paciente se revocará su acceso a reservar o
+                      agendar citas en línea en la plataforma web.
+                    }
                   </p>
                 </div>
               </div>
 
-              @if (banError()) {
+              @if (actionError()) {
                 <div
                   class="bg-red-100 text-red-800 text-xs rounded-lg px-3 py-2 mb-3"
                 >
-                  {{ banError() }}
+                  {{ actionError() }}
                 </div>
               }
 
               @if (isBanned()) {
-                <div
-                  class="bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-lg px-4 py-2.5 text-center"
+                <button
+                  type="button"
+                  (click)="openConfirm('activate')"
+                  class="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  Paciente bloqueado en esta sesión
-                </div>
+                  <svg lucideCircleCheck [size]="16"></svg>
+                  Reactivar Paciente
+                </button>
               } @else {
                 <button
                   type="button"
-                  (click)="openBanConfirm()"
+                  (click)="openConfirm('deactivate')"
                   class="w-full bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <svg lucideAlertCircle [size]="16"></svg>
+                  <svg lucideCircleAlert [size]="16"></svg>
                   Banear / Bloquear Paciente
                 </button>
               }
@@ -300,14 +308,14 @@
   </div>
 </div>
 
-<!-- Modal de confirmación de baneo -->
-@if (showBanConfirm()) {
+<!-- Modal de confirmación (bloquear / reactivar) -->
+@if (pendingAction(); as action) {
   <div
     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
     role="button"
     tabindex="0"
-    (click)="closeBanConfirm()"
-    (keydown.escape)="closeBanConfirm()"
+    (click)="closeConfirm()"
+    (keydown.escape)="closeConfirm()"
   >
     <div
       class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md"
@@ -317,37 +325,57 @@
       (keydown)="$event.stopPropagation()"
     >
       <div class="flex flex-col items-center text-center">
-        <div class="bg-red-100 rounded-full p-4 mb-4">
-          <svg lucideAlertCircle [size]="40" class="text-red-600"></svg>
+        <div
+          [class]="
+            'rounded-full p-4 mb-4 ' +
+            (action === 'deactivate' ? 'bg-red-100' : 'bg-green-100')
+          "
+        >
+          @if (action === 'deactivate') {
+            <svg lucideCircleAlert [size]="40" class="text-red-600"></svg>
+          } @else {
+            <svg lucideCircleCheck [size]="40" class="text-green-600"></svg>
+          }
         </div>
         <h2 class="text-xl font-bold text-gray-800 mb-2">
-          ¿Bloquear a {{ selectedPatient()?.firstName }}
+          {{ action === 'deactivate' ? '¿Bloquear a ' : '¿Reactivar a '
+          }}{{ selectedPatient()?.firstName }}
           {{ selectedPatient()?.lastName }}?
         </h2>
         <p class="text-gray-600 text-sm mb-6">
-          Esta acción revocará su acceso para agendar citas en línea hasta que
-          se reactive manualmente.
+          @if (action === 'deactivate') {
+            Esta acción revocará su acceso para agendar citas en línea hasta que
+            se reactive manualmente.
+          } @else {
+            El paciente recuperará su acceso para reservar y agendar citas en
+            línea.
+          }
         </p>
         <div class="flex flex-col-reverse sm:flex-row gap-3 w-full">
           <button
-            (click)="closeBanConfirm()"
-            [disabled]="banning()"
+            (click)="closeConfirm()"
+            [disabled]="updating()"
             class="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl transition-colors text-base font-medium disabled:opacity-60"
           >
             Cancelar
           </button>
           <button
-            (click)="confirmBan()"
-            [disabled]="banning()"
-            class="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl transition-colors text-base font-medium flex items-center justify-center gap-2 disabled:opacity-60"
+            (click)="confirmAccountChange()"
+            [disabled]="updating()"
+            [class]="
+              'flex-1 px-6 py-3 text-white rounded-xl transition-colors text-base font-medium flex items-center justify-center gap-2 disabled:opacity-60 ' +
+              (action === 'deactivate'
+                ? 'bg-red-600 hover:bg-red-700'
+                : 'bg-green-600 hover:bg-green-700')
+            "
           >
-            @if (banning()) {
+            @if (updating()) {
               <span
                 class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
               ></span>
-              Bloqueando...
+              {{ action === 'deactivate' ? 'Bloqueando...' : 'Reactivando...' }}
             } @else {
-              Sí, Bloquear
+              {{ action === 'deactivate' ? 'Sí, Bloquear' : 'Sí, Reactivar' }}
             }
           </button>
         </div>

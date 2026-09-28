@@ -6,7 +6,8 @@ import {
   signal,
 } from '@angular/core';
 import {
-  LucideAlertCircle,
+  LucideCircleAlert,
+  LucideCircleCheck,
   LucideFileText,
   LucideMail,
   LucidePhone,
@@ -15,8 +16,9 @@ import {
   LucideX,
 } from '@lucide/angular';
 import { SearchInputComponent } from '../../../../designSystem/molecules/searchInput/searchInput.component';
-import { PatientQuickResult } from '../../../../shared/models/dtos/patientQuickResult.dto';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { Patient } from '../../../../shared/models/interfaces/patient.model';
+import { SystemPatient } from '../../../../shared/models/interfaces/systemPatient.model';
 import { AdminService } from '../../service/admin.service';
 
 const SEX_LABELS: Record<string, string> = {
@@ -31,17 +33,18 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   PASAPORTE: 'PAS',
 };
 
+/** Acción pendiente de confirmación sobre la cuenta del paciente. */
+type AccountAction = 'deactivate' | 'activate';
+
 /**
  * Panel de administración de pacientes: búsqueda, consulta de perfil
- * completo y control de acceso (banear/bloquear).
+ * completo y control de acceso (bloquear / reactivar la cuenta).
  *
- * El endpoint de baneo aún no existe en el backend (ver
- * `AdminService.banPatient`), y `Patient` todavía no tiene un campo de
- * estado (activo/bloqueado). Por eso el estado que se muestra en pantalla
- * (`bannedPatientIds`) es solo memoria de esta sesión del navegador — no
- * persiste al recargar ni viene del servidor. En cuanto el backend entregue
- * el endpoint real y (probablemente) un campo de estado en `Patient`, hay
- * que reemplazar `bannedPatientIds`/`isBanned` por ese dato real.
+ * La búsqueda (`GET /user/patients`) devuelve los datos básicos junto con
+ * `accountEnabled`, que es la fuente de verdad del estado (Activo/Bloqueado).
+ * El perfil completo (teléfono, correo, etc.) se pide aparte al seleccionar
+ * al paciente. Al bloquear o reactivar, el estado se actualiza localmente
+ * en la lista y en la selección para no repetir la búsqueda.
  */
 @Component({
   selector: 'app-admin-patients',
@@ -54,7 +57,8 @@ const DOC_TYPE_LABELS: Record<string, string> = {
     LucideFileText,
     LucidePhone,
     LucideMail,
-    LucideAlertCircle,
+    LucideCircleAlert,
+    LucideCircleCheck,
     LucideShieldAlert,
     LucideX,
   ],
@@ -63,29 +67,26 @@ export class AdminPatientsComponent {
   private adminService = inject(AdminService);
 
   // ── Búsqueda ──────────────────────────────────────────────────────────────
-  results = signal<PatientQuickResult[]>([]);
+  results = signal<SystemPatient[]>([]);
   loading = signal(false);
   searched = signal(false);
 
   // ── Selección + detalle ──────────────────────────────────────────────────
-  selectedPatient = signal<PatientQuickResult | null>(null);
+  selectedPatient = signal<SystemPatient | null>(null);
   patientDetail = signal<Patient | null>(null);
   loadingDetail = signal(false);
   detailError = signal<string | null>(null);
 
-  // ── Baneo (ver nota de clase: pendiente de backend) ───────────────────────
-  bannedPatientIds = signal<Set<string>>(new Set());
-  showBanConfirm = signal(false);
-  banning = signal(false);
-  banError = signal<string | null>(null);
+  // ── Control de acceso (bloquear / reactivar) ─────────────────────────────
+  /** Acción esperando confirmación en el modal; `null` si el modal está cerrado. */
+  pendingAction = signal<AccountAction | null>(null);
+  updating = signal(false);
+  actionError = signal<string | null>(null);
 
   readonly sexLabels = SEX_LABELS;
   readonly docTypeLabels = DOC_TYPE_LABELS;
 
-  isBanned = computed(() => {
-    const p = this.selectedPatient();
-    return p ? this.bannedPatientIds().has(p.id) : false;
-  });
+  isBanned = computed(() => this.selectedPatient()?.accountEnabled === false);
 
   age = computed(() => {
     const detail = this.patientDetail();
@@ -115,14 +116,14 @@ export class AdminPatientsComponent {
   }
 
   // ── Selección ─────────────────────────────────────────────────────────────
-  select(patient: PatientQuickResult): void {
+  select(patient: SystemPatient): void {
     this.selectedPatient.set(patient);
     this.patientDetail.set(null);
     this.detailError.set(null);
-    this.banError.set(null);
+    this.actionError.set(null);
     this.loadingDetail.set(true);
 
-    this.adminService.getPatientDetail(patient.identification).subscribe({
+    this.adminService.getPatientDetail(patient.documentId).subscribe({
       next: (detail) => {
         this.patientDetail.set(detail);
         this.loadingDetail.set(false);
@@ -140,40 +141,57 @@ export class AdminPatientsComponent {
     this.selectedPatient.set(null);
     this.patientDetail.set(null);
     this.detailError.set(null);
-    this.showBanConfirm.set(false);
-    this.banError.set(null);
+    this.pendingAction.set(null);
+    this.actionError.set(null);
   }
 
-  // ── Baneo ─────────────────────────────────────────────────────────────────
-  openBanConfirm(): void {
-    this.banError.set(null);
-    this.showBanConfirm.set(true);
+  // ── Bloquear / reactivar ──────────────────────────────────────────────────
+  openConfirm(action: AccountAction): void {
+    this.actionError.set(null);
+    this.pendingAction.set(action);
   }
 
-  closeBanConfirm(): void {
-    this.showBanConfirm.set(false);
+  closeConfirm(): void {
+    this.pendingAction.set(null);
   }
 
-  confirmBan(): void {
+  confirmAccountChange(): void {
     const patient = this.selectedPatient();
-    if (!patient) return;
+    const action = this.pendingAction();
+    if (!patient || !action) return;
 
-    this.banning.set(true);
-    this.banError.set(null);
+    const enabling = action === 'activate';
+    const request$ = enabling
+      ? this.adminService.activatePatient(patient.id)
+      : this.adminService.deactivatePatient(patient.id);
 
-    this.adminService.banPatient(patient.id).subscribe({
+    this.updating.set(true);
+    this.actionError.set(null);
+
+    request$.subscribe({
       next: () => {
-        this.bannedPatientIds.update((set) => new Set(set).add(patient.id));
-        this.banning.set(false);
-        this.showBanConfirm.set(false);
+        this.setAccountEnabled(patient.id, enabling);
+        this.updating.set(false);
+        this.pendingAction.set(null);
       },
-      error: () => {
-        this.banError.set(
-          'No se pudo completar la acción: el backend todavía no expone este endpoint.'
-        );
-        this.banning.set(false);
+      error: (err: AppError) => {
+        this.actionError.set(err.message);
+        this.updating.set(false);
+        this.pendingAction.set(null);
       },
     });
+  }
+
+  /** Refleja el nuevo estado de la cuenta en la lista de resultados y en la selección. */
+  private setAccountEnabled(patientId: string, enabled: boolean): void {
+    this.results.update((list) =>
+      list.map((p) =>
+        p.id === patientId ? { ...p, accountEnabled: enabled } : p
+      )
+    );
+    this.selectedPatient.update((p) =>
+      p && p.id === patientId ? { ...p, accountEnabled: enabled } : p
+    );
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

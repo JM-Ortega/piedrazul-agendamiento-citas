@@ -3,9 +3,9 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { PageResponse } from '../../../shared/models/dtos/pageResponse.dto';
-import { PatientQuickResult } from '../../../shared/models/dtos/patientQuickResult.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
+import { SystemPatient } from '../../../shared/models/interfaces/systemPatient.model';
 import { CreateUserRequestDto } from '../models/dtos/CreateUserRequestDto';
 import { DoctorAdminDto } from '../models/dtos/DoctorAdminDto';
 import { dtoSchedule } from '../models/dtos/schedule.dto';
@@ -296,12 +296,11 @@ export class AdminService {
   // ── Patients ──────────────────────────────────────────────────────────────
 
   /**
-   * Busca pacientes por nombre completo o número de documento, para el
-   * panel de administración de pacientes.
+   * Busca pacientes por nombre completo o número de documento para el panel
+   * de administración. A diferencia del buscador del agendador, esta
+   * respuesta incluye el estado de la cuenta (`accountEnabled`).
    *
-   * Refleja `GET /patients?search=...`, el mismo recurso que usa el
-   * agendador vía `SchedulerService.searchPatients`; se expone también aquí
-   * para mantener separados los servicios por rol.
+   * Refleja `GET /user/patients?search=...&page=...&size=...`.
    *
    * @param search - Texto de búsqueda (nombre completo o documento).
    * @param page - Índice de página (base 0). Por defecto 0.
@@ -312,9 +311,9 @@ export class AdminService {
     search: string,
     page = 0,
     size = 10
-  ): Observable<PageResponse<PatientQuickResult>> {
-    return this.http.get<PageResponse<PatientQuickResult>>(
-      `${this.apiUrl}/patients`,
+  ): Observable<PageResponse<SystemPatient>> {
+    return this.http.get<PageResponse<SystemPatient>>(
+      `${this.apiUrl}/user/patients`,
       { params: { search, page, size } }
     );
   }
@@ -338,20 +337,29 @@ export class AdminService {
   }
 
   /**
-   * Banea/bloquea a un paciente, revocando su acceso para reservar o
-   * agendar citas en línea (web y app móvil).
+   * Activa el usuario asociado a un paciente, devolviéndole el acceso para
+   * reservar o agendar citas en línea. No cambia nada si ya estaba activo.
    *
-   * PENDIENTE DE BACKEND: el endpoint aún no existe; esta URL es un
-   * placeholder. En cuanto el backend lo entregue, solo hay que actualizar
-   * esta ruta — el resto del flujo (componente, modal de confirmación,
-   * manejo de error) ya queda listo.
-   *
-   * @param patientId - ID del paciente a banear.
-   * @returns Observable que completa sin contenido si la operación fue exitosa.
+   * @param patientId - ID del paciente (UUID de su persona).
+   * @returns Observable que completa sin contenido (204) si la operación fue exitosa.
    */
-  banPatient(patientId: string): Observable<void> {
+  activatePatient(patientId: string): Observable<void> {
     return this.http.put<void>(
-      `${this.apiUrl}/patients/${patientId}/ban`,
+      `${this.apiUrl}/user/patients/${patientId}/activate`,
+      null
+    );
+  }
+
+  /**
+   * Desactiva el usuario asociado a un paciente, revocando su acceso para
+   * reservar o agendar citas en línea. No cambia nada si ya estaba desactivado.
+   *
+   * @param patientId - ID del paciente (UUID de su persona).
+   * @returns Observable que completa sin contenido (204) si la operación fue exitosa.
+   */
+  deactivatePatient(patientId: string): Observable<void> {
+    return this.http.put<void>(
+      `${this.apiUrl}/user/patients/${patientId}/deactivate`,
       null
     );
   }
