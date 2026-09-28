@@ -1,17 +1,16 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { LucideCheckCircle, LucideXCircle } from '@lucide/angular';
+import { LucideBan, LucideCheckCircle, LucideXCircle } from '@lucide/angular';
 
 /**
- * Badge de resultado ('Exitoso'/'Fallido').
+ * Badge de resultado ('Exitoso' / 'Fallido' / 'Denegado')
  */
 @Component({
   selector: 'app-status-badge',
   standalone: true,
-  imports: [LucideCheckCircle, LucideXCircle],
+  imports: [LucideCheckCircle, LucideXCircle, LucideBan],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './statusBadge.component.html',
 })
 export class StatusBadgeComponent {
-  /** Resultado de la acción. */
-  status = input.required<'success' | 'failed'>();
+  status = input.required<'EXITOSO' | 'FALLIDO' | 'DENEGADO'>();
 }
