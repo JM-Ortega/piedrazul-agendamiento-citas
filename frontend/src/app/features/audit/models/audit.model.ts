@@ -1,25 +1,32 @@
-/**
- * Contrato único que consumen las 3 pages de auditoría (citas, usuarios, control médico).
- * Cada page mapea su propio log a esta forma antes de pasarlo a `AuditTableComponent`.
- */
-export interface AuditRow {
-  id: string;
-  name: string;
-  role: string;
-  userId: string;
-  timestamp: string;
-  action: string;
-  status: 'success' | 'failed';
-}
+import { AuditOutcome } from './audit.dto';
 
+/** Filtros de búsqueda de las pages de auditoría. Un valor vacío significa "sin filtrar por ese campo". */
 export interface AuditFilters {
+  /** Texto a buscar en el nombre o el documento de quien ejecutó la acción. */
   search: string;
-  status: 'all' | 'success' | 'failed';
-  date: string;
+  /** Primer día del rango, `YYYY-MM-DD`. */
+  from: string;
+  /** Último día del rango, `YYYY-MM-DD`. */
+  to: string;
+  outcome: AuditOutcome | '';
 }
 
 export const EMPTY_AUDIT_FILTERS: AuditFilters = {
   search: '',
-  status: 'all',
-  date: '',
+  from: '',
+  to: '',
+  outcome: '',
 };
+
+/** Registros por página en las tablas de auditoría. */
+export const AUDIT_PAGE_SIZE = 20;
+
+/**
+ * Módulo del backend que delimita cada page. El endpoint de auditoría es uno
+ * solo; cada page ve la porción de la bitácora que pertenece a su módulo.
+ */
+export const AUDIT_MODULE = {
+  appointments: 'CITAS',
+  users: 'USUARIOS',
+  medicalCheckup: 'CONTROLES_MEDICOS',
+} as const;

@@ -1,50 +1,64 @@
-import { AuditRow } from './audit.model';
+/** Resultado de una acción auditada. */
+export type AuditOutcome = 'EXITOSO' | 'FALLIDO' | 'DENEGADO';
 
-// TODO Estos 3 tipos deben reemplazarse por los DTOs reales que exponga el backend para cada log de auditoría.
-
-export interface AppointmentAuditLog {
-  id: string; //este es el id del registro
-  timestamp: string;
-  name: string;
-  role: string;
-  //authenticationId: string;
-  userId: string;
-  action: 'scheduled' | 'rescheduled' | 'cancelled'; //crear un enum con las 9 accciones que tiene lau en el backend y colocar el tipo aquí
-  status: 'success' | 'failed';
-  //targetEntityId: string; este es el id del objeto afectado
-}
-
-export interface UserManagementAuditLog {
+/**
+ * Registro de auditoría devuelto por `GET /api/audit`.
+ */
+export interface AuditEventResponse {
+  /** Identificador del registro de auditoría. */
   id: string;
+  /** Instante en que ocurrió la acción, ISO-8601 en UTC. */
   timestamp: string;
+  /** Nombre completo vigente de quien ejecutó la acción. `null` si la cuenta no tiene persona asociada. */
+  actorName: string | null;
+  /** Usuario de Keycloak (número de documento). `null` si la cuenta no tiene persona asociada. */
+  actorUsername: string | null;
+  /** Id de la cuenta de Keycloak. Es `system` cuando la acción la hace el sistema. */
+  actorId: string;
+  /** Roles que tenía quien ejecutó la acción en ese momento. */
+  actorRoles: string[];
+  /** Código de la acción (ej. `PACIENTE_MODIFICADO`). Su nombre legible está en el catálogo. */
+  action: string;
+  moduleCode: string;
+  moduleName: string;
+  outcome: AuditOutcome;
+  /** Tipo del objeto afectado. */
+  targetEntityType: string | null;
+  /** Id del objeto afectado. `N/A` cuando la acción no tiene un objeto identificable. */
+  targetEntityId: string | null;
+}
+
+export interface AuditCatalogOption {
+  code: string;
   name: string;
-  role: string;
-  userId: string;
-  action: 'created' | 'modified' | 'deactivated' | 'activated';
-  status: 'success' | 'failed';
 }
 
-export interface MedicalRecordAuditLog {
-  id: string;
-  timestamp: string;
-  name: string;
-  role: string;
-  userId: string;
-  action: 'created';
-  status: 'success' | 'failed';
+/** Acción del catálogo, con el módulo al que pertenece. */
+export interface AuditActionOption extends AuditCatalogOption {
+  moduleCode: string;
+  moduleName: string;
 }
 
-/** Normaliza un log de auditoría de citas a la fila común de la tabla. */
-export function toAppointmentRow(log: AppointmentAuditLog): AuditRow {
-  return log;
+export interface AuditFilterCatalog {
+  modules: AuditCatalogOption[];
+  actions: AuditActionOption[];
+  outcomes: AuditCatalogOption[];
+  targetEntityTypes: AuditCatalogOption[];
+  /** Máximo de días que puede abarcar el rango `from`–`to`. */
+  maxRangeDays: number;
+  /** Máximo de caracteres del texto de búsqueda. */
+  maxSearchLength: number;
 }
 
-/** Normaliza un log de auditoría de usuarios a la fila común de la tabla. */
-export function toUserRow(log: UserManagementAuditLog): AuditRow {
-  return log;
-}
-
-/** Normaliza un log de auditoría de historias clínicas a la fila común de la tabla. */
-export function toRecordRow(log: MedicalRecordAuditLog): AuditRow {
-  return log;
+export interface AuditQueryParams {
+  /** Primer día del rango, `YYYY-MM-DD`. */
+  from?: string;
+  /** Último día del rango, `YYYY-MM-DD`. */
+  to?: string;
+  moduleCode?: string;
+  outcome?: AuditOutcome | '';
+  /** Texto a buscar en el nombre o el documento de quien ejecutó la acción. */
+  search?: string;
+  pageNumber?: number;
+  pageSize?: number;
 }
