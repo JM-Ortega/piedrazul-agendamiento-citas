@@ -41,154 +41,184 @@
       </div>
     </div>
 
-    <!-- Error de carga -->
-    @if (errorCarga()) {
-      ...
-    }
-
-    <!-- Lista de doctores -->
+    <!-- Selector de vista -->
     <div
-      class="bg-white rounded-xl shadow-md p-4 md:p-5 border border-[#d9e9f8]"
+      class="bg-white rounded-xl shadow-sm p-1.5 flex gap-1.5 w-fit border border-[#d9e9f8]"
     >
-      <div class="mb-4 space-y-3">
-        <div class="flex items-center justify-between flex-wrap gap-2">
-          <h2
-            class="text-[#163c63] text-lg font-semibold flex items-center gap-2"
-          >
-            <svg lucidePencil [size]="18"></svg>
-            Configuración de Médicos y Terapistas
-          </h2>
-          <app-pagination
-            [pagination]="pagination()"
-            (pageChange)="goToPage($event)"
-          />
-        </div>
+      <button
+        type="button"
+        [class]="viewTabClass('horarios')"
+        (click)="activeView.set('horarios')"
+      >
+        <svg lucideChartNoAxesColumn [size]="15"></svg>
+        Horarios
+      </button>
+      <button
+        type="button"
+        [class]="viewTabClass('estadisticas')"
+        (click)="activeView.set('estadisticas')"
+      >
+        <svg lucideBarChart2 [size]="15"></svg>
+        Estadísticas
+      </button>
+    </div>
 
-        <!-- Buscador (izquierda) + Ordenamiento (derecha) -->
-        <div class="flex items-end justify-between flex-wrap gap-3">
-          <div class="flex flex-col gap-1 w-full sm:w-64">
-            <span
-              class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+    <!-- Vista: Horarios (contenido existente, sin cambios) -->
+    <div class="space-y-4" [class.hidden]="activeView() !== 'horarios'">
+      <!-- Error de carga -->
+      @if (errorCarga()) {
+        ...
+      }
+
+      <!-- Lista de doctores -->
+      <div
+        class="bg-white rounded-xl shadow-md p-4 md:p-5 border border-[#d9e9f8]"
+      >
+        <div class="mb-4 space-y-3">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <h2
+              class="text-[#163c63] text-lg font-semibold flex items-center gap-2"
             >
-              Buscar
-            </span>
-            <app-search-input
-              size="sm"
-              placeholder="Buscar médico o documento..."
-              [loading]="searching()"
-              [showButton]="false"
-              (searchChange)="onSearch($event)"
-              (searchNow)="onSearch($event)"
+              <svg lucidePencil [size]="18"></svg>
+              Configuración de Médicos y Terapistas
+            </h2>
+            <app-pagination
+              [pagination]="pagination()"
+              (pageChange)="goToPage($event)"
             />
           </div>
 
-          <div class="flex flex-col gap-1">
-            <span
-              class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
-            >
-              Ordenar por
-            </span>
-            <app-sort-control
-              [options]="sortOptions"
-              [field]="sortField()"
-              [direction]="sortDirection()"
-              (fieldChange)="onSortFieldChange($event)"
-              (directionChange)="onSortDirectionChange($event)"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div class="relative">
-        @if (loading()) {
-          <div class="absolute inset-0 flex items-center justify-center z-10">
-            <div
-              class="w-6 h-6 border-2 border-[#215c98] border-t-transparent rounded-full animate-spin"
-            ></div>
-          </div>
-        }
-
-        <!-- Después -->
-        <div
-          class="grid grid-cols-1 lg:grid-cols-2 gap-y-3 gap-x-5 transition-opacity duration-300"
-          [class.opacity-40]="loading()"
-          [class.pointer-events-none]="loading()"
-        >
-          @for (doctor of doctors(); track doctor.id) {
-            <div
-              [id]="'doctor-card-' + doctor.id"
-              animate.enter="card-enter-animation"
-              class="border rounded-xl transition-all"
-              [class]="containerClass(doctor)"
-              [class.lg:col-span-2]="editingId() === doctor.id"
-            >
-              <app-doctor-card
-                [doctor]="doctor"
-                [isEditing]="editingId() === doctor.id"
-                [isSaved]="savedId() === doctor.id"
-                (edit)="startEdit($event)"
-                (toggleModal)="openToggleModal($event)"
+          <!-- Buscador (izquierda) + Ordenamiento (derecha) -->
+          <div class="flex items-end justify-between flex-wrap gap-3">
+            <div class="flex flex-col gap-1 w-full sm:w-64">
+              <span
+                class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+              >
+                Buscar
+              </span>
+              <app-search-input
+                size="sm"
+                placeholder="Buscar médico o documento..."
+                [loading]="searching()"
+                [showButton]="false"
+                (searchChange)="onSearch($event)"
+                (searchNow)="onSearch($event)"
               />
+            </div>
 
-              @if (editingId() === doctor.id) {
-                <app-doctor-edit-form
-                  [doctor]="doctor"
-                  [isSaving]="savingDoctorId() === doctor.id"
-                  (saved)="onFormSaved($event)"
-                  (cancelled)="cancelEdit()"
-                />
-              }
+            <div class="flex flex-col gap-1">
+              <span
+                class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+              >
+                Ordenar por
+              </span>
+              <app-sort-control
+                [options]="sortOptions"
+                [field]="sortField()"
+                [direction]="sortDirection()"
+                (fieldChange)="onSortFieldChange($event)"
+                (directionChange)="onSortDirectionChange($event)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="relative">
+          @if (loading()) {
+            <div class="absolute inset-0 flex items-center justify-center z-10">
+              <div
+                class="w-6 h-6 border-2 border-[#215c98] border-t-transparent rounded-full animate-spin"
+              ></div>
             </div>
           }
+
+          <!-- Después -->
+          <div
+            class="grid grid-cols-1 lg:grid-cols-2 gap-y-3 gap-x-5 transition-opacity duration-300"
+            [class.opacity-40]="loading()"
+            [class.pointer-events-none]="loading()"
+          >
+            @for (doctor of doctors(); track doctor.id) {
+              <div
+                [id]="'doctor-card-' + doctor.id"
+                animate.enter="card-enter-animation"
+                class="border rounded-xl transition-all"
+                [class]="containerClass(doctor)"
+                [class.lg:col-span-2]="editingId() === doctor.id"
+              >
+                <app-doctor-card
+                  [doctor]="doctor"
+                  [isEditing]="editingId() === doctor.id"
+                  [isSaved]="savedId() === doctor.id"
+                  (edit)="startEdit($event)"
+                  (toggleModal)="openToggleModal($event)"
+                />
+
+                @if (editingId() === doctor.id) {
+                  <app-doctor-edit-form
+                    [doctor]="doctor"
+                    [isSaving]="savingDoctorId() === doctor.id"
+                    (saved)="onFormSaved($event)"
+                    (cancelled)="cancelEdit()"
+                  />
+                }
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Guía -->
+      <div class="bg-[#215c98] text-white rounded-xl p-4">
+        <h3 class="text-base font-semibold mb-3">Guía de Configuración</h3>
+        <div
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-[#d9e9f8] text-sm"
+        >
+          <div>
+            <p class="font-semibold text-white mb-0.5">Período Laboral</p>
+            <p>
+              Fecha de inicio y fin del contrato o período de trabajo del médico
+              en la clínica.
+            </p>
+          </div>
+          <div>
+            <p class="font-semibold text-white mb-0.5">Franja Horaria</p>
+            <p>
+              Define el inicio y fin de la jornada del médico cada día de
+              atención. Puede personalizarse por día.
+            </p>
+          </div>
+          <div>
+            <p class="font-semibold text-white mb-0.5">Intervalo</p>
+            <p>
+              Tiempo en minutos entre cada cita. Determina el número de citas
+              disponibles por día.
+            </p>
+          </div>
+          <div>
+            <p class="font-semibold text-white mb-0.5">Días</p>
+            <p>
+              Seleccione los días de la semana (lunes a viernes) en que el
+              médico presta sus servicios.
+            </p>
+          </div>
+          <div>
+            <p class="font-semibold text-white mb-0.5">
+              Habilitar / Deshabilitar
+            </p>
+            <p>
+              Permite activar o desactivar un médico para que aparezca o no en
+              el sistema de agendamiento.
+            </p>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Guía -->
-    <div class="bg-[#215c98] text-white rounded-xl p-4">
-      <h3 class="text-base font-semibold mb-3">Guía de Configuración</h3>
-      <div
-        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-[#d9e9f8] text-sm"
-      >
-        <div>
-          <p class="font-semibold text-white mb-0.5">Período Laboral</p>
-          <p>
-            Fecha de inicio y fin del contrato o período de trabajo del médico
-            en la clínica.
-          </p>
-        </div>
-        <div>
-          <p class="font-semibold text-white mb-0.5">Franja Horaria</p>
-          <p>
-            Define el inicio y fin de la jornada del médico cada día de
-            atención. Puede personalizarse por día.
-          </p>
-        </div>
-        <div>
-          <p class="font-semibold text-white mb-0.5">Intervalo</p>
-          <p>
-            Tiempo en minutos entre cada cita. Determina el número de citas
-            disponibles por día.
-          </p>
-        </div>
-        <div>
-          <p class="font-semibold text-white mb-0.5">Días</p>
-          <p>
-            Seleccione los días de la semana (lunes a viernes) en que el médico
-            presta sus servicios.
-          </p>
-        </div>
-        <div>
-          <p class="font-semibold text-white mb-0.5">
-            Habilitar / Deshabilitar
-          </p>
-          <p>
-            Permite activar o desactivar un médico para que aparezca o no en el
-            sistema de agendamiento.
-          </p>
-        </div>
-      </div>
-    </div>
+    <!-- Vista: Estadísticas -->
+    @if (activeView() === 'estadisticas') {
+      <app-admin-statistics />
+    }
   </div>
 
   <app-toast [message]="toastMessage()" [type]="toastType()" />

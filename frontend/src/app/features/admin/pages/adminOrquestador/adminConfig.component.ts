@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import {
   LucideCalendarCheck,
+  LucideChartNoAxesColumn,
   LucideCheck,
   LucideDynamicIcon,
   LucidePencil,
@@ -37,6 +38,7 @@ import {
 import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
+import { AdminStatisticsComponent } from '../../components/adminStatistics/adminStatistics.component';
 import { DoctorCardComponent } from '../../components/doctorCard/doctorCard.component';
 import {
   DoctorEditFormComponent,
@@ -45,6 +47,8 @@ import {
 import { AdminModalsComponent } from '../../components/modals/modalHorarios/adminModals.component';
 import { dtoSchedule } from '../../models/dtos/schedule.dto';
 import { AdminService } from '../../service/admin.service';
+
+type AdminView = 'horarios' | 'estadisticas';
 
 @Component({
   selector: 'app-admin-config',
@@ -65,6 +69,8 @@ import { AdminService } from '../../service/admin.service';
     ConfirmModalComponent,
     LucideDynamicIcon,
     ButtonComponent,
+    AdminStatisticsComponent,
+    LucideChartNoAxesColumn,
   ],
 })
 export class AdminConfigComponent implements OnInit {
@@ -90,6 +96,8 @@ export class AdminConfigComponent implements OnInit {
 
   readonly Check = LucideCheck;
   readonly X = LucideX;
+  // ── Vista activa ──────────────────────────────────────────────────────────
+  activeView = signal<AdminView>('horarios');
   // ── Paginacion ──────────────────────────────────────────────────────────────
   currentPage = signal(0);
   totalPages = signal(0);
@@ -385,6 +393,15 @@ export class AdminConfigComponent implements OnInit {
     if (doctor.status === false) return 'border-gray-200 bg-gray-50';
     if (this.editingId() === doctor.id) return 'border-blue-400 bg-blue-50';
     return 'border-gray-100 bg-white hover:shadow-lg transition-shadow';
+  }
+
+  viewTabClass(view: AdminView): string {
+    return (
+      'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ' +
+      (this.activeView() === view
+        ? 'bg-[#215c98] text-white shadow-sm'
+        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700')
+    );
   }
 
   // ── Private ───────────────────────────────────────────────────────────────
