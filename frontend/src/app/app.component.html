@@ -68,7 +68,7 @@
 }
 
 @if (sessionExpired()) {
-  <div class="fixed inset-0 z-[100] backdrop-blur-sm">
+  <div class="fixed inset-0 z-100 backdrop-blur-sm">
     <app-confirm-modal
       [visible]="true"
       title="Sesión expirada"

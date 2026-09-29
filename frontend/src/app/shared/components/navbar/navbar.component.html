@@ -125,7 +125,7 @@
           "
         >
           <svg lucideUsers [size]="20"></svg>
-          Gestionar Usuarios
+          Usuarios
         </a>
         <a
           routerLink="/admin/medicos"
@@ -139,7 +139,21 @@
           "
         >
           <svg lucideUserCog [size]="20"></svg>
-          Gestión Médicos
+          Médicos
+        </a>
+        <a
+          routerLink="/admin/pacientes"
+          #rla13="routerLinkActive"
+          routerLinkActive
+          [class]="
+            'flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-base ' +
+            (rla13.isActive
+              ? 'bg-white text-[#215c98]'
+              : 'text-white hover:bg-[#4e92d9]')
+          "
+        >
+          <svg lucideUserCheck [size]="20"></svg>
+          Pacientes
         </a>
       }
 
@@ -377,7 +391,15 @@
           class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
         >
           <svg lucideUserCog [size]="20"></svg>
-          Gestión Médicos
+          Médicos
+        </a>
+        <a
+          routerLink="/admin/pacientes"
+          (click)="menuOpen.set(false)"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-base hover:bg-[#4e92d9] text-white"
+        >
+          <svg lucideUserCheck [size]="20"></svg>
+          Pacientes
         </a>
       }
 
