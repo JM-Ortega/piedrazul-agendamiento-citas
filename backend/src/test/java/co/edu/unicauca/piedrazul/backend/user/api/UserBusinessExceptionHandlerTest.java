@@ -33,7 +33,8 @@ class UserBusinessExceptionHandlerTest {
         ProblemDetail result = handler.handleBusinessException(ex, request);
 
         assertEquals(HttpStatus.NOT_FOUND.value(), result.getStatus());
-        assertEquals("Usuario no encontrado", result.getTitle());
+        assertEquals("No encontrado", result.getTitle());
+        assertEquals("USER_NOT_FOUND", result.getProperties().get("errorCode"));
         assertEquals(ex.getMessage(), result.getDetail());
     }
 
@@ -44,7 +45,8 @@ class UserBusinessExceptionHandlerTest {
         ProblemDetail result = handler.handleBusinessException(ex, request);
 
         assertEquals(HttpStatus.BAD_REQUEST.value(), result.getStatus());
-        assertEquals("Datos de usuario inválidos", result.getTitle());
+        assertEquals("Solicitud inválida", result.getTitle());
+        assertEquals("INVALID_USER_DATA", result.getProperties().get("errorCode"));
         assertEquals(ex.getMessage(), result.getDetail());
     }
 
@@ -55,19 +57,20 @@ class UserBusinessExceptionHandlerTest {
         ProblemDetail result = handler.handleBusinessException(ex, request);
 
         assertEquals(HttpStatus.BAD_GATEWAY.value(), result.getStatus());
-        assertEquals("Error del proveedor de identidad", result.getTitle());
+        assertEquals("KEYCLOAK_EXCEPTION", result.getProperties().get("errorCode"));
         assertEquals(ex.getMessage(), result.getDetail());
     }
 
     @Test
-    void handleUserException_shouldReturnBadRequest() {
+    void handleUserException_shouldUseTheStatusOfTheException() {
         UserBusinessException ex = new UserBusinessException("error genérico", "GENERIC_ERROR", HttpStatus.INTERNAL_SERVER_ERROR) {
         };
 
         ProblemDetail result = handler.handleBusinessException(ex, request);
 
-        assertEquals(HttpStatus.BAD_REQUEST.value(), result.getStatus());
-        assertEquals("Error de usuario", result.getTitle());
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR.value(), result.getStatus());
+        assertEquals("Error interno del servidor", result.getTitle());
+        assertEquals("GENERIC_ERROR", result.getProperties().get("errorCode"));
         assertEquals(ex.getMessage(), result.getDetail());
     }
 }
