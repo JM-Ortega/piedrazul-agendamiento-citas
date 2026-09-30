@@ -109,7 +109,7 @@ export class AppService {
       SCHEDULER: '/agendador',
       DOCTOR: '/medico',
       PATIENT: '/paciente',
-      AUDITOR: '/auditor/auditoria-citas',
+      AUDITOR: '/auditor/auditoria',
     };
     this.router.navigate([routeMap[role] ?? '/']);
   }

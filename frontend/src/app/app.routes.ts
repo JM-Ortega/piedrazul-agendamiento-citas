@@ -19,9 +19,7 @@ import { PatientDashboardComponent } from './features/patient/patientDashboard/p
 import { RegisterComponent } from './features/register/register.component';
 import { SchedulerDashboardComponent } from './features/scheduler/pages/schedulerDashboard/schedulerDashboard.component';
 import { SchedulerHistoryComponent } from './features/scheduler/pages/schedulerHistory/schedulerHistory.component';
-import { AppointmentAuditComponent } from './features/audit/pages/appointmentAudit/appointmentAudit.component';
-import { MedicalCheckupAuditComponent } from './features/audit/pages/medicalCheckupAudit/medicalCheckupAudit.component';
-import { UserAuditComponent } from './features/audit/pages/userAudit/userAudit.component';
+import { AuditComponent } from './features/audit/pages/audit/audit.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -131,20 +129,8 @@ export const routes: Routes = [
     data: { role: 'PATIENT' },
   },
   {
-    path: 'auditor/auditoria-citas',
-    component: AppointmentAuditComponent,
-    canActivate: [AuthGuard],
-    data: { role: 'AUDITOR' },
-  },
-  {
-    path: 'auditor/auditoria-usuarios',
-    component: UserAuditComponent,
-    canActivate: [AuthGuard],
-    data: { role: 'AUDITOR' },
-  },
-  {
-    path: 'auditor/auditoria-control-medico',
-    component: MedicalCheckupAuditComponent,
+    path: 'auditor/auditoria',
+    component: AuditComponent,
     canActivate: [AuthGuard],
     data: { role: 'AUDITOR' },
   },
