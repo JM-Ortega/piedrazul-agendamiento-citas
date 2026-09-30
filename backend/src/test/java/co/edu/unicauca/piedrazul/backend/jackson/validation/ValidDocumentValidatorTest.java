@@ -41,13 +41,19 @@ class ValidDocumentValidatorTest {
     }
 
     @Test
-    void shouldIgnoreWhenDocumentNumberIsNull() {
-        TestDocumentDto dto = new TestDocumentDto(null, DocType.CEDULA);
+    void shouldIgnoreWhenIdentificationAndTypeAreNull() {
+        TestDocumentDto dto = new TestDocumentDto(null, null);
         assertThat(validator.validate(dto)).isEmpty();
     }
 
+    @Test
+    void shouldRejectTypeWithoutIdentification() {
+        TestDocumentDto dto = new TestDocumentDto(null, DocType.CEDULA);
+        assertThat(validator.validate(dto)).isNotEmpty();
+    }
+
     @ValidDocument
-    private record TestDocumentDto(String documentNumber, DocType documentType) {
+    private record TestDocumentDto(String identification, DocType identificationType) {
     }
 
     private enum DocType {

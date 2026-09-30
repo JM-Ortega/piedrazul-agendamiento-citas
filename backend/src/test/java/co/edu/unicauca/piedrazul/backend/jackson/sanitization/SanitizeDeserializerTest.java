@@ -16,7 +16,7 @@ class SanitizeDeserializerTest {
     void shouldSanitizeOnlyAnnotatedFieldsOnDeserialization() throws Exception {
         String json = """
                 {
-                  "documentNumber": "<script>alert('1')</script>123",
+                  "identification": "<script>alert('1')</script>123",
                   "code": "<b>ABC123</b>",
                   "password": "<tag>myP@ss</tag>"
                 }
@@ -24,7 +24,7 @@ class SanitizeDeserializerTest {
 
         ConfirmLinkUserAccountRequest request = objectMapper.readValue(json, ConfirmLinkUserAccountRequest.class);
 
-        //assertThat(request.getDocumentNumber()).isEqualTo("123");
+        assertThat(request.getIdentification()).isEqualTo("123");
         assertThat(request.getCode()).isEqualTo("<b>ABC123</b>");
         assertThat(request.getPassword()).isEqualTo("<tag>myP@ss</tag>");
     }
@@ -33,28 +33,28 @@ class SanitizeDeserializerTest {
     void shouldRemoveDangerousAttributes() throws Exception {
         String json = """
         {
-          "documentNumber": "<img src=x onerror=alert(1)>123"
+          "identification": "<img src=x onerror=alert(1)>123"
         }
     """;
 
         ConfirmLinkUserAccountRequest request =
                 objectMapper.readValue(json, ConfirmLinkUserAccountRequest.class);
 
-        //assertThat(request.getDocumentNumber()).doesNotContain("onerror");
+        assertThat(request.getIdentification()).doesNotContain("onerror");
     }
 
     @Test
     void shouldPreserveAllowedHtml() throws Exception {
         String json = """
         {
-          "documentNumber": "<b>123</b>"
+          "identification": "<b>123</b>"
         }
     """;
 
         ConfirmLinkUserAccountRequest request =
                 objectMapper.readValue(json, ConfirmLinkUserAccountRequest.class);
 
-        //assertThat(request.getDocumentNumber()).contains("<b>");
+        assertThat(request.getIdentification()).contains("<b>");
     }
 
     @Test
