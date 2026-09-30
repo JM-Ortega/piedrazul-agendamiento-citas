@@ -56,9 +56,12 @@ export interface AuditQueryParams {
   /** Último día del rango, `YYYY-MM-DD`. */
   to?: string;
   moduleCode?: string;
+  action?: string;
   outcome?: AuditOutcome | '';
   /** Texto a buscar en el nombre o el documento de quien ejecutó la acción. */
   search?: string;
+  /** Id exacto del objeto afectado. */
+  targetEntityId?: string;
   pageNumber?: number;
   pageSize?: number;
 }
