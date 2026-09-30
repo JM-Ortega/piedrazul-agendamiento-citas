@@ -7,16 +7,17 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { AuditFilterCatalog } from '../../models/audit.dto';
+import { AuditActionOption, AuditFilterCatalog } from '../../models/audit.dto';
 import { AuditFilters, EMPTY_AUDIT_FILTERS } from '../../models/audit.model';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
- * Barra de filtros para las tablas de auditoría: búsqueda por nombre o documento,
- * rango de fechas (desde/hasta) y resultado. Las opciones y los límites salen del
- * catálogo del backend. Los valores se editan localmente y solo se emiten al
- * presionar "Buscar" o "Limpiar".
+ * Barra de filtros de auditoría. Siempre visibles: búsqueda por nombre/documento
+ * (prefijo) y por id exacto del objeto afectado. Un desplegable de "Búsqueda
+ * avanzada" agrega rango de fechas, resultado, acción y módulo, con las
+ * opciones y límites tomados del catálogo del backend. Los valores se editan
+ * localmente y solo se emiten al presionar "Buscar" o "Limpiar".
  */
 @Component({
   selector: 'app-audit-filter-bar',
@@ -35,10 +36,33 @@ export class AuditFilterBarComponent {
   /** Valores en edición; no se aplican hasta que el usuario lo confirme. */
   protected draft = signal<AuditFilters>(EMPTY_AUDIT_FILTERS);
 
+  /** True mientras el panel de búsqueda avanzada está desplegado. */
+  protected advancedOpen = signal(false);
+
   /** True si hay al menos un filtro con valor (para mostrar el botón "Limpiar"). */
   protected hasFilters = computed(() => {
     const d = this.draft();
-    return !!d.search || !!d.from || !!d.to || !!d.outcome;
+    return (
+      !!d.search ||
+      !!d.targetEntityId ||
+      !!d.from ||
+      !!d.to ||
+      !!d.outcome ||
+      !!d.action ||
+      !!d.moduleCode
+    );
+  });
+
+  /**
+   * Acciones del catálogo disponibles para elegir. Si hay un módulo
+   * seleccionado, se limitan a las de ese módulo.
+   */
+  protected actionOptions = computed<AuditActionOption[]>(() => {
+    const actions = this.catalog()?.actions ?? [];
+    const moduleCode = this.draft().moduleCode;
+    return moduleCode
+      ? actions.filter((a) => a.moduleCode === moduleCode)
+      : actions;
   });
 
   /**
@@ -54,18 +78,40 @@ export class AuditFilterBarComponent {
     return null;
   });
 
+  /** Alterna la visibilidad del panel de búsqueda avanzada. */
+  protected toggleAdvanced(): void {
+    this.advancedOpen.update((open) => !open);
+  }
+
   /**
-   * Fusiona los campos recibidos sobre los valores en edición.
+   * Fusiona los campos recibidos sobre los valores en edición. Si cambia el
+   * módulo y la acción elegida ya no pertenece a él, la acción se limpia.
    * @param partial Campos de `AuditFilters` a sobrescribir (los no incluidos conservan su valor).
    */
   protected patch(partial: Partial<AuditFilters>): void {
-    this.draft.update((d) => ({ ...d, ...partial }));
+    this.draft.update((d) => {
+      const next = { ...d, ...partial };
+      if (
+        partial.moduleCode !== undefined &&
+        next.action &&
+        !this.catalog()?.actions.some(
+          (a) => a.code === next.action && a.moduleCode === next.moduleCode
+        )
+      ) {
+        next.action = '';
+      }
+      return next;
+    });
   }
 
   /** Emite los filtros en edición, salvo que el rango de fechas sea inválido. */
   protected submit(): void {
     if (this.rangeError()) return;
-    this.apply.emit({ ...this.draft(), search: this.draft().search.trim() });
+    this.apply.emit({
+      ...this.draft(),
+      search: this.draft().search.trim(),
+      targetEntityId: this.draft().targetEntityId.trim(),
+    });
   }
 
   /** Restablece los campos y emite los filtros vacíos. */

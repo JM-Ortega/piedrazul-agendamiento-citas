@@ -1,66 +1,127 @@
-<div class="flex flex-wrap items-end gap-3 mb-5">
-  <div class="relative flex-1 min-w-[220px]">
-    <input
-      type="text"
-      [ngModel]="draft().search"
-      (ngModelChange)="patch({ search: $event })"
-      (keydown.enter)="submit()"
-      [attr.maxlength]="catalog()?.maxSearchLength ?? null"
-      placeholder="Buscar por nombre o documento de quien realizó la acción..."
-      class="w-full pl-4 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-white"
-    />
-  </div>
+<div class="mb-5">
+  <div class="flex flex-wrap items-start gap-3">
+    <div class="flex-1 min-w-[220px]">
+      <input
+        type="text"
+        [ngModel]="draft().search"
+        (ngModelChange)="patch({ search: $event })"
+        (keydown.enter)="submit()"
+        [attr.maxlength]="catalog()?.maxSearchLength ?? null"
+        placeholder="Buscar por nombre o documento de quien realizó la acción..."
+        class="w-full pl-4 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-white"
+      />
+    </div>
 
-  <label class="flex flex-col gap-1 text-xs text-gray-500">
-    Desde
-    <input
-      type="date"
-      [ngModel]="draft().from"
-      (ngModelChange)="patch({ from: $event })"
-      [attr.max]="draft().to || null"
-      class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400 bg-white"
-    />
-  </label>
+    <div class="flex-1 min-w-[220px]">
+      <input
+        type="text"
+        [ngModel]="draft().targetEntityId"
+        (ngModelChange)="patch({ targetEntityId: $event })"
+        (keydown.enter)="submit()"
+        placeholder="Buscar por id exacto de objeto afectado..."
+        class="w-full pl-4 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-white"
+      />
+      <p class="text-xs text-gray-400 mt-1">
+        Debe coincidir exactamente con el id del objeto afectado
+      </p>
+    </div>
 
-  <label class="flex flex-col gap-1 text-xs text-gray-500">
-    Hasta
-    <input
-      type="date"
-      [ngModel]="draft().to"
-      (ngModelChange)="patch({ to: $event })"
-      [attr.min]="draft().from || null"
-      class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400 bg-white"
-    />
-  </label>
-
-  <select
-    [ngModel]="draft().outcome"
-    (ngModelChange)="patch({ outcome: $event })"
-    class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-white"
-  >
-    <option value="">Todos los resultados</option>
-    @for (option of catalog()?.outcomes ?? []; track option.code) {
-      <option [value]="option.code">{{ option.name }}</option>
-    }
-  </select>
-
-  <button
-    type="button"
-    (click)="submit()"
-    [disabled]="!!rangeError()"
-    class="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#215c98] hover:bg-[#4e92d9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-  >
-    Buscar
-  </button>
-
-  @if (hasFilters()) {
     <button
       type="button"
-      (click)="clear()"
-      class="px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+      (click)="submit()"
+      [disabled]="!!rangeError()"
+      class="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#215c98] hover:bg-[#4e92d9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
     >
-      Limpiar
+      Buscar
     </button>
+
+    @if (hasFilters()) {
+      <button
+        type="button"
+        (click)="clear()"
+        class="px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+      >
+        Limpiar
+      </button>
+    }
+
+    <button
+      type="button"
+      (click)="toggleAdvanced()"
+      class="px-4 py-2.5 rounded-xl text-sm font-semibold text-[#215c98] hover:bg-[#ddefff] transition-colors"
+    >
+      Búsqueda avanzada {{ advancedOpen() ? '▲' : '▼' }}
+    </button>
+  </div>
+
+  @if (advancedOpen()) {
+    <div
+      class="mt-3 p-4 border-2 border-gray-100 rounded-xl bg-gray-50 flex flex-wrap items-end gap-3"
+    >
+      <label class="flex flex-col gap-1 text-xs text-gray-500">
+        Desde
+        <input
+          type="date"
+          [ngModel]="draft().from"
+          (ngModelChange)="patch({ from: $event })"
+          [attr.max]="draft().to || null"
+          class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400 bg-white"
+        />
+      </label>
+
+      <label class="flex flex-col gap-1 text-xs text-gray-500">
+        Hasta
+        <input
+          type="date"
+          [ngModel]="draft().to"
+          (ngModelChange)="patch({ to: $event })"
+          [attr.min]="draft().from || null"
+          class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400 bg-white"
+        />
+      </label>
+
+      <label class="flex flex-col gap-1 text-xs text-gray-500">
+        Resultado
+        <select
+          [ngModel]="draft().outcome"
+          (ngModelChange)="patch({ outcome: $event })"
+          class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-white"
+        >
+          <option value="">Todos</option>
+          @for (option of catalog()?.outcomes ?? []; track option.code) {
+            <option [value]="option.code">{{ option.name }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="flex flex-col gap-1 text-xs text-gray-500">
+        Módulo
+        <select
+          [ngModel]="draft().moduleCode"
+          (ngModelChange)="patch({ moduleCode: $event })"
+          class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-white"
+        >
+          <option value="">Todos</option>
+          @for (option of catalog()?.modules ?? []; track option.code) {
+            <option [value]="option.code">{{ option.name }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="flex flex-col gap-1 text-xs text-gray-500">
+        Acción
+        <select
+          [ngModel]="draft().action"
+          (ngModelChange)="patch({ action: $event })"
+          class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-white"
+        >
+          <option value="">Todas</option>
+          @for (option of actionOptions(); track option.code) {
+            <option [value]="option.code">{{ option.name }}</option>
+          }
+        </select>
+      </label>
+    </div>
   }
 </div>
 
