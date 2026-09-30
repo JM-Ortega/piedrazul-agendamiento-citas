@@ -34,7 +34,6 @@ import {
   LucideUsers,
   LucideX,
   LucideShield,
-  LucideFileText,
   type LucideIcon,
 } from '@lucide/angular';
 import Keycloak from 'keycloak-js';
@@ -57,7 +56,6 @@ import { ButtonComponent } from '../../../designSystem/atoms/button/button.compo
     LucideMenu,
     LucideSettings,
     LucideStethoscope,
-    LucideFileText,
     LucideUser,
     LucideUserCheck,
     LucideUserCog,
