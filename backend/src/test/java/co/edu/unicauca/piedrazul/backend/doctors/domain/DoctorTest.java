@@ -133,7 +133,7 @@ class DoctorTest {
             LocalDate newStart = today.plusDays(1);
             LocalDate newEnd = today.plusMonths(6);
 
-            doctor.updateInfo(newStart, newEnd, 6, 45);
+            doctor.updateInfo(newStart, newEnd, 45, 6);
 
             assertThat(doctor.getLaborStart()).isEqualTo(newStart);
             assertThat(doctor.getLaborEnd()).isEqualTo(newEnd);
@@ -145,7 +145,7 @@ class DoctorTest {
         void shouldThrowWhenLaborStartIsNull() {
             Doctor doctor = buildDoctor(today, today.plusMonths(3), 4, 30);
 
-            assertThatThrownBy(() -> doctor.updateInfo(null, today.plusMonths(3), 4, 30))
+            assertThatThrownBy(() -> doctor.updateInfo(null, today.plusMonths(3), 30, 4))
                     .isInstanceOf(DoctorValidationException.class);
         }
 
@@ -153,7 +153,7 @@ class DoctorTest {
         void shouldThrowWhenLaborEndIsNull() {
             Doctor doctor = buildDoctor(today, today.plusMonths(3), 4, 30);
 
-            assertThatThrownBy(() -> doctor.updateInfo(today, null, 4, 30))
+            assertThatThrownBy(() -> doctor.updateInfo(today, null, 30, 4))
                     .isInstanceOf(DoctorValidationException.class);
         }
 
@@ -161,7 +161,7 @@ class DoctorTest {
         void shouldThrowWhenLaborEndBeforeLaborStart() {
             Doctor doctor = buildDoctor(today, today.plusMonths(3), 4, 30);
 
-            assertThatThrownBy(() -> doctor.updateInfo(today, today.minusDays(1), 4, 30))
+            assertThatThrownBy(() -> doctor.updateInfo(today, today.minusDays(1), 30, 4))
                     .isInstanceOf(DateConflictException.class);
         }
 
@@ -169,7 +169,7 @@ class DoctorTest {
         void shouldThrowWhenWeeksIsZeroOrNegative() {
             Doctor doctor = buildDoctor(today, today.plusMonths(3), 4, 30);
 
-            assertThatThrownBy(() -> doctor.updateInfo(today, today.plusMonths(3), 0, 30))
+            assertThatThrownBy(() -> doctor.updateInfo(today, today.plusMonths(3), 30, 0))
                     .isInstanceOf(DoctorValidationException.class);
         }
 
@@ -177,7 +177,7 @@ class DoctorTest {
         void shouldThrowWhenMinutesIsZeroOrNegative() {
             Doctor doctor = buildDoctor(today, today.plusMonths(3), 4, 30);
 
-            assertThatThrownBy(() -> doctor.updateInfo(today, today.plusMonths(3), 4, 0))
+            assertThatThrownBy(() -> doctor.updateInfo(today, today.plusMonths(3), 0, 4))
                     .isInstanceOf(DoctorValidationException.class);
         }
 
@@ -187,7 +187,7 @@ class DoctorTest {
             // horario de 1 hora (60 min)
             doctor.updateSchedule(Workday.LUNES, LocalTime.of(8, 0), LocalTime.of(9, 0));
 
-            assertThatThrownBy(() -> doctor.updateInfo(today, today.plusMonths(3), 4, 90))
+            assertThatThrownBy(() -> doctor.updateInfo(today, today.plusMonths(3), 90, 4))
                     .isInstanceOf(DoctorValidationException.class);
         }
 
