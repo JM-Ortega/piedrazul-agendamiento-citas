@@ -37,9 +37,9 @@ class IsNewPatientUseCaseImplTest {
     }
 
     @Test
-    void isNewPatientShouldReturnFalseWhenPatientHasScheduledOrAttendedAppointment() {
+    void isNewPatientShouldReturnFalseWhenPatientHasAnAttendedAppointment() {
         UUID patientId = UUID.randomUUID();
-        Collection<AppointmentState> expectedStates = EnumSet.of(AppointmentState.AGENDADA, AppointmentState.ATENDIDA);
+        Collection<AppointmentState> expectedStates = EnumSet.of(AppointmentState.ATENDIDA);
 
         when(patientConsultPort.existsById(patientId)).thenReturn(true);
         when(appointmentRepository.existsByPatientIdAndStates(patientId, expectedStates)).thenReturn(true);
@@ -50,13 +50,14 @@ class IsNewPatientUseCaseImplTest {
 
         ArgumentCaptor<Collection<AppointmentState>> statesCaptor = ArgumentCaptor.forClass(Collection.class);
         verify(appointmentRepository).existsByPatientIdAndStates(eq(patientId), statesCaptor.capture());
-        assertThat(statesCaptor.getValue()).containsExactlyInAnyOrder(AppointmentState.AGENDADA, AppointmentState.ATENDIDA);
+        assertThat(statesCaptor.getValue()).containsExactly(AppointmentState.ATENDIDA);
     }
 
+    /** Una cita agendada que aún no se atiende no cuenta: el paciente sigue siendo nuevo. */
     @Test
-    void isNewPatientShouldReturnTrueWhenPatientHasNoScheduledOrAttendedAppointments() {
+    void isNewPatientShouldReturnTrueWhenPatientHasNoAttendedAppointments() {
         UUID patientId = UUID.randomUUID();
-        Collection<AppointmentState> expectedStates = EnumSet.of(AppointmentState.AGENDADA, AppointmentState.ATENDIDA);
+        Collection<AppointmentState> expectedStates = EnumSet.of(AppointmentState.ATENDIDA);
 
         when(patientConsultPort.existsById(patientId)).thenReturn(true);
         when(appointmentRepository.existsByPatientIdAndStates(patientId, expectedStates)).thenReturn(false);
@@ -67,7 +68,7 @@ class IsNewPatientUseCaseImplTest {
     }
 
     @Test
-    void isNewPatientShouldPropagatePatientNotFoundWhenPatientDoesNotExist() {
+    void isNewPatientShouldReturnTrueWhenPatientDoesNotExist() {
         UUID patientId = UUID.randomUUID();
 
         when(patientConsultPort.existsById(patientId)).thenReturn(false);
