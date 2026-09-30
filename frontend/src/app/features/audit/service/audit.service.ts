@@ -53,8 +53,10 @@ export class AuditService {
    * @param params.from primer día del rango, `YYYY-MM-DD` (opcional)
    * @param params.to último día del rango, `YYYY-MM-DD` (opcional)
    * @param params.moduleCode módulo al que pertenecen las acciones (opcional)
+   * @param params.action código de acción (opcional)
    * @param params.outcome resultado de la acción (opcional)
-   * @param params.search texto a buscar en nombre o documento del actor (opcional)
+   * @param params.search texto a buscar en nombre o documento del actor, por prefijo (opcional)
+   * @param params.targetEntityId id exacto del objeto afectado (opcional)
    * @param params.pageNumber número de página a solicitar, base 0
    * @param params.pageSize cantidad de registros por página
    */
@@ -78,9 +80,15 @@ export class AuditService {
     if (params?.to) httpParams = httpParams.set('to', params.to);
     if (params?.moduleCode)
       httpParams = httpParams.set('moduleCode', params.moduleCode);
+    if (params?.action) httpParams = httpParams.set('action', params.action);
     if (params?.outcome) httpParams = httpParams.set('outcome', params.outcome);
     if (params?.search?.trim())
       httpParams = httpParams.set('search', params.search.trim());
+    if (params?.targetEntityId?.trim())
+      httpParams = httpParams.set(
+        'targetEntityId',
+        params.targetEntityId.trim()
+      );
     httpParams = withPagination(
       httpParams,
       params?.pageNumber,
