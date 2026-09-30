@@ -71,13 +71,13 @@ class KeycloakUserServiceTest {
 	}
 
 	@Test
-	void findSchedulersShouldDelegateToClient() {
-		when(keycloakClient.findUsersByRole(Role.SCHEDULER)).thenReturn(List.of());
+	void getSystemUsersShouldDelegateToClient() {
+		when(keycloakClient.getSystemUsers()).thenReturn(List.of());
 
 		List<UserSummary> result = keycloakUserService.getSystemUsers();
 
 		assertTrue(result.isEmpty());
-		verify(keycloakClient).findUsersByRole(Role.SCHEDULER);
+		verify(keycloakClient).getSystemUsers();
 	}
 
 	@Test
