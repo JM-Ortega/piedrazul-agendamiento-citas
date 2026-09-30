@@ -24,7 +24,7 @@ Piedra Azul es una clínica cuyo proceso de agendamiento de citas se ha basado h
 - Spring Security para la validación de JWT en el backend (ADR-001).
 - Spring Modulith para la definición y verificación de límites entre módulos (ADR-003).
 - Flyway para el versionado de migraciones de esquema de base de datos (ADR-002).
-- Docker Compose para la orquestación local de PostgreSQL y Keycloak (ADR-005).
+- Docker Compose para la orquestación local de PostgreSQL y Keycloak (ADR-005) y, en producción, para el stack desplegado en el servidor (`infra/compose/prod.yml`).
 
 ## Flujos importantes
 
@@ -68,7 +68,21 @@ Piedra Azul es una clínica cuyo proceso de agendamiento de citas se ha basado h
 - Puertos, usuarios y credenciales se configuran mediante variables de entorno.
 - El backend y el frontend se ejecutan localmente durante el desarrollo, consumiendo los servicios levantados por Docker Compose (ADR-005).
 
-> **Pendiente:** documentar la estrategia de despliegue en ambientes distintos al local (staging, producción).
+### Producción
+
+El repositorio define un modelo de despliegue de producción compuesto por:
+
+- **Terraform** (ejecutado mediante HCP Terraform) para aprovisionar la infraestructura: servidor y firewall en **Hetzner**, y DNS, ajustes de zona, protección de origen y proyecto de Pages (frontend) en **Cloudflare**.
+- **Ansible** para configurar el servidor y desplegar la aplicación.
+- **Docker Compose** en el servidor de producción, que ejecuta Traefik (proxy inverso), el backend, Keycloak y PostgreSQL.
+
+Este documento no describe el estado en vivo de esa infraestructura. Los detalles están en:
+
+- [`infra/terraform/live/prod/README.md`](../../infra/terraform/live/prod/README.md) — Terraform y postura de red declarada.
+- [`infra/ansible/ANSIBLE.md`](../../infra/ansible/ANSIBLE.md) — configuración y despliegue con Ansible.
+- [`infra/compose/prod.yml`](../../infra/compose/prod.yml) — stack Compose de producción.
+
+El entorno OCI (`infra/terraform/live/oci/`) es histórico e inactivo y no es un destino de despliegue.
 
 ## Riesgos conocidos
 
@@ -76,7 +90,6 @@ Piedra Azul es una clínica cuyo proceso de agendamiento de citas se ha basado h
 - Keycloak demanda una cantidad considerable de recursos y puede aumentar el tiempo de arranque del entorno (ADR-001).
 - La modularidad del backend no reemplaza un buen diseño del dominio; sigue dependiendo de la disciplina del equipo para mantener los límites entre módulos (ADR-003).
 - El backend permanece como una única aplicación desplegable, por lo que no es posible escalar módulos de forma independiente como en una arquitectura de microservicios (ADR-003).
-- Una futura migración del frontend fuera de Angular requeriría un esfuerzo considerable debido al tamaño de la base de código existente (ADR-004).
 - PostgreSQL presenta un escalado horizontal más complejo que enfoques NoSQL puros (ADR-002).
 - Dependencia de Docker Desktop o Docker Engine en los equipos de desarrollo, con posibles conflictos de puertos locales (ADR-005).
 
