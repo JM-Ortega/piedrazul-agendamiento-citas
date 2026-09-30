@@ -29,10 +29,6 @@ export class AuditTableComponent {
   rows = input.required<AuditEventResponse[]>();
   /** Nombre legible de cada acción, indexado por su código. Si falta, se muestra el código. */
   actionNames = input<Record<string, string>>({});
-  /** Clase Tailwind de fondo para la fila del encabezado */
-  headClass = input('bg-blue-50');
-  /** Clase Tailwind de color de texto para el encabezado. */
-  headTextClass = input('text-blue-800');
 
   /**
    * Nombre a mostrar de quien ejecutó la acción.

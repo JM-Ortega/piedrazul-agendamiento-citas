@@ -14,48 +14,36 @@
   <div class="overflow-x-auto rounded-xl border border-gray-200">
     <table class="w-full text-sm">
       <thead>
-        <tr class="{{ headClass() }}">
+        <tr class="bg-blue-50">
           <th
-            class="text-left px-4 py-3 font-bold {{
-              headTextClass()
-            }} whitespace-nowrap rounded-tl-xl"
+            class="text-left px-4 py-3 font-bold text-[#163c63] whitespace-nowrap rounded-tl-xl"
           >
             Nombre y Rol
           </th>
           <th
-            class="text-left px-4 py-3 font-bold {{
-              headTextClass()
-            }} whitespace-nowrap"
+            class="text-left px-4 py-3 font-bold text-[#163c63] whitespace-nowrap"
           >
             Id de usuario
           </th>
           <th
-            class="text-left px-4 py-3 font-bold {{
-              headTextClass()
-            }} whitespace-nowrap"
+            class="text-left px-4 py-3 font-bold text-[#163c63] whitespace-nowrap"
           >
             Fecha y Hora
           </th>
           <th
-            class="text-left px-4 py-3 font-bold {{
-              headTextClass()
-            }} whitespace-nowrap"
+            class="text-left px-4 py-3 font-bold text-[#163c63] whitespace-nowrap"
           >
             Acción
           </th>
           <th
-            class="text-left px-4 py-3 font-bold {{
-              headTextClass()
-            }} whitespace-nowrap"
+            class="text-left px-4 py-3 font-bold text-[#163c63] whitespace-nowrap"
           >
             Resultado
           </th>
           <th
-            class="text-left px-4 py-3 font-bold {{
-              headTextClass()
-            }} whitespace-nowrap rounded-tr-xl"
+            class="text-left px-4 py-3 font-bold text-[#163c63] whitespace-nowrap rounded-tr-xl"
           >
-            Id de objeto afectado
+            Id y tipo de objeto afectado
           </th>
         </tr>
       </thead>
@@ -105,6 +93,11 @@
                 class="font-mono text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-lg"
                 >{{ row.targetEntityId ?? 'N/A' }}</span
               >
+              @if (row.targetEntityType) {
+                <p class="text-gray-400 text-xs mt-1">
+                  {{ row.targetEntityType }}
+                </p>
+              }
             </td>
           </tr>
         }
