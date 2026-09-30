@@ -79,7 +79,7 @@ public class KeycloakUserClient {
 
             if (status == Response.Status.CONFLICT.getStatusCode()) {
                 // El conflicto puede ser por username o por email.
-                throw new IdentityProviderException(
+                throw new UserAlreadyExistsException(
                         "Ya existe un usuario registrado con ese nombre de usuario o correo electrónico (" + username
                                 + " / " + email + ")");
             }
