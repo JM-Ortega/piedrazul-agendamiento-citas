@@ -1,130 +1,254 @@
-<div class="mb-5">
-  <div class="flex flex-wrap items-start gap-3">
-    <div class="flex-1 min-w-[220px]">
-      <input
-        type="text"
-        [ngModel]="draft().search"
-        (ngModelChange)="patch({ search: $event })"
-        (keydown.enter)="submit()"
-        [attr.maxlength]="catalog()?.maxSearchLength ?? null"
-        placeholder="Buscar por nombre o documento de quien realizó la acción..."
-        class="w-full pl-4 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-white"
-      />
-    </div>
-
-    <div class="flex-1 min-w-[220px]">
-      <input
-        type="text"
-        [ngModel]="draft().targetEntityId"
-        (ngModelChange)="patch({ targetEntityId: $event })"
-        (keydown.enter)="submit()"
-        placeholder="Buscar por id exacto de objeto afectado..."
-        class="w-full pl-4 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-white"
-      />
-      <p class="text-xs text-gray-400 mt-1">
-        Debe coincidir exactamente con el id del objeto afectado
-      </p>
-    </div>
-
-    <button
-      type="button"
-      (click)="submit()"
-      [disabled]="!!rangeError()"
-      class="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#215c98] hover:bg-[#4e92d9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+<div class="mb-5 space-y-3">
+  <!-- Búsqueda básica -->
+  <div
+    class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100"
+  >
+    <div
+      class="w-full flex items-center justify-between gap-3 px-5 py-3 border-b border-gray-100"
     >
-      Buscar
-    </button>
+      <div class="flex items-center gap-3">
+        <div class="bg-blue-100 rounded-full p-2 shrink-0">
+          <svg lucideSearch [size]="18" class="text-[#215c98]"></svg>
+        </div>
+        <div>
+          <h3
+            class="text-[#163c63] text-sm font-semibold flex items-center gap-2 flex-wrap"
+          >
+            Búsqueda básica
+          </h3>
+          <p class="text-gray-500 text-sm">
+            Filtra por término principal y rango de fechas
+          </p>
+        </div>
+      </div>
+    </div>
 
-    @if (hasFilters()) {
-      <button
-        type="button"
-        (click)="clear()"
-        class="px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-      >
-        Limpiar
-      </button>
-    }
+    <div class="p-5">
+      <div class="flex flex-wrap items-start gap-3">
+        <div class="flex-1 min-w-[220px]">
+          <label
+            for="audit-filter-search"
+            class="block text-sm text-gray-500 mb-1"
+          >
+            Nombre o documento
+          </label>
+          <app-input
+            id="audit-filter-search"
+            [ngModel]="draft().search"
+            (valueChange)="patchSearch($event)"
+            (keydown.enter)="submit()"
+            [maxLength]="catalog()?.maxSearchLength"
+            placeholder="Buscar por nombre o documento..."
+            helperText="Puede ingresar solo el inicio del nombre o documento"
+          >
+            <svg suffix lucideSearch [size]="16"></svg>
+          </app-input>
+        </div>
 
+        <div class="w-44">
+          <label
+            for="audit-filter-from"
+            class="block text-sm text-gray-500 mb-1"
+          >
+            Desde
+          </label>
+          <app-datepicker
+            id="audit-filter-from"
+            [ngModel]="fromDate()"
+            (ngModelChange)="patchFrom($event)"
+            [max]="toDate() ?? undefined"
+            placeholder="dd/mm/aaaa"
+          />
+        </div>
+
+        <div class="w-44">
+          <label for="audit-filter-to" class="block text-sm text-gray-500 mb-1">
+            Hasta
+          </label>
+          <app-datepicker
+            id="audit-filter-to"
+            [ngModel]="toDate()"
+            (ngModelChange)="patchTo($event)"
+            [min]="fromDate() ?? undefined"
+            placeholder="dd/mm/aaaa"
+          />
+        </div>
+
+        <div class="flex items-center gap-2 pt-5">
+          <app-button
+            variant="primary"
+            [disabled]="!!rangeError()"
+            (buttonClick)="submit()"
+          >
+            Buscar
+          </app-button>
+
+          @if (hasFilters()) {
+            <app-button variant="secondary" (buttonClick)="clear()">
+              Limpiar
+            </app-button>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+
+  @if (rangeError(); as error) {
+    <p class="text-sm text-red-600 flex items-center gap-1">⚠️ {{ error }}</p>
+  }
+
+  <!-- Búsqueda avanzada -->
+  <div
+    class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100"
+  >
     <button
       type="button"
       (click)="toggleAdvanced()"
-      class="px-4 py-2.5 rounded-xl text-sm font-semibold text-[#215c98] hover:bg-[#ddefff] transition-colors"
+      [attr.aria-expanded]="advancedOpen()"
+      class="w-full flex items-center justify-between gap-3 px-5 py-3 hover:bg-blue-50/60 active:bg-blue-50 transition-colors cursor-pointer text-left"
     >
-      Búsqueda avanzada {{ advancedOpen() ? '▲' : '▼' }}
+      <div class="flex items-center gap-3">
+        <div class="bg-blue-100 rounded-full p-2 shrink-0">
+          <svg lucideFilter [size]="18" class="text-[#215c98]"></svg>
+        </div>
+        <div>
+          <h3
+            class="text-[#163c63] text-sm font-semibold flex items-center gap-2 flex-wrap"
+          >
+            Búsqueda avanzada
+            @if (hasAdvancedActiveFilters()) {
+              <span
+                class="bg-[#215c98] text-white text-sm font-semibold px-2.5 py-0.5 rounded-full"
+              >
+                {{ advancedActiveCount() }} activo{{
+                  advancedActiveCount() > 1 ? 's' : ''
+                }}
+              </span>
+            }
+          </h3>
+          <p class="text-gray-500 text-sm">
+            {{
+              advancedOpen()
+                ? 'Completa los campos y presiona "Buscar" arriba'
+                : 'Busca por id de objeto afectado, módulo, acción realizada o resultado de la acción'
+            }}
+          </p>
+        </div>
+      </div>
+      <svg
+        lucideChevronDown
+        [size]="22"
+        [class]="
+          'text-[#215c98] shrink-0 transition-transform duration-300 ease-in-out ' +
+          (advancedOpen() ? 'rotate-180' : '')
+        "
+      ></svg>
     </button>
-  </div>
 
-  @if (advancedOpen()) {
     <div
-      class="mt-3 p-4 border-2 border-gray-100 rounded-xl bg-gray-50 flex flex-wrap items-end gap-3"
+      [class]="
+        'grid transition-[grid-template-rows] duration-300 ease-in-out ' +
+        (advancedOpen() ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')
+      "
     >
-      <label class="flex flex-col gap-1 text-xs text-gray-500">
-        Desde
-        <input
-          type="date"
-          [ngModel]="draft().from"
-          (ngModelChange)="patch({ from: $event })"
-          [attr.max]="draft().to || null"
-          class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400 bg-white"
-        />
-      </label>
-
-      <label class="flex flex-col gap-1 text-xs text-gray-500">
-        Hasta
-        <input
-          type="date"
-          [ngModel]="draft().to"
-          (ngModelChange)="patch({ to: $event })"
-          [attr.min]="draft().from || null"
-          class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-blue-400 bg-white"
-        />
-      </label>
-
-      <label class="flex flex-col gap-1 text-xs text-gray-500">
-        Resultado
-        <select
-          [ngModel]="draft().outcome"
-          (ngModelChange)="patch({ outcome: $event })"
-          class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-white"
+      <div class="overflow-hidden">
+        <div
+          class="px-5 pb-5 pt-1 border-t-2 border-blue-50 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
         >
-          <option value="">Todos</option>
-          @for (option of catalog()?.outcomes ?? []; track option.code) {
-            <option [value]="option.code">{{ option.name }}</option>
-          }
-        </select>
-      </label>
+          <div>
+            <label
+              for="audit-filter-target-entity-id"
+              class="block text-sm text-gray-500 mb-1"
+              >Id de objeto afectado</label
+            >
+            <app-input
+              id="audit-filter-target-entity-id"
+              [ngModel]="draft().targetEntityId"
+              (valueChange)="patchTargetEntityId($event)"
+              (keydown.enter)="submit()"
+              placeholder="Id exacto del objeto afectado..."
+            >
+              <svg suffix lucideSearch [size]="16"></svg>
+            </app-input>
+          </div>
 
-      <label class="flex flex-col gap-1 text-xs text-gray-500">
-        Módulo
-        <select
-          [ngModel]="draft().moduleCode"
-          (ngModelChange)="patch({ moduleCode: $event })"
-          class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-white"
-        >
-          <option value="">Todos</option>
-          @for (option of catalog()?.modules ?? []; track option.code) {
-            <option [value]="option.code">{{ option.name }}</option>
-          }
-        </select>
-      </label>
+          <div>
+            <label
+              for="audit-filter-module"
+              class="block text-sm text-gray-500 mb-1"
+              >Módulo</label
+            >
+            <app-select
+              id="audit-filter-module"
+              [options]="moduleOptions()"
+              placeholder="Todos"
+              [ngModel]="draft().moduleCode"
+              (valueChange)="patch({ moduleCode: $event })"
+            />
+          </div>
 
-      <label class="flex flex-col gap-1 text-xs text-gray-500">
-        Acción
-        <select
-          [ngModel]="draft().action"
-          (ngModelChange)="patch({ action: $event })"
-          class="border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-white"
-        >
-          <option value="">Todas</option>
-          @for (option of actionOptions(); track option.code) {
-            <option [value]="option.code">{{ option.name }}</option>
+          <div>
+            <label
+              for="audit-filter-action"
+              class="block text-sm text-gray-500 mb-1"
+              >Acción</label
+            >
+            <app-select
+              id="audit-filter-action"
+              [options]="actionOptions()"
+              placeholder="Todas"
+              [ngModel]="draft().action"
+              (valueChange)="patch({ action: $event })"
+            />
+          </div>
+
+          <div>
+            <label
+              for="audit-filter-outcome"
+              class="block text-sm text-gray-500 mb-1"
+              >Resultado</label
+            >
+            <app-select
+              id="audit-filter-outcome"
+              [options]="outcomeOptions()"
+              placeholder="Todos"
+              [ngModel]="draft().outcome"
+              (valueChange)="patchOutcome($event)"
+            />
+          </div>
+
+          @if (draftChips().length) {
+            <div class="flex flex-wrap gap-1.5 items-center pt-1">
+              <span class="text-sm text-gray-500">
+                Filtros seleccionados{{
+                  advancedIsDirty() ? ' (sin aplicar):' : ':'
+                }}
+              </span>
+              @for (chip of draftChips(); track chip.id) {
+                <span
+                  class="inline-flex items-center gap-1.5 bg-[#eaf3fc] text-[#215c98] border border-[#a7c9ec]/60 pl-3 pr-1.5 py-1 rounded-full text-xs font-medium"
+                >
+                  {{ chip.label }}
+                  <app-button
+                    variant="icon"
+                    extraClass="!w-4 !h-4 !min-w-0 !p-0 !text-[#215c98]/60 hover:!text-[#215c98] hover:!bg-[#a7c9ec]/40 !rounded-full"
+                    (buttonClick)="clearDraftField(chip.id)"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                      <path
+                        d="M1 1l8 8M9 1l-8 8"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                      />
+                    </svg>
+                  </app-button>
+                </span>
+              }
+            </div>
           }
-        </select>
-      </label>
+        </div>
+      </div>
     </div>
-  }
+  </div>
 </div>
-
-@if (rangeError(); as error) {
-  <p class="text-sm text-red-600 -mt-3 mb-4">{{ error }}</p>
-}
