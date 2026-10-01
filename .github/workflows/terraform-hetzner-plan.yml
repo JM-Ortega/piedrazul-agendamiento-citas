@@ -6,8 +6,7 @@ on:
     paths:
       - "infra/terraform/live/prod/**"
       - "infra/terraform/modules/hetzner/**"
-      - "infra/terraform/modules/dns/**"
-      - "infra/terraform/modules/pages/**"
+      - "infra/terraform/modules/cloudflare/**"
       - ".github/workflows/terraform-hetzner-*.yml"
 
 concurrency:
