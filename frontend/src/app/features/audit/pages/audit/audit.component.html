@@ -20,18 +20,19 @@
             clínicas
           </p>
         </div>
-        <div class="ml-auto">
-          <app-pagination
-            [pagination]="pagination()"
-            (pageChange)="onPageChange($event)"
-          ></app-pagination>
-        </div>
       </div>
 
       <app-audit-filter-bar
         [catalog]="catalog()"
         (apply)="onApplyFilters($event)"
       ></app-audit-filter-bar>
+
+      <div class="w-full flex justify-end">
+        <app-pagination
+          [pagination]="pagination()"
+          (pageChange)="onPageChange($event)"
+        ></app-pagination>
+      </div>
 
       <app-audit-table
         [rows]="events()"
