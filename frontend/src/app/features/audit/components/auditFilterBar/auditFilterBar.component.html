@@ -166,6 +166,7 @@
               [ngModel]="draft().targetEntityId"
               (valueChange)="patchTargetEntityId($event)"
               (keydown.enter)="submit()"
+              [maxLength]="catalog()?.maxSearchLength"
               placeholder="Id exacto del objeto afectado..."
             >
               <svg suffix lucideSearch [size]="16"></svg>
