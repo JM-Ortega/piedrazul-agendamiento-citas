@@ -32,7 +32,7 @@ on:
         type: boolean
         default: false
       image_tag:
-        description: "Tag específico de imagen para rollback (vacío = SHA del commit si run_build=true)"
+        description: "Tag explícito de imagen backend para rollback (vacío = imagen construida si run_build=true, si no el último deploy exitoso del servidor)"
         type: string
         default: ""
       force_init_keycloak:
@@ -90,6 +90,8 @@ jobs:
       packages: read
     steps:
       - name: Verificar combinaciones inválidas
+        env:
+          ROLLBACK_IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
           set -euo pipefail
 
@@ -102,17 +104,21 @@ jobs:
           fi
 
           if [ "${{ inputs.run_build }}" = "true" ] && \
-             [ -n "${{ inputs.image_tag }}" ]; then
+             [ -n "${ROLLBACK_IMAGE_TAG}" ]; then
             echo "Error: no se puede especificar image_tag cuando run_build=true"
             exit 1
           fi
 
-          if [ "${{ inputs.run_app_deploy }}" = "true" ] && \
-             [ "${{ inputs.run_build }}" = "false" ] && \
-             [ "${{ inputs.run_build_postgres }}" = "false" ] && \
-             [ -z "${{ inputs.image_tag }}" ]; then
-            echo "Error: run_app_deploy=true requiere run_build=true, run_build_postgres=true, o un image_tag explícito"
-            exit 1
+          if [ -n "${ROLLBACK_IMAGE_TAG}" ]; then
+            if [ "${{ inputs.run_app_deploy }}" != "true" ]; then
+              echo "Error: image_tag solo tiene efecto con run_app_deploy=true"
+              exit 1
+            fi
+            if ! [[ "${ROLLBACK_IMAGE_TAG}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || \
+               [[ "${ROLLBACK_IMAGE_TAG,,}" =~ ^(none|null|undefined|latest)$ ]]; then
+              echo "Error: image_tag '${ROLLBACK_IMAGE_TAG}' no es un tag OCI explícito válido"
+              exit 1
+            fi
           fi
 
           if [ "${{ inputs.ansible_host }}" != "vps" ] && \
@@ -128,6 +134,7 @@ jobs:
           inputs.image_tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ROLLBACK_IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
           set -euo pipefail
 
@@ -135,14 +142,14 @@ jobs:
             --head \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json" \
-            "https://ghcr.io/v2/${{ env.IMAGE_NAME }}/manifests/${{ inputs.image_tag }}")
+            "https://ghcr.io/v2/${{ env.IMAGE_NAME }}/manifests/${ROLLBACK_IMAGE_TAG}")
 
           if [ "$STATUS" != "200" ]; then
-            echo "Error: imagen ${{ env.IMAGE_NAME }}:${{ inputs.image_tag }} no existe o no es accesible en GHCR"
+            echo "Error: imagen ${{ env.IMAGE_NAME }}:${ROLLBACK_IMAGE_TAG} no existe o no es accesible en GHCR"
             exit 1
           fi
 
-          echo "Imagen ${{ env.IMAGE_NAME }}:${{ inputs.image_tag }} verificada"
+          echo "Imagen ${{ env.IMAGE_NAME }}:${ROLLBACK_IMAGE_TAG} verificada"
 
   infra:
     name: Obtener infraestructura
@@ -356,16 +363,72 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # Única fuente de la identidad de imagen backend que reciben converge y deploy.
+  # Precedencia: rollback explícito > imagen construida en este run > reuso del
+  # último deploy exitoso registrado en el servidor (vacío; Ansible lo lee, valida
+  # y verifica que la imagen exista).
+  select_backend_image:
+    name: Seleccionar imagen backend
+    runs-on: ubuntu-latest
+    needs: [validate_inputs, app_build]
+    if: |
+      always() &&
+      needs.validate_inputs.result == 'success' &&
+      (needs.app_build.result == 'success' || needs.app_build.result == 'skipped')
+    outputs:
+      image_tag: ${{ steps.select.outputs.image_tag }}
+    steps:
+      - name: Resolver IMAGE_TAG
+        id: select
+        env:
+          RUN_APP_DEPLOY: ${{ inputs.run_app_deploy }}
+          RUN_BUILD: ${{ inputs.run_build }}
+          ROLLBACK_IMAGE_TAG: ${{ inputs.image_tag }}
+          BUILT_IMAGE_TAG: ${{ needs.app_build.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          # Sin deploy de app, converge conserva la identidad que ya corre en el servidor
+          if [ "${RUN_APP_DEPLOY}" != "true" ]; then
+            SOURCE="reuso"
+            TAG=""
+          elif [ -n "${ROLLBACK_IMAGE_TAG}" ]; then
+            SOURCE="rollback"
+            TAG="${ROLLBACK_IMAGE_TAG}"
+          elif [ "${RUN_BUILD}" = "true" ]; then
+            SOURCE="build"
+            TAG="${BUILT_IMAGE_TAG}"
+            if [ -z "${TAG}" ]; then
+              echo "Error: run_build=true pero app_build no produjo image_tag"
+              exit 1
+            fi
+          else
+            SOURCE="reuso"
+            TAG=""
+          fi
+
+          if [ -n "${TAG}" ]; then
+            if ! [[ "${TAG}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || \
+               [[ "${TAG,,}" =~ ^(none|null|undefined|latest)$ ]]; then
+              echo "Error: image_tag '${TAG}' (${SOURCE}) no es un tag OCI explícito válido"
+              exit 1
+            fi
+          fi
+
+          echo "image_tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Imagen backend seleccionada (${SOURCE}): ${TAG:-<identidad actual del servidor>}"
+
   host_config:
     name: Configurar servidor
     runs-on: ubuntu-latest
-    needs: [infra, inventory, readiness, postgres_build]
+    needs: [infra, inventory, readiness, postgres_build, select_backend_image]
     if: |
       always() &&
       inputs.run_host_config == true &&
       needs.infra.result == 'success' &&
       needs.inventory.result == 'success' &&
       needs.readiness.result == 'success' &&
+      needs.select_backend_image.result == 'success' &&
       (needs.postgres_build.result == 'success' || needs.postgres_build.result == 'skipped')
     timeout-minutes: 30
     environment: ${{ inputs.github_environment }}
@@ -412,10 +475,12 @@ jobs:
           ansible-playbook \
             -i infra/ansible/inventories/prod \
             -i hosts.runtime.yml \
+            -e "image_tag=${IMAGE_TAG}" \
             -e "postgres_image_tag=${POSTGRES_IMAGE_TAG}" \
             infra/ansible/playbooks/converge.yml
         env:
           ANSIBLE_HOST_KEY_CHECKING: "False"
+          IMAGE_TAG: ${{ needs.select_backend_image.outputs.image_tag }}
           POSTGRES_IMAGE_TAG: ${{ needs.postgres_build.outputs.image_tag }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
@@ -443,7 +508,7 @@ jobs:
         inventory,
         readiness,
         host_config,
-        app_build,
+        select_backend_image,
         postgres_build,
       ]
     if: |
@@ -454,7 +519,7 @@ jobs:
       needs.inventory.result == 'success' &&
       needs.readiness.result == 'success' &&
       (needs.host_config.result == 'success' || needs.host_config.result == 'skipped') &&
-      (needs.app_build.result == 'success' || needs.app_build.result == 'skipped') &&
+      needs.select_backend_image.result == 'success' &&
       (needs.postgres_build.result == 'success' || needs.postgres_build.result == 'skipped')
     timeout-minutes: 15
     environment: ${{ inputs.github_environment }}
@@ -482,16 +547,6 @@ jobs:
             -r infra/ansible/requirements.yml \
             -p infra/ansible/collections
 
-      - name: Resolver IMAGE_TAG
-        id: tag
-        run: |
-          set -euo pipefail
-          if [ -n "${{ inputs.image_tag }}" ]; then
-            echo "value=${{ inputs.image_tag }}" >> $GITHUB_OUTPUT
-          else
-            echo "value=${{ needs.app_build.outputs.image_tag }}" >> $GITHUB_OUTPUT
-          fi
-
       - name: Resolver POSTGRES_IMAGE_TAG
         id: postgres_tag
         run: |
@@ -513,7 +568,7 @@ jobs:
             infra/ansible/playbooks/deploy.yml
         env:
           ANSIBLE_HOST_KEY_CHECKING: "False"
-          IMAGE_TAG: ${{ steps.tag.outputs.value }}
+          IMAGE_TAG: ${{ needs.select_backend_image.outputs.image_tag }}
           POSTGRES_IMAGE_TAG: ${{ steps.postgres_tag.outputs.value }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}

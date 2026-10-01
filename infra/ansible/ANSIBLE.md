@@ -30,7 +30,8 @@ infra/ansible/
         │   ├── main.yml                 # Punto de entrada (importa setup.yml)
         │   ├── setup.yml                # Copia archivos, genera .env, levanta stack
         │   ├── init_keycloak.yml        # Bootstrap de identidad (solo una vez)
-        │   └── deploy.yml               # Rollout de nueva imagen
+        │   ├── deploy.yml               # Rollout de nueva imagen
+        │   └── backend_image.yml        # Selección y verificación de IMAGE_TAG (setup y deploy)
         ├── handlers/
         │   └── main.yml                 # Handler de restart del stack
         └── templates/
@@ -93,6 +94,7 @@ Variables compartidas por todos los entornos — valores que no cambian entre He
 app_dir: /opt/piedrazul
 compose_project_name: piedrazul
 compose_src_dir: "{{ playbook_dir }}/../../compose"
+backend_deployed_file: "{{ app_dir }}/backend-deployed.env"
 kc_realm: piedrazul
 kc_port: 8180
 kc_backend_client_id: piedrazul-backend
@@ -144,7 +146,7 @@ ansible-playbook \
 
 ### `deploy.yml` — rollout de nueva imagen
 
-Solo actualiza la imagen del backend. No reconfigura el servidor ni toca Keycloak. Requiere `image_tag` como variable extra.
+Solo actualiza la imagen del backend. No reconfigura el servidor ni toca Keycloak. `image_tag` es opcional: si viene vacío se reusa el último deploy exitoso del backend registrado en el servidor (ver [Identidad de la imagen del backend](#identidad-de-la-imagen-del-backend)).
 
 ```bash
 ansible-playbook \
@@ -196,6 +198,26 @@ Corre en cada `converge`. Pasos:
 7. `flush_handlers` — aplica cualquier restart pendiente de forma controlada
 8. Levanta el stack con `docker_compose_v2 state: present`
 
+#### Identidad de la imagen del backend
+
+El servidor guarda dos estados distintos:
+
+| Archivo | Contenido | Quién lo escribe |
+|---------|-----------|------------------|
+| `image.env` | `IMAGE_TAG` que Compose interpola; puede ser un candidato aún no desplegado | `setup.yml` y `deploy.yml`, antes de levantar servicios |
+| `backend-deployed.env` (`backend_deployed_file`) | `IMAGE_TAG` del último deploy **exitoso** del backend | solo `deploy.yml`, cuando el contenedor `backend` corre esa imagen y su `HEALTHCHECK` reporta `healthy` |
+
+`setup.yml` y `deploy.yml` resuelven `IMAGE_TAG` con la misma tarea (`backend_image.yml`):
+
+1. `image_tag` explícito, si viene — el workflow ya aplicó la precedencia rollback > imagen construida en el run
+2. Si no, el `IMAGE_TAG` de `backend-deployed.env` (nunca el de `image.env`)
+
+El valor debe ser un tag OCI (`[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}`) y no puede ser `none`, `null`, `undefined` ni `latest`. Antes de escribir `image.env`, la imagen se descarga de GHCR (`force_source`); si no existe, el play falla y `image.env` queda intacto. `deploy.yml` arranca el backend con `pull: missing` sobre esa misma imagen.
+
+Si el deploy falla (Compose falla o el backend no queda `healthy` en ~6 min), `backend-deployed.env` no cambia: el siguiente run de reuso vuelve al último deploy exitoso, aunque `image.env` o el contenedor tengan el candidato fallido. No hay rollback automático del contenedor; para eso se pasa `image_tag` explícito.
+
+Sin identidad válida no hay fallback. Un servidor sin `backend-deployed.env` (nuevo, o anterior a este contrato) necesita `run_build=true` o un `image_tag` existente; un converge o deploy de solo reuso falla. `backend.yml` exige `IMAGE_TAG` definido (`${IMAGE_TAG:?}`).
+
 #### `init_keycloak.yml`
 
 Corre **una sola vez** — controlado por el marker `/opt/piedrazul/.keycloak_initialized`. Si el marker existe, todo el bloque se salta. Pasos:
@@ -216,9 +238,10 @@ Corre **una sola vez** — controlado por el marker `/opt/piedrazul/.keycloak_in
 Rollout de nueva imagen. Pasos:
 
 1. Lee `KC_BACKEND_CLIENT_SECRET` del `.env` existente (igual que `setup.yml`)
-2. Actualiza `image.env` con el nuevo `IMAGE_TAG`
+2. Selecciona y verifica (pull) la imagen del backend, y actualiza `image.env` con ese `IMAGE_TAG`
 3. Regenera `.env` (preservando `app_kc_backend_secret`)
-4. `docker_compose_v2 state: present pull: always` — pull y deploy en un solo paso
+4. `docker_compose_v2 state: present pull: missing` — deploy con la imagen ya descargada
+5. Espera `healthy` con la imagen seleccionada y recién entonces registra `backend-deployed.env`
 
 #### Handler: `Restart app stack`
 
@@ -413,6 +436,7 @@ GitHub Actions (workflow)
         │     ├── genera KC_BACKEND_CLIENT_SECRET (nuevo)
         │     ├── copia compose files + keycloak/ + postgres/
         │     ├── genera .env
+        │     ├── selecciona y verifica IMAGE_TAG (image_tag del run; falla si no hay)
         │     └── levanta stack (DB + Keycloak + backend + Traefik)
         └── init_keycloak.yml
               ├── espera Keycloak healthy (9000/health/ready)
@@ -435,9 +459,10 @@ GitHub Actions (workflow)
         │
         └── deploy.yml
               ├── lee KC_BACKEND_CLIENT_SECRET del .env existente
-              ├── actualiza image.env con IMAGE_TAG=abc123
+              ├── pull de backend:abc123 (falla si no existe) y actualiza image.env con IMAGE_TAG=abc123
               ├── regenera .env (preservando el secret)
-              └── docker_compose_v2 pull: always → pull + deploy
+              ├── docker_compose_v2 pull: missing → deploy
+              └── backend healthy con abc123 → backend-deployed.env IMAGE_TAG=abc123
 ```
 
 ## Flujo completo — converge posterior (sin cambios de imagen)

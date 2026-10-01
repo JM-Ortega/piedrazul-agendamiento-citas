@@ -77,21 +77,6 @@
   register: image_env_current
   when: image_env_stat.stat.exists
 
-- name: Extraer IMAGE_TAG actual
-  ansible.builtin.set_fact:
-    current_image_tag: >-
-      {{
-        (
-          image_env_current.content
-          | b64decode
-          | regex_findall('(?m)^IMAGE_TAG=(.+)$')
-          | first
-          | default('')
-        )
-        if image_env_stat.stat.exists
-        else ''
-      }}
-
 - name: Extraer POSTGRES_IMAGE_TAG actual
   ansible.builtin.set_fact:
     current_postgres_image_tag: >-
@@ -121,6 +106,9 @@
     msg: "No hay POSTGRES_IMAGE_TAG actual y postgres_image_tag vino vacío — corre con run_build_postgres=true"
   when: final_postgres_image_tag | length == 0
 
+- name: Seleccionar imagen del backend
+  ansible.builtin.include_tasks: backend_image.yml
+
 # Generar image.env con tags resueltos
 - name: Generar image.env con tags resueltos
   ansible.builtin.copy:
@@ -129,7 +117,7 @@
     group: ansible
     mode: "0640"
     content: |
-      IMAGE_TAG={{ current_image_tag | default('none', true) }}
+      IMAGE_TAG={{ selected_backend_image_tag }}
       POSTGRES_IMAGE_TAG={{ final_postgres_image_tag }}
 
 # Levantar solo infraestructura base (sin backend)

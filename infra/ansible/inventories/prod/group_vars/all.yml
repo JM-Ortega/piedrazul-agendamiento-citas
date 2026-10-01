@@ -4,6 +4,8 @@ app_dir: /opt/piedrazul
 compose_project_name: piedrazul
 compose_file: "{{ app_dir }}/compose/prod.yml"
 compose_src_dir: "{{ playbook_dir }}/../../compose"
+# Último IMAGE_TAG del backend desplegado con éxito (fuente de reuso; ver app/tasks/backend_image.yml)
+backend_deployed_file: "{{ app_dir }}/backend-deployed.env"
 
 # Container registry
 ghcr_registry: ghcr.io
