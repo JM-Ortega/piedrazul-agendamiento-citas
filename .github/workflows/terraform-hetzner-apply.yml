@@ -30,17 +30,17 @@ jobs:
     environment: production-hetzner
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Upload configuration
-        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@v1.3.2
+        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@8e08d1ba957673f5fbf971a22b3219639dc45661 # v1.3.2
         id: upload
         with:
           workspace: ${{ env.TF_WORKSPACE }}
           directory: ${{ env.CONFIG_DIRECTORY }}
 
       - name: Create apply run
-        uses: hashicorp/tfc-workflows-github/actions/create-run@v1.3.2
+        uses: hashicorp/tfc-workflows-github/actions/create-run@8e08d1ba957673f5fbf971a22b3219639dc45661 # v1.3.2
         id: run
         continue-on-error: true
         with:
@@ -49,7 +49,7 @@ jobs:
           message: "Apply — merge a main ${{ github.sha }}"
 
       - name: Apply run
-        uses: hashicorp/tfc-workflows-github/actions/apply-run@v1.3.2
+        uses: hashicorp/tfc-workflows-github/actions/apply-run@8e08d1ba957673f5fbf971a22b3219639dc45661 # v1.3.2
         if: fromJSON(steps.run.outputs.payload).data.attributes.actions.is-confirmable
         id: apply
         continue-on-error: true

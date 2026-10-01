@@ -28,10 +28,10 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Upload configuration
-        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@v1.3.2
+        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@8e08d1ba957673f5fbf971a22b3219639dc45661 # v1.3.2
         id: upload
         with:
           workspace: ${{ env.TF_WORKSPACE }}
@@ -39,7 +39,7 @@ jobs:
           speculative: true
 
       - name: Create plan run
-        uses: hashicorp/tfc-workflows-github/actions/create-run@v1.3.2
+        uses: hashicorp/tfc-workflows-github/actions/create-run@8e08d1ba957673f5fbf971a22b3219639dc45661 # v1.3.2
         id: run
         continue-on-error: true
         with:
@@ -49,13 +49,13 @@ jobs:
           message: "PR #${{ github.event.pull_request.number }} — Hetzner speculative plan"
 
       - name: Get plan output
-        uses: hashicorp/tfc-workflows-github/actions/plan-output@v1.3.2
+        uses: hashicorp/tfc-workflows-github/actions/plan-output@8e08d1ba957673f5fbf971a22b3219639dc45661 # v1.3.2
         id: plan_output
         with:
           plan: ${{ steps.run.outputs.plan_id }}
 
       - name: Upsert plan comment on PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         if: github.event_name == 'pull_request'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
