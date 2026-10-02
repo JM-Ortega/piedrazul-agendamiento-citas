@@ -420,6 +420,34 @@ Last profile that met the validation criteria was 'production'.
 
 ---
 
+## Identidad inmutable y escaneo de imágenes (workflow)
+
+El deploy **todavía no es por digest**: Ansible y Compose despliegan las cuatro imágenes por tag, así que lo escaneado no está garantizado como lo desplegado. Lo que sí hace el workflow es fijar, cuando la conoce, la identidad inmutable de cada imagen y escanearla en modo solo reporte.
+
+`_deploy-server.yml` resuelve esa identidad **una sola vez** con `.github/scripts/resolve-amd64-image.sh`: lee el índice OCI (`docker buildx imagetools inspect --raw`), calcula su digest sobre los bytes recibidos y elige su único manifiesto `linux/amd64` que no sea attestation. Falla si el índice no se puede leer, no es un índice multi-plataforma, no coincide con el digest pedido o no tiene exactamente un hijo `linux/amd64`.
+
+| imagen | identidad en el workflow |
+|---|---|
+| backend, build | conocida: digest que devuelve el mismo `docker/build-push-action`, leído por digest; el tag no se vuelve a consultar |
+| backend, rollback | conocida: `validate_inputs` lee el `image_tag` una vez (también es la verificación de que existe en GHCR) |
+| backend, reuso | **pendiente**: el último deploy exitoso solo está en el servidor (`backend-deployed.env`) |
+| postgres, build | conocida: igual que backend build |
+| postgres, sin build | **pendiente**: el servidor conserva su `POSTGRES_IMAGE_TAG` |
+| keycloak, traefik | fijada **solo para el escaneo**: se resuelve la referencia de `infra/compose/*.yml`, pero Compose sigue desplegando por tag |
+
+`select_backend_image` expone `image_tag` (lo que reciben converge y deploy) y, solo para build y rollback, `image_index_digest`, `image_amd64_digest` e `image_ref` (`repo@sha256:<linux/amd64>`). Un build o rollback sin identidad `linux/amd64` válida falla antes del deploy.
+
+**Escaneo (solo reporte).** `image_targets` reúne las imágenes que el run construye o aplica en el servidor y cuya identidad conoce: backend y postgres construidos (marcados "no desplegada" si el run no los despliega), backend de rollback, keycloak si corre converge o deploy (deploy lo levanta por `depends_on`) y traefik solo si corre converge. `image_scan` corre Trivy 0.74.0 (imagen oficial fijada por digest) sobre cada `image_ref`: `--image-src remote --platform linux/amd64 --scanners vuln`, sin socket de Docker ni credenciales. Cada job publica en el resumen del run el ref escaneado, la versión de Trivy, la fecha de la DB y los CRITICAL/HIGH, y sube `trivy.json`, `trivy-version.json` y `summary.json` como artifact `image-scan-<imagen>-<run_id>` (30 días).
+
+- Los hallazgos **no bloquean**: ningún job de configuración o deploy depende de `image_targets` ni de `image_scan`.
+- Un fallo operativo (registry, DB de vulnerabilidades o Trivy) deja ese job en rojo, con una anotación de error y `FALLO OPERATIVO` en el resumen; nunca se reporta como cero hallazgos. Mientras el escaneo sea solo reporte, ambos jobs tienen `continue-on-error: true`: la conclusión del run sigue reflejando solo el deploy. Para reintentar un escaneo, re-correr solo ese job (no "Re-run all jobs", que repite el deploy).
+- El resumen lista como "sin escanear" las imágenes que el run aplica pero cuya identidad solo existe en el servidor (backend en reuso, postgres sin build).
+- El escaneo de keycloak y traefik describe el contenido actual de su tag, que puede no ser lo que corre en el servidor.
+
+Los `FROM` de `backend/Dockerfile` e `infra/postgres/Dockerfile` están fijados por digest del índice OCI (`imagen:tag@sha256:…`), así buildx toma el hijo correcto para `linux/amd64` y `linux/arm64`. Para actualizar una base se resuelve el nuevo índice (`docker buildx imagetools inspect <imagen>:<tag>`) y se reemplaza el digest.
+
+---
+
 ## Flujo completo — primer deploy
 
 ```
@@ -454,7 +482,9 @@ GitHub Actions (workflow)
 ```
 GitHub Actions (workflow)
   │
-  ├── CI build → imagen multi-arch → push a GHCR → IMAGE_TAG=abc123
+  ├── CI build → imagen multi-arch → push a GHCR → IMAGE_TAG=abc123 + digest linux/amd64
+  ├── escaneo Trivy del digest linux/amd64 (solo reporte, en paralelo; no bloquea;
+  │   el deploy sigue siendo por tag)
   └── Corre: ansible-playbook deploy.yml -e "image_tag=abc123"
         │
         └── deploy.yml
