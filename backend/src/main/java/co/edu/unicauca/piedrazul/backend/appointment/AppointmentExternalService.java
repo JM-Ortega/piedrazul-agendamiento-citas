@@ -27,6 +27,9 @@ public interface AppointmentExternalService {
 
     boolean hasScheduledAppointments(UUID doctorID);
 
+    // Fechas (sin repetir, ordenadas) con citas agendadas del doctor dentro del rango, extremos inclusivos
+    List<LocalDate> findScheduledAppointmentDates(UUID doctorId, LocalDate start, LocalDate end);
+
     Set<UUID> calculateDoctorsAvailability(List<DoctorsAvailability> doctorsAvailability);
 
     List<LocalDate> getAvailableDates(UUID doctorId);

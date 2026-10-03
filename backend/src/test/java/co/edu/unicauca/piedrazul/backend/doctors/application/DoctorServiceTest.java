@@ -154,8 +154,7 @@ class DoctorServiceTest {
                         CreateDoctorRequest request = new CreateDoctorRequest(
                                         List.of(SpecialtyCode.TERAPIA_NEURAL), LocalDate.now(),
                                         LocalDate.now().plusMonths(6), 4, 30,
-                                        List.of(new ScheduleRequest(LocalTime.of(5, 0), LocalTime.of(9, 0),
-                                                        Workday.LUNES)));
+                                        List.of(scheduleRequest));
 
                         Specialty specialty = buildSpecialty(SpecialtyCode.TERAPIA_NEURAL);
                         when(specialtyRepository.findById(SpecialtyCode.TERAPIA_NEURAL))

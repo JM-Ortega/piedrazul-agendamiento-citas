@@ -9,12 +9,14 @@ import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCode
 import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeBlockedException;
 import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeExpiredException;
 import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeNotFoundException;
+import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeRequestLimitException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -26,6 +28,12 @@ public class VerificationService implements VerificationModuleApi {
     private static final int CODE_LENGTH = 6;
     private static final int MAX_ATTEMPTS = 5;
     private static final int EXPIRATION_MINUTES = 5;
+
+    // Límites de solicitud por sujeto y propósito. Pedir un código nuevo reinicia los intentos
+    // y envía un mensaje, así que sin límite se podría adivinar el código y saturar a la persona.
+    private static final Duration REQUEST_COOLDOWN = Duration.ofMinutes(1);
+    private static final Duration REQUEST_WINDOW = Duration.ofHours(1);
+    private static final int MAX_REQUESTS_PER_WINDOW = 5;
 
     private final VerificationCodeStore verificationCodeStore;
     private final VerificationAttemptProcessor verificationAttemptProcessor;
@@ -52,8 +60,12 @@ public class VerificationService implements VerificationModuleApi {
         validateAtLeastOneContact(phone, email);
         Objects.requireNonNull(recipientId, "recipientId cannot be null");
 
+        // El bloqueo sobre el código activo serializa las solicitudes simultáneas del mismo sujeto,
+        // para que ninguna se salte el conteo de los límites.
         Optional<VerificationCode> existing =
-                verificationCodeStore.findLatestActive(subject, purpose);
+                verificationCodeStore.findLatestActiveForUpdate(subject, purpose);
+
+        enforceRequestLimits(subject, purpose, Instant.now());
 
         existing.ifPresent(code -> {
             code.invalidate();
@@ -105,6 +117,18 @@ public class VerificationService implements VerificationModuleApi {
 
         if (consumed == 0) {
             throw new VerificationCodeAlreadyUsedException();
+        }
+    }
+
+    private void enforceRequestLimits(String subject, VerificationPurpose purpose, Instant now) {
+        if (verificationCodeStore.countIssuedSince(subject, purpose, now.minus(REQUEST_COOLDOWN)) > 0) {
+            throw new VerificationCodeRequestLimitException(
+                    "Ya se envió un código hace menos de un minuto. Espera antes de solicitar otro");
+        }
+
+        if (verificationCodeStore.countIssuedSince(subject, purpose, now.minus(REQUEST_WINDOW)) >= MAX_REQUESTS_PER_WINDOW) {
+            throw new VerificationCodeRequestLimitException(
+                    "Se alcanzó el límite de códigos solicitados para este documento. Intenta de nuevo más tarde");
         }
     }
 

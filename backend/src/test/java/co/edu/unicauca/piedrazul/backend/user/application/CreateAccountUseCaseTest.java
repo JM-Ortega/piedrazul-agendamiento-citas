@@ -13,6 +13,7 @@ import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayl
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
+import co.edu.unicauca.piedrazul.backend.user.exception.InvalidRoleAssignmentException;
 import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -257,7 +258,7 @@ class CreateAccountUseCaseTest {
     void executeShouldThrowWhenRolesCombinationIsInvalid() {
         CreateSystemUserPayload payload = buildPayload(List.of(Role.ADMIN, Role.PATIENT));
 
-        assertThrows(InvalidUserDataException.class, () -> createAccountUseCase.execute(payload));
+        assertThrows(InvalidRoleAssignmentException.class, () -> createAccountUseCase.execute(payload));
     }
 
     private CreateSystemUserPayload buildPayload(List<Role> roles) {

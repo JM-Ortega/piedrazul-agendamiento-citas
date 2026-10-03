@@ -48,6 +48,15 @@ class AuditActionCatalogIT extends PostgresIntegrationSupport {
     @Test
     void theModuleCatalogListsEverySeededModule() {
         assertThat(moduleRepository.findAll()).extracting(AuditModuleJpaEntity::getCode)
-                .contains("CITAS", "USUARIOS", "PACIENTES", "CONTROLES_MEDICOS", "SEGURIDAD");
+                .contains("CITAS", "USUARIOS", "PACIENTES", "CONTROLES_MEDICOS", "SEGURIDAD", "DOCTORES");
+    }
+
+    @Test
+    void timeOffActionsBelongToTheDoctorsModule() {
+        List<String> modules = jdbcTemplate.queryForList(
+                "SELECT DISTINCT audit_module_code FROM piedrazul.audit_action WHERE code LIKE 'DESCANSO_%'",
+                String.class);
+
+        assertThat(modules).containsExactly("DOCTORES");
     }
 }
