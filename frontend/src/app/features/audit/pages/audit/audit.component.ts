@@ -15,6 +15,7 @@ import { AuditTableComponent } from '../../components/auditTable/auditTable.comp
 import { AuditFilterBarComponent } from '../../components/auditFilterBar/auditFilterBar.component';
 import { PaginationComponent } from '../../../../designSystem/molecules/pagination/pagination.component';
 import { AuditService } from '../../service/audit.service';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 
 /**
  * Consulta `AuditService` sobre toda la bitácora del sistema;
@@ -49,10 +50,11 @@ export class AuditComponent implements OnInit {
   ngOnInit(): void {
     this.auditService.clearEvents();
     this.auditService.loadCatalog().subscribe({
-      error: (err: { message: string }) =>
+      error: (err: AppError) => {
         this.errorMessage.set(
           'No se pudieron cargar los filtros: ' + err.message
-        ),
+        );
+      },
     });
     this.loadEvents(0);
   }
@@ -77,10 +79,11 @@ export class AuditComponent implements OnInit {
         pageSize: AUDIT_PAGE_SIZE,
       })
       .subscribe({
-        error: (err: { message: string }) =>
+        error: (err: AppError) => {
           this.errorMessage.set(
             'No se pudieron cargar los registros: ' + err.message
-          ),
+          );
+        },
       });
   }
 }
