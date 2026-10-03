@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.jackson.sanitization;
 
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.input.ConfirmLinkUserAccountRequest;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SanitizeDeserializerTest {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     @Test
     void shouldSanitizeOnlyAnnotatedFieldsOnDeserialization() throws Exception {
