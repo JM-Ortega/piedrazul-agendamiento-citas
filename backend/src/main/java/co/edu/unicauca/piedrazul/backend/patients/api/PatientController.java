@@ -124,23 +124,15 @@ public class PatientController {
     }
 
     @GetMapping("/document/{documentNumber}")
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR', 'ADMIN')")
     public PatientResponse findByDocument(@PathVariable String documentNumber) {
-        UUID authenticatedActorId = UUID.fromString(securityContextExtractor.currentActorId());
-        String userRoles = securityContextExtractor.currentActorRoles();
-
-        if (userRoles.contains("PATIENT")) {
-            documentNumber = personExternalService.findPersonIdByUserId(authenticatedActorId).toString();
-        }
-
-        String finalDocumentNumber = documentNumber;
         PatientData patient = patientService.findByDocumentNumber(documentNumber)
-                .orElseThrow(() -> new PatientNotFoundException(finalDocumentNumber));
+                .orElseThrow(() -> new PatientNotFoundException(documentNumber));
         return toResponse(patient);
     }
 
     @GetMapping("/search/by-document-prefix")
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR')")
     public List<PatientSummaryResponse> searchByDocumentPrefix(@RequestParam String documentPrefix) {
         return patientService.searchByDocumentNumberPrefix(documentPrefix)
                 .stream()
