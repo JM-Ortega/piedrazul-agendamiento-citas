@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.audit.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.events.ScheduledAppointmentEvent;
+import co.edu.unicauca.piedrazul.backend.doctors.events.TimeOffChangedEvent;
 import co.edu.unicauca.piedrazul.backend.medicalCheckup.events.MedicalCheckupCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.patients.events.PatientUpdatedEvent;
 import co.edu.unicauca.piedrazul.backend.shared.audit.AuditTargetType;
@@ -48,6 +49,24 @@ public class AuditEventListener {
                 .target(AuditTargetType.CONTROL_MEDICO, event.medicalCheckupId().toString())
                 .outcome(AuditOutcome.EXITOSO)
                 .correlationId(event.correlationId())
+                .build());
+    }
+
+    @ApplicationModuleListener
+    void on(TimeOffChangedEvent event) {
+        AuditAction action = switch (event.change()) {
+            case CREATED -> AuditAction.DESCANSO_CREADO;
+            case DELETED -> AuditAction.DESCANSO_ELIMINADO;
+            case TRUNCATED -> AuditAction.DESCANSO_RECORTADO;
+        };
+
+        repository.save(AuditEvent.builder()
+                .actor(event.performedBy(), event.performedByRole())
+                .action(action)
+                .target(AuditTargetType.DOCTOR, event.doctorId())
+                .outcome(AuditOutcome.EXITOSO)
+                .correlationId(event.correlationId())
+                .states(event.beforeState(), event.afterState())
                 .build());
     }
 

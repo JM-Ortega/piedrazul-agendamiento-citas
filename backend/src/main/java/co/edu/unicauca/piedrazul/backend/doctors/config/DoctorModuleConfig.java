@@ -12,6 +12,8 @@ import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.Spec
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import de.focus_shift.jollyday.core.HolidayManager;
 import de.focus_shift.jollyday.core.ManagerParameters;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -38,9 +40,12 @@ public class DoctorModuleConfig {
     public TimeOffService timeOffService(
             DoctorRepository doctorRepository,
             DoctorTimeOffRepository timeOffRepository,
-            AppointmentExternalService appointmentExternalService
+            AppointmentExternalService appointmentExternalService,
+            ApplicationEventPublisher eventPublisher,
+            SecurityContextExtractor securityExtractor
     ) {
-        return new TimeOffService(doctorRepository, timeOffRepository, appointmentExternalService);
+        return new TimeOffService(doctorRepository, timeOffRepository, appointmentExternalService,
+                eventPublisher, securityExtractor);
     }
 
     /**

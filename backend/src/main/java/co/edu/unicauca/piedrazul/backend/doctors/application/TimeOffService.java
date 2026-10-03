@@ -4,10 +4,14 @@ import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.input.CreateTimeOffRequest;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.DoctorTimeOff;
+import co.edu.unicauca.piedrazul.backend.doctors.events.TimeOffChangedEvent;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.*;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorTimeOffRepository;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import jakarta.transaction.Transactional;
+import org.slf4j.MDC;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -19,15 +23,21 @@ public class TimeOffService {
     private final DoctorRepository doctorRepository;
     private final DoctorTimeOffRepository timeOffRepository;
     private final AppointmentExternalService appointmentExternalService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final SecurityContextExtractor securityExtractor;
 
     public TimeOffService(
             DoctorRepository doctorRepository,
             DoctorTimeOffRepository timeOffRepository,
-            AppointmentExternalService appointmentExternalService
+            AppointmentExternalService appointmentExternalService,
+            ApplicationEventPublisher eventPublisher,
+            SecurityContextExtractor securityExtractor
     ) {
         this.doctorRepository = doctorRepository;
         this.timeOffRepository = timeOffRepository;
         this.appointmentExternalService = appointmentExternalService;
+        this.eventPublisher = eventPublisher;
+        this.securityExtractor = securityExtractor;
     }
 
     @Transactional
@@ -75,7 +85,10 @@ public class TimeOffService {
             throw new TimeOffOverlapException("El rango se cruza con otro descanso del doctor");
         }
 
-        return timeOffRepository.save(new DoctorTimeOff(doctor.getPersonId(), start, end, request.reason()));
+        DoctorTimeOff saved = timeOffRepository.save(
+                new DoctorTimeOff(doctor.getPersonId(), start, end, request.reason()));
+        publish(saved.getDoctorId(), TimeOffChangedEvent.Change.CREATED, null, rangeJson(start, end));
+        return saved;
     }
 
     public List<DoctorTimeOff> getByDoctor(UUID doctorId) {
@@ -97,12 +110,31 @@ public class TimeOffService {
             throw new TimeOffAlreadyEndedException("El descanso ya terminó y se conserva como historial");
         }
 
+        String before = rangeJson(timeOff.getStartDate(), timeOff.getEndDate());
         if (timeOff.isUpcoming(today)) {
             timeOffRepository.delete(timeOff);
+            publish(timeOff.getDoctorId(), TimeOffChangedEvent.Change.DELETED, before, null);
         } else {
             timeOff.endBefore(today);
             timeOffRepository.save(timeOff);
+            publish(timeOff.getDoctorId(), TimeOffChangedEvent.Change.TRUNCATED, before,
+                    rangeJson(timeOff.getStartDate(), timeOff.getEndDate()));
         }
+    }
+
+    private void publish(UUID doctorId, TimeOffChangedEvent.Change change, String before, String after) {
+        eventPublisher.publishEvent(new TimeOffChangedEvent(
+                doctorId.toString(),
+                change,
+                securityExtractor.currentActorId(),
+                securityExtractor.currentActorRoles(),
+                MDC.get("correlationId"),
+                before,
+                after));
+    }
+
+    private static String rangeJson(LocalDate start, LocalDate end) {
+        return "{\"startDate\":\"" + start + "\",\"endDate\":\"" + end + "\"}";
     }
 
     private Doctor findDoctor(UUID doctorId) {

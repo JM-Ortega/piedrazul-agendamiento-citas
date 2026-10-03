@@ -60,7 +60,8 @@ INSERT INTO piedrazul.audit_module (code, name) VALUES
     ('USUARIOS', 'Usuarios'),
     ('PACIENTES', 'Pacientes'),
     ('CONTROLES_MEDICOS', 'Controles Médicos'),
-    ('SEGURIDAD', 'Seguridad')
+    ('SEGURIDAD', 'Seguridad'),
+    ('DOCTORES', 'Doctores')
 ON CONFLICT (code) DO NOTHING;
 
 -- ---------------------------------------------------------------------
@@ -77,6 +78,9 @@ INSERT INTO piedrazul.audit_action (code, name, audit_module_code) VALUES
     ('CONTROL_MEDICO_CREADO',      'Control médico creado',               'CONTROLES_MEDICOS'),
     ('CONTROL_MEDICO_CONSULTADO',  'Control médico consultado',           'CONTROLES_MEDICOS'),
     ('CONTROL_MEDICO_MODIFICADO',  'Control médico modificado',           'CONTROLES_MEDICOS'),
+    ('DESCANSO_CREADO',            'Descanso de doctor creado',           'DOCTORES'),
+    ('DESCANSO_ELIMINADO',         'Descanso de doctor eliminado',        'DOCTORES'),
+    ('DESCANSO_RECORTADO',         'Descanso de doctor recortado',        'DOCTORES'),
     ('LOGIN_EXITOSO',              'Inicio de sesión exitoso',            'SEGURIDAD'),
     ('LOGIN_FALLIDO',              'Intento de inicio de sesión fallido', 'SEGURIDAD')
 ON CONFLICT (code) DO NOTHING;
