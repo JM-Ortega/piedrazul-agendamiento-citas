@@ -4,13 +4,15 @@ app_dir: /opt/piedrazul
 compose_project_name: piedrazul
 compose_file: "{{ app_dir }}/compose/prod.yml"
 compose_src_dir: "{{ playbook_dir }}/../../compose"
-# Último IMAGE_TAG del backend desplegado con éxito (fuente de reuso; ver app/tasks/backend_image.yml)
-backend_deployed_file: "{{ app_dir }}/backend-deployed.env"
+# Último despliegue exitoso: identidades exactas de backend y postgres verificadas en
+# ejecución y healthy (única fuente de reuso; ver app/tasks/record_release.yml)
+release_state_file: "{{ app_dir }}/last-success.env"
 
 # Container registry
 ghcr_registry: ghcr.io
 ghcr_namespace: jm-ortega/piedrazul-agendamiento-citas
 backend_image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/backend"
+postgres_image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/postgres"
 
 # Dominio base
 base_domain: piedrazul.org

@@ -1,0 +1,61 @@
+---
+# Verifica que los contenedores de las imágenes propias corren exactamente la identidad
+# esperada. No mira health: eso es verify_health.yml, y un health OK no prueba que corra
+# el contenido esperado.
+#
+# Variables:
+#   app_release_services → servicios a verificar (subconjunto de [postgres, backend])
+#   backend_image_ref / postgres_image_ref → identidades exactas esperadas
+#
+# Identidad en ejecución: el contenedor existe y corre, se creó desde la referencia
+# exacta (Config.Image), y la imagen local que ejecuta (Image) es la que el daemon
+# registró bajo ese digest (RepoDigests).
+
+- name: Validar servicios a verificar
+  ansible.builtin.assert:
+    that:
+      - app_release_services | length > 0
+      - app_release_services | difference(['postgres', 'backend']) | length == 0
+    fail_msg: "app_release_services debe ser un subconjunto no vacío de [postgres, backend]"
+    quiet: true
+
+- name: Definir identidades esperadas
+  ansible.builtin.set_fact:
+    app_release_expected:
+      backend: "{{ backend_image_ref }}"
+      postgres: "{{ postgres_image_ref }}"
+
+- name: Leer contenedores de las imágenes propias
+  community.docker.docker_container_info:
+    name: "{{ item }}"
+  loop: "{{ app_release_services }}"
+  register: app_release_containers
+
+- name: Leer imágenes que ejecutan los contenedores
+  community.docker.docker_image_info:
+    name: "{{ item.container.Image }}"
+  loop: "{{ app_release_containers.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.exists
+  register: app_release_images
+
+- name: Verificar identidad exacta en ejecución
+  ansible.builtin.assert:
+    that:
+      - item.0.exists
+      - item.0.container.State.Running
+      - item.0.container.Config.Image == app_release_expected[item.0.item]
+      - item.1.images | length == 1
+      - item.1.images[0].Id == item.0.container.Image
+      - app_release_expected[item.0.item] in (item.1.images[0].RepoDigests | default([]))
+    fail_msg: >-
+      IDENTIDAD EN EJECUCIÓN: {{ item.0.item }} no corre {{ app_release_expected[item.0.item] }}
+      (contenedor: {{ (item.0.container | default({}, true)).Config.Image | default('ausente') }},
+      imagen: {{ (item.0.container | default({}, true)).Image | default('n/a') }},
+      RepoDigests: {{ (item.1.images | default([], true) | first | default({}, true)).RepoDigests | default([]) }}).
+      No se registra como éxito.
+    success_msg: "{{ item.0.item }} corre {{ app_release_expected[item.0.item] }}"
+  loop: "{{ app_release_containers.results | zip(app_release_images.results) | list }}"
+  loop_control:
+    label: "{{ item.0.item }}"

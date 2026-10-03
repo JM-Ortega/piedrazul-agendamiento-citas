@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ghcr.io/${GITHUB_OWNER}/${GITHUB_REPO}/backend:${IMAGE_TAG:?IMAGE_TAG no definido — image.env debe contener una identidad de backend válida}
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE no definido — image.env debe contener la identidad exacta del backend (repo@sha256)}
     container_name: backend
     restart: unless-stopped
     environment:

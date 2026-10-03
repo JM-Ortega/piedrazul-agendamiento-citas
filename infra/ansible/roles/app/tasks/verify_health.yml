@@ -1,0 +1,32 @@
+---
+# Verifica el health de los contenedores de las imágenes propias (HEALTHCHECK de cada
+# imagen o de Compose). Independiente de la identidad: verify_running_images.yml.
+#
+# Variables:
+#   app_release_services → servicios a verificar (subconjunto de [postgres, backend])
+
+- name: Esperar health de las imágenes propias
+  community.docker.docker_container_info:
+    name: "{{ item }}"
+  loop: "{{ app_release_services }}"
+  register: app_release_health
+  until: >-
+    app_release_health.exists and
+    (app_release_health.container.State.Health.Status | default('none')) in ['healthy', 'unhealthy']
+  retries: 36
+  delay: 10
+  failed_when: false
+
+- name: Verificar health de las imágenes propias
+  ansible.builtin.assert:
+    that:
+      - item.exists
+      - (item.container.State.Health.Status | default('none')) == 'healthy'
+    fail_msg: >-
+      HEALTH: {{ item.item }} no quedó healthy
+      (estado: {{ ((item.container | default({}, true)).State | default({})).Health.Status | default('sin healthcheck o contenedor ausente') }}).
+      No se registra como éxito.
+    success_msg: "{{ item.item }} healthy"
+  loop: "{{ app_release_health.results }}"
+  loop_control:
+    label: "{{ item.item }}"

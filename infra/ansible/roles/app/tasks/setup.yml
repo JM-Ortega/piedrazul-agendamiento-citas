@@ -65,60 +65,20 @@
     mode: "0640"
   no_log: true
 
-# Resolver tags para image.env
-- name: Verificar image.env actual
-  ansible.builtin.stat:
-    path: "{{ app_dir }}/image.env"
-  register: image_env_stat
+# Identidades exactas de las imágenes propias para image.env
+- name: Validar y descargar imágenes propias
+  ansible.builtin.include_tasks: release_images.yml
 
-- name: Leer image.env actual
-  ansible.builtin.slurp:
-    src: "{{ app_dir }}/image.env"
-  register: image_env_current
-  when: image_env_stat.stat.exists
-
-- name: Extraer POSTGRES_IMAGE_TAG actual
-  ansible.builtin.set_fact:
-    current_postgres_image_tag: >-
-      {{
-        (
-          image_env_current.content
-          | b64decode
-          | regex_findall('(?m)^POSTGRES_IMAGE_TAG=(.+)$')
-          | first
-          | default('')
-        )
-        if image_env_stat.stat.exists
-        else ''
-      }}
-
-- name: Resolver POSTGRES_IMAGE_TAG final
-  ansible.builtin.set_fact:
-    final_postgres_image_tag: >-
-      {{
-        postgres_image_tag
-        if (postgres_image_tag | default('') | length > 0)
-        else current_postgres_image_tag
-      }}
-
-- name: Validar que POSTGRES_IMAGE_TAG está disponible
-  ansible.builtin.fail:
-    msg: "No hay POSTGRES_IMAGE_TAG actual y postgres_image_tag vino vacío — corre con run_build_postgres=true"
-  when: final_postgres_image_tag | length == 0
-
-- name: Seleccionar imagen del backend
-  ansible.builtin.include_tasks: backend_image.yml
-
-# Generar image.env con tags resueltos
-- name: Generar image.env con tags resueltos
+# image.env es la entrada de Compose: referencias exactas, nunca tags
+- name: Generar image.env con identidades exactas
   ansible.builtin.copy:
     dest: "{{ app_dir }}/image.env"
     owner: ansible
     group: ansible
     mode: "0640"
     content: |
-      IMAGE_TAG={{ selected_backend_image_tag }}
-      POSTGRES_IMAGE_TAG={{ final_postgres_image_tag }}
+      BACKEND_IMAGE={{ backend_image_ref }}
+      POSTGRES_IMAGE={{ postgres_image_ref }}
 
 # Levantar solo infraestructura base (sin backend)
 - name: Levantar servicios de infraestructura

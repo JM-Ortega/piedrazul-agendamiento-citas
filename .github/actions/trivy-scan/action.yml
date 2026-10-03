@@ -1,0 +1,185 @@
+name: Escanear imagen con Trivy (solo reporte)
+description: >-
+  Intenta escanear con Trivy el manifiesto linux/amd64 exacto de una imagen, directo del
+  registry, y deja evidencia explícita del resultado: "scanned" (con conteo de hallazgos,
+  que puede ser cero) u "operational_failure" (registry, DB de vulnerabilidades o Trivy
+  fallaron: no hay evaluación, nunca equivale a cero hallazgos). Mientras la política de
+  vulnerabilidades no esté activa ninguno de esos dos resultados hace fallar el paso;
+  cualquier otro error (entrada inválida, evidencia, artifact) sí lo hace. El escáner no
+  recibe secretos ni el socket de Docker.
+
+inputs:
+  surface:
+    description: "Imagen lógica (backend, postgres, keycloak, traefik)"
+    required: true
+  source:
+    description: "Origen de la identidad (build, rollback, reuse, compose (tag), ...)"
+    required: true
+  label:
+    description: "Referencia legible (tag) asociada a la identidad"
+    required: true
+  image_index_digest:
+    description: "Digest del índice OCI"
+    required: true
+  image_ref:
+    description: "Referencia exacta escaneada: <repo>@sha256:<manifiesto linux/amd64>"
+    required: true
+  phase:
+    description: "selected = identidad conocida antes del gate; production = reuso leído tras el gate"
+    required: true
+
+outputs:
+  outcome:
+    description: "scanned | operational_failure"
+    value: ${{ steps.scan.outputs.outcome }}
+
+runs:
+  using: composite
+  steps:
+    # Sin socket de Docker ni credenciales: Trivy lee las capas directo del registry
+    # (--image-src remote) y solo monta su caché y el directorio del reporte.
+    # --exit-code 0: los hallazgos nunca son error. Un error del intento de Trivy (registry,
+    # DB, ejecución o reporte que no corresponde) se registra como operational_failure en
+    # vez de fallar el paso (transitorio mientras el escaneo sea solo reporte; con la
+    # política activa será bloqueante). Cualquier otro error (entrada inválida, evidencia,
+    # artifact) SÍ falla el paso: no hay evidencia verificable y producción no muta.
+    - name: Escanear con Trivy
+      id: scan
+      shell: bash
+      env:
+        SCAN_DIR: scan-${{ inputs.phase }}-${{ inputs.surface }}
+        # Trivy v0.74.0, imagen oficial fijada por digest del índice OCI
+        TRIVY_IMAGE: aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+        IMAGE_REF: ${{ inputs.image_ref }}
+      run: |
+        set -euo pipefail
+        # Entrada inválida = error del workflow, no del escáner: falla el paso
+        [[ "${IMAGE_REF}" =~ ^[a-z0-9./_-]+@sha256:[0-9a-f]{64}$ ]] || {
+          echo "Error: '${IMAGE_REF}' no es una referencia exacta por digest"
+          exit 1
+        }
+        mkdir -p "${RUNNER_TEMP}/trivy-cache" "${SCAN_DIR}"
+        rm -f "${SCAN_DIR}/trivy.json" "${SCAN_DIR}/trivy-version.json" "${SCAN_DIR}/summary.json"
+
+        # Intento de Trivy: su fallo es operational_failure, no un error del paso
+        set +e
+        (
+          set -euo pipefail
+          docker run --rm \
+            -v "${RUNNER_TEMP}/trivy-cache:/root/.cache/trivy" \
+            -v "${PWD}/${SCAN_DIR}:/scan" \
+            "${TRIVY_IMAGE}" image \
+              --image-src remote \
+              --platform linux/amd64 \
+              --scanners vuln \
+              --format json \
+              --output /scan/trivy.json \
+              --exit-code 0 \
+              --no-progress \
+              --skip-version-check \
+              "${IMAGE_REF}"
+
+          docker run --rm \
+            -v "${RUNNER_TEMP}/trivy-cache:/root/.cache/trivy" \
+            "${TRIVY_IMAGE}" version --format json > "${SCAN_DIR}/trivy-version.json"
+
+          jq -e --arg ref "${IMAGE_REF}" \
+            '.SchemaVersion == 2 and .ArtifactName == $ref and (.Results | type == "array" or . == null)' \
+            "${SCAN_DIR}/trivy.json" > /dev/null || {
+              echo "Error: el reporte de Trivy no corresponde a ${IMAGE_REF} o está incompleto"
+              exit 1
+            }
+          jq -e '.VulnerabilityDB.UpdatedAt' "${SCAN_DIR}/trivy-version.json" > /dev/null || {
+            echo "Error: Trivy no reporta metadatos de la base de vulnerabilidades"
+            exit 1
+          }
+        )
+        RC=$?
+        set -e
+
+        if [ "${RC}" -eq 0 ]; then
+          echo "outcome=scanned" >> "$GITHUB_OUTPUT"
+        else
+          echo "outcome=operational_failure" >> "$GITHUB_OUTPUT"
+          echo "::error title=Escaneo de imagen: FALLO OPERATIVO::No se pudo evaluar ${IMAGE_REF} (código ${RC}). No equivale a cero hallazgos. Solo reporte: no bloquea mientras la política de vulnerabilidades no esté activa."
+        fi
+
+    - name: Evidencia del escaneo
+      shell: bash
+      env:
+        SCAN_DIR: scan-${{ inputs.phase }}-${{ inputs.surface }}
+        OUTCOME: ${{ steps.scan.outputs.outcome }}
+        SURFACE: ${{ inputs.surface }}
+        SOURCE: ${{ inputs.source }}
+        LABEL: ${{ inputs.label }}
+        INDEX_DIGEST: ${{ inputs.image_index_digest }}
+        IMAGE_REF: ${{ inputs.image_ref }}
+      run: |
+        set -euo pipefail
+        case "${OUTCOME}" in
+          scanned | operational_failure) ;;
+          *) echo "Error: resultado de escaneo desconocido '${OUTCOME}'"; exit 1 ;;
+        esac
+
+        BASE=$(jq -n \
+          --arg surface "${SURFACE}" --arg source "${SOURCE}" --arg label "${LABEL}" \
+          --arg index "${INDEX_DIGEST}" --arg ref "${IMAGE_REF}" --arg outcome "${OUTCOME}" \
+          '{surface: $surface, source: $source, label: $label, image_index_digest: $index,
+            image_ref: $ref, platform: "linux/amd64", outcome: $outcome, enforcement: "report-only"}')
+
+        if [ "${OUTCOME}" = "scanned" ]; then
+          jq --slurpfile report "${SCAN_DIR}/trivy.json" --slurpfile version "${SCAN_DIR}/trivy-version.json" '
+            [$report[0].Results[]?.Vulnerabilities[]?] as $v
+            | def sev($s): [$v[] | select(.Severity == $s)]
+                | {findings: length, unique_ids: ([.[].VulnerabilityID] | unique | length)};
+            . + {
+              trivy_version: $version[0].Version,
+              vulnerability_db: $version[0].VulnerabilityDB,
+              critical: sev("CRITICAL"),
+              high: sev("HIGH")
+            }' <<< "${BASE}" > "${SCAN_DIR}/summary.json"
+
+          jq -r '
+            "## Escaneo de `\(.surface)`: evaluado (solo reporte)",
+            "",
+            "| campo | valor |",
+            "|---|---|",
+            "| resultado | scanned |",
+            "| origen | \(.source) (`\(.label)`) |",
+            "| índice OCI | `\(.image_index_digest)` |",
+            "| escaneado (linux/amd64) | `\(.image_ref)` |",
+            "| Trivy | \(.trivy_version) |",
+            "| DB de vulnerabilidades | v\(.vulnerability_db.Version), actualizada \(.vulnerability_db.UpdatedAt) |",
+            "| CRITICAL | \(.critical.findings) hallazgos, \(.critical.unique_ids) CVE únicos |",
+            "| HIGH | \(.high.findings) hallazgos, \(.high.unique_ids) CVE únicos |",
+            "",
+            "> Solo reporte: los hallazgos no bloquean; la política de vulnerabilidades todavía no está activa."
+          ' "${SCAN_DIR}/summary.json" >> "$GITHUB_STEP_SUMMARY"
+        else
+          # Sin conteos: un fallo operativo no es una evaluación (y nunca es "0 hallazgos")
+          jq '. + {critical: null, high: null}' <<< "${BASE}" > "${SCAN_DIR}/summary.json"
+          {
+            echo "## Escaneo de \`${SURFACE}\`: FALLO OPERATIVO (solo reporte)"
+            echo
+            echo "| campo | valor |"
+            echo "|---|---|"
+            echo "| resultado | operational_failure |"
+            echo "| imagen | \`${IMAGE_REF}\` |"
+            echo
+            echo "> No se pudo evaluar esta imagen: **no equivale a cero hallazgos**. Transitorio mientras la"
+            echo "> política no esté activa: no bloquea producción."
+          } >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+        jq -c . "${SCAN_DIR}/summary.json"
+
+    - name: Subir evidencia del escaneo
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        name: image-scan-${{ inputs.phase }}-${{ inputs.surface }}-${{ github.run_id }}
+        path: |
+          scan-${{ inputs.phase }}-${{ inputs.surface }}/summary.json
+          scan-${{ inputs.phase }}-${{ inputs.surface }}/trivy.json
+          scan-${{ inputs.phase }}-${{ inputs.surface }}/trivy-version.json
+        if-no-files-found: error
+        retention-days: 30

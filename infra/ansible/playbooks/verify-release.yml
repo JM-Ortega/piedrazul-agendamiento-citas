@@ -1,0 +1,30 @@
+---
+# Verificación posterior a converge/deploy de las imágenes propias. No modifica nada.
+#   -e release_check=identity → identidad exacta en ejecución
+#   -e release_check=health   → health de los contenedores
+#   -e '{"app_release_services": ["postgres", "backend"]}'
+#   -e backend_image_ref=... -e postgres_image_ref=...   (identidades esperadas)
+
+- name: Verificar imágenes propias
+  hosts: vps
+  gather_facts: false
+
+  tasks:
+    - name: Validar verificación pedida
+      ansible.builtin.assert:
+        that:
+          - release_check | default('') in ['identity', 'health']
+        fail_msg: "release_check debe ser 'identity' o 'health'"
+        quiet: true
+
+    - name: Verificar identidad exacta en ejecución
+      ansible.builtin.include_role:
+        name: app
+        tasks_from: verify_running_images.yml
+      when: release_check == 'identity'
+
+    - name: Verificar health
+      ansible.builtin.include_role:
+        name: app
+        tasks_from: verify_health.yml
+      when: release_check == 'health'

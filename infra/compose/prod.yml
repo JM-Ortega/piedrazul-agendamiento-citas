@@ -11,6 +11,10 @@ include:
   - ./traefik.yml
 
 services:
+  # Imágenes propias: siempre por identidad exacta (repo@sha256), nunca por tag
+  postgres:
+    image: ${POSTGRES_IMAGE:?POSTGRES_IMAGE no definido — image.env debe contener la identidad exacta de postgres (repo@sha256)}
+
   keycloak:
     command: ["start", "--import-realm"]
     environment:

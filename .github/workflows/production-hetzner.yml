@@ -1,0 +1,1336 @@
+name: Producción — Hetzner
+
+# Única cadena de producción de Hetzner: Terraform Apply y deploy de la aplicación.
+#
+#   classify ─┬─ resolve_rollback ─┐
+#             ├─ app_build ────────┼─ select_images ─ image_targets ─ image_scan ─┐
+#             └─ postgres_build ───┘                                             │
+#                                    production (gate production-hetzner) ◄──────┘
+#                                      └─ conclude
+#
+# Solo `production` usa el environment production-hetzner y credenciales de producción
+# (HCP Terraform, SSH, secretos de la app). Clasificación, builds, selección y escaneo de
+# identidades conocidas corren antes del gate y solo con GITHUB_TOKEN.
+#
+# Escaneo antes de mutar: ninguna mutación que pueda aplicar una imagen empieza antes de
+# que termine el intento de escaneo de esa identidad exacta. Identidades conocidas antes
+# del gate → image_scan (production espera a que termine). Reuso de backend/postgres → se
+# lee tras el gate y se escanea dentro de production antes de converge/deploy.
+# Solo reporte: cada intento queda como "scanned" (con hallazgos, que no bloquean) u
+# "operational_failure" (registry/DB/Trivy; sin evaluación, nunca "0 hallazgos", tampoco
+# bloquea mientras la política no esté activa). Bloquea la mutación una cadena de
+# escaneo incompleta o no verificable: job de escaneo fallido o cancelado, evidencia
+# ausente, malformada o de otra referencia. Eso NO es un operational_failure.
+
+on:
+  # Todo push a main corre la clasificación (sin filtro de rutas): si un commit ajeno a
+  # producción avanza main y deja obsoleto a un run anterior, su run clasifica el rango
+  # acumulado desde el último éxito y recoge los cambios pendientes. Un rango sin cambios
+  # de producción termina como no-op limpio.
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_terraform_apply:
+        description: "Aplicar Terraform (HCP) antes del deploy"
+        type: boolean
+        default: false
+      run_host_config:
+        description: "Correr configuración del servidor"
+        type: boolean
+        default: false
+      run_build:
+        description: "Construir nueva imagen del backend"
+        type: boolean
+        default: true
+      run_build_postgres:
+        description: "Construir nueva imagen de postgres"
+        type: boolean
+        default: false
+      run_app_deploy:
+        description: "Desplegar aplicación"
+        type: boolean
+        default: true
+      image_tag:
+        description: "Tag específico del backend para rollback (vacío = construir nueva o reusar)"
+        type: string
+        default: ""
+      force_init_keycloak:
+        description: "Forzar re-inicialización de Keycloak (requiere configuración del servidor)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: jm-ortega/piedrazul-agendamiento-citas/backend
+  POSTGRES_IMAGE_NAME: jm-ortega/piedrazul-agendamiento-citas/postgres
+  WORKFLOW_PATH: .github/workflows/production-hetzner.yml
+
+jobs:
+  # ── Intención de producción ────────────────────────────────────────────────
+  # push: clasifica el rango desde el último run push exitoso de este workflow hasta
+  #       este commit (no solo el último commit), así un push descartado por la cola o
+  #       un run fallido quedan cubiertos por el siguiente.
+  # workflow_dispatch: la intención es explícita (inputs) y no avanza el rango.
+  classify:
+    name: Intención de producción
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      intent: ${{ steps.intent.outputs.intent }}
+      terraform_required: ${{ steps.intent.outputs.terraform_required }}
+      deploy_required: ${{ steps.intent.outputs.deploy_required }}
+      run_build: ${{ steps.intent.outputs.run_build }}
+      run_build_postgres: ${{ steps.intent.outputs.run_build_postgres }}
+      run_host_config: ${{ steps.intent.outputs.run_host_config }}
+      run_app_deploy: ${{ steps.intent.outputs.run_app_deploy }}
+      image_tag: ${{ steps.intent.outputs.image_tag }}
+      force_init_keycloak: ${{ steps.intent.outputs.force_init_keycloak }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Clasificar intención
+        id: intent
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          IN_TERRAFORM: ${{ inputs.run_terraform_apply }}
+          IN_HOST_CONFIG: ${{ inputs.run_host_config }}
+          IN_BUILD: ${{ inputs.run_build }}
+          IN_BUILD_POSTGRES: ${{ inputs.run_build_postgres }}
+          IN_APP_DEPLOY: ${{ inputs.run_app_deploy }}
+          IN_IMAGE_TAG: ${{ inputs.image_tag }}
+          IN_FORCE_INIT_KEYCLOAK: ${{ inputs.force_init_keycloak }}
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "::error title=Intención de producción::Solo main puede iniciar producción (ref: ${GITHUB_REF})"
+            exit 1
+          fi
+
+          OUT="${RUNNER_TEMP}/intent.env"
+
+          if [ "${EVENT_NAME}" = "push" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/$(basename "${WORKFLOW_PATH}")/runs?branch=main&event=push&status=success&per_page=50" \
+              > "${RUNNER_TEMP}/runs.json"
+            BASE=$(.github/scripts/production-range-base.sh "${WORKFLOW_PATH}" "${GITHUB_SHA}" "${GITHUB_RUN_ID}" \
+              < "${RUNNER_TEMP}/runs.json")
+            .github/scripts/classify-production.sh "${BASE}" "${GITHUB_SHA}" > "${OUT}"
+            {
+              echo "image_tag="
+              echo "force_init_keycloak=false"
+            } >> "${OUT}"
+          else
+            if [ "${IN_TERRAFORM}" = "false" ] && [ "${IN_HOST_CONFIG}" = "false" ] && \
+               [ "${IN_BUILD}" = "false" ] && [ "${IN_BUILD_POSTGRES}" = "false" ] && \
+               [ "${IN_APP_DEPLOY}" = "false" ]; then
+              echo "::error title=Intención de producción::Todos los flags están en false; no hay nada que hacer"
+              exit 1
+            fi
+            if [ -n "${IN_IMAGE_TAG}" ]; then
+              if [ "${IN_BUILD}" = "true" ]; then
+                echo "::error title=Intención de producción::No se puede especificar image_tag cuando run_build=true"
+                exit 1
+              fi
+              if [ "${IN_APP_DEPLOY}" != "true" ]; then
+                echo "::error title=Intención de producción::image_tag solo tiene efecto con run_app_deploy=true"
+                exit 1
+              fi
+              if ! [[ "${IN_IMAGE_TAG}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || \
+                 [[ "${IN_IMAGE_TAG,,}" =~ ^(none|null|undefined|latest)$ ]]; then
+                echo "::error title=Intención de producción::image_tag '${IN_IMAGE_TAG}' no es un tag OCI explícito válido"
+                exit 1
+              fi
+            fi
+            if [ "${IN_FORCE_INIT_KEYCLOAK}" = "true" ] && [ "${IN_HOST_CONFIG}" != "true" ]; then
+              echo "::error title=Intención de producción::force_init_keycloak requiere run_host_config=true"
+              exit 1
+            fi
+
+            DEPLOY=false
+            if [ "${IN_HOST_CONFIG}" = "true" ] || [ "${IN_APP_DEPLOY}" = "true" ]; then
+              DEPLOY=true
+            fi
+            case "${IN_TERRAFORM}/${DEPLOY}" in
+              true/true) INTENT=apply_then_deploy ;;
+              true/false) INTENT=apply_only ;;
+              false/true) INTENT=deploy_only ;;
+              *) INTENT=noop ;;
+            esac
+            {
+              echo "range_mode=manual"
+              echo "range_base="
+              echo "terraform_required=${IN_TERRAFORM}"
+              echo "deploy_required=${DEPLOY}"
+              echo "run_build=${IN_BUILD}"
+              echo "run_build_postgres=${IN_BUILD_POSTGRES}"
+              echo "run_host_config=${IN_HOST_CONFIG}"
+              echo "run_app_deploy=${IN_APP_DEPLOY}"
+              echo "intent=${INTENT}"
+              echo "image_tag=${IN_IMAGE_TAG}"
+              echo "force_init_keycloak=${IN_FORCE_INIT_KEYCLOAK}"
+            } > "${OUT}"
+          fi
+
+          cat "${OUT}" >> "$GITHUB_OUTPUT"
+          cat "${OUT}"
+
+          get() { sed -n "s/^$1=//p" "${OUT}"; }
+          {
+            echo "## Intención de producción: \`$(get intent)\`"
+            echo
+            echo "| campo | valor |"
+            echo "|---|---|"
+            echo "| evento | ${EVENT_NAME} |"
+            echo "| commit | \`${GITHUB_SHA}\` |"
+            case "$(get range_mode)" in
+              incremental) echo "| rango | \`$(get range_base)..${GITHUB_SHA}\` (desde el último run push exitoso) |" ;;
+              full) echo "| rango | árbol completo (sin run push exitoso previo confiable) |" ;;
+              manual) echo "| rango | — (dispatch manual: intención explícita, no avanza el rango) |" ;;
+            esac
+            echo "| terraform_required | $(get terraform_required) |"
+            echo "| deploy_required | $(get deploy_required) |"
+            echo "| build backend / postgres | $(get run_build) / $(get run_build_postgres) |"
+            echo "| configuración del servidor | $(get run_host_config) |"
+            echo "| deploy de aplicación | $(get run_app_deploy) |"
+            if [ -n "$(get image_tag)" ]; then
+              echo "| rollback backend | \`$(get image_tag)\` |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Identidades de imagen (sin privilegios de producción) ─────────────────
+  # Única lectura del tag de rollback: verifica que exista en GHCR y fija su índice OCI
+  # y su manifiesto linux/amd64. Después solo se usan esos digests.
+  resolve_rollback:
+    name: Resolver rollback del backend
+    runs-on: ubuntu-latest
+    needs: classify
+    if: |
+      needs.classify.outputs.run_app_deploy == 'true' &&
+      needs.classify.outputs.run_build != 'true' &&
+      needs.classify.outputs.image_tag != ''
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      image_index_digest: ${{ steps.rollback.outputs.image_index_digest }}
+      image_amd64_digest: ${{ steps.rollback.outputs.image_amd64_digest }}
+      image_ref: ${{ steps.rollback.outputs.image_ref }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Login a GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verificar image_tag en GHCR y resolver su identidad inmutable
+        id: rollback
+        env:
+          ROLLBACK_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.classify.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          if ! IDENTITY=$(.github/scripts/resolve-amd64-image.sh "${ROLLBACK_IMAGE}"); then
+            echo "::error title=Identidad de imagen::${ROLLBACK_IMAGE} no existe, no es accesible en GHCR o no tiene una identidad linux/amd64 única"
+            exit 1
+          fi
+
+          echo "${IDENTITY}" >> "$GITHUB_OUTPUT"
+          echo "Imagen ${ROLLBACK_IMAGE} verificada"
+          echo "${IDENTITY}"
+
+  app_build:
+    name: Build imagen backend
+    runs-on: ubuntu-latest
+    needs: classify
+    if: needs.classify.outputs.run_build == 'true'
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.tag.outputs.value }}
+      image_index_digest: ${{ steps.identity.outputs.image_index_digest }}
+      image_amd64_digest: ${{ steps.identity.outputs.image_amd64_digest }}
+      image_ref: ${{ steps.identity.outputs.image_ref }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Generar IMAGE_TAG
+        id: tag
+        run: |
+          set -euo pipefail
+          echo "value=${GITHUB_SHA::10}" >> "$GITHUB_OUTPUT"
+
+      - name: Configurar QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Login a GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build y push imagen multi-arch
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: backend/
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # El índice se lee por el digest que devolvió este mismo push; el tag no se vuelve a resolver
+      - name: Resolver identidad inmutable linux/amd64
+        id: identity
+        env:
+          BUILT_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          IDENTITY=$(.github/scripts/resolve-amd64-image.sh "${BUILT_IMAGE}")
+          echo "${IDENTITY}" >> "$GITHUB_OUTPUT"
+          echo "${IDENTITY}"
+
+  postgres_build:
+    name: Build imagen postgres
+    runs-on: ubuntu-latest
+    needs: classify
+    if: needs.classify.outputs.run_build_postgres == 'true'
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.tag.outputs.value }}
+      image_index_digest: ${{ steps.identity.outputs.image_index_digest }}
+      image_amd64_digest: ${{ steps.identity.outputs.image_amd64_digest }}
+      image_ref: ${{ steps.identity.outputs.image_ref }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Generar POSTGRES_IMAGE_TAG
+        id: tag
+        run: |
+          set -euo pipefail
+          echo "value=${GITHUB_SHA::10}" >> "$GITHUB_OUTPUT"
+
+      - name: Configurar QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Login a GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build y push imagen multi-arch
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: infra/postgres/
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE_NAME }}:${{ steps.tag.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # El índice se lee por el digest que devolvió este mismo push; el tag no se vuelve a resolver
+      - name: Resolver identidad inmutable linux/amd64
+        id: identity
+        env:
+          BUILT_IMAGE: ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          IDENTITY=$(.github/scripts/resolve-amd64-image.sh "${BUILT_IMAGE}")
+          echo "${IDENTITY}" >> "$GITHUB_OUTPUT"
+          echo "${IDENTITY}"
+
+  # Fuente de la identidad de backend y postgres que recibe el job de producción.
+  # Precedencia backend: rollback explícito > imagen construida en este run > reuso.
+  # Postgres: imagen construida en este run > reuso. Sin deploy de aplicación, ambas
+  # son reuso (una imagen construida pero no desplegada no es candidata).
+  # Build y rollback arrastran la identidad inmutable ya resuelta. Reuso queda vacío
+  # aquí: la identidad exacta del último éxito solo se lee en el servidor, después del
+  # gate de producción (select-release.sh).
+  select_images:
+    name: Seleccionar imágenes propias
+    runs-on: ubuntu-latest
+    needs: [classify, resolve_rollback, app_build, postgres_build]
+    if: |
+      !cancelled() &&
+      needs.classify.result == 'success' &&
+      (needs.resolve_rollback.result == 'success' || needs.resolve_rollback.result == 'skipped') &&
+      (needs.app_build.result == 'success' || needs.app_build.result == 'skipped') &&
+      (needs.postgres_build.result == 'success' || needs.postgres_build.result == 'skipped')
+    timeout-minutes: 5
+    outputs:
+      backend_source: ${{ steps.select.outputs.backend_source }}
+      backend_tag: ${{ steps.select.outputs.backend_tag }}
+      backend_index_digest: ${{ steps.select.outputs.backend_index_digest }}
+      backend_image_ref: ${{ steps.select.outputs.backend_image_ref }}
+      postgres_source: ${{ steps.select.outputs.postgres_source }}
+      postgres_tag: ${{ steps.select.outputs.postgres_tag }}
+      postgres_index_digest: ${{ steps.select.outputs.postgres_index_digest }}
+      postgres_image_ref: ${{ steps.select.outputs.postgres_image_ref }}
+    steps:
+      - name: Seleccionar identidades
+        id: select
+        env:
+          RUN_APP_DEPLOY: ${{ needs.classify.outputs.run_app_deploy }}
+          RUN_BUILD: ${{ needs.classify.outputs.run_build }}
+          RUN_BUILD_POSTGRES: ${{ needs.classify.outputs.run_build_postgres }}
+          ROLLBACK_IMAGE_TAG: ${{ needs.classify.outputs.image_tag }}
+          ROLLBACK_INDEX_DIGEST: ${{ needs.resolve_rollback.outputs.image_index_digest }}
+          ROLLBACK_AMD64_DIGEST: ${{ needs.resolve_rollback.outputs.image_amd64_digest }}
+          ROLLBACK_IMAGE_REF: ${{ needs.resolve_rollback.outputs.image_ref }}
+          BUILT_IMAGE_TAG: ${{ needs.app_build.outputs.image_tag }}
+          BUILT_INDEX_DIGEST: ${{ needs.app_build.outputs.image_index_digest }}
+          BUILT_AMD64_DIGEST: ${{ needs.app_build.outputs.image_amd64_digest }}
+          BUILT_IMAGE_REF: ${{ needs.app_build.outputs.image_ref }}
+          PG_BUILT_IMAGE_TAG: ${{ needs.postgres_build.outputs.image_tag }}
+          PG_BUILT_INDEX_DIGEST: ${{ needs.postgres_build.outputs.image_index_digest }}
+          PG_BUILT_AMD64_DIGEST: ${{ needs.postgres_build.outputs.image_amd64_digest }}
+          PG_BUILT_IMAGE_REF: ${{ needs.postgres_build.outputs.image_ref }}
+          BACKEND_REPOSITORY: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          POSTGRES_REPOSITORY: ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE_NAME }}
+        run: |
+          set -euo pipefail
+
+          # Build y rollback ya resolvieron su identidad inmutable una sola vez; aquí solo se arrastra
+          emit() { # <salida> <fuente> <repo> <tag> <índice> <amd64> <ref>
+            local out="$1" source="$2" repo="$3" tag="$4" index="$5" amd64="$6" ref="$7"
+            if [ "${source}" != "reuse" ]; then
+              if ! [[ "${index}" =~ ^sha256:[0-9a-f]{64}$ ]] || \
+                 ! [[ "${amd64}" =~ ^sha256:[0-9a-f]{64}$ ]] || \
+                 [ "${ref}" != "${repo}@${amd64}" ]; then
+                echo "::error title=Identidad de imagen::${out} (${source}) no tiene una identidad inmutable linux/amd64 válida"
+                exit 1
+              fi
+              if ! [[ "${tag}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || \
+                 [[ "${tag,,}" =~ ^(none|null|undefined|latest)$ ]]; then
+                echo "::error title=Identidad de imagen::tag '${tag}' de ${out} (${source}) no es un tag OCI explícito válido"
+                exit 1
+              fi
+            else
+              tag="" index="" ref=""
+            fi
+            {
+              echo "${out}_source=${source}"
+              echo "${out}_tag=${tag}"
+              echo "${out}_index_digest=${index}"
+              echo "${out}_image_ref=${ref}"
+            } >> "$GITHUB_OUTPUT"
+            echo "${out} (${source}): ${tag:-<último éxito del servidor, tras el gate>} ${ref}"
+          }
+
+          if [ "${RUN_APP_DEPLOY}" != "true" ]; then
+            emit backend reuse "${BACKEND_REPOSITORY}" "" "" "" ""
+          elif [ -n "${ROLLBACK_IMAGE_TAG}" ]; then
+            emit backend rollback "${BACKEND_REPOSITORY}" "${ROLLBACK_IMAGE_TAG}" \
+              "${ROLLBACK_INDEX_DIGEST}" "${ROLLBACK_AMD64_DIGEST}" "${ROLLBACK_IMAGE_REF}"
+          elif [ "${RUN_BUILD}" = "true" ]; then
+            emit backend build "${BACKEND_REPOSITORY}" "${BUILT_IMAGE_TAG}" \
+              "${BUILT_INDEX_DIGEST}" "${BUILT_AMD64_DIGEST}" "${BUILT_IMAGE_REF}"
+          else
+            emit backend reuse "${BACKEND_REPOSITORY}" "" "" "" ""
+          fi
+
+          if [ "${RUN_APP_DEPLOY}" = "true" ] && [ "${RUN_BUILD_POSTGRES}" = "true" ]; then
+            emit postgres build "${POSTGRES_REPOSITORY}" "${PG_BUILT_IMAGE_TAG}" \
+              "${PG_BUILT_INDEX_DIGEST}" "${PG_BUILT_AMD64_DIGEST}" "${PG_BUILT_IMAGE_REF}"
+          else
+            emit postgres reuse "${POSTGRES_REPOSITORY}" "" "" "" ""
+          fi
+
+  # ── Escaneo de imágenes conocidas antes del gate (solo reporte) ─────────────
+  # Intenta escanear con Trivy el manifiesto linux/amd64 exacto de cada imagen que este
+  # run construye o aplica en el servidor y cuya identidad se conoce antes del gate. El
+  # job de producción espera a que estos intentos terminen antes de mutar. Las identidades
+  # de reuso solo se conocen dentro de production y se escanean allí antes de mutar.
+  # Ni los hallazgos ni un fallo operativo (resolución, registry, DB o Trivy) bloquean
+  # todavía: la acción trivy-scan registra el fallo como operational_failure (anotación
+  # de error, resumen y summary.json) y termina bien; es distinto de cero hallazgos.
+  # Un job de escaneo que FALLA es otra cosa (error fuera del intento modelado: checkout,
+  # evidencia, artifact): no hay evidencia verificable y production no empieza.
+  image_targets:
+    name: Identidades a escanear
+    runs-on: ubuntu-latest
+    needs: [classify, app_build, postgres_build, select_images]
+    if: |
+      !cancelled() &&
+      needs.select_images.result == 'success'
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      targets: ${{ steps.targets.outputs.targets }}
+      unresolved: ${{ steps.targets.outputs.unresolved }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Reunir identidades inmutables
+        id: targets
+        env:
+          RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
+          RUN_APP_DEPLOY: ${{ needs.classify.outputs.run_app_deploy }}
+          BACKEND_SOURCE: ${{ needs.select_images.outputs.backend_source }}
+          BACKEND_TAG: ${{ needs.select_images.outputs.backend_tag }}
+          BACKEND_INDEX_DIGEST: ${{ needs.select_images.outputs.backend_index_digest }}
+          BACKEND_IMAGE_REF: ${{ needs.select_images.outputs.backend_image_ref }}
+          BUILT_BACKEND_TAG: ${{ needs.app_build.outputs.image_tag }}
+          BUILT_BACKEND_INDEX_DIGEST: ${{ needs.app_build.outputs.image_index_digest }}
+          BUILT_BACKEND_IMAGE_REF: ${{ needs.app_build.outputs.image_ref }}
+          POSTGRES_SOURCE: ${{ needs.select_images.outputs.postgres_source }}
+          POSTGRES_TAG: ${{ needs.select_images.outputs.postgres_tag }}
+          POSTGRES_INDEX_DIGEST: ${{ needs.select_images.outputs.postgres_index_digest }}
+          POSTGRES_IMAGE_REF: ${{ needs.select_images.outputs.postgres_image_ref }}
+          BUILT_POSTGRES_TAG: ${{ needs.postgres_build.outputs.image_tag }}
+          BUILT_POSTGRES_INDEX_DIGEST: ${{ needs.postgres_build.outputs.image_index_digest }}
+          BUILT_POSTGRES_IMAGE_REF: ${{ needs.postgres_build.outputs.image_ref }}
+        run: |
+          set -euo pipefail
+
+          TARGETS='[]'
+          PENDING='[]'
+          NOT_APPLIED='[]'
+          UNRESOLVED='[]'
+
+          add_target() {
+            TARGETS=$(jq -c --arg surface "$1" --arg source "$2" --arg label "$3" \
+              --arg index "$4" --arg ref "$5" \
+              '. + [{surface: $surface, source: $source, label: $label, image_index_digest: $index, image_ref: $ref}]' \
+              <<< "${TARGETS}")
+          }
+          add_pending() {
+            PENDING=$(jq -c --arg surface "$1" --arg reason "$2" \
+              '. + [{surface: $surface, reason: $reason}]' <<< "${PENDING}")
+          }
+          add_not_applied() {
+            NOT_APPLIED=$(jq -c --arg surface "$1" '. + [$surface]' <<< "${NOT_APPLIED}")
+          }
+
+          # Qué aplica este run en el servidor:
+          #   converge (setup.yml) → postgres, keycloak, traefik
+          #   deploy.yml           → postgres y backend, y por depends_on keycloak
+          APPLIES_STACK=false
+          if [ "${RUN_HOST_CONFIG}" = "true" ] || [ "${RUN_APP_DEPLOY}" = "true" ]; then
+            APPLIES_STACK=true
+          fi
+
+          # Imágenes propias: identidad seleccionada (build o rollback) o, si se construyó
+          # sin desplegarla, la imagen construida. El reuso se escanea en production antes de mutar.
+          own_surface() { # <surface> <source> <tag> <index> <ref> <built_tag> <built_index> <built_ref>
+            if [ "$2" != "reuse" ]; then
+              add_target "$1" "$2" "$3" "$4" "$5"
+            elif [ -n "$8" ]; then
+              add_target "$1" "build (no desplegada en este run)" "$6" "$7" "$8"
+            fi
+            if [ "$2" = "reuse" ] && [ "${APPLIES_STACK}" = "true" ]; then
+              add_pending "$1" "reuso: la identidad exacta del último éxito se lee en el servidor tras el gate y se escanea en production antes de mutar"
+            elif [ "${APPLIES_STACK}" != "true" ] && [ -z "$8" ]; then
+              add_not_applied "$1"
+            fi
+          }
+          own_surface backend "${BACKEND_SOURCE}" "${BACKEND_TAG}" "${BACKEND_INDEX_DIGEST}" "${BACKEND_IMAGE_REF}" \
+            "${BUILT_BACKEND_TAG}" "${BUILT_BACKEND_INDEX_DIGEST}" "${BUILT_BACKEND_IMAGE_REF}"
+          own_surface postgres "${POSTGRES_SOURCE}" "${POSTGRES_TAG}" "${POSTGRES_INDEX_DIGEST}" "${POSTGRES_IMAGE_REF}" \
+            "${BUILT_POSTGRES_TAG}" "${BUILT_POSTGRES_INDEX_DIGEST}" "${BUILT_POSTGRES_IMAGE_REF}"
+
+          # Terceros: la referencia configurada en Compose se resuelve una vez, solo si este
+          # run aplica ese servicio. Compose sigue desplegando por tag, así que esto no
+          # garantiza escaneado = desplegado.
+          for SURFACE in keycloak traefik; do
+            if [ "${SURFACE}" = "traefik" ] && [ "${RUN_HOST_CONFIG}" != "true" ]; then
+              add_not_applied "${SURFACE}"
+              continue
+            fi
+            if [ "${APPLIES_STACK}" != "true" ]; then
+              add_not_applied "${SURFACE}"
+              continue
+            fi
+            CONFIGURED=$(yq -r ".services.${SURFACE}.image" "infra/compose/${SURFACE}.yml")
+            # Un fallo de resolución es operativo: se registra y no bloquea (solo reporte)
+            if ! IDENTITY=$(.github/scripts/resolve-amd64-image.sh "${CONFIGURED}"); then
+              echo "::error title=Escaneo de imagen: FALLO OPERATIVO::No se pudo resolver ${CONFIGURED}; ${SURFACE} no se evalúa en este run. No equivale a cero hallazgos."
+              UNRESOLVED=$(jq -c --arg surface "${SURFACE}" --arg label "${CONFIGURED}" \
+                '. + [{surface: $surface, label: $label, outcome: "operational_failure"}]' <<< "${UNRESOLVED}")
+              continue
+            fi
+            INDEX_DIGEST=$(sed -n 's/^image_index_digest=//p' <<< "${IDENTITY}")
+            IMAGE_REF=$(sed -n 's/^image_ref=//p' <<< "${IDENTITY}")
+            add_target "${SURFACE}" "compose (tag)" "${CONFIGURED}" "${INDEX_DIGEST}" "${IMAGE_REF}"
+          done
+
+          echo "targets=${TARGETS}" >> "$GITHUB_OUTPUT"
+          echo "unresolved=${UNRESOLVED}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Identidades de imagen a escanear"
+            echo
+            if [ "$(jq 'length' <<< "${TARGETS}")" -gt 0 ]; then
+              echo "| imagen | origen | referencia | índice OCI | escaneada (linux/amd64) |"
+              echo "|---|---|---|---|---|"
+              jq -r '.[] | "| \(.surface) | \(.source) | `\(.label)` | `\(.image_index_digest)` | `\(.image_ref)` |"' <<< "${TARGETS}"
+            else
+              echo "Ninguna imagen con identidad conocida antes del gate."
+            fi
+            if [ "$(jq 'length' <<< "${PENDING}")" -gt 0 ]; then
+              echo
+              echo "**Aplicadas por este run, identidad conocida solo tras el gate:**"
+              echo
+              jq -r '.[] | "- \(.surface): \(.reason)"' <<< "${PENDING}"
+            fi
+            if [ "$(jq 'length' <<< "${UNRESOLVED}")" -gt 0 ]; then
+              echo
+              echo "**FALLO OPERATIVO (sin evaluar, no equivale a cero hallazgos):**"
+              echo
+              jq -r '.[] | "- \(.surface): no se pudo resolver `\(.label)`"' <<< "${UNRESOLVED}"
+            fi
+            if [ "$(jq 'length' <<< "${NOT_APPLIED}")" -gt 0 ]; then
+              echo
+              echo "No aplicadas por este run: $(jq -r 'join(", ")' <<< "${NOT_APPLIED}")."
+            fi
+            echo
+            echo "> Solo reporte: ni hallazgos ni fallos operativos bloquean. Producción espera a que"
+            echo "> terminen estos intentos antes de mutar."
+            echo "> Backend y postgres se despliegan por la misma identidad exacta escaneada;"
+            echo "> keycloak y traefik todavía por tag."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Reportar fallo operativo
+        if: failure()
+        run: |
+          echo "::error title=Identidades a escanear::El job no pudo reunir las identidades a escanear (error del workflow, no del escáner); producción no empieza sin saber qué se intentó escanear."
+          {
+            echo "## Identidades a escanear: ERROR"
+            echo
+            echo "No se pudo determinar qué escanear; producción no empieza."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  image_scan:
+    name: Escanear ${{ matrix.surface }} (solo reporte)
+    runs-on: ubuntu-latest
+    needs: image_targets
+    if: |
+      !cancelled() &&
+      needs.image_targets.outputs.targets != '' &&
+      needs.image_targets.outputs.targets != '[]'
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.image_targets.outputs.targets) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Escanear
+        uses: ./.github/actions/trivy-scan
+        with:
+          surface: ${{ matrix.surface }}
+          source: ${{ matrix.source }}
+          label: ${{ matrix.label }}
+          image_index_digest: ${{ matrix.image_index_digest }}
+          image_ref: ${{ matrix.image_ref }}
+          phase: selected
+
+  # ── Autoridad de producción ────────────────────────────────────────────────
+  # Único job con el environment production-hetzner y credenciales de producción. Una
+  # aprobación cubre toda la cadena:
+  #
+  #   [escaneo de identidades conocidas: image_scan] → frescura → Apply (si aplica) →
+  #   state version exacto → outputs → SSH → último éxito del servidor → identidades
+  #   exactas → evidencia de escaneo + escaneo del reuso → [frescura si no hubo Apply] →
+  #   converge / deploy → identidad en ejecución → health (contenedores + públicos) →
+  #   registro del último éxito
+  #
+  # Frescura: solo la punta actual de main inicia una mutación, verificado justo antes
+  # de la primera. Iniciada la cadena, termina aunque main avance. Un re-run de un commit
+  # que ya no es la punta falla en la frescura sin mutar nada.
+  # La concurrencia serializa producción y, con queue: max, conserva los jobs pendientes
+  # en vez de reemplazarlos. El orden de la cola no define la corrección: la frescura
+  # deja mutar solo a la punta de main y el rango acumulado cubre lo pendiente.
+  production:
+    name: Producción
+    runs-on: ubuntu-latest
+    needs: [classify, select_images, image_targets, image_scan]
+    # Con deploy, espera a que el escaneo de las identidades conocidas antes del gate haya
+    # terminado en success: todos los intentos completados con evidencia (scanned u
+    # operational_failure, ambos aceptables mientras el escaneo sea solo reporte). Fallido
+    # o cancelado = cadena no verificable. Sin objetivos, image_scan se salta y la lista
+    # debe estar vacía. Los hallazgos no autorizan ni bloquean.
+    if: |
+      !cancelled() &&
+      needs.classify.result == 'success' &&
+      needs.select_images.result == 'success' &&
+      (needs.classify.outputs.terraform_required == 'true' || needs.classify.outputs.deploy_required == 'true') &&
+      (needs.classify.outputs.deploy_required != 'true' ||
+        (needs.image_targets.result == 'success' &&
+          (needs.image_scan.result == 'success' ||
+            (needs.image_scan.result == 'skipped' && needs.image_targets.outputs.targets == '[]'))))
+    timeout-minutes: 90
+    environment: production-hetzner
+    concurrency:
+      group: piedrazul-production-hetzner
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+    env:
+      ANSIBLE_CONFIG: infra/ansible/ansible.cfg
+      ANSIBLE_HOST_KEY_CHECKING: "False"
+      ANSIBLE_HOST: vps
+      TF_CLOUD_ORGANIZATION: Piedrazul
+      TF_WORKSPACE: piedrazul-hetzner
+      HCP_WORKSPACE_ID: ${{ vars.TF_WORKSPACE_HETZNER_ID }}
+      KC_REALM: piedrazul
+      TERRAFORM_REQUIRED: ${{ needs.classify.outputs.terraform_required }}
+      DEPLOY_REQUIRED: ${{ needs.classify.outputs.deploy_required }}
+      RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
+      RUN_APP_DEPLOY: ${{ needs.classify.outputs.run_app_deploy }}
+      FORCE_INIT_KEYCLOAK: ${{ needs.classify.outputs.force_init_keycloak }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Verificar credenciales de producción
+        id: credentials
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          ANSIBLE_SSH_KEY: ${{ secrets.ANSIBLE_SSH_KEY }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
+          KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
+          KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
+          CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
+          IDENTITY_SEED_ADMIN_PASSWORD: ${{ secrets.IDENTITY_SEED_ADMIN_PASSWORD }}
+          KC_BACKEND_CLIENT_SECRET: ${{ secrets.KC_BACKEND_CLIENT_SECRET }}
+          KC_AUTOMATION_CLIENT_SECRET: ${{ secrets.KC_AUTOMATION_CLIENT_SECRET }}
+          PIEDRAZUL_BACKEND_MAIL_SEND: ${{ secrets.PIEDRAZUL_BACKEND_MAIL_SEND }}
+          NOTIFICATION_ENCRYPTION_KEY: ${{ secrets.NOTIFICATION_ENCRYPTION_KEY }}
+        run: |
+          set -euo pipefail
+          MISSING=()
+          need() { for NAME in "$@"; do [ -n "${!NAME:-}" ] || MISSING+=("${NAME}"); done; }
+
+          need TF_API_TOKEN
+          [[ "${HCP_WORKSPACE_ID}" =~ ^ws-[A-Za-z0-9]+$ ]] || MISSING+=("vars.TF_WORKSPACE_HETZNER_ID")
+          if [ "${DEPLOY_REQUIRED}" = "true" ]; then
+            need ANSIBLE_SSH_KEY
+          fi
+          if [ "${RUN_HOST_CONFIG}" = "true" ] || [ "${RUN_APP_DEPLOY}" = "true" ]; then
+            need DB_PASSWORD KC_DB_PASSWORD KC_BOOTSTRAP_ADMIN_PASSWORD KC_ADMIN_PASSWORD \
+              CLOUDFLARE_DNS_API_TOKEN IDENTITY_SEED_ADMIN_PASSWORD \
+              PIEDRAZUL_BACKEND_MAIL_SEND NOTIFICATION_ENCRYPTION_KEY
+          fi
+          if [ "${RUN_HOST_CONFIG}" = "true" ]; then
+            need KC_BACKEND_CLIENT_SECRET KC_AUTOMATION_CLIENT_SECRET
+          fi
+
+          if [ "${#MISSING[@]}" -gt 0 ]; then
+            echo "::error title=Autoridad de producción::Faltan credenciales o variables: ${MISSING[*]}"
+            exit 1
+          fi
+          echo "Credenciales requeridas presentes"
+
+      # ── Terraform ──
+      - name: Esperar a que HCP Terraform esté libre
+        id: hcp_idle
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: .github/scripts/hcp-state.sh wait-idle
+
+      - name: Capturar state version previo
+        id: hcp_before
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          SV=$(.github/scripts/hcp-state.sh current)
+          echo "state_version_id=${SV}" >> "$GITHUB_OUTPUT"
+          echo "State version previo: ${SV}"
+
+      - name: Verificar frescura antes del Apply
+        id: fresh_apply
+        if: env.TERRAFORM_REQUIRED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/verify-main-tip.sh
+
+      - name: Subir configuración a HCP Terraform
+        id: hcp_upload
+        if: env.TERRAFORM_REQUIRED == 'true'
+        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@8e08d1ba957673f5fbf971a22b3219639dc45661 # v1.3.2
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        with:
+          workspace: ${{ env.TF_WORKSPACE }}
+          directory: infra/terraform
+
+      - name: Crear run de Apply
+        id: hcp_run
+        if: env.TERRAFORM_REQUIRED == 'true'
+        uses: hashicorp/tfc-workflows-github/actions/create-run@8e08d1ba957673f5fbf971a22b3219639dc45661 # v1.3.2
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        with:
+          workspace: ${{ env.TF_WORKSPACE }}
+          configuration_version: ${{ steps.hcp_upload.outputs.configuration_version_id }}
+          message: "Producción ${{ github.sha }} — run ${{ github.run_id }}/${{ github.run_attempt }}"
+
+      - name: Confirmar Apply
+        id: hcp_apply
+        if: |
+          env.TERRAFORM_REQUIRED == 'true' &&
+          steps.hcp_run.outcome == 'success' &&
+          fromJSON(steps.hcp_run.outputs.payload || '{}').data.attributes.actions.is-confirmable
+        uses: hashicorp/tfc-workflows-github/actions/apply-run@8e08d1ba957673f5fbf971a22b3219639dc45661 # v1.3.2
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        with:
+          run: ${{ steps.hcp_run.outputs.run_id }}
+          comment: "Apply desde GitHub Actions — commit ${{ github.sha }}, run ${{ github.run_id }}/${{ github.run_attempt }}"
+
+      # El Deploy solo consume el state version que produjo el run de esta misma
+      # ejecución (o, si no produjo estado, el previo sin cambios). Ver hcp-state.sh.
+      - name: Resolver state version del Apply
+        id: hcp_state
+        if: env.TERRAFORM_REQUIRED == 'true'
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          RUN_ID: ${{ steps.hcp_run.outputs.run_id }}
+          STATE_BEFORE: ${{ steps.hcp_before.outputs.state_version_id }}
+        run: |
+          set -euo pipefail
+          .github/scripts/hcp-state.sh run-state "${RUN_ID}" "${STATE_BEFORE}" > "${RUNNER_TEMP}/hcp-state.env"
+          cat "${RUNNER_TEMP}/hcp-state.env" >> "$GITHUB_OUTPUT"
+          echo "run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/hcp-state.env"
+
+      - name: Leer outputs del state version esperado
+        id: tf_outputs
+        if: env.DEPLOY_REQUIRED == 'true'
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          APPLY_STATE: ${{ steps.hcp_state.outputs.state_version_id }}
+          STATE_BEFORE: ${{ steps.hcp_before.outputs.state_version_id }}
+        run: |
+          set -euo pipefail
+          # Con Apply: el state version de ese run. Sin Apply: el capturado antes, que
+          # outputs vuelve a exigir como actual.
+          if [ "${TERRAFORM_REQUIRED}" = "true" ]; then
+            EXPECTED_STATE="${APPLY_STATE}"
+          else
+            EXPECTED_STATE="${STATE_BEFORE}"
+          fi
+          if [ -z "${EXPECTED_STATE}" ]; then
+            echo "Error: no hay state version esperado"
+            exit 1
+          fi
+          .github/scripts/hcp-state.sh outputs "${EXPECTED_STATE}" > "${RUNNER_TEMP}/tf-outputs.env"
+          cat "${RUNNER_TEMP}/tf-outputs.env" >> "$GITHUB_OUTPUT"
+          echo "state_version_id=${EXPECTED_STATE}" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/tf-outputs.env"
+
+      # ── Acceso al servidor ──
+      - name: Preparar acceso SSH e inventario
+        id: access
+        if: env.DEPLOY_REQUIRED == 'true'
+        env:
+          ANSIBLE_SSH_KEY: ${{ secrets.ANSIBLE_SSH_KEY }}
+          SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${ANSIBLE_SSH_KEY}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf 'all:\n  hosts:\n    %s:\n      ansible_host: %s\n' "${ANSIBLE_HOST}" "${SERVER_IP}" \
+            > "${RUNNER_TEMP}/hosts.runtime.yml"
+          cat "${RUNNER_TEMP}/hosts.runtime.yml"
+
+      - name: Esperar SSH en el servidor
+        id: readiness
+        if: env.DEPLOY_REQUIRED == 'true'
+        timeout-minutes: 6
+        env:
+          SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if ssh -o StrictHostKeyChecking=no \
+                   -o ConnectTimeout=5 \
+                   -o BatchMode=yes \
+                   -i ~/.ssh/id_ed25519 \
+                   "ansible@${SERVER_IP}" true 2>/dev/null; then
+              echo "SSH disponible"
+              exit 0
+            fi
+            echo "Intento $i/30 — esperando 10s..."
+            sleep 10
+          done
+          echo "Error: SSH no disponible después de 5 minutos"
+          exit 1
+
+      - name: Instalar colecciones de Ansible
+        if: env.DEPLOY_REQUIRED == 'true'
+        run: |
+          set -euo pipefail
+          ansible-galaxy collection install \
+            -r infra/ansible/requirements.yml \
+            -p infra/ansible/collections
+
+      # Lectura privilegiada (solo lectura) del último éxito registrado en el servidor.
+      # Ausente es un estado válido (servidor nuevo); ilegible falla.
+      - name: Leer último éxito del servidor
+        id: host_state
+        if: env.DEPLOY_REQUIRED == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/release"
+          rm -f "${RUNNER_TEMP}/release/last-success.env"
+          ansible "${ANSIBLE_HOST}" \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -m ansible.builtin.fetch \
+            -a "src={{ release_state_file }} dest=${RUNNER_TEMP}/release/last-success.env flat=true fail_on_missing=false"
+          if [ -f "${RUNNER_TEMP}/release/last-success.env" ]; then
+            echo "Último éxito registrado en el servidor:"
+            grep -v '^#' "${RUNNER_TEMP}/release/last-success.env"
+          else
+            echo "El servidor no tiene último éxito registrado"
+          fi
+
+      - name: Seleccionar identidades exactas
+        id: select
+        if: env.DEPLOY_REQUIRED == 'true'
+        env:
+          BACKEND_REPOSITORY: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          POSTGRES_REPOSITORY: ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE_NAME }}
+          BACKEND_SOURCE: ${{ needs.select_images.outputs.backend_source }}
+          BACKEND_IMAGE_REF: ${{ needs.select_images.outputs.backend_image_ref }}
+          BACKEND_INDEX_DIGEST: ${{ needs.select_images.outputs.backend_index_digest }}
+          BACKEND_TAG: ${{ needs.select_images.outputs.backend_tag }}
+          POSTGRES_SOURCE: ${{ needs.select_images.outputs.postgres_source }}
+          POSTGRES_IMAGE_REF: ${{ needs.select_images.outputs.postgres_image_ref }}
+          POSTGRES_INDEX_DIGEST: ${{ needs.select_images.outputs.postgres_index_digest }}
+          POSTGRES_TAG: ${{ needs.select_images.outputs.postgres_tag }}
+        run: |
+          set -euo pipefail
+          STATE_FILE="${RUNNER_TEMP}/release/last-success.env" \
+            .github/scripts/select-release.sh > "${RUNNER_TEMP}/release/selected.env"
+          cat "${RUNNER_TEMP}/release/selected.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/release/selected.env"
+          if grep -q '^state_status=invalid$' "${RUNNER_TEMP}/release/selected.env"; then
+            echo "::warning title=Último éxito del servidor::Inválido ($(sed -n 's/^state_error=//p' "${RUNNER_TEMP}/release/selected.env")); no se usó. Un deploy exitoso lo reemplaza."
+          fi
+
+      # ── Escaneo antes de mutar ──
+      # Build/rollback y terceros: summary.json válido de image_scan sobre la misma
+      # referencia exacta (scanned u operational_failure). Reuso: se escanea aquí, con la identidad recién leída del
+      # servidor. El escáner (acción trivy-scan) no recibe secretos ni el socket de Docker.
+      # Resultados (scanned / operational_failure) solo se informan: no autorizan ni
+      # bloquean mientras la política de vulnerabilidades no esté activa.
+      # Solo datos (summary.json de cada intento). Si falta, scan-evidence.sh bloquea: un
+      # artifact ausente no prueba que Trivy haya intentado el escaneo.
+      - name: Descargar evidencia de escaneos previos
+        id: scan_download
+        if: env.DEPLOY_REQUIRED == 'true' && needs.image_scan.result != 'skipped'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: image-scan-selected-*-${{ github.run_id }}
+          path: ${{ runner.temp }}/scan-evidence
+
+      - name: Verificar evidencia de escaneo
+        id: scan_evidence
+        if: env.DEPLOY_REQUIRED == 'true'
+        env:
+          TARGETS: ${{ needs.image_targets.outputs.targets }}
+          UNRESOLVED: ${{ needs.image_targets.outputs.unresolved }}
+          SCAN_RESULT: ${{ needs.image_scan.result }}
+          EVIDENCE_DIR: ${{ runner.temp }}/scan-evidence
+          BACKEND_SOURCE: ${{ steps.select.outputs.backend_source }}
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          POSTGRES_SOURCE: ${{ steps.select.outputs.postgres_source }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+        run: |
+          set -euo pipefail
+          .github/scripts/scan-evidence.sh > "${RUNNER_TEMP}/scan-evidence.env"
+          cat "${RUNNER_TEMP}/scan-evidence.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/scan-evidence.env"
+
+      - name: Escanear backend en reuso
+        id: scan_backend
+        if: env.DEPLOY_REQUIRED == 'true' && steps.scan_evidence.outputs.scan_backend == 'true'
+        uses: ./.github/actions/trivy-scan
+        with:
+          surface: backend
+          source: reuse (último éxito del servidor)
+          label: ${{ steps.select.outputs.backend_tag }}
+          image_index_digest: ${{ steps.select.outputs.backend_index_digest }}
+          image_ref: ${{ steps.select.outputs.backend_image_ref }}
+          phase: production
+
+      - name: Escanear postgres en reuso
+        id: scan_postgres
+        if: env.DEPLOY_REQUIRED == 'true' && steps.scan_evidence.outputs.scan_postgres == 'true'
+        uses: ./.github/actions/trivy-scan
+        with:
+          surface: postgres
+          source: reuse (último éxito del servidor)
+          label: ${{ steps.select.outputs.postgres_tag }}
+          image_index_digest: ${{ steps.select.outputs.postgres_index_digest }}
+          image_ref: ${{ steps.select.outputs.postgres_image_ref }}
+          phase: production
+
+      # ── Mutaciones del servidor ──
+      - name: Verificar frescura antes de mutar el servidor
+        id: fresh_deploy
+        if: env.DEPLOY_REQUIRED == 'true' && env.TERRAFORM_REQUIRED != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/verify-main-tip.sh
+
+      - name: Borrar marker de Keycloak
+        id: kc_marker
+        if: env.RUN_HOST_CONFIG == 'true' && env.FORCE_INIT_KEYCLOAK == 'true'
+        run: |
+          set -euo pipefail
+          ansible "${ANSIBLE_HOST}" \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -m ansible.builtin.file \
+            -a "path=/opt/piedrazul/.keycloak_initialized state=absent" \
+            --become
+
+      - name: Correr converge
+        id: converge
+        if: env.RUN_HOST_CONFIG == 'true'
+        env:
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
+          KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
+          KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
+          CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
+          KC_BACKEND_CLIENT_SECRET: ${{ secrets.KC_BACKEND_CLIENT_SECRET }}
+          KC_AUTOMATION_CLIENT_SECRET: ${{ secrets.KC_AUTOMATION_CLIENT_SECRET }}
+          IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
+          IDENTITY_SEED_ADMIN_USERNAME: ${{ vars.IDENTITY_SEED_ADMIN_USERNAME }}
+          IDENTITY_SEED_ADMIN_FIRST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_FIRST_NAME }}
+          IDENTITY_SEED_ADMIN_LAST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_LAST_NAME }}
+          IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
+          IDENTITY_SEED_ADMIN_PASSWORD: ${{ secrets.IDENTITY_SEED_ADMIN_PASSWORD }}
+          PIEDRAZUL_BACKEND_MAIL_SEND: ${{ secrets.PIEDRAZUL_BACKEND_MAIL_SEND }}
+          NOTIFICATION_ENCRYPTION_KEY: ${{ secrets.NOTIFICATION_ENCRYPTION_KEY }}
+        run: |
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
+            -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            infra/ansible/playbooks/converge.yml
+
+      - name: Verificar postgres tras converge (identidad en ejecución)
+        id: converge_identity
+        if: env.RUN_HOST_CONFIG == 'true'
+        env:
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+        run: |
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
+            -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            -e release_check=identity \
+            -e '{"app_release_services": ["postgres"]}' \
+            infra/ansible/playbooks/verify-release.yml
+
+      - name: Correr deploy
+        id: deploy
+        if: env.RUN_APP_DEPLOY == 'true'
+        env:
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
+          KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
+          KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
+          CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
+          IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
+          IDENTITY_SEED_ADMIN_USERNAME: ${{ vars.IDENTITY_SEED_ADMIN_USERNAME }}
+          IDENTITY_SEED_ADMIN_FIRST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_FIRST_NAME }}
+          IDENTITY_SEED_ADMIN_LAST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_LAST_NAME }}
+          IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
+          IDENTITY_SEED_ADMIN_PASSWORD: ${{ secrets.IDENTITY_SEED_ADMIN_PASSWORD }}
+          PIEDRAZUL_BACKEND_MAIL_SEND: ${{ secrets.PIEDRAZUL_BACKEND_MAIL_SEND }}
+          NOTIFICATION_ENCRYPTION_KEY: ${{ secrets.NOTIFICATION_ENCRYPTION_KEY }}
+        run: |
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
+            -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            infra/ansible/playbooks/deploy.yml
+
+      # ── Verificación posterior ──
+      - name: Verificar identidad en ejecución
+        id: running_identity
+        if: env.RUN_APP_DEPLOY == 'true'
+        env:
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+        run: |
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
+            -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            -e release_check=identity \
+            -e '{"app_release_services": ["postgres", "backend"]}' \
+            infra/ansible/playbooks/verify-release.yml
+
+      - name: Verificar health de contenedores
+        id: container_health
+        if: env.DEPLOY_REQUIRED == 'true'
+        env:
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+          SERVICES: ${{ env.RUN_APP_DEPLOY == 'true' && '["postgres", "backend"]' || '["postgres"]' }}
+        run: |
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
+            -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            -e release_check=health \
+            -e "{\"app_release_services\": ${SERVICES}}" \
+            infra/ansible/playbooks/verify-release.yml
+
+      - name: Verificar health público
+        id: public_health
+        if: env.DEPLOY_REQUIRED == 'true'
+        timeout-minutes: 5
+        env:
+          API_FQDN: ${{ steps.tf_outputs.outputs.api_fqdn }}
+          AUTH_FQDN: ${{ steps.tf_outputs.outputs.auth_fqdn }}
+        run: |
+          set -euo pipefail
+          check() { # <nombre> <url>
+            echo "Verificando $2..."
+            for i in $(seq 1 12); do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$2" || echo "000")
+              if [ "${STATUS}" = "200" ]; then
+                echo "$1 healthy"
+                return 0
+              fi
+              echo "Intento $i/12 — status: ${STATUS} — esperando 10s..."
+              sleep 10
+            done
+            echo "Error: $1 no responde después de 2 minutos"
+            return 1
+          }
+          check backend "https://${API_FQDN}/actuator/health"
+          check keycloak "https://${AUTH_FQDN}/realms/${KC_REALM}/.well-known/openid-configuration"
+
+      # Único punto que avanza el último éxito: deploy + identidad en ejecución + health
+      # de contenedores + health público ya pasaron. Re-verifica la identidad justo antes
+      # de escribir.
+      - name: Registrar último éxito
+        id: record
+        if: env.RUN_APP_DEPLOY == 'true'
+        env:
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          BACKEND_INDEX_DIGEST: ${{ steps.select.outputs.backend_index_digest }}
+          BACKEND_TAG: ${{ steps.select.outputs.backend_tag }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+          POSTGRES_INDEX_DIGEST: ${{ steps.select.outputs.postgres_index_digest }}
+          POSTGRES_TAG: ${{ steps.select.outputs.postgres_tag }}
+        run: |
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
+            -e "backend_image_index_digest=${BACKEND_INDEX_DIGEST}" \
+            -e "backend_image_tag=${BACKEND_TAG}" \
+            -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            -e "postgres_image_index_digest=${POSTGRES_INDEX_DIGEST}" \
+            -e "postgres_image_tag=${POSTGRES_TAG}" \
+            -e "release_commit=${GITHUB_SHA}" \
+            -e "release_run=${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}" \
+            infra/ansible/playbooks/record-release.yml
+
+      - name: Resumen de producción
+        if: always()
+        env:
+          INTENT: ${{ needs.classify.outputs.intent }}
+          HCP_RUN: ${{ steps.hcp_state.outputs.run_id }}
+          HCP_RUN_STATUS: ${{ steps.hcp_state.outputs.run_status }}
+          STATE_BEFORE: ${{ steps.hcp_before.outputs.state_version_id }}
+          STATE_USED: ${{ steps.tf_outputs.outputs.state_version_id || steps.hcp_state.outputs.state_version_id }}
+          STATE_SOURCE: ${{ steps.hcp_state.outputs.state_source || 'current' }}
+          BACKEND_SOURCE: ${{ steps.select.outputs.backend_source }}
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          POSTGRES_SOURCE: ${{ steps.select.outputs.postgres_source }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+          PREVIOUS_BACKEND: ${{ steps.select.outputs.previous_backend_image_ref }}
+          PREVIOUS_POSTGRES: ${{ steps.select.outputs.previous_postgres_image_ref }}
+          STATE_STATUS: ${{ steps.select.outputs.state_status }}
+          O_CREDENTIALS: ${{ steps.credentials.outcome }}
+          O_FRESH_APPLY: ${{ steps.fresh_apply.outcome }}
+          O_HCP: ${{ steps.hcp_idle.outcome }}/${{ steps.hcp_before.outcome }}/${{ steps.hcp_upload.outcome }}/${{ steps.hcp_run.outcome }}/${{ steps.hcp_apply.outcome }}/${{ steps.hcp_state.outcome }}/${{ steps.tf_outputs.outcome }}
+          O_ACCESS: ${{ steps.access.outcome }}/${{ steps.readiness.outcome }}/${{ steps.host_state.outcome }}
+          O_SELECT: ${{ steps.select.outcome }}
+          O_SCAN: ${{ steps.scan_download.outcome }}/${{ steps.scan_evidence.outcome }}/${{ steps.scan_backend.outcome }}/${{ steps.scan_postgres.outcome }}
+          SCAN_EVIDENCE: ${{ steps.scan_evidence.outputs.evidence }}
+          REUSE_BACKEND_SCAN: ${{ steps.scan_backend.outputs.outcome }}
+          REUSE_POSTGRES_SCAN: ${{ steps.scan_postgres.outputs.outcome }}
+          O_FRESH_DEPLOY: ${{ steps.fresh_deploy.outcome }}
+          O_DEPLOY: ${{ steps.kc_marker.outcome }}/${{ steps.converge.outcome }}/${{ steps.deploy.outcome }}
+          O_IDENTITY: ${{ steps.converge_identity.outcome }}/${{ steps.running_identity.outcome }}
+          O_HEALTH: ${{ steps.container_health.outcome }}/${{ steps.public_health.outcome }}
+          O_RECORD: ${{ steps.record.outcome }}
+        run: |
+          set -euo pipefail
+
+          # Primera etapa que falló → categoría visible para el operador
+          CATEGORY=""
+          first_failure() { # <categoría> <outcomes separados por />
+            [ -z "${CATEGORY}" ] && [[ "/$2/" == */failure/* ]] && CATEGORY="$1"
+            return 0
+          }
+          first_failure "Autoridad de producción (credenciales)" "${O_CREDENTIALS}"
+          first_failure "Frescura (main avanzó o ref no es main)" "${O_FRESH_APPLY}"
+          first_failure "Causalidad/estado de HCP Terraform" "${O_HCP}"
+          first_failure "Acceso al servidor" "${O_ACCESS}"
+          first_failure "Identidad de imagen (selección)" "${O_SELECT}"
+          first_failure "Evidencia de escaneo incompleta o no verificable" "${O_SCAN}"
+          first_failure "Frescura (main avanzó o ref no es main)" "${O_FRESH_DEPLOY}"
+          first_failure "Deploy" "${O_DEPLOY}"
+          first_failure "Identidad en ejecución" "${O_IDENTITY}"
+          first_failure "Health" "${O_HEALTH}"
+          first_failure "Registro del último éxito" "${O_RECORD}"
+
+          if [ "${O_RECORD}" = "success" ]; then
+            RESULT="último éxito registrado: backend \`${BACKEND_IMAGE_REF}\`, postgres \`${POSTGRES_IMAGE_REF}\`"
+          elif [ -n "${CATEGORY}" ]; then
+            RESULT="**FALLÓ: ${CATEGORY}** — el último éxito del servidor no cambió"
+            echo "::error title=Producción: ${CATEGORY}::El último éxito del servidor no cambió. Ver el resumen del run."
+          elif [ "${{ job.status }}" != "success" ]; then
+            RESULT="**incompleto (${{ job.status }})** — el último éxito del servidor no cambió"
+          else
+            RESULT="sin deploy de aplicación — el último éxito del servidor no cambia"
+          fi
+
+          {
+            echo "## Producción: \`${INTENT}\`"
+            echo
+            echo "${RESULT}"
+            echo
+            echo "| etapa | valor |"
+            echo "|---|---|"
+            echo "| HCP state version previo | \`${STATE_BEFORE:-—}\` |"
+            if [ "${TERRAFORM_REQUIRED}" = "true" ]; then
+              echo "| run de Apply | \`${HCP_RUN:-—}\` (${HCP_RUN_STATUS:-sin terminar}) |"
+            fi
+            echo "| state version consumido | \`${STATE_USED:-—}\` (${STATE_SOURCE}) |"
+            if [ "${DEPLOY_REQUIRED}" = "true" ]; then
+              echo "| último éxito leído | ${STATE_STATUS:-—} |"
+              echo "| backend | ${BACKEND_SOURCE:-—} \`${BACKEND_IMAGE_REF:-—}\` (anterior \`${PREVIOUS_BACKEND:-—}\`) |"
+              echo "| postgres | ${POSTGRES_SOURCE:-—} \`${POSTGRES_IMAGE_REF:-—}\` (anterior \`${PREVIOUS_POSTGRES:-—}\`) |"
+            fi
+            echo "| credenciales / frescura | ${O_CREDENTIALS} / ${O_FRESH_APPLY:-—} ${O_FRESH_DEPLOY:-} |"
+            echo "| HCP (idle/previo/upload/run/apply/state/outputs) | ${O_HCP} |"
+            echo "| acceso (ssh/espera/último éxito) | ${O_ACCESS} |"
+            echo "| selección | ${O_SELECT} |"
+            echo "| escaneo antes de mutar (descarga/evidencia/backend reuso/postgres reuso) | ${O_SCAN} |"
+            if [ -n "${SCAN_EVIDENCE}" ] && [ "${SCAN_EVIDENCE}" != "[]" ]; then
+              jq -r '.[] | "| escaneo previo \(.surface) | \(.outcome)\(if .critical != null then " — CRITICAL \(.critical), HIGH \(.high)" else "" end) |"' <<< "${SCAN_EVIDENCE}"
+            fi
+            [ -z "${REUSE_BACKEND_SCAN}" ] || echo "| escaneo backend (reuso) | ${REUSE_BACKEND_SCAN} |"
+            [ -z "${REUSE_POSTGRES_SCAN}" ] || echo "| escaneo postgres (reuso) | ${REUSE_POSTGRES_SCAN} |"
+            echo "| política de vulnerabilidades | solo reporte: ni hallazgos ni fallos operativos bloquean |"
+            echo "| deploy (marker/converge/deploy) | ${O_DEPLOY} |"
+            echo "| identidad en ejecución (converge/deploy) | ${O_IDENTITY} |"
+            echo "| health (contenedores/público) | ${O_HEALTH} |"
+            echo "| registro del último éxito | ${O_RECORD} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Resultado ─────────────────────────────────────────────────────────────
+  # La conclusión del run es la base del siguiente rango (production-range-base.sh):
+  # solo puede ser success si producción corrió y terminó bien, o si no hacía falta.
+  conclude:
+    name: Resultado de producción
+    runs-on: ubuntu-latest
+    needs: [classify, select_images, production]
+    if: always()
+    timeout-minutes: 2
+    steps:
+      - name: Verificar resultado
+        env:
+          CLASSIFY: ${{ needs.classify.result }}
+          SELECT: ${{ needs.select_images.result }}
+          PRODUCTION: ${{ needs.production.result }}
+          TERRAFORM_REQUIRED: ${{ needs.classify.outputs.terraform_required }}
+          DEPLOY_REQUIRED: ${{ needs.classify.outputs.deploy_required }}
+        run: |
+          set -euo pipefail
+          echo "classify=${CLASSIFY} select_images=${SELECT} production=${PRODUCTION}"
+          [ "${CLASSIFY}" = "success" ] || { echo "Error: la intención no se pudo clasificar"; exit 1; }
+          [ "${SELECT}" = "success" ] || { echo "Error: la selección de imágenes no terminó (${SELECT})"; exit 1; }
+          if [ "${TERRAFORM_REQUIRED}" = "true" ] || [ "${DEPLOY_REQUIRED}" = "true" ]; then
+            [ "${PRODUCTION}" = "success" ] || { echo "Error: producción requerida terminó en '${PRODUCTION}'"; exit 1; }
+          else
+            [ "${PRODUCTION}" = "skipped" ] || { echo "Error: producción no requerida terminó en '${PRODUCTION}'"; exit 1; }
+            echo "Sin cambios de producción en el rango: no-op limpio"
+          fi

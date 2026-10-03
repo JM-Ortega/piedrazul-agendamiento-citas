@@ -1,0 +1,36 @@
+---
+# Identidades de las imágenes propias (backend y postgres) para este run.
+# Lo incluyen setup.yml y deploy.yml antes de escribir image.env.
+#
+# El workflow de producción ya las seleccionó (rollback > build de este run > último
+# éxito del servidor) y las pasa como referencias exactas:
+#   backend_image_ref  = <backend_image>@sha256:<manifiesto linux/amd64>
+#   postgres_image_ref = <postgres_image>@sha256:<manifiesto linux/amd64>
+# Aquí no se selecciona ni se resuelve ningún tag: solo se valida el formato y se
+# descarga por digest. Sin identidad exacta válida, falla antes de tocar image.env.
+
+- name: Validar identidades exactas de las imágenes propias
+  ansible.builtin.assert:
+    that:
+      - (backend_image_ref | default('') | string) is match('^' ~ (backend_image | regex_escape) ~ '@sha256:[0-9a-f]{64}\Z')
+      - (postgres_image_ref | default('') | string) is match('^' ~ (postgres_image | regex_escape) ~ '@sha256:[0-9a-f]{64}\Z')
+    fail_msg: >-
+      backend_image_ref y postgres_image_ref deben ser referencias exactas
+      <repositorio>@sha256:<digest> de {{ backend_image }} y {{ postgres_image }}
+      (recibido: '{{ backend_image_ref | default('') }}', '{{ postgres_image_ref | default('') }}').
+      Las selecciona el workflow de producción; no se aceptan tags.
+    quiet: true
+
+# Por digest el contenido es inmutable: si ya está en el daemon es el mismo
+- name: Descargar imágenes propias por digest
+  community.docker.docker_image_pull:
+    name: "{{ item }}"
+    platform: linux/amd64
+    pull: not_present
+  loop:
+    - "{{ backend_image_ref }}"
+    - "{{ postgres_image_ref }}"
+
+- name: Mostrar imágenes propias de este run
+  ansible.builtin.debug:
+    msg: "backend={{ backend_image_ref }} postgres={{ postgres_image_ref }}"

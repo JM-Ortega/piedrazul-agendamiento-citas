@@ -1,6 +1,8 @@
 services:
   postgres:
-    image: ghcr.io/${GITHUB_OWNER}/${GITHUB_REPO}/postgres:${POSTGRES_IMAGE_TAG}
+    # Desarrollo local (docker-compose.yml raíz construye la imagen). En producción
+    # prod.yml reemplaza esta referencia por la identidad exacta de image.env.
+    image: ghcr.io/${GITHUB_OWNER}/${GITHUB_REPO}/postgres:${POSTGRES_IMAGE_TAG:-local}
     container_name: postgres
     restart: unless-stopped
     environment:
