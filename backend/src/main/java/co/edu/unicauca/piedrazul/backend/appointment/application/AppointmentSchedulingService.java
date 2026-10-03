@@ -93,6 +93,11 @@ public class AppointmentSchedulingService {
             PatientResolutionStrategy patientResolutionStrategy,
             boolean manualFlow) {
 
+        // El doctor no atiende en sus periodos de descanso
+        if (doctorConfigConsultPort.isOnTimeOff(idDoctor, date)) {
+            throw new DoctorOnTimeOffException("El doctor está en descanso en la fecha seleccionada");
+        }
+
         int intervalMinutes = doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor);
         String doctorName = doctorConfigConsultPort.getDoctorName(idDoctor);
         List<Appointment> existingAppointments = appointmentRepository.findByDoctorIdAndDate(idDoctor, date);
