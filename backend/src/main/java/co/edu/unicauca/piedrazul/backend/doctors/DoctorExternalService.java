@@ -4,6 +4,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.WorkingSchedu
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 
+import java.time.LocalDate;
 import java.util.*;
 
 public interface DoctorExternalService {
@@ -24,4 +25,7 @@ public interface DoctorExternalService {
 
     // Retorna las fechas y slots y el intervalo en las que el doctor trabaja
     WorkingSchedule workingSchedule(UUID idDoctor);
+
+    // Indica si la fecha cae dentro de un periodo de descanso del doctor
+    boolean isOnTimeOff(UUID idDoctor, LocalDate date);
 }

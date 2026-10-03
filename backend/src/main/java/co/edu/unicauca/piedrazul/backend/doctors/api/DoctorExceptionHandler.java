@@ -17,7 +17,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice(basePackageClasses = {
         DoctorController.class,
-        ScheduleController.class
+        ScheduleController.class,
+        DoctorTimeOffController.class
 })
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j

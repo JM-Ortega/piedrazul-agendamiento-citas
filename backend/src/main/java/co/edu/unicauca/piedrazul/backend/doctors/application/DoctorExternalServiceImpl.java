@@ -5,6 +5,8 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.WorkingDateSl
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.WorkingSchedule;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.DoctorTimeOff;
+import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorTimeOffRepository;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.proyections.DoctorSpecialtyProjection;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
@@ -29,17 +31,20 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     private final ScheduleService scheduleService;
     private final PersonExternalService personExternalService;
     private final HolidayManager holidayManager;
+    private final DoctorTimeOffRepository timeOffRepository;
 
     public DoctorExternalServiceImpl(
             DoctorRepository doctorRepository,
             ScheduleService scheduleService,
             PersonExternalService personExternalService,
-            HolidayManager holidayManager
+            HolidayManager holidayManager,
+            DoctorTimeOffRepository timeOffRepository
     ) {
         this.doctorRepository = doctorRepository;
         this.scheduleService = scheduleService;
         this.personExternalService = personExternalService;
         this.holidayManager = holidayManager;
+        this.timeOffRepository = timeOffRepository;
     }
 
     @Override
@@ -115,6 +120,12 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
         return new WorkingSchedule(workingDatesAndSlots(doctor),doctor.getAppointmentInterval());
     }
 
+    @Override
+    public boolean isOnTimeOff(UUID idDoctor, LocalDate date) {
+        return timeOffRepository.existsByDoctorIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
+                idDoctor, date, date);
+    }
+
     private List<WorkingDateSlots> workingDatesAndSlots(Doctor doctor) {
 
         // Horarios del médico agrupados por día
@@ -138,13 +149,20 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
                 return List.of();
         }
 
-        // Fechas disponibles quitando festivos y dias diferentes a los de atención
+        // Periodos de descanso del doctor que tocan la ventana de agendamiento
+        List<DoctorTimeOff> descansos = timeOffRepository
+                .findByDoctorIdAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
+                        doctor.getPersonId(), limiteAgendamiento, inicio);
+
+        // Fechas disponibles quitando festivos, descansos y dias diferentes a los de atención
         List<LocalDate> fechas = inicio
                 .datesUntil(limiteAgendamiento.plusDays(1))
                 .filter(fecha ->
                         schedulesByDay.containsKey(fecha.getDayOfWeek()))
                 .filter(fecha ->
                         !holidayManager.isHoliday(fecha))
+                .filter(fecha ->
+                        descansos.stream().noneMatch(d -> d.covers(fecha)))
                 .toList();
 
         // Generar slots para cada fecha

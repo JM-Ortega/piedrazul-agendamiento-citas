@@ -229,12 +229,14 @@ public class DoctorService implements DoctorProvisioningApi {
         // Si es nuevo o el agendamiento es autonomo retornara a los doces de terapia
         // nerual con solo esa especialidad
         // aunque tengan más
+        // Un doctor sin fechas agendables (por ejemplo, descanso que cubre toda su ventana) no se ofrece
         return activeDoctors.stream()
                 .map(d -> DoctorAvailableResponse.fromEntity(
                         d,
                         names.get(d.getPersonId()),
                         onlyNeuralTherapy,
                         appointmentExternalService.getAvailableDates(d.getPersonId())))
+                .filter(r -> !r.availableDates().isEmpty())
                 .toList();
     }
 

@@ -146,6 +146,16 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
     }
 
     @Override
+    public List<LocalDate> findScheduledAppointmentDates(UUID doctorId, LocalDate start, LocalDate end) {
+        return appointmentRepository.findByDoctorAndDateBetween(doctorId, start, end).stream()
+                .filter(a -> a.getAppointmentState() == AppointmentState.AGENDADA)
+                .map(Appointment::getDate)
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    @Override
     public boolean isNewPatient(UUID patientId) {
         return isNewPatientUseCase.isNewPatient(patientId);
     }

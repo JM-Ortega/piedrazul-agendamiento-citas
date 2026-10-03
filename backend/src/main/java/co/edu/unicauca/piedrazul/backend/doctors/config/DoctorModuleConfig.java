@@ -3,6 +3,8 @@ package co.edu.unicauca.piedrazul.backend.doctors.config;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorExternalServiceImpl;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import co.edu.unicauca.piedrazul.backend.doctors.application.ScheduleService;
+import co.edu.unicauca.piedrazul.backend.doctors.application.TimeOffService;
+import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorTimeOffRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.ScheduleRepository;
@@ -27,6 +29,18 @@ public class DoctorModuleConfig {
     @Bean
     public ScheduleService scheduleService(DoctorRepository doctorRepository) {
         return new ScheduleService(doctorRepository);
+    }
+
+    /**
+     * Bean para TimeOffService
+     */
+    @Bean
+    public TimeOffService timeOffService(
+            DoctorRepository doctorRepository,
+            DoctorTimeOffRepository timeOffRepository,
+            AppointmentExternalService appointmentExternalService
+    ) {
+        return new TimeOffService(doctorRepository, timeOffRepository, appointmentExternalService);
     }
 
     /**
@@ -58,13 +72,15 @@ public class DoctorModuleConfig {
             DoctorRepository doctorRepository,
             ScheduleService scheduleService,
             PersonExternalService personExternalService,
-            HolidayManager holidayManager
+            HolidayManager holidayManager,
+            DoctorTimeOffRepository timeOffRepository
     ) {
         return new DoctorExternalServiceImpl(
                 doctorRepository,
                 scheduleService,
                 personExternalService,
-                holidayManager
+                holidayManager,
+                timeOffRepository
         );
     }
 }
