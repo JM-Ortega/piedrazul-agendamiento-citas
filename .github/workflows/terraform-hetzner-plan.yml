@@ -7,6 +7,7 @@ on:
       - "infra/terraform/live/prod/**"
       - "infra/terraform/modules/hetzner/**"
       - "infra/terraform/modules/cloudflare/**"
+      - "infra/terraform/modules/shared/**"
       - ".github/workflows/terraform-hetzner-*.yml"
 
 concurrency:
