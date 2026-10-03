@@ -7,11 +7,16 @@ import co.edu.unicauca.piedrazul.backend.doctors.domain.DoctorTimeOff;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.*;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorTimeOffRepository;
+import co.edu.unicauca.piedrazul.backend.doctors.events.TimeOffChangedEvent;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -34,6 +39,10 @@ class TimeOffServiceTest {
     private DoctorTimeOffRepository timeOffRepository;
     @Mock
     private AppointmentExternalService appointmentExternalService;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+    @Mock
+    private SecurityContextExtractor securityExtractor;
 
     private TimeOffService service;
     private final UUID doctorId = UUID.randomUUID();
@@ -42,7 +51,8 @@ class TimeOffServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TimeOffService(doctorRepository, timeOffRepository, appointmentExternalService);
+        service = new TimeOffService(doctorRepository, timeOffRepository, appointmentExternalService,
+                eventPublisher, securityExtractor);
     }
 
     private Doctor doctor(boolean active, LocalDate laborEnd) {
@@ -232,5 +242,86 @@ class TimeOffServiceTest {
         when(timeOffRepository.findByDoctorIdOrderByStartDateDesc(doctorId)).thenReturn(history);
 
         assertThat(service.getByDoctor(doctorId)).isEqualTo(history);
+    }
+
+    // ---------------- auditoría ----------------
+
+    private TimeOffChangedEvent publishedEvent() {
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        return (TimeOffChangedEvent) captor.getValue();
+    }
+
+    @Test
+    void createShouldPublishCreatedEventWithRangeAndActor() {
+        givenDoctor(doctor(true, today.plusYears(1)));
+        LocalDate start = windowEnd.plusDays(1);
+        LocalDate end = start.plusDays(4);
+        when(appointmentExternalService.findScheduledAppointmentDates(doctorId, start, end)).thenReturn(List.of());
+        when(timeOffRepository.save(any(DoctorTimeOff.class))).thenAnswer(i -> i.getArgument(0));
+        when(securityExtractor.currentActorId()).thenReturn("admin-1");
+        when(securityExtractor.currentActorRoles()).thenReturn("[ADMIN]");
+
+        service.create(request(start, end));
+
+        TimeOffChangedEvent event = publishedEvent();
+        assertThat(event.change()).isEqualTo(TimeOffChangedEvent.Change.CREATED);
+        assertThat(event.doctorId()).isEqualTo(doctorId.toString());
+        assertThat(event.performedBy()).isEqualTo("admin-1");
+        assertThat(event.performedByRole()).isEqualTo("[ADMIN]");
+        assertThat(event.beforeState()).isNull();
+        assertThat(event.afterState()).isEqualTo("{\"startDate\":\"" + start + "\",\"endDate\":\"" + end + "\"}");
+    }
+
+    @Test
+    void createShouldNotPublishWhenValidationFails() {
+        givenDoctor(doctor(false, today.plusYears(1)));
+        LocalDate start = windowEnd.plusDays(1);
+
+        assertThatThrownBy(() -> service.create(request(start, start.plusDays(3))))
+                .isInstanceOf(InactiveDoctorTimeOffException.class);
+
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    void deleteShouldPublishDeletedEventWhenTimeOffHasNotStarted() {
+        UUID id = UUID.randomUUID();
+        LocalDate start = today.plusDays(40);
+        LocalDate end = today.plusDays(46);
+        when(timeOffRepository.findById(id)).thenReturn(Optional.of(new DoctorTimeOff(doctorId, start, end, null)));
+
+        service.delete(id);
+
+        TimeOffChangedEvent event = publishedEvent();
+        assertThat(event.change()).isEqualTo(TimeOffChangedEvent.Change.DELETED);
+        assertThat(event.beforeState()).contains(start.toString()).contains(end.toString());
+        assertThat(event.afterState()).isNull();
+    }
+
+    @Test
+    void deleteShouldPublishTruncatedEventWithOldAndNewEnd() {
+        UUID id = UUID.randomUUID();
+        LocalDate start = today.minusDays(2);
+        LocalDate end = today.plusDays(3);
+        when(timeOffRepository.findById(id)).thenReturn(Optional.of(new DoctorTimeOff(doctorId, start, end, null)));
+
+        service.delete(id);
+
+        TimeOffChangedEvent event = publishedEvent();
+        assertThat(event.change()).isEqualTo(TimeOffChangedEvent.Change.TRUNCATED);
+        assertThat(event.beforeState()).contains(end.toString());
+        assertThat(event.afterState()).contains(today.minusDays(1).toString()).doesNotContain(end.toString());
+    }
+
+    @Test
+    void deleteShouldNotPublishWhenTimeOffAlreadyEnded() {
+        UUID id = UUID.randomUUID();
+        when(timeOffRepository.findById(id))
+                .thenReturn(Optional.of(new DoctorTimeOff(doctorId, today.minusDays(10), today.minusDays(1), null)));
+
+        assertThatThrownBy(() -> service.delete(id)).isInstanceOf(TimeOffAlreadyEndedException.class);
+
+        verifyNoInteractions(eventPublisher);
     }
 }
