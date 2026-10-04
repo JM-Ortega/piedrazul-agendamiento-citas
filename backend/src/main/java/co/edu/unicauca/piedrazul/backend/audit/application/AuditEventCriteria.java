@@ -23,8 +23,6 @@ public record AuditEventCriteria(
         String moduleCode,
         AuditOutcome outcome,
         String search,
-        String actorId,
-        String targetEntityType,
         String targetEntityId,
         int page,
         int size
@@ -45,8 +43,6 @@ public record AuditEventCriteria(
 
         search = normalizeSearch(search);
         moduleCode = blankToNull(moduleCode);
-        actorId = blankToNull(actorId);
-        targetEntityType = blankToNull(targetEntityType);
         targetEntityId = blankToNull(targetEntityId);
 
         if (page < 0) page = 0;

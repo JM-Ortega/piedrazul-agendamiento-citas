@@ -33,7 +33,7 @@ class AuditQueryServiceTest {
     private AuditEventQuery searchBetween(String from, String to) {
         service.search(new AuditEventCriteria(
                 from == null ? null : LocalDate.parse(from), to == null ? null : LocalDate.parse(to),
-                null, null, null, null, null, null, null, 0, 20));
+                null, null, null, null, null, 0, 20));
         ArgumentCaptor<AuditEventQuery> captor = ArgumentCaptor.forClass(AuditEventQuery.class);
         verify(repository).findByCriteria(captor.capture());
         return captor.getValue();

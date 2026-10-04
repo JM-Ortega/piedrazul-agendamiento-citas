@@ -4,7 +4,6 @@ import co.edu.unicauca.piedrazul.backend.audit.domain.AuditActionCatalogEntry;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditActionCatalogRepository;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditModuleCatalogEntry;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditOutcome;
-import co.edu.unicauca.piedrazul.backend.shared.audit.AuditTargetType;
 import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,14 +51,6 @@ class AuditFilterCatalogServiceTest {
         assertThat(filters.outcomes()).extracting(AuditFilterCatalog.Option::code)
                 .containsExactlyElementsOf(Arrays.stream(AuditOutcome.values()).map(Enum::name).toList());
         assertThat(filters.outcomes()).contains(new AuditFilterCatalog.Option("DENEGADO", "Denegado"));
-    }
-
-    @Test
-    void everyTargetEntityTypeIsOfferedWithItsDisplayName() {
-        assertThat(filters.targetEntityTypes()).extracting(AuditFilterCatalog.Option::code)
-                .containsExactlyElementsOf(AuditTargetType.NAMES.keySet());
-        assertThat(filters.targetEntityTypes())
-                .contains(new AuditFilterCatalog.Option(AuditTargetType.CONTROL_MEDICO, "Control médico"));
     }
 
     @Test

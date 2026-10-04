@@ -24,8 +24,6 @@ public record AuditEventQuery(
         String moduleCode,
         AuditOutcome outcome,
         String search,
-        String actorId,
-        String targetEntityType,
         String targetEntityId,
         int page,
         int size

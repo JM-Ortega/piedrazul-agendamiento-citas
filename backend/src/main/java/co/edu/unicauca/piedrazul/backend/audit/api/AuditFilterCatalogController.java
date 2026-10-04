@@ -27,7 +27,7 @@ public class AuditFilterCatalogController {
     @GetMapping
     @Operation(summary = "Obtener las opciones de los filtros de auditoría",
             description = "Devuelve, en una sola llamada, los valores posibles de los filtros de valor cerrado de "
-                    + "`GET /api/audit` (`moduleCode`, `action`, `outcome` y `targetEntityType`), cada uno con su "
+                    + "`GET /api/audit` (`moduleCode`, `action` y `outcome`), cada uno con su "
                     + "nombre para mostrar, y los límites de los filtros abiertos: días máximos entre `from` y `to` "
                     + "y caracteres máximos de `search`.")
     @ApiResponses({
@@ -46,7 +46,6 @@ public class AuditFilterCatalogController {
                                 e.code().name(), e.name(), e.moduleCode(), e.moduleName()))
                         .toList(),
                 toOptions(catalog.outcomes()),
-                toOptions(catalog.targetEntityTypes()),
                 catalog.maxRangeDays(),
                 catalog.maxSearchLength());
     }

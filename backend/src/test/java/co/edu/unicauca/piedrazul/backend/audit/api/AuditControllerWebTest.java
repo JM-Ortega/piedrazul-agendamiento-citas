@@ -113,8 +113,6 @@ class AuditControllerWebTest {
                         .param("moduleCode", "PACIENTES")
                         .param("outcome", "DENEGADO")
                         .param("search", "  ana   ruiz ")
-                        .param("actorId", "kc-1")
-                        .param("targetEntityType", "Paciente")
                         .param("targetEntityId", "p-9")
                         .param("page", "2")
                         .param("size", "10"))
@@ -127,8 +125,6 @@ class AuditControllerWebTest {
         assertThat(criteria.moduleCode()).isEqualTo("PACIENTES");
         assertThat(criteria.outcome()).isEqualTo(AuditOutcome.DENEGADO);
         assertThat(criteria.search()).isEqualTo("ana ruiz");
-        assertThat(criteria.actorId()).isEqualTo("kc-1");
-        assertThat(criteria.targetEntityType()).isEqualTo("Paciente");
         assertThat(criteria.targetEntityId()).isEqualTo("p-9");
         assertThat(criteria.page()).isEqualTo(2);
         assertThat(criteria.size()).isEqualTo(10);

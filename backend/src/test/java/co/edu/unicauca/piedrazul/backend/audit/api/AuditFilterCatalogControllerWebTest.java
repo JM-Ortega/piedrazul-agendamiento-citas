@@ -33,7 +33,6 @@ class AuditFilterCatalogControllerWebTest {
                 List.of(new AuditModuleCatalogEntry("PACIENTES", "Pacientes")),
                 List.of(PATIENT_MODIFIED),
                 List.of(new AuditFilterCatalog.Option("DENEGADO", "Denegado")),
-                List.of(new AuditFilterCatalog.Option("ControlMedico", "Control médico")),
                 90, 100));
 
         mvc = MockMvcBuilders.standaloneSetup(new AuditFilterCatalogController(service)).build();
@@ -51,8 +50,7 @@ class AuditFilterCatalogControllerWebTest {
                 .andExpect(jsonPath("$.actions[0].moduleName").value("Pacientes"))
                 .andExpect(jsonPath("$.outcomes[0].code").value("DENEGADO"))
                 .andExpect(jsonPath("$.outcomes[0].name").value("Denegado"))
-                .andExpect(jsonPath("$.targetEntityTypes[0].code").value("ControlMedico"))
-                .andExpect(jsonPath("$.targetEntityTypes[0].name").value("Control médico"))
+                .andExpect(jsonPath("$.targetEntityTypes").doesNotExist())
                 .andExpect(jsonPath("$.maxRangeDays").value(90))
                 .andExpect(jsonPath("$.maxSearchLength").value(100));
     }

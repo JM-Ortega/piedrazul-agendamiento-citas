@@ -90,17 +90,17 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
     }
 
     private static AuditEventQuery query(Instant from, Instant to, AuditAction action, AuditOutcome outcome,
-                                         String search, String actorId, int page, int size) {
-        return new AuditEventQuery(from, to, action, null, outcome, search, actorId, null, null, page, size);
+                                         String search, int page, int size) {
+        return new AuditEventQuery(from, to, action, null, outcome, search, null, page, size);
     }
 
     private static AuditEventQuery queryByModule(Instant from, Instant to, String moduleCode, int page, int size) {
-        return new AuditEventQuery(from, to, null, moduleCode, null, null, null, null, null, page, size);
+        return new AuditEventQuery(from, to, null, moduleCode, null, null, null, page, size);
     }
 
     /** Ventana que abarca solo los cinco registros de este test. */
     private AuditEventQuery window() {
-        return query(BASE.minusSeconds(1), BASE.plus(Duration.ofHours(5)), null, null, null, null, 0, 50);
+        return query(BASE.minusSeconds(1), BASE.plus(Duration.ofHours(5)), null, null, null, 0, 50);
     }
 
     private static List<UUID> ids(AuditEventPage page) {
@@ -117,14 +117,14 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
     @Test
     void theStartIsInclusiveAndTheEndExclusive() {
         var page = repository.findByCriteria(query(BASE.plus(Duration.ofHours(1)), BASE.plus(Duration.ofHours(3)),
-                null, null, null, null, 0, 50));
+                null, null, null, 0, 50));
 
         assertThat(ids(page)).containsExactly(r3, r2);
     }
 
     @Test
     void withOnlyTheStartTheRangeIsOpenAtTheEnd() {
-        var page = repository.findByCriteria(query(BASE.plus(Duration.ofHours(3)), null, null, null, null, null, 0, 50));
+        var page = repository.findByCriteria(query(BASE.plus(Duration.ofHours(3)), null, null, null, null, 0, 50));
 
         assertThat(ids(page)).startsWith(r5, r4);
         assertThat(ids(page)).doesNotContain(r3, r2, r1);
@@ -132,7 +132,7 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
 
     @Test
     void withOnlyTheEndTheRangeIsOpenAtTheStart() {
-        var page = repository.findByCriteria(query(null, BASE.plus(Duration.ofHours(2)), null, null, null, null, 0, 50));
+        var page = repository.findByCriteria(query(null, BASE.plus(Duration.ofHours(2)), null, null, null, 0, 50));
 
         assertThat(ids(page)).contains(r2, r1).doesNotContain(r3, r4, r5);
         assertThat(ids(page).indexOf(r2)).isLessThan(ids(page).indexOf(r1));
@@ -140,7 +140,7 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
 
     @Test
     void withoutAnyDateTheWholeHistoryIsListedNewestFirst() {
-        var all = ids(repository.findByCriteria(query(null, null, null, null, null, null, 0, 200)));
+        var all = ids(repository.findByCriteria(query(null, null, null, null, null, 0, 200)));
 
         assertThat(all).contains(r1, r2, r3, r4, r5);
         assertThat(all.indexOf(r5)).isLessThan(all.indexOf(r1));
@@ -151,7 +151,7 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
     @Test
     void itFiltersByAction() {
         var page = repository.findByCriteria(query(window().from(), window().toExclusive(),
-                AuditAction.USUARIO_CREADO, null, null, null, 0, 50));
+                AuditAction.USUARIO_CREADO, null, null, 0, 50));
 
         assertThat(ids(page)).containsExactly(r5, r2);
     }
@@ -159,7 +159,7 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
     @Test
     void itFiltersByOutcome() {
         var page = repository.findByCriteria(query(window().from(), window().toExclusive(),
-                null, AuditOutcome.DENEGADO, null, null, 0, 50));
+                null, AuditOutcome.DENEGADO, null, 0, 50));
 
         assertThat(ids(page)).containsExactly(r4, r3);
     }
@@ -167,11 +167,11 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
     @Test
     void theFiltersCombine() {
         var page = repository.findByCriteria(query(window().from(), window().toExclusive(),
-                AuditAction.PACIENTE_MODIFICADO, AuditOutcome.DENEGADO, null, null, 0, 50));
+                AuditAction.PACIENTE_MODIFICADO, AuditOutcome.DENEGADO, null, 0, 50));
 
         assertThat(ids(page)).containsExactly(r3);
         assertThat(repository.findByCriteria(query(window().from(), window().toExclusive(),
-                AuditAction.PACIENTE_MODIFICADO, AuditOutcome.EXITOSO, null, null, 0, 50)).content()).isEmpty();
+                AuditAction.PACIENTE_MODIFICADO, AuditOutcome.EXITOSO, null, 0, 50)).content()).isEmpty();
     }
 
     // ---- búsqueda por nombre o usuario ----------------------------------------
@@ -179,7 +179,7 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
     @Test
     void itSearchesByNameIgnoringCaseAndAccents() {
         for (String term : new String[]{"nunez " + MARK, "NÚÑEZ", "ana nunez", "ANA NUÑEZ QZKW"}) {
-            var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, term, null, 0, 50));
+            var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, term, 0, 50));
 
             assertThat(ids(page)).as("término: " + term).containsExactly(r3, r1);
         }
@@ -187,15 +187,15 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
 
     @Test
     void itSearchesByThePartOfTheNameThatSpansFirstAndLastName() {
-        var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, "carlos diaz", null, 0, 50));
+        var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, "carlos diaz", 0, 50));
 
         assertThat(ids(page)).containsExactly(r2);
     }
 
     @Test
     void itSearchesByTheKeycloakUsernameWhichIsTheDocument() {
-        var exact = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, carlosDocument, null, 0, 50));
-        var partial = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, docPrefix, null, 0, 50));
+        var exact = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, carlosDocument, 0, 50));
+        var partial = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, docPrefix, 0, 50));
 
         assertThat(ids(exact)).containsExactly(r2);
         assertThat(ids(partial)).containsExactly(r3, r2, r1);
@@ -203,7 +203,7 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
 
     @Test
     void aSearchNeverMatchesActorsWithoutPerson() {
-        var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, "system", null, 0, 50));
+        var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, "system", 0, 50));
 
         assertThat(page.content()).isEmpty();
         assertThat(page.totalElements()).isZero();
@@ -212,7 +212,7 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
     @Test
     void wildcardsInTheSearchAreLiteral() {
         for (String term : new String[]{"%", "_", "\\", "a%"}) {
-            var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, term, null, 0, 50));
+            var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, term, 0, 50));
 
             assertThat(page.totalElements()).as("término: " + term).isZero();
         }
@@ -221,7 +221,7 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
     @Test
     void theSearchCombinesWithTheOtherFilters() {
         var page = repository.findByCriteria(query(window().from(), window().toExclusive(),
-                AuditAction.CITA_AGENDADA, AuditOutcome.EXITOSO, "nunez", null, 0, 50));
+                AuditAction.CITA_AGENDADA, AuditOutcome.EXITOSO, "nunez", 0, 50));
 
         assertThat(ids(page)).containsExactly(r1);
     }
@@ -234,14 +234,14 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
         Instant to = BASE.plus(Duration.ofHours(6));
 
         for (String term : new String[]{"maria jose", "jose gomez", "gomez maria", "MARÍA GÓMEZ", "perez jose " + MARK}) {
-            assertThat(ids(repository.findByCriteria(query(window().from(), to, null, null, term, null, 0, 50))))
+            assertThat(ids(repository.findByCriteria(query(window().from(), to, null, null, term, 0, 50))))
                     .as("término: " + term).containsExactly(mariaRow);
         }
     }
 
     @Test
     void aWordThatAppearsNowhereExcludesTheRecordEvenIfTheOthersMatch() {
-        var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, "ana zzzz", null, 0, 50));
+        var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, "ana zzzz", 0, 50));
 
         assertThat(page.content()).isEmpty();
     }
@@ -249,27 +249,19 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
     @Test
     void oneWordMayMatchTheNameAndAnotherTheDocument() {
         var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null,
-                "carlos " + carlosDocument, null, 0, 50));
+                "carlos " + carlosDocument, 0, 50));
 
         assertThat(ids(page)).containsExactly(r2);
     }
 
     @Test
     void theSameWordRepeatedDoesNotChangeTheResult() {
-        var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, "ana ana ana", null, 0, 50));
+        var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, "ana ana ana", 0, 50));
 
         assertThat(ids(page)).containsExactly(r3, r1);
     }
 
     // ---- quién actuó -----------------------------------------------------------
-
-    @Test
-    void itFiltersByTheExactAccountId() {
-        var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, null,
-                accountWithoutPerson.toString(), 0, 50));
-
-        assertThat(ids(page)).containsExactly(r4);
-    }
 
     @Test
     void theActorDataComesFromThePersonOfTheAccount() {
@@ -309,8 +301,8 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
         jdbc.update("UPDATE piedrazul.person SET first_name = 'Anabel', last_name = ?, identification = ? WHERE user_id = ?",
                 "Pérez " + MARK, newDocument, anaAccount);
 
-        var oldRows = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, null,
-                anaAccount.toString(), 0, 50));
+        var oldRows = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null,
+                "anabel perez", 0, 50));
 
         assertThat(oldRows.content()).extracting(AuditEventView::id).containsExactly(r3, r1);
         assertThat(oldRows.content()).allSatisfy(v -> {
@@ -318,13 +310,11 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
             assertThat(v.actorUsername()).isEqualTo(newDocument);
         });
 
-        // Se encuentran por el nombre nuevo, todas sus filas juntas, y ya no por el viejo.
-        assertThat(ids(repository.findByCriteria(query(window().from(), window().toExclusive(), null, null,
-                "anabel perez", null, 0, 50)))).containsExactly(r3, r1);
+        // Ya no se encuentran por el nombre ni el documento viejos.
         assertThat(repository.findByCriteria(query(window().from(), window().toExclusive(), null, null,
-                "ana nunez", null, 0, 50)).content()).isEmpty();
+                "ana nunez", 0, 50)).content()).isEmpty();
         assertThat(repository.findByCriteria(query(window().from(), window().toExclusive(), null, null,
-                anaDocument, null, 0, 50)).content()).isEmpty();
+                anaDocument, 0, 50)).content()).isEmpty();
     }
 
     // ---- módulo ------------------------------------------------------------------
@@ -351,7 +341,7 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
     @Test
     void theModuleFilterCombinesWithTheOtherFilters() {
         var query = new AuditEventQuery(window().from(), window().toExclusive(), null, "USUARIOS", AuditOutcome.DENEGADO,
-                null, null, null, null, 0, 50);
+                null, null, 0, 50);
 
         assertThat(ids(repository.findByCriteria(query))).containsExactly(r4);
     }
@@ -360,9 +350,9 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
 
     @Test
     void itPaginatesAndReportsTheTotal() {
-        var first = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, null, null, 0, 2));
-        var second = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, null, null, 1, 2));
-        var third = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, null, null, 2, 2));
+        var first = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, null, 0, 2));
+        var second = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, null, 1, 2));
+        var third = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, null, 2, 2));
 
         assertThat(first.totalElements()).isEqualTo(5);
         assertThat(first.totalPages()).isEqualTo(3);
@@ -373,7 +363,7 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
 
     @Test
     void theTotalCountsOnlyWhatMatchesTheSearch() {
-        var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, MARK, null, 0, 1));
+        var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, MARK, 0, 1));
 
         assertThat(page.totalElements()).isEqualTo(3);
         assertThat(page.content()).hasSize(1);
@@ -381,7 +371,7 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
 
     @Test
     void aPageBeyondTheEndIsEmptyButKeepsTheTotal() {
-        var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, null, null, 9, 10));
+        var page = repository.findByCriteria(query(window().from(), window().toExclusive(), null, null, null, 9, 10));
 
         assertThat(page.content()).isEmpty();
         assertThat(page.totalElements()).isEqualTo(5);
