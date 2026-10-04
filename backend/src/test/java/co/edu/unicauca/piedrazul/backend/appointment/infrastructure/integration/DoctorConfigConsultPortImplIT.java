@@ -5,6 +5,7 @@ import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorExternalServiceImpl;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
+import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorTimeOffRepository;
 import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 import co.edu.unicauca.piedrazul.backend.support.PostgresIntegrationSupport;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
@@ -41,9 +42,10 @@ class DoctorConfigConsultPortImplIT extends PostgresIntegrationSupport {
     static class TestBeans {
         @Bean
         DoctorExternalService doctorExternalService(DoctorRepository doctorRepository,
-                PersonExternalService personExternalService) {
+                PersonExternalService personExternalService, DoctorTimeOffRepository timeOffRepository) {
             // getDoctorName/getDoctorInfoByIds no tocan scheduleService ni holidayManager.
-            return new DoctorExternalServiceImpl(doctorRepository, null, personExternalService, null);
+            return new DoctorExternalServiceImpl(doctorRepository, null, personExternalService, null,
+                    timeOffRepository);
         }
 
         @Bean
