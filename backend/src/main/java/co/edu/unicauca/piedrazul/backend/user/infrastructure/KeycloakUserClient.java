@@ -18,6 +18,7 @@ import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.representations.idm.CredentialRepresentation;
+import org.keycloak.representations.idm.EventRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
@@ -32,6 +33,7 @@ import java.util.*;
 public class KeycloakUserClient {
 
     private static final Logger log = LoggerFactory.getLogger(KeycloakUserClient.class);
+    private static final List<String> LOGIN_EVENT_TYPES = List.of("LOGIN", "LOGIN_ERROR");
 
     private final Keycloak keycloak;
     private final KeycloakProperties props;
@@ -410,6 +412,16 @@ public class KeycloakUserClient {
         }
 
         return enabledByUserId;
+    }
+
+    /**
+     * Los eventos de inicio de sesión ({@code LOGIN} y {@code LOGIN_ERROR}) desde {@code fromMillis}
+     * (inclusive), del más antiguo al más reciente. Requiere que el realm guarde esos eventos y que
+     * la cuenta de servicio tenga el rol {@code view-events}.
+     */
+    public List<EventRepresentation> findLoginEvents(long fromMillis, int first, int max) {
+        return keycloak.realm(props.getRealm())
+                .getEvents(LOGIN_EVENT_TYPES, null, null, fromMillis, Long.MAX_VALUE, null, first, max, "asc");
     }
 
     public List<String> getUserRoles(String keycloakId) {

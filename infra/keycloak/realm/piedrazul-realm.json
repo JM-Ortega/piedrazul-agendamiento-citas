@@ -500,7 +500,8 @@
           "view-realm",
           "manage-users",
           "view-users",
-          "query-users"
+          "query-users",
+          "view-events"
         ]
       },
       "notBefore": 0,
@@ -1658,9 +1659,10 @@
   "accountTheme": "",
   "adminTheme": "",
   "emailTheme": "",
-  "eventsEnabled": false,
+  "eventsEnabled": true,
+  "eventsExpiration": 7776000,
   "eventsListeners": ["jboss-logging"],
-  "enabledEventTypes": [],
+  "enabledEventTypes": ["LOGIN", "LOGIN_ERROR"],
   "adminEventsEnabled": false,
   "adminEventsDetailsEnabled": false,
   "identityProviders": [],

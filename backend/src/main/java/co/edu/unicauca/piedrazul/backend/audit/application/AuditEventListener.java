@@ -9,6 +9,7 @@ import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEvent;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditEventRepository;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditOutcome;
+import co.edu.unicauca.piedrazul.backend.user.events.LoginAttemptedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserAccountStatusChangedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserCreatedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserRoleAssignedEvent;
@@ -133,5 +134,39 @@ public class AuditEventListener {
                 .correlationId(event.correlationId())
                 .states(event.rolesBefore(), event.rolesAfter())
                 .build());
+    }
+
+    /**
+     * El id de correlación identifica el hecho en Keycloak: la sesión que abrió un inicio de sesión
+     * exitoso o el evento de un intento fallido. Tras un reinicio, el backend vuelve a leer el
+     * último día de eventos y así no se guardan dos veces.
+     */
+    @ApplicationModuleListener
+    void on(LoginAttemptedEvent event) {
+        String correlationId = event.successful()
+                ? "keycloak-session:" + event.sessionId()
+                : "keycloak-event:" + event.keycloakEventId();
+
+        if (repository.existsByCorrelationId(correlationId)) {
+            return;
+        }
+
+        repository.save(AuditEvent.builder()
+                .occurredAt(event.occurredAt())
+                .actor(event.userId(), event.roles())
+                .action(event.successful() ? AuditAction.LOGIN_EXITOSO : AuditAction.LOGIN_FALLIDO)
+                .target(AuditTargetType.USUARIO, event.userId())
+                .outcome(event.successful() ? AuditOutcome.EXITOSO : AuditOutcome.FALLIDO)
+                .correlationId(correlationId)
+                .states(null, loginFailureJson(event.error()))
+                .build());
+    }
+
+    /** El motivo que da Keycloak, solo si es un código esperado (minúsculas y guiones bajos). */
+    private static String loginFailureJson(String error) {
+        if (error == null || !error.matches("[a-z_]{1,60}")) {
+            return null;
+        }
+        return "{\"motivo\":\"" + error + "\"}";
     }
 }

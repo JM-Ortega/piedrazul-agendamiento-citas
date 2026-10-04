@@ -73,6 +73,11 @@ public class AuditEventRepositoryAdapter implements AuditEventRepository {
     }
 
     @Override
+    public boolean existsByCorrelationId(String correlationId) {
+        return jpaRepository.existsByCorrelationId(correlationId);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public AuditEventPage findByCriteria(AuditEventQuery query) {
         Map<String, Object> params = new LinkedHashMap<>();
