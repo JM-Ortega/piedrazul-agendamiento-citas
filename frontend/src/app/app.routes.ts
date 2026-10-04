@@ -19,6 +19,8 @@ import { PatientDashboardComponent } from './features/patient/patientDashboard/p
 import { RegisterComponent } from './features/register/register.component';
 import { SchedulerDashboardComponent } from './features/scheduler/pages/schedulerDashboard/schedulerDashboard.component';
 import { SchedulerHistoryComponent } from './features/scheduler/pages/schedulerHistory/schedulerHistory.component';
+import { AuditComponent } from './features/audit/pages/audit/audit.component';
+
 export const routes: Routes = [
   { path: '', component: HomeComponent },
 
@@ -125,6 +127,12 @@ export const routes: Routes = [
     component: PatientAppointmentHistoryComponent,
     canActivate: [AuthGuard],
     data: { role: 'PATIENT' },
+  },
+  {
+    path: 'auditor/auditoria',
+    component: AuditComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'AUDITOR' },
   },
   { path: 'registro', component: RegisterComponent },
 

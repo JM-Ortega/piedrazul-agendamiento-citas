@@ -33,6 +33,7 @@ import {
   LucideUserCog,
   LucideUsers,
   LucideX,
+  LucideShield,
   type LucideIcon,
 } from '@lucide/angular';
 import Keycloak from 'keycloak-js';
@@ -108,6 +109,11 @@ export class NavbarComponent implements OnInit, AfterViewInit, OnDestroy {
       label: 'Médico',
     },
     PATIENT: { icon: LucideUser, color: 'text-orange-600', label: 'Paciente' },
+    AUDITOR: {
+      icon: LucideShield,
+      color: 'text-amber-700',
+      label: 'Auditor',
+    },
   };
 
   ngOnInit(): void {
