@@ -6,6 +6,10 @@ import { environment } from '../../../environments/environment';
 import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
 import { Patient } from '../../shared/models/interfaces/patient.model';
 
+/**
+ * Estado público de un documento: permite saber si el paciente existe, si ya
+ * tiene cuenta y de qué rol/usuario dispone, sin exponer el documento completo.
+ */
 export interface PatientPublicResponse {
   identificationType: string | null;
   maskedDocument: string;
@@ -40,10 +44,13 @@ export class PatientService {
 
   medicalRecords = signal<MedicalRecord[]>([]);
   error = signal<string | null>(null);
+  /** Tipos de documento disponibles, cargados con {@link loadDocumentTypes}. */
   readonly documentTypes = signal<string[]>([]);
+  /** Paciente autenticado en memoria; `null` hasta que {@link getMe} lo cargue. */
   readonly me = signal<Patient | null>(null);
   private me$: Observable<Patient> | null = null;
 
+  /** Carga los tipos de documento en {@link documentTypes}; no repite la carga si ya existen. */
   loadDocumentTypes(): void {
     if (this.documentTypes().length > 0) return;
     this.getAllDocumentTypes().subscribe({
@@ -56,7 +63,8 @@ export class PatientService {
 
   /**
    * Devuelve los datos del paciente autenticado. La primera llamada cachea
-   * el resultado en memoria para el resto de la sesión
+   * el resultado en memoria para el resto de la sesión; las siguientes
+   * reutilizan esa caché sin repetir la petición.
    */
   getMe(): Observable<Patient> {
     const cached = this.me();
@@ -89,7 +97,12 @@ export class PatientService {
     this.me$ = null;
   }
 
-  // consulta el estado público del documento
+  /**
+   * Consulta el estado público de un documento (si el paciente existe y si ya
+   * tiene cuenta), usado para decidir el flujo de registro.
+   *
+   * @param documentNumber número de documento a consultar
+   */
   getPublicByDocument(
     documentNumber: string
   ): Observable<PatientPublicResponse> {
@@ -98,7 +111,11 @@ export class PatientService {
     );
   }
 
-  // crea paciente nuevo con cuenta nueva
+  /**
+   * Crea un paciente nuevo junto con su cuenta de usuario.
+   *
+   * @param data datos del paciente y credenciales de la cuenta
+   */
   createWithUser(data: {
     username: string;
     password: string;
@@ -115,7 +132,12 @@ export class PatientService {
     return this.http.post<Patient>(`${this.apiUrl}/patients/with-user`, data);
   }
 
-  // solicita OTP para vincular o completar registro
+  /**
+   * Solicita un código OTP para vincular una cuenta o completar el registro
+   * de un paciente existente.
+   *
+   * @param data.identification documento del paciente
+   */
   requestLinkUserAccountCode(data: {
     identification: string;
   }): Observable<void> {
@@ -125,7 +147,14 @@ export class PatientService {
     );
   }
 
-  // confirma OTP y crea o vincula la cuenta según el caso
+  /**
+   * Confirma el código OTP y, según el estado del paciente, crea o vincula su
+   * cuenta de usuario. Los campos opcionales completan los datos que faltaban
+   * del paciente.
+   *
+   * @param data.identification documento del paciente
+   * @param data.code código OTP recibido
+   */
   confirmLinkUserAccount(data: {
     identification: string;
     code: string;
@@ -140,6 +169,7 @@ export class PatientService {
     );
   }
 
+  /** Obtiene del backend los tipos de documento válidos. */
   getAllDocumentTypes(): Observable<string[]> {
     return this.http.get<string[]>(`${this.apiUrl}/patients/document-types`);
   }
