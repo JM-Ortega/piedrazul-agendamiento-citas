@@ -63,12 +63,6 @@ export const EMPTY_PATIENT_FORM: PatientFormData = {
   email: '',
 };
 
-const SEX_OPTIONS: SelectOption[] = [
-  { value: 'MASCULINO', label: 'Masculino' },
-  { value: 'FEMENINO', label: 'Femenino' },
-  { value: 'OTRO', label: 'Otro' },
-];
-
 /**
  * Formulario completo de datos de un paciente: tipo de documento (y,
  * opcionalmente, número de documento vía `showDocumentNumber`), nombres,
@@ -104,7 +98,6 @@ export class PatientFormComponent implements ControlValueAccessor, OnInit {
   /** Emite el formulario completo cada vez que cambia cualquier campo. */
   @Output() valueChange = new EventEmitter<PatientFormData>();
 
-  readonly sexOptions = SEX_OPTIONS;
   readonly nameMin = NAME_MIN_DEFAULT;
   readonly emailMax = EMAIL_MAX_DEFAULT;
   readonly documentMaxLength = DEFAULT_DOCUMENT_MAX_LENGTH;
@@ -143,8 +136,17 @@ export class PatientFormComponent implements ControlValueAccessor, OnInit {
     isMinorPatient(this.documentTypeSignal(), this.birthDateSignal())
   );
 
+  sexOptions = computed<SelectOption[]>(() =>
+    this.patientService.sexOptions().map((sex) => ({
+      value: sex,
+      label: this.formatoPipe.transform(sex),
+    }))
+  );
+
   ngOnInit(): void {
     this.patientService.loadDocumentTypes();
+    this.patientService.loadSexOptions();
+  }
   }
 
   /** Lee el valor actual de un campo del formulario. */

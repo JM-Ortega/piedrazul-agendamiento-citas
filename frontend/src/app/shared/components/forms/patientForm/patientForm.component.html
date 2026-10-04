@@ -98,7 +98,7 @@
     </label>
     <app-select
       [id]="'sex'"
-      [options]="sexOptions"
+      [options]="sexOptions()"
       [ngModel]="get('sex')"
       (valueChange)="set('sex', $event)"
       [errorMessage]="errors()['sex']"
