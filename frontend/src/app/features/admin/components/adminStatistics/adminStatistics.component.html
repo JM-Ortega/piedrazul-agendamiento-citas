@@ -1,0 +1,273 @@
+<div class="space-y-4">
+  @if (errorMessage()) {
+    <div
+      class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"
+    >
+      {{ errorMessage() }}
+    </div>
+  }
+
+  <!-- Citas por mes -->
+  <section
+    class="bg-white rounded-xl shadow-md p-4 md:p-5 border border-[#d9e9f8]"
+  >
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+      <div class="flex items-center gap-3">
+        <div class="bg-blue-50 rounded-lg p-2">
+          <svg lucideActivity [size]="22" class="text-[#215c98]"></svg>
+        </div>
+        <div>
+          <h2 class="text-[#163c63] text-lg font-semibold">Citas por Mes</h2>
+          <p class="text-gray-500 text-sm">Total de todas las especialidades</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <label for="monthly-year" class="text-sm font-semibold text-gray-500"
+          >Año:</label
+        >
+        <app-select
+          [id]="'monthly-year'"
+          size="sm"
+          [options]="yearOptions()"
+          [fullWidth]="false"
+          [ngModel]="monthlyYear().toString()"
+          (valueChange)="onMonthlyYearChange($event)"
+        ></app-select>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2 mb-3">
+      @for (opt of presetOptions; track opt.value) {
+        <app-button
+          variant="chip"
+          [active]="monthlyPreset() === opt.value"
+          [activeChipClasses]="presetActiveClasses"
+          [inactiveChipClasses]="presetInactiveClasses"
+          [extraClass]="presetExtraClass"
+          (buttonClick)="monthlyPreset.set(opt.value)"
+        >
+          {{ opt.label }}
+        </app-button>
+      }
+    </div>
+    <div class="relative h-65">
+      <canvas
+        baseChart
+        type="bar"
+        [data]="monthlyChart()"
+        [options]="monthlyOptions"
+        [plugins]="monthlyPlugins"
+      ></canvas>
+    </div>
+  </section>
+
+  <!-- Citas por médico -->
+  <section
+    class="bg-white rounded-xl shadow-md p-4 md:p-5 border border-[#d9e9f8]"
+  >
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+      <div class="flex items-center gap-3">
+        <div class="bg-blue-50 rounded-lg p-2">
+          <svg lucideStethoscope [size]="22" class="text-[#215c98]"></svg>
+        </div>
+        <div>
+          <h2 class="text-[#163c63] text-lg font-semibold">Citas por Médico</h2>
+          <p class="text-gray-500 text-sm">Mes a mes · sin canceladas</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <label for="doctor-year" class="text-sm font-semibold text-gray-500"
+          >Año:</label
+        >
+        <app-select
+          [id]="'doctor-year'"
+          size="sm"
+          [options]="yearOptions()"
+          [fullWidth]="false"
+          [ngModel]="doctorYear().toString()"
+          (valueChange)="onDoctorYearChange($event)"
+        ></app-select>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2 mb-3">
+      @for (opt of presetOptions; track opt.value) {
+        <app-button
+          variant="chip"
+          [active]="doctorPreset() === opt.value"
+          [activeChipClasses]="presetActiveClasses"
+          [inactiveChipClasses]="presetInactiveClasses"
+          [extraClass]="presetExtraClass"
+          (buttonClick)="doctorPreset.set(opt.value)"
+        >
+          {{ opt.label }}
+        </app-button>
+      }
+    </div>
+    @let doctors = doctorChart();
+    @if (doctors.legend.length === 0) {
+      <div class="h-40 flex items-center justify-center text-gray-400 text-sm">
+        Sin datos para {{ doctorYear() }}
+      </div>
+    } @else {
+      <div class="relative h-65">
+        <canvas
+          baseChart
+          type="bar"
+          [data]="doctors.chart"
+          [options]="groupedOptions"
+          [plugins]="groupedPlugins"
+        ></canvas>
+      </div>
+      <ng-container
+        [ngTemplateOutlet]="legendTpl"
+        [ngTemplateOutletContext]="{ $implicit: doctors.legend }"
+      />
+    }
+  </section>
+
+  <!-- Comparativo por especialidad -->
+  <section
+    class="bg-white rounded-xl shadow-md p-4 md:p-5 border border-[#d9e9f8]"
+  >
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+      <div class="flex items-center gap-3">
+        <div class="bg-blue-50 rounded-lg p-2">
+          <svg lucideUsers [size]="22" class="text-[#215c98]"></svg>
+        </div>
+        <div>
+          <h2 class="text-[#163c63] text-lg font-semibold">
+            Comparativo por Especialidad
+          </h2>
+          <p class="text-gray-500 text-sm">Mes a mes · sin canceladas</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <label for="specialty-year" class="text-sm font-semibold text-gray-500"
+          >Año:</label
+        >
+        <app-select
+          [id]="'specialty-year'"
+          [options]="yearOptions()"
+          [fullWidth]="false"
+          [ngModel]="specialtyYear().toString()"
+          (valueChange)="onSpecialtyYearChange($event)"
+          size="sm"
+        ></app-select>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2 mb-3">
+      @for (opt of presetOptions; track opt.value) {
+        <app-button
+          variant="chip"
+          [active]="specialtyPreset() === opt.value"
+          [activeChipClasses]="presetActiveClasses"
+          [inactiveChipClasses]="presetInactiveClasses"
+          [extraClass]="presetExtraClass"
+          (buttonClick)="specialtyPreset.set(opt.value)"
+        >
+          {{ opt.label }}
+        </app-button>
+      }
+    </div>
+    @let specialties = specialtyChart();
+    @if (specialties.legend.length === 0) {
+      <div class="h-40 flex items-center justify-center text-gray-400 text-sm">
+        Sin datos para {{ specialtyYear() }}
+      </div>
+    } @else {
+      <div class="relative h-65">
+        <canvas
+          baseChart
+          type="bar"
+          [data]="specialties.chart"
+          [options]="groupedOptions"
+          [plugins]="groupedPlugins"
+        ></canvas>
+      </div>
+      <ng-container
+        [ngTemplateOutlet]="legendTpl"
+        [ngTemplateOutletContext]="{ $implicit: specialties.legend }"
+      />
+    }
+  </section>
+
+  <!-- Tasa de cancelación -->
+  <section
+    class="bg-white rounded-xl shadow-md p-4 md:p-5 border border-[#d9e9f8]"
+  >
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+      <div class="flex items-center gap-3">
+        <div class="bg-red-50 rounded-lg p-2">
+          <svg lucideTrendingDown [size]="22" class="text-red-500"></svg>
+        </div>
+        <div>
+          <h2 class="text-[#163c63] text-lg font-semibold">
+            Tasa de Cancelación
+          </h2>
+          <p class="text-gray-500 text-sm">
+            Porcentaje de citas canceladas mes a mes
+          </p>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="flex items-center gap-2">
+          <label for="cancel-year" class="text-sm font-semibold text-gray-500"
+            >Año:</label
+          >
+          <app-select
+            [id]="'cancel-year'"
+            [options]="yearOptions()"
+            [fullWidth]="false"
+            size="sm"
+            [ngModel]="cancelYear().toString()"
+            (valueChange)="onCancelYearChange($event)"
+          ></app-select>
+        </div>
+        <div
+          class="bg-red-50 border border-red-200 rounded-xl px-4 py-2 flex flex-col items-center min-w-24"
+          [appTooltip]="'Citas canceladas sobre el total del año seleccionado'"
+        >
+          <p class="text-2xl font-extrabold text-red-600 leading-none">
+            {{ cancelYearRate() }}%
+          </p>
+          <p class="text-gray-500 text-xs font-semibold mt-0.5 text-center">
+            Tasa del período
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="relative h-65">
+      <canvas
+        baseChart
+        type="line"
+        [data]="cancelChart()"
+        [options]="cancelOptions"
+        [plugins]="cancelPlugins"
+      ></canvas>
+    </div>
+    <p class="text-xs text-gray-400 mt-2 text-right">
+      La línea punteada indica el umbral de alerta (20%)
+    </p>
+  </section>
+
+  <p class="text-center text-gray-400 text-sm pb-2">
+    Cada sección puede mostrar un año distinto
+  </p>
+</div>
+
+<!-- Leyenda de colores -->
+<ng-template #legendTpl let-items>
+  <div
+    class="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100"
+  >
+    @for (item of items; track item.name) {
+      <div class="flex items-center gap-2">
+        <span
+          class="w-2.5 h-2.5 rounded-full shrink-0"
+          [style.background-color]="item.color"
+        ></span>
+        <span class="text-xs font-medium text-gray-600">{{ item.name }}</span>
+      </div>
+    }
+  </div>
+</ng-template>

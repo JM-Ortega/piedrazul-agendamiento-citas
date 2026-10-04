@@ -70,7 +70,7 @@
               {{ getDisplaySchedule().endTime }}
             </span>
           }
-          @if (doctor().workdays?.length) {
+          @if (doctor().workdays.length) {
             <span class="bg-blue-50 px-2 py-1 rounded-lg">
               {{ getWorkDayLabels(doctor().workdays) }}
             </span>
