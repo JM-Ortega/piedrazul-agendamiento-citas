@@ -20,6 +20,7 @@ import { RegisterComponent } from './features/register/register.component';
 import { SchedulerDashboardComponent } from './features/scheduler/pages/schedulerDashboard/schedulerDashboard.component';
 import { SchedulerHistoryComponent } from './features/scheduler/pages/schedulerHistory/schedulerHistory.component';
 import { AuditComponent } from './features/audit/pages/audit/audit.component';
+import { EditProfileComponent } from './features/patient/PatientEditProfile/editProfile.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -125,6 +126,12 @@ export const routes: Routes = [
   {
     path: 'paciente/historial-citas',
     component: PatientAppointmentHistoryComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'PATIENT' },
+  },
+  {
+    path: 'paciente/editar-perfil',
+    component: EditProfileComponent,
     canActivate: [AuthGuard],
     data: { role: 'PATIENT' },
   },
