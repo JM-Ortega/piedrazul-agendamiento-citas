@@ -95,6 +95,12 @@ export class PatientFormComponent implements ControlValueAccessor, OnInit {
   /** Si es `true`, renderiza y valida también el número de documento. */
   @Input() showDocumentNumber = false;
 
+  /**
+   * Campos que se muestran pero no se pueden editar.
+   * Para bloquear otro campo enlazar `[disabled]="isLocked('campo')"` en su control.
+   */
+  @Input() lockedFields: readonly (keyof PatientFormData)[] = [];
+
   /** Emite el formulario completo cada vez que cambia cualquier campo. */
   @Output() valueChange = new EventEmitter<PatientFormData>();
 
@@ -147,6 +153,9 @@ export class PatientFormComponent implements ControlValueAccessor, OnInit {
     this.patientService.loadDocumentTypes();
     this.patientService.loadSexOptions();
   }
+
+  isLocked(field: keyof PatientFormData): boolean {
+    return this.lockedFields.includes(field);
   }
 
   /** Lee el valor actual de un campo del formulario. */
