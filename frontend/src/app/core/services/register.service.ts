@@ -17,6 +17,22 @@ export interface PatientPublicResponse {
   hasPatientRole: boolean;
 }
 
+/** Campos que el paciente puede modificar de su propio perfil. */
+export type UpdatePatientRequest = Pick<
+  Patient,
+  | 'firstName'
+  | 'lastName'
+  | 'phone'
+  | 'sex'
+  | 'birthDate'
+  | 'email'
+  | 'guardianPhone'
+>;
+
+/**
+ * Servicio de pacientes: registro, vinculación de cuenta, catálogos de
+ * formulario y datos del paciente autenticado (`me`).
+ */
 @Injectable({ providedIn: 'root' })
 export class PatientService {
   private http = inject(HttpClient);
@@ -55,7 +71,19 @@ export class PatientService {
     return this.me$;
   }
 
-  /** Borra los datos del paciente autenticado. */
+  /**
+   * Reemplaza los datos del paciente autenticado y refresca la caché `me`
+   * con la respuesta del backend.
+   *
+   * @param data campos editables del perfil (el documento no se puede modificar)
+   */
+  updateMe(data: UpdatePatientRequest): Observable<Patient> {
+    return this.http
+      .put<Patient>(`${this.apiUrl}/patients/me`, data)
+      .pipe(tap((patient) => this.me.set(patient)));
+  }
+
+  /** Borra la caché del paciente autenticado; la próxima llamada a {@link getMe} consulta de nuevo al backend. */
   invalidateMeCache(): void {
     this.me.set(null);
     this.me$ = null;
