@@ -7,4 +7,6 @@ import java.util.UUID;
 
 public interface AuditEventJpaRepository extends JpaRepository<AuditEventJpaEntity, UUID>,
         JpaSpecificationExecutor<AuditEventJpaEntity> {
+
+    boolean existsByCorrelationId(String correlationId);
 }

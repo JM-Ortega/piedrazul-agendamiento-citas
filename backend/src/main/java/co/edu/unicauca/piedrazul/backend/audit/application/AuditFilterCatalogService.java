@@ -4,7 +4,6 @@ import co.edu.unicauca.piedrazul.backend.audit.domain.AuditActionCatalogEntry;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditActionCatalogRepository;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditModuleCatalogEntry;
 import co.edu.unicauca.piedrazul.backend.audit.domain.AuditOutcome;
-import co.edu.unicauca.piedrazul.backend.shared.audit.AuditTargetType;
 import org.jmolecules.ddd.annotation.Service;
 import org.springframework.stereotype.Component;
 
@@ -33,10 +32,7 @@ public class AuditFilterCatalogService {
         var outcomes = Arrays.stream(AuditOutcome.values())
                 .map(o -> new AuditFilterCatalog.Option(o.name(), o.displayName()))
                 .toList();
-        var targetEntityTypes = AuditTargetType.NAMES.entrySet().stream()
-                .map(e -> new AuditFilterCatalog.Option(e.getKey(), e.getValue()))
-                .toList();
-        return new AuditFilterCatalog(modules, actions, outcomes, targetEntityTypes,
+        return new AuditFilterCatalog(modules, actions, outcomes,
                 AuditEventCriteria.MAX_RANGE_DAYS, AuditEventCriteria.MAX_SEARCH_LENGTH);
     }
 }

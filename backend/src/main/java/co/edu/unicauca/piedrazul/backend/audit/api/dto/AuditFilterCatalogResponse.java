@@ -17,9 +17,6 @@ public record AuditFilterCatalogResponse(
         @Schema(description = "Valores del filtro `outcome`")
         List<Option> outcomes,
 
-        @Schema(description = "Valores del filtro `targetEntityType`")
-        List<Option> targetEntityTypes,
-
         @Schema(description = "Días máximos que puede abarcar el rango cuando se envían `from` y `to`, "
                 + "contando los dos", example = "90")
         int maxRangeDays,

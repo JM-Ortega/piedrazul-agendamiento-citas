@@ -8,6 +8,9 @@ public interface AuditEventRepository {
 
     void save(AuditEvent event);
 
+    /** Si ya hay un registro con ese id de correlación, para no guardar dos veces el mismo hecho. */
+    boolean existsByCorrelationId(String correlationId);
+
     /** Ordenado siempre del más reciente al más antiguo. */
     AuditEventPage findByCriteria(AuditEventQuery query);
 }

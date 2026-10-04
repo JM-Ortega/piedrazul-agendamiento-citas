@@ -73,6 +73,11 @@ public class AuditEventRepositoryAdapter implements AuditEventRepository {
     }
 
     @Override
+    public boolean existsByCorrelationId(String correlationId) {
+        return jpaRepository.existsByCorrelationId(correlationId);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public AuditEventPage findByCriteria(AuditEventQuery query) {
         Map<String, Object> params = new LinkedHashMap<>();
@@ -126,14 +131,6 @@ public class AuditEventRepositoryAdapter implements AuditEventRepository {
         if (query.outcome() != null) {
             conditions.add("a.outcome = :outcome");
             params.put("outcome", query.outcome().name());
-        }
-        if (query.actorId() != null) {
-            conditions.add("a.actor_id = :actorId");
-            params.put("actorId", query.actorId());
-        }
-        if (query.targetEntityType() != null) {
-            conditions.add("a.target_entity_type = :targetEntityType");
-            params.put("targetEntityType", query.targetEntityType());
         }
         if (query.targetEntityId() != null) {
             conditions.add("a.target_entity_id = :targetEntityId");

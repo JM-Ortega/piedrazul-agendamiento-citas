@@ -84,6 +84,13 @@ keycloak:
   client-id: ${KC_BACKEND_CLIENT_ID:piedrazul-backend}
   client-secret: ${KC_BACKEND_CLIENT_SECRET:}
 
+audit:
+  # Inicios de sesión del personal, leídos de los eventos de Keycloak (requiere el rol view-events).
+  login-events:
+    enabled: ${AUDIT_LOGIN_EVENTS_ENABLED:true}
+    initial-delay: ${AUDIT_LOGIN_EVENTS_INITIAL_DELAY:60000}
+    fixed-delay: ${AUDIT_LOGIN_EVENTS_FIXED_DELAY:120000}
+
 notifications:
   encryption:
     key: ${NOTIFICATION_ENCRYPTION_KEY:}

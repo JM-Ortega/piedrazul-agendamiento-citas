@@ -77,11 +77,6 @@ public class AuditController {
                     + "orden. Hasta 100 caracteres.",
                     example = "jose garcia")
             @RequestParam(required = false) String search,
-            @Parameter(description = "Id de la cuenta de Keycloak de quien ejecutó la acción. Coincidencia exacta.",
-                    example = "3f2c1d0e-8a41-4b6e-9d57-2b1e6f0a7c11")
-            @RequestParam(required = false) String actorId,
-            @Parameter(description = "Tipo del objeto afectado. Coincidencia exacta.", example = "Paciente")
-            @RequestParam(required = false) String targetEntityType,
             @Parameter(description = "Id del objeto afectado. Coincidencia exacta.",
                     example = "9b8f2d64-1c3e-4f0a-a7d5-5e6b8c9d0e12")
             @RequestParam(required = false) String targetEntityId,
@@ -90,8 +85,8 @@ public class AuditController {
             @Parameter(description = "Registros por página, de 1 a 200. Fuera de ese rango se usa 50.", example = "20")
             @RequestParam(defaultValue = "20") int size) {
 
-        var criteria = new AuditEventCriteria(from, to, action, moduleCode, outcome, search, actorId,
-                targetEntityType, targetEntityId, page, size);
+        var criteria = new AuditEventCriteria(from, to, action, moduleCode, outcome, search,
+                targetEntityId, page, size);
         var result = queryService.search(criteria);
         var content = result.content().stream().map(mapper::toResponse).toList();
         var totalPages = result.totalPages();

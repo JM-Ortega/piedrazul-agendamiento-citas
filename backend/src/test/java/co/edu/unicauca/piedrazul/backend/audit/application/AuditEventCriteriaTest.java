@@ -14,15 +14,15 @@ class AuditEventCriteriaTest {
     private static final LocalDate TODAY = LocalDate.parse("2026-09-26");
 
     private static AuditEventCriteria between(LocalDate from, LocalDate to) {
-        return new AuditEventCriteria(from, to, null, null, null, null, null, null, null, 0, 20);
+        return new AuditEventCriteria(from, to, null, null, null, null, null, 0, 20);
     }
 
     private static AuditEventCriteria withModule(String moduleCode) {
-        return new AuditEventCriteria(null, null, null, moduleCode, null, null, null, null, null, 0, 20);
+        return new AuditEventCriteria(null, null, null, moduleCode, null, null, null, 0, 20);
     }
 
     private static AuditEventCriteria searching(String search) {
-        return new AuditEventCriteria(null, null, null, null, null, search, null, null, null, 0, 20);
+        return new AuditEventCriteria(null, null, null, null, null, search, null, 0, 20);
     }
 
     @Test
@@ -79,11 +79,9 @@ class AuditEventCriteriaTest {
 
     @Test
     void blankExactFiltersAreTreatedAsAbsent() {
-        var criteria = new AuditEventCriteria(null, null, null, " ", null, null, " ", "", "  ", 0, 20);
+        var criteria = new AuditEventCriteria(null, null, null, " ", null, null, "  ", 0, 20);
 
         assertThat(criteria.moduleCode()).isNull();
-        assertThat(criteria.actorId()).isNull();
-        assertThat(criteria.targetEntityType()).isNull();
         assertThat(criteria.targetEntityId()).isNull();
     }
 
@@ -96,9 +94,9 @@ class AuditEventCriteriaTest {
 
     @Test
     void thePageAndSizeAreKeptWithinSafeBounds() {
-        assertThat(new AuditEventCriteria(null, null, null, null, null, null, null, null, null, -3, 20).page()).isZero();
-        assertThat(new AuditEventCriteria(null, null, null, null, null, null, null, null, null, 0, 0).size()).isEqualTo(50);
-        assertThat(new AuditEventCriteria(null, null, null, null, null, null, null, null, null, 0, 5000).size()).isEqualTo(50);
-        assertThat(new AuditEventCriteria(null, null, null, null, null, null, null, null, null, 2, 200).size()).isEqualTo(200);
+        assertThat(new AuditEventCriteria(null, null, null, null, null, null, null, -3, 20).page()).isZero();
+        assertThat(new AuditEventCriteria(null, null, null, null, null, null, null, 0, 0).size()).isEqualTo(50);
+        assertThat(new AuditEventCriteria(null, null, null, null, null, null, null, 0, 5000).size()).isEqualTo(50);
+        assertThat(new AuditEventCriteria(null, null, null, null, null, null, null, 2, 200).size()).isEqualTo(200);
     }
 }

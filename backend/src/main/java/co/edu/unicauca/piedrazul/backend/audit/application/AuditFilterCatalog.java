@@ -13,7 +13,6 @@ public record AuditFilterCatalog(
         List<AuditModuleCatalogEntry> modules,
         List<AuditActionCatalogEntry> actions,
         List<Option> outcomes,
-        List<Option> targetEntityTypes,
         int maxRangeDays,
         int maxSearchLength
 ) {

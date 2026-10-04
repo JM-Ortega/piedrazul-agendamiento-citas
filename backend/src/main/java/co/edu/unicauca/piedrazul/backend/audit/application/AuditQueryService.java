@@ -32,8 +32,6 @@ public class AuditQueryService {
                 criteria.moduleCode(),
                 criteria.outcome(),
                 criteria.search(),
-                criteria.actorId(),
-                criteria.targetEntityType(),
                 criteria.targetEntityId(),
                 criteria.page(),
                 criteria.size()

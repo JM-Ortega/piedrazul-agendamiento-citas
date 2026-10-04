@@ -57,7 +57,7 @@ class AuditControllerAccessTest {
     }
 
     private void list() {
-        controller.search(null, null, null, null, null, null, null, null, null, 0, 20);
+        controller.search(null, null, null, null, null, null, null, 0, 20);
     }
 
     @Test

@@ -32,7 +32,7 @@ class AuditFilterCatalogControllerAccessTest {
         @Bean
         AuditFilterCatalogService auditFilterCatalogService() {
             AuditFilterCatalogService service = mock(AuditFilterCatalogService.class);
-            when(service.filters()).thenReturn(new AuditFilterCatalog(List.of(), List.of(), List.of(), List.of(), 90, 100));
+            when(service.filters()).thenReturn(new AuditFilterCatalog(List.of(), List.of(), List.of(), 90, 100));
             return service;
         }
 
