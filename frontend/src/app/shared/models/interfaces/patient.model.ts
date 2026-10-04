@@ -6,7 +6,7 @@ export interface Patient {
   firstName: string;
   lastName: string;
   phone: string;
-  sex: 'MASCULINO' | 'FEMENINO' | '';
+  sex: 'MASCULINO' | 'FEMENINO' | 'OTRO' | '';
   birthDate: string;
   email?: string;
   guardianPhone?: string;

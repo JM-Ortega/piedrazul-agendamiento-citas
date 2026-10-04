@@ -9,6 +9,7 @@
     <app-select
       [id]="'documentType'"
       [options]="documentTypeOptions()"
+      [disabled]="isLocked('identificationType')"
       [ngModel]="get('identificationType')"
       (valueChange)="set('identificationType', $event)"
       [errorMessage]="errors()['identificationType']"
@@ -28,6 +29,7 @@
         type="text"
         [sanitize]="documentSanitizeRule()"
         [maxLength]="documentMaxLength"
+        [disabled]="isLocked('identification')"
         placeholder="Ingrese el número de documento"
         [ngModel]="get('identification')"
         (valueChange)="setFromInput('identification', $event)"
@@ -98,7 +100,7 @@
     </label>
     <app-select
       [id]="'sex'"
-      [options]="sexOptions"
+      [options]="sexOptions()"
       [ngModel]="get('sex')"
       (valueChange)="set('sex', $event)"
       [errorMessage]="errors()['sex']"

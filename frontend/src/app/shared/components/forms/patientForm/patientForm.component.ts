@@ -63,12 +63,6 @@ export const EMPTY_PATIENT_FORM: PatientFormData = {
   email: '',
 };
 
-const SEX_OPTIONS: SelectOption[] = [
-  { value: 'MASCULINO', label: 'Masculino' },
-  { value: 'FEMENINO', label: 'Femenino' },
-  { value: 'OTRO', label: 'Otro' },
-];
-
 /**
  * Formulario completo de datos de un paciente: tipo de documento (y,
  * opcionalmente, número de documento vía `showDocumentNumber`), nombres,
@@ -101,10 +95,15 @@ export class PatientFormComponent implements ControlValueAccessor, OnInit {
   /** Si es `true`, renderiza y valida también el número de documento. */
   @Input() showDocumentNumber = false;
 
+  /**
+   * Campos que se muestran pero no se pueden editar.
+   * Para bloquear otro campo enlazar `[disabled]="isLocked('campo')"` en su control.
+   */
+  @Input() lockedFields: readonly (keyof PatientFormData)[] = [];
+
   /** Emite el formulario completo cada vez que cambia cualquier campo. */
   @Output() valueChange = new EventEmitter<PatientFormData>();
 
-  readonly sexOptions = SEX_OPTIONS;
   readonly nameMin = NAME_MIN_DEFAULT;
   readonly emailMax = EMAIL_MAX_DEFAULT;
   readonly documentMaxLength = DEFAULT_DOCUMENT_MAX_LENGTH;
@@ -143,8 +142,20 @@ export class PatientFormComponent implements ControlValueAccessor, OnInit {
     isMinorPatient(this.documentTypeSignal(), this.birthDateSignal())
   );
 
+  sexOptions = computed<SelectOption[]>(() =>
+    this.patientService.sexOptions().map((sex) => ({
+      value: sex,
+      label: this.formatoPipe.transform(sex),
+    }))
+  );
+
   ngOnInit(): void {
     this.patientService.loadDocumentTypes();
+    this.patientService.loadSexOptions();
+  }
+
+  isLocked(field: keyof PatientFormData): boolean {
+    return this.lockedFields.includes(field);
   }
 
   /** Lee el valor actual de un campo del formulario. */
