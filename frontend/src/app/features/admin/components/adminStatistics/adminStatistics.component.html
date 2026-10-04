@@ -21,30 +21,32 @@
           <p class="text-gray-500 text-sm">Total de todas las especialidades</p>
         </div>
       </div>
-      <label
-        class="flex items-center gap-2 text-sm font-semibold text-gray-500"
-      >
-        Año:
-        <select
-          class="border border-[#a7c9ec] focus:border-[#215c98] rounded-lg px-3 py-1.5 text-sm font-bold text-[#163c63] bg-white outline-none cursor-pointer"
-          [value]="monthlyYear()"
-          (change)="onMonthlyYearChange($any($event.target).value)"
+      <div class="flex items-center gap-2">
+        <label for="monthly-year" class="text-sm font-semibold text-gray-500"
+          >Año:</label
         >
-          @for (y of years(); track y) {
-            <option [value]="y">{{ y }}</option>
-          }
-        </select>
-      </label>
+        <app-select
+          [id]="'monthly-year'"
+          size="sm"
+          [options]="yearOptions()"
+          [fullWidth]="false"
+          [ngModel]="monthlyYear().toString()"
+          (valueChange)="onMonthlyYearChange($event)"
+        ></app-select>
+      </div>
     </div>
     <div class="flex flex-wrap gap-2 mb-3">
       @for (opt of presetOptions; track opt.value) {
-        <button
-          type="button"
-          [class]="presetClass(monthlyPreset() === opt.value)"
-          (click)="monthlyPreset.set(opt.value)"
+        <app-button
+          variant="chip"
+          [active]="monthlyPreset() === opt.value"
+          [activeChipClasses]="presetActiveClasses"
+          [inactiveChipClasses]="presetInactiveClasses"
+          [extraClass]="presetExtraClass"
+          (buttonClick)="monthlyPreset.set(opt.value)"
         >
           {{ opt.label }}
-        </button>
+        </app-button>
       }
     </div>
     <div class="relative h-65">
@@ -72,30 +74,32 @@
           <p class="text-gray-500 text-sm">Mes a mes · sin canceladas</p>
         </div>
       </div>
-      <label
-        class="flex items-center gap-2 text-sm font-semibold text-gray-500"
-      >
-        Año:
-        <select
-          class="border border-[#a7c9ec] focus:border-[#215c98] rounded-lg px-3 py-1.5 text-sm font-bold text-[#163c63] bg-white outline-none cursor-pointer"
-          [value]="doctorYear()"
-          (change)="onDoctorYearChange($any($event.target).value)"
+      <div class="flex items-center gap-2">
+        <label for="doctor-year" class="text-sm font-semibold text-gray-500"
+          >Año:</label
         >
-          @for (y of years(); track y) {
-            <option [value]="y">{{ y }}</option>
-          }
-        </select>
-      </label>
+        <app-select
+          [id]="'doctor-year'"
+          size="sm"
+          [options]="yearOptions()"
+          [fullWidth]="false"
+          [ngModel]="doctorYear().toString()"
+          (valueChange)="onDoctorYearChange($event)"
+        ></app-select>
+      </div>
     </div>
     <div class="flex flex-wrap gap-2 mb-3">
       @for (opt of presetOptions; track opt.value) {
-        <button
-          type="button"
-          [class]="presetClass(doctorPreset() === opt.value)"
-          (click)="doctorPreset.set(opt.value)"
+        <app-button
+          variant="chip"
+          [active]="doctorPreset() === opt.value"
+          [activeChipClasses]="presetActiveClasses"
+          [inactiveChipClasses]="presetInactiveClasses"
+          [extraClass]="presetExtraClass"
+          (buttonClick)="doctorPreset.set(opt.value)"
         >
           {{ opt.label }}
-        </button>
+        </app-button>
       }
     </div>
     @let doctors = doctorChart();
@@ -136,30 +140,32 @@
           <p class="text-gray-500 text-sm">Mes a mes · sin canceladas</p>
         </div>
       </div>
-      <label
-        class="flex items-center gap-2 text-sm font-semibold text-gray-500"
-      >
-        Año:
-        <select
-          class="border border-[#a7c9ec] focus:border-[#215c98] rounded-lg px-3 py-1.5 text-sm font-bold text-[#163c63] bg-white outline-none cursor-pointer"
-          [value]="specialtyYear()"
-          (change)="onSpecialtyYearChange($any($event.target).value)"
+      <div class="flex items-center gap-2">
+        <label for="specialty-year" class="text-sm font-semibold text-gray-500"
+          >Año:</label
         >
-          @for (y of years(); track y) {
-            <option [value]="y">{{ y }}</option>
-          }
-        </select>
-      </label>
+        <app-select
+          [id]="'specialty-year'"
+          [options]="yearOptions()"
+          [fullWidth]="false"
+          [ngModel]="specialtyYear().toString()"
+          (valueChange)="onSpecialtyYearChange($event)"
+          size="sm"
+        ></app-select>
+      </div>
     </div>
     <div class="flex flex-wrap gap-2 mb-3">
       @for (opt of presetOptions; track opt.value) {
-        <button
-          type="button"
-          [class]="presetClass(specialtyPreset() === opt.value)"
-          (click)="specialtyPreset.set(opt.value)"
+        <app-button
+          variant="chip"
+          [active]="specialtyPreset() === opt.value"
+          [activeChipClasses]="presetActiveClasses"
+          [inactiveChipClasses]="presetInactiveClasses"
+          [extraClass]="presetExtraClass"
+          (buttonClick)="specialtyPreset.set(opt.value)"
         >
           {{ opt.label }}
-        </button>
+        </app-button>
       }
     </div>
     @let specialties = specialtyChart();
@@ -203,22 +209,22 @@
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-3">
-        <label
-          class="flex items-center gap-2 text-sm font-semibold text-gray-500"
-        >
-          Año:
-          <select
-            class="border border-[#a7c9ec] focus:border-[#215c98] rounded-lg px-3 py-1.5 text-sm font-bold text-[#163c63] bg-white outline-none cursor-pointer"
-            [value]="cancelYear()"
-            (change)="onCancelYearChange($any($event.target).value)"
+        <div class="flex items-center gap-2">
+          <label for="cancel-year" class="text-sm font-semibold text-gray-500"
+            >Año:</label
           >
-            @for (y of years(); track y) {
-              <option [value]="y">{{ y }}</option>
-            }
-          </select>
-        </label>
+          <app-select
+            [id]="'cancel-year'"
+            [options]="yearOptions()"
+            [fullWidth]="false"
+            size="sm"
+            [ngModel]="cancelYear().toString()"
+            (valueChange)="onCancelYearChange($event)"
+          ></app-select>
+        </div>
         <div
           class="bg-red-50 border border-red-200 rounded-xl px-4 py-2 flex flex-col items-center min-w-24"
+          [appTooltip]="'Citas canceladas sobre el total del año seleccionado'"
         >
           <p class="text-2xl font-extrabold text-red-600 leading-none">
             {{ cancelYearRate() }}%

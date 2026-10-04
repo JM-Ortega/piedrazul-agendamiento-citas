@@ -10,6 +10,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
 import {
   LucideActivity,
   LucideStethoscope,
@@ -23,6 +24,12 @@ import {
   withDefaultRegisterables,
 } from 'ng2-charts';
 import { Observable } from 'rxjs';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
+import {
+  SelectComponent,
+  SelectOption,
+} from '../../../../designSystem/atoms/select/select.component';
+import { TooltipDirective } from '../../../../designSystem/atoms/tooltip/tooltip.directive';
 import {
   LegendItem,
   MONTH_NAMES,
@@ -56,7 +63,11 @@ import { StatisticsService } from '../../service/statistics.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgTemplateOutlet,
+    FormsModule,
     BaseChartDirective,
+    ButtonComponent,
+    SelectComponent,
+    TooltipDirective,
     LucideActivity,
     LucideStethoscope,
     LucideUsers,
@@ -74,6 +85,13 @@ export class AdminStatisticsComponent implements OnInit {
     { value: '6', label: 'Últ. 6 meses' },
     { value: 'all', label: 'Todo el año' },
   ];
+
+  // ── Estilos de los chips de rango (app-button variant="chip") ─────────────
+  readonly presetExtraClass = '!w-auto !py-1.5 !px-3 !text-xs !rounded-lg';
+  readonly presetActiveClasses =
+    'border-[#215c98] bg-[#215c98] text-white shadow-sm';
+  readonly presetInactiveClasses =
+    'border-[#a7c9ec] bg-blue-50 text-[#215c98] hover:bg-[#d9e9f8]';
 
   // ── Opciones y plugins de cada gráfica (constantes) ───────────────────────
   readonly monthlyOptions = barOptions(false);
@@ -124,6 +142,11 @@ export class AdminStatisticsComponent implements OnInit {
 
   years = signal<number[]>([]);
   errorMessage = signal('');
+
+  /** Años en el formato que espera `app-select` (value/label como string). */
+  readonly yearOptions = computed<SelectOption[]>(() =>
+    this.years().map((y) => ({ value: String(y), label: String(y) }))
+  );
 
   // ── Citas por mes ─────────────────────────────────────────────────────────
   monthlyYear = signal(new Date().getFullYear());
@@ -244,19 +267,23 @@ export class AdminStatisticsComponent implements OnInit {
   }
 
   // ── Handlers de año ───────────────────────────────────────────────────────
+  // `app-select` siempre incluye una opción vacía ("Seleccione..."): se ignora.
   onMonthlyYearChange(value: string): void {
+    if (!value) return;
     const year = Number(value);
     this.monthlyYear.set(year);
     this.load(this.statisticsService.getMonthlyTotals(year), this.monthlyData);
   }
 
   onDoctorYearChange(value: string): void {
+    if (!value) return;
     const year = Number(value);
     this.doctorYear.set(year);
     this.load(this.statisticsService.getMonthlyByDoctor(year), this.doctorData);
   }
 
   onSpecialtyYearChange(value: string): void {
+    if (!value) return;
     const year = Number(value);
     this.specialtyYear.set(year);
     this.load(
@@ -266,21 +293,12 @@ export class AdminStatisticsComponent implements OnInit {
   }
 
   onCancelYearChange(value: string): void {
+    if (!value) return;
     const year = Number(value);
     this.cancelYear.set(year);
     this.load(
       this.statisticsService.getCancellationRate(year),
       this.cancelData
-    );
-  }
-
-  // ── Helpers de template ───────────────────────────────────────────────────
-  presetClass(active: boolean): string {
-    return (
-      'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ' +
-      (active
-        ? 'bg-[#215c98] text-white shadow-sm'
-        : 'bg-blue-50 text-[#215c98] hover:bg-[#d9e9f8] border border-[#a7c9ec]')
     );
   }
 
