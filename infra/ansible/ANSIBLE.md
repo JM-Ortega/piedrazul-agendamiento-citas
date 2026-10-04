@@ -32,7 +32,10 @@ infra/ansible/
         │   ├── main.yml                 # Punto de entrada (importa setup.yml)
         │   ├── setup.yml                # Copia archivos, genera .env, levanta stack
         │   ├── init_keycloak.yml        # Bootstrap de identidad (solo una vez)
-        │   ├── deploy.yml               # Rollout de backend y postgres
+        │   ├── deploy.yml               # Rollout de backend y postgres (con migración previa)
+        │   ├── db_converge.yml          # postgres + reconciliación de autoridades de la base (setup y deploy)
+        │   ├── migrate.yml              # Migración de esquema de un solo uso (deploy)
+        │   ├── refresh_backend.yml      # Entrega el .env vigente al backend que ya corre (converge)
         │   ├── release_images.yml       # Valida y descarga por digest las imágenes propias (setup y deploy)
         │   ├── verify_running_images.yml # Identidad exacta en ejecución
         │   ├── verify_health.yml        # Health de los contenedores propios
@@ -136,8 +139,9 @@ converge.yml
 ├── role: common        → apt update, paquetes base, timezone
 ├── role: docker_host   → instala Docker CE + Compose plugin, daemon.json
 ├── role: hardening     → fail2ban, sysctl, deshabilita servicios innecesarios
-├── app/setup.yml       → copia archivos, genera .env, levanta stack
-└── app/init_keycloak.yml → bootstrap de identidad (solo si no existe el marker)
+├── app/setup.yml       → copia archivos, genera .env, postgres + reconciliación, Keycloak/Traefik
+├── app/init_keycloak.yml → bootstrap de identidad (solo si no existe el marker)
+└── app/refresh_backend.yml → recrea el backend en ejecución si cambió su configuración (sin imagen nueva)
 ```
 
 Ejecutar manualmente:
@@ -159,10 +163,11 @@ ansible-playbook \
   -i /tmp/hosts.runtime.yml \
   -e "backend_image_ref=ghcr.io/jm-ortega/piedrazul-agendamiento-citas/backend@sha256:<digest>" \
   -e "postgres_image_ref=ghcr.io/jm-ortega/piedrazul-agendamiento-citas/postgres@sha256:<digest>" \
+  -e app_migrate=true \
   playbooks/deploy.yml
 ```
 
-`converge.yml` recibe las mismas dos variables.
+`app_migrate` es obligatorio: `true` migra el esquema con `backend_image_ref` antes de arrancarlo; `false` no migra (el workflow lo usa para rollback y reuso, ver [Base de datos](#base-de-datos-autoridades-reconciliación-y-migración)). `converge.yml` recibe las dos referencias, sin `app_migrate`.
 
 ### `verify-release.yml` y `record-release.yml`
 
@@ -205,10 +210,11 @@ Corre en cada `converge`. Pasos:
 2. Lee `KC_BACKEND_CLIENT_SECRET` del `.env` existente usando `slurp` + filtro Jinja — si no existe, genera uno nuevo con `openssl rand -hex 32` y lo guarda como `app_kc_backend_secret`
 3. Copia `infra/compose/` → `/opt/piedrazul/`
 4. Copia `infra/keycloak/` → `/opt/piedrazul/keycloak/` (realm JSON + theme JAR)
-5. Copia `infra/postgres/` → `/opt/piedrazul/postgres/` (script de init de DB)
-6. Genera `.env` desde `env.j2` usando `app_kc_backend_secret`
-7. `flush_handlers` — aplica cualquier restart pendiente de forma controlada
-8. Levanta el stack con `docker_compose_v2 state: present`
+5. Toma del entorno del runner las contraseñas de la base (`POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `MIGRATION_DB_PASSWORD`, `KC_DB_PASSWORD`) y falla, nombrando solo las claves, si alguna está vacía o contiene comilla simple o salto de línea
+6. Genera `.env` desde `env.j2`
+7. Valida y descarga por digest las imágenes propias → `image.env`
+8. `db_converge.yml`: postgres con el `.env` vigente + reconciliación de autoridades
+9. Levanta Keycloak y Traefik (`docker_compose_v2 state: present`). No arranca el backend ni migra
 
 #### Identidad de las imágenes propias
 
@@ -255,6 +261,49 @@ Rollout de las imágenes propias. Pasos:
 
 La verificación y el registro del último éxito son pasos posteriores del workflow (`verify-release.yml`, `record-release.yml`).
 
+#### Base de datos: autoridades, reconciliación y migración
+
+Cuatro autoridades separadas sobre la base `piedrazul_db`. Los nombres están en `group_vars/all.yml`; las contraseñas son secretos del GitHub Environment `production-hetzner` (no secretos de repositorio), llegan al paso de converge y quedan en `.env` del servidor.
+
+| Autoridad | Variables | Rol (`group_vars`) | Consumidores | Alcance |
+|-----------|-----------|--------------------|--------------|---------|
+| Administrativa | `POSTGRES_USER`, `POSTGRES_PASSWORD` | `postgres_user` | solo el contenedor `postgres` (inicialización y reconciliación) | superusuario |
+| Aplicación | `APP_DB_USERNAME`, `APP_DB_PASSWORD` | `app_db_username` | `backend` en ejecución | DML sobre las tablas de la aplicación en `piedrazul`; sin `CREATE`; ningún privilegio sobre `flyway_schema_history` |
+| Migraciones | `MIGRATION_DB_USERNAME`, `MIGRATION_DB_PASSWORD` | `migration_db_username` | solo el servicio `migrate` | dueño de `piedrazul`, `extensions` y del historial de Flyway |
+| Keycloak | `KC_DB_USERNAME`, `KC_DB_PASSWORD` | `kc_db_username` | `keycloak` | dueño de `keycloak` |
+
+`postgres` recibe todas porque las fija. `migrate` recibe además `APP_DB_USERNAME` (solo el nombre, para el placeholder `${app_role}` de las migraciones). Compose exige cada variable de la base (`${VAR:?}`): ausente o vacía, el render falla. El backend corre siempre con `SPRING_FLYWAY_ENABLED=false` y `JPA_DDL_AUTO=validate`, fijos en `compose/backend.yml` y no configurables desde `.env`: no evoluciona ni repara el esquema; si no coincide con las entidades, no arranca.
+
+**Convergencia (`db_converge.yml`, en `setup.yml` y en `deploy.yml`)**
+
+1. `postgres` se (re)crea si cambió su imagen o su entorno y se espera a que esté healthy. `PGDATA` se conserva.
+2. Se vuelve a correr `01-init-databases.sh` dentro del contenedor (`docker exec -u postgres`), el mismo script que inicializa un `PGDATA` vacío. Es idempotente: crea lo que falte, fija las contraseñas declaradas de los cuatro roles, los schemas, sus dueños, los permisos y los default privileges. Se conecta por el socket local, así que no necesita las contraseñas anteriores; las anteriores dejan de autenticar.
+
+**Historial de Flyway**: `flyway_schema_history` lo crea `migration_role` y solo él lo modifica. Los default privileges que dan DML a `app_role` sobre las tablas nuevas de `piedrazul` también lo alcanzarían, así que se retira en dos puntos idempotentes: al final de cada migración (callback de Flyway `ProtectSchemaHistoryCallback`, solo en `SchemaMigrationApplication`) y en cada reconciliación si la tabla ya existe (`REVOKE ALL … FROM app_role` en `01-init-databases.sh`). Las default privileges no se aplican a tablas existentes, así que una reconciliación posterior no lo deshace; un deploy sin migración (rollback, reuso) también pasa por la reconciliación.
+
+Solo después arrancan o se recrean los consumidores: Keycloak (`setup.yml`), `migrate` y `backend` (`deploy.yml`), y en un converge sin deploy el backend que ya corre (`refresh_backend.yml`, al final de `converge.yml`, después de la sincronización de Keycloak). `refresh_backend.yml` solo actúa si el contenedor `backend` corre exactamente `backend_image_ref`; nunca introduce una imagen nueva.
+
+**Rotación de credenciales de la base**: actualizar el secreto en el GitHub Environment `production-hetzner` y correr el workflow con `run_host_config=true` (workflow_dispatch). Converge reescribe `.env`, recrea `postgres` con las credenciales nuevas, las reconcilia y recrea Keycloak y el backend en ejecución. No hace falta borrar `PGDATA`, conocer las contraseñas anteriores ni recrear el servidor. No es atómica: entre la reconciliación y la recreación de cada consumidor, ese consumidor puede fallar conexiones nuevas durante un intervalo corto. En un run con converge y deploy a la vez, el backend se recrea al final del deploy.
+
+**Migración (`migrate.yml`, en `deploy.yml` con `app_migrate=true`)**
+
+- Servicio `migrate` de `compose/migrate.yml`: misma imagen que `backend` (`BACKEND_IMAGE` de `image.env`), punto de entrada `SchemaMigrationApplication` (vía `PropertiesLauncher`). Solo carga Flyway con la configuración `spring.flyway.*` de `application.yaml`: sin servidor web, JPA, seeders, schedulers ni Keycloak. Aplica las migraciones versionadas y repetibles que trae la imagen y termina.
+- Perfil `migrate`: `docker compose up` nunca lo arranca. Ansible lo corre con `docker compose --profile migrate run --rm --no-deps migrate`, después de verificar en la configuración efectiva de Compose que `migrate` y `backend` resuelven a `backend_image_ref`.
+- Repetirla con el esquema al día es seguro (Flyway no aplica nada).
+- **Exclusividad**: la reconciliación y la migración corren bajo `flock` sobre `db_lock_file` (`/opt/piedrazul/db.lock`), con espera máxima `db_lock_timeout` (600 s). El lock se libera al terminar el proceso, también si falla.
+- **Fallo**: si la migración termina con error, `deploy.yml` falla con `MIGRACIÓN: falló …` antes de arrancar el backend candidato: no hay verificación de identidad o health, ni registro del último éxito. No se ejecuta `flyway repair` ni ninguna corrección automática. El contenedor de migración se elimina (`--rm`); un reintento vuelve a correr la migración sobre el estado que dejó PostgreSQL, sin limpieza previa.
+
+**Cuándo migra el workflow**: `app_migrate=true` solo si el backend seleccionado es un build de este run. Un rollback explícito (`image_tag`) no migra; tampoco el reuso del último éxito, que ya se desplegó con éxito (o es un rollback registrado). En esos casos el backend valida el esquema existente al arrancar y, si no coincide, el health falla y el último éxito no avanza.
+
+**Verificación local** (credenciales sintéticas, sin red ni servidor):
+
+```bash
+infra/tests/db-contract-check.sh    # env.j2 → Compose → orden de Ansible y del workflow
+infra/tests/db-migration-check.sh   # PostgreSQL desechable: desde cero, repetición, autoridades, rotación, fallos
+```
+
+`db-migration-check.sh` construye las imágenes de `backend/` e `infra/postgres/` (o usa `BACKEND_IMAGE` / `POSTGRES_IMAGE`) y no depende del contenido ni del número de migraciones. Usa los nombres fijos de producción (`postgres`, `piedrazul_net`) en su propio proyecto y no corre si ya existen fuera de él.
+
 #### Handler: `Restart app stack`
 
 Se dispara cuando cambian los compose files o el `.env`. Hace `docker_compose_v2 state: present` — Compose reconcilia solo lo que cambió.
@@ -269,7 +318,7 @@ El archivo `.env` se genera en cada converge desde este template. Las variables 
 |--------|----------|
 | `group_vars/all.yml` | `compose_project_name`, `kc_realm`, `kc_port` |
 | `host_vars/vps.yml` | `kc_hostname`, `api_public_domain`, `acme_email` |
-| Variables de entorno del runner (GitHub Secrets) | `DB_PASSWORD`, `KC_DB_PASSWORD`, `KC_ADMIN_PASSWORD`, `KC_BOOTSTRAP_ADMIN_PASSWORD`, `CLOUDFLARE_DNS_API_TOKEN` |
+| Variables de entorno del runner (secretos del GitHub Environment `production-hetzner`) | `POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `MIGRATION_DB_PASSWORD`, `KC_DB_PASSWORD`, `KC_ADMIN_PASSWORD`, `KC_BOOTSTRAP_ADMIN_PASSWORD`, `CLOUDFLARE_DNS_API_TOKEN` |
 | `set_fact` calculado por Ansible | `app_kc_backend_secret` (leído del `.env` existente o generado) |
 
 `KC_BACKEND_CLIENT_SECRET` **nunca pasa por GitHub Secrets** — Ansible lo genera en el servidor en el primer deploy y lo preserva en deploys posteriores leyéndolo del `.env` existente.
@@ -278,10 +327,12 @@ El archivo `.env` se genera en cada converge desde este template. Las variables 
 
 ## Secrets requeridos en GitHub
 
-Los siguientes secrets deben existir en el repositorio de GitHub:
+Los siguientes secrets pertenecen al GitHub Environment `production-hetzner` (alcance declarado en `.github/scripts/audit-github-trust.sh`), no al repositorio. Solo el job `production` los lee:
 
 ```
-DB_PASSWORD                  # Password de la base de datos principal
+POSTGRES_PASSWORD            # Password del superusuario administrativo de postgres
+APP_DB_PASSWORD              # Password del rol de la aplicación (backend en ejecución)
+MIGRATION_DB_PASSWORD        # Password del rol de migraciones (solo el servicio migrate)
 KC_DB_PASSWORD               # Password del usuario de Keycloak en postgres
 KC_BOOTSTRAP_ADMIN_PASSWORD  # Password del usuario temporal de bootstrap de Keycloak
 KC_ADMIN_PASSWORD            # Password del usuario admin permanente de Keycloak
@@ -295,7 +346,9 @@ El workflow los inyecta como variables de entorno antes de correr Ansible:
 - name: Run Ansible converge
   env:
     ANSIBLE_HOST_KEY_CHECKING: "False"
-    DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+    POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+    APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+    MIGRATION_DB_PASSWORD: ${{ secrets.MIGRATION_DB_PASSWORD }}
     KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
     KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
     KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
@@ -458,7 +511,7 @@ Dentro de `production`, en orden:
 4. **Último éxito**: lectura (solo lectura) de `last-success.env` del servidor.
 5. **Selección** (`select-release.sh`): backend = rollback > build de este run > último éxito; postgres = build de este run > último éxito. Build y rollback llegan con la identidad inmutable resuelta antes del gate; el reuso toma la identidad exacta registrada. Ausente, malformada o ambigua falla cerrado. Sin deploy de aplicación ambas son reuso.
 6. **Escaneo antes de mutar** (`scan-evidence.sh`): para cada imagen que el run aplica, build/rollback y keycloak/traefik deben tener un `summary.json` válido de `image_scan` sobre la misma referencia exacta; el backend o postgres en reuso se escanea aquí, con la identidad recién leída, usando la misma acción. El resultado de cada intento (`scanned` con sus hallazgos, u `operational_failure`) se informa en el resumen pero no bloquea. Sí bloquea una cadena de escaneo incompleta o no verificable (ver abajo).
-7. **Converge / deploy** con esas referencias exactas (con frescura justo antes si no hubo Apply).
+7. **Converge / deploy** con esas referencias exactas (con frescura justo antes si no hubo Apply). Ambos convergen postgres y reconcilian las autoridades de la base antes de cualquier consumidor; deploy migra el esquema con el backend construido en este run (misma identidad exacta) antes de arrancarlo. Si la migración falla, el paso de deploy falla y no se llega a la verificación ni al registro.
 8. **Identidad en ejecución** y **health** (contenedores, y luego `actuator/health` del backend y el discovery OIDC de Keycloak).
 9. **Registro** del último éxito, solo si hubo deploy de aplicación y todo lo anterior pasó.
 
@@ -513,8 +566,9 @@ GitHub Actions (workflow)
         │     ├── copia compose files + keycloak/ + postgres/
         │     ├── genera .env
         │     ├── valida y descarga por digest backend/postgres → image.env exacto
-        │     └── levanta DB + Keycloak + Traefik
-        └── init_keycloak.yml
+        │     ├── postgres (PGDATA vacío → 01-init-databases.sh) + reconciliación
+        │     └── levanta Keycloak + Traefik
+        ├── init_keycloak.yml
               ├── espera Keycloak healthy (9000/health/ready)
               ├── espera realm piedrazul importado
               ├── crea usuario kc-admin en master realm
@@ -523,6 +577,12 @@ GitHub Actions (workflow)
               ├── elimina usuario kc-bootstrap
               ├── reinicia backend
               └── crea marker .keycloak_initialized
+        └── refresh_backend.yml → sin backend todavía: no hace nada
+
+  └── deploy.yml (app_migrate=true: backend de build)
+        ├── postgres + reconciliación
+        ├── migrate (misma identidad que el backend) → esquema desde cero
+        └── backend (Flyway deshabilitado, JPA validate)
 ```
 
 ## Flujo completo — deploy de nueva imagen
@@ -536,8 +596,10 @@ GitHub Actions (production-hetzner.yml)
         ├── state version actual → IP; lee last-success.env (postgres en reuso)
         ├── evidencia: escaneo previo del backend; escaneo aquí del postgres en reuso
         ├── frescura: el commit es la punta de main
-        ├── deploy.yml -e backend_image_ref=<build> -e postgres_image_ref=<último éxito>
+        ├── deploy.yml -e backend_image_ref=<build> -e postgres_image_ref=<último éxito> -e app_migrate=true
         │     ├── pull por digest → image.env exacto
+        │     ├── postgres + reconciliación de autoridades (flock)
+        │     ├── migrate con <build> (flock; si falla, se detiene aquí)
         │     └── docker_compose_v2 postgres + backend
         ├── verify-release.yml identity → contenedores corren esas referencias exactas
         ├── verify-release.yml health   → contenedores healthy
@@ -558,7 +620,9 @@ GitHub Actions (production-hetzner.yml — cambios en infra/ansible, infra/compo
         │     ├── lee KC_BACKEND_CLIENT_SECRET existente → preserva
         │     ├── copia archivos (sin cambios → no notifica handler)
         │     ├── genera .env (sin cambios → no notifica handler)
-        │     └── docker_compose_v2 state: present → no-op
-        └── init_keycloak.yml
-              └── marker existe → skip completo
+        │     ├── postgres + reconciliación (idempotente)
+        │     └── docker_compose_v2 Keycloak/Traefik → no-op
+        ├── init_keycloak.yml
+        │     └── marker existe → skip completo
+        └── refresh_backend.yml → recrea el backend solo si cambió su configuración
 ```

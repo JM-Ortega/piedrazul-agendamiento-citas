@@ -9,10 +9,10 @@ services:
       KC_DB: postgres
       KC_DB_URL_HOST: postgres
       KC_DB_URL_PORT: 5432
-      KC_DB_URL_DATABASE: ${DB_NAME}
-      KC_DB_SCHEMA: ${KC_DB_SCHEMA}
-      KC_DB_USERNAME: ${KC_DB_USERNAME}
-      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
+      KC_DB_URL_DATABASE: ${DB_NAME:?DB_NAME es requerido}
+      KC_DB_SCHEMA: ${KC_DB_SCHEMA:?KC_DB_SCHEMA es requerido}
+      KC_DB_USERNAME: ${KC_DB_USERNAME:?KC_DB_USERNAME es requerido}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?KC_DB_PASSWORD es requerido}
       KC_HTTP_ENABLED: "true"
       KC_HTTP_PORT: ${KC_PORT}
       KC_HEALTH_ENABLED: ${KC_HEALTH_ENABLED}

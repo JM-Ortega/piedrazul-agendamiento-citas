@@ -61,7 +61,9 @@ declare -A AUTH=(
   [IDENTITY_SEED_ADMIN_PASSWORD]="production-hetzner"
   [PIEDRAZUL_BACKEND_MAIL_SEND]="production-hetzner"
   [NOTIFICATION_ENCRYPTION_KEY]="production-hetzner"
-  [DB_PASSWORD]="production-hetzner"
+  [POSTGRES_PASSWORD]="production-hetzner"
+  [APP_DB_PASSWORD]="production-hetzner"
+  [MIGRATION_DB_PASSWORD]="production-hetzner"
   [KC_DB_PASSWORD]="production-hetzner"
 )
 # Mecanismos de GitHub que se leen como secrets.* pero no son secretos del repositorio

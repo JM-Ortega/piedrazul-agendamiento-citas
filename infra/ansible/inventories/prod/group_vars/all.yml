@@ -4,6 +4,19 @@ app_dir: /opt/piedrazul
 compose_project_name: piedrazul
 compose_file: "{{ app_dir }}/compose/prod.yml"
 compose_src_dir: "{{ playbook_dir }}/../../compose"
+# CLI de Compose equivalente a docker_compose_v2 (para run/config). Se usa con
+# chdir={{ app_dir }}/compose.
+compose_cli:
+  - docker
+  - compose
+  - --project-name
+  - "{{ compose_project_name }}"
+  - --file
+  - prod.yml
+  - --env-file
+  - ../.env
+  - --env-file
+  - ../image.env
 # Último despliegue exitoso: identidades exactas de backend y postgres verificadas en
 # ejecución y healthy (única fuente de reuso; ver app/tasks/record_release.yml)
 release_state_file: "{{ app_dir }}/last-success.env"
@@ -23,15 +36,23 @@ server_port: 8080
 server_forward_headers_strategy: framework
 app_timezone: America/Bogota
 
-# Base de datos app
+# Base de datos: conexión y autoridades (nombres; las contraseñas llegan del entorno del
+# runner, ver app/tasks/setup.yml). El backend en ejecución corre siempre con Flyway
+# deshabilitado y JPA en validate (fijo en compose/backend.yml).
 db_host: postgres
 db_port: 5432
 db_name: piedrazul_db
-db_user: piedrazul
 db_schema: piedrazul
+postgres_user: postgres                     # superusuario administrativo (POSTGRES_*)
+app_db_username: piedrazul_app              # backend en ejecución (APP_DB_*)
+migration_db_username: piedrazul_migration  # servicio migrate (MIGRATION_DB_*)
+
+# Exclusividad del host para mutaciones de la base (reconciliación de roles y migración):
+# flock sobre este archivo, con espera acotada.
+db_lock_file: "{{ app_dir }}/db.lock"
+db_lock_timeout: 600
 
 # JPA / Hibernate
-jpa_ddl_auto: update
 jpa_show_sql: false
 jpa_format_sql: false
 

@@ -8,6 +8,7 @@ include:
   - ./db.yml
   - ./keycloak.yml
   - ./backend.yml
+  - ./migrate.yml
   - ./traefik.yml
 
 services:

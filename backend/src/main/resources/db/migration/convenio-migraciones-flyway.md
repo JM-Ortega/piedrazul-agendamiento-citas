@@ -455,6 +455,27 @@ modificar la bitácora (`AuditEventImmutabilityIT`).
 
 ---
 
+## 17. Dónde se ejecutan las migraciones
+
+- **Desarrollo y tests**: el backend las aplica al arrancar (`spring.flyway.enabled`,
+  por defecto `true`; los `*IT` usan `PostgresIntegrationSupport`).
+- **Producción**: el backend en ejecución corre con Flyway deshabilitado y
+  `ddl-auto=validate`, con el rol de la aplicación. Las migraciones las aplica antes el
+  servicio de un solo uso `migrate` (`infra/compose/migrate.yml`): misma imagen exacta
+  del backend, punto de entrada `co.edu.unicauca.piedrazul.migration.SchemaMigrationApplication`
+  y rol de migraciones (`MIGRATION_DB_*`). Usa esta misma configuración `spring.flyway.*`
+  de `application.yaml`, incluido el placeholder `app_role`. Al terminar retira a
+  `app_role` todo privilegio sobre `flyway_schema_history` (`ProtectSchemaHistoryCallback`;
+  la reconciliación de la base lo reaplica). Si una migración falla, el
+  backend candidato no arranca; no se ejecuta `flyway repair` automáticamente. Ver
+  `infra/ansible/ANSIBLE.md` (Base de datos).
+
+Consecuencia: una migración debe poder correr sin la aplicación (sin beans, seeders ni
+Keycloak) y el resultado debe coincidir con las entidades JPA, porque el runtime solo
+valida.
+
+---
+
 ## Fuentes consultadas
 
 - PostgreSQL Documentation — _5.5. Constraints_ (postgresql.org/docs/current/ddl-constraints.html)

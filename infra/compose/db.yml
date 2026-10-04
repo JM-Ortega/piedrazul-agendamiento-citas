@@ -5,19 +5,22 @@ services:
     image: ghcr.io/${GITHUB_OWNER}/${GITHUB_REPO}/postgres:${POSTGRES_IMAGE_TAG:-local}
     container_name: postgres
     restart: unless-stopped
+    # Credenciales declaradas de todas las autoridades de la base. Las consume
+    # 01-init-databases.sh al inicializar PGDATA y al reconciliar en cada convergencia
+    # (docker exec), así que el contenedor debe recrearse con el .env vigente antes.
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:?DB_NAME es requerido}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER es requerido}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es requerido}
 
-      APP_DB_USERNAME: ${APP_DB_USERNAME}
-      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      APP_DB_USERNAME: ${APP_DB_USERNAME:?APP_DB_USERNAME es requerido}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD es requerido}
 
-      MIGRATION_DB_USERNAME: ${MIGRATION_DB_USERNAME}
-      MIGRATION_DB_PASSWORD: ${MIGRATION_DB_PASSWORD}
+      MIGRATION_DB_USERNAME: ${MIGRATION_DB_USERNAME:?MIGRATION_DB_USERNAME es requerido}
+      MIGRATION_DB_PASSWORD: ${MIGRATION_DB_PASSWORD:?MIGRATION_DB_PASSWORD es requerido}
 
-      KC_DB_USERNAME: ${KC_DB_USERNAME}
-      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
+      KC_DB_USERNAME: ${KC_DB_USERNAME:?KC_DB_USERNAME es requerido}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?KC_DB_PASSWORD es requerido}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

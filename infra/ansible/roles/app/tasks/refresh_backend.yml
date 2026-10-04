@@ -1,0 +1,45 @@
+---
+# Al final de converge: entrega al backend que ya corre la configuración vigente de .env
+# (p. ej. APP_DB_PASSWORD rotada), después de reconciliar la base y de sincronizar
+# Keycloak. Así un backend en ejecución no depende de que la credencial anterior siga
+# valiendo.
+#
+# Nunca introduce una identidad nueva: solo actúa si el contenedor backend existe y ya
+# corre exactamente backend_image_ref (el último éxito en un converge sin deploy). Con un
+# candidato distinto (converge + deploy en el mismo run) no hace nada: deploy.yml migra
+# y recién entonces lo arranca. Compose solo lo recrea si cambió su configuración.
+
+- name: Leer el contenedor backend
+  community.docker.docker_container_info:
+    name: backend
+  register: app_backend_container
+
+- name: Recrear el backend con la configuración vigente
+  when:
+    - app_backend_container.exists
+    - app_backend_container.container.Config.Image == backend_image_ref
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/compose"
+    project_name: "{{ compose_project_name }}"
+    files:
+      - prod.yml
+    services:
+      - backend
+    dependencies: false
+    state: present
+    pull: missing
+    wait: true
+    wait_timeout: 300
+    env_files:
+      - ../.env
+      - ../image.env
+
+- name: Omitir el backend
+  ansible.builtin.debug:
+    msg: >-
+      Backend sin cambios en converge:
+      {{ 'no existe' if not app_backend_container.exists
+         else 'corre ' ~ app_backend_container.container.Config.Image ~ ', distinto de la identidad seleccionada' }}
+  when: >-
+    not app_backend_container.exists or
+    app_backend_container.container.Config.Image != backend_image_ref

@@ -21,3 +21,8 @@
       ansible.builtin.include_role:
         name: app
         tasks_from: init_keycloak.yml
+
+    - name: Entregar la configuración vigente al backend en ejecución
+      ansible.builtin.include_role:
+        name: app
+        tasks_from: refresh_backend.yml

@@ -8,6 +8,9 @@ spring:
     password: ${APP_DB_PASSWORD:piedrazul_app}
     driver-class-name: org.postgresql.Driver
 
+  # En producción el backend corre con SPRING_FLYWAY_ENABLED=false y JPA_DDL_AUTO=validate
+  # (infra/compose/backend.yml); esta configuración la usa el servicio migrate
+  # (SchemaMigrationApplication, infra/compose/migrate.yml) con MIGRATION_DB_*.
   flyway:
     enabled: true
     user: ${MIGRATION_DB_USERNAME:piedrazul_migration}

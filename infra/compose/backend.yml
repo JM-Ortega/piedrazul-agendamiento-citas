@@ -8,18 +8,19 @@ services:
       SERVER_PORT: ${SERVER_PORT}
       SERVER_FORWARD_HEADERS_STRATEGY: ${SERVER_FORWARD_HEADERS_STRATEGY}
 
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_NAME: ${DB_NAME}
-      DB_SCHEMA: ${DB_SCHEMA}
+      DB_HOST: ${DB_HOST:?DB_HOST es requerido}
+      DB_PORT: ${DB_PORT:?DB_PORT es requerido}
+      DB_NAME: ${DB_NAME:?DB_NAME es requerido}
+      DB_SCHEMA: ${DB_SCHEMA:?DB_SCHEMA es requerido}
 
-      APP_DB_USERNAME: ${APP_DB_USERNAME}
-      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      # Solo la autoridad de la aplicación. Sin MIGRATION_DB_*: el esquema lo evoluciona
+      # el servicio migrate (migrate.yml) antes de arrancar este contenedor.
+      APP_DB_USERNAME: ${APP_DB_USERNAME:?APP_DB_USERNAME es requerido}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD es requerido}
 
-      MIGRATION_DB_USERNAME: ${MIGRATION_DB_USERNAME}
-      MIGRATION_DB_PASSWORD: ${MIGRATION_DB_PASSWORD}
-
-      JPA_DDL_AUTO: ${JPA_DDL_AUTO}
+      # Contrato fijo, no configurable desde .env: el runtime no migra ni repara esquema
+      SPRING_FLYWAY_ENABLED: "false"
+      JPA_DDL_AUTO: validate
       JPA_SHOW_SQL: ${JPA_SHOW_SQL}
       JPA_FORMAT_SQL: ${JPA_FORMAT_SQL}
 

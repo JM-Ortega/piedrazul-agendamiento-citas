@@ -1,5 +1,7 @@
-# Crea directorios, copia compose files y assets, genera .env
-# y levanta solo la infraestructura base (sin backend).
+# Crea directorios, copia compose files y assets, genera .env, converge postgres y
+# reconcilia las autoridades de la base, y después levanta Keycloak y Traefik.
+# No arranca un backend nuevo ni migra (eso es deploy.yml); refresh_backend.yml, al final
+# de converge, solo recrea el backend que ya corre la identidad seleccionada.
 
 - name: Crear directorio de la aplicación
   ansible.builtin.file:
@@ -25,6 +27,35 @@
       KC_BACKEND_CLIENT_SECRET o KC_AUTOMATION_CLIENT_SECRET no están definidos.
       Ambos deben existir como GitHub Secrets e inyectarse al workflow de Ansible.
   no_log: true
+
+# Autoridades de la base desde el entorno (contraseñas; los nombres están en group_vars)
+- name: Tomar contraseñas de la base desde el entorno
+  ansible.builtin.set_fact:
+    app_db_secrets:
+      POSTGRES_PASSWORD: "{{ lookup('env', 'POSTGRES_PASSWORD') | string }}"
+      APP_DB_PASSWORD: "{{ lookup('env', 'APP_DB_PASSWORD') | string }}"
+      MIGRATION_DB_PASSWORD: "{{ lookup('env', 'MIGRATION_DB_PASSWORD') | string }}"
+      KC_DB_PASSWORD: "{{ lookup('env', 'KC_DB_PASSWORD') | string }}"
+  no_log: true
+
+# Solo nombres en el mensaje, nunca valores
+- name: Detectar contraseñas de la base ausentes o no representables en .env
+  ansible.builtin.set_fact:
+    app_db_secrets_invalid: >-
+      {{ app_db_secrets | dict2items
+         | selectattr('value', 'match', '^$|.*[\'\r\n]')
+         | map(attribute='key') | list }}
+  no_log: true
+
+- name: Verificar las contraseñas de la base
+  ansible.builtin.assert:
+    that:
+      - app_db_secrets_invalid | length == 0
+    fail_msg: >-
+      Contraseñas de la base vacías o con comilla simple / salto de línea:
+      {{ app_db_secrets_invalid | join(', ') }}. Deben existir como secretos del
+      GitHub Environment production-hetzner e inyectarse al paso de converge.
+    quiet: true
 
 # Compose files
 - name: Copiar archivos compose al servidor
@@ -80,7 +111,11 @@
       BACKEND_IMAGE={{ backend_image_ref }}
       POSTGRES_IMAGE={{ postgres_image_ref }}
 
-# Levantar solo infraestructura base (sin backend)
+# Base primero: ningún consumidor arranca con credenciales que postgres aún no acepta
+- name: Converger postgres y reconciliar autoridades de la base
+  ansible.builtin.include_tasks: db_converge.yml
+
+# Infraestructura restante (sin backend)
 - name: Levantar servicios de infraestructura
   community.docker.docker_compose_v2:
     project_src: "{{ app_dir }}/compose"
@@ -88,7 +123,6 @@
     files:
       - prod.yml
     services:
-      - postgres
       - keycloak
       - traefik
     state: present

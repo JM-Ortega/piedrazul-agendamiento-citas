@@ -1,6 +1,13 @@
 ---
 # Rollout de las imágenes propias. No toca Keycloak ni secretos.
 # backend_image_ref y postgres_image_ref (inyectados por el workflow) son obligatorios y exactos.
+# app_migrate (obligatorio, true|false) decide si se migra el esquema con el backend
+# seleccionado antes de arrancarlo. El workflow lo pone en true solo para un backend
+# construido en este run; un rollback explícito (o el reuso del último éxito) no migra.
+#
+# Orden:
+#   .env válido → imágenes por digest → image.env → postgres + reconciliación
+#   (db_converge.yml) → [migración con la misma identidad (migrate.yml)] → backend
 
 # Validar que .env existe y tiene claves críticas
 - name: Verificar que .env existe
@@ -28,6 +35,43 @@
     fail_msg: "KC_BACKEND_CLIENT_SECRET está vacío en .env — corre converge primero"
   no_log: true
 
+# Contrato de base de datos: un .env anterior (DB_USER/DB_PASSWORD) no lo cumple
+- name: Buscar claves de base de datos vacías o ausentes en .env
+  ansible.builtin.set_fact:
+    app_env_db_missing: >-
+      {{ app_db_env_keys | reject('in', (app_env_file.content | b64decode).split('\n')
+         | select('match', '^[A-Z_]+=.+') | map('regex_replace', '=.*$', '') | list) | list }}
+  vars:
+    app_db_env_keys:
+      - DB_HOST
+      - DB_PORT
+      - DB_NAME
+      - DB_SCHEMA
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - APP_DB_USERNAME
+      - APP_DB_PASSWORD
+      - MIGRATION_DB_USERNAME
+      - MIGRATION_DB_PASSWORD
+      - KC_DB_USERNAME
+      - KC_DB_PASSWORD
+      - KC_DB_SCHEMA
+
+- name: Validar el contrato de base de datos en .env
+  ansible.builtin.assert:
+    that:
+      - app_env_db_missing | length == 0
+    fail_msg: "Faltan o están vacías en .env: {{ app_env_db_missing | join(', ') }} — corre converge primero"
+    quiet: true
+
+- name: Validar la decisión de migración
+  ansible.builtin.assert:
+    that:
+      - app_migrate is defined
+      - (app_migrate | string | lower) in ['true', 'false']
+    fail_msg: "app_migrate debe ser true o false (lo decide el workflow según el origen del backend)"
+    quiet: true
+
 # Identidades exactas de las imágenes propias
 - name: Validar y descargar imágenes propias
   ansible.builtin.include_tasks: release_images.yml
@@ -45,6 +89,19 @@
       BACKEND_IMAGE={{ backend_image_ref }}
       POSTGRES_IMAGE={{ postgres_image_ref }}
 
+- name: Converger postgres y reconciliar autoridades de la base
+  ansible.builtin.include_tasks: db_converge.yml
+
+- name: Migrar esquema con el backend seleccionado
+  ansible.builtin.include_tasks: migrate.yml
+  when: app_migrate | bool
+
+- name: Omitir migración
+  ansible.builtin.debug:
+    msg: "Sin migración (app_migrate=false): el backend valida el esquema existente al arrancar (JPA validate)"
+  when: not (app_migrate | bool)
+
+# Solo después de una migración exitosa (o sin migración pedida)
 - name: Desplegar postgres y backend con identidades exactas
   community.docker.docker_compose_v2:
     project_src: "{{ app_dir }}/compose"

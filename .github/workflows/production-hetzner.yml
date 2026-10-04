@@ -682,8 +682,9 @@ jobs:
   #   [escaneo de identidades conocidas: image_scan] → frescura → Apply (si aplica) →
   #   state version exacto → outputs → SSH → último éxito del servidor → identidades
   #   exactas → evidencia de escaneo + escaneo del reuso → [frescura si no hubo Apply] →
-  #   converge / deploy → identidad en ejecución → health (contenedores + públicos) →
-  #   registro del último éxito
+  #   converge (postgres + reconciliación de autoridades de la base → Keycloak/Traefik) /
+  #   deploy (postgres + reconciliación → migración del backend construido → backend) →
+  #   identidad en ejecución → health (contenedores + públicos) → registro del último éxito
   #
   # Frescura: solo la punta actual de main inicia una mutación, verificado justo antes
   # de la primera. Iniciada la cadena, termina aunque main avance. Un re-run de un commit
@@ -741,7 +742,9 @@ jobs:
         env:
           TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
           ANSIBLE_SSH_KEY: ${{ secrets.ANSIBLE_SSH_KEY }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+          MIGRATION_DB_PASSWORD: ${{ secrets.MIGRATION_DB_PASSWORD }}
           KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
           KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
           KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
@@ -762,7 +765,8 @@ jobs:
             need ANSIBLE_SSH_KEY
           fi
           if [ "${RUN_HOST_CONFIG}" = "true" ] || [ "${RUN_APP_DEPLOY}" = "true" ]; then
-            need DB_PASSWORD KC_DB_PASSWORD KC_BOOTSTRAP_ADMIN_PASSWORD KC_ADMIN_PASSWORD \
+            need POSTGRES_PASSWORD APP_DB_PASSWORD MIGRATION_DB_PASSWORD KC_DB_PASSWORD \
+              KC_BOOTSTRAP_ADMIN_PASSWORD KC_ADMIN_PASSWORD \
               CLOUDFLARE_DNS_API_TOKEN IDENTITY_SEED_ADMIN_PASSWORD \
               PIEDRAZUL_BACKEND_MAIL_SEND NOTIFICATION_ENCRYPTION_KEY
           fi
@@ -1051,7 +1055,9 @@ jobs:
         env:
           BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
           POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+          MIGRATION_DB_PASSWORD: ${{ secrets.MIGRATION_DB_PASSWORD }}
           KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
           KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
           KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
@@ -1092,14 +1098,18 @@ jobs:
             -e '{"app_release_services": ["postgres"]}' \
             infra/ansible/playbooks/verify-release.yml
 
+      # deploy.yml: postgres + reconciliación → migración (solo backend construido en este
+      # run, con su misma identidad exacta) → backend. Usa el .env que dejó converge; no
+      # recibe credenciales de la base. Un rollback explícito no migra: el backend valida
+      # el esquema al arrancar (JPA validate). Si la migración falla, el backend candidato
+      # no arranca y este paso falla antes de la verificación y del registro.
       - name: Correr deploy
         id: deploy
         if: env.RUN_APP_DEPLOY == 'true'
         env:
           BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
           POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
+          APP_MIGRATE: ${{ steps.select.outputs.backend_source == 'build' }}
           KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
           KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
           CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
@@ -1118,6 +1128,7 @@ jobs:
             -i "${RUNNER_TEMP}/hosts.runtime.yml" \
             -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
             -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            -e "app_migrate=${APP_MIGRATE}" \
             infra/ansible/playbooks/deploy.yml
 
       # ── Verificación posterior ──
@@ -1223,6 +1234,7 @@ jobs:
           BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
           POSTGRES_SOURCE: ${{ steps.select.outputs.postgres_source }}
           POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+          RUN_APP_DEPLOY_SUMMARY: ${{ env.RUN_APP_DEPLOY }}
           PREVIOUS_BACKEND: ${{ steps.select.outputs.previous_backend_image_ref }}
           PREVIOUS_POSTGRES: ${{ steps.select.outputs.previous_postgres_image_ref }}
           STATE_STATUS: ${{ steps.select.outputs.state_status }}
@@ -1288,6 +1300,13 @@ jobs:
               echo "| último éxito leído | ${STATE_STATUS:-—} |"
               echo "| backend | ${BACKEND_SOURCE:-—} \`${BACKEND_IMAGE_REF:-—}\` (anterior \`${PREVIOUS_BACKEND:-—}\`) |"
               echo "| postgres | ${POSTGRES_SOURCE:-—} \`${POSTGRES_IMAGE_REF:-—}\` (anterior \`${PREVIOUS_POSTGRES:-—}\`) |"
+              if [ "${RUN_APP_DEPLOY_SUMMARY}" = "true" ]; then
+                if [ "${BACKEND_SOURCE}" = "build" ]; then
+                  echo "| migración de esquema | sí, con \`${BACKEND_IMAGE_REF}\` antes de arrancar el backend (dentro de deploy) |"
+                else
+                  echo "| migración de esquema | no (${BACKEND_SOURCE:-—}): el backend valida el esquema existente |"
+                fi
+              fi
             fi
             echo "| credenciales / frescura | ${O_CREDENTIALS} / ${O_FRESH_APPLY:-—} ${O_FRESH_DEPLOY:-} |"
             echo "| HCP (idle/previo/upload/run/apply/state/outputs) | ${O_HCP} |"
