@@ -16,13 +16,18 @@ concurrency:
 
 env:
   TF_CLOUD_ORGANIZATION: "Piedrazul"
-  TF_API_TOKEN: "${{ secrets.TF_API_TOKEN }}"
   TF_WORKSPACE: "piedrazul-hetzner"
   CONFIG_DIRECTORY: "infra/terraform"
 jobs:
   plan:
     name: Speculative plan — Hetzner
     runs-on: ubuntu-latest
+    # El token de HCP se consume vía el environment terraform-plan: el plan ejecuta código
+    # Terraform/workflow controlado por el PR contra el workspace productivo, así que
+    # requiere aprobación privilegiada (revisar infra/terraform/** y .github/workflows/**).
+    environment: terraform-plan
+    env:
+      TF_API_TOKEN: "${{ secrets.TF_API_TOKEN }}"
     permissions:
       contents: read
       pull-requests: write
