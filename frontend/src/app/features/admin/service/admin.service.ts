@@ -9,6 +9,7 @@ import { SystemPatient } from '../../../shared/models/interfaces/systemPatient.m
 import { CreateUserRequestDto } from '../models/dtos/CreateUserRequestDto';
 import { DoctorAdminDto } from '../models/dtos/DoctorAdminDto';
 import { dtoSchedule } from '../models/dtos/schedule.dto';
+import { CreateTimeOffRequest, TimeOffDto } from '../models/dtos/timeOff.dto';
 import { SystemUser } from '../models/interfaces/systemUser.model';
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -185,6 +186,48 @@ export class AdminService {
   deleteSchedule(doctorId: string, workday: string): Observable<void> {
     return this.http.delete<void>(
       `${this.apiUrl}/doctor/schedules/${doctorId}/${workday}`
+    );
+  }
+
+  // ── Time off (descansos) ──────────────────────────────────────────────────
+
+  /**
+   * Registra un periodo de descanso (fechas inclusivas) para un doctor.
+   * Mientras dure, esas fechas no se pueden agendar.
+   *
+   * @param payload - Doctor, fechas de inicio/fin (yyyy-MM-dd) y motivo.
+   * @returns Observable con el descanso creado.
+   */
+  createTimeOff(payload: CreateTimeOffRequest): Observable<TimeOffDto> {
+    return this.http.post<TimeOffDto>(
+      `${this.apiUrl}/doctor/time-off`,
+      payload
+    );
+  }
+
+  /**
+   * Obtiene el historial completo de descansos de un doctor, del más
+   * reciente al más antiguo.
+   *
+   * @param doctorId - Identificador del médico.
+   * @returns Observable con la lista de descansos (puede estar vacía).
+   */
+  getTimeOffs(doctorId: string): Observable<TimeOffDto[]> {
+    return this.http.get<TimeOffDto[]>(
+      `${this.apiUrl}/doctor/time-off/${doctorId}`
+    );
+  }
+
+  /**
+   * Elimina un descanso que aún no empieza, o recorta uno en curso
+   * (su fecha de fin pasa a ser ayer). Uno finalizado no se puede modificar.
+   *
+   * @param timeOffId - Identificador del descanso.
+   * @returns Observable que completa sin contenido (204).
+   */
+  deleteTimeOff(timeOffId: string): Observable<void> {
+    return this.http.delete<void>(
+      `${this.apiUrl}/doctor/time-off/${timeOffId}`
     );
   }
 

@@ -152,6 +152,8 @@
                   [isSaved]="savedId() === doctor.id"
                   (edit)="startEdit($event)"
                   (toggleModal)="openToggleModal($event)"
+                  [timeOffs]="timeOffsByDoctor()[doctor.id] ?? []"
+                  (timeOff)="openTimeOff($event)"
                 />
 
                 @if (editingId() === doctor.id) {
@@ -222,6 +224,16 @@
   </div>
 
   <app-toast [message]="toastMessage()" [type]="toastType()" />
+
+  <!-- Panel lateral: descansos del médico -->
+  @if (timeOffDoctor(); as timeOffDoctor) {
+    <app-doctor-time-off-drawer
+      [doctor]="timeOffDoctor"
+      (timeOffsChange)="onTimeOffsChange(timeOffDoctor.id, $event)"
+      (notify)="showToast('success', $event)"
+      (closed)="closeTimeOff()"
+    />
+  }
   <!-- Modales -->
   <app-admin-modals
     [showConfirmModal]="showConfirmModal()"
