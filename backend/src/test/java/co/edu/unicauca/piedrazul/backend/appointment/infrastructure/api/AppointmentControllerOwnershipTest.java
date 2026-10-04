@@ -11,6 +11,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrig
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentAccessDeniedException;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.ListAppointmentFiltersRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
@@ -19,6 +20,8 @@ import co.edu.unicauca.piedrazul.backend.config.security.JwtAuthConverter;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -31,6 +34,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -155,11 +159,8 @@ class AppointmentControllerOwnershipTest {
         AppointmentRequest request = manualAppointmentForSomeoneElse();
         Jwt jwt = jwt(PATIENT_USER_ID, "PATIENT");
 
-        try {
-            controller.scheduleAppointment(request, jwt, authentication(jwt));
-        } catch (RuntimeException rejected) {
-            // Rechazar la petición es la respuesta correcta.
-        }
+        assertThatThrownBy(() -> controller.scheduleAppointment(request, jwt, authentication(jwt)))
+                .isInstanceOf(AppointmentAccessDeniedException.class);
 
         verify(appointmentSchedulingService, never())
                 .scheduleManual(any(), any(), any(), any(), any(), any(), any());
@@ -173,6 +174,49 @@ class AppointmentControllerOwnershipTest {
         controller.scheduleAppointment(request, jwt, authentication(jwt));
 
         verify(appointmentSchedulingService).scheduleManual(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void aDoctorCanStillScheduleManually() {
+        AppointmentRequest request = manualAppointmentForSomeoneElse();
+        Jwt jwt = jwt(DOCTOR_USER_ID, "DOCTOR");
+
+        controller.scheduleAppointment(request, jwt, authentication(jwt));
+
+        verify(appointmentSchedulingService).scheduleManual(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    /**
+     * Solo un token cuyo único rol es paciente queda excluido del agendamiento manual: si además
+     * tiene rol de médico o agendador, conserva ese acceso.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"SCHEDULER", "DOCTOR"})
+    void aTokenWithPatientAndStaffRolesCanStillScheduleManually(String staffRole) {
+        AppointmentRequest request = manualAppointmentForSomeoneElse();
+        Jwt jwt = jwt(PATIENT_USER_ID, "PATIENT", staffRole);
+
+        controller.scheduleAppointment(request, jwt, authentication(jwt));
+
+        verify(appointmentSchedulingService).scheduleManual(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    /**
+     * Con rol de paciente en el token, el agendamiento autónomo sigue atado a su propio paciente
+     * aunque tenga también un rol de personal: el id del body no sustituye la identidad.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"SCHEDULER", "DOCTOR"})
+    void aTokenWithPatientAndStaffRolesSchedulingAutonomouslyBooksForTheirOwnPatient(String staffRole) {
+        AppointmentRequest request = appointment(SchedulingOrigin.AUTONOMO);
+        request.setPatientId(OTHER_PATIENT_ID);
+        Jwt jwt = jwt(PATIENT_USER_ID, "PATIENT", staffRole);
+
+        controller.scheduleAppointment(request, jwt, authentication(jwt));
+
+        ArgumentCaptor<PatientSchedulingContext> context = ArgumentCaptor.forClass(PatientSchedulingContext.class);
+        verify(appointmentSchedulingService).scheduleAutonomous(context.capture(), any(), any(), any(), any(), any(), any());
+        assertThat(context.getValue().idPatient()).isEqualTo(OWN_PATIENT_ID);
     }
 
     // ---- utilidades ----
@@ -204,11 +248,11 @@ class AppointmentControllerOwnershipTest {
         return request;
     }
 
-    private static Jwt jwt(UUID userId, String role) {
+    private static Jwt jwt(UUID userId, String... roles) {
         return Jwt.withTokenValue("token")
                 .header("alg", "none")
                 .subject(userId.toString())
-                .claim("realm_access", Map.of("roles", List.of(role)))
+                .claim("realm_access", Map.of("roles", List.of(roles)))
                 .build();
     }
 
