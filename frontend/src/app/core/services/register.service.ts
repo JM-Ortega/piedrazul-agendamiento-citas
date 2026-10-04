@@ -49,6 +49,30 @@ export class PatientService {
   /** Paciente autenticado en memoria; `null` hasta que {@link getMe} lo cargue. */
   readonly me = signal<Patient | null>(null);
   private me$: Observable<Patient> | null = null;
+  /** Opciones de sexo disponibles, cargadas con {@link loadSexOptions}. */
+  readonly sexOptions = signal<string[]>([]);
+
+  /** Carga las opciones de sexo en {@link sexOptions}; no repite la carga si ya existen. */
+  loadSexOptions(): void {
+    if (this.sexOptions().length > 0) return;
+    this.getAllSexOptions().subscribe({
+      next: (options) => this.sexOptions.set(options),
+      error: () => {
+        console.error('Error al cargar las opciones de sexo');
+      },
+    });
+  }
+
+  /**
+   * Obtiene las opciones de sexo disponibles para un paciente.
+   *
+   * TODO: la petición al backend (`GET /patients/sex-options`) aún no está
+   * implementada; mientras tanto se devuelve una lista fija.
+   */
+  getAllSexOptions(): Observable<string[]> {
+    //return this.http.get<string[]>(`${this.apiUrl}/patients/sex-options`);
+    return of(['MASCULINO', 'FEMENINO', 'OTRO']);
+  }
 
   /** Carga los tipos de documento en {@link documentTypes}; no repite la carga si ya existen. */
   loadDocumentTypes(): void {
