@@ -15,9 +15,11 @@ import java.util.EnumSet;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -25,7 +27,7 @@ class IsNewPatientUseCaseImplTest {
 
     @Mock
     private AppointmentRepository appointmentRepository;
-    
+
     @Mock
     private PatientConsultPort patientConsultPort;
 
@@ -37,7 +39,7 @@ class IsNewPatientUseCaseImplTest {
     }
 
     @Test
-    void isNewPatientShouldReturnFalseWhenPatientHasAnAttendedAppointment() {
+    void isNewPatientShouldReturnFalseWhenPatientHasAttendedAppointment() {
         UUID patientId = UUID.randomUUID();
         Collection<AppointmentState> expectedStates = EnumSet.of(AppointmentState.ATENDIDA);
 
@@ -55,7 +57,7 @@ class IsNewPatientUseCaseImplTest {
 
     /** Una cita agendada que aún no se atiende no cuenta: el paciente sigue siendo nuevo. */
     @Test
-    void isNewPatientShouldReturnTrueWhenPatientHasNoAttendedAppointments() {
+    void isNewPatientShouldReturnTrueWhenPatientHasNoAttendedAppointment() {
         UUID patientId = UUID.randomUUID();
         Collection<AppointmentState> expectedStates = EnumSet.of(AppointmentState.ATENDIDA);
 
@@ -68,12 +70,22 @@ class IsNewPatientUseCaseImplTest {
     }
 
     @Test
-    void isNewPatientShouldReturnTrueWhenPatientDoesNotExist() {
+    void isNewPatientShouldReturnTrueWhenPatientDoesNotExistInPatientModule() {
         UUID patientId = UUID.randomUUID();
 
         when(patientConsultPort.existsById(patientId)).thenReturn(false);
 
         boolean result = useCase.isNewPatient(patientId);
+
         assertThat(result).isTrue();
+        verify(appointmentRepository, never()).existsByPatientIdAndStates(any(), any());
+    }
+
+    @Test
+    void isNewPatientShouldReturnTrueWhenPatientIdIsNull() {
+        boolean result = useCase.isNewPatient(null);
+
+        assertThat(result).isTrue();
+        verifyNoInteractions(appointmentRepository, patientConsultPort);
     }
 }
