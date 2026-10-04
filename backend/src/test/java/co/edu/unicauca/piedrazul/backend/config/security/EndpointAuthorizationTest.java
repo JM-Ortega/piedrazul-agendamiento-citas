@@ -62,7 +62,8 @@ class EndpointAuthorizationTest {
             new Endpoint(HttpMethod.POST, "/api/patients/link-user-account/request-code"),
             new Endpoint(HttpMethod.POST, "/api/patients/link-user-account/confirm"),
             new Endpoint(HttpMethod.GET, "/api/patients/document/{documentNumber}/public"),
-            new Endpoint(HttpMethod.GET, "/api/patients/document-types")
+            new Endpoint(HttpMethod.GET, "/api/patients/document-types"),
+            new Endpoint(HttpMethod.GET, "/api/patients/gender-types")
     );
 
     @Configuration

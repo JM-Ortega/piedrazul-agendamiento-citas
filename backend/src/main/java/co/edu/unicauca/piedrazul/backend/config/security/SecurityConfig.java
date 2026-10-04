@@ -37,6 +37,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/patients/link-user-account/request-code").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/patients/link-user-account/confirm").permitAll()
                         .requestMatchers(HttpMethod.GET,"/api/patients/document-types").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/patients/gender-types").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2

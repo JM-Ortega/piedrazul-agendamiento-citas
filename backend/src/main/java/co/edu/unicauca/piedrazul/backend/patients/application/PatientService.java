@@ -521,6 +521,10 @@ public class PatientService implements PatientModuleApi {
         return Arrays.asList(IdentificationType.values());
     }
 
+    public List<PatientSex> getAllGenderTypes() {
+        return Arrays.asList(PatientSex.values());
+    }
+
     /**
      * Fase que corresponde al estado real de la persona. Rechaza los estados que no
      * admiten habilitación: ya habilitado, e inconsistente.

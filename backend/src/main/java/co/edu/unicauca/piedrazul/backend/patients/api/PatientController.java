@@ -323,6 +323,16 @@ public class PatientController {
         return patientService.getAllDocumentTypes();
     }
 
+    @GetMapping("/gender-types")
+    @Operation(summary = "Listar los tipos de género",
+            description = "Endpoint público. Devuelve los géneros admitidos para registrar o actualizar un paciente: el valor que se envía en el campo `sex`.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Tipos de género obtenidos correctamente")
+    })
+    public List<PatientSex> findAllGenderTypes() {
+        return patientService.getAllGenderTypes();
+    }
+
     private PatientResponse toResponse(PatientData patient) {
         return new PatientResponse(
                 patient.personId(),
