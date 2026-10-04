@@ -64,14 +64,10 @@ export class PatientService {
   }
 
   /**
-   * Obtiene las opciones de sexo disponibles para un paciente.
-   *
-   * TODO: la petición al backend (`GET /patients/sex-options`) aún no está
-   * implementada; mientras tanto se devuelve una lista fija.
+   * Obtiene las opciones de género.
    */
   getAllSexOptions(): Observable<string[]> {
-    //return this.http.get<string[]>(`${this.apiUrl}/patients/sex-options`);
-    return of(['MASCULINO', 'FEMENINO', 'OTRO']);
+    return this.http.get<string[]>(`${this.apiUrl}/patients/gender-types`);
   }
 
   /** Carga los tipos de documento en {@link documentTypes}; no repite la carga si ya existen. */
