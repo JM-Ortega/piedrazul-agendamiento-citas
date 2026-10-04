@@ -1,0 +1,488 @@
+<div class="fixed inset-0 z-[60]">
+  <!-- Fondo -->
+  <div
+    class="timeoff-backdrop absolute inset-0 bg-[#0f1e37]/45 backdrop-blur-[2px]"
+    [class.is-closing]="closing()"
+    role="presentation"
+    (click)="close()"
+    (keydown.escape)="close()"
+  ></div>
+
+  <!-- Panel -->
+  <aside
+    #panel
+    class="timeoff-panel absolute inset-y-0 right-0 w-full sm:w-[460px] bg-white shadow-2xl flex flex-col outline-none"
+    [class.is-closing]="closing()"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="timeOffTitle"
+    tabindex="-1"
+  >
+    <!-- Encabezado -->
+    <div
+      class="flex items-center gap-3.5 px-6 py-4 border-b border-[#d9e9f8] shrink-0"
+    >
+      <div
+        class="w-11 h-11 rounded-xl bg-[#e8f0fa] text-[#215c98] flex items-center justify-center shrink-0"
+      >
+        <svg lucideCoffee [size]="22"></svg>
+      </div>
+      <div class="flex-1 min-w-0">
+        <h2
+          id="timeOffTitle"
+          class="text-[#163c63] text-lg font-bold leading-tight"
+        >
+          Descansos
+        </h2>
+        <p class="text-gray-500 text-sm truncate">
+          {{ doctor().name }} · {{ specialties() }}
+        </p>
+      </div>
+      <app-button
+        variant="icon"
+        extraClass="!w-10 !h-10 hover:!text-gray-700"
+        [appTooltip]="'Cerrar'"
+        appTooltipPosition="left"
+        (buttonClick)="close()"
+      >
+        <svg lucideX [size]="20"></svg>
+        <span class="sr-only">Cerrar</span>
+      </app-button>
+    </div>
+
+    <!-- Contenido -->
+    <div class="timeoff-stagger flex-1 overflow-y-auto px-6 py-5 space-y-5">
+      <!-- Rango permitido -->
+      @if (hasRoom()) {
+        <div
+          class="flex gap-2.5 p-3 bg-[#eef5fd] border border-[#d3e3f6] rounded-xl text-sm text-[#163c63] leading-snug"
+        >
+          <svg
+            lucideInfo
+            [size]="18"
+            class="text-[#215c98] shrink-0 mt-0.5"
+          ></svg>
+          <div>
+            <p>
+              Puedes programar descansos entre
+              <strong>{{ minStartLabel() }}</strong> y
+              <strong>{{ maxEndLabel() }}</strong
+              >.
+            </p>
+            <p class="text-gray-500 text-[13px] mt-0.5">
+              Antes está abierta su ventana de agendamiento ({{
+                doctor().bookingWindowWeeks
+              }}
+              {{ doctor().bookingWindowWeeks === 1 ? 'semana' : 'semanas' }});
+              después termina su vinculación.
+            </p>
+          </div>
+        </div>
+      } @else {
+        <div
+          class="flex gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900 leading-snug"
+        >
+          <svg lucideTriangleAlert [size]="18" class="shrink-0 mt-0.5"></svg>
+          <p>
+            No hay fechas disponibles para programar descansos: su ventana de
+            agendamiento llega hasta el
+            <strong>{{ windowEndLabel() }}</strong> y su vinculación termina el
+            <strong>{{ maxEndLabel() }}</strong
+            >. Reduzca la ventana o amplíe el período laboral.
+          </p>
+        </div>
+      }
+
+      <!-- Nuevo descanso -->
+      @if (hasRoom()) {
+        <section class="space-y-3">
+          <h3
+            class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+          >
+            Nuevo descanso
+          </h3>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label
+                for="timeOffStart"
+                class="block text-gray-700 mb-1 text-sm"
+              >
+                Desde
+              </label>
+              <app-datepicker
+                id="timeOffStart"
+                format="yyyy-mm-dd"
+                [min]="minStart()"
+                [max]="maxEnd() ?? undefined"
+                [disabled]="creating()"
+                [ngModel]="startDate()"
+                (ngModelChange)="onStartChange($event)"
+                [errorMessage]="startError() || undefined"
+              />
+            </div>
+            <div>
+              <label for="timeOffEnd" class="block text-gray-700 mb-1 text-sm">
+                Hasta
+              </label>
+              <app-datepicker
+                id="timeOffEnd"
+                format="yyyy-mm-dd"
+                [min]="startDate() ?? minStart()"
+                [max]="maxEnd() ?? undefined"
+                [disabled]="creating()"
+                [ngModel]="endDate()"
+                (ngModelChange)="onEndChange($event)"
+                [errorMessage]="endError() || undefined"
+              />
+            </div>
+          </div>
+
+          @if (rangeSummary(); as range) {
+            <div
+              animate.enter="fade-slide-in"
+              animate.leave="fade-out"
+              class="flex items-center gap-2 text-sm text-[#14548f] bg-[#f3f8fe] rounded-lg px-3 py-2"
+            >
+              <svg lucideCalendarRange [size]="16" class="shrink-0"></svg>
+              <span>
+                <strong
+                  >{{ range.days }}
+                  {{ range.days === 1 ? 'día' : 'días' }}</strong
+                >
+                · {{ range.label }} · {{ range.attention }} de atención
+              </span>
+            </div>
+          }
+
+          @if (formAlert()) {
+            <div
+              role="alert"
+              animate.enter="shake-in"
+              animate.leave="fade-out"
+              class="flex gap-2.5 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800 leading-snug"
+            >
+              <svg
+                lucideTriangleAlert
+                [size]="18"
+                class="shrink-0 mt-0.5"
+              ></svg>
+              <p>
+                <strong>No se puede programar.</strong>
+                {{ formAlert() }}
+              </p>
+            </div>
+          }
+
+          <div>
+            <label for="timeOffReason" class="block text-gray-700 mb-1 text-sm">
+              Motivo
+            </label>
+            <app-input
+              id="timeOffReason"
+              placeholder="Ej. vacaciones, congreso…"
+              [maxLength]="REASON_MAX_LENGTH"
+              [trimLeadingSpaces]="true"
+              [collapseSpaces]="true"
+              [disabled]="creating()"
+              [ngModel]="reason()"
+              (ngModelChange)="onReasonChange($event)"
+              [errorMessage]="reasonError() || undefined"
+            />
+          </div>
+
+          <app-button
+            variant="primary"
+            hostDisplay="block"
+            [fullWidth]="true"
+            extraClass="!rounded-xl !py-2.5 !text-sm font-semibold"
+            [disabled]="!isActive()"
+            [loading]="creating()"
+            (buttonClick)="onSubmit()"
+          >
+            @if (creating()) {
+              <span
+                class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
+              ></span>
+              Programando...
+            } @else {
+              <svg lucidePlus [size]="18"></svg>
+              Programar descanso
+            }
+          </app-button>
+        </section>
+      }
+
+      <!-- Programados y en curso -->
+      <section class="space-y-2.5 pt-4 border-t border-[#d9e9f8]">
+        <div class="flex items-center justify-between">
+          <h3
+            class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+          >
+            Programados y en curso
+          </h3>
+          <span
+            class="min-w-[22px] text-center text-xs font-bold text-[#215c98] bg-[#e8f0fa] rounded-full px-2 py-0.5 transition-all duration-300"
+          >
+            {{ activeItems().length }}
+          </span>
+        </div>
+
+        @if (listError()) {
+          <div
+            role="alert"
+            animate.enter="shake-in"
+            animate.leave="fade-out"
+            class="flex gap-2.5 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800"
+          >
+            <svg lucideTriangleAlert [size]="18" class="shrink-0 mt-0.5"></svg>
+            <p>{{ listError() }}</p>
+          </div>
+        }
+
+        @if (loadingList() && !timeOffs().length) {
+          @for (i of [1, 2]; track i) {
+            <div class="h-[74px] rounded-xl bg-gray-100 animate-pulse"></div>
+          }
+        } @else {
+          @for (item of activeItems(); track item.id) {
+            <div
+              animate.enter="item-enter"
+              animate.leave="item-leave"
+              class="rounded-xl border p-3 space-y-2.5 transition-colors duration-300"
+              [class]="
+                item.isOngoing
+                  ? 'border-orange-200 bg-orange-50/50'
+                  : 'border-[#e3ebf4] bg-white hover:border-[#c2d8f0]'
+              "
+            >
+              <div class="flex items-center gap-3">
+                <div
+                  class="w-[52px] shrink-0 text-center rounded-lg py-1.5 leading-tight"
+                  [class]="
+                    item.isOngoing
+                      ? 'bg-orange-100 text-orange-800'
+                      : 'bg-[#e6f1fd] text-[#14548f]'
+                  "
+                >
+                  <div class="text-[11px] font-extrabold tracking-wider">
+                    {{ item.month }}
+                  </div>
+                  <div class="text-lg font-extrabold">{{ item.day }}</div>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[#163c63] font-semibold text-[15px]">
+                    {{ item.label }}
+                  </p>
+                  <p class="text-gray-500 text-sm truncate">
+                    {{ item.days }} {{ item.days === 1 ? 'día' : 'días' }} ·
+                    {{ item.reason }}
+                  </p>
+                </div>
+                @if (item.isOngoing) {
+                  <span
+                    class="flex items-center gap-1.5 text-xs font-semibold text-orange-800 bg-orange-100 rounded-full px-2.5 py-1 shrink-0"
+                  >
+                    <span class="relative flex w-2 h-2">
+                      <span
+                        class="absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75 animate-ping"
+                      ></span>
+                      <span
+                        class="relative inline-flex rounded-full w-2 h-2 bg-orange-500"
+                      ></span>
+                    </span>
+                    En curso
+                  </span>
+                } @else {
+                  <span
+                    class="text-xs font-semibold text-[#14548f] bg-[#e6f1fd] rounded-full px-2.5 py-1 shrink-0"
+                  >
+                    Programado
+                  </span>
+                }
+                @if (item.removeMode === 'delete') {
+                  <app-button
+                    variant="icon"
+                    extraClass="!w-10 !h-10 !text-red-600 hover:!bg-red-50 border border-red-100"
+                    [appTooltip]="'Eliminar descanso'"
+                    [loading]="processingId() === item.id"
+                    (buttonClick)="requestRemoval(item)"
+                  >
+                    @if (processingId() === item.id) {
+                      <span
+                        class="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"
+                      ></span>
+                    } @else {
+                      <svg lucideTrash2 [size]="18"></svg>
+                    }
+                    <span class="sr-only"
+                      >Eliminar descanso del {{ item.label }}</span
+                    >
+                  </app-button>
+                }
+              </div>
+
+              @if (item.removeMode === 'trim') {
+                <div class="flex items-center gap-3">
+                  <div class="flex-1 min-w-0">
+                    <div
+                      class="h-1.5 rounded-full bg-orange-100 overflow-hidden"
+                    >
+                      <div
+                        class="progress-fill h-full rounded-full bg-orange-500"
+                        [style.width.%]="item.progress"
+                      ></div>
+                    </div>
+                    <p class="text-xs text-orange-900/80 mt-1.5">
+                      {{ item.takenDays }}
+                      {{ item.takenDays === 1 ? 'día tomado' : 'días tomados' }}
+                      · quedan {{ item.remainingDays }}
+                    </p>
+                  </div>
+                  <app-button
+                    variant="secondary"
+                    extraClass="!rounded-lg !px-3 !py-2 !text-sm font-semibold !border-orange-300 !text-orange-800 hover:!bg-orange-50"
+                    [loading]="processingId() === item.id"
+                    (buttonClick)="requestRemoval(item)"
+                  >
+                    @if (processingId() === item.id) {
+                      <span
+                        class="w-4 h-4 border-2 border-orange-700 border-t-transparent rounded-full animate-spin"
+                      ></span>
+                    }
+                    Terminar hoy
+                  </app-button>
+                </div>
+              }
+            </div>
+          } @empty {
+            <div
+              animate.enter="fade-slide-in"
+              class="flex flex-col items-center gap-1.5 text-center py-6 text-sm text-gray-500 border border-dashed border-gray-200 rounded-xl"
+            >
+              <svg lucideCalendarOff [size]="22" class="text-gray-400"></svg>
+              No tiene descansos programados.
+            </div>
+          }
+        }
+      </section>
+
+      <!-- Historial -->
+      @if (historyItems().length) {
+        <section animate.enter="fade-slide-in">
+          <app-button
+            variant="secondary"
+            [fullWidth]="true"
+            extraClass="!justify-between !rounded-xl !px-4 !py-3 !text-sm !bg-gray-50 hover:!bg-gray-100 !border-[#e3ebf4]"
+            (buttonClick)="toggleHistory()"
+          >
+            <span class="flex items-center gap-2 font-semibold text-gray-700">
+              <svg
+                lucideChevronDown
+                [size]="16"
+                class="transition-transform duration-300"
+                [class.-rotate-90]="!historyOpen()"
+              ></svg>
+              Historial
+            </span>
+            <span class="text-gray-500">
+              {{ historyItems().length }}
+              {{ historyItems().length === 1 ? 'finalizado' : 'finalizados' }}
+            </span>
+          </app-button>
+
+          <div
+            class="grid transition-[grid-template-rows,opacity] duration-300 ease-out"
+            [class]="
+              historyOpen()
+                ? 'grid-rows-[1fr] opacity-100'
+                : 'grid-rows-[0fr] opacity-0'
+            "
+            [attr.aria-hidden]="!historyOpen()"
+          >
+            <div class="overflow-hidden">
+              <div class="pt-2 space-y-1">
+                @for (item of historyItems(); track item.id) {
+                  <div
+                    animate.enter="item-enter"
+                    class="flex items-center gap-3 px-3 py-2 rounded-lg"
+                  >
+                    <div
+                      class="w-11 shrink-0 text-center rounded-md py-1 leading-tight bg-gray-100 text-gray-500"
+                    >
+                      <div class="text-[10px] font-extrabold tracking-wider">
+                        {{ item.month }}
+                      </div>
+                      <div class="text-base font-extrabold">{{ item.day }}</div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-gray-600 font-medium text-sm">
+                        {{ item.label }}
+                      </p>
+                      <p class="text-gray-500 text-xs truncate">
+                        {{ item.days }} {{ item.days === 1 ? 'día' : 'días' }} ·
+                        {{ item.reason }}
+                      </p>
+                    </div>
+                    <span
+                      class="text-xs font-semibold text-gray-600 bg-gray-100 rounded-full px-2.5 py-1 shrink-0"
+                    >
+                      Finalizado
+                    </span>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        </section>
+      }
+    </div>
+  </aside>
+</div>
+
+<!-- Confirmación: eliminar o terminar hoy (por encima del panel) -->
+<div class="relative z-[70]">
+  <app-confirm-modal
+    [visible]="!!pendingRemoval()"
+    [title]="
+      pendingRemoval()?.mode === 'trim'
+        ? '¿Terminar el descanso hoy?'
+        : '¿Eliminar este descanso?'
+    "
+    [richMessage]="true"
+    maxWidth="max-w-md"
+    [fullWidthButtons]="true"
+    cancelLabel="Cancelar"
+    [confirmLabel]="
+      pendingRemoval()?.mode === 'trim' ? 'Terminar hoy' : 'Eliminar'
+    "
+    [confirmVariant]="pendingRemoval()?.mode === 'trim' ? 'primary' : 'danger'"
+    [iconBg]="
+      pendingRemoval()?.mode === 'trim' ? 'bg-orange-100' : 'bg-red-100'
+    "
+    (dismissed)="cancelRemoval()"
+    (confirmed)="confirmRemoval()"
+  >
+    <svg
+      icon
+      [lucideIcon]="pendingIcon()"
+      [size]="24"
+      [class]="
+        pendingRemoval()?.mode === 'trim' ? 'text-orange-600' : 'text-red-600'
+      "
+    ></svg>
+    <span message>
+      @if (pendingRemoval(); as pending) {
+        @if (pending.mode === 'trim') {
+          El descanso terminará ayer, <strong>{{ yesterdayLabel() }}</strong
+          >. Desde hoy se podrán agendar citas con {{ doctor().name }}. Los
+          {{ pending.item.takenDays }} días ya tomados quedan en el historial.
+        } @else {
+          <strong>{{ pending.item.label }}</strong> · {{ pending.item.reason }}.
+          Las fechas volverán a estar disponibles para agendar con
+          {{ doctor().name }}.
+        }
+      }
+    </span>
+  </app-confirm-modal>
+</div>

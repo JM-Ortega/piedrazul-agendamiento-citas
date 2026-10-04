@@ -8,13 +8,14 @@ import {
 } from '@angular/core';
 import {
   LucideCalendarCheck,
+  LucideChartNoAxesColumn,
   LucideCheck,
   LucideDynamicIcon,
   LucidePencil,
   LucideSettings,
   LucideX,
 } from '@lucide/angular';
-import { finalize, forkJoin, Observable } from 'rxjs';
+import { catchError, finalize, forkJoin, Observable, of } from 'rxjs';
 import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
 import { PaginationComponent } from '../../../../designSystem/molecules/pagination/pagination.component';
 import { SearchInputComponent } from '../../../../designSystem/molecules/searchInput/searchInput.component';
@@ -37,14 +38,19 @@ import {
 import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
+import { AdminStatisticsComponent } from '../../components/adminStatistics/adminStatistics.component';
 import { DoctorCardComponent } from '../../components/doctorCard/doctorCard.component';
+import { DoctorTimeOffDrawerComponent } from '../../components/doctorTimeOffDrawer/doctorTimeOffDrawer.component';
 import {
   DoctorEditFormComponent,
   DoctorSaveEvent,
 } from '../../components/doctorEditForm/doctorEditForm.component';
 import { AdminModalsComponent } from '../../components/modals/modalHorarios/adminModals.component';
 import { dtoSchedule } from '../../models/dtos/schedule.dto';
+import { TimeOffDto } from '../../models/dtos/timeOff.dto';
 import { AdminService } from '../../service/admin.service';
+
+type AdminView = 'horarios' | 'estadisticas';
 
 @Component({
   selector: 'app-admin-config',
@@ -65,6 +71,9 @@ import { AdminService } from '../../service/admin.service';
     ConfirmModalComponent,
     LucideDynamicIcon,
     ButtonComponent,
+    AdminStatisticsComponent,
+    LucideChartNoAxesColumn,
+    DoctorTimeOffDrawerComponent,
   ],
 })
 export class AdminConfigComponent implements OnInit {
@@ -88,8 +97,16 @@ export class AdminConfigComponent implements OnInit {
   toastMessage = signal('');
   toastType = signal<ToastType | null>(null);
 
+  // ── Descansos ─────────────────────────────────────────────────────────────
+  /** Descansos por id de doctor (para los chips de las tarjetas). */
+  timeOffsByDoctor = signal<Record<string, TimeOffDto[]>>({});
+  /** Doctor cuyo panel de descansos está abierto. */
+  timeOffDoctor = signal<Doctor | null>(null);
+
   readonly Check = LucideCheck;
   readonly X = LucideX;
+  // ── Vista activa ──────────────────────────────────────────────────────────
+  activeView = signal<AdminView>('horarios');
   // ── Paginacion ──────────────────────────────────────────────────────────────
   currentPage = signal(0);
   totalPages = signal(0);
@@ -153,6 +170,8 @@ export class AdminConfigComponent implements OnInit {
             this.loading.set(false);
             return;
           }
+
+          this.loadTimeOffs(doctors);
 
           forkJoin(
             doctors.map((d) => this.adminService.getSchedulesByDoctor(d.id))
@@ -375,6 +394,35 @@ export class AdminConfigComponent implements OnInit {
     });
   }
 
+  // ── Descansos ─────────────────────────────────────────────────────────────
+  openTimeOff(doctor: Doctor): void {
+    if (doctor.status === false) return;
+    this.timeOffDoctor.set(doctor);
+  }
+
+  closeTimeOff(): void {
+    this.timeOffDoctor.set(null);
+  }
+
+  onTimeOffsChange(doctorId: string, timeOffs: TimeOffDto[]): void {
+    this.timeOffsByDoctor.update((map) => ({ ...map, [doctorId]: timeOffs }));
+  }
+
+  /** Carga los descansos de los doctores de la página. Si uno falla, queda sin chip. */
+  private loadTimeOffs(doctors: Doctor[]): void {
+    forkJoin(
+      doctors.map((d) =>
+        this.adminService
+          .getTimeOffs(d.id)
+          .pipe(catchError(() => of([] as TimeOffDto[])))
+      )
+    ).subscribe((lists) => {
+      const map: Record<string, TimeOffDto[]> = {};
+      doctors.forEach((d, i) => (map[d.id] = lists[i]));
+      this.timeOffsByDoctor.set(map);
+    });
+  }
+
   onCloseErrorModal(): void {
     this.showErrorModal.set(false);
     this.errorGuardado.set('');
@@ -387,12 +435,21 @@ export class AdminConfigComponent implements OnInit {
     return 'border-gray-100 bg-white hover:shadow-lg transition-shadow';
   }
 
+  viewTabClass(view: AdminView): string {
+    return (
+      'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ' +
+      (this.activeView() === view
+        ? 'bg-[#215c98] text-white shadow-sm'
+        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700')
+    );
+  }
+
   // ── Private ───────────────────────────────────────────────────────────────
   private toTimeBackend(time: string | undefined): string {
     if (!time) return '';
     return time.length === 5 ? `${time}:00` : time;
   }
-  private showToast(type: ToastType, message: string, duration = 3000): void {
+  showToast(type: ToastType, message: string, duration = 3000): void {
     this.toastType.set(type);
     this.toastMessage.set(message);
     setTimeout(() => {

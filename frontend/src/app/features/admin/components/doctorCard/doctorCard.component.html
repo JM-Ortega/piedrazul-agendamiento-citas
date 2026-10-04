@@ -35,15 +35,34 @@
   }
 
   @if (!isEditing()) {
-    <app-button
-      variant="primary"
-      extraClass="!rounded-lg !px-3.5 !py-1.5 !text-sm"
-      [appTooltip]="'Editar configuración del médico'"
-      (buttonClick)="handleEdit()"
-    >
-      <svg lucidePencil [size]="15"></svg>
-      Editar
-    </app-button>
+    <div class="flex items-center gap-2">
+      <span
+        [appTooltip]="
+          doctor().status === false
+            ? 'El médico debe estar activo para programar descansos'
+            : 'Ver y programar descansos'
+        "
+      >
+        <app-button
+          variant="secondary"
+          extraClass="!rounded-lg !px-3.5 !py-1.5 !text-sm !border-[#c2d8f0] !text-[#215c98] hover:!bg-blue-50"
+          [disabled]="doctor().status === false"
+          (buttonClick)="handleTimeOff()"
+        >
+          <svg lucideCoffee [size]="15"></svg>
+          Descansos
+        </app-button>
+      </span>
+      <app-button
+        variant="primary"
+        extraClass="!rounded-lg !px-3.5 !py-1.5 !text-sm"
+        [appTooltip]="'Editar configuración del médico'"
+        (buttonClick)="handleEdit()"
+      >
+        <svg lucidePencil [size]="15"></svg>
+        Editar
+      </app-button>
+    </div>
   }
 </div>
 
@@ -70,7 +89,7 @@
               {{ getDisplaySchedule().endTime }}
             </span>
           }
-          @if (doctor().workdays?.length) {
+          @if (doctor().workdays.length) {
             <span class="bg-blue-50 px-2 py-1 rounded-lg">
               {{ getWorkDayLabels(doctor().workdays) }}
             </span>
@@ -119,6 +138,27 @@
         <svg lucideCalendar [size]="12"></svg>
         Período laboral: {{ doctor().laborStart }} – {{ doctor().laborEnd }}
       </span>
+      @if (featuredTimeOff(); as timeOff) {
+        <span
+          animate.enter="animate-fade-in"
+          class="px-2 py-1 rounded-lg flex items-center gap-1.5 font-medium border"
+          [class]="
+            timeOff.status === 'EN_CURSO'
+              ? 'bg-orange-50 text-orange-800 border-orange-200'
+              : 'bg-sky-50 text-[#14548f] border-sky-200'
+          "
+        >
+          @if (timeOff.status === 'EN_CURSO') {
+            <span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+          } @else {
+            <svg lucideCoffee [size]="12"></svg>
+          }
+          {{ timeOffLabel(timeOff) }}
+          @if (extraScheduledTimeOffs() > 0) {
+            <span class="opacity-70">+{{ extraScheduledTimeOffs() }}</span>
+          }
+        </span>
+      }
     </div>
 
     @if (hasRealDayOverrides()) {

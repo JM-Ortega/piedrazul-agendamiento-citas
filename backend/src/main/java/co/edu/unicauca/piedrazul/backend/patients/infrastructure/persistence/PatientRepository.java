@@ -66,4 +66,65 @@ public interface PatientRepository extends JpaRepository<Patient, UUID> {
         """,
             nativeQuery = true)
     Page<PatientSummaryProjection> searchSummaries(@Param("term") String term, Pageable pageable);
+
+    /**
+     * Igual que {@link #findAllSummaries(Pageable)}, pero solo los pacientes que tienen
+     * cuenta de usuario ({@code person.user_id} no nulo), e incluye ese id.
+     */
+    @Query(
+            value = """
+        SELECT p.id AS "id",
+               p.identification AS "identification",
+               p.first_name AS "firstName",
+               p.last_name AS "lastName",
+               p.user_id AS "userId"
+        FROM piedrazul.patient pt
+        JOIN piedrazul.person p ON p.id = pt.person_id
+        WHERE p.user_id IS NOT NULL
+        ORDER BY extensions.immutable_unaccent(lower(p.first_name || ' ' || p.last_name)), p.id
+        """,
+            countQuery = """
+        SELECT COUNT(*)
+        FROM piedrazul.patient pt
+        JOIN piedrazul.person p ON p.id = pt.person_id
+        WHERE p.user_id IS NOT NULL
+        """,
+            nativeQuery = true)
+    Page<PatientAccountSummaryProjection> findAccountedSummaries(Pageable pageable);
+
+    /**
+     * Igual que {@link #findAccountedSummaries(Pageable)}, pero solo los que además
+     * coinciden con {@code term} en nombre completo o documento. El término debe venir
+     * con {@code \}, {@code %} y {@code _} escapados con {@code \}.
+     */
+    @Query(
+            value = """
+        SELECT p.id AS "id",
+               p.identification AS "identification",
+               p.first_name AS "firstName",
+               p.last_name AS "lastName",
+               p.user_id AS "userId"
+        FROM piedrazul.patient pt
+        JOIN piedrazul.person p ON p.id = pt.person_id
+        WHERE p.user_id IS NOT NULL
+          AND (
+                extensions.immutable_unaccent(lower(p.first_name || ' ' || p.last_name))
+                    LIKE extensions.immutable_unaccent(lower('%' || :term || '%')) ESCAPE '\\'
+                OR p.identification LIKE ('%' || :term || '%') ESCAPE '\\'
+              )
+        ORDER BY extensions.immutable_unaccent(lower(p.first_name || ' ' || p.last_name)), p.id
+        """,
+            countQuery = """
+        SELECT COUNT(*)
+        FROM piedrazul.patient pt
+        JOIN piedrazul.person p ON p.id = pt.person_id
+        WHERE p.user_id IS NOT NULL
+          AND (
+                extensions.immutable_unaccent(lower(p.first_name || ' ' || p.last_name))
+                    LIKE extensions.immutable_unaccent(lower('%' || :term || '%')) ESCAPE '\\'
+                OR p.identification LIKE ('%' || :term || '%') ESCAPE '\\'
+              )
+        """,
+            nativeQuery = true)
+    Page<PatientAccountSummaryProjection> searchAccountedSummaries(@Param("term") String term, Pageable pageable);
 }

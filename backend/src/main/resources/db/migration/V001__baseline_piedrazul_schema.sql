@@ -96,32 +96,6 @@ CREATE TABLE piedrazul.verification_purpose (
     CONSTRAINT pk_verification_purpose PRIMARY KEY (code)
 );
 
-/*
--- ---------------------------------------------------------------------
--- Catálogo: audit_action
--- Acción registrada en la bitácora de auditoría. Catálogo porque puede
--- crecer con el tiempo a medida que se instrumenten más acciones.
--- ---------------------------------------------------------------------
-CREATE TABLE piedrazul.audit_action (
-    code   VARCHAR(60)  NOT NULL,
-    name   VARCHAR(150) NOT NULL,
-
-    CONSTRAINT pk_audit_action PRIMARY KEY (code)
-);
-
--- ---------------------------------------------------------------------
--- Catálogo: audit_module
--- Módulo del sistema al que pertenece una acción auditada. Catálogo
--- porque puede crecer con nuevos módulos.
--- ---------------------------------------------------------------------
-CREATE TABLE piedrazul.audit_module (
-    code   VARCHAR(40)  NOT NULL,
-    name   VARCHAR(100) NOT NULL,
-
-    CONSTRAINT pk_audit_module PRIMARY KEY (code)
-);
- */
-
 -- =====================================================================
 -- Tabla: audit_module
 -- Catálogo de módulos de negocio que pueden generar eventos de auditoría
@@ -268,6 +242,31 @@ CREATE TABLE piedrazul.schedule (
 );
 
 CREATE INDEX idx_schedule_doctor ON piedrazul.schedule (doctor_id);
+
+-- ---------------------------------------------------------------------
+-- Tabla: doctor_time_off
+-- Periodo de descanso de un doctor (rango de fechas inclusivo en el que
+-- no se puede agendar con él). Un doctor puede tener muchos.
+--
+-- Es también el historial de descansos: un descanso en curso que se
+-- elimina no se borra, se recorta (end_date = ayer) para conservar los
+-- días que sí se descansaron. Solo se borran los que aún no empezaron.
+-- Los rangos de un mismo doctor no se solapan (lo valida la aplicación).
+-- ---------------------------------------------------------------------
+CREATE TABLE piedrazul.doctor_time_off (
+    id           UUID         NOT NULL,
+    doctor_id    UUID         NOT NULL,
+    start_date   DATE         NOT NULL,
+    end_date     DATE         NOT NULL,
+    reason       VARCHAR(255),
+    created_at   TIMESTAMPTZ  NOT NULL,
+
+    CONSTRAINT pk_doctor_time_off PRIMARY KEY (id),
+    CONSTRAINT fk_doctor_time_off_doctor FOREIGN KEY (doctor_id) REFERENCES piedrazul.doctor(person_id),
+    CONSTRAINT ck_doctor_time_off_dates CHECK (end_date >= start_date)
+);
+
+CREATE INDEX idx_doctor_time_off_doctor_dates ON piedrazul.doctor_time_off (doctor_id, start_date, end_date);
 
 -- ---------------------------------------------------------------------
 -- Tabla: appointment

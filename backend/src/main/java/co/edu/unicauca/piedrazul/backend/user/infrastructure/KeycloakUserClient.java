@@ -18,6 +18,7 @@ import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.representations.idm.CredentialRepresentation;
+import org.keycloak.representations.idm.EventRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
@@ -32,6 +33,7 @@ import java.util.*;
 public class KeycloakUserClient {
 
     private static final Logger log = LoggerFactory.getLogger(KeycloakUserClient.class);
+    private static final List<String> LOGIN_EVENT_TYPES = List.of("LOGIN", "LOGIN_ERROR");
 
     private final Keycloak keycloak;
     private final KeycloakProperties props;
@@ -79,7 +81,7 @@ public class KeycloakUserClient {
 
             if (status == Response.Status.CONFLICT.getStatusCode()) {
                 // El conflicto puede ser por username o por email.
-                throw new IdentityProviderException(
+                throw new UserAlreadyExistsException(
                         "Ya existe un usuario registrado con ese nombre de usuario o correo electrónico (" + username
                                 + " / " + email + ")");
             }
@@ -106,8 +108,9 @@ public class KeycloakUserClient {
 
         user.setId(keycloakId);
 
-        String actorId = securityExtractor.currentActorId();
-        String actorRoles = securityExtractor.currentActorRoles();
+        // Sin usuario autenticado (el registro público de un paciente), quien actúa es la propia cuenta.
+        String actorId = securityExtractor.currentActorId(keycloakId);
+        String actorRoles = securityExtractor.currentActorRoles(keycloakId);
 
         eventPublisher.publishEvent(
                 UserCreatedEvent.of(
@@ -169,8 +172,8 @@ public class KeycloakUserClient {
 
         eventPublisher.publishEvent(UserRoleAssignedEvent.of(
                 keycloakId.toString(),
-                securityExtractor.currentActorId(),
-                securityExtractor.currentActorRoles(),
+                securityExtractor.currentActorId(keycloakId.toString()),
+                securityExtractor.currentActorRoles(keycloakId.toString()),
                 MDC.get("correlationId"),
                 toJson(before),
                 toJson(after)));
@@ -190,8 +193,8 @@ public class KeycloakUserClient {
 
         eventPublisher.publishEvent(UserRoleRevokedEvent.of(
                 keycloakId.toString(),
-                securityExtractor.currentActorId(),
-                securityExtractor.currentActorRoles(),
+                securityExtractor.currentActorId(keycloakId.toString()),
+                securityExtractor.currentActorRoles(keycloakId.toString()),
                 MDC.get("correlationId"),
                 toJson(before),
                 toJson(after)));
@@ -295,8 +298,8 @@ public class KeycloakUserClient {
 
         eventPublisher.publishEvent(UserAccountStatusChangedEvent.of(
                 patientId.toString(),
-                securityExtractor.currentActorId(),
-                securityExtractor.currentActorRoles(),
+                securityExtractor.currentActorId(keycloakId.toString()),
+                securityExtractor.currentActorRoles(keycloakId.toString()),
                 MDC.get("correlationId"),
                 before,
                 enabled));
@@ -383,6 +386,42 @@ public class KeycloakUserClient {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /**
+     * El indicador {@code enabled} de cada cuenta. Una cuenta que ya no existe en el
+     * proveedor de identidad (dato inconsistente: la persona conserva un {@code userId}
+     * que Keycloak ya no tiene) se reporta como desactivada en vez de romper el listado.
+     */
+    public Map<UUID, Boolean> getEnabledStatusByIds(Collection<UUID> keycloakIds) {
+        Map<UUID, Boolean> enabledByUserId = new LinkedHashMap<>();
+
+        for (UUID keycloakId : keycloakIds) {
+            boolean enabled;
+            try {
+                UserRepresentation user = keycloak.realm(props.getRealm())
+                        .users()
+                        .get(keycloakId.toString())
+                        .toRepresentation();
+                enabled = Boolean.TRUE.equals(user.isEnabled());
+            } catch (WebApplicationException ex) {
+                log.warn("No se pudo leer el estado de la cuenta {} en el proveedor de identidad", keycloakId, ex);
+                enabled = false;
+            }
+            enabledByUserId.put(keycloakId, enabled);
+        }
+
+        return enabledByUserId;
+    }
+
+    /**
+     * Los eventos de inicio de sesión ({@code LOGIN} y {@code LOGIN_ERROR}) desde {@code fromMillis}
+     * (inclusive), del más antiguo al más reciente. Requiere que el realm guarde esos eventos y que
+     * la cuenta de servicio tenga el rol {@code view-events}.
+     */
+    public List<EventRepresentation> findLoginEvents(long fromMillis, int first, int max) {
+        return keycloak.realm(props.getRealm())
+                .getEvents(LOGIN_EVENT_TYPES, null, null, fromMillis, Long.MAX_VALUE, null, first, max, "asc");
     }
 
     public List<String> getUserRoles(String keycloakId) {

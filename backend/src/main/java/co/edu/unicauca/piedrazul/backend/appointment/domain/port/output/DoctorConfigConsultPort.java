@@ -20,6 +20,9 @@ public interface DoctorConfigConsultPort {
     // Devuelve el intervalo entre citas configurado para el médico
     int getIntervalMinutesByDoctor(UUID idDoctor);
 
+    // Indica si el doctor está en un periodo de descanso en esa fecha
+    boolean isOnTimeOff(UUID idDoctor, java.time.LocalDate date);
+
     // Obtener IDs de medicos activos
     List<UUID> getActiveDoctorIds();
 

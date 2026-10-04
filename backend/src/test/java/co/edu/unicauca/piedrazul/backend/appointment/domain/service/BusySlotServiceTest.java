@@ -120,7 +120,7 @@ class BusySlotServiceTest {
         Appointment noAsistio = buildAppointmentWithState(
                 LocalTime.of(9, 0), AppointmentState.NO_ASISTIO
         );
-        AppointmentTime newSlot = new AppointmentTime(LocalTime.of(9, 0));
+        AppointmentTime newSlot = new AppointmentTime(LocalTime.of(10, 0));
 
         boolean result = busySlotService.isBusy(List.of(noAsistio), newSlot, 30);
 

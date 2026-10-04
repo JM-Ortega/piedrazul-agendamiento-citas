@@ -1,14 +1,11 @@
 /**
- * Resultado de búsqueda rápida de pacientes.
- * TODO(backend): alinear con el DTO real cuando exista el endpoint
- * `GET /patients/search?query=...`.
+ * Resultado de búsqueda de pacientes.
+ * Coincide con `PatientSummaryResponse` del backend
+ * (GET /api/patients?search=...).
  */
 export interface PatientQuickResult {
   id: string;
+  identification: string;
   firstName: string;
   lastName: string;
-  documentNumber: string;
-  phone: string;
-  sex: string;
-  appointmentsCount: number;
 }

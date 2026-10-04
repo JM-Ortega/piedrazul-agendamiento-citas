@@ -15,6 +15,11 @@ export interface SelectOption {
 
 export type SelectVariant = 'default' | 'outline' | 'ghost';
 export type SelectSize = 'sm' | 'md' | 'lg';
+const SIZE_CLASSES: Record<SelectSize, string> = {
+  sm: 'py-1.5 text-sm',
+  md: 'py-3 text-base',
+  lg: 'py-4 text-lg',
+};
 
 @Component({
   selector: 'app-select',
@@ -72,8 +77,7 @@ export class SelectComponent implements ControlValueAccessor {
       'bg-white',
       this.hasPrefix ? 'pl-12' : 'px-4',
       this.hasSuffix ? 'pr-12' : 'pr-4',
-      'py-3',
-      'text-base',
+      SIZE_CLASSES[this.size],
     ];
 
     baseClasses.push(

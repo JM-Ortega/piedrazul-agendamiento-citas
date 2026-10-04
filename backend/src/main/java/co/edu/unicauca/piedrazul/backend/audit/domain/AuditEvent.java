@@ -85,6 +85,14 @@ public final class AuditEvent {
             this.timestamp = timestamp; return this;
         }
 
+        /**
+         * Para lo que ocurrió fuera del backend y se registra después, como un inicio de sesión en
+         * Keycloak: la auditoría debe mostrar cuándo ocurrió, no cuándo se registró.
+         */
+        public Builder occurredAt(Instant occurredAt) {
+            return timestamp(occurredAt);
+        }
+
         public Builder actor(String actorId, String role) {
             this.actorId = actorId;
             this.actorRole = role;

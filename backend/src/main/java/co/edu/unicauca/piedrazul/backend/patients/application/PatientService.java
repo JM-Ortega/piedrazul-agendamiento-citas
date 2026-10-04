@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.patients.application;
 
 import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
 import co.edu.unicauca.piedrazul.backend.patients.api.PatientSex;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientAccountSummary;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientData;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.RegisterPatientCommand;
 import co.edu.unicauca.piedrazul.backend.patients.api.dto.output.PatientPublicResponse;
@@ -12,6 +13,7 @@ import co.edu.unicauca.piedrazul.backend.patients.exception.InvalidPatientDataEx
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientAlreadyLinkedUserException;
 import co.edu.unicauca.piedrazul.backend.patients.exception.PatientNotFoundException;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.mappers.PatientApiMapper;
+import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientAccountSummaryProjection;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientRepository;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientSummaryProjection;
 import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
@@ -394,6 +396,20 @@ public class PatientService implements PatientModuleApi {
 
     @Override
     @Transactional(readOnly = true)
+    public Page<PatientAccountSummary> searchPatientsWithAccount(String search, Pageable pageable) {
+        Pageable page = boundedPage(pageable);
+        String term = normalizeSearch(search);
+
+        Page<PatientAccountSummaryProjection> result = term == null
+                ? patientRepository.findAccountedSummaries(page)
+                : patientRepository.searchAccountedSummaries(escapeLike(term), page);
+
+        return result.map(row -> new PatientAccountSummary(
+                row.getId(), row.getUserId(), row.getIdentification(), row.getFirstName(), row.getLastName()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public boolean existsById(UUID id) {
         validateId(id);
         return patientRepository.existsById(id);
@@ -503,6 +519,10 @@ public class PatientService implements PatientModuleApi {
 
     public List<IdentificationType> getAllDocumentTypes() {
         return Arrays.asList(IdentificationType.values());
+    }
+
+    public List<PatientSex> getAllGenderTypes() {
+        return Arrays.asList(PatientSex.values());
     }
 
     /**

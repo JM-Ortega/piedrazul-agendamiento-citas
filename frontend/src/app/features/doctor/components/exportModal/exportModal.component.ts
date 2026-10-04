@@ -2,11 +2,13 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject,
   input,
   output,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import {
   LucideCalendar,
   LucideCircleCheck,
@@ -22,6 +24,8 @@ import {
   LucideTag,
   type LucideIcon,
 } from '@lucide/angular';
+import { catchError, combineLatest, of, switchMap, tap } from 'rxjs';
+import { DoctorService } from '../../../../core/services/doctor.service';
 import { SchedulerService } from '../../../../core/services/scheduler.service';
 import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
 import { AppointmentExportRequest } from '../../../../shared/models/dtos/AppointmentExportRequest.dto';
@@ -105,6 +109,8 @@ const EXPORT_STATUSES = [
 })
 export class ExportModalComponent {
   private schedulerService = inject(SchedulerService);
+  private doctorService = inject(DoctorService);
+  private destroyRef = inject(DestroyRef);
 
   // ── Inputs desde el padre ──────────────────────────────────────────────────
 
@@ -127,6 +133,14 @@ export class ExportModalComponent {
   // ── Estado interno ─────────────────────────────────────────────────────────
   currentStep = signal<ExportStep>(1);
   exportStatusFilter = signal<string>('all');
+
+  hasAvailability = signal(false);
+
+  /** True mientras se resuelve la verificación de disponibilidad (evita saltos de UI y dobles clics). */
+  checkingExistence = signal(false);
+
+  /** Error al verificar disponibilidad contra el backend (distinto del error de exportación). */
+  availabilityError = signal<string | null>(null);
 
   exportFormat = signal<ExportFormat>('excel');
   exportingInProgress = signal(false);
@@ -197,22 +211,48 @@ export class ExportModalComponent {
   /** Opciones de estado para el select, en el orden en que deben mostrarse. */
   readonly statusOptions: string[] = ['all', ...EXPORT_STATUSES];
 
+  // ── Constructor: verificación reactiva de disponibilidad ─────────────────
+
+  constructor() {
+    combineLatest([
+      toObservable(this.exportStatusFilter),
+      toObservable(this.appointments),
+    ])
+      .pipe(
+        tap(() => {
+          this.checkingExistence.set(true);
+          this.availabilityError.set(null);
+        }),
+        switchMap(([status, appointments]) => {
+          if (status === 'all') {
+            return of(appointments.length > 0);
+          }
+
+          const doctorId = this.idDoctor();
+          if (!doctorId) {
+            return of(appointments.some((a) => a.appointmentState === status));
+          }
+
+          return this.doctorService
+            .checkExistenceByDoctorAndState(doctorId, status)
+            .pipe(
+              catchError(() => {
+                this.availabilityError.set(
+                  'No se pudo verificar la disponibilidad de citas. Intente nuevamente.'
+                );
+                return of(false);
+              })
+            );
+        }),
+        tap(() => this.checkingExistence.set(false)),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe((hasAvailability) =>
+        this.hasAvailability.set(hasAvailability)
+      );
+  }
+
   // ── Computed ───────────────────────────────────────────────────────────────
-
-  /** Cantidad de citas de hoy por cada estado, más el total en 'all'. */
-  statusCounts = computed<Record<string, number>>(() => {
-    const list = this.appointments();
-    const counts: Record<string, number> = { all: list.length };
-    for (const s of EXPORT_STATUSES) {
-      counts[s] = list.filter((a) => a.appointmentState === s).length;
-    }
-    return counts;
-  });
-
-  /** Cantidad de citas que se exportarán según el estado seleccionado. */
-  selectedCount = computed(
-    () => this.statusCounts()[this.exportStatusFilter()] ?? 0
-  );
 
   hasSelectedColumns = computed(() =>
     Object.values(this.exportColumns()).some((v) => v)
@@ -254,7 +294,7 @@ export class ExportModalComponent {
 
   // ── Navegación entre pasos ────────────────────────────────────────────────
   goToStep2(): void {
-    if (this.selectedCount() === 0) return;
+    if (!this.hasAvailability() || this.checkingExistence()) return;
     this.currentStep.set(2);
   }
 
@@ -294,7 +334,7 @@ export class ExportModalComponent {
   }
 
   handleExport(): void {
-    if (!this.hasSelectedColumns() || this.selectedCount() === 0) return;
+    if (!this.hasSelectedColumns() || !this.hasAvailability()) return;
 
     this.exportingInProgress.set(true);
     this.exportError.set(null);

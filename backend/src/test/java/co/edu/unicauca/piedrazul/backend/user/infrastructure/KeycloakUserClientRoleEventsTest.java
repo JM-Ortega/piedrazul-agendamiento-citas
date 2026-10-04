@@ -74,8 +74,8 @@ class KeycloakUserClientRoleEventsTest {
         when(roleMappingResource.realmLevel()).thenReturn(roleScopeResource);
         when(realmResource.roles()).thenReturn(rolesResource);
         when(rolesResource.get(Role.DOCTOR.name())).thenReturn(roleResource);
-        when(securityExtractor.currentActorId()).thenReturn("admin-1");
-        when(securityExtractor.currentActorRoles()).thenReturn("[ADMIN]");
+        when(securityExtractor.currentActorId(USER_ID.toString())).thenReturn("admin-1");
+        when(securityExtractor.currentActorRoles(USER_ID.toString())).thenReturn("[ADMIN]");
     }
 
     private static RoleRepresentation role(Role role) {

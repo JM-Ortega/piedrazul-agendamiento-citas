@@ -16,10 +16,11 @@ import { scrollToElementById } from '../../../../shared/helpers/scrollToElement'
 
 /**
  * Panel colapsable de filtros. Encapsula su propio estado de apertura,
- * el scroll hacia el panel al abrirlo, y el conteo de filtros activos
- * (derivado genéricamente de appliedValues, sin importar qué campos traiga).
- * El padre solo provee los campos disponibles y los valores aplicados, y
- * escucha `apply` cuando el usuario confirma cambios.
+ * el scroll hacia el panel al abrirlo, el cierre automático al aplicar,
+ * y el conteo de filtros activos (derivado genéricamente de appliedValues,
+ * sin importar qué campos traiga). El padre solo provee los campos
+ * disponibles y los valores aplicados, y escucha `apply` cuando el
+ * usuario confirma cambios.
  */
 @Component({
   selector: 'app-filters-panel',
@@ -52,5 +53,12 @@ export class FiltersPanelComponent {
     if (willOpen) {
       scrollToElementById('filters-panel', { offset: 12 });
     }
+  }
+
+  // ── Filtros ───────────────────────────────────────────────────────────────
+  /** Reenvía los valores confirmados al padre y cierra el panel al instante. */
+  onFiltersApply(values: FilterValues): void {
+    this.apply.emit(values);
+    this.filtersOpen.set(false);
   }
 }

@@ -1,20 +1,22 @@
 import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   EventEmitter,
   Input,
+  OnInit,
   Output,
   computed,
   forwardRef,
   inject,
-  OnInit,
   signal,
-  ChangeDetectionStrategy,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import {
+  ControlValueAccessor,
+  FormsModule,
+  NG_VALUE_ACCESSOR,
+} from '@angular/forms';
 import { PatientService } from '../../../../core/services/register.service';
-import { Patient } from '../../../models/interfaces/patient.model';
-import { FormatoPipe } from '../../../pipes/formatoPipe';
 import {
   InputComponent,
   SanitizeRule,
@@ -25,9 +27,10 @@ import {
 } from '../../../../designSystem/atoms/select/select.component';
 import { DatepickerComponent } from '../../../../designSystem/molecules/datepicker/datepicker.component';
 import {
-  parseLocalDateString,
-  toIsoDateString,
-} from '../../../helpers/transformDateLocal';
+  DEFAULT_DOCUMENT_MAX_LENGTH,
+  DOCUMENT_RULES,
+  validateDocumentForType,
+} from '../../../helpers/documentValidation';
 import {
   EMAIL_MAX_DEFAULT,
   NAME_MAX_DEFAULT,
@@ -40,10 +43,11 @@ import {
   validatePhone,
 } from '../../../helpers/patientValidation';
 import {
-  DEFAULT_DOCUMENT_MAX_LENGTH,
-  DOCUMENT_RULES,
-  validateDocumentForType,
-} from '../../../helpers/documentValidation';
+  parseLocalDateString,
+  toIsoDateString,
+} from '../../../helpers/transformDateLocal';
+import { Patient } from '../../../models/interfaces/patient.model';
+import { FormatoPipe } from '../../../pipes/formatoPipe';
 
 export type PatientFormData = Omit<Patient, 'id'>;
 
@@ -58,12 +62,6 @@ export const EMPTY_PATIENT_FORM: PatientFormData = {
   guardianPhone: '',
   email: '',
 };
-
-const SEX_OPTIONS: SelectOption[] = [
-  { value: 'MASCULINO', label: 'Masculino' },
-  { value: 'FEMENINO', label: 'Femenino' },
-  { value: 'OTRO', label: 'Otro' },
-];
 
 /**
  * Formulario completo de datos de un paciente: tipo de documento (y,
@@ -88,6 +86,7 @@ const SEX_OPTIONS: SelectOption[] = [
 export class PatientFormComponent implements ControlValueAccessor, OnInit {
   protected patientService = inject(PatientService);
   private formatoPipe = new FormatoPipe();
+  private cdr = inject(ChangeDetectorRef);
 
   /** Fecha máxima seleccionable en el datepicker de fecha de nacimiento (por defecto, hoy). */
   @Input() maxBirthDate = new Date();
@@ -96,10 +95,15 @@ export class PatientFormComponent implements ControlValueAccessor, OnInit {
   /** Si es `true`, renderiza y valida también el número de documento. */
   @Input() showDocumentNumber = false;
 
+  /**
+   * Campos que se muestran pero no se pueden editar.
+   * Para bloquear otro campo enlazar `[disabled]="isLocked('campo')"` en su control.
+   */
+  @Input() lockedFields: readonly (keyof PatientFormData)[] = [];
+
   /** Emite el formulario completo cada vez que cambia cualquier campo. */
   @Output() valueChange = new EventEmitter<PatientFormData>();
 
-  readonly sexOptions = SEX_OPTIONS;
   readonly nameMin = NAME_MIN_DEFAULT;
   readonly emailMax = EMAIL_MAX_DEFAULT;
   readonly documentMaxLength = DEFAULT_DOCUMENT_MAX_LENGTH;
@@ -138,8 +142,20 @@ export class PatientFormComponent implements ControlValueAccessor, OnInit {
     isMinorPatient(this.documentTypeSignal(), this.birthDateSignal())
   );
 
+  sexOptions = computed<SelectOption[]>(() =>
+    this.patientService.sexOptions().map((sex) => ({
+      value: sex,
+      label: this.formatoPipe.transform(sex),
+    }))
+  );
+
   ngOnInit(): void {
     this.patientService.loadDocumentTypes();
+    this.patientService.loadSexOptions();
+  }
+
+  isLocked(field: keyof PatientFormData): boolean {
+    return this.lockedFields.includes(field);
   }
 
   /** Lee el valor actual de un campo del formulario. */
@@ -228,6 +244,7 @@ export class PatientFormComponent implements ControlValueAccessor, OnInit {
     this.value = value ? { ...value } : { ...EMPTY_PATIENT_FORM };
     this.birthDateSignal.set(this.value.birthDate ?? '');
     this.documentTypeSignal.set(this.value.identificationType ?? '');
+    this.cdr.markForCheck();
   }
 
   registerOnChange(fn: (value: PatientFormData) => void): void {

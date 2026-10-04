@@ -46,10 +46,7 @@
 
       <div class="my-3">
         <app-patient-quick-search
-          [results]="patientSearchResults()"
-          [loading]="patientSearchLoading()"
           [selectedPatient]="selectedPatient()"
-          (searchTermChanged)="onPatientSearch($event)"
           (patientSelected)="onPatientSelected($event)"
           (cleared)="onClearPatientFilter()"
         ></app-patient-quick-search>
@@ -72,24 +69,27 @@
           <p class="text-gray-500 text-sm mt-1">
             {{
               selectedPatient()
-                ? 'Doc: ' + selectedPatient()!.documentNumber
+                ? 'Doc: ' + selectedPatient()!.identification
                 : historyDescription()
             }}
           </p>
         </div>
-        <div>
-          @if (!selectedPatient()) {
-            <app-pagination
-              [pagination]="pagination()"
-              (pageChange)="onPageChange($event)"
-            ></app-pagination>
+        <div class="flex items-center gap-2">
+          @if (loadingPatientAppointments()) {
+            <div
+              class="w-4 h-4 border-2 border-[#215c98] border-t-transparent rounded-full animate-spin"
+            ></div>
           }
+          <app-pagination
+            [pagination]="pagination()"
+            (pageChange)="onPageChange($event)"
+          ></app-pagination>
         </div>
       </div>
 
       <app-appointment-table
         view="all"
-        [results]="tableResults()"
+        [results]="results()"
         (cancelRequested)="requestCancelAppointment($event)"
       ></app-appointment-table>
     </div>

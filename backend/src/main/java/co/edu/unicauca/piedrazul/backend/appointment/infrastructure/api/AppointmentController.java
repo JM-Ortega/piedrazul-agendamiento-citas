@@ -36,6 +36,9 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import co.edu.unicauca.piedrazul.backend.shared.audit.AuditTargetType;
+import co.edu.unicauca.piedrazul.backend.shared.audit.Auditable;
+import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 
 @Tag(name = "Citas", description = "Operaciones de agendamiento, gestión y consulta de citas médicas")
 @RestController
@@ -216,6 +219,7 @@ public class AppointmentController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
+    @Auditable(action = AuditAction.CITA_AGENDADA, targetEntityType = AuditTargetType.CITA, onlyDenied = true)
     @Operation(summary = "Agendar una cita",
             description = "Programa una cita médica. Maneja agendamiento manual (SCHEDULER/DOCTOR) y autónomo (PATIENT)," +
                     " aplicando las estrategias de resolución de pacientes correspondientes.")
@@ -278,6 +282,7 @@ public class AppointmentController {
 
     @PostMapping("/unscheduled")
     @PreAuthorize("hasRole('DOCTOR')")
+    @Auditable(action = AuditAction.CONTROL_MEDICO_CREADO, targetEntityType = AuditTargetType.CITA, onlyDenied = true)
     @Operation(summary = "Registrar atención no agendada",
             description = "Registra una cita de atención inmediata no agendada previamente," +
                     " con la opción de asociarla a un control medico (Medical Check up).")
@@ -308,6 +313,7 @@ public class AppointmentController {
 
     @PutMapping("/{appointmentId}/mark-as-attended")
     @PreAuthorize("hasRole('DOCTOR')")
+    @Auditable(action = AuditAction.CONTROL_MEDICO_CREADO, targetEntityType = AuditTargetType.CITA, targetIdExpression = "#appointmentId", onlyDenied = true)
     @Operation(summary = "Marcar cita como atendida", description = "Actualiza el estado de la cita a 'ATENDIDA' e inicia el proceso para asociarle un control medico.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Estado de cita actualizado correctamente"),

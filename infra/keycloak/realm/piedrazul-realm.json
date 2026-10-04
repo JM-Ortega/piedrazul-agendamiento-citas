@@ -117,6 +117,15 @@
         "clientRole": false,
         "containerId": "2ce18505-528d-4620-ae3a-f629f88fc0cc",
         "attributes": {}
+      },
+      {
+        "id": "6f1c4b3e-2a9d-4e07-8c5a-7b0e6d4f9a21",
+        "name": "AUDITOR",
+        "description": "Auditor. Consulta la bitácora de auditoría del sistema.",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "2ce18505-528d-4620-ae3a-f629f88fc0cc",
+        "attributes": {}
       }
     ],
     "client": {
@@ -491,7 +500,8 @@
           "view-realm",
           "manage-users",
           "view-users",
-          "query-users"
+          "query-users",
+          "view-events"
         ]
       },
       "notBefore": 0,
@@ -1649,9 +1659,10 @@
   "accountTheme": "",
   "adminTheme": "",
   "emailTheme": "",
-  "eventsEnabled": false,
+  "eventsEnabled": true,
+  "eventsExpiration": 7776000,
   "eventsListeners": ["jboss-logging"],
-  "enabledEventTypes": [],
+  "enabledEventTypes": ["LOGIN", "LOGIN_ERROR"],
   "adminEventsEnabled": false,
   "adminEventsDetailsEnabled": false,
   "identityProviders": [],

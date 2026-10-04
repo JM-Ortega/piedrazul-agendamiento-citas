@@ -55,6 +55,7 @@ class IsNewPatientUseCaseImplTest {
         assertThat(statesCaptor.getValue()).containsExactly(AppointmentState.ATENDIDA);
     }
 
+    /** Una cita agendada que aún no se atiende no cuenta: el paciente sigue siendo nuevo. */
     @Test
     void isNewPatientShouldReturnTrueWhenPatientHasNoAttendedAppointment() {
         UUID patientId = UUID.randomUUID();

@@ -6,6 +6,7 @@ import co.edu.unicauca.piedrazul.backend.verification.domain.VerificationCode;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,6 +36,11 @@ public class JpaVerificationCodeStore implements VerificationCodeStore {
     @Override
     public int consumeIfUnused(UUID codeId) {
         return repository.consumeIfUnused(codeId);
+    }
+
+    @Override
+    public long countIssuedSince(String subject, VerificationPurpose purpose, Instant since) {
+        return repository.countBySubjectAndPurposeAndCreatedAtGreaterThanEqual(subject, purpose, since);
     }
 
     @Override

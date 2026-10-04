@@ -32,7 +32,7 @@ class UserServiceTest {
 	private UserService userService;
 
 	@Test
-	void getSystemUsersShouldMergeDoctorsAndSchedulersWithoutDuplicates() {
+	void getSystemUsersShouldListEveryUserWithTheirRolesExceptPatient() {
 		UUID doctorId = UUID.fromString("11111111-1111-1111-1111-111111111111");
 		UUID schedulerId = UUID.fromString("22222222-2222-2222-2222-222222222222");
 
@@ -41,9 +41,7 @@ class UserServiceTest {
 		UserSummary scheduler = new UserSummary(schedulerId, "scheduler01", "Luis", "Perez",
 				"luis@test.com", List.of("SCHEDULER"));
 
-		when(keycloakUserService.findDoctors()).thenReturn(List.of(doctor, scheduler));
-		when(keycloakUserService.getSystemUsers()).thenReturn(List.of(scheduler));
-
+		when(keycloakUserService.getSystemUsers()).thenReturn(List.of(scheduler, doctor));
 		when(keycloakUserService.getUserRolesByIds(Set.of(doctorId, schedulerId)))
 				.thenReturn(Map.of(
 						doctorId, List.of(Role.DOCTOR.name(), Role.PATIENT.name()),
@@ -58,10 +56,11 @@ class UserServiceTest {
 		assertEquals(2, resultPage.getTotalElements());
 		assertEquals(2, result.size());
 
+		// Ordenados por nombre: Ana antes que Luis.
 		assertEquals(doctorId, result.get(0).id());
 		assertEquals("Ana", result.get(0).firstName());
 		assertEquals("Lopez", result.get(0).lastName());
-		assertEquals("doctor01", result.get(0).documentId()); // Ajusta a username() o documentId() según tu DTO
+		assertEquals("doctor01", result.get(0).documentId());
 		assertEquals(List.of(Role.DOCTOR.name()), result.get(0).roles()); // EXCLUDED_ROLES filtra PATIENT
 
 		assertEquals(schedulerId, result.get(1).id());
@@ -69,10 +68,6 @@ class UserServiceTest {
 		assertEquals("Perez", result.get(1).lastName());
 		assertEquals("scheduler01", result.get(1).documentId());
 		assertEquals(List.of(Role.SCHEDULER.name(), Role.DOCTOR.name()), result.get(1).roles());
-
-		verify(keycloakUserService).findDoctors();
-		verify(keycloakUserService).getSystemUsers();
-		verify(keycloakUserService).getUserRolesByIds(Set.of(doctorId, schedulerId));
 	}
 
 	@Test

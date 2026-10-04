@@ -12,11 +12,20 @@
       <div
         class="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden"
       >
-        <p
-          class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100"
+        @let total = pagination()?.totalElements ?? results().length;
+        <div
+          class="flex items-center justify-between px-4 border-b border-gray-100"
         >
-          {{ results().length }} resultado{{ results().length > 1 ? 's' : '' }}
-        </p>
+          <p
+            class="py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide"
+          >
+            {{ total }} resultado{{ total === 1 ? '' : 's' }}
+          </p>
+          <app-pagination
+            [pagination]="pagination()"
+            (pageChange)="onPageChange($event)"
+          ></app-pagination>
+        </div>
         @for (p of results(); track p.id) {
           <button
             type="button"
@@ -33,14 +42,9 @@
                 <p class="text-gray-800 text-sm font-semibold">
                   {{ p.firstName }} {{ p.lastName }}
                 </p>
-                <p class="text-gray-500 text-xs flex items-center gap-3 mt-0.5">
-                  <span class="flex items-center gap-1">
-                    <svg lucideFileText [size]="12"></svg>Doc:
-                    {{ p.documentNumber }}
-                  </span>
-                  <span class="flex items-center gap-1">
-                    <svg lucidePhone [size]="12"></svg>{{ p.phone }}
-                  </span>
+                <p class="text-gray-500 text-xs flex items-center gap-1 mt-0.5">
+                  <svg lucideFileText [size]="12"></svg>Doc:
+                  {{ p.identification }}
                 </p>
               </div>
             </div>
@@ -79,26 +83,18 @@
             {{ selectedPatient()!.firstName }} {{ selectedPatient()!.lastName }}
           </p>
           <p class="text-[#215c98] text-xs mt-0.5">
-            Doc: {{ selectedPatient()!.documentNumber }} ·
-            {{ selectedPatient()!.phone }}
+            Doc: {{ selectedPatient()!.identification }}
           </p>
         </div>
       </div>
-      <div class="flex items-center gap-3 shrink-0">
-        <span
-          class="bg-[#a7c9ec] text-[#163c63] text-xs font-semibold px-3 py-1.5 rounded-lg"
-        >
-          {{ selectedPatient()!.appointmentsCount }} citas
-        </span>
-        <button
-          type="button"
-          (click)="clear()"
-          class="text-[#4e92d9] hover:text-red-500 transition-colors cursor-pointer"
-          aria-label="Quitar filtro de paciente"
-        >
-          <svg lucideX [size]="18"></svg>
-        </button>
-      </div>
+      <button
+        type="button"
+        (click)="clear()"
+        class="text-[#4e92d9] hover:text-red-500 transition-colors cursor-pointer"
+        aria-label="Quitar filtro de paciente"
+      >
+        <svg lucideX [size]="18"></svg>
+      </button>
     </div>
   }
 </div>

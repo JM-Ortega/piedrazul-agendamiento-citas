@@ -6,6 +6,11 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.ScheduleRespons
 import co.edu.unicauca.piedrazul.backend.doctors.application.ScheduleService;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Workday;
 import co.edu.unicauca.piedrazul.backend.doctors.exception.DoctorNotFoundException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -18,6 +23,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
+@Tag(name = "Horarios de doctores", description = "Configuración y consulta de los horarios semanales de atención de los doctores")
 @RestController
 @RequestMapping("/api/doctor/schedules")
 @PreAuthorize("hasRole('ADMIN')")
@@ -42,7 +48,18 @@ public class ScheduleController {
      * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @PutMapping("/{doctorId}")
+    @Operation(summary = "Crear o actualizar el horario de un día",
+            description = "Método único para crear y actualizar: si el doctor no tiene horario para el día indicado lo crea; si ya lo tiene, "
+                    + "cambia sus horas. La hora final debe ser posterior a la inicial y la jornada debe estar entre las 6:00 y las 13:00.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Horario creado o actualizado correctamente"),
+            @ApiResponse(responseCode = "400", description = "Horas inválidas: la final no es posterior a la inicial, la jornada se sale de 6:00 a 13:00, el día falta o la duración de las citas no cabe"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para modificar horarios"),
+            @ApiResponse(responseCode = "404", description = "No existe un doctor con el identificador proporcionado")
+    })
     public ResponseEntity<Void> updateSchedule(
+            @Parameter(description = "Identificador único (UUID) del doctor")
             @PathVariable @NotNull(message = "El id del doctor es requerido")
             UUID doctorId,
             @RequestBody @Validated @NotNull(message = "El  horario a actualizar debe ser proporcionado")
@@ -75,9 +92,20 @@ public class ScheduleController {
      * @throws AccessDeniedException si el acceso al recurso es denegado por Spring Security.
      */
     @DeleteMapping("/{doctorId}/{workday}")
+    @Operation(summary = "Eliminar el horario de un día",
+            description = "Elimina el horario del doctor para el día de la semana indicado. Si el doctor no tiene horario ese día, no cambia nada.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Horario eliminado correctamente (o no existía para ese día)"),
+            @ApiResponse(responseCode = "400", description = "El día indicado no es válido"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para eliminar horarios"),
+            @ApiResponse(responseCode = "404", description = "No existe un doctor con el identificador proporcionado")
+    })
     public ResponseEntity<Void> deleteSchedule(
+            @Parameter(description = "Identificador único (UUID) del doctor")
             @PathVariable @NotNull(message = "El id del doctor es requerido")
             UUID doctorId,
+            @Parameter(description = "Día de la semana del horario a eliminar")
             @PathVariable @NotNull(message = "El dia del horario a eliminar es requerido")
             Workday workday
     ) {
@@ -95,7 +123,7 @@ public class ScheduleController {
      *
      * <p>
      * Requiere que el usuario autenticado posea alguno de los roles
-     * {@code SCHEDULER}, {@code PATIENT} o {@code DOCTOR}.
+     * {@code SCHEDULER} o {@code PATIENT}.
      * </p>
      *
      * @param doctorId identificador único (UUID) del doctor cuyos horarios serán consultados.
@@ -109,7 +137,18 @@ public class ScheduleController {
      */
     @GetMapping("/{doctorId}")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT')")
+    @Operation(summary = "Consultar los horarios de un doctor",
+            description = "Devuelve los horarios semanales de atención del doctor (día, hora de inicio y hora de fin). "
+                    + "La lista puede estar vacía si el doctor no tiene horarios registrados.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Horarios obtenidos correctamente"),
+            @ApiResponse(responseCode = "400", description = "El identificador del doctor no es válido"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar horarios"),
+            @ApiResponse(responseCode = "404", description = "No existe un doctor con el identificador proporcionado")
+    })
     public ResponseEntity<?> getSchedulesByDoctor(
+            @Parameter(description = "Identificador único (UUID) del doctor")
             @PathVariable @NotNull(message = "El id del doctor es requerido")
             UUID doctorId) {
 
@@ -144,9 +183,22 @@ public class ScheduleController {
      */
     @GetMapping("/{doctorId}/available-intervals/{workday}")
     @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
+    @Operation(summary = "Consultar los intervalos disponibles de un día",
+            description = "Devuelve las horas de inicio de cita posibles en el día de la semana indicado, según el horario del doctor "
+                    + "y la duración de sus citas. Solo incluye los intervalos que caben completos dentro de la jornada.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Intervalos obtenidos correctamente"),
+            @ApiResponse(responseCode = "400", description = "El día indicado no es válido o el horario del doctor es inválido"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar intervalos"),
+            @ApiResponse(responseCode = "404", description = "No existe el doctor o no trabaja el día indicado"),
+            @ApiResponse(responseCode = "409", description = "El doctor tiene más de un horario para ese día")
+    })
     public ResponseEntity<?> getAvailableIntervals(
+            @Parameter(description = "Identificador único (UUID) del doctor")
             @PathVariable @NotNull(message = "El id del doctor es requerido")
             UUID doctorId,
+            @Parameter(description = "Día de la semana a consultar")
             @PathVariable @NotNull(message = "El dia es requerido")
             Workday workday
     ) {

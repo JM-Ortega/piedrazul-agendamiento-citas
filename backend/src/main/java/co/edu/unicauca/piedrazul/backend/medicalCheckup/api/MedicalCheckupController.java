@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.medicalCheckup.api;
 
-import co.edu.unicauca.piedrazul.backend.audit.infrastructure.aop.Auditable;
+import co.edu.unicauca.piedrazul.backend.shared.audit.AuditTargetType;
+import co.edu.unicauca.piedrazul.backend.shared.audit.Auditable;
 import co.edu.unicauca.piedrazul.backend.medicalCheckup.MedicalCheckupExternalService;
 import co.edu.unicauca.piedrazul.backend.medicalCheckup.api.dto.intput.CheckupUpdateRequest;
 import co.edu.unicauca.piedrazul.backend.medicalCheckup.api.dto.output.MedicalCheckupResponse;
@@ -39,8 +40,8 @@ public class MedicalCheckupController {
 
     @GetMapping("/patient/{idPatient}")
     @Auditable(
-            action = AuditAction.HISTORIA_CLINICA_CONSULTADA,
-            targetEntityType = "HistoriaClinica",
+            action = AuditAction.CONTROL_MEDICO_CONSULTADO,
+            targetEntityType = AuditTargetType.CONTROL_MEDICO,
             targetIdExpression = "#idPatient"
     )
     @Operation(summary = "Obtener historial clínico de un paciente", description = "Devuelve una página con los controles médicos previos de un paciente. Por defecto, ordena mostrando los controles más recientes primero.")
@@ -64,8 +65,8 @@ public class MedicalCheckupController {
 
     @PostMapping("/updateCheckup/{idCheckUp}")
     @Auditable(
-            action = AuditAction.HISTORIA_CLINICA_CONSULTADA,
-            targetEntityType = "HistoriaClinica",
+            action = AuditAction.CONTROL_MEDICO_MODIFICADO,
+            targetEntityType = AuditTargetType.CONTROL_MEDICO,
             targetIdExpression = "#idCheckUp"
     )
     @Operation(summary = "Actualizar descripción de un control médico",

@@ -31,6 +31,11 @@ public class DoctorConfigConsultPortImpl implements DoctorConfigConsultPort {
     }
 
     @Override
+    public boolean isOnTimeOff(UUID idDoctor, java.time.LocalDate date) {
+        return doctorExternalService.isOnTimeOff(idDoctor, date);
+    }
+
+    @Override
     public List<UUID> getActiveDoctorIds() {
         return doctorExternalService.getActiveDoctorIds();
     }
