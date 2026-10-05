@@ -1,0 +1,167 @@
+---
+# Clasificación del estado técnico de Keycloak a partir de su propio estado (nunca de
+# archivos del host). La incluye keycloak_lifecycle.yml.
+#
+# Entradas:
+#   app_kc_with_api  true → además de la base, prueba la credencial de automatización
+#                    contra la API (requiere el contenedor keycloak healthy)
+#   app_kc_expected  forma y roles esperados (keycloak_lifecycle.yml)
+# Salidas:
+#   app_kc_observed  hechos leídos (sin secretos ni nombres de usuarios humanos)
+#   app_kc_state     P1 | P2 | P3 | unavailable
+#   app_kc_reasons   todos los motivos por los que no es P1 (vacío en P1 y P2)
+#   app_kc_blocking  subconjunto que ninguna automatización corrige, tampoco la recuperación
+#                    autorizada: posible pérdida de identidad o autoridad ajena → escalar
+#
+#   P2  el schema de Keycloak existe (P-1) y está vacío: Keycloak nunca escribió en él.
+#   P1  base inicializada, sin autoridad temporal, principales técnicos con la forma y los
+#       roles exactos, y la automatización autentica con el secreto deseado y ve el backend.
+#   P3  cualquier otra cosa observada: desconocido o divergente.
+#   unavailable  Keycloak no respondió a la prueba: falla transitoria, no P3.
+
+- name: Reiniciar la clasificación anterior
+  ansible.builtin.set_fact:
+    app_kc_reasons: []
+    app_kc_blocking: []
+    app_kc_api: {}
+
+- name: Leer el estado de Keycloak desde su base (solo lectura)
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - --interactive
+      - --user
+      - postgres
+      - postgres
+      - psql
+      - --no-psqlrc
+      - --quiet
+      - --tuples-only
+      - --no-align
+      - --set=kc_schema={{ kc_db_schema }}
+      - --set=app_realm={{ kc_realm }}
+      - --set=automation_client={{ kc_automation_client_id }}
+      - --set=backend_client={{ kc_backend_client_id }}
+      - --set=owned_temp_regex={{ kc_temp_admin_owned_regex }}
+      - --username={{ postgres_user }}
+      - --dbname={{ db_name }}
+    stdin: "{{ lookup('ansible.builtin.file', 'keycloak-state.sql') }}"
+  register: app_kc_db_probe
+  changed_when: false
+
+- name: Interpretar el estado de la base
+  ansible.builtin.set_fact:
+    app_kc_observed:
+      schema: "{{ _lines | select('match', '^schema=') | map('regex_replace', '^schema=', '') | first | default('') }}"
+      schema_objects: "{{ _lines | select('match', '^schema_objects=') | map('regex_replace', '^[^=]+=', '') | first | default('0') }}"
+      realms: "{{ _lines | select('match', '^realm=') | map('regex_replace', '^realm=', '') | list }}"
+      # owned:<tipo>:<nombre>:<uuid> / foreign:<tipo>:<nombre>:<uuid>
+      temporary_owned: "{{ _lines | select('match', '^temporary_admin=owned:') | map('regex_replace', '^temporary_admin=owned:', '') | list }}"
+      temporary_foreign: "{{ _lines | select('match', '^temporary_admin=foreign:') | map('regex_replace', '^temporary_admin=foreign:', '') | list }}"
+      automation_shape: "{{ _lines | select('match', '^client[.]automation=') | map('regex_replace', '^[^=]+=', '') | first | default('') }}"
+      backend_shape: "{{ _lines | select('match', '^client[.]backend=') | map('regex_replace', '^[^=]+=', '') | first | default('') }}"
+      automation_roles: "{{ (_lines | select('match', '^roles[.]automation=') | map('regex_replace', '^[^=]+=', '') | first | default('')).split(',') | reject('equalto', '') | reject('match', '^realm:default-roles-') | sort }}"
+      backend_roles: "{{ (_lines | select('match', '^roles[.]backend=') | map('regex_replace', '^[^=]+=', '') | first | default('')).split(',') | reject('equalto', '') | reject('match', '^realm:default-roles-') | sort }}"
+      master_admin_users: "{{ _lines | select('match', '^master_admin_users=') | map('regex_replace', '^[^=]+=', '') | first | default('0') | int }}"
+  vars:
+    _lines: "{{ app_kc_db_probe.stdout_lines }}"
+
+- name: Verificar que la lectura de la base fue concluyente
+  ansible.builtin.assert:
+    that:
+      - app_kc_observed.schema in ['absent', 'empty', 'partial', 'initialized']
+    fail_msg: >-
+      KEYCLOAK: no se pudo leer el estado de su base (schema {{ kc_db_schema }}). No se
+      clasifica ni se muta nada.
+    quiet: true
+
+# Bloqueantes: ni la convergencia ni la recuperación los corrigen. Reconstruirlos (importar
+# un realm, recrear un cliente, reiniciar un esquema) podría ocultar pérdida de identidad o
+# adoptar autoridad desconocida.
+- name: Calcular divergencias bloqueantes
+  ansible.builtin.set_fact:
+    app_kc_blocking: >-
+      {{ []
+         + (['falta el schema ' ~ kc_db_schema ~ ' (lo crea la base, contrato P-1)'] if o.schema == 'absent' else [])
+         + (['esquema de Keycloak parcialmente inicializado (' ~ o.schema_objects ~ ' objetos, sin tabla realm)']
+              if o.schema == 'partial' else [])
+         + (['falta el realm master'] if o.schema == 'initialized' and 'master' not in o.realms else [])
+         + (['falta el realm ' ~ kc_realm] if o.schema == 'initialized' and kc_realm not in o.realms else [])
+         + (['falta el cliente ' ~ kc_backend_client_id ~ ' en ' ~ kc_realm]
+              if o.schema == 'initialized' and kc_realm in o.realms and not o.backend_shape else [])
+         + (['autoridad temporal ajena o ambigua presente (' ~ o.temporary_foreign | length ~ '): '
+              ~ (o.temporary_foreign | map('regex_replace', ':[^:]+$', '') | join(', '))] if o.temporary_foreign else []) }}
+  vars:
+    o: "{{ app_kc_observed }}"
+
+- name: Calcular divergencias recuperables
+  ansible.builtin.set_fact:
+    app_kc_reasons: >-
+      {{ app_kc_blocking
+         + (['autoridad temporal propia de un evento interrumpido: '
+              ~ (o.temporary_owned | map('regex_replace', ':[^:]+$', '') | join(', '))] if o.temporary_owned else [])
+         + (['falta el cliente de automatización ' ~ kc_automation_client_id ~ ' en master']
+              if 'master' in o.realms and not o.automation_shape else [])
+         + (['forma del cliente de automatización divergente: ' ~ o.automation_shape]
+              if o.automation_shape and o.automation_shape != e.automation_shape else [])
+         + (['roles del service account de automatización divergentes: ' ~ (o.automation_roles | join(',') or 'ninguno')]
+              if o.automation_shape and o.automation_roles != e.automation_roles else [])
+         + (['forma del cliente ' ~ kc_backend_client_id ~ ' divergente: ' ~ o.backend_shape]
+              if o.backend_shape and o.backend_shape != e.backend_shape else [])
+         + (['roles del service account de ' ~ kc_backend_client_id ~ ' divergentes: ' ~ (o.backend_roles | join(',') or 'ninguno')]
+              if o.backend_shape and o.backend_roles != e.backend_roles else []) }}
+  vars:
+    o: "{{ app_kc_observed }}"
+    e: "{{ app_kc_expected }}"
+
+# Solo si la estructura ya es la esperada: la credencial deseada decide entre P1 y P3
+- name: Probar la credencial de automatización
+  community.docker.docker_container_exec:
+    container: keycloak
+    argv: ["/bin/bash", "-c", "{{ lookup('ansible.builtin.file', 'keycloak-admin.sh') }}", "keycloak-admin", "probe"]
+    env:
+      KCL_SERVER: "http://localhost:{{ kc_port }}"
+      KCL_REALM: "{{ kc_realm }}"
+      KCL_AUTOMATION_CLIENT_ID: "{{ kc_automation_client_id }}"
+      KCL_BACKEND_CLIENT_ID: "{{ kc_backend_client_id }}"
+      KCL_AUTOMATION_SECRET: "{{ app_kc_automation_secret }}"
+  register: app_kc_api_probe
+  changed_when: false
+  no_log: true
+  when:
+    - app_kc_with_api | bool
+    - app_kc_observed.schema == 'initialized'
+    - app_kc_reasons | length == 0
+
+- name: Interpretar la prueba de la API
+  ansible.builtin.set_fact:
+    app_kc_api: "{{ dict(_kv | map('regex_replace', '=.*$', '') | zip(_kv | map('regex_replace', '^[^=]*=', ''))) }}"
+  vars:
+    _kv: "{{ app_kc_api_probe.stdout_lines | default([]) | select('match', '^[a-z_.]+=') | list }}"
+  when: app_kc_api_probe is not skipped
+
+- name: Clasificar
+  ansible.builtin.set_fact:
+    app_kc_state: >-
+      {{ 'P2' if app_kc_observed.schema == 'empty'
+         else 'P3' if app_kc_reasons | length > 0
+         else 'pending' if app_kc_api_probe is skipped
+         else 'unavailable' if app_kc_api['auth.automation'] | default('') in ['unavailable', 'error']
+         else 'P1' if app_kc_api['auth.automation'] | default('') == 'ok' and app_kc_api['backend.visible'] | default('') == 'yes'
+         else 'P3' }}
+    app_kc_reasons: >-
+      {{ app_kc_reasons if app_kc_reasons | length > 0 or app_kc_api_probe is skipped
+         else ['la credencial de automatización fue rechazada: KC_AUTOMATION_CLIENT_SECRET rotado en GitHub o divergente en Keycloak']
+              if app_kc_api['auth.automation'] | default('') == 'rejected'
+         else ['la automatización no ve el cliente ' ~ kc_backend_client_id ~ ' (' ~ app_kc_api['backend.visible'] | default('sin respuesta') ~ ')']
+              if app_kc_api['auth.automation'] | default('') == 'ok' and app_kc_api['backend.visible'] | default('') != 'yes'
+         else [] }}
+
+- name: Fallar ante Keycloak sin respuesta (transitorio, no es P3)
+  ansible.builtin.fail:
+    msg: >-
+      KEYCLOAK: el servidor no respondió a la prueba de la automatización
+      ({{ app_kc_api['auth.automation'] | default('sin resultado') }}). Falla transitoria:
+      no se clasificó como P3 ni se mutó nada. Reintentar la convergencia.
+  when: app_kc_state == 'unavailable'

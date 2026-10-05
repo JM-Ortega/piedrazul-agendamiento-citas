@@ -17,10 +17,12 @@
         name: app
         tasks_from: setup.yml
 
-    - name: Inicializar identidad Keycloak (solo primer deploy)
+    # Clasifica por el estado de Keycloak (P1/P2/P3) y reconcilia credenciales técnicas.
+    # -e keycloak_recovery=true solo para una recuperación P3 autorizada.
+    - name: Ciclo técnico de Keycloak
       ansible.builtin.include_role:
         name: app
-        tasks_from: init_keycloak.yml
+        tasks_from: keycloak_lifecycle.yml
 
     - name: Entregar la configuración vigente al backend en ejecución
       ansible.builtin.include_role:

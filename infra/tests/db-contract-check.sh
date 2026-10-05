@@ -18,7 +18,7 @@
 #      con `up` (perfil) ni expone puertos o rutas.
 #   4. Cada variable requerida de la base ausente o vacía hace fallar el render.
 #   5. Orden: deploy.yml reconcilia → migra → arranca backend; setup.yml reconcilia antes de
-#      Keycloak; el workflow migra solo un backend construido y no pasa credenciales de la
+#      Traefik y converge.yml arranca Keycloak (keycloak_lifecycle.yml) después; el workflow migra solo un backend construido y no pasa credenciales de la
 #      base al paso de deploy.
 # Salida: 0 si todo pasa; 1 si algo falla.
 set -euo pipefail
@@ -186,8 +186,11 @@ check "deploy.yml: migración condicionada a app_migrate" \
   test "$(yq -r '.[] | select(.name == "Migrar esquema con el backend seleccionado") | .when' "${TASKS}/deploy.yml")" = "app_migrate | bool"
 S_CONVERGE="$(task_index "${TASKS}/setup.yml" 'Converger postgres y reconciliar autoridades de la base')"
 S_INFRA="$(task_index "${TASKS}/setup.yml" 'Levantar servicios de infraestructura')"
-check "setup.yml: reconciliación antes de Keycloak/Traefik" \
+check "setup.yml: reconciliación antes de Traefik" \
   test -n "${S_CONVERGE}" -a -n "${S_INFRA}" -a "${S_CONVERGE:-99}" -lt "${S_INFRA:-0}"
+CONVERGE_ORDER="$(yq -r '.[0].tasks[] | .["ansible.builtin.include_role"].tasks_from' "${ANSIBLE_DIR}/playbooks/converge.yml" | tr '\n' ' ')"
+check "converge.yml: Keycloak (keycloak_lifecycle.yml) arranca después de la reconciliación (setup.yml)" \
+  bash -c "[[ '${CONVERGE_ORDER}' == *'setup.yml keycloak_lifecycle.yml'* ]]"
 check "setup.yml: no levanta backend ni migrate" \
   bash -c "! yq -r '.[] | select(.\"community.docker.docker_compose_v2\") | .\"community.docker.docker_compose_v2\".services[]' '${TASKS}/setup.yml' | grep -Eq '^(backend|migrate)$'"
 check "migrate.yml: la migración corre bajo flock de db_lock_file" \

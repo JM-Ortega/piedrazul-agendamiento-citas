@@ -30,8 +30,12 @@ infra/ansible/
     └── app/                             # Gestión del stack de la aplicación
         ├── tasks/
         │   ├── main.yml                 # Punto de entrada (importa setup.yml)
-        │   ├── setup.yml                # Copia archivos, genera .env, levanta stack
-        │   ├── init_keycloak.yml        # Bootstrap de identidad (solo una vez)
+        │   ├── setup.yml                # Copia archivos, genera .env, postgres, Traefik
+        │   ├── keycloak_credentials.yml # Toma y valida las credenciales técnicas de Keycloak (setup)
+        │   ├── keycloak_backend_delivery.yml # Verifica que el backend recibe su secreto intacto (setup)
+        │   ├── keycloak_lifecycle.yml   # Ciclo técnico de Keycloak: P1/P2/P3 (converge)
+        │   ├── keycloak_state.yml       # Clasificación por el estado de Keycloak (base + API)
+        │   ├── keycloak_bootstrap.yml   # Evento con autoridad temporal (P2 o recuperación P3)
         │   ├── deploy.yml               # Rollout de backend y postgres (con migración previa)
         │   ├── db_converge.yml          # postgres + reconciliación de autoridades de la base (setup y deploy)
         │   ├── migrate.yml              # Migración de esquema de un solo uso (deploy)
@@ -40,6 +44,9 @@ infra/ansible/
         │   ├── verify_running_images.yml # Identidad exacta en ejecución
         │   ├── verify_health.yml        # Health de los contenedores propios
         │   └── record_release.yml       # Escribe el último despliegue exitoso
+        ├── files/
+        │   ├── keycloak-state.sql       # Lectura del estado de Keycloak en su base (solo lectura)
+        │   └── keycloak-admin.sh        # kcadm dentro del contenedor (secretos solo por entorno)
         ├── handlers/
         │   └── main.yml                 # Handler de restart del stack
         └── templates/
@@ -57,7 +64,7 @@ collections:
     version: "5.2.0"
   - name: ansible.posix       # sysctl, authorized_key
     version: "2.1.0"
-  - name: community.general   # keycloak_*, timezone
+  - name: community.general   # timezone
     version: "12.5.0"
 ```
 
@@ -106,8 +113,11 @@ release_state_file: "{{ app_dir }}/last-success.env"
 kc_realm: piedrazul
 kc_port: 8180
 kc_backend_client_id: piedrazul-backend
-kc_bootstrap_admin_user: kc-bootstrap
-kc_admin_user: kc-admin
+kc_automation_client_id: piedrazul-keycloak-automation
+kc_automation_roles: [piedrazul-realm:manage-clients, piedrazul-realm:view-clients]
+kc_temp_admin_prefix: piedrazul-tmp-admin
+kc_temp_admin_owned_regex: "^{{ kc_temp_admin_prefix }}-[0-9]{14}-[a-z0-9]{8}$"
+kc_realm_file: "{{ repo_root }}/infra/keycloak/realm/piedrazul-realm.json"
 ```
 
 ### `host_vars/vps.yml` (Hetzner)
@@ -139,8 +149,8 @@ converge.yml
 ├── role: common        → apt update, paquetes base, timezone
 ├── role: docker_host   → instala Docker CE + Compose plugin, daemon.json
 ├── role: hardening     → fail2ban, sysctl, deshabilita servicios innecesarios
-├── app/setup.yml       → copia archivos, genera .env, postgres + reconciliación, Keycloak/Traefik
-├── app/init_keycloak.yml → bootstrap de identidad (solo si no existe el marker)
+├── app/setup.yml       → copia archivos, genera .env, postgres + reconciliación, Traefik
+├── app/keycloak_lifecycle.yml → ciclo técnico de Keycloak (P1/P2/P3, ver abajo)
 └── app/refresh_backend.yml → recrea el backend en ejecución si cambió su configuración (sin imagen nueva)
 ```
 
@@ -207,14 +217,15 @@ El rol principal. Se invoca desde los playbooks con `tasks_from` para controlar 
 Corre en cada `converge`. Pasos:
 
 1. Crea `/opt/piedrazul/`
-2. Lee `KC_BACKEND_CLIENT_SECRET` del `.env` existente usando `slurp` + filtro Jinja — si no existe, genera uno nuevo con `openssl rand -hex 32` y lo guarda como `app_kc_backend_secret`
+2. `keycloak_credentials.yml`: toma `KC_BACKEND_CLIENT_SECRET` y `KC_AUTOMATION_CLIENT_SECRET` del entorno del runner y falla, nombrando solo la regla, si alguno está vacío, si son iguales (el de automatización no debe persistirse en el host) o si coinciden con un valor del repositorio (`.env.example`, realm). Sin lista de caracteres prohibidos ni requisito de formato nuevo: el valor (con el `trim` de extremos que ya se aplicaba) llega a Keycloak en JSON armado por Ansible y al backend por `.env` con escape
 3. Copia `infra/compose/` → `/opt/piedrazul/`
 4. Copia `infra/keycloak/` → `/opt/piedrazul/keycloak/` (realm JSON + theme JAR)
 5. Toma del entorno del runner las contraseñas de la base (`POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `MIGRATION_DB_PASSWORD`, `KC_DB_PASSWORD`) y falla, nombrando solo las claves, si alguna está vacía o contiene comilla simple o salto de línea
 6. Genera `.env` desde `env.j2`
 7. Valida y descarga por digest las imágenes propias → `image.env`
+   - `keycloak_backend_delivery.yml`: comprueba con `docker compose config` que el backend recibiría `KC_BACKEND_CLIENT_SECRET` exactamente igual al declarado (en `.env` va entre comillas dobles con `\ " $` escapados); si no, falla sin mostrar el valor
 8. `db_converge.yml`: postgres con el `.env` vigente + reconciliación de autoridades
-9. Levanta Keycloak y Traefik (`docker_compose_v2 state: present`). No arranca el backend ni migra
+9. Levanta Traefik (`docker_compose_v2 state: present`). No arranca Keycloak (lo hace `keycloak_lifecycle.yml`), el backend ni migra
 
 #### Identidad de las imágenes propias
 
@@ -235,20 +246,55 @@ Si cualquier paso falla o el run se cancela antes del registro, `last-success.en
 
 `last-success.env` es la única fuente de reuso y la lee el workflow, nunca Ansible (ver [Cadena de producción](#cadena-de-producción-workflow)). El formato anterior (`backend-deployed.env`, solo tag) no se migra: un servidor sin `last-success.env` necesita un deploy con build de backend y de postgres (o rollback de backend más build de postgres); un reuso falla cerrado.
 
-#### `init_keycloak.yml`
+#### Ciclo técnico de Keycloak (`keycloak_lifecycle.yml`)
 
-Corre **una sola vez** — controlado por el marker `/opt/piedrazul/.keycloak_initialized`. Si el marker existe, todo el bloque se salta. Pasos:
+Corre en cada `converge`, después de `setup.yml` (base reconciliada, `.env` vigente) y antes de `refresh_backend.yml`. Decide por el **estado de Keycloak**, no por archivos del host: no hay marker (el histórico `/opt/piedrazul/.keycloak_initialized` se borra si existe y no se consulta).
 
-1. Espera `http://127.0.0.1:9000/health/ready` (puerto management de Keycloak)
-2. Espera que el realm `piedrazul` esté importado (retry con `keycloak_realm`)
-3. Crea usuario admin permanente `kc-admin` en master realm (`keycloak_user`)
-4. Asigna rol `admin` a `kc-admin` (`keycloak_user_rolemapping`)
-5. Aplica `KC_BACKEND_CLIENT_SECRET` al client `piedrazul-backend` en realm `piedrazul` (`keycloak_client`)
-6. Elimina usuario bootstrap temporal `kc-bootstrap` (`keycloak_user`)
-7. Reinicia solo el backend para que tome el secret correcto
-8. Crea el marker `.keycloak_initialized`
+**Clasificación** (`keycloak_state.yml`):
 
-> **Para forzar re-inicialización:** eliminar `/opt/piedrazul/.keycloak_initialized` del servidor y correr `converge` de nuevo.
+1. Lee la base de Keycloak por el socket local de postgres (`files/keycloak-state.sql`, solo lectura, nunca columnas con secretos ni nombres de usuarios humanos): estado del schema `keycloak` (ausente, **vacío** —como lo deja `01-init-databases.sh`: cero tablas, secuencias, funciones y tipos—, **parcial** —objetos sin tabla `realm`— o inicializado), los realms `master` y `piedrazul`, autoridades temporales (`is_temporary_admin=true`, la marca de Keycloak para lo creado por `bootstrap-admin` o `KC_BOOTSTRAP_ADMIN_*`) clasificadas como **propias** (cliente con clientId exacto `kc_temp_admin_owned_regex` y solo los roles que da bootstrap-admin) o **ajenas** (todo lo demás), forma (banderas) y roles directos de los service accounts de `piedrazul-keycloak-automation` y `piedrazul-backend`, y el **número** de usuarios humanos con rol `admin` en `master`.
+2. Si no hay divergencias, prueba la credencial deseada de automatización contra la API (`files/keycloak-admin.sh probe`).
+
+| Estado | Condición | Resultado |
+|--------|-----------|-----------|
+| **P2** nuevo | el schema `keycloak` existe y está vacío | evento con autoridad temporal (con importación del realm) → reclasifica (debe ser P1) → reconciliación P1 |
+| **P1** conocido/reconciliado | sin autoridad temporal; automatización y backend con la forma y los roles exactos (backend: los del realm del repositorio; automatización: `kc_automation_roles`); la automatización autentica con `KC_AUTOMATION_CLIENT_SECRET` y ve el backend | reconciliación P1, sin autoridad temporal |
+| **P3 bloqueante** | schema ausente o parcial; falta `master`, `piedrazul` o el cliente `piedrazul-backend`; autoridad temporal ajena | **falla cerrado antes de arrancar Keycloak**, también con `keycloak_recovery=true`: puede implicar pérdida de identidad o autoridad desconocida → escalar |
+| **P3 recuperable** | credencial de automatización rechazada; falta la automatización; forma o roles técnicos distintos; autoridad temporal propia huérfana | **falla cerrado** con los motivos; no adopta, reinicia ni borra nada. Solo la recuperación autorizada lo corrige |
+| sin respuesta | Keycloak no respondió a la prueba | falla como transitoria (no es P3); reintentar |
+
+Si el schema está vacío pero el contenedor `keycloak` corre (p. ej. reiniciando sin conectar), se detiene antes del evento y se vuelve a leer; si entre tanto escribió en la base, ya no es P2.
+
+Keycloak de producción arranca con `start`, **sin `--import-realm`**: un reinicio nunca recrea un realm que falta. El realm del repositorio solo se importa dentro de un evento P2.
+
+**Reconciliación P1** (`keycloak-admin.sh reconcile`, con la automatización): sin leer el secreto vigente, prueba si el backend ya autentica con `KC_BACKEND_CLIENT_SECRET`; si Keycloak lo rechaza, lo fija. Después verifica el consumidor real: el backend autentica con ese secreto y lee su realm por la API de administración. Repetible: sin cambios no escribe nada.
+
+**Evento con autoridad temporal** (`keycloak_bootstrap.yml`, P2 o recuperación P3 autorizada):
+
+1. Detiene Keycloak: `kc.sh bootstrap-admin` exige todos los nodos detenidos (Keycloak 26.5 no lo verifica por sí mismo).
+2. `docker compose run --rm --no-deps keycloak bootstrap-admin service` con la configuración del servicio: cliente admin temporal en `master` con id `piedrazul-tmp-admin-<fecha>-<aleatorio>` y secreto aleatorio generado en el runner. No se persiste en el host ni va en argv: viaja por entorno, en tránsito, al contenedor de un solo uso (`--rm`) y al exec de kcadm (sesión en `/dev/shm`, borrada al terminar). En una base nueva el mismo comando crea el esquema y el realm `master`.
+3. Solo P2: `docker compose run --rm --no-deps keycloak import --dir … --override false` importa el realm del repositorio (el cliente backend no trae secreto y Keycloak genera uno aleatorio). Una recuperación nunca importa ni recrea `master`, `piedrazul` ni `piedrazul-backend`; sí puede crear o corregir el cliente técnico `piedrazul-keycloak-automation` (paso 5).
+4. Arranca Keycloak (`start`).
+5. Con la autoridad temporal (`keycloak-admin.sh establish`): crea o corrige `piedrazul-keycloak-automation` (confidencial, solo service account, secreto `KC_AUTOMATION_CLIENT_SECRET`, roles exactos: agrega los que faltan y quita los demás), y forma y roles exactos de `piedrazul-backend`. Comprueba que la automatización autentica. Si falla, el mensaje muestra el avance (`automation.*`, `backend.*`, `role.*`) y el error.
+6. Siempre, también si 1-5 fallaron (`always`): elimina la autoridad temporal **propia** —la del evento, al final, y huérfanas propias de eventos interrumpidos—, verifica que Keycloak rechaza la del evento y que la base no tiene ninguna propia. Nunca toca una autoridad temporal ajena (de todos modos bloquea antes del evento). Después la clasificación debe dar P1 y sigue la reconciliación P1.
+
+Si el evento falla, `converge` falla con la tarea y el motivo. Si además la autoridad temporal no se pudo eliminar (p. ej. Keycloak no arrancó), el mensaje lo dice: su secreto nunca se persistió (solo estuvo en tránsito durante ese run), y la convergencia siguiente la ve como huérfana propia (P3 recuperable) → recuperación. No se borra el realm ni identidades fuera de la autoridad temporal propia.
+
+**Recuperación P3**: solo con `-e keycloak_recovery=true`, que el workflow pasa únicamente desde `workflow_dispatch` con `keycloak_recovery=true` y `run_host_config=true` (mismo job `production`, misma aprobación del environment y misma concurrencia). Solo para P3 recuperable: con divergencias bloqueantes falla igual, sin crear autoridad. Con estado P1 o P2 la marca no crea autoridad temporal adicional. Procedimiento: [`docs/operations/runbooks/recuperar-keycloak.md`](../../docs/operations/runbooks/recuperar-keycloak.md).
+
+**Autoridades técnicas**
+
+| Principal | Consumidor | Dónde vive el secreto | Ciclo de vida |
+|-----------|------------|-----------------------|---------------|
+| `piedrazul-backend` (service account del realm `piedrazul`) | backend en ejecución (Keycloak Admin Client) | GitHub `KC_BACKEND_CLIENT_SECRET` → runner → `.env` del host → solo el servicio `backend` | durable; rotación: cambiar el secreto y correr converge (P1 lo fija y verifica, `refresh_backend.yml` recrea el backend) |
+| `piedrazul-keycloak-automation` (service account en `master`, roles `manage-clients` y `view-clients` de `piedrazul-realm`) | `keycloak_lifecycle.yml` | GitHub `KC_AUTOMATION_CLIENT_SECRET` → runner → en tránsito al exec de kcadm dentro del contenedor `keycloak` (entorno del exec y sesión en `/dev/shm`, borrada al terminar); nunca persistido en `.env` ni en Compose | durable; no puede modificarse a sí misma: tras rotar el secreto en GitHub, converge da P3 (credencial rechazada) y la recuperación autorizada fija el nuevo |
+| `piedrazul-tmp-admin-*` (admin temporal de `master`) | un evento P2 o de recuperación | generado en el runner; en tránsito al contenedor de un solo uso de bootstrap-admin y al exec de kcadm; nunca persistido | creado y eliminado dentro del evento |
+
+El flujo no crea ni necesita un administrador humano permanente de Keycloak. Si `master` tiene usuarios humanos con rol `admin` (p. ej. un `kc-admin` de la automatización anterior), la clasificación informa **cuántos** son, sin nombres, sin usarlos ni borrarlos: su custodia se decide fuera de este ciclo.
+
+**Desarrollo local**: `docker-compose.yml` (raíz) agrega `KC_BOOTSTRAP_ADMIN_*` solo a su Keycloak de desarrollo, y el servicio de un solo uso `keycloak-dev-secret` fija en el realm local el `KC_BACKEND_CLIENT_SECRET` del `.env`.
+
+**Pruebas**: `infra/tests/keycloak-lifecycle-check.sh` (contrato estático: realm, `.env`, Compose, workflow, Ansible, desarrollo) e `infra/tests/keycloak-lifecycle-harness.sh` (P1/P2, rotaciones con caracteres especiales, P3 recuperable y su recuperación —también interrumpida o fallida a mitad—, y P3 bloqueante con y sin recuperación: autoridad temporal ajena, realm ausente, esquema parcial, base inicializada fuera del ciclo; con estos mismos task files contra PostgreSQL y Keycloak desechables).
 
 #### `deploy.yml`
 
@@ -318,10 +364,9 @@ El archivo `.env` se genera en cada converge desde este template. Las variables 
 |--------|----------|
 | `group_vars/all.yml` | `compose_project_name`, `kc_realm`, `kc_port` |
 | `host_vars/vps.yml` | `kc_hostname`, `api_public_domain`, `acme_email` |
-| Variables de entorno del runner (secretos del GitHub Environment `production-hetzner`) | `POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `MIGRATION_DB_PASSWORD`, `KC_DB_PASSWORD`, `KC_ADMIN_PASSWORD`, `KC_BOOTSTRAP_ADMIN_PASSWORD`, `CLOUDFLARE_DNS_API_TOKEN` |
-| `set_fact` calculado por Ansible | `app_kc_backend_secret` (leído del `.env` existente o generado) |
+| Variables de entorno del runner (secretos de GitHub) | `POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `MIGRATION_DB_PASSWORD`, `KC_DB_PASSWORD`, `KC_BACKEND_CLIENT_SECRET` (vía `app_kc_backend_secret`), `CLOUDFLARE_DNS_API_TOKEN` |
 
-`KC_BACKEND_CLIENT_SECRET` **nunca pasa por GitHub Secrets** — Ansible lo genera en el servidor en el primer deploy y lo preserva en deploys posteriores leyéndolo del `.env` existente.
+`.env` no lleva credenciales de administración de Keycloak ni `KC_AUTOMATION_CLIENT_SECRET`: el secreto de automatización y el de la autoridad temporal de un evento no se persisten en el host; Ansible solo los entrega en tránsito al exec administrativo de Keycloak (ver [Ciclo técnico de Keycloak](#ciclo-técnico-de-keycloak-keycloak_lifecycleyml)).
 
 ---
 
@@ -334,8 +379,8 @@ POSTGRES_PASSWORD            # Password del superusuario administrativo de postg
 APP_DB_PASSWORD              # Password del rol de la aplicación (backend en ejecución)
 MIGRATION_DB_PASSWORD        # Password del rol de migraciones (solo el servicio migrate)
 KC_DB_PASSWORD               # Password del usuario de Keycloak en postgres
-KC_BOOTSTRAP_ADMIN_PASSWORD  # Password del usuario temporal de bootstrap de Keycloak
-KC_ADMIN_PASSWORD            # Password del usuario admin permanente de Keycloak
+KC_BACKEND_CLIENT_SECRET     # Secreto del cliente piedrazul-backend (backend en ejecución)
+KC_AUTOMATION_CLIENT_SECRET  # Secreto de piedrazul-keycloak-automation (no se persiste en el host)
 CLOUDFLARE_DNS_API_TOKEN     # Token de Cloudflare para DNS challenge de Let's Encrypt
 ANSIBLE_SSH_KEY              # Clave privada SSH para que Ansible se conecte al servidor
 ```
@@ -350,8 +395,8 @@ El workflow los inyecta como variables de entorno antes de correr Ansible:
     APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
     MIGRATION_DB_PASSWORD: ${{ secrets.MIGRATION_DB_PASSWORD }}
     KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
-    KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
-    KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
+    KC_BACKEND_CLIENT_SECRET: ${{ secrets.KC_BACKEND_CLIENT_SECRET }}
+    KC_AUTOMATION_CLIENT_SECRET: ${{ secrets.KC_AUTOMATION_CLIENT_SECRET }}
     CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
   run: |
     ansible-playbook \
@@ -435,7 +480,7 @@ env:
 
 4. Agregar al compose file que lo necesite.
 
-### Caso 4: Secret gestionado solo en el servidor (como `KC_BACKEND_CLIENT_SECRET`)
+### Caso 4: Secret gestionado solo en el servidor
 
 Para secrets que no deben pasar por GitHub en ningún momento:
 
@@ -451,7 +496,7 @@ Ansible-lint (profile `production`) exige que las variables definidas dentro de 
 
 | Rol | Prefijo requerido | Ejemplos |
 |-----|-------------------|---------|
-| `app` | `app_` | `app_kc_backend_secret`, `app_env_file`, `app_kc_initialized` |
+| `app` | `app_` | `app_kc_backend_secret`, `app_env_file`, `app_kc_state` |
 | `docker_host` | `docker_host_` | `docker_host_apt_arch` |
 | `common` | `common_` | — |
 | `hardening` | `hardening_` | — |
@@ -562,21 +607,19 @@ GitHub Actions (workflow)
         ├── docker_host → Docker CE instalado y corriendo
         ├── hardening  → fail2ban, sysctl
         ├── setup.yml
-        │     ├── genera KC_BACKEND_CLIENT_SECRET (nuevo)
+        │     ├── valida KC_BACKEND_CLIENT_SECRET / KC_AUTOMATION_CLIENT_SECRET
         │     ├── copia compose files + keycloak/ + postgres/
         │     ├── genera .env
         │     ├── valida y descarga por digest backend/postgres → image.env exacto
         │     ├── postgres (PGDATA vacío → 01-init-databases.sh) + reconciliación
-        │     └── levanta Keycloak + Traefik
-        ├── init_keycloak.yml
-              ├── espera Keycloak healthy (9000/health/ready)
-              ├── espera realm piedrazul importado
-              ├── crea usuario kc-admin en master realm
-              ├── asigna rol admin a kc-admin
-              ├── aplica KC_BACKEND_CLIENT_SECRET al client
-              ├── elimina usuario kc-bootstrap
-              ├── reinicia backend
-              └── crea marker .keycloak_initialized
+        │     └── levanta Traefik
+        ├── keycloak_lifecycle.yml → P2 (schema keycloak vacío)
+        │     ├── bootstrap-admin service (Keycloak detenido) → admin temporal aleatorio
+        │     ├── kc.sh import (un solo uso) → piedrazul (secreto del backend aleatorio)
+        │     ├── arranca Keycloak (start, sin --import-realm)
+        │     ├── establece la automatización y la forma/roles del backend
+        │     ├── elimina la autoridad temporal y verifica que Keycloak la rechaza
+        │     └── reclasifica (P1) → fija KC_BACKEND_CLIENT_SECRET y verifica el backend
         └── refresh_backend.yml → sin backend todavía: no hace nada
 
   └── deploy.yml (app_migrate=true: backend de build)
@@ -617,12 +660,12 @@ GitHub Actions (production-hetzner.yml — cambios en infra/ansible, infra/compo
         │
         ├── common/docker_host/hardening → idempotentes, sin cambios
         ├── setup.yml
-        │     ├── lee KC_BACKEND_CLIENT_SECRET existente → preserva
+        │     ├── valida las credenciales técnicas de Keycloak
         │     ├── copia archivos (sin cambios → no notifica handler)
         │     ├── genera .env (sin cambios → no notifica handler)
         │     ├── postgres + reconciliación (idempotente)
-        │     └── docker_compose_v2 Keycloak/Traefik → no-op
-        ├── init_keycloak.yml
-        │     └── marker existe → skip completo
+        │     └── docker_compose_v2 Traefik → no-op
+        ├── keycloak_lifecycle.yml
+        │     └── P1 → secreto del backend sin cambios (o rotado) y verificado; sin autoridad temporal
         └── refresh_backend.yml → recrea el backend solo si cambió su configuración
 ```

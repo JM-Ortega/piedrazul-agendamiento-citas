@@ -55,8 +55,8 @@ on:
         description: "Tag específico del backend para rollback (vacío = construir nueva o reusar)"
         type: string
         default: ""
-      force_init_keycloak:
-        description: "Forzar re-inicialización de Keycloak (requiere configuración del servidor)"
+      keycloak_recovery:
+        description: "Recuperación P3 de Keycloak autorizada: autoridad temporal con kc.sh bootstrap-admin, detiene Keycloak durante el evento (requiere configuración del servidor; docs/operations/runbooks/recuperar-keycloak.md)"
         type: boolean
         default: false
 
@@ -91,7 +91,7 @@ jobs:
       run_host_config: ${{ steps.intent.outputs.run_host_config }}
       run_app_deploy: ${{ steps.intent.outputs.run_app_deploy }}
       image_tag: ${{ steps.intent.outputs.image_tag }}
-      force_init_keycloak: ${{ steps.intent.outputs.force_init_keycloak }}
+      keycloak_recovery: ${{ steps.intent.outputs.keycloak_recovery }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -110,7 +110,7 @@ jobs:
           IN_BUILD_POSTGRES: ${{ inputs.run_build_postgres }}
           IN_APP_DEPLOY: ${{ inputs.run_app_deploy }}
           IN_IMAGE_TAG: ${{ inputs.image_tag }}
-          IN_FORCE_INIT_KEYCLOAK: ${{ inputs.force_init_keycloak }}
+          IN_KEYCLOAK_RECOVERY: ${{ inputs.keycloak_recovery }}
         run: |
           set -euo pipefail
 
@@ -129,7 +129,7 @@ jobs:
             .github/scripts/classify-production.sh "${BASE}" "${GITHUB_SHA}" > "${OUT}"
             {
               echo "image_tag="
-              echo "force_init_keycloak=false"
+              echo "keycloak_recovery=false"
             } >> "${OUT}"
           else
             if [ "${IN_TERRAFORM}" = "false" ] && [ "${IN_HOST_CONFIG}" = "false" ] && \
@@ -153,8 +153,8 @@ jobs:
                 exit 1
               fi
             fi
-            if [ "${IN_FORCE_INIT_KEYCLOAK}" = "true" ] && [ "${IN_HOST_CONFIG}" != "true" ]; then
-              echo "::error title=Intención de producción::force_init_keycloak requiere run_host_config=true"
+            if [ "${IN_KEYCLOAK_RECOVERY}" = "true" ] && [ "${IN_HOST_CONFIG}" != "true" ]; then
+              echo "::error title=Intención de producción::keycloak_recovery requiere run_host_config=true"
               exit 1
             fi
 
@@ -179,7 +179,7 @@ jobs:
               echo "run_app_deploy=${IN_APP_DEPLOY}"
               echo "intent=${INTENT}"
               echo "image_tag=${IN_IMAGE_TAG}"
-              echo "force_init_keycloak=${IN_FORCE_INIT_KEYCLOAK}"
+              echo "keycloak_recovery=${IN_KEYCLOAK_RECOVERY}"
             } > "${OUT}"
           fi
 
@@ -206,6 +206,9 @@ jobs:
             echo "| deploy de aplicación | $(get run_app_deploy) |"
             if [ -n "$(get image_tag)" ]; then
               echo "| rollback backend | \`$(get image_tag)\` |"
+            fi
+            if [ "$(get keycloak_recovery)" = "true" ]; then
+              echo "| recuperación de Keycloak (P3) | **autorizada**: autoridad temporal con bootstrap-admin, Keycloak detenido durante el evento |"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -730,7 +733,7 @@ jobs:
       DEPLOY_REQUIRED: ${{ needs.classify.outputs.deploy_required }}
       RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
       RUN_APP_DEPLOY: ${{ needs.classify.outputs.run_app_deploy }}
-      FORCE_INIT_KEYCLOAK: ${{ needs.classify.outputs.force_init_keycloak }}
+      KEYCLOAK_RECOVERY: ${{ needs.classify.outputs.keycloak_recovery }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -746,8 +749,6 @@ jobs:
           APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
           MIGRATION_DB_PASSWORD: ${{ secrets.MIGRATION_DB_PASSWORD }}
           KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
-          KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
-          KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
           CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
           IDENTITY_SEED_ADMIN_PASSWORD: ${{ secrets.IDENTITY_SEED_ADMIN_PASSWORD }}
           KC_BACKEND_CLIENT_SECRET: ${{ secrets.KC_BACKEND_CLIENT_SECRET }}
@@ -766,7 +767,6 @@ jobs:
           fi
           if [ "${RUN_HOST_CONFIG}" = "true" ] || [ "${RUN_APP_DEPLOY}" = "true" ]; then
             need POSTGRES_PASSWORD APP_DB_PASSWORD MIGRATION_DB_PASSWORD KC_DB_PASSWORD \
-              KC_BOOTSTRAP_ADMIN_PASSWORD KC_ADMIN_PASSWORD \
               CLOUDFLARE_DNS_API_TOKEN IDENTITY_SEED_ADMIN_PASSWORD \
               PIEDRAZUL_BACKEND_MAIL_SEND NOTIFICATION_ENCRYPTION_KEY
           fi
@@ -1037,18 +1037,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: .github/scripts/verify-main-tip.sh
 
-      - name: Borrar marker de Keycloak
-        id: kc_marker
-        if: env.RUN_HOST_CONFIG == 'true' && env.FORCE_INIT_KEYCLOAK == 'true'
-        run: |
-          set -euo pipefail
-          ansible "${ANSIBLE_HOST}" \
-            -i infra/ansible/inventories/prod \
-            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
-            -m ansible.builtin.file \
-            -a "path=/opt/piedrazul/.keycloak_initialized state=absent" \
-            --become
-
       - name: Correr converge
         id: converge
         if: env.RUN_HOST_CONFIG == 'true'
@@ -1059,8 +1047,6 @@ jobs:
           APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
           MIGRATION_DB_PASSWORD: ${{ secrets.MIGRATION_DB_PASSWORD }}
           KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
-          KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
-          KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
           CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
           KC_BACKEND_CLIENT_SECRET: ${{ secrets.KC_BACKEND_CLIENT_SECRET }}
           KC_AUTOMATION_CLIENT_SECRET: ${{ secrets.KC_AUTOMATION_CLIENT_SECRET }}
@@ -1079,6 +1065,7 @@ jobs:
             -i "${RUNNER_TEMP}/hosts.runtime.yml" \
             -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
             -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            -e "keycloak_recovery=${KEYCLOAK_RECOVERY}" \
             infra/ansible/playbooks/converge.yml
 
       - name: Verificar postgres tras converge (identidad en ejecución)
@@ -1110,8 +1097,6 @@ jobs:
           BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
           POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
           APP_MIGRATE: ${{ steps.select.outputs.backend_source == 'build' }}
-          KC_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KC_BOOTSTRAP_ADMIN_PASSWORD }}
-          KC_ADMIN_PASSWORD: ${{ secrets.KC_ADMIN_PASSWORD }}
           CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
           IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
           IDENTITY_SEED_ADMIN_USERNAME: ${{ vars.IDENTITY_SEED_ADMIN_USERNAME }}
@@ -1248,7 +1233,7 @@ jobs:
           REUSE_BACKEND_SCAN: ${{ steps.scan_backend.outputs.outcome }}
           REUSE_POSTGRES_SCAN: ${{ steps.scan_postgres.outputs.outcome }}
           O_FRESH_DEPLOY: ${{ steps.fresh_deploy.outcome }}
-          O_DEPLOY: ${{ steps.kc_marker.outcome }}/${{ steps.converge.outcome }}/${{ steps.deploy.outcome }}
+          O_DEPLOY: ${{ steps.converge.outcome }}/${{ steps.deploy.outcome }}
           O_IDENTITY: ${{ steps.converge_identity.outcome }}/${{ steps.running_identity.outcome }}
           O_HEALTH: ${{ steps.container_health.outcome }}/${{ steps.public_health.outcome }}
           O_RECORD: ${{ steps.record.outcome }}
@@ -1319,7 +1304,7 @@ jobs:
             [ -z "${REUSE_BACKEND_SCAN}" ] || echo "| escaneo backend (reuso) | ${REUSE_BACKEND_SCAN} |"
             [ -z "${REUSE_POSTGRES_SCAN}" ] || echo "| escaneo postgres (reuso) | ${REUSE_POSTGRES_SCAN} |"
             echo "| política de vulnerabilidades | solo reporte: ni hallazgos ni fallos operativos bloquean |"
-            echo "| deploy (marker/converge/deploy) | ${O_DEPLOY} |"
+            echo "| deploy (converge/deploy) | ${O_DEPLOY} |"
             echo "| identidad en ejecución (converge/deploy) | ${O_IDENTITY} |"
             echo "| health (contenedores/público) | ${O_HEALTH} |"
             echo "| registro del último éxito | ${O_RECORD} |"

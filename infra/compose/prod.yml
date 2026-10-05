@@ -17,7 +17,10 @@ services:
     image: ${POSTGRES_IMAGE:?POSTGRES_IMAGE no definido — image.env debe contener la identidad exacta de postgres (repo@sha256)}
 
   keycloak:
-    command: ["start", "--import-realm"]
+    # Sin --import-realm: el realm solo se importa en un evento P2 (kc.sh import, ver
+    # ansible/roles/app/tasks/keycloak_bootstrap.yml). Un reinicio o una recuperación nunca
+    # recrean un realm que falta.
+    command: ["start"]
     environment:
       KC_HOSTNAME: ${KC_HOSTNAME}
       KC_HOSTNAME_STRICT: "true"

@@ -1,7 +1,8 @@
 # Crea directorios, copia compose files y assets, genera .env, converge postgres y
-# reconcilia las autoridades de la base, y después levanta Keycloak y Traefik.
-# No arranca un backend nuevo ni migra (eso es deploy.yml); refresh_backend.yml, al final
-# de converge, solo recrea el backend que ya corre la identidad seleccionada.
+# reconcilia las autoridades de la base, y después levanta Traefik. Keycloak lo arranca
+# keycloak_lifecycle.yml (después de setup, en converge.yml). No arranca un backend nuevo
+# ni migra (eso es deploy.yml); refresh_backend.yml, al final de converge, solo recrea el
+# backend que ya corre la identidad seleccionada.
 
 - name: Crear directorio de la aplicación
   ansible.builtin.file:
@@ -11,22 +12,8 @@
     group: ansible
     mode: "0750"
 
-# KC secrets desde el entorno
-- name: Tomar KC secrets desde el entorno
-  ansible.builtin.set_fact:
-    app_kc_backend_secret: "{{ lookup('env', 'KC_BACKEND_CLIENT_SECRET') | trim | string }}"
-    app_kc_automation_secret: "{{ lookup('env', 'KC_AUTOMATION_CLIENT_SECRET') | trim | string }}"
-  no_log: true
-
-- name: Verificar que los KC secrets están definidos
-  ansible.builtin.assert:
-    that:
-      - app_kc_backend_secret | length > 0
-      - app_kc_automation_secret | length > 0
-    fail_msg: >-
-      KC_BACKEND_CLIENT_SECRET o KC_AUTOMATION_CLIENT_SECRET no están definidos.
-      Ambos deben existir como GitHub Secrets e inyectarse al workflow de Ansible.
-  no_log: true
+- name: Tomar y validar las credenciales técnicas de Keycloak
+  ansible.builtin.include_tasks: keycloak_credentials.yml
 
 # Autoridades de la base desde el entorno (contraseñas; los nombres están en group_vars)
 - name: Tomar contraseñas de la base desde el entorno
@@ -111,11 +98,16 @@
       BACKEND_IMAGE={{ backend_image_ref }}
       POSTGRES_IMAGE={{ postgres_image_ref }}
 
+- name: Verificar la entrega de KC_BACKEND_CLIENT_SECRET al backend
+  ansible.builtin.include_tasks: keycloak_backend_delivery.yml
+
 # Base primero: ningún consumidor arranca con credenciales que postgres aún no acepta
 - name: Converger postgres y reconciliar autoridades de la base
   ansible.builtin.include_tasks: db_converge.yml
 
-# Infraestructura restante (sin backend)
+# Infraestructura restante (sin backend ni Keycloak). Keycloak lo arranca
+# keycloak_lifecycle.yml: en una base nunca inicializada (P2) no debe arrancar antes de
+# crear la autoridad temporal del evento.
 - name: Levantar servicios de infraestructura
   community.docker.docker_compose_v2:
     project_src: "{{ app_dir }}/compose"
@@ -123,7 +115,6 @@
     files:
       - prod.yml
     services:
-      - keycloak
       - traefik
     state: present
     env_files:

@@ -722,7 +722,6 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "28cxKvXW2kUGZy3Qju2CsQCLEvJtYzPh",
       "redirectUris": ["/*"],
       "webOrigins": ["/*"],
       "notBefore": 0,
@@ -738,7 +737,6 @@
       "attributes": {
         "realm_client": "false",
         "oidc.ciba.grant.enabled": "false",
-        "client.secret.creation.time": "1775074131",
         "backchannel.logout.session.required": "true",
         "standard.token.exchange.enabled": "false",
         "post.logout.redirect.uris": "+",

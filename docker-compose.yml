@@ -20,5 +20,39 @@ services:
     command: ["start-dev", "--import-realm"]
     environment:
       KC_HOSTNAME_STRICT: "false"
+      # Solo desarrollo: admin de la consola local (producción no usa KC_BOOTSTRAP_ADMIN_*)
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
     ports:
       - "${KC_PORT}:${KC_PORT}"
+
+  # Solo desarrollo. El realm compartido no trae secreto para piedrazul-backend (en
+  # producción ningún valor del repositorio puede ser válido), así que este paso de un solo
+  # uso fija en Keycloak el KC_BACKEND_CLIENT_SECRET del .env local. Idempotente.
+  keycloak-dev-secret:
+    image: quay.io/keycloak/keycloak:26.5.6
+    restart: "no"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -euo pipefail
+        K=/opt/keycloak/bin/kcadm.sh
+        CFG="$$(mktemp -u /dev/shm/kcadm.XXXXXX)"
+        trap 'rm -f "$$CFG"' EXIT
+        KC_CLI_PASSWORD="$$KC_BOOTSTRAP_ADMIN_PASSWORD" "$$K" config credentials --config "$$CFG" \
+          --server "http://keycloak:$$KC_PORT" --realm master --user "$$KC_BOOTSTRAP_ADMIN_USERNAME"
+        ID="$$("$$K" get clients -r "$$KC_REALM" -q "clientId=$$KC_BACKEND_CLIENT_ID" --fields id --format csv --noquotes --config "$$CFG")"
+        printf '{"secret":"%s"}' "$$KC_BACKEND_CLIENT_SECRET" | "$$K" update "clients/$$ID" -r "$$KC_REALM" -f - --merge --config "$$CFG"
+        echo "KC_BACKEND_CLIENT_SECRET de .env aplicado a $$KC_BACKEND_CLIENT_ID"
+    environment:
+      KC_PORT: ${KC_PORT}
+      KC_REALM: ${KC_REALM}
+      KC_BACKEND_CLIENT_ID: ${KC_BACKEND_CLIENT_ID}
+      KC_BACKEND_CLIENT_SECRET: ${KC_BACKEND_CLIENT_SECRET}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
+    networks:
+      - piedrazul_net

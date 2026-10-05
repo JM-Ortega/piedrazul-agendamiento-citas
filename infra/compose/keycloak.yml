@@ -3,9 +3,10 @@ services:
     image: quay.io/keycloak/keycloak:26.5.6
     container_name: keycloak
     restart: unless-stopped
+    # Sin KC_BOOTSTRAP_ADMIN_*: en producción la autoridad temporal la crea
+    # kc.sh bootstrap-admin dentro de un evento (app/tasks/keycloak_bootstrap.yml); el
+    # desarrollo local la agrega en docker-compose.yml.
     environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
       KC_DB: postgres
       KC_DB_URL_HOST: postgres
       KC_DB_URL_PORT: 5432

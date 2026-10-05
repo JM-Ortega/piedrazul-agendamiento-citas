@@ -1,0 +1,243 @@
+---
+# Evento con autoridad temporal de Keycloak: P2 (base nueva) o recuperación P3 autorizada.
+# Lo incluye keycloak_lifecycle.yml; app_kc_event = fresh | recovery.
+#
+#   1. Keycloak detenido (kc.sh bootstrap-admin exige todos los nodos detenidos; 26.5 no lo
+#      verifica por sí mismo).
+#   2. kc.sh bootstrap-admin service en un contenedor de un solo uso con la misma
+#      configuración del servicio: cliente admin temporal en master, con id
+#      <kc_temp_admin_prefix>-<fecha>-<aleatorio> y secreto aleatorio generado aquí (runner).
+#      No se persiste en el host: viaja por entorno, en tránsito, al contenedor de un solo uso
+#      (--rm) y al exec de kcadm (sesión en /dev/shm, borrada al terminar). En una base nueva el mismo
+#      comando crea el esquema y el realm master; Keycloak marca el cliente con
+#      is_temporary_admin=true.
+#   3. Solo P2: kc.sh import (un solo uso, --override false) del realm del repositorio; el
+#      cliente backend no trae secreto: Keycloak genera uno aleatorio. Una recuperación
+#      nunca importa: un realm que falta es bloqueante (keycloak_state.yml) y no se recrea.
+#   4. Keycloak arranca (`start`, sin --import-realm).
+#   5. Con la autoridad temporal: automatización con forma, secreto deseado y roles exactos;
+#      forma y roles exactos del backend.
+#   6. Siempre (también si 2-5 fallaron): se eliminan la autoridad temporal propia y las
+#      huérfanas inequívocamente propias de eventos anteriores (kc_temp_admin_owned_regex);
+#      la propia al final. Se verifica que la propia ya no autentica y que la base no tiene
+#      ninguna propia. Una autoridad temporal ajena nunca se toca (bloquea antes del evento).
+#
+# Si el evento falla, la convergencia falla. La autoridad temporal que no se pudo eliminar
+# queda inutilizable (su secreto nunca se persistió: solo estuvo en tránsito en este run) y la siguiente
+# convergencia la ve como P3: recuperación.
+
+- name: Generar la autoridad temporal del evento
+  ansible.builtin.set_fact:
+    app_kc_temp_client_id: >-
+      {{ kc_temp_admin_prefix }}-{{ now(utc=true).strftime('%Y%m%d%H%M%S') }}-{{ lookup('ansible.builtin.password', '/dev/null', length=8, chars=['ascii_lowercase', 'digits']) }}
+    app_kc_temp_secret: "{{ lookup('ansible.builtin.password', '/dev/null', length=48, chars=['ascii_letters', 'digits']) }}"
+    app_kc_event_error: ""
+  no_log: true
+
+- name: Informar el evento
+  ansible.builtin.debug:
+    msg: >-
+      KEYCLOAK: evento {{ 'P2 (inicialización)' if app_kc_event == 'fresh' else 'de recuperación P3 autorizada' }}
+      con autoridad temporal {{ app_kc_temp_client_id }}
+
+- name: Evento
+  block:
+    - name: Detener Keycloak (bootstrap-admin exige el servidor detenido)
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}/compose"
+        project_name: "{{ compose_project_name }}"
+        files:
+          - prod.yml
+        services:
+          - keycloak
+        state: stopped
+        env_files:
+          - ../.env
+          - ../image.env
+
+    - name: Crear la autoridad temporal (kc.sh bootstrap-admin service)
+      ansible.builtin.command:
+        argv: >-
+          {{ compose_cli + ['run', '--rm', '--no-deps', '--env', 'KC_TMP_ADMIN_SECRET',
+                            '--label', 'traefik.enable=false',
+                            'keycloak', 'bootstrap-admin', 'service',
+                            '--client-id', app_kc_temp_client_id,
+                            '--client-secret:env', 'KC_TMP_ADMIN_SECRET', '--no-prompt'] }}
+        chdir: "{{ app_dir }}/compose"
+      environment:
+        KC_TMP_ADMIN_SECRET: "{{ app_kc_temp_secret }}"
+      register: app_kc_bootstrap_admin
+      changed_when: true
+      no_log: true
+
+    - name: Verificar que Keycloak creó la autoridad temporal
+      ansible.builtin.assert:
+        that:
+          - app_kc_bootstrap_admin.rc == 0
+          - ('Created temporary admin service account with client id ' ~ app_kc_temp_client_id) in app_kc_bootstrap_admin.stdout
+        fail_msg: "KEYCLOAK: kc.sh bootstrap-admin no creó {{ app_kc_temp_client_id }} (rc={{ app_kc_bootstrap_admin.rc }})"
+        quiet: true
+
+    - name: Importar el realm de la aplicación (solo P2)
+      ansible.builtin.command:
+        argv: >-
+          {{ compose_cli + ['run', '--rm', '--no-deps', '--label', 'traefik.enable=false',
+                            'keycloak', 'import', '--dir', '/opt/keycloak/data/import',
+                            '--override', 'false'] }}
+        chdir: "{{ app_dir }}/compose"
+      register: app_kc_import
+      changed_when: true
+      when: app_kc_event == 'fresh'
+
+    - name: Verificar la importación del realm
+      ansible.builtin.assert:
+        that:
+          - ("Realm '" ~ kc_realm ~ "' imported") in app_kc_import.stdout
+        fail_msg: "KEYCLOAK: kc.sh import no importó el realm {{ kc_realm }} (rc={{ app_kc_import.rc }})"
+        quiet: true
+      when: app_kc_event == 'fresh'
+
+    - name: Arrancar Keycloak
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}/compose"
+        project_name: "{{ compose_project_name }}"
+        files:
+          - prod.yml
+        services:
+          - keycloak
+        dependencies: false
+        state: present
+        wait: true
+        wait_timeout: "{{ kc_start_timeout | default(600) }}"
+        env_files:
+          - ../.env
+          - ../image.env
+
+    - name: Leer el estado de la base con la autoridad temporal
+      ansible.builtin.include_tasks: keycloak_state.yml
+      vars:
+        app_kc_with_api: false
+
+    - name: Verificar el punto de partida del evento
+      ansible.builtin.assert:
+        that:
+          - "'master' in app_kc_observed.realms"
+          - kc_realm in app_kc_observed.realms
+          - app_kc_observed.temporary_owned | select('match', '^client:' ~ app_kc_temp_client_id ~ ':') | list | length == 1
+          - app_kc_observed.temporary_foreign | length == 0
+        fail_msg: >-
+          KEYCLOAK: tras arrancar faltan realms o la autoridad temporal
+          (realms: {{ app_kc_observed.realms | join(', ') }})
+        quiet: true
+
+    - name: Establecer la automatización y la forma del backend
+      community.docker.docker_container_exec:
+        container: keycloak
+        argv: ["/bin/bash", "-c", "{{ lookup('ansible.builtin.file', 'keycloak-admin.sh') }}", "keycloak-admin", "establish"]
+        env:
+          KCL_SERVER: "http://localhost:{{ kc_port }}"
+          KCL_REALM: "{{ kc_realm }}"
+          KCL_AUTOMATION_CLIENT_ID: "{{ kc_automation_client_id }}"
+          KCL_BACKEND_CLIENT_ID: "{{ kc_backend_client_id }}"
+          KCL_TEMP_CLIENT_ID: "{{ app_kc_temp_client_id }}"
+          KCL_TEMP_SECRET: "{{ app_kc_temp_secret }}"
+          KCL_AUTOMATION_SECRET: "{{ app_kc_automation_secret }}"
+          KCL_AUTOMATION_SECRET_JSON_B64: "{{ {'secret': app_kc_automation_secret} | to_json | b64encode }}"
+          KCL_AUTOMATION_ROLES_ADD: "{{ app_kc_expected.automation_roles | difference(_auto_current) | join(',') }}"
+          KCL_AUTOMATION_ROLES_REMOVE: "{{ _auto_current | difference(app_kc_expected.automation_roles) | join(',') }}"
+          KCL_BACKEND_ROLES_ADD: "{{ app_kc_expected.backend_roles | difference(app_kc_observed.backend_roles) | join(',') }}"
+          KCL_BACKEND_ROLES_REMOVE: "{{ app_kc_observed.backend_roles | difference(app_kc_expected.backend_roles) | join(',') }}"
+          KCL_BACKEND_SHAPE: "{{ app_kc_expected.backend_shape_json }}"
+      vars:
+        # Un cliente de automatización sin forma válida (p. ej. sin service account) no
+        # tiene roles legibles: se parte de cero
+        _auto_current: "{{ app_kc_observed.automation_roles if app_kc_observed.automation_shape else [] }}"
+      register: app_kc_establish
+      changed_when: true
+      failed_when: false
+      no_log: true
+
+    - name: Verificar el establecimiento
+      ansible.builtin.assert:
+        that:
+          - app_kc_establish.rc == 0
+          - "'auth.automation=ok' in app_kc_establish.stdout_lines"
+        fail_msg: >-
+          KEYCLOAK: no se pudo establecer la automatización; avance antes del fallo:
+          {{ app_kc_establish.stdout_lines | default([]) | select('match', '^(automation|backend|role)[.]') | join(', ') or 'ninguno' }};
+          {{ app_kc_establish.stdout_lines | default([]) | select('match', '^(error|auth[.][a-z]+)=') | join(', ') or 'sin salida' }}
+        success_msg: >-
+          KEYCLOAK: {{ app_kc_establish.stdout_lines | select('match', '^(automation|backend|role)[.]') | join(', ') }}
+
+  rescue:
+    - name: Registrar la falla del evento
+      ansible.builtin.set_fact:
+        app_kc_event_error: >-
+          {{ ansible_failed_task.name | default('tarea desconocida') }}:
+          {{ ansible_failed_result.msg | default('sin mensaje') }}
+
+  always:
+    # Con el estado actual de la base: solo la autoridad temporal propia (la de este evento y
+    # huérfanas inequívocamente propias); la de este evento al final
+    - name: Leer las autoridades temporales presentes
+      ansible.builtin.include_tasks: keycloak_state.yml
+      vars:
+        app_kc_with_api: false
+
+    - name: Eliminar la autoridad temporal
+      community.docker.docker_container_exec:
+        container: keycloak
+        argv: ["/bin/bash", "-c", "{{ lookup('ansible.builtin.file', 'keycloak-admin.sh') }}", "keycloak-admin", "cleanup"]
+        env:
+          KCL_SERVER: "http://localhost:{{ kc_port }}"
+          KCL_REALM: "{{ kc_realm }}"
+          KCL_AUTOMATION_CLIENT_ID: "{{ kc_automation_client_id }}"
+          KCL_BACKEND_CLIENT_ID: "{{ kc_backend_client_id }}"
+          KCL_TEMP_CLIENT_ID: "{{ app_kc_temp_client_id }}"
+          KCL_TEMP_SECRET: "{{ app_kc_temp_secret }}"
+          KCL_TEMPORARY_PRINCIPALS: "{{ app_kc_observed.temporary_owned | join(',') }}"
+      register: app_kc_cleanup
+      changed_when: true
+      failed_when: false
+      no_log: true
+      when: app_kc_observed.temporary_owned | length > 0
+
+    - name: Comprobar en la base que no queda autoridad temporal
+      ansible.builtin.include_tasks: keycloak_state.yml
+      vars:
+        app_kc_with_api: false
+
+    - name: Olvidar el secreto temporal
+      ansible.builtin.set_fact:
+        app_kc_temp_secret: ""
+      no_log: true
+
+- name: Fallar si quedó autoridad temporal
+  ansible.builtin.fail:
+    msg: >-
+      KEYCLOAK: NO se pudo eliminar la autoridad temporal
+      ({{ app_kc_observed.temporary_owned | map('regex_replace', ':[^:]+$', '') | join(', ') }};
+      limpieza: {{ app_kc_cleanup.stdout_lines | default([]) | select('match', '^(error|auth[.][a-z]+|deleted)=') | join(', ') or 'sin salida' }}).
+      Su secreto nunca se persistió (solo estuvo en tránsito en este run), pero la siguiente convergencia lo verá como P3:
+      correr la recuperación autorizada.{{ ' Falla del evento: ' ~ app_kc_event_error if app_kc_event_error else '' }}
+  when: app_kc_observed.temporary_owned | length > 0
+
+- name: Verificar la revocación de la autoridad temporal
+  ansible.builtin.assert:
+    that:
+      - app_kc_cleanup is not skipped
+      - "'temp.revoked=yes' in app_kc_cleanup.stdout_lines | default([])"
+    fail_msg: >-
+      KEYCLOAK: la base no tiene autoridad temporal pero no se verificó el rechazo de
+      {{ app_kc_temp_client_id }}{{ ' (falla del evento: ' ~ app_kc_event_error ~ ')' if app_kc_event_error else '' }}.
+    success_msg: "KEYCLOAK: autoridad temporal {{ app_kc_temp_client_id }} eliminada y rechazada por Keycloak"
+  when: app_kc_event_error | length == 0
+
+- name: Fallar el evento
+  ansible.builtin.fail:
+    msg: >-
+      KEYCLOAK: el evento {{ app_kc_event }} falló ({{ app_kc_event_error }}). No queda
+      autoridad temporal propia en la base; el estado parcial se verá como P3 en la siguiente
+      convergencia.
+      Ver docs/operations/runbooks/recuperar-keycloak.md.
+  when: app_kc_event_error | length > 0
