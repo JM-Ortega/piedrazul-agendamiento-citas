@@ -1,4 +1,4 @@
-<div class="fixed inset-0 z-[60]">
+<div class="fixed inset-0 z-60">
   <!-- Fondo -->
   <div
     class="timeoff-backdrop absolute inset-0 bg-[#0f1e37]/45 backdrop-blur-[2px]"
@@ -11,7 +11,7 @@
   <!-- Panel -->
   <aside
     #panel
-    class="timeoff-panel absolute inset-y-0 right-0 w-full sm:w-[460px] bg-white shadow-2xl flex flex-col outline-none"
+    class="timeoff-panel absolute inset-y-0 right-0 w-full sm:w-115 bg-white shadow-2xl flex flex-col outline-none"
     [class.is-closing]="closing()"
     role="dialog"
     aria-modal="true"
@@ -32,7 +32,7 @@
           id="timeOffTitle"
           class="text-[#163c63] text-lg font-bold leading-tight"
         >
-          Descansos
+          Semanas de receso
         </h2>
         <p class="text-gray-500 text-sm truncate">
           {{ doctor().name }} · {{ specialties() }}
@@ -64,17 +64,15 @@
           ></svg>
           <div>
             <p>
-              Puedes programar descansos entre
-              <strong>{{ minStartLabel() }}</strong> y
+              Se pueden programar semanas de receso del
+              <strong>{{ minStartLabel() }}</strong> al
               <strong>{{ maxEndLabel() }}</strong
               >.
             </p>
             <p class="text-gray-500 text-[13px] mt-0.5">
-              Antes está abierta su ventana de agendamiento ({{
-                doctor().bookingWindowWeeks
-              }}
-              {{ doctor().bookingWindowWeeks === 1 ? 'semana' : 'semanas' }});
-              después termina su vinculación.
+              Hasta el {{ windowEndLabel() }} los pacientes ya pueden pedir
+              citas, por eso la semana de receso debe empezar después. El
+              {{ maxEndLabel() }} termina su contrato.
             </p>
           </div>
         </div>
@@ -83,13 +81,23 @@
           class="flex gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900 leading-snug"
         >
           <svg lucideTriangleAlert [size]="18" class="shrink-0 mt-0.5"></svg>
-          <p>
-            No hay fechas disponibles para programar descansos: su ventana de
-            agendamiento llega hasta el
-            <strong>{{ windowEndLabel() }}</strong> y su vinculación termina el
-            <strong>{{ maxEndLabel() }}</strong
-            >. Reduzca la ventana o amplíe el período laboral.
-          </p>
+          <div>
+            <p>
+              <strong
+                >Por ahora no se pueden programar semanas de receso.</strong
+              >
+            </p>
+            <p class="mt-0.5">
+              Los pacientes ya pueden pedir citas hasta el
+              <strong>{{ windowEndLabel() }}</strong> y su contrato termina el
+              <strong>{{ maxEndLabel() }}</strong
+              >, así que no quedan días libres.
+            </p>
+            <p class="text-[13px] mt-1 text-amber-800">
+              Para habilitar fechas, reduzca las semanas de agendamiento o
+              extienda la fecha de fin del contrato.
+            </p>
+          </div>
         </div>
       }
 
@@ -99,7 +107,7 @@
           <h3
             class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
           >
-            Nuevo descanso
+            Nueva semana de receso
           </h3>
 
           <div class="grid grid-cols-2 gap-3">
@@ -207,7 +215,7 @@
               Programando...
             } @else {
               <svg lucidePlus [size]="18"></svg>
-              Programar descanso
+              Programar semanas de receso
             }
           </app-button>
         </section>
@@ -222,7 +230,7 @@
             Programados y en curso
           </h3>
           <span
-            class="min-w-[22px] text-center text-xs font-bold text-[#215c98] bg-[#e8f0fa] rounded-full px-2 py-0.5 transition-all duration-300"
+            class="min-w-5.5 text-center text-xs font-bold text-[#215c98] bg-[#e8f0fa] rounded-full px-2 py-0.5 transition-all duration-300"
           >
             {{ activeItems().length }}
           </span>
@@ -242,7 +250,7 @@
 
         @if (loadingList() && !timeOffs().length) {
           @for (i of [1, 2]; track i) {
-            <div class="h-[74px] rounded-xl bg-gray-100 animate-pulse"></div>
+            <div class="h-18.5 rounded-xl bg-gray-100 animate-pulse"></div>
           }
         } @else {
           @for (item of activeItems(); track item.id) {
@@ -258,7 +266,7 @@
             >
               <div class="flex items-center gap-3">
                 <div
-                  class="w-[52px] shrink-0 text-center rounded-lg py-1.5 leading-tight"
+                  class="w-13 shrink-0 text-center rounded-lg py-1.5 leading-tight"
                   [class]="
                     item.isOngoing
                       ? 'bg-orange-100 text-orange-800'
@@ -304,7 +312,7 @@
                   <app-button
                     variant="icon"
                     extraClass="!w-10 !h-10 !text-red-600 hover:!bg-red-50 border border-red-100"
-                    [appTooltip]="'Eliminar descanso'"
+                    [appTooltip]="'Eliminar receso'"
                     [loading]="processingId() === item.id"
                     (buttonClick)="requestRemoval(item)"
                   >
@@ -316,7 +324,7 @@
                       <svg lucideTrash2 [size]="18"></svg>
                     }
                     <span class="sr-only"
-                      >Eliminar descanso del {{ item.label }}</span
+                      >Eliminar receso del {{ item.label }}</span
                     >
                   </app-button>
                 }
@@ -361,7 +369,7 @@
               class="flex flex-col items-center gap-1.5 text-center py-6 text-sm text-gray-500 border border-dashed border-gray-200 rounded-xl"
             >
               <svg lucideCalendarOff [size]="22" class="text-gray-400"></svg>
-              No tiene descansos programados.
+              No tiene semanas de receso programadas.
             </div>
           }
         }
@@ -441,13 +449,13 @@
 </div>
 
 <!-- Confirmación: eliminar o terminar hoy (por encima del panel) -->
-<div class="relative z-[70]">
+<div class="relative z-70">
   <app-confirm-modal
     [visible]="!!pendingRemoval()"
     [title]="
       pendingRemoval()?.mode === 'trim'
-        ? '¿Terminar el descanso hoy?'
-        : '¿Eliminar este descanso?'
+        ? '¿Terminar las semanas de receso hoy?'
+        : '¿Eliminar estas semanas de receso?'
     "
     [richMessage]="true"
     maxWidth="max-w-md"

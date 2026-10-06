@@ -39,8 +39,8 @@
       <span
         [appTooltip]="
           doctor().status === false
-            ? 'El médico debe estar activo para programar descansos'
-            : 'Ver y programar descansos'
+            ? 'El médico debe estar activo para programar recesos'
+            : 'Ver y programar semanas de recesos'
         "
       >
         <app-button
@@ -50,7 +50,7 @@
           (buttonClick)="handleTimeOff()"
         >
           <svg lucideCoffee [size]="15"></svg>
-          Descansos
+          Recesos
         </app-button>
       </span>
       <app-button
