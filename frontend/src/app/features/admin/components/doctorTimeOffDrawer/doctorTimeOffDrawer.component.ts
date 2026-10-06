@@ -178,7 +178,13 @@ export class DoctorTimeOffDrawerComponent implements OnInit, OnDestroy {
   // ── Listas ────────────────────────────────────────────────────────────────
   private items = computed(() => this.timeOffs().map((t) => this.toItem(t)));
   activeItems = computed(() =>
-    this.items().filter((t) => t.status !== 'FINALIZADO')
+    this.items()
+      .filter((t) => t.status !== 'FINALIZADO')
+      .sort(
+        (a, b) =>
+          Number(b.isOngoing) - Number(a.isOngoing) ||
+          a.startDate.localeCompare(b.startDate)
+      )
   );
   historyItems = computed(() =>
     this.items().filter((t) => t.status === 'FINALIZADO')
