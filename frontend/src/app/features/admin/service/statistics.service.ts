@@ -2,6 +2,8 @@ import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import {
   CancellationStats,
+  EstadoCita,
+  EstadoFiltro,
   MonthlyBreakdown,
   MonthlyTotalStat,
 } from '../../../shared/models/dtos/statistics.dto';
@@ -25,6 +27,16 @@ export class StatisticsService {
     { name: 'Julián Torres', specialty: 'Medicina General' },
   ];
   private readonly MONTHS = Array.from({ length: 12 }, (_, i) => i);
+  /** Estados sin canceladas: lo que suman por defecto médico y especialidad. */
+  private readonly ESTADOS_SIN_CANCELADAS: EstadoCita[] = [
+    'AGENDADA',
+    'ATENDIDA',
+    'NO_ASISTIO',
+  ];
+  private readonly ESTADOS_TODOS: EstadoCita[] = [
+    ...this.ESTADOS_SIN_CANCELADAS,
+    'CANCELADA',
+  ];
 
   /** Años con citas registradas, del más reciente al más antiguo. */
   getAvailableYears(): Observable<number[]> {
@@ -34,23 +46,30 @@ export class StatisticsService {
     return of([current, current - 1]);
   }
 
-  /** Total de citas (incluye canceladas) por mes del año indicado. */
-  getMonthlyTotals(year: number): Observable<MonthlyTotalStat[]> {
+  /** Total de citas por mes. Sin `estado`, incluye todos (canceladas también). */
+  getMonthlyTotals(
+    year: number,
+    estado?: EstadoFiltro
+  ): Observable<MonthlyTotalStat[]> {
     // TODO: Conectar con endpoint de estadísticas
-    // Ruta sugerida: GET `${apiUrl}/statistics/appointments/monthly?year=${year}`
+    // Ruta sugerida: GET `${apiUrl}/statistics/appointments/monthly?year=${year}&estado=${estado ?? ''}`
+    const estados = estado ? [estado] : this.ESTADOS_TODOS;
     return of(
       this.MONTHS.map((month) => ({
         month,
-        total:
-          this.mockAttendedTotal(year, month) + this.mockCancelled(year, month),
+        total: this.mockCount(year, month, estados),
       }))
     );
   }
 
-  /** Citas no canceladas por médico y por mes del año indicado. */
-  getMonthlyByDoctor(year: number): Observable<MonthlyBreakdown> {
+  /** Citas por médico y por mes. Sin `estado`, suma todos menos canceladas. */
+  getMonthlyByDoctor(
+    year: number,
+    estado?: EstadoFiltro
+  ): Observable<MonthlyBreakdown> {
     // TODO: Conectar con endpoint de estadísticas
-    // Ruta sugerida: GET `${apiUrl}/statistics/appointments/by-doctor?year=${year}`
+    // Ruta sugerida: GET `${apiUrl}/statistics/appointments/by-doctor?year=${year}&estado=${estado ?? ''}`
+    const estados = estado ? [estado] : this.ESTADOS_SIN_CANCELADAS;
     return of({
       series: this.MOCK_DOCTORS.map((d) => d.name),
       rows: this.MONTHS.map((month) => ({
@@ -58,17 +77,21 @@ export class StatisticsService {
         values: Object.fromEntries(
           this.MOCK_DOCTORS.map((d) => [
             d.name,
-            this.mockAttended(year, month, d.name),
+            this.mockCount(year, month, estados, d.name),
           ])
         ),
       })),
     });
   }
 
-  /** Citas no canceladas por especialidad y por mes del año indicado. */
-  getMonthlyBySpecialty(year: number): Observable<MonthlyBreakdown> {
+  /** Citas por especialidad y por mes. Sin `estado`, suma todos menos canceladas. */
+  getMonthlyBySpecialty(
+    year: number,
+    estado?: EstadoFiltro
+  ): Observable<MonthlyBreakdown> {
     // TODO: Conectar con endpoint de estadísticas
-    // Ruta sugerida: GET `${apiUrl}/statistics/appointments/by-specialty?year=${year}`
+    // Ruta sugerida: GET `${apiUrl}/statistics/appointments/by-specialty?year=${year}&estado=${estado ?? ''}`
+    const estados = estado ? [estado] : this.ESTADOS_SIN_CANCELADAS;
     const specialties = [...new Set(this.MOCK_DOCTORS.map((d) => d.specialty))];
     return of({
       series: specialties,
@@ -78,7 +101,7 @@ export class StatisticsService {
           specialties.map((spec) => [
             spec,
             this.MOCK_DOCTORS.filter((d) => d.specialty === spec).reduce(
-              (acc, d) => acc + this.mockAttended(year, month, d.name),
+              (acc, d) => acc + this.mockCount(year, month, estados, d.name),
               0
             ),
           ])
@@ -94,8 +117,8 @@ export class StatisticsService {
     let totalYear = 0;
     let cancelledYear = 0;
     const months = this.MONTHS.map((month) => {
-      const cancelled = this.mockCancelled(year, month);
-      const total = this.mockAttendedTotal(year, month) + cancelled;
+      const cancelled = this.mockCount(year, month, ['CANCELADA']);
+      const total = this.mockCount(year, month, this.ESTADOS_TODOS);
       totalYear += total;
       cancelledYear += cancelled;
       return {
@@ -119,6 +142,14 @@ export class StatisticsService {
     );
   }
 
+  private mockIsPast(year: number, month: number): boolean {
+    const now = new Date();
+    return (
+      year < now.getFullYear() ||
+      (year === now.getFullYear() && month < now.getMonth())
+    );
+  }
+
   /** Número pseudoaleatorio determinista en [0, 1) para que el mock sea estable. */
   private mockNoise(...parts: (string | number)[]): number {
     let h = 2166136261;
@@ -129,21 +160,47 @@ export class StatisticsService {
     return ((h >>> 0) % 1000) / 1000;
   }
 
-  private mockAttended(year: number, month: number, doctor: string): number {
-    if (this.mockIsFuture(year, month)) return 0;
-    return 10 + Math.floor(this.mockNoise(year, month, doctor) * 25);
+  /** Suma las citas de los estados indicados; sin `doctor` suma todos. */
+  private mockCount(
+    year: number,
+    month: number,
+    estados: EstadoCita[],
+    doctor?: string
+  ): number {
+    const doctors = doctor ? [doctor] : this.MOCK_DOCTORS.map((d) => d.name);
+    let total = 0;
+    for (const d of doctors) {
+      for (const e of estados) total += this.mockByState(year, month, d, e);
+    }
+    return total;
   }
 
-  private mockAttendedTotal(year: number, month: number): number {
-    return this.MOCK_DOCTORS.reduce(
-      (acc, d) => acc + this.mockAttended(year, month, d.name),
-      0
-    );
-  }
-
-  private mockCancelled(year: number, month: number): number {
-    if (this.mockIsFuture(year, month)) return 0;
-    const ratio = 0.05 + this.mockNoise(year, month, 'cancel') * 0.2;
-    return Math.floor(this.mockAttendedTotal(year, month) * ratio);
+  private mockByState(
+    year: number,
+    month: number,
+    doctor: string,
+    estado: EstadoCita
+  ): number {
+    switch (estado) {
+      case 'ATENDIDA':
+        if (this.mockIsFuture(year, month)) return 0;
+        return 10 + Math.floor(this.mockNoise(year, month, doctor) * 25);
+      case 'AGENDADA':
+        if (this.mockIsPast(year, month)) return 0;
+        return (
+          3 + Math.floor(this.mockNoise(year, month, doctor, 'sched') * 10)
+        );
+      case 'NO_ASISTIO': {
+        const attended = this.mockByState(year, month, doctor, 'ATENDIDA');
+        const ratio =
+          0.03 + this.mockNoise(year, month, doctor, 'noshow') * 0.07;
+        return Math.floor(attended * ratio);
+      }
+      case 'CANCELADA': {
+        const attended = this.mockByState(year, month, doctor, 'ATENDIDA');
+        const ratio = 0.05 + this.mockNoise(year, month, 'cancel') * 0.2;
+        return Math.floor(attended * ratio);
+      }
+    }
   }
 }
