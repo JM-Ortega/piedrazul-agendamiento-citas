@@ -46,6 +46,7 @@ import {
 } from '../../../../shared/helpers/statisticsCharts';
 import {
   CancellationStats,
+  EstadoFiltro,
   MonthlyBreakdown,
   MonthlySeriesStat,
   MonthlyTotalStat,
@@ -84,6 +85,13 @@ export class AdminStatisticsComponent implements OnInit {
     { value: '3', label: 'Últ. 3 meses' },
     { value: '6', label: 'Últ. 6 meses' },
     { value: 'all', label: 'Todo el año' },
+  ];
+
+  /** Filtro de estado. La opción vacía de `app-select` equivale a "Todas". */
+  readonly estadoOptions: SelectOption[] = [
+    { value: 'AGENDADA', label: 'Agendada' },
+    { value: 'ATENDIDA', label: 'Atendida' },
+    { value: 'NO_ASISTIO', label: 'No asistió' },
   ];
 
   // ── Estilos de los chips de rango (app-button variant="chip") ─────────────
@@ -151,16 +159,19 @@ export class AdminStatisticsComponent implements OnInit {
   // ── Citas por mes ─────────────────────────────────────────────────────────
   monthlyYear = signal(new Date().getFullYear());
   monthlyPreset = signal<MonthPreset>('6');
+  monthlyEstado = signal<EstadoFiltro | ''>('');
   private monthlyData = signal<MonthlyTotalStat[]>([]);
 
   // ── Citas por médico ──────────────────────────────────────────────────────
   doctorYear = signal(new Date().getFullYear());
   doctorPreset = signal<MonthPreset>('6');
+  doctorEstado = signal<EstadoFiltro | ''>('');
   private doctorData = signal<MonthlyBreakdown>({ series: [], rows: [] });
 
   // ── Comparativo por especialidad ──────────────────────────────────────────
   specialtyYear = signal(new Date().getFullYear());
   specialtyPreset = signal<MonthPreset>('6');
+  specialtyEstado = signal<EstadoFiltro | ''>('');
   private specialtyData = signal<MonthlyBreakdown>({ series: [], rows: [] });
 
   // ── Tasa de cancelación ───────────────────────────────────────────────────
@@ -244,62 +255,94 @@ export class AdminStatisticsComponent implements OnInit {
           this.doctorYear.set(year);
           this.specialtyYear.set(year);
           this.cancelYear.set(year);
-          this.load(
-            this.statisticsService.getMonthlyTotals(year),
-            this.monthlyData
-          );
-          this.load(
-            this.statisticsService.getMonthlyByDoctor(year),
-            this.doctorData
-          );
-          this.load(
-            this.statisticsService.getMonthlyBySpecialty(year),
-            this.specialtyData
-          );
-          this.load(
-            this.statisticsService.getCancellationRate(year),
-            this.cancelData
-          );
+          this.refreshMonthly();
+          this.refreshDoctor();
+          this.refreshSpecialty();
+          this.refreshCancel();
         },
         error: () =>
           this.errorMessage.set('No se pudieron cargar las estadísticas.'),
       });
   }
 
-  // ── Handlers de año ───────────────────────────────────────────────────────
-  // `app-select` siempre incluye una opción vacía ("Seleccione..."): se ignora.
-  onMonthlyYearChange(value: string): void {
-    if (!value) return;
-    const year = Number(value);
-    this.monthlyYear.set(year);
-    this.load(this.statisticsService.getMonthlyTotals(year), this.monthlyData);
-  }
-
-  onDoctorYearChange(value: string): void {
-    if (!value) return;
-    const year = Number(value);
-    this.doctorYear.set(year);
-    this.load(this.statisticsService.getMonthlyByDoctor(year), this.doctorData);
-  }
-
-  onSpecialtyYearChange(value: string): void {
-    if (!value) return;
-    const year = Number(value);
-    this.specialtyYear.set(year);
+  // ── Refresco (también lo usa el botón "Refrescar") ────────────────────────
+  refreshMonthly(): void {
     this.load(
-      this.statisticsService.getMonthlyBySpecialty(year),
+      this.statisticsService.getMonthlyTotals(
+        this.monthlyYear(),
+        this.monthlyEstado() || undefined
+      ),
+      this.monthlyData
+    );
+  }
+
+  refreshDoctor(): void {
+    this.load(
+      this.statisticsService.getMonthlyByDoctor(
+        this.doctorYear(),
+        this.doctorEstado() || undefined
+      ),
+      this.doctorData
+    );
+  }
+
+  refreshSpecialty(): void {
+    this.load(
+      this.statisticsService.getMonthlyBySpecialty(
+        this.specialtyYear(),
+        this.specialtyEstado() || undefined
+      ),
       this.specialtyData
     );
   }
 
-  onCancelYearChange(value: string): void {
-    if (!value) return;
-    const year = Number(value);
-    this.cancelYear.set(year);
+  refreshCancel(): void {
     this.load(
-      this.statisticsService.getCancellationRate(year),
+      this.statisticsService.getCancellationRate(this.cancelYear()),
       this.cancelData
     );
+  }
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  // `app-select` siempre incluye una opción vacía ("Seleccione..."): en año se
+  // ignora; en estado equivale a "Todas".
+  onMonthlyYearChange(value: string): void {
+    if (!value) return;
+    this.monthlyYear.set(Number(value));
+    this.refreshMonthly();
+  }
+
+  onDoctorYearChange(value: string): void {
+    if (!value) return;
+    this.doctorYear.set(Number(value));
+    this.refreshDoctor();
+  }
+
+  onSpecialtyYearChange(value: string): void {
+    if (!value) return;
+    this.specialtyYear.set(Number(value));
+    this.refreshSpecialty();
+  }
+
+  onCancelYearChange(value: string): void {
+    if (!value) return;
+    this.cancelYear.set(Number(value));
+    this.refreshCancel();
+  }
+
+  onMonthlyEstadoChange(value: string): void {
+    this.monthlyEstado.set(value as EstadoFiltro | '');
+    this.refreshMonthly();
+  }
+
+  onDoctorEstadoChange(value: string): void {
+    this.doctorEstado.set(value as EstadoFiltro | '');
+    this.refreshDoctor();
+  }
+
+  onSpecialtyEstadoChange(value: string): void {
+    this.specialtyEstado.set(value as EstadoFiltro | '');
+    this.refreshSpecialty();
   }
 
   // ── Private ───────────────────────────────────────────────────────────────
