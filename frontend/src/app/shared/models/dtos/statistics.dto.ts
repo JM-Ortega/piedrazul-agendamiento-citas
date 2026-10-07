@@ -27,3 +27,7 @@ export interface CancellationStats {
   /** Tasa de cancelación de todo el año, en porcentaje. */
   yearRate: number;
 }
+
+export type EstadoCita = 'AGENDADA' | 'ATENDIDA' | 'NO_ASISTIO' | 'CANCELADA';
+/** Estados disponibles en el desplegable*/
+export type EstadoFiltro = Exclude<EstadoCita, 'CANCELADA'>;
