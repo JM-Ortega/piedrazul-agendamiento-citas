@@ -21,18 +21,48 @@
           <p class="text-gray-500 text-sm">Total de todas las especialidades</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <label for="monthly-year" class="text-sm font-semibold text-gray-500"
-          >Año:</label
+      <div class="flex flex-col items-end gap-2">
+        <div class="flex flex-wrap items-center justify-end gap-3">
+          <div class="flex items-center gap-2">
+            <label
+              for="monthly-year"
+              class="text-sm font-semibold text-gray-500"
+              >Año:</label
+            >
+            <app-select
+              [id]="'monthly-year'"
+              size="sm"
+              [options]="yearOptions()"
+              [fullWidth]="false"
+              [ngModel]="monthlyYear().toString()"
+              (valueChange)="onMonthlyYearChange($event)"
+            ></app-select>
+          </div>
+          <div class="flex items-center gap-2">
+            <label
+              for="monthly-estado"
+              class="text-sm font-semibold text-gray-500"
+              >Estado:</label
+            >
+            <app-select
+              [id]="'monthly-estado'"
+              size="sm"
+              [options]="estadoOptions"
+              [fullWidth]="false"
+              [ngModel]="monthlyEstado()"
+              (valueChange)="onMonthlyEstadoChange($event)"
+            ></app-select>
+          </div>
+        </div>
+        <app-button
+          variant="chip"
+          [active]="false"
+          [inactiveChipClasses]="presetInactiveClasses"
+          [extraClass]="presetExtraClass"
+          (buttonClick)="refreshMonthly()"
         >
-        <app-select
-          [id]="'monthly-year'"
-          size="sm"
-          [options]="yearOptions()"
-          [fullWidth]="false"
-          [ngModel]="monthlyYear().toString()"
-          (valueChange)="onMonthlyYearChange($event)"
-        ></app-select>
+          Refrescar
+        </app-button>
       </div>
     </div>
     <div class="flex flex-wrap gap-2 mb-3">
@@ -74,18 +104,46 @@
           <p class="text-gray-500 text-sm">Mes a mes · sin canceladas</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <label for="doctor-year" class="text-sm font-semibold text-gray-500"
-          >Año:</label
+      <div class="flex flex-col items-end gap-2">
+        <div class="flex flex-wrap items-center justify-end gap-3">
+          <div class="flex items-center gap-2">
+            <label for="doctor-year" class="text-sm font-semibold text-gray-500"
+              >Año:</label
+            >
+            <app-select
+              [id]="'doctor-year'"
+              size="sm"
+              [options]="yearOptions()"
+              [fullWidth]="false"
+              [ngModel]="doctorYear().toString()"
+              (valueChange)="onDoctorYearChange($event)"
+            ></app-select>
+          </div>
+          <div class="flex items-center gap-2">
+            <label
+              for="doctor-estado"
+              class="text-sm font-semibold text-gray-500"
+              >Estado:</label
+            >
+            <app-select
+              [id]="'doctor-estado'"
+              size="sm"
+              [options]="estadoOptions"
+              [fullWidth]="false"
+              [ngModel]="doctorEstado()"
+              (valueChange)="onDoctorEstadoChange($event)"
+            ></app-select>
+          </div>
+        </div>
+        <app-button
+          variant="chip"
+          [active]="false"
+          [inactiveChipClasses]="presetInactiveClasses"
+          [extraClass]="presetExtraClass"
+          (buttonClick)="refreshDoctor()"
         >
-        <app-select
-          [id]="'doctor-year'"
-          size="sm"
-          [options]="yearOptions()"
-          [fullWidth]="false"
-          [ngModel]="doctorYear().toString()"
-          (valueChange)="onDoctorYearChange($event)"
-        ></app-select>
+          Refrescar
+        </app-button>
       </div>
     </div>
     <div class="flex flex-wrap gap-2 mb-3">
@@ -140,18 +198,48 @@
           <p class="text-gray-500 text-sm">Mes a mes · sin canceladas</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <label for="specialty-year" class="text-sm font-semibold text-gray-500"
-          >Año:</label
+      <div class="flex flex-col items-end gap-2">
+        <div class="flex flex-wrap items-center justify-end gap-3">
+          <div class="flex items-center gap-2">
+            <label
+              for="specialty-year"
+              class="text-sm font-semibold text-gray-500"
+              >Año:</label
+            >
+            <app-select
+              [id]="'specialty-year'"
+              [options]="yearOptions()"
+              [fullWidth]="false"
+              [ngModel]="specialtyYear().toString()"
+              (valueChange)="onSpecialtyYearChange($event)"
+              size="sm"
+            ></app-select>
+          </div>
+          <div class="flex items-center gap-2">
+            <label
+              for="specialty-estado"
+              class="text-sm font-semibold text-gray-500"
+              >Estado:</label
+            >
+            <app-select
+              [id]="'specialty-estado'"
+              [options]="estadoOptions"
+              [fullWidth]="false"
+              [ngModel]="specialtyEstado()"
+              (valueChange)="onSpecialtyEstadoChange($event)"
+              size="sm"
+            ></app-select>
+          </div>
+        </div>
+        <app-button
+          variant="chip"
+          [active]="false"
+          [inactiveChipClasses]="presetInactiveClasses"
+          [extraClass]="presetExtraClass"
+          (buttonClick)="refreshSpecialty()"
         >
-        <app-select
-          [id]="'specialty-year'"
-          [options]="yearOptions()"
-          [fullWidth]="false"
-          [ngModel]="specialtyYear().toString()"
-          (valueChange)="onSpecialtyYearChange($event)"
-          size="sm"
-        ></app-select>
+          Refrescar
+        </app-button>
       </div>
     </div>
     <div class="flex flex-wrap gap-2 mb-3">
@@ -208,31 +296,42 @@
           </p>
         </div>
       </div>
-      <div class="flex flex-wrap items-center gap-3">
-        <div class="flex items-center gap-2">
-          <label for="cancel-year" class="text-sm font-semibold text-gray-500"
-            >Año:</label
+      <div class="flex flex-col items-end gap-2">
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-2">
+            <label for="cancel-year" class="text-sm font-semibold text-gray-500"
+              >Año:</label
+            >
+            <app-select
+              [id]="'cancel-year'"
+              [options]="yearOptions()"
+              [fullWidth]="false"
+              size="sm"
+              [ngModel]="cancelYear().toString()"
+              (valueChange)="onCancelYearChange($event)"
+            ></app-select>
+          </div>
+          <div
+            class="bg-red-50 border border-red-200 rounded-xl px-4 py-2 flex flex-col items-center min-w-24"
+            [appTooltip]="'Citas canceladas sobre el total del año seleccionado'"
           >
-          <app-select
-            [id]="'cancel-year'"
-            [options]="yearOptions()"
-            [fullWidth]="false"
-            size="sm"
-            [ngModel]="cancelYear().toString()"
-            (valueChange)="onCancelYearChange($event)"
-          ></app-select>
+            <p class="text-2xl font-extrabold text-red-600 leading-none">
+              {{ cancelYearRate() }}%
+            </p>
+            <p class="text-gray-500 text-xs font-semibold mt-0.5 text-center">
+              Tasa del período
+            </p>
+          </div>
         </div>
-        <div
-          class="bg-red-50 border border-red-200 rounded-xl px-4 py-2 flex flex-col items-center min-w-24"
-          [appTooltip]="'Citas canceladas sobre el total del año seleccionado'"
+        <app-button
+          variant="chip"
+          [active]="false"
+          [inactiveChipClasses]="presetInactiveClasses"
+          [extraClass]="presetExtraClass"
+          (buttonClick)="refreshCancel()"
         >
-          <p class="text-2xl font-extrabold text-red-600 leading-none">
-            {{ cancelYearRate() }}%
-          </p>
-          <p class="text-gray-500 text-xs font-semibold mt-0.5 text-center">
-            Tasa del período
-          </p>
-        </div>
+          Refrescar
+        </app-button>
       </div>
     </div>
 
