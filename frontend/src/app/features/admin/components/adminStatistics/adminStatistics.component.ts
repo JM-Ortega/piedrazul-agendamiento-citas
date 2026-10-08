@@ -13,7 +13,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import {
   LucideActivity,
-  LucideRefreshCw,
   LucideStethoscope,
   LucideTrendingDown,
   LucideUsers,
@@ -77,7 +76,6 @@ type EstadoAgendaFiltro = Extract<EstadoFiltro, 'AGENDADA' | 'ATENDIDA'>;
     SelectComponent,
     TooltipDirective,
     LucideActivity,
-    LucideRefreshCw,
     LucideStethoscope,
     LucideUsers,
     LucideTrendingDown,
