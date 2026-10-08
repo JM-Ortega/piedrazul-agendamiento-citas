@@ -13,6 +13,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import {
   LucideActivity,
+  LucideRefreshCw,
   LucideStethoscope,
   LucideTrendingDown,
   LucideUsers,
@@ -53,10 +54,16 @@ import {
 } from '../../../../shared/models/dtos/statistics.dto';
 import { StatisticsService } from '../../service/statistics.service';
 
+/** Estados permitidos en el filtro de médico y especialidad. */
+type EstadoAgendaFiltro = Extract<EstadoFiltro, 'AGENDADA' | 'ATENDIDA'>;
+
 /**
  * Vista de estadísticas del panel de administración: citas por mes, por
  * médico, por especialidad y tasa de cancelación. Los datos vienen de
  * `StatisticsService` (hoy simulados) y se grafican con Chart.js.
+ *
+ * Año y estado se editan como borrador y solo se consultan al pulsar
+ * "Filtrar"; el rango de meses se aplica al instante sobre los datos en caché.
  */
 @Component({
   selector: 'app-admin-statistics',
@@ -70,6 +77,7 @@ import { StatisticsService } from '../../service/statistics.service';
     SelectComponent,
     TooltipDirective,
     LucideActivity,
+    LucideRefreshCw,
     LucideStethoscope,
     LucideUsers,
     LucideTrendingDown,
@@ -81,7 +89,7 @@ export class AdminStatisticsComponent implements OnInit {
   private statisticsService = inject(StatisticsService);
   private destroyRef = inject(DestroyRef);
 
-  readonly presetOptions: { value: MonthPreset; label: string }[] = [
+  readonly presetOptions: SelectOption[] = [
     { value: '3', label: 'Últ. 3 meses' },
     { value: '6', label: 'Últ. 6 meses' },
     { value: 'all', label: 'Todo el año' },
@@ -91,15 +99,10 @@ export class AdminStatisticsComponent implements OnInit {
   readonly estadoOptions: SelectOption[] = [
     { value: 'AGENDADA', label: 'Agendada' },
     { value: 'ATENDIDA', label: 'Atendida' },
-    { value: 'NO_ASISTIO', label: 'No asistió' },
   ];
 
-  // ── Estilos de los chips de rango (app-button variant="chip") ─────────────
-  readonly presetExtraClass = '!w-auto !py-1.5 !px-3 !text-xs !rounded-lg';
-  readonly presetActiveClasses =
-    'border-[#215c98] bg-[#215c98] text-white shadow-sm';
-  readonly presetInactiveClasses =
-    'border-[#a7c9ec] bg-blue-50 text-[#215c98] hover:bg-[#d9e9f8]';
+  // ── Estilo del botón "Filtrar" (app-button) ───────────────────────────────
+  readonly filterButtonClass = '!w-auto !py-1.5 !px-3 !text-xs !rounded-lg';
 
   // ── Opciones y plugins de cada gráfica (constantes) ───────────────────────
   readonly monthlyOptions = barOptions(false);
@@ -156,23 +159,47 @@ export class AdminStatisticsComponent implements OnInit {
     this.years().map((y) => ({ value: String(y), label: String(y) }))
   );
 
-  // ── Citas por mes ─────────────────────────────────────────────────────────
+  // ── Citas por mes (solo atendidas) ────────────────────────────────────────
+  // `monthlyYear` es el año aplicado; `monthlyYearDraft` es lo que muestra el select.
   monthlyYear = signal(new Date().getFullYear());
+  monthlyYearDraft = signal(new Date().getFullYear());
   monthlyPreset = signal<MonthPreset>('6');
-  monthlyEstado = signal<EstadoFiltro | ''>('');
   private monthlyData = signal<MonthlyTotalStat[]>([]);
+  readonly monthlyDirty = computed(
+    () => this.monthlyYearDraft() !== this.monthlyYear()
+  );
 
   // ── Citas por médico ──────────────────────────────────────────────────────
   doctorYear = signal(new Date().getFullYear());
+  doctorYearDraft = signal(new Date().getFullYear());
+  doctorEstado = signal<EstadoAgendaFiltro | ''>('');
+  doctorEstadoDraft = signal<EstadoAgendaFiltro | ''>('');
   doctorPreset = signal<MonthPreset>('6');
-  doctorEstado = signal<EstadoFiltro | ''>('');
   private doctorData = signal<MonthlyBreakdown>({ series: [], rows: [] });
+  readonly doctorDirty = computed(
+    () =>
+      this.doctorYearDraft() !== this.doctorYear() ||
+      this.doctorEstadoDraft() !== this.doctorEstado()
+  );
+  readonly doctorSubtitle = computed(() =>
+    this.breakdownSubtitle(this.doctorEstado())
+  );
 
   // ── Comparativo por especialidad ──────────────────────────────────────────
   specialtyYear = signal(new Date().getFullYear());
+  specialtyYearDraft = signal(new Date().getFullYear());
+  specialtyEstado = signal<EstadoAgendaFiltro | ''>('');
+  specialtyEstadoDraft = signal<EstadoAgendaFiltro | ''>('');
   specialtyPreset = signal<MonthPreset>('6');
-  specialtyEstado = signal<EstadoFiltro | ''>('');
   private specialtyData = signal<MonthlyBreakdown>({ series: [], rows: [] });
+  readonly specialtyDirty = computed(
+    () =>
+      this.specialtyYearDraft() !== this.specialtyYear() ||
+      this.specialtyEstadoDraft() !== this.specialtyEstado()
+  );
+  readonly specialtySubtitle = computed(() =>
+    this.breakdownSubtitle(this.specialtyEstado())
+  );
 
   // ── Tasa de cancelación ───────────────────────────────────────────────────
   cancelYear = signal(new Date().getFullYear());
@@ -252,31 +279,36 @@ export class AdminStatisticsComponent implements OnInit {
           this.years.set(years);
           const year = years[0] ?? new Date().getFullYear();
           this.monthlyYear.set(year);
+          this.monthlyYearDraft.set(year);
           this.doctorYear.set(year);
+          this.doctorYearDraft.set(year);
           this.specialtyYear.set(year);
+          this.specialtyYearDraft.set(year);
           this.cancelYear.set(year);
-          this.refreshMonthly();
-          this.refreshDoctor();
-          this.refreshSpecialty();
-          this.refreshCancel();
+          this.refresh();
         },
         error: () =>
           this.errorMessage.set('No se pudieron cargar las estadísticas.'),
       });
   }
 
-  // ── Refresco (también lo usa el botón "Refrescar") ────────────────────────
-  refreshMonthly(): void {
+  // ── Refresco (siempre con los filtros aplicados, no con los borradores) ───
+  /** Botón global "Refrescar": vuelve a consultar todas las secciones. */
+  refresh(): void {
+    this.refreshMonthly();
+    this.refreshDoctor();
+    this.refreshSpecialty();
+    this.refreshCancel();
+  }
+
+  private refreshMonthly(): void {
     this.load(
-      this.statisticsService.getMonthlyTotals(
-        this.monthlyYear(),
-        this.monthlyEstado() || undefined
-      ),
+      this.statisticsService.getMonthlyTotals(this.monthlyYear(), 'ATENDIDA'),
       this.monthlyData
     );
   }
 
-  refreshDoctor(): void {
+  private refreshDoctor(): void {
     this.load(
       this.statisticsService.getMonthlyByDoctor(
         this.doctorYear(),
@@ -286,7 +318,7 @@ export class AdminStatisticsComponent implements OnInit {
     );
   }
 
-  refreshSpecialty(): void {
+  private refreshSpecialty(): void {
     this.load(
       this.statisticsService.getMonthlyBySpecialty(
         this.specialtyYear(),
@@ -296,53 +328,78 @@ export class AdminStatisticsComponent implements OnInit {
     );
   }
 
-  refreshCancel(): void {
+  private refreshCancel(): void {
     this.load(
       this.statisticsService.getCancellationRate(this.cancelYear()),
       this.cancelData
     );
   }
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // ── Handlers de borrador (no consultan) ───────────────────────────────────
   // `app-select` siempre incluye una opción vacía ("Seleccione..."): en año se
   // ignora; en estado equivale a "Todas".
   onMonthlyYearChange(value: string): void {
     if (!value) return;
-    this.monthlyYear.set(Number(value));
-    this.refreshMonthly();
+    this.monthlyYearDraft.set(Number(value));
   }
 
   onDoctorYearChange(value: string): void {
     if (!value) return;
-    this.doctorYear.set(Number(value));
-    this.refreshDoctor();
+    this.doctorYearDraft.set(Number(value));
+  }
+
+  onDoctorEstadoChange(value: string): void {
+    this.doctorEstadoDraft.set(value as EstadoAgendaFiltro | '');
   }
 
   onSpecialtyYearChange(value: string): void {
     if (!value) return;
-    this.specialtyYear.set(Number(value));
+    this.specialtyYearDraft.set(Number(value));
+  }
+
+  onSpecialtyEstadoChange(value: string): void {
+    this.specialtyEstadoDraft.set(value as EstadoAgendaFiltro | '');
+  }
+
+  // ── Botones "Filtrar": aplican el borrador y consultan ────────────────────
+  applyMonthlyFilters(): void {
+    this.monthlyYear.set(this.monthlyYearDraft());
+    this.refreshMonthly();
+  }
+
+  applyDoctorFilters(): void {
+    this.doctorYear.set(this.doctorYearDraft());
+    this.doctorEstado.set(this.doctorEstadoDraft());
+    this.refreshDoctor();
+  }
+
+  applySpecialtyFilters(): void {
+    this.specialtyYear.set(this.specialtyYearDraft());
+    this.specialtyEstado.set(this.specialtyEstadoDraft());
     this.refreshSpecialty();
+  }
+
+  // ── Handlers que se aplican al instante ───────────────────────────────────
+  // El rango solo filtra en el cliente sobre los datos en caché.
+  onMonthlyPresetChange(value: string): void {
+    if (!value) return;
+    this.monthlyPreset.set(value as MonthPreset);
+  }
+
+  onDoctorPresetChange(value: string): void {
+    if (!value) return;
+    this.doctorPreset.set(value as MonthPreset);
+  }
+
+  onSpecialtyPresetChange(value: string): void {
+    if (!value) return;
+    this.specialtyPreset.set(value as MonthPreset);
   }
 
   onCancelYearChange(value: string): void {
     if (!value) return;
     this.cancelYear.set(Number(value));
     this.refreshCancel();
-  }
-
-  onMonthlyEstadoChange(value: string): void {
-    this.monthlyEstado.set(value as EstadoFiltro | '');
-    this.refreshMonthly();
-  }
-
-  onDoctorEstadoChange(value: string): void {
-    this.doctorEstado.set(value as EstadoFiltro | '');
-    this.refreshDoctor();
-  }
-
-  onSpecialtyEstadoChange(value: string): void {
-    this.specialtyEstado.set(value as EstadoFiltro | '');
-    this.refreshSpecialty();
   }
 
   // ── Private ───────────────────────────────────────────────────────────────
@@ -353,6 +410,17 @@ export class AdminStatisticsComponent implements OnInit {
       error: () =>
         this.errorMessage.set('No se pudieron cargar las estadísticas.'),
     });
+  }
+
+  private breakdownSubtitle(estado: EstadoAgendaFiltro | ''): string {
+    switch (estado) {
+      case 'ATENDIDA':
+        return 'Mes a mes · citas atendidas';
+      case 'AGENDADA':
+        return 'Mes a mes · citas agendadas';
+      default:
+        return 'Mes a mes · citas agendadas y atendidas';
+    }
   }
 
   private filterMonths<T extends { month: number }>(
