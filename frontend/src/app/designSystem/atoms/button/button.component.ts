@@ -126,7 +126,7 @@ export class ButtonComponent {
       'py-3 rounded-xl border-2 text-base font-semibold transition-colors cursor-pointer w-full';
     return this.active
       ? `${base} ${this.activeChipClasses}`
-      : `${base} ${this.inactiveChipClasses}`; // 👈 ahora usa el input en vez del hardcode
+      : `${base} ${this.inactiveChipClasses}`;
   }
   onClick(): void {
     if (!this.disabled && !this.isLoading()) {
