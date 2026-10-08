@@ -27,14 +27,15 @@ export class StatisticsService {
     { name: 'Julián Torres', specialty: 'Medicina General' },
   ];
   private readonly MONTHS = Array.from({ length: 12 }, (_, i) => i);
-  /** Estados sin canceladas: lo que suman por defecto médico y especialidad. */
-  private readonly ESTADOS_SIN_CANCELADAS: EstadoCita[] = [
+  /** Estados que suman por defecto médico y especialidad (sin filtro). */
+  private readonly ESTADOS_AGENDADA_ATENDIDA: EstadoCita[] = [
+    'AGENDADA',
+    'ATENDIDA',
+  ];
+  private readonly ESTADOS_TODOS: EstadoCita[] = [
     'AGENDADA',
     'ATENDIDA',
     'NO_ASISTIO',
-  ];
-  private readonly ESTADOS_TODOS: EstadoCita[] = [
-    ...this.ESTADOS_SIN_CANCELADAS,
     'CANCELADA',
   ];
 
@@ -69,7 +70,7 @@ export class StatisticsService {
   ): Observable<MonthlyBreakdown> {
     // TODO: Conectar con endpoint de estadísticas
     // Ruta sugerida: GET `${apiUrl}/statistics/appointments/by-doctor?year=${year}&estado=${estado ?? ''}`
-    const estados = estado ? [estado] : this.ESTADOS_SIN_CANCELADAS;
+    const estados = estado ? [estado] : this.ESTADOS_AGENDADA_ATENDIDA;
     return of({
       series: this.MOCK_DOCTORS.map((d) => d.name),
       rows: this.MONTHS.map((month) => ({
@@ -91,7 +92,7 @@ export class StatisticsService {
   ): Observable<MonthlyBreakdown> {
     // TODO: Conectar con endpoint de estadísticas
     // Ruta sugerida: GET `${apiUrl}/statistics/appointments/by-specialty?year=${year}&estado=${estado ?? ''}`
-    const estados = estado ? [estado] : this.ESTADOS_SIN_CANCELADAS;
+    const estados = estado ? [estado] : this.ESTADOS_AGENDADA_ATENDIDA;
     const specialties = [...new Set(this.MOCK_DOCTORS.map((d) => d.specialty))];
     return of({
       series: specialties,
