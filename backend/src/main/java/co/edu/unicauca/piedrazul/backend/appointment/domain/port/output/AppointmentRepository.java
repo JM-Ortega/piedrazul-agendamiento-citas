@@ -1,6 +1,8 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.port.output;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyGroupCount;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyStateCount;
 
 import java.time.LocalDate;
 import java.util.Collection;
@@ -43,4 +45,10 @@ public interface AppointmentRepository {
     PagedResult<Appointment> ListDoctorDailyAgenda(UUID idDoctor, LocalDate date, PageQuery pageQuery);
 
     long countByDateAndState(LocalDate date, AppointmentState state);
+
+    List<MonthlyGroupCount> countByMonthAndDoctor(int year, Collection<AppointmentState> states);
+
+    List<MonthlyGroupCount> countByMonthAndSpecialty(int year, Collection<AppointmentState> states);
+
+    List<MonthlyStateCount> countByMonthAndState(int year);
 }
