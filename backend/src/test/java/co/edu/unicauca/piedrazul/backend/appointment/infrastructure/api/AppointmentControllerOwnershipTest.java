@@ -93,6 +93,7 @@ class AppointmentControllerOwnershipTest {
                 mock(GetDoctorDailyAgendaUseCase.class),
                 mock(CountScheduledAppointmentsUseCase.class),
                 mock(CheckExistenceByDocAndStateUseCase.class),
+                mock(GetAppointmentStatisticsUseCase.class),
                 appointmentSchedulingService,
                 mock(ManualPatientResolutionStrategy.class),
                 mock(AutonomousPatientResolutionStrategy.class),
