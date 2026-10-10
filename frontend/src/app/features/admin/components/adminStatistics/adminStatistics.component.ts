@@ -57,6 +57,7 @@ import {
 import { StatisticsService } from '../../service/statistics.service';
 import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
 import { toIsoDateString } from '../../../../shared/helpers/transformDateLocal';
+import { DatepickerComponent } from '../../../../designSystem/molecules/datepicker/datepicker.component';
 
 /** Estados permitidos en el filtro de médico y especialidad. */
 type EstadoAgendaFiltro = Extract<EstadoFiltro, 'AGENDADA' | 'ATENDIDA'>;
@@ -93,6 +94,7 @@ const WORKLOAD_COLORS = {
     LucideUsers,
     LucideTrendingDown,
     LucideCalendarDays,
+    DatepickerComponent,
   ],
   providers: [provideCharts(withDefaultRegisterables())],
   templateUrl: './adminStatistics.component.html',
@@ -186,11 +188,12 @@ export class AdminStatisticsComponent implements OnInit {
   // ── Carga de trabajo diaria ───────────────────────────────────────────────
   // `workloadDate` es la fecha aplicada; `workloadDateDraft` es la del input.
   workloadDate = signal(toIsoDateString(new Date()));
-  workloadDateDraft = signal(this.workloadDate());
+  workloadDateDraft = signal<string | null>(this.workloadDate());
   private workloadData = signal<DailyWorkloadStat[]>([]);
-  readonly workloadDirty = computed(
-    () => this.workloadDateDraft() !== this.workloadDate()
-  );
+  readonly workloadDirty = computed(() => {
+    const draft = this.workloadDateDraft();
+    return draft !== null && draft !== this.workloadDate();
+  });
   readonly workloadDateLabel = computed(() =>
     formatLongDateEs(this.workloadDate())
   );
@@ -379,15 +382,18 @@ export class AdminStatisticsComponent implements OnInit {
     );
   }
 
-  // Handler de borrador (no consulta)
-  onWorkloadDateChange(value: string): void {
-    if (!value) return;
-    this.workloadDateDraft.set(value);
+  /** Handler de borrador: se actualiza `workloadDateDraft` al cambiar la fecha en el input.
+   * `null` = fecha incompleta o inválida: deshabilita "Filtrar".
+   */
+  onWorkloadDateChange(date: Date | null): void {
+    this.workloadDateDraft.set(date ? toIsoDateString(date) : null);
   }
 
   // Botón "Filtrar"
   applyWorkloadFilters(): void {
-    this.workloadDate.set(this.workloadDateDraft());
+    const draft = this.workloadDateDraft();
+    if (!draft) return;
+    this.workloadDate.set(draft);
     this.refreshWorkload();
   }
 

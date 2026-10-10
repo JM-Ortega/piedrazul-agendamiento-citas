@@ -30,13 +30,13 @@
           <label for="workload-date" class="text-sm font-semibold text-gray-500"
             >Fecha:</label
           >
-          <input
-            id="workload-date"
-            type="date"
-            class="border border-[#a7c9ec] rounded-lg px-2.5 py-1 text-sm font-semibold text-[#215c98] bg-white outline-none focus:border-[#215c98] cursor-pointer"
+          <app-datepicker
+            [id]="'workload-date'"
+            [fullWidth]="false"
+            inputClass="w-36 py-1 !pl-3 !pr-9 !text-sm !rounded-lg"
             [ngModel]="workloadDateDraft()"
-            (ngModelChange)="onWorkloadDateChange($event)"
-          />
+            (valueChange)="onWorkloadDateChange($event)"
+          ></app-datepicker>
         </div>
         <app-button
           variant="primary"
