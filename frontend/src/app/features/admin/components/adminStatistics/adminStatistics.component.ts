@@ -55,6 +55,8 @@ import {
   DailyWorkloadStat,
 } from '../../../../shared/models/dtos/statistics.dto';
 import { StatisticsService } from '../../service/statistics.service';
+import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
+import { toIsoDateString } from '../../../../shared/helpers/transformDateLocal';
 
 /** Estados permitidos en el filtro de médico y especialidad. */
 type EstadoAgendaFiltro = Extract<EstadoFiltro, 'AGENDADA' | 'ATENDIDA'>;
@@ -66,25 +68,6 @@ const WORKLOAD_COLORS = {
   overload: '#dc2626',
   empty: '#e2e8f0',
 } as const;
-
-/** Fecha local en formato YYYY-MM-DD (toISOString usaría UTC). */
-function todayIso(): string {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${now.getFullYear()}-${month}-${day}`;
-}
-
-/** "viernes, 10 de octubre de 2026" a partir de YYYY-MM-DD, sin desfase de zona. */
-function formatDateEs(date: string): string {
-  const [y, m, d] = date.split('-').map(Number);
-  return new Intl.DateTimeFormat('es-CO', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(y, m - 1, d));
-}
 
 /**
  * Vista de estadísticas del panel de administración: citas por mes, por
@@ -202,14 +185,14 @@ export class AdminStatisticsComponent implements OnInit {
 
   // ── Carga de trabajo diaria ───────────────────────────────────────────────
   // `workloadDate` es la fecha aplicada; `workloadDateDraft` es la del input.
-  workloadDate = signal(todayIso());
-  workloadDateDraft = signal(todayIso());
+  workloadDate = signal(toIsoDateString(new Date()));
+  workloadDateDraft = signal(this.workloadDate());
   private workloadData = signal<DailyWorkloadStat[]>([]);
   readonly workloadDirty = computed(
     () => this.workloadDateDraft() !== this.workloadDate()
   );
   readonly workloadDateLabel = computed(() =>
-    formatDateEs(this.workloadDate())
+    formatLongDateEs(this.workloadDate())
   );
   readonly workloadTotal = computed(() =>
     this.workloadData().reduce((sum, d) => sum + d.total, 0)

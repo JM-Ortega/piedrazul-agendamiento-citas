@@ -50,7 +50,7 @@
     </div>
 
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-      <p class="text-[#215c98] text-sm font-semibold first-letter:uppercase">
+      <p class="text-[#215c98] text-sm font-semibold">
         {{ workloadDateLabel() }}
       </p>
       <div
@@ -74,7 +74,7 @@
 
     @if (workloadTotal() === 0) {
       <div class="h-40 flex items-center justify-center text-gray-400 text-sm">
-        Sin citas para el {{ workloadDateLabel() }}
+        Sin citas para esta fecha
       </div>
     } @else {
       <div class="relative h-65">
