@@ -17,6 +17,9 @@ public interface DoctorExternalService {
 
     List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
 
+    // Retorna el nombre de cada doctor indexado por su id
+    Map<UUID, String> getDoctorNamesByIds(List<UUID> doctorIds);
+
     Map<UUID, List<SpecialtyCode>> findSpecialtiesByPersonIds(Collection<UUID> personIds);
 
     Map<UUID, Integer> bookingWindowWeeksByDoctorIds(List<UUID> doctorIds);
