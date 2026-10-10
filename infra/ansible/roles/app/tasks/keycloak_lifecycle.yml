@@ -9,6 +9,8 @@
 #   P2 nuevo (schema de Keycloak vacío, tal como lo deja P-1) → evento con autoridad
 #      temporal (ver keycloak_bootstrap.yml): importa el realm, establece la automatización,
 #      elimina la autoridad temporal → se reclasifica (debe ser P1) → reconciliación P1.
+#      En P2 el evento también crea el administrador humano permanente de master
+#      (kc_platform_admin_username), una sola vez y nunca después.
 #   P3 desconocido/divergente → falla cerrado y explica por qué.
 #      - Bloqueante (schema ausente o parcial, falta master, el realm de la aplicación o el
 #        cliente backend, autoridad temporal ajena): falla antes de arrancar Keycloak y
@@ -29,6 +31,10 @@
 #     al exec de kcadm dentro del contenedor keycloak; roles manage-clients y
 #     view-clients del realm de la aplicación, nada en master.
 #   - backend (KC_BACKEND_CLIENT_SECRET): runtime; el único secreto técnico en el host.
+#   - administrador humano permanente: no es una autoridad del ciclo. Su contraseña inicial
+#     (KC_PLATFORM_ADMIN_INITIAL_PASSWORD) solo se exige y usa en P2, en tránsito al exec de
+#     kcadm; después contraseña y OTP son del operador. Ningún estado lo modifica, repara ni
+#     recrea; la clasificación solo informa su preparación, aparte de P1/P2/P3.
 #
 # Variables:
 #   keycloak_recovery  true solo para una recuperación P3 autorizada (por defecto false)
@@ -168,7 +174,12 @@
       - "{{ app_kc_reasons if app_kc_reasons else 'sin divergencias' }}"
       - >-
         Usuarios humanos con rol admin en master: {{ app_kc_observed.master_admin_users | default(0) }}
-        (no son dependencia de este ciclo; su custodia se decide fuera de él)
+        (incluye al administrador humano permanente; ninguno es dependencia de este ciclo)
+
+- name: Informar la administración humana de Keycloak
+  ansible.builtin.debug:
+    msg: "ADMINISTRACIÓN HUMANA DE KEYCLOAK (aparte del estado técnico): {{ app_kc_platform_admin.summary }}"
+  when: app_kc_state != 'P2'
 
 - name: Informar recuperación pedida sin necesidad
   ansible.builtin.debug:
@@ -199,17 +210,44 @@
     - app_kc_state == 'P3'
     - not app_kc_recovery
 
+# La contraseña inicial solo se exige para crear el administrador humano en P2, antes de
+# cualquier paso del evento (Keycloak sigue detenido y la base vacía si falla)
+- name: Verificar la contraseña inicial del administrador humano (solo P2)
+  ansible.builtin.assert:
+    that:
+      - app_kc_platform_admin_password_invalid | length == 0
+    fail_msg: >-
+      KEYCLOAK P2: la instalación nueva crea el administrador humano permanente y necesita
+      KC_PLATFORM_ADMIN_INITIAL_PASSWORD válida: {{ app_kc_platform_admin_password_invalid | join('; ') }}
+      (valor no mostrado). No se inició el evento: la base de Keycloak sigue vacía. Ver
+      docs/operations/runbooks/administrador-keycloak.md.
+    quiet: true
+  when: app_kc_state == 'P2'
+
+- name: Avisar que la contraseña inicial ya no se usa
+  ansible.builtin.debug:
+    msg: >-
+      KEYCLOAK: KC_PLATFORM_ADMIN_INITIAL_PASSWORD está presente pero solo la usa una
+      instalación nueva (P2); este run ({{ app_kc_state }}) no la usa ni toca el administrador
+      humano. Eliminar el secreto del environment de GitHub una vez completado el primer login.
+  when:
+    - app_kc_state != 'P2'
+    - app_kc_platform_admin_password_present | bool
+
 # ── Evento con autoridad temporal: P2 o recuperación P3 autorizada ───────────
 # Fijado antes del evento: la reclasificación cambia app_kc_state y el `when` de un
 # bloque se evalúa en cada tarea
 - name: Decidir el evento con autoridad temporal
   ansible.builtin.set_fact:
     app_kc_event_required: "{{ app_kc_state == 'P2' or (app_kc_state == 'P3' and app_kc_recovery) }}"
+    # También fijado como hecho: app_kc_event se usa después de las reclasificaciones internas
+    # del evento, y una variable de include se volvería a evaluar con el app_kc_state nuevo
+    app_kc_event_kind: "{{ 'fresh' if app_kc_state == 'P2' else 'recovery' }}"
 
 - name: Evento con autoridad temporal
   ansible.builtin.include_tasks: keycloak_bootstrap.yml
   vars:
-    app_kc_event: "{{ 'fresh' if app_kc_state == 'P2' else 'recovery' }}"
+    app_kc_event: "{{ app_kc_event_kind }}"
   when: app_kc_event_required | bool
 
 - name: Reclasificar después del evento
@@ -229,6 +267,10 @@
           {{ app_kc_state }}: {{ app_kc_reasons | join('; ') }}. Requiere revisión
           (docs/operations/runbooks/recuperar-keycloak.md).
         success_msg: "KEYCLOAK: estado P1 después del evento"
+
+    - name: Informar la administración humana de Keycloak después del evento
+      ansible.builtin.debug:
+        msg: "ADMINISTRACIÓN HUMANA DE KEYCLOAK (aparte del estado técnico): {{ app_kc_platform_admin.summary }}"
 
 # ── P1: reconciliación de credenciales durables ──────────────────────────────
 - name: Reconciliar el secreto del backend

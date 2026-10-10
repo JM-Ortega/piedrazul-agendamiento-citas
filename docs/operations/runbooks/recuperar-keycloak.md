@@ -9,9 +9,10 @@ reconcilia la automatización y el cliente backend, elimina su autoridad tempora
 inequívocamente propias de eventos anteriores) y verifica el resultado.
 
 La recuperación **nunca** importa ni recrea `master`, `piedrazul` ni `piedrazul-backend`, no
-borra identidades, no toca autoridad temporal ajena y no crea administradores permanentes. Sí
-puede crear o corregir el cliente técnico `piedrazul-keycloak-automation` cuando falta o
-diverge.
+borra identidades, no toca autoridad temporal ajena y no crea, repara ni modifica el
+administrador humano permanente (eso solo ocurre en una instalación nueva; ver
+[`administrador-keycloak.md`](administrador-keycloak.md)). Sí puede crear o corregir el
+cliente técnico `piedrazul-keycloak-automation` cuando falta o diverge.
 
 Cómo se clasifica el estado y qué hace cada paso: `infra/ansible/ANSIBLE.md`, sección
 *Ciclo técnico de Keycloak*.
@@ -60,7 +61,7 @@ ciclo no decide por sí mismo descartar el estado.
 - Los secretos `KC_BACKEND_CLIENT_SECRET` y `KC_AUTOMATION_CLIENT_SECRET` con los valores que
   deben quedar vigentes (si se está rotando, el nuevo ya guardado).
 - No hace falta SSH, ni credenciales de administración de Keycloak, ni conocer secretos
-  anteriores.
+  anteriores. `KC_PLATFORM_ADMIN_INITIAL_PASSWORD` no interviene.
 - Nadie más debe correr Ansible contra el servidor por fuera del workflow mientras tanto: la
   exclusión la da la concurrencia del workflow, no un lock del host.
 
@@ -75,8 +76,8 @@ ciclo no decide por sí mismo descartar el estado.
   `manage-clients` y `view-clients` de `piedrazul-realm`; roles adicionales se quitan.
 - `piedrazul-backend` queda con la forma y los roles de service account del realm del
   repositorio; su secreto queda en `KC_BACKEND_CLIENT_SECRET` (el anterior deja de valer).
-- No se tocan usuarios humanos de `master` (el run solo informa cuántos tienen rol `admin`)
-  ni identidades de negocio.
+- No se tocan usuarios humanos de `master` (el run solo informa cuántos tienen rol `admin` y
+  el estado del administrador humano permanente) ni identidades de negocio.
 
 ## Procedimiento
 

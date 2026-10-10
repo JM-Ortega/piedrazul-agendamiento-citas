@@ -12,6 +12,9 @@
 #   app_kc_reasons   todos los motivos por los que no es P1 (vacío en P1 y P2)
 #   app_kc_blocking  subconjunto que ninguna automatización corrige, tampoco la recuperación
 #                    autorizada: posible pérdida de identidad o autoridad ajena → escalar
+#   app_kc_platform_admin  preparación del administrador humano permanente, aparte del
+#                    estado técnico (no lo cambia ni lo exige): {status, detail}
+#                    missing | unexpected | incomplete | pending_first_login | otp_absent | configured
 #
 #   P2  el schema de Keycloak existe (P-1) y está vacío: Keycloak nunca escribió en él.
 #   P1  base inicializada, sin autoridad temporal, principales técnicos con la forma y los
@@ -44,6 +47,8 @@
       - --set=automation_client={{ kc_automation_client_id }}
       - --set=backend_client={{ kc_backend_client_id }}
       - --set=owned_temp_regex={{ kc_temp_admin_owned_regex }}
+      - --set=platform_admin_username={{ kc_platform_admin_username }}
+      - --set=platform_admin_role={{ kc_platform_admin_role }}
       - --username={{ postgres_user }}
       - --dbname={{ db_name }}
     stdin: "{{ lookup('ansible.builtin.file', 'keycloak-state.sql') }}"
@@ -64,6 +69,9 @@
       automation_roles: "{{ (_lines | select('match', '^roles[.]automation=') | map('regex_replace', '^[^=]+=', '') | first | default('')).split(',') | reject('equalto', '') | reject('match', '^realm:default-roles-') | sort }}"
       backend_roles: "{{ (_lines | select('match', '^roles[.]backend=') | map('regex_replace', '^[^=]+=', '') | first | default('')).split(',') | reject('equalto', '') | reject('match', '^realm:default-roles-') | sort }}"
       master_admin_users: "{{ _lines | select('match', '^master_admin_users=') | map('regex_replace', '^[^=]+=', '') | first | default('0') | int }}"
+      # absent | enabled:<b>,local:<b>,temporary:<b>,role:<b>,actions:<a+b>,password:<n>,otp:<n>
+      platform_admin: "{{ _lines | select('match', '^platform_admin=') | map('regex_replace', '^[^=]+=', '') | first | default('') }}"
+      master_password_policy: "{{ _lines | select('match', '^master_password_policy=') | map('regex_replace', '^[^=]+=', '') | first | default('') }}"
   vars:
     _lines: "{{ app_kc_db_probe.stdout_lines }}"
 
@@ -75,6 +83,59 @@
       KEYCLOAK: no se pudo leer el estado de su base (schema {{ kc_db_schema }}). No se
       clasifica ni se muta nada.
     quiet: true
+
+# Preparación del administrador humano: solo informa. No es dependencia del ciclo técnico ni
+# del backend, y ningún estado lleva a crearlo, repararlo ni recrearlo fuera del evento P2.
+- name: Evaluar la preparación del administrador humano
+  ansible.builtin.set_fact:
+    app_kc_platform_admin:
+      status: >-
+        {{ 'unknown' if app_kc_observed.schema != 'initialized'
+           else 'missing' if _f.absent | default(false)
+           else 'unexpected' if _f.local != 'true' or _f.temporary != 'false'
+           else 'incomplete' if _f.enabled != 'true' or _f.role != 'true' or _f.password | int == 0
+           else 'pending_first_login' if _f.actions | length > 0
+           else 'otp_absent' if _f.otp | int == 0
+           else 'configured' }}
+      detail: >-
+        {{ '' if _f.absent | default(false) or app_kc_observed.schema != 'initialized'
+           else 'habilitada=%s, rol %s=%s, contraseña=%s, OTP=%s, acciones requeridas=%s, política de contraseñas de master=%s'
+                | format('sí' if _f.enabled == 'true' else 'no', kc_platform_admin_role,
+                         'sí' if _f.role == 'true' else 'no', 'sí' if _f.password | int > 0 else 'no',
+                         _f.otp, _f.actions | replace('+', ', ') or 'ninguna',
+                         app_kc_observed.master_password_policy or 'ninguna') }}
+  vars:
+    _raw: "{{ app_kc_observed.platform_admin }}"
+    _f: >-
+      {{ {'absent': true} if _raw in ['absent', '']
+         else dict(_raw.split(',') | map('regex_replace', ':.*$', '') | zip(_raw.split(',') | map('regex_replace', '^[^:]*:', ''))) }}
+
+- name: Resumir la preparación del administrador humano
+  ansible.builtin.set_fact:
+    app_kc_platform_admin: "{{ app_kc_platform_admin | combine({'summary': _summary[app_kc_platform_admin.status]}) }}"
+  vars:
+    _d: "{{ app_kc_platform_admin.detail }}"
+    _summary:
+      unknown: "sin evaluar: Keycloak todavía no tiene base inicializada"
+      missing: >-
+        FALTA: master no tiene la cuenta configurada (kc_platform_admin_username). Solo se crea
+        en una instalación nueva (P2): no se recrea; escalar
+      unexpected: >-
+        INESPERADA: existe una cuenta con ese nombre que no es un usuario local permanente
+        (service account, federada o temporal). No se adopta ni modifica; escalar
+      incomplete: >-
+        INCOMPLETA ({{ _d }}): creación interrumpida o cuenta alterada. No se repara ni
+        habilita sola; escalar
+      pending_first_login: >-
+        CREADA, primer login pendiente ({{ _d }}): el operador cambia la contraseña temporal y
+        enrola OTP
+      otp_absent: >-
+        SIN OTP ({{ _d }}): la cuenta no tiene OTP enrolado (decisión del operador tras el
+        primer login); con los flujos por defecto de master, la contraseña sola da acceso. Solo
+        informativo: la automatización no lo restituye
+      configured: >-
+        CONFIGURADA ({{ _d }}). Es la configuración, no una prueba de login: el login con OTP se
+        verifica a mano
 
 # Bloqueantes: ni la convergencia ni la recuperación los corrigen. Reconstruirlos (importar
 # un realm, recrear un cliente, reiniciar un esquema) podría ocultar pérdida de identidad o

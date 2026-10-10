@@ -94,6 +94,19 @@ kc_temp_admin_prefix: piedrazul-tmp-admin
 # autoridad temporal con esta forma (y los roles que da bootstrap-admin) se considera propia
 # y puede eliminarse; cualquier otra es ajena y bloquea hasta que un operador decida.
 kc_temp_admin_owned_regex: "^{{ kc_temp_admin_prefix }}-[0-9]{14}-[a-z0-9]{8}$"
+# Administrador humano permanente de master: lo crea solo el evento P2, con la contraseña
+# inicial de un solo uso KC_PLATFORM_ADMIN_INITIAL_PASSWORD y las acciones requeridas
+# UPDATE_PASSWORD y CONFIGURE_TOTP. Después pertenece al operador: ningún converge ni
+# recuperación lo modifica, repara ni recrea. Nombre de rol, no personal (no identifica a
+# quien lo custodia). Ver docs/operations/runbooks/administrador-keycloak.md.
+kc_platform_admin_username: piedrazul-platform-admin
+# Rol de realm de master que da la autoridad completa de la plataforma
+kc_platform_admin_role: admin
+# Política de contraseñas de master (alcance: todo el realm, no solo esta cuenta): mínimo de
+# 16 caracteres, sin categorías obligatorias ni rotación. Solo la fija el evento P2, sobre un
+# master recién creado sin política; nunca se reaplica. Sin hashAlgorithm: se mantiene el hash
+# por defecto de Keycloak.
+kc_master_password_policy: "length(16)"
 # Realm de la aplicación (fuente de la forma y los roles esperados del backend)
 kc_realm_file: "{{ repo_root }}/infra/keycloak/realm/piedrazul-realm.json"
 kc_health_enabled: true

@@ -17,6 +17,12 @@
 #   4. Keycloak arranca (`start`, sin --import-realm).
 #   5. Con la autoridad temporal: automatización con forma, secreto deseado y roles exactos;
 #      forma y roles exactos del backend.
+#   5b. Solo P2: administrador humano permanente de master (keycloak-admin.sh platform-admin):
+#      falla ante un usuario con el mismo nombre; nace deshabilitado, con la contraseña
+#      inicial temporal (KC_PLATFORM_ADMIN_INITIAL_PASSWORD, en tránsito como las demás) y
+#      las acciones UPDATE_PASSWORD y CONFIGURE_TOTP, y se habilita solo tras verificarlo.
+#      Antes fija la política de contraseñas de master (kc_master_password_policy) si master
+#      no tiene ninguna; una política distinta preexistente hace fallar sin pisarla.
 #   6. Siempre (también si 2-5 fallaron): se eliminan la autoridad temporal propia y las
 #      huérfanas inequívocamente propias de eventos anteriores (kc_temp_admin_owned_regex);
 #      la propia al final. Se verifica que la propia ya no autentica y que la base no tiene
@@ -169,6 +175,48 @@
         success_msg: >-
           KEYCLOAK: {{ app_kc_establish.stdout_lines | select('match', '^(automation|backend|role)[.]') | join(', ') }}
 
+    # Solo P2, después de dejar operativa la automatización: si falla, el estado técnico ya es
+    # P1 y la autoridad temporal igual se elimina (always). Una recuperación nunca crea,
+    # adopta ni toca el administrador humano.
+    - name: Crear el administrador humano permanente (solo P2)
+      community.docker.docker_container_exec:
+        container: keycloak
+        argv: ["/bin/bash", "-c", "{{ lookup('ansible.builtin.file', 'keycloak-admin.sh') }}", "keycloak-admin", "platform-admin"]
+        env:
+          KCL_SERVER: "http://localhost:{{ kc_port }}"
+          KCL_REALM: "{{ kc_realm }}"
+          KCL_AUTOMATION_CLIENT_ID: "{{ kc_automation_client_id }}"
+          KCL_BACKEND_CLIENT_ID: "{{ kc_backend_client_id }}"
+          KCL_TEMP_CLIENT_ID: "{{ app_kc_temp_client_id }}"
+          KCL_TEMP_SECRET: "{{ app_kc_temp_secret }}"
+          KCL_PLATFORM_ADMIN_USERNAME: "{{ kc_platform_admin_username }}"
+          KCL_PLATFORM_ADMIN_ROLE: "{{ kc_platform_admin_role }}"
+          KCL_MASTER_PASSWORD_POLICY: "{{ kc_master_password_policy }}"
+          KCL_PLATFORM_ADMIN_PASSWORD: "{{ app_kc_platform_admin_password }}"
+          KCL_PLATFORM_ADMIN_CREDENTIAL_JSON_B64: >-
+            {{ {'type': 'password', 'value': app_kc_platform_admin_password, 'temporary': true} | to_json | b64encode }}
+      register: app_kc_platform_admin_create
+      changed_when: true
+      failed_when: false
+      no_log: true
+      when: app_kc_event == 'fresh'
+
+    - name: Verificar la creación del administrador humano
+      ansible.builtin.assert:
+        that:
+          - app_kc_platform_admin_create.rc == 0
+          - "'platform_admin.created=yes' in app_kc_platform_admin_create.stdout_lines"
+        fail_msg: >-
+          KEYCLOAK: el administrador humano NO quedó establecido; avance antes del fallo:
+          {{ app_kc_platform_admin_create.stdout_lines | default([]) | select('match', '^(platform_admin|master)[.]') | join(', ') or 'ninguno' }};
+          {{ app_kc_platform_admin_create.stdout_lines | default([]) | select('match', '^(error|auth[.][a-z]+)=') | join(', ') or 'sin salida' }}.
+          No se reintenta, repara ni borra: escalar (docs/operations/runbooks/administrador-keycloak.md).
+        success_msg: >-
+          KEYCLOAK: administrador humano creado ({{ kc_platform_admin_role }} de master, contraseña
+          temporal, acciones requeridas UPDATE_PASSWORD y CONFIGURE_TOTP; política de contraseñas
+          de master {{ kc_master_password_policy }}); el primer login lo completa el operador
+      when: app_kc_event == 'fresh'
+
   rescue:
     - name: Registrar la falla del evento
       ansible.builtin.set_fact:
@@ -207,9 +255,10 @@
       vars:
         app_kc_with_api: false
 
-    - name: Olvidar el secreto temporal
+    - name: Olvidar el secreto temporal y la contraseña inicial
       ansible.builtin.set_fact:
         app_kc_temp_secret: ""
+        app_kc_platform_admin_password: ""
       no_log: true
 
 - name: Fallar si quedó autoridad temporal

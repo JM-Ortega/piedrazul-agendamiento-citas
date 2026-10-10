@@ -58,6 +58,7 @@ declare -A AUTH=(
   [KC_ADMIN_PASSWORD]="production-hetzner"
   [KC_AUTOMATION_CLIENT_SECRET]="production-hetzner"
   [KC_BACKEND_CLIENT_SECRET]="production-hetzner"
+  [KC_PLATFORM_ADMIN_INITIAL_PASSWORD]="production-hetzner"
   [IDENTITY_SEED_ADMIN_PASSWORD]="production-hetzner"
   [PIEDRAZUL_BACKEND_MAIL_SEND]="production-hetzner"
   [NOTIFICATION_ENCRYPTION_KEY]="production-hetzner"

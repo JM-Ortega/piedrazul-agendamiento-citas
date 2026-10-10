@@ -7,10 +7,13 @@
 --   automation_client  clientId de la automatización en master
 --   backend_client     clientId del backend en app_realm
 --   owned_temp_regex   forma exacta del clientId de una autoridad temporal propia
+--   platform_admin_username, platform_admin_role   administrador humano permanente
 --
 -- Salida: una línea clave=valor por hecho. Nunca selecciona columnas con secretos
--- (client.secret, credential.*) ni usernames: solo existencia, conteos, ids internos,
--- clientIds técnicos, banderas y asignaciones de roles de los principales técnicos.
+-- (client.secret, credential.secret_data/credential_data) ni usernames: solo existencia,
+-- conteos (de credenciales, solo por tipo), ids internos, clientIds técnicos, banderas y
+-- asignaciones de roles de los principales técnicos y acciones requeridas del administrador
+-- humano.
 --
 -- schema:
 --   absent         no existe el schema (lo crea 01-init-databases.sh: contrato P-1 roto)
@@ -106,6 +109,29 @@ SELECT 'master_admin_users=' || count(*)
  WHERE u.service_account_client_link IS NULL
    AND NOT EXISTS (SELECT 1 FROM user_attribute a
                     WHERE a.user_id = u.id AND a.name = 'is_temporary_admin' AND a.value = 'true');
+
+-- Política de contraseñas de master (de realm; no es un secreto). Solo informativa.
+SELECT 'master_password_policy=' || coalesce(password_policy, '') FROM realm WHERE name = 'master';
+
+-- Administrador humano permanente (kc_platform_admin_username): solo la configuración que
+-- decide si está listo, nunca su nombre ni el contenido de sus credenciales (solo cuántas
+-- hay de cada tipo). El nombre llega como variable y solo filtra.
+SELECT 'platform_admin=' || CASE WHEN u.id IS NULL THEN 'absent' ELSE concat_ws(',',
+         'enabled:' || u.enabled,
+         'local:' || (u.federation_link IS NULL AND u.service_account_client_link IS NULL),
+         'temporary:' || EXISTS (SELECT 1 FROM user_attribute a
+                                  WHERE a.user_id = u.id AND a.name = 'is_temporary_admin' AND a.value = 'true'),
+         'role:' || EXISTS (SELECT 1 FROM user_role_mapping m JOIN keycloak_role k ON k.id = m.role_id
+                             WHERE m.user_id = u.id AND NOT k.client_role AND k.realm_id = r.id
+                               AND k.name = :'platform_admin_role'),
+         'actions:' || coalesce((SELECT string_agg(ra.required_action, '+' ORDER BY ra.required_action)
+                                   FROM user_required_action ra WHERE ra.user_id = u.id), ''),
+         'password:' || (SELECT count(*) FROM credential c WHERE c.user_id = u.id AND c.type = 'password'),
+         'otp:' || (SELECT count(*) FROM credential c WHERE c.user_id = u.id AND c.type = 'otp'))
+       END
+  FROM realm r
+  LEFT JOIN user_entity u ON u.realm_id = r.id AND u.username = :'platform_admin_username'
+ WHERE r.name = 'master';
 
 COMMIT;
 

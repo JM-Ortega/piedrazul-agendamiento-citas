@@ -11,6 +11,8 @@
 #              y roles del backend
 #   cleanup    autoridad temporal: elimina toda autoridad temporal listada (la propia al final)
 #              y verifica que la propia ya no autentica
+#   platform-admin  autoridad temporal, solo P2: crea el administrador humano permanente de
+#              master. Nunca adopta ni modifica un usuario existente
 #
 # Secretos solo por entorno, nunca en argv ni en la salida. kcadm 26.5 ignora
 # KC_CLI_CLIENT_SECRET junto con --no-config, así que cada sesión se abre con
@@ -32,6 +34,12 @@
 #   KCL_BACKEND_ROLES_ADD/_REMOVE             establish: <clientId>:<rol> o realm:<rol>, por comas
 #   KCL_BACKEND_SHAPE                         establish: JSON con las banderas del backend
 #   KCL_TEMPORARY_PRINCIPALS                  cleanup: <client|user>:<nombre>:<uuid>, por comas
+#   KCL_TEMP_CLIENT_ID, KCL_TEMP_SECRET,
+#   KCL_PLATFORM_ADMIN_USERNAME, KCL_PLATFORM_ADMIN_ROLE,
+#   KCL_PLATFORM_ADMIN_PASSWORD, KCL_PLATFORM_ADMIN_CREDENTIAL_JSON_B64,
+#   KCL_MASTER_PASSWORD_POLICY                                               platform-admin
+#     (el nombre lo valida Ansible; la credencial es {"type":"password","value":…,
+#     "temporary":true}, armada por Ansible como las demás)
 set -euo pipefail
 
 KCADM=/opt/keycloak/bin/kcadm.sh
@@ -186,7 +194,75 @@ cleanup() {
   esac
 }
 
+# user_id <sesión> <nombre> → uuid o vacío (nombre exacto; Keycloak los guarda en minúsculas)
+user_id() { as "$1" get users -r master -q "username=$2" -q exact=true --fields id --format csv --noquotes; }
+
+# Orden seguro: la cuenta nace deshabilitada y solo se habilita cuando la contraseña
+# temporal, las acciones requeridas y el rol están verificados. Si algo falla antes, queda
+# deshabilitada (inutilizable) y visible como incompleta; nunca se repara ni se borra sola.
+platform_admin() {
+  : "${KCL_TEMP_CLIENT_ID:?}" "${KCL_PLATFORM_ADMIN_USERNAME:?}" "${KCL_PLATFORM_ADMIN_ROLE:?}" \
+    "${KCL_PLATFORM_ADMIN_PASSWORD:?}" "${KCL_PLATFORM_ADMIN_CREDENTIAL_JSON_B64:?}" "${KCL_MASTER_PASSWORD_POLICY:?}"
+  login temp master "${KCL_TEMP_CLIENT_ID}" KCL_TEMP_SECRET || die temp_login
+  local u="${KCL_PLATFORM_ADMIN_USERNAME}" id
+  # Un usuario con ese nombre en un master recién creado no es de este evento: no se adopta
+  id="$(user_id temp "${u}")" || die platform_admin_lookup
+  [ -z "${id}" ] || die platform_admin_collision
+  # Política de contraseñas de master (de realm: vale para toda contraseña nueva o reemplazada
+  # en master). Antes de fijar la contraseña inicial, para que Keycloak también la valide. Un
+  # master recién creado no tiene política; cualquier otra distinta de la deseada no se pisa.
+  local policy
+  policy="$(as temp get realms/master --fields passwordPolicy --format csv --noquotes)" || die master_password_policy_read
+  if [ -z "${policy}" ]; then
+    as temp update realms/master -s "passwordPolicy=${KCL_MASTER_PASSWORD_POLICY}" || die master_password_policy_set
+    policy="$(as temp get realms/master --fields passwordPolicy --format csv --noquotes)" || die master_password_policy_read
+    [ "${policy}" = "${KCL_MASTER_PASSWORD_POLICY}" ] || die master_password_policy_readback
+    echo "master.password_policy=set"
+  elif [ "${policy}" = "${KCL_MASTER_PASSWORD_POLICY}" ]; then
+    echo "master.password_policy=unchanged"
+  else
+    die master_password_policy_unexpected
+  fi
+  printf '{"username":"%s","enabled":false,"requiredActions":["CONFIGURE_TOTP","UPDATE_PASSWORD"]}' "${u}" \
+    | as temp create users -r master -f - >/dev/null || die platform_admin_create
+  id="$(user_id temp "${u}")" || die platform_admin_lookup
+  [ -n "${id}" ] || die platform_admin_absent_after_create
+  echo "platform_admin.user=created_disabled"
+  printf '%s' "${KCL_PLATFORM_ADMIN_CREDENTIAL_JSON_B64}" | base64 -d \
+    | as temp update "users/${id}/reset-password" -r master -f - -n || die platform_admin_password
+  echo "platform_admin.password=temporary"
+  as temp add-roles -r master --uid "${id}" --rolename "${KCL_PLATFORM_ADMIN_ROLE}" || die platform_admin_role
+  echo "platform_admin.role=${KCL_PLATFORM_ADMIN_ROLE}"
+
+  # Verificación antes de habilitar: exactamente lo pedido, leído de vuelta
+  local got
+  field() { as temp get "users/${id}$1" -r master --fields "$2" --format csv --noquotes || die platform_admin_readback; }
+  got="$(field '' enabled)"; [ "${got}" = false ] || die platform_admin_readback_enabled
+  got="$(field '' federationLink,serviceAccountClientId)"; [ "${got}" = , ] || die platform_admin_readback_kind
+  got="$(field '' requiredActions | tr ',' '\n' | sort | paste -sd, -)"
+  [ "${got}" = CONFIGURE_TOTP,UPDATE_PASSWORD ] || die platform_admin_readback_actions
+  got="$(field /credentials type)"; [ "${got}" = password ] || die platform_admin_readback_credentials
+  field /role-mappings/realm name | grep -qx "${KCL_PLATFORM_ADMIN_ROLE}" || die platform_admin_readback_role
+  echo "platform_admin.verified=yes"
+
+  as temp update "users/${id}" -r master -s enabled=true || die platform_admin_enable
+  echo "platform_admin.enabled=yes"
+  # La contraseña entregada es la que custodia el operador y por sí sola no da acceso:
+  # Keycloak exige completar las acciones requeridas (cambio de contraseña y OTP)
+  local res
+  res="$(KC_CLI_PASSWORD="${KCL_PLATFORM_ADMIN_PASSWORD}" "${KCADM}" config credentials --config "${SESSIONS}/human" \
+         --server "${KCL_SERVER}" --realm master --user "${u}" 2>&1 || true)"
+  rm -f "${SESSIONS}/human"
+  case "${res}" in
+    *"Account is not fully set up"*) echo "platform_admin.login=actions_required" ;;
+    *"Invalid user credentials"*) die platform_admin_password_mismatch ;;
+    *) die platform_admin_login_unverified ;;
+  esac
+  echo "platform_admin.created=yes"
+}
+
 case "${1:-}" in
   probe|reconcile|establish|cleanup) "$1" ;;
-  *) echo "uso: $0 probe|reconcile|establish|cleanup" >&2; exit 64 ;;
+  platform-admin) platform_admin ;;
+  *) echo "uso: $0 probe|reconcile|establish|cleanup|platform-admin" >&2; exit 64 ;;
 esac
