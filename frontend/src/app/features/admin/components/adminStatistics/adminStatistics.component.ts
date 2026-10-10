@@ -16,6 +16,7 @@ import {
   LucideStethoscope,
   LucideTrendingDown,
   LucideUsers,
+  LucideCalendarDays,
 } from '@lucide/angular';
 import { ChartData, ChartOptions } from 'chart.js';
 import {
@@ -43,6 +44,7 @@ import {
   resolveMonths,
   thresholdPlugin,
   valueLabelsPlugin,
+  averageLinePlugin,
 } from '../../../../shared/helpers/statisticsCharts';
 import {
   CancellationStats,
@@ -50,11 +52,39 @@ import {
   MonthlyBreakdown,
   MonthlySeriesStat,
   MonthlyTotalStat,
+  DailyWorkloadStat,
 } from '../../../../shared/models/dtos/statistics.dto';
 import { StatisticsService } from '../../service/statistics.service';
 
 /** Estados permitidos en el filtro de médico y especialidad. */
 type EstadoAgendaFiltro = Extract<EstadoFiltro, 'AGENDADA' | 'ATENDIDA'>;
+
+/** Colores por nivel de carga diaria. */
+const WORKLOAD_COLORS = {
+  normal: PRIMARY,
+  high: '#f59e0b',
+  overload: '#dc2626',
+  empty: '#e2e8f0',
+} as const;
+
+/** Fecha local en formato YYYY-MM-DD (toISOString usaría UTC). */
+function todayIso(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+/** "viernes, 10 de octubre de 2026" a partir de YYYY-MM-DD, sin desfase de zona. */
+function formatDateEs(date: string): string {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Intl.DateTimeFormat('es-CO', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(y, m - 1, d));
+}
 
 /**
  * Vista de estadísticas del panel de administración: citas por mes, por
@@ -79,6 +109,7 @@ type EstadoAgendaFiltro = Extract<EstadoFiltro, 'AGENDADA' | 'ATENDIDA'>;
     LucideStethoscope,
     LucideUsers,
     LucideTrendingDown,
+    LucideCalendarDays,
   ],
   providers: [provideCharts(withDefaultRegisterables())],
   templateUrl: './adminStatistics.component.html',
@@ -99,8 +130,20 @@ export class AdminStatisticsComponent implements OnInit {
     { value: 'ATENDIDA', label: 'Atendida' },
   ];
 
-  // ── Estilo del botón "Filtrar" (app-button) ───────────────────────────────
-  readonly filterButtonClass = '!w-auto !py-1.5 !px-3 !text-xs !rounded-lg';
+  // ── Carga de trabajo diaria: leyenda y opciones ───────────────────────────
+  readonly workloadLegend: LegendItem[] = [
+    { name: 'Normal', color: WORKLOAD_COLORS.normal },
+    {
+      name: 'Carga alta (>30% sobre el promedio)',
+      color: WORKLOAD_COLORS.high,
+    },
+    {
+      name: 'Sobrecarga (≥ al doble del promedio)',
+      color: WORKLOAD_COLORS.overload,
+    },
+    { name: 'Sin citas', color: WORKLOAD_COLORS.empty },
+  ];
+  readonly workloadOptions = this.buildWorkloadOptions();
 
   // ── Opciones y plugins de cada gráfica (constantes) ───────────────────────
   readonly monthlyOptions = barOptions(false);
@@ -157,6 +200,28 @@ export class AdminStatisticsComponent implements OnInit {
     this.years().map((y) => ({ value: String(y), label: String(y) }))
   );
 
+  // ── Carga de trabajo diaria ───────────────────────────────────────────────
+  // `workloadDate` es la fecha aplicada; `workloadDateDraft` es la del input.
+  workloadDate = signal(todayIso());
+  workloadDateDraft = signal(todayIso());
+  private workloadData = signal<DailyWorkloadStat[]>([]);
+  readonly workloadDirty = computed(
+    () => this.workloadDateDraft() !== this.workloadDate()
+  );
+  readonly workloadDateLabel = computed(() =>
+    formatDateEs(this.workloadDate())
+  );
+  readonly workloadTotal = computed(() =>
+    this.workloadData().reduce((sum, d) => sum + d.total, 0)
+  );
+  /** Promedio entre médicos con citas; 0 si hay menos de dos (no es comparable). */
+  readonly workloadAvg = computed(() => {
+    const withAppts = this.workloadData().filter((d) => d.total > 0);
+    if (withAppts.length < 2) return 0;
+    const sum = withAppts.reduce((s, d) => s + d.total, 0);
+    return Math.round((sum / withAppts.length) * 10) / 10;
+  });
+
   // ── Citas por mes (solo atendidas) ────────────────────────────────────────
   // `monthlyYear` es el año aplicado; `monthlyYearDraft` es lo que muestra el select.
   monthlyYear = signal(new Date().getFullYear());
@@ -206,6 +271,30 @@ export class AdminStatisticsComponent implements OnInit {
   readonly cancelYearRate = computed(() => this.cancelData().yearRate);
 
   // ── Datos de las gráficas (computed) ──────────────────────────────────────
+  readonly workloadChart = computed<ChartData<'bar'>>(() => {
+    const data = this.workloadData();
+    const avg = this.workloadAvg();
+    return {
+      labels: data.map((d) => d.doctor),
+      datasets: [
+        {
+          label: 'Citas',
+          data: data.map((d) => d.total),
+          backgroundColor: data.map((d) => this.workloadColor(d.total, avg)),
+          borderRadius: { topLeft: 8, topRight: 8 },
+          borderSkipped: false,
+          maxBarThickness: 64,
+        },
+      ],
+    };
+  });
+
+  readonly workloadPlugins = computed(() => [
+    hoverColumnPlugin,
+    valueLabelsPlugin,
+    averageLinePlugin(this.workloadAvg()),
+  ]);
+
   readonly monthlyChart = computed<ChartData<'bar'>>(() => {
     const rows = this.filterMonths(
       this.monthlyData(),
@@ -293,10 +382,30 @@ export class AdminStatisticsComponent implements OnInit {
   // ── Refresco (siempre con los filtros aplicados, no con los borradores) ───
   /** Botón global "Refrescar": vuelve a consultar todas las secciones. */
   refresh(): void {
+    this.refreshWorkload();
     this.refreshMonthly();
     this.refreshDoctor();
     this.refreshSpecialty();
     this.refreshCancel();
+  }
+
+  private refreshWorkload(): void {
+    this.load(
+      this.statisticsService.getDailyWorkload(this.workloadDate()),
+      this.workloadData
+    );
+  }
+
+  // Handler de borrador (no consulta)
+  onWorkloadDateChange(value: string): void {
+    if (!value) return;
+    this.workloadDateDraft.set(value);
+  }
+
+  // Botón "Filtrar"
+  applyWorkloadFilters(): void {
+    this.workloadDate.set(this.workloadDateDraft());
+    this.refreshWorkload();
   }
 
   private refreshMonthly(): void {
@@ -461,6 +570,36 @@ export class AdminStatisticsComponent implements OnInit {
           borderSkipped: false,
           maxBarThickness: 36,
         })),
+      },
+    };
+  }
+
+  /** Normal, carga alta (>30% sobre el promedio), sobrecarga (≥ 2×) o sin citas. */
+  private workloadColor(total: number, avg: number): string {
+    if (total === 0) return WORKLOAD_COLORS.empty;
+    if (avg === 0) return WORKLOAD_COLORS.normal;
+    if (total >= avg * 2) return WORKLOAD_COLORS.overload;
+    if (total > avg * 1.3) return WORKLOAD_COLORS.high;
+    return WORKLOAD_COLORS.normal;
+  }
+
+  /** Igual que el gráfico mensual, pero el tooltip muestra "N citas" y la especialidad. */
+  private buildWorkloadOptions(): ChartOptions<'bar'> {
+    const base = barOptions(false);
+    return {
+      ...base,
+      plugins: {
+        ...base.plugins,
+        tooltip: {
+          ...base.plugins?.tooltip,
+          displayColors: false,
+          callbacks: {
+            label: (item) =>
+              `${item.parsed.y} ${item.parsed.y === 1 ? 'cita' : 'citas'}`,
+            afterLabel: (item) =>
+              this.workloadData()[item.dataIndex]?.specialty ?? '',
+          },
+        },
       },
     };
   }
