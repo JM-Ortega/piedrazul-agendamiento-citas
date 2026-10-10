@@ -189,3 +189,29 @@ export function lineDrawAnimation() {
   } as any;
   /* eslint-enable @typescript-eslint/no-explicit-any */
 }
+
+/** Línea punteada horizontal con el promedio. No dibuja nada si `avg` es 0. */
+export const averageLinePlugin = (avg: number): Plugin<'bar'> => ({
+  id: 'averageLine',
+  afterDatasetsDraw(chart) {
+    const scale = chart.scales['y'];
+    if (avg <= 0 || !scale) return;
+    const { ctx, chartArea } = chart;
+    const y = scale.getPixelForValue(avg);
+    ctx.save();
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 3]);
+    ctx.beginPath();
+    ctx.moveTo(chartArea.left, y);
+    ctx.lineTo(chartArea.right, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#b45309';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`Promedio: ${avg}`, chartArea.right, y - 4);
+    ctx.restore();
+  },
+});
