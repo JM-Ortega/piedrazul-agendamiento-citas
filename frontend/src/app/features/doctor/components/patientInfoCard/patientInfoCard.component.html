@@ -65,7 +65,10 @@
   @if (mostrarInfo()) {
     @if (isEditingPatient()) {
       <!-- Panel de edición de paciente (componente separado) -->
-      <div class="mt-1 pt-3 pb-1 border-t border-gray-100">
+      <div
+        animate.enter="animate-fade-in"
+        class="mt-1 pt-3 pb-1 border-t border-gray-100"
+      >
         <app-patient-edit-panel
           [patient]="patient()"
           (saved)="onPatientSaved($event)"
@@ -75,6 +78,7 @@
     } @else {
       <!-- Vista de solo lectura -->
       <div
+        animate.enter="animate-fade-in"
         class="grid grid-cols-1 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-7 gap-5 mt-1 pt-2 pb-3 border-t border-gray-100"
       >
         <div>

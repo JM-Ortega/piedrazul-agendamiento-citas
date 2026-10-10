@@ -1,0 +1,14 @@
+/* Las columnas entran en cascada después de la tarjeta del paciente */
+.stagger-1 {
+  animation-delay: 90ms;
+}
+.stagger-2 {
+  animation-delay: 180ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-enter-animation,
+  .animate-fade-in {
+    animation: none;
+  }
+}
