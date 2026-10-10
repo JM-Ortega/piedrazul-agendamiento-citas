@@ -5,6 +5,12 @@ import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.Auto
 import co.edu.unicauca.piedrazul.backend.appointment.application.scheduling.ManualPatientResolutionStrategy;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.StatisticDimension;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.DoctorAppointmentsCountDto;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.MonthlyCancellationDataDto;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.MonthlyTotalAppointmentDto;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.SpecialtyAppointmentsCountDto;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.StatisticsDtoMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentAccessDeniedException;
@@ -57,6 +63,7 @@ public class AppointmentController {
     private final GetDoctorDailyAgendaUseCase getDoctorDailyAgendaUseCase;
     private final CountScheduledAppointmentsUseCase countScheduledAppointmentsUseCase;
     private final CheckExistenceByDocAndStateUseCase checkExistenceByDocAndStateUseCase;
+    private final GetAppointmentStatisticsUseCase getAppointmentStatisticsUseCase;
 
 
     private final AppointmentSchedulingService appointmentSchedulingService;
@@ -78,6 +85,7 @@ public class AppointmentController {
             GetDoctorDailyAgendaUseCase getDoctorDailyAgendaUseCase,
             CountScheduledAppointmentsUseCase countScheduledAppointmentsUseCase,
             CheckExistenceByDocAndStateUseCase checkExistenceByDocAndStateUseCase,
+            GetAppointmentStatisticsUseCase getAppointmentStatisticsUseCase,
             AppointmentSchedulingService appointmentSchedulingService,
             ManualPatientResolutionStrategy manualPatientResolutionStrategy,
             AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy,
@@ -95,6 +103,7 @@ public class AppointmentController {
         this.getDoctorDailyAgendaUseCase = getDoctorDailyAgendaUseCase;
         this.countScheduledAppointmentsUseCase = countScheduledAppointmentsUseCase;
         this.checkExistenceByDocAndStateUseCase = checkExistenceByDocAndStateUseCase;
+        this.getAppointmentStatisticsUseCase = getAppointmentStatisticsUseCase;
         this.appointmentSchedulingService = appointmentSchedulingService;
         this.manualPatientResolutionStrategy = manualPatientResolutionStrategy;
         this.autonomousPatientResolutionStrategy = autonomousPatientResolutionStrategy;
@@ -434,6 +443,60 @@ public class AppointmentController {
         return ResponseEntity.ok(checkExistenceByDocAndStateUseCase.execute(idDoctor, state));
     }
 
+
+    @GetMapping("/statistics/by-doctor")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SCHEDULER')")
+    @Operation(summary = "Citas por médico y mes", description = "Cantidad de citas por médico en cada mes (0 = enero ... 11 = diciembre). Si 'state' es nulo se cuentan AGENDADA y ATENDIDA.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Estadísticas obtenidas correctamente"),
+            @ApiResponse(responseCode = "400", description = "Año inválido"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar esta información")
+    })
+    public ResponseEntity<DoctorAppointmentsCountDto> getAppointmentsByDoctor(@RequestParam int year,
+            @RequestParam(required = false) AppointmentState state) {
+        return ResponseEntity.ok(StatisticsDtoMapper.toDoctorDto(getAppointmentStatisticsUseCase.getMonthlyBreakdown(year, StatisticDimension.DOCTOR, state)));
+    }
+
+    @GetMapping("/statistics/by-month")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SCHEDULER')")
+    @Operation(summary = "Citas atendidas por mes", description = "Cantidad de citas en estado ATENDIDA en cada mes (0 = enero ... 11 = diciembre).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Estadísticas obtenidas correctamente"),
+            @ApiResponse(responseCode = "400", description = "Año inválido"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar esta información")
+    })
+    public ResponseEntity<List<MonthlyTotalAppointmentDto>> getAttendedAppointmentsByMonth(@RequestParam int year) {
+        return ResponseEntity.ok(StatisticsDtoMapper.toMonthlyTotals(getAppointmentStatisticsUseCase.getMonthlyStateCounts(year)));
+    }
+
+    @GetMapping("/statistics/by-specialty")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SCHEDULER')")
+    @Operation(summary = "Citas por especialidad y mes", description = "Cantidad de citas por especialidad en cada mes (0 = enero ... 11 = diciembre). Si 'state' es nulo se cuentan AGENDADA y ATENDIDA.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Estadísticas obtenidas correctamente"),
+            @ApiResponse(responseCode = "400", description = "Año inválido"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar esta información")
+    })
+    public ResponseEntity<SpecialtyAppointmentsCountDto> getAppointmentsBySpecialty(@RequestParam int year,
+            @RequestParam(required = false) AppointmentState state) {
+        return ResponseEntity.ok(StatisticsDtoMapper.toSpecialtyDto(getAppointmentStatisticsUseCase.getMonthlyBreakdown(year, StatisticDimension.SPECIALTY, state)));
+    }
+
+    @GetMapping("/statistics/cancellation-rate")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SCHEDULER')")
+    @Operation(summary = "Datos de tasa de cancelación por mes", description = "Total de citas (todos los estados) y citas CANCELADA en cada mes (0 = enero ... 11 = diciembre).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Estadísticas obtenidas correctamente"),
+            @ApiResponse(responseCode = "400", description = "Año inválido"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar esta información")
+    })
+    public ResponseEntity<List<MonthlyCancellationDataDto>> getCancellationDataByMonth(@RequestParam int year) {
+        return ResponseEntity.ok(StatisticsDtoMapper.toCancellationData(getAppointmentStatisticsUseCase.getMonthlyStateCounts(year)));
+    }
 
     // Helper methods
     private UUID resolvePerformedBy(Jwt jwt) {
