@@ -71,8 +71,8 @@ class BusySlotServiceTest {
     }
 
     @Test
-    void isBusyShouldReturnTrueWhenAtendidaAppointmentExistsAtSameTime() {
-        // Un slot ya atendido no se libera: no puede agendarse otra cita encima
+    void isBusyShouldReturnTrueWhenOnlyAtendidaAppointmentExistsAtSameTime() {
+        // ATENDIDA también se considera activa/ocupante del slot
         Appointment atendida = buildAppointmentWithState(
                 LocalTime.of(9, 0), AppointmentState.ATENDIDA
         );
@@ -116,26 +116,26 @@ class BusySlotServiceTest {
     }
 
     @Test
+    void isBusyShouldReturnFalseWhenOnlyNoAsistioAppointmentExistsAtSameTime() {
+        Appointment noAsistio = buildAppointmentWithState(
+                LocalTime.of(9, 0), AppointmentState.NO_ASISTIO
+        );
+        AppointmentTime newSlot = new AppointmentTime(LocalTime.of(10, 0));
+
+        boolean result = busySlotService.isBusy(List.of(noAsistio), newSlot, 30);
+
+        assertThat(result).isFalse();
+    }
+
+    @Test
     void isBusyShouldReturnFalseWhenOnlyReprogramadaAppointmentExistsAtSameTime() {
-        // La cita reprogramada se movió a otro horario: su slot original queda libre
+        // REPROGRAMADA no se considera activa: no bloquea el slot
         Appointment reprogramada = buildAppointmentWithState(
                 LocalTime.of(10, 0), AppointmentState.REPROGRAMADA
         );
         AppointmentTime newSlot = new AppointmentTime(LocalTime.of(10, 0));
 
         boolean result = busySlotService.isBusy(List.of(reprogramada), newSlot, 30);
-
-        assertThat(result).isFalse();
-    }
-
-    @Test
-    void isBusyShouldReturnFalseWhenOnlyNoAsistioAppointmentExistsAtSameTime() {
-        Appointment noAsistio = buildAppointmentWithState(
-                LocalTime.of(9, 0), AppointmentState.NO_ASISTIO
-        );
-        AppointmentTime newSlot = new AppointmentTime(LocalTime.of(9, 0));
-
-        boolean result = busySlotService.isBusy(List.of(noAsistio), newSlot, 30);
 
         assertThat(result).isFalse();
     }

@@ -7,6 +7,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentAccessDeniedException;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentPatientNotFoundException;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.DoctorConfigInconsistentException;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
@@ -236,6 +237,12 @@ public class AppointmentController {
             @RequestBody @Valid AppointmentRequest request,
             @AuthenticationPrincipal Jwt jwt,
             Authentication authentication) {
+
+        boolean manualSchedulingAllowed = hasRole(authentication, "DOCTOR") || hasRole(authentication, "SCHEDULER");
+
+        if (request.getSchedulingOrigin() == SchedulingOrigin.MANUAL && !manualSchedulingAllowed) {
+            throw new AppointmentAccessDeniedException("Los pacientes no pueden agendar citas de forma manual");
+        }
 
         request.validate();
         UUID performedBy = resolvePerformedBy(jwt);

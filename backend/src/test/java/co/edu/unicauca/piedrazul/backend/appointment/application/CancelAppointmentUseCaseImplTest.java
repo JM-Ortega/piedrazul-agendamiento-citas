@@ -6,9 +6,13 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTim
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentAccessDeniedException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.CancelAppointmentNotAllowedException;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -17,60 +21,76 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Un paciente solo cancela sus propias citas; el agendador (sin paciente) cancela cualquiera. */
+@ExtendWith(MockitoExtension.class)
 class CancelAppointmentUseCaseImplTest {
 
-    private static final UUID APPOINTMENT_ID = UUID.fromString("55555555-0000-0000-0000-000000000005");
-    private static final UUID OWNER_ID = UUID.fromString("11111111-0000-0000-0000-000000000001");
-    private static final UUID OTHER_PATIENT_ID = UUID.fromString("22222222-0000-0000-0000-000000000002");
+    @Mock
+    private AppointmentRepository appointmentRepository;
 
-    private AppointmentRepository repository;
     private CancelAppointmentUseCaseImpl useCase;
-    private Appointment appointment;
 
     @BeforeEach
     void setUp() {
-        repository = mock(AppointmentRepository.class);
-        useCase = new CancelAppointmentUseCaseImpl(repository);
-        appointment = Appointment.reconstruct(
-                APPOINTMENT_ID,
-                UUID.fromString("33333333-0000-0000-0000-000000000003"),
-                OWNER_ID,
-                SpecialtyCode.QUIROPRAXIA,
-                AppointmentState.AGENDADA,
-                LocalDate.now().plusDays(3),
-                new AppointmentTime(LocalTime.of(9, 0)),
-                SchedulingOrigin.AUTONOMO);
-        when(repository.findById(APPOINTMENT_ID)).thenReturn(appointment);
+        useCase = new CancelAppointmentUseCaseImpl(appointmentRepository);
+    }
+
+    private Appointment buildAppointment(UUID idPatient, LocalDate date) {
+        return Appointment.reconstruct(
+                UUID.randomUUID(), UUID.randomUUID(), idPatient, SpecialtyCode.FISIOTERAPIA,
+                AppointmentState.AGENDADA, date, new AppointmentTime(LocalTime.of(9, 0)), SchedulingOrigin.MANUAL);
     }
 
     @Test
-    void aPatientCannotCancelAnotherPatientsAppointment() {
-        assertThatThrownBy(() -> useCase.cancel(APPOINTMENT_ID, OTHER_PATIENT_ID))
+    void shouldCancelWhenOwningPatientCancelsTheirOwnAppointment() {
+        UUID appointmentId = UUID.randomUUID();
+        UUID idPatient = UUID.randomUUID();
+        Appointment appointment = buildAppointment(idPatient, LocalDate.now().plusDays(1));
+        when(appointmentRepository.findById(appointmentId)).thenReturn(appointment);
+
+        useCase.cancel(appointmentId, idPatient);
+
+        assertThat(appointment.getAppointmentState()).isEqualTo(AppointmentState.CANCELADA);
+        verify(appointmentRepository).save(appointment);
+    }
+
+    @Test
+    void shouldCancelWhenPatientIdIsNullBecauseStaffCancels() {
+        UUID appointmentId = UUID.randomUUID();
+        Appointment appointment = buildAppointment(UUID.randomUUID(), LocalDate.now().plusDays(1));
+        when(appointmentRepository.findById(appointmentId)).thenReturn(appointment);
+
+        useCase.cancel(appointmentId, null);
+
+        assertThat(appointment.getAppointmentState()).isEqualTo(AppointmentState.CANCELADA);
+        verify(appointmentRepository).save(appointment);
+    }
+
+    @Test
+    void shouldThrowWhenPatientIdDoesNotMatchAppointmentOwner() {
+        UUID appointmentId = UUID.randomUUID();
+        Appointment appointment = buildAppointment(UUID.randomUUID(), LocalDate.now().plusDays(1));
+        when(appointmentRepository.findById(appointmentId)).thenReturn(appointment);
+
+        assertThatThrownBy(() -> useCase.cancel(appointmentId, UUID.randomUUID()))
                 .isInstanceOf(AppointmentAccessDeniedException.class);
 
-        verify(repository, never()).save(any());
-        assertThat(appointment.getAppointmentState()).isEqualTo(AppointmentState.AGENDADA);
+        verify(appointmentRepository, never()).save(any());
     }
 
     @Test
-    void aPatientCanCancelTheirOwnAppointment() {
-        useCase.cancel(APPOINTMENT_ID, OWNER_ID);
+    void shouldThrowWhenAppointmentDateIsInThePast() {
+        UUID appointmentId = UUID.randomUUID();
+        UUID idPatient = UUID.randomUUID();
+        Appointment appointment = buildAppointment(idPatient, LocalDate.now().minusDays(1));
+        when(appointmentRepository.findById(appointmentId)).thenReturn(appointment);
 
-        verify(repository).save(appointment);
-        assertThat(appointment.getAppointmentState()).isEqualTo(AppointmentState.CANCELADA);
-    }
+        assertThatThrownBy(() -> useCase.cancel(appointmentId, idPatient))
+                .isInstanceOf(CancelAppointmentNotAllowedException.class);
 
-    @Test
-    void theSchedulerCancelsWithoutAPatientAndCanCancelAnyAppointment() {
-        useCase.cancel(APPOINTMENT_ID, null);
-
-        verify(repository).save(appointment);
-        assertThat(appointment.getAppointmentState()).isEqualTo(AppointmentState.CANCELADA);
+        verify(appointmentRepository, never()).save(any());
     }
 }
