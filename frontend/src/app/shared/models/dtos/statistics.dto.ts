@@ -34,6 +34,5 @@ export type EstadoFiltro = Exclude<EstadoCita, 'CANCELADA'>;
 
 export interface DailyWorkloadStat {
   doctor: string;
-  specialty: string;
   total: number;
 }

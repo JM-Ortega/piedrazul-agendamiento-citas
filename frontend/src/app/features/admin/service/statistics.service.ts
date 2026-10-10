@@ -71,7 +71,6 @@ export class StatisticsService {
     return of(
       this.MOCK_DOCTORS.map((d) => ({
         doctor: d.name,
-        specialty: d.specialty,
         total: this.mockDailyCount(date, d.name),
       }))
     );

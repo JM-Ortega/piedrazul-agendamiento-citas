@@ -566,7 +566,7 @@ export class AdminStatisticsComponent implements OnInit {
     return WORKLOAD_COLORS.normal;
   }
 
-  /** Igual que el gráfico mensual, pero el tooltip muestra "N citas" y la especialidad. */
+  /** Igual que el gráfico mensual, pero el tooltip muestra "N citas". */
   private buildWorkloadOptions(): ChartOptions<'bar'> {
     const base = barOptions(false);
     return {
@@ -579,8 +579,6 @@ export class AdminStatisticsComponent implements OnInit {
           callbacks: {
             label: (item) =>
               `${item.parsed.y} ${item.parsed.y === 1 ? 'cita' : 'citas'}`,
-            afterLabel: (item) =>
-              this.workloadData()[item.dataIndex]?.specialty ?? '',
           },
         },
       },
