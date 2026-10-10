@@ -31,3 +31,9 @@ export interface CancellationStats {
 export type EstadoCita = 'AGENDADA' | 'ATENDIDA' | 'NO_ASISTIO' | 'CANCELADA';
 /** Estados disponibles en el desplegable*/
 export type EstadoFiltro = Exclude<EstadoCita, 'CANCELADA'>;
+
+export interface DailyWorkloadStat {
+  doctor: string;
+  specialty: string;
+  total: number;
+}

@@ -6,6 +6,7 @@ import {
   EstadoFiltro,
   MonthlyBreakdown,
   MonthlyTotalStat,
+  DailyWorkloadStat,
 } from '../../../shared/models/dtos/statistics.dto';
 
 /**
@@ -59,6 +60,19 @@ export class StatisticsService {
       this.MONTHS.map((month) => ({
         month,
         total: this.mockCount(year, month, estados),
+      }))
+    );
+  }
+
+  /** Citas agendadas y atendidas por médico en una fecha (YYYY-MM-DD). */
+  getDailyWorkload(date: string): Observable<DailyWorkloadStat[]> {
+    // TODO: Conectar con endpoint de estadísticas
+    // Ruta sugerida: GET `${apiUrl}/statistics/appointments/daily-workload?date=${date}`
+    return of(
+      this.MOCK_DOCTORS.map((d) => ({
+        doctor: d.name,
+        specialty: d.specialty,
+        total: this.mockDailyCount(date, d.name),
       }))
     );
   }
@@ -149,6 +163,14 @@ export class StatisticsService {
       year < now.getFullYear() ||
       (year === now.getFullYear() && month < now.getMonth())
     );
+  }
+
+  /** Citas de un médico en una fecha: 0 en fines de semana, 0-12 entre semana. */
+  private mockDailyCount(date: string, doctor: string): number {
+    const [y, m, d] = date.split('-').map(Number);
+    const weekday = new Date(y, m - 1, d).getDay();
+    if (weekday === 0 || weekday === 6) return 0;
+    return Math.floor(this.mockNoise(date, doctor, 'daily') * 13);
   }
 
   /** Número pseudoaleatorio determinista en [0, 1) para que el mock sea estable. */
