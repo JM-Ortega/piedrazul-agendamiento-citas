@@ -13,6 +13,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyGroupCount;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyStateCount;
+
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -194,4 +197,28 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
         );
     }
 
+    @Override
+    public List<MonthlyGroupCount> countByMonthAndDoctor(int year, Collection<AppointmentState> states) {
+        return jpaRepository.countByMonthAndDoctor(startOf(year), startOf(year + 1), states).stream()
+                .map(v -> new MonthlyGroupCount(v.getMonthNumber() - 1, String.valueOf(v.getGroupKey()), v.getTotal()))
+                .toList();
+    }
+
+    @Override
+    public List<MonthlyGroupCount> countByMonthAndSpecialty(int year, Collection<AppointmentState> states) {
+        return jpaRepository.countByMonthAndSpecialty(startOf(year), startOf(year + 1), states).stream()
+                .map(v -> new MonthlyGroupCount(v.getMonthNumber() - 1, String.valueOf(v.getGroupKey()), v.getTotal()))
+                .toList();
+    }
+
+    @Override
+    public List<MonthlyStateCount> countByMonthAndState(int year) {
+        return jpaRepository.countByMonthAndState(startOf(year), startOf(year + 1)).stream()
+                .map(v -> new MonthlyStateCount(v.getMonthNumber() - 1, v.getState(), v.getTotal()))
+                .toList();
+    }
+
+    private static LocalDate startOf(int year) {
+        return LocalDate.of(year, 1, 1);
+    }
 }
