@@ -52,7 +52,8 @@ import {
   MonthlyBreakdown,
   MonthlySeriesStat,
   MonthlyTotalStat,
-  DailyWorkloadStat,
+  DailyWorkload,
+  NivelCarga,
   MotivoInasistencia,
 } from '../../../../shared/models/dtos/statistics.dto';
 import { StatisticsService } from '../../service/statistics.service';
@@ -63,13 +64,13 @@ import { DatepickerComponent } from '../../../../designSystem/molecules/datepick
 /** Estados permitidos en el filtro de médico y especialidad. */
 type EstadoAgendaFiltro = Extract<EstadoFiltro, 'AGENDADA' | 'ATENDIDA'>;
 
-/** Colores por nivel de carga diaria. */
-const WORKLOAD_COLORS = {
-  normal: PRIMARY,
-  high: '#f59e0b',
-  overload: '#dc2626',
-  empty: '#e2e8f0',
-} as const;
+/** Color de cada nivel de carga. */
+const WORKLOAD_COLORS: Record<NivelCarga, string> = {
+  NORMAL: PRIMARY,
+  ALTA: '#f59e0b',
+  SOBRECARGA: '#dc2626',
+  SIN_CITAS: '#e2e8f0',
+};
 
 /**
  * Vista de estadísticas del panel de administración: citas por mes, por
@@ -124,16 +125,16 @@ export class AdminStatisticsComponent implements OnInit {
 
   // ── Carga de trabajo diaria: leyenda y opciones ───────────────────────────
   readonly workloadLegend: LegendItem[] = [
-    { name: 'Normal', color: WORKLOAD_COLORS.normal },
+    { name: 'Normal', color: WORKLOAD_COLORS.NORMAL },
     {
       name: 'Carga alta (>30% sobre el promedio)',
-      color: WORKLOAD_COLORS.high,
+      color: WORKLOAD_COLORS.ALTA,
     },
     {
-      name: 'Sobrecarga (≥ al doble del promedio)',
-      color: WORKLOAD_COLORS.overload,
+      name: 'Sobrecarga (≥ 2× el promedio)',
+      color: WORKLOAD_COLORS.SOBRECARGA,
     },
-    { name: 'Sin citas', color: WORKLOAD_COLORS.empty },
+    { name: 'Sin citas', color: WORKLOAD_COLORS.SIN_CITAS },
   ];
   readonly workloadOptions = this.buildWorkloadOptions();
 
@@ -204,7 +205,11 @@ export class AdminStatisticsComponent implements OnInit {
   // `workloadDate` es la fecha aplicada; `workloadDateDraft` es la del input.
   workloadDate = signal(toIsoDateString(new Date()));
   workloadDateDraft = signal<string | null>(this.workloadDate());
-  private workloadData = signal<DailyWorkloadStat[]>([]);
+  private workloadData = signal<DailyWorkload>({
+    dayTotal: 0,
+    averagePerDoctor: 0,
+    doctors: [],
+  });
   readonly workloadDirty = computed(() => {
     const draft = this.workloadDateDraft();
     return draft !== null && draft !== this.workloadDate();
@@ -212,16 +217,9 @@ export class AdminStatisticsComponent implements OnInit {
   readonly workloadDateLabel = computed(() =>
     formatLongDateEs(this.workloadDate())
   );
-  readonly workloadTotal = computed(() =>
-    this.workloadData().reduce((sum, d) => sum + d.total, 0)
-  );
+  readonly workloadTotal = computed(() => this.workloadData().dayTotal);
   /** Promedio entre médicos con citas; 0 si hay menos de dos (no es comparable). */
-  readonly workloadAvg = computed(() => {
-    const withAppts = this.workloadData().filter((d) => d.total > 0);
-    if (withAppts.length < 2) return 0;
-    const sum = withAppts.reduce((s, d) => s + d.total, 0);
-    return Math.round((sum / withAppts.length) * 10) / 10;
-  });
+  readonly workloadAvg = computed(() => this.workloadData().averagePerDoctor);
 
   // ── Citas por mes (solo atendidas) ────────────────────────────────────────
   // `monthlyYear` es el año aplicado; `monthlyYearDraft` es lo que muestra el select.
@@ -279,15 +277,14 @@ export class AdminStatisticsComponent implements OnInit {
 
   // ── Datos de las gráficas (computed) ──────────────────────────────────────
   readonly workloadChart = computed<ChartData<'bar'>>(() => {
-    const data = this.workloadData();
-    const avg = this.workloadAvg();
+    const { doctors } = this.workloadData();
     return {
-      labels: data.map((d) => d.doctor),
+      labels: doctors.map((d) => d.doctor),
       datasets: [
         {
           label: 'Citas',
-          data: data.map((d) => d.total),
-          backgroundColor: data.map((d) => this.workloadColor(d.total, avg)),
+          data: doctors.map((d) => d.total),
+          backgroundColor: doctors.map((d) => WORKLOAD_COLORS[d.level]),
           borderRadius: { topLeft: 8, topRight: 8 },
           borderSkipped: false,
           maxBarThickness: 64,
@@ -420,7 +417,7 @@ export class AdminStatisticsComponent implements OnInit {
 
   private refreshMonthly(): void {
     this.load(
-      this.statisticsService.getMonthlyTotals(this.monthlyYear(), 'ATENDIDA'),
+      this.statisticsService.getMonthlyTotals(this.monthlyYear()),
       this.monthlyData
     );
   }
@@ -591,15 +588,6 @@ export class AdminStatisticsComponent implements OnInit {
         })),
       },
     };
-  }
-
-  /** Normal, carga alta (>30% sobre el promedio), sobrecarga (≥ 2×) o sin citas. */
-  private workloadColor(total: number, avg: number): string {
-    if (total === 0) return WORKLOAD_COLORS.empty;
-    if (avg === 0) return WORKLOAD_COLORS.normal;
-    if (total >= avg * 2) return WORKLOAD_COLORS.overload;
-    if (total > avg * 1.3) return WORKLOAD_COLORS.high;
-    return WORKLOAD_COLORS.normal;
   }
 
   /** Igual que el gráfico mensual, pero el tooltip muestra "N citas". */
