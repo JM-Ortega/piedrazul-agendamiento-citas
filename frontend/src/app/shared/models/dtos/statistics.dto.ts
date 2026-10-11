@@ -35,8 +35,9 @@ export interface CancellationStats {
 }
 
 export type EstadoCita = 'AGENDADA' | 'ATENDIDA' | 'NO_ASISTIO' | 'CANCELADA';
-/** Estados disponibles en el desplegable*/
-export type EstadoFiltro = Exclude<EstadoCita, 'CANCELADA'>;
+
+/** Estados que se pueden elegir en Citas por Médico y por Tipo de Atención. */
+export type EstadoAgendaFiltro = 'AGENDADA' | 'ATENDIDA';
 
 /** Nivel de carga de un médico en el día */
 export type NivelCarga = 'NORMAL' | 'ALTA' | 'SOBRECARGA' | 'SIN_CITAS';

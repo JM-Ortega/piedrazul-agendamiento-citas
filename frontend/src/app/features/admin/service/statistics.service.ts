@@ -3,7 +3,7 @@ import { Observable, of } from 'rxjs';
 import {
   CancellationStats,
   EstadoCita,
-  EstadoFiltro,
+  EstadoAgendaFiltro,
   MonthlyBreakdown,
   MonthlyTotalStat,
   DailyWorkload,
@@ -30,11 +30,6 @@ export class StatisticsService {
     { name: 'Julián Torres', specialty: 'Medicina General' },
   ];
   private readonly MONTHS = Array.from({ length: 12 }, (_, i) => i);
-  /** Estados que suman por defecto médico y especialidad (sin filtro). */
-  private readonly ESTADOS_AGENDADA_ATENDIDA: EstadoCita[] = [
-    'AGENDADA',
-    'ATENDIDA',
-  ];
   private readonly ESTADOS_TODOS: EstadoCita[] = [
     'AGENDADA',
     'ATENDIDA',
@@ -86,14 +81,14 @@ export class StatisticsService {
     });
   }
 
-  /** Citas por médico y por mes. Sin `estado`, suma todos menos canceladas. */
+  /** Citas por médico y por mes. `AGENDADA` incluye todas las citas; `ATENDIDA`, solo las atendidas. */
   getMonthlyByDoctor(
     year: number,
-    estado?: EstadoFiltro
+    estado: EstadoAgendaFiltro
   ): Observable<MonthlyBreakdown> {
     // TODO: Conectar con endpoint de estadísticas
-    // GET `${apiUrl}/statistics/appointments/by-doctor?year=${year}&estado=${estado ?? ''}`
-    const estados = estado ? [estado] : this.ESTADOS_AGENDADA_ATENDIDA;
+    // GET `${apiUrl}/statistics/appointments/by-doctor?year=${year}&estado=${estado}`
+    const estados = this.mockEstadosDe(estado);
     return of({
       series: this.MOCK_DOCTORS.map((d) => d.name),
       rows: this.MONTHS.map((month) => ({
@@ -108,14 +103,14 @@ export class StatisticsService {
     });
   }
 
-  /** Citas por especialidad y por mes. Sin `estado`, suma todos menos canceladas. */
+  /** Citas por especialidad y por mes. `AGENDADA` incluye todas las citas; `ATENDIDA`, solo las atendidas. */
   getMonthlyBySpecialty(
     year: number,
-    estado?: EstadoFiltro
+    estado: EstadoAgendaFiltro
   ): Observable<MonthlyBreakdown> {
     // TODO: Conectar con endpoint de estadísticas
-    // GET `${apiUrl}/statistics/appointments/by-specialty?year=${year}&estado=${estado ?? ''}`
-    const estados = estado ? [estado] : this.ESTADOS_AGENDADA_ATENDIDA;
+    // GET `${apiUrl}/statistics/appointments/by-specialty?year=${year}&estado=${estado}`
+    const estados = this.mockEstadosDe(estado);
     const specialties = [...new Set(this.MOCK_DOCTORS.map((d) => d.specialty))];
     return of({
       series: specialties,
@@ -162,6 +157,10 @@ export class StatisticsService {
   }
 
   // ── MOCK: helpers (eliminar al conectar el backend) ───────────────────────
+  private mockEstadosDe(estado: EstadoAgendaFiltro): EstadoCita[] {
+    return estado === 'ATENDIDA' ? ['ATENDIDA'] : this.ESTADOS_TODOS;
+  }
+
   private mockLoadLevel(total: number, avg: number): NivelCarga {
     if (total === 0) return 'SIN_CITAS';
     if (avg === 0) return 'NORMAL';

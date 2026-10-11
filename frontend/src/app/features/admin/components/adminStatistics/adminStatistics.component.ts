@@ -48,7 +48,7 @@ import {
 } from '../../../../shared/helpers/statisticsCharts';
 import {
   CancellationStats,
-  EstadoFiltro,
+  EstadoAgendaFiltro,
   MonthlyBreakdown,
   MonthlySeriesStat,
   MonthlyTotalStat,
@@ -60,9 +60,6 @@ import { StatisticsService } from '../../service/statistics.service';
 import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
 import { toIsoDateString } from '../../../../shared/helpers/transformDateLocal';
 import { DatepickerComponent } from '../../../../designSystem/molecules/datepicker/datepicker.component';
-
-/** Estados permitidos en el filtro de médico y especialidad. */
-type EstadoAgendaFiltro = Extract<EstadoFiltro, 'AGENDADA' | 'ATENDIDA'>;
 
 /** Color de cada nivel de carga. */
 const WORKLOAD_COLORS: Record<NivelCarga, string> = {
@@ -111,7 +108,7 @@ export class AdminStatisticsComponent implements OnInit {
     { value: 'all', label: 'Todo el año' },
   ];
 
-  /** Filtro de estado. La opción vacía de `app-select` equivale a "Todas". */
+  /** Filtro de estado: siempre hay una opción elegida (por defecto, Agendada). */
   readonly estadoOptions: SelectOption[] = [
     { value: 'AGENDADA', label: 'Agendada' },
     { value: 'ATENDIDA', label: 'Atendida' },
@@ -234,8 +231,8 @@ export class AdminStatisticsComponent implements OnInit {
   // ── Citas por médico ──────────────────────────────────────────────────────
   doctorYear = signal(new Date().getFullYear());
   doctorYearDraft = signal(new Date().getFullYear());
-  doctorEstado = signal<EstadoAgendaFiltro | ''>('');
-  doctorEstadoDraft = signal<EstadoAgendaFiltro | ''>('');
+  doctorEstado = signal<EstadoAgendaFiltro>('AGENDADA');
+  doctorEstadoDraft = signal<EstadoAgendaFiltro>('AGENDADA');
   doctorPreset = signal<MonthPreset>('6');
   private doctorData = signal<MonthlyBreakdown>({ series: [], rows: [] });
   readonly doctorDirty = computed(
@@ -250,8 +247,8 @@ export class AdminStatisticsComponent implements OnInit {
   // ── Comparativo por especialidad ──────────────────────────────────────────
   specialtyYear = signal(new Date().getFullYear());
   specialtyYearDraft = signal(new Date().getFullYear());
-  specialtyEstado = signal<EstadoAgendaFiltro | ''>('');
-  specialtyEstadoDraft = signal<EstadoAgendaFiltro | ''>('');
+  specialtyEstado = signal<EstadoAgendaFiltro>('AGENDADA');
+  specialtyEstadoDraft = signal<EstadoAgendaFiltro>('AGENDADA');
   specialtyPreset = signal<MonthPreset>('6');
   private specialtyData = signal<MonthlyBreakdown>({ series: [], rows: [] });
   readonly specialtyDirty = computed(
@@ -426,7 +423,7 @@ export class AdminStatisticsComponent implements OnInit {
     this.load(
       this.statisticsService.getMonthlyByDoctor(
         this.doctorYear(),
-        this.doctorEstado() || undefined
+        this.doctorEstado()
       ),
       this.doctorData
     );
@@ -436,7 +433,7 @@ export class AdminStatisticsComponent implements OnInit {
     this.load(
       this.statisticsService.getMonthlyBySpecialty(
         this.specialtyYear(),
-        this.specialtyEstado() || undefined
+        this.specialtyEstado()
       ),
       this.specialtyData
     );
@@ -459,8 +456,7 @@ export class AdminStatisticsComponent implements OnInit {
   }
 
   // ── Handlers de borrador (no consultan) ───────────────────────────────────
-  // `app-select` siempre incluye una opción vacía ("Seleccione..."): en año se
-  // ignora; en estado equivale a "Todas".
+  // `app-select` incluye una opción vacía ("Seleccione..."): se ignora, tanto en año como en estado.
   onMonthlyYearChange(value: string): void {
     if (!value) return;
     this.monthlyYearDraft.set(Number(value));
@@ -472,7 +468,7 @@ export class AdminStatisticsComponent implements OnInit {
   }
 
   onDoctorEstadoChange(value: string): void {
-    this.doctorEstadoDraft.set(value as EstadoAgendaFiltro | '');
+    this.doctorEstadoDraft.set(value as EstadoAgendaFiltro);
   }
 
   onSpecialtyYearChange(value: string): void {
@@ -481,7 +477,7 @@ export class AdminStatisticsComponent implements OnInit {
   }
 
   onSpecialtyEstadoChange(value: string): void {
-    this.specialtyEstadoDraft.set(value as EstadoAgendaFiltro | '');
+    this.specialtyEstadoDraft.set(value as EstadoAgendaFiltro);
   }
 
   // ── Botones "Filtrar": aplican el borrador y consultan ────────────────────
@@ -535,15 +531,10 @@ export class AdminStatisticsComponent implements OnInit {
     });
   }
 
-  private breakdownSubtitle(estado: EstadoAgendaFiltro | ''): string {
-    switch (estado) {
-      case 'ATENDIDA':
-        return 'Mes a mes · citas atendidas';
-      case 'AGENDADA':
-        return 'Mes a mes · citas agendadas';
-      default:
-        return 'Mes a mes · citas agendadas y atendidas';
-    }
+  private breakdownSubtitle(estado: EstadoAgendaFiltro): string {
+    return estado === 'ATENDIDA'
+      ? 'Mes a mes · citas atendidas'
+      : 'Mes a mes · todas las citas (agendadas, atendidas, no asistidas y canceladas)';
   }
 
   private filterMonths<T extends { month: number }>(
