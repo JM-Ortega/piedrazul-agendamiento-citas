@@ -87,12 +87,8 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     }
 
     @Override
-    public Map<UUID, String> getDoctorNamesByIds(List<UUID> doctorIds) {
-        if (doctorIds == null || doctorIds.isEmpty()) {
-            return Map.of();
-        }
-
-        List<UUID> existingDoctorIds = doctorRepository.findByPersonIdIn(doctorIds).stream()
+    public Map<UUID, String> getDoctorNamesByIds() {
+        List<UUID> existingDoctorIds = doctorRepository.findAll().stream()
                 .map(Doctor::getPersonId)
                 .toList();
 
