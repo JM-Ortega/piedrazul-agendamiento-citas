@@ -337,7 +337,7 @@
     }
   </section>
 
-  <!-- Tasa de cancelación -->
+  <!-- Tasa de no asistencia -->
   <section
     class="bg-white rounded-xl shadow-md p-4 md:p-5 border border-[#d9e9f8]"
   >
@@ -348,11 +348,9 @@
         </div>
         <div>
           <h2 class="text-[#163c63] text-lg font-semibold">
-            Tasa de Cancelación
+            Tasa de No Asistencia
           </h2>
-          <p class="text-gray-500 text-sm">
-            Porcentaje de citas canceladas mes a mes
-          </p>
+          <p class="text-gray-500 text-sm">Porcentaje mes a mes según motivo</p>
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-3">
@@ -369,12 +367,29 @@
             (valueChange)="onCancelYearChange($event)"
           ></app-select>
         </div>
+        <div class="flex items-center gap-2">
+          <label for="cancel-motivo" class="text-sm font-semibold text-gray-500"
+            >Motivo:</label
+          >
+          <app-select
+            [id]="'cancel-motivo'"
+            [options]="motivoOptions"
+            [fullWidth]="false"
+            size="sm"
+            [ngModel]="cancelMotivo()"
+            (valueChange)="onCancelMotivoChange($event)"
+          ></app-select>
+        </div>
         <div
           class="bg-red-50 border border-red-200 rounded-xl px-4 py-2 flex flex-col items-center min-w-24"
-          [appTooltip]="'Citas canceladas sobre el total del año seleccionado'"
+          [appTooltip]="'Citas del motivo seleccionado sobre el total del año seleccionado'"
         >
           <p class="text-2xl font-extrabold text-red-600 leading-none">
             {{ cancelYearRate() }}%
+          </p>
+          <p class="text-red-500 text-xs font-bold mt-0.5">
+            = {{ cancelYearCount() }}
+            {{ cancelYearCount() === 1 ? 'cita' : 'citas' }}
           </p>
           <p class="text-gray-500 text-xs font-semibold mt-0.5 text-center">
             Tasa del período

@@ -53,6 +53,7 @@ import {
   MonthlySeriesStat,
   MonthlyTotalStat,
   DailyWorkloadStat,
+  MotivoInasistencia,
 } from '../../../../shared/models/dtos/statistics.dto';
 import { StatisticsService } from '../../service/statistics.service';
 import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
@@ -115,6 +116,12 @@ export class AdminStatisticsComponent implements OnInit {
     { value: 'ATENDIDA', label: 'Atendida' },
   ];
 
+  /** Motivo de la tasa de no asistencia. */
+  readonly motivoOptions: SelectOption[] = [
+    { value: 'CANCELADA', label: 'Cancelada' },
+    { value: 'NO_ASISTIO', label: 'No asistió' },
+  ];
+
   // ── Carga de trabajo diaria: leyenda y opciones ───────────────────────────
   readonly workloadLegend: LegendItem[] = [
     { name: 'Normal', color: WORKLOAD_COLORS.normal },
@@ -150,8 +157,16 @@ export class AdminStatisticsComponent implements OnInit {
         titleColor: '#7f1d1d',
         displayColors: false,
         callbacks: {
-          label: (item) => `${item.parsed.y}%`,
-          afterLabel: () => 'tasa de cancelación',
+          label: (item) => {
+            const count = this.cancelData().months[item.dataIndex]?.count ?? 0;
+            const citaTexto = count === 1 ? 'cita' : 'citas';
+            return `${item.parsed.y}% = ${count} ${citaTexto}`;
+          },
+          afterLabel: () => {
+            return this.cancelMotivo() === 'CANCELADA'
+              ? 'tasa de cancelación'
+              : 'tasa de inasistencia';
+          },
         },
       },
     },
@@ -250,11 +265,17 @@ export class AdminStatisticsComponent implements OnInit {
     this.breakdownSubtitle(this.specialtyEstado())
   );
 
-  // ── Tasa de cancelación ───────────────────────────────────────────────────
+  // ── Tasa de no asistencia ─────────────────────────────────────────────────
   cancelYear = signal(new Date().getFullYear());
-  private cancelData = signal<CancellationStats>({ months: [], yearRate: 0 });
+  cancelMotivo = signal<MotivoInasistencia>('CANCELADA');
+  private cancelData = signal<CancellationStats>({
+    months: [],
+    yearRate: 0,
+    yearCount: 0,
+  });
 
   readonly cancelYearRate = computed(() => this.cancelData().yearRate);
+  readonly cancelYearCount = computed(() => this.cancelData().yearCount);
 
   // ── Datos de las gráficas (computed) ──────────────────────────────────────
   readonly workloadChart = computed<ChartData<'bar'>>(() => {
@@ -426,9 +447,18 @@ export class AdminStatisticsComponent implements OnInit {
 
   private refreshCancel(): void {
     this.load(
-      this.statisticsService.getCancellationRate(this.cancelYear()),
+      this.statisticsService.getCancellationRate(
+        this.cancelYear(),
+        this.cancelMotivo()
+      ),
       this.cancelData
     );
+  }
+
+  onCancelMotivoChange(value: string): void {
+    if (!value) return;
+    this.cancelMotivo.set(value as MotivoInasistencia);
+    this.refreshCancel();
   }
 
   // ── Handlers de borrador (no consultan) ───────────────────────────────────
