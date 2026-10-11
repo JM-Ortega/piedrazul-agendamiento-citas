@@ -10,6 +10,7 @@ import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
+import co.edu.unicauca.piedrazul.backend.shared.seed.DemoSeedOnly;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
@@ -19,7 +20,12 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
+/**
+ * Médicos de demostración (datos ficticios) para desarrollo. Solo existe con
+ * {@link DemoSeedOnly}: perfil {@code dev} exclusivo y {@code APP_DEMO_SEED_ENABLED=true}.
+ */
 @Component
+@DemoSeedOnly
 @Order(2)
 public class DoctorDataInitializer implements ApplicationRunner {
 
@@ -41,10 +47,10 @@ public class DoctorDataInitializer implements ApplicationRunner {
                         new CreateSystemUserRequest(
                                 "11000001",
                                  IdentificationType.CEDULA,
-                                "Clara Inés",
-                                "Córdoba",
-                                "clara.cordoba@piedrazul.com",
-                                "3208337463",
+                                "Aurora",
+                                "Demo Neural",
+                                "aurora.neural@demo.piedrazul.test",
+                                "3000000101",
                                 "Doctor123!"
                         ), new CreateDoctorRequest(
                         List.of(SpecialtyCode.TERAPIA_NEURAL),
@@ -69,10 +75,10 @@ public class DoctorDataInitializer implements ApplicationRunner {
                 new CreateSystemUserRequest(
                         "11000002",
                          IdentificationType.CEDULA,
-                        "José Ignacio",
-                        "García",
-                        "jose.garcia@piedrazul.com",
-                        "3147826393",
+                        "Bruno",
+                        "Demo Fisioterapia",
+                        "bruno.fisio@demo.piedrazul.test",
+                        "3000000102",
                         "Doctor123!"
                 ),
                 new CreateDoctorRequest(
@@ -96,10 +102,10 @@ public class DoctorDataInitializer implements ApplicationRunner {
                 new CreateSystemUserRequest(
                         "11000003",
                          IdentificationType.CEDULA,
-                        "Ibis Ester",
-                        "Peña",
-                        "ibis.pena@piedrazul.com",
-                        "314738447",
+                        "Celia",
+                        "Demo Quiropraxia",
+                        "celia.quiro@demo.piedrazul.test",
+                        "3000000103",
                         "Doctor123!"
                 ),
                 new CreateDoctorRequest(
@@ -124,10 +130,10 @@ public class DoctorDataInitializer implements ApplicationRunner {
                 new CreateSystemUserRequest(
                         "11000004",
                          IdentificationType.CEDULA,
-                        "Rocío",
-                        "Gómez",
-                        "rocio.gomez@piedrazul.dev",
-                        "3147826393",
+                        "Dalia",
+                        "Demo Neural",
+                        "dalia.neural@demo.piedrazul.test",
+                        "3000000104",
                         "Doctor123!"
                 ),
                 new CreateDoctorRequest(

@@ -26,6 +26,12 @@ RUN --mount=type=cache,target=/root/.m2,id=maven-$TARGETARCH \
 # ── Runtime stage ──────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine@sha256:51ab5e3302e7141ce665ca3ea85e8b5cd648eafbc3c0c90dd79d6537684e4555
 
+# Contrato del bootstrap del primer administrador que implementa esta imagen (create-only,
+# fail-closed). El despliegue solo entrega IDENTITY_SEED_* habilitado a una imagen con esta
+# etiqueta: una imagen anterior lo procesaría con su código (adopción de cuentas, contraseña
+# permanente, personal de demostración). Ver infra/ansible/roles/app/tasks/identity_seed_image_gate.yml.
+LABEL org.piedrazul.identity-bootstrap="create-only-v1"
+
 # Usuario no root para reducir superficie de ataque
 RUN addgroup -S spring && adduser -S spring -G spring
 USER spring:spring

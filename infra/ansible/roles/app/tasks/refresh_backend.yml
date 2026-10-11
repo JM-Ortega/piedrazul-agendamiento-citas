@@ -14,25 +14,55 @@
     name: backend
   register: app_backend_container
 
+- name: Decidir si el backend se recrea en este converge
+  ansible.builtin.set_fact:
+    app_backend_refreshable: >-
+      {{ app_backend_container.exists and
+         app_backend_container.container.Config.Image == backend_image_ref }}
+
+# Con el bootstrap del primer administrador habilitado, un resultado no listo impide arrancar
+# el backend (fail-closed) y la espera de Compose falla: el rescate informa el resultado del
+# bootstrap antes de fallar, en vez de un "no quedó en ejecución" sin causa.
 - name: Recrear el backend con la configuración vigente
-  when:
-    - app_backend_container.exists
-    - app_backend_container.container.Config.Image == backend_image_ref
-  community.docker.docker_compose_v2:
-    project_src: "{{ app_dir }}/compose"
-    project_name: "{{ compose_project_name }}"
-    files:
-      - prod.yml
-    services:
-      - backend
-    dependencies: false
-    state: present
-    pull: missing
-    wait: true
-    wait_timeout: 300
-    env_files:
-      - ../.env
-      - ../image.env
+  when: app_backend_refreshable | bool
+  block:
+    - name: Recrear el backend con la configuración vigente
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}/compose"
+        project_name: "{{ compose_project_name }}"
+        files:
+          - prod.yml
+        services:
+          - backend
+        dependencies: false
+        state: present
+        pull: missing
+        wait: true
+        wait_timeout: 300
+        env_files:
+          - ../.env
+          - ../image.env
+  rescue:
+    - name: Informar el bootstrap del primer administrador del backend que no arrancó
+      ansible.builtin.include_tasks: identity_seed_runtime.yml
+
+    - name: Fallar por el backend que no quedó en ejecución
+      ansible.builtin.fail:
+        msg: "El backend recreado no quedó en ejecución (ver la tarea anterior y docker logs backend)."
+
+# Bootstrap del primer administrador: en vigor y con resultado listo (habilitado) o retirado
+# del contenedor (deshabilitado). Sin recreación en este converge: si sigue un deploy en el
+# mismo run (app_deploy_follows), lo verifica el deploy; si no, se exige aquí sobre el
+# contenedor que corre, que falla si el cambio del .env está pendiente de recrearlo.
+- name: Verificar el bootstrap del primer administrador en el backend recreado
+  when: app_backend_refreshable | bool
+  ansible.builtin.include_tasks: identity_seed_runtime.yml
+
+- name: Verificar el bootstrap del primer administrador en el backend no recreado
+  when: not (app_backend_refreshable | bool)
+  ansible.builtin.include_tasks: identity_seed_runtime.yml
+  vars:
+    app_identity_seed_runtime_mode: "{{ 'deferred' if (app_deploy_follows | default(false) | bool) else 'enforce' }}"
 
 - name: Omitir el backend
   ansible.builtin.debug:
@@ -40,6 +70,4 @@
       Backend sin cambios en converge:
       {{ 'no existe' if not app_backend_container.exists
          else 'corre ' ~ app_backend_container.container.Config.Image ~ ', distinto de la identidad seleccionada' }}
-  when: >-
-    not app_backend_container.exists or
-    app_backend_container.container.Config.Image != backend_image_ref
+  when: not (app_backend_refreshable | bool)

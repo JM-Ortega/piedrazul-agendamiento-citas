@@ -1,151 +1,82 @@
 package co.edu.unicauca.piedrazul.backend.user.config;
 
-import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
-import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
-import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
-import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
-import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
-import co.edu.unicauca.piedrazul.backend.user.exception.PersonAlreadyExistsException;
-import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsException;
+import co.edu.unicauca.piedrazul.backend.user.application.bootstrap.AdminBootstrapRequest;
+import co.edu.unicauca.piedrazul.backend.user.application.bootstrap.AdminBootstrapResult;
+import co.edu.unicauca.piedrazul.backend.user.application.bootstrap.AdminBootstrapService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+import org.springframework.stereotype.Component;
 
-import java.util.List;
-
-@Configuration
+/**
+ * Bootstrap del primer administrador de negocio al arrancar, solo si
+ * {@code IDENTITY_SEED_ENABLED=true}. Deshabilitado (por defecto) no hace ninguna
+ * operación de Keycloak ni de Person y no necesita la contraseña inicial.
+ *
+ * <p>Emite una única línea {@code identity-bootstrap result=...} (sin datos personales ni
+ * credenciales), que el despliegue lee. Fail-closed: con un resultado que no es un bootstrap
+ * listo, el arranque falla (y la política de reinicio del contenedor lo reintenta), salvo
+ * {@code ALREADY_LINKED_NOT_READY}, que arranca sin reparar nada y que el despliegue trata
+ * como fallo. Ver {@link AdminBootstrapOutcome} y
+ * docs/operations/runbooks/primer-admin-negocio.md.
+ *
+ * <p>Corre antes que los inicializadores de demostración (orden 1): en desarrollo, los
+ * médicos de demostración traen ADMIN y bloquearían una creación posterior.
+ *
+ * <p>Los datos de demostración (agendadores, auditor, médicos, pacientes) no dependen de
+ * esta propiedad: ver {@code DemoStaffDataInitializer} y {@code DemoSeedCondition}.
+ */
+@Component
 @EnableConfigurationProperties(IdentitySeedProperties.class)
-public class IdentityDataInitializer {
+public class IdentityDataInitializer implements ApplicationRunner, Ordered {
 
-    @Bean
-    ApplicationRunner seedIdentityUsers(
-            UserProvisioningApi userProvisioningApi,
-            IdentitySeedProperties properties
-    ) {
-        return args -> {
-            if (!properties.isEnabled()) {
-                return;
-            }
+    private static final Logger log = LoggerFactory.getLogger(IdentityDataInitializer.class);
 
-            seedAdmin(userProvisioningApi, properties.getAdmin());
-            seedDemoSchedulers(userProvisioningApi);
-            seedAuditor(userProvisioningApi);
-        };
+    private final IdentitySeedProperties properties;
+    private final AdminBootstrapService adminBootstrapService;
+
+    public IdentityDataInitializer(IdentitySeedProperties properties, AdminBootstrapService adminBootstrapService) {
+        this.properties = properties;
+        this.adminBootstrapService = adminBootstrapService;
     }
 
-    private void seedAdmin(
-            UserProvisioningApi userProvisioningApi,
-            IdentitySeedProperties.SeedUser admin
-    ) {
-        require(admin.getUsername(), "IDENTITY_SEED_ADMIN_USERNAME");
-        require(admin.getFirstName(), "IDENTITY_SEED_ADMIN_FIRST_NAME");
-        require(admin.getLastName(), "IDENTITY_SEED_ADMIN_LAST_NAME");
-        require(admin.getPhone(), "IDENTITY_SEED_ADMIN_PHONE");
-        require(admin.getPassword(), "IDENTITY_SEED_ADMIN_PASSWORD");
-
-        if (admin.getIdentificationType() == null) {
-            throw new IllegalStateException(
-                    "Missing required identity seed property: IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE"
-            );
+    @Override
+    public void run(ApplicationArguments args) {
+        if (!properties.isEnabled()) {
+            return;
         }
 
-        createIfNotExists(
-                userProvisioningApi,
-                new CreateSystemUserPayload(
-                        new CreateSystemUserRequest(
-                                admin.getUsername(),
-                                admin.getIdentificationType(),
-                                admin.getFirstName(),
-                                admin.getLastName(),
-                                admin.getEmail(),
-                                admin.getPhone(),
-                                admin.getPassword()
-                        ),
-                        null,
-                        null,
-                        List.of(Role.ADMIN)
-                )
-        );
-    }
+        IdentitySeedProperties.SeedUser admin = properties.getAdmin();
+        AdminBootstrapResult result = adminBootstrapService.bootstrap(new AdminBootstrapRequest(
+                admin.getUsername(),
+                admin.getIdentificationType(),
+                admin.getFirstName(),
+                admin.getLastName(),
+                admin.getEmail(),
+                admin.getPhone(),
+                admin.getPassword()));
 
-    private void seedDemoSchedulers(UserProvisioningApi userProvisioningApi) {
-        String demoPassword = "Scheduler123!";
-
-        List<DemoScheduler> schedulers = List.of(
-                new DemoScheduler("9000001", "Laura", "Pérez", "laura.scheduler@piedrazul.local", "3001112233"),
-                new DemoScheduler("9000002", "Carlos", "Rodríguez", "carlos.scheduler@piedrazul.local", "3001112244"),
-                new DemoScheduler("9000003", "Valeria", "Torres", "valeria.scheduler@piedrazul.local", "3001112255")
-        );
-
-        schedulers.forEach(scheduler ->
-                createIfNotExists(
-                        userProvisioningApi,
-                        new CreateSystemUserPayload(
-                                new CreateSystemUserRequest(
-                                        scheduler.username(),
-                                        IdentificationType.CEDULA,
-                                        scheduler.firstName(),
-                                        scheduler.lastName(),
-                                        scheduler.email(),
-                                        scheduler.phone(),
-                                        demoPassword
-                                ),
-                                null,
-                                null,
-                                List.of(Role.SCHEDULER)
-                        )
-                )
-        );
-    }
-
-    private void seedAuditor(UserProvisioningApi userProvisioningApi) {
-        createIfNotExists(
-                userProvisioningApi,
-                new CreateSystemUserPayload(
-                        new CreateSystemUserRequest(
-                                "9700001",
-                                IdentificationType.CEDULA,
-                                "Libardo",
-                                "Pantoja",
-                                "wpantoja@unicauca.edu.co",
-                                "3001112266", // No se que numero poner xd
-                                "Auditor123!"
-                        ),
-                        null,
-                        null,
-                        List.of(Role.AUDITOR)
-                )
-        );
-    }
-
-    private void createIfNotExists(
-            UserProvisioningApi userProvisioningApi,
-            CreateSystemUserPayload payload
-    ) {
-        try {
-            userProvisioningApi.createUser(payload);
-        } catch (PersonAlreadyExistsException exception) {
-            // La persona puede existir si la base de datos conserva una inicialización anterior.
-        } catch (UserAlreadyExistsException exception) {
-            // La cuenta puede existir si Keycloak conserva una inicialización anterior.
+        String line = result.toLogLine();
+        if (result.outcome().successful()) {
+            log.info(line);
+            return;
         }
-    }
-
-    private void require(String value, String propertyName) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException(
-                    "Missing required identity seed property: " + propertyName
-            );
+        if (!result.outcome().abortsStartup()) {
+            log.warn(line);
+            return;
         }
+
+        log.error(line);
+        // Fail-closed: el backend no arranca con un bootstrap habilitado que no terminó bien.
+        // El mensaje es la misma línea, sin datos personales ni credenciales.
+        throw new IllegalStateException("Bootstrap del primer administrador no completado: " + line);
     }
 
-    private record DemoScheduler(
-            String username,
-            String firstName,
-            String lastName,
-            String email,
-            String phone
-    ) {
+    @Override
+    public int getOrder() {
+        return 1;
     }
 }

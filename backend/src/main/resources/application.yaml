@@ -69,17 +69,26 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
 
   seed:
+    # Bootstrap create-only del primer administrador de negocio (rol ADMIN del realm de la
+    # aplicación). Deshabilitado no usa ninguna de estas propiedades, tampoco la contraseña.
+    # Ver docs/operations/runbooks/primer-admin-negocio.md.
     identity:
       enabled: ${IDENTITY_SEED_ENABLED:false}
 
       admin:
         username: ${IDENTITY_SEED_ADMIN_USERNAME:}
-        identification-type: ${IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE:CEDULA}
+        identification-type: ${IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE:}
         first-name: ${IDENTITY_SEED_ADMIN_FIRST_NAME:}
         last-name: ${IDENTITY_SEED_ADMIN_LAST_NAME:}
         email: ${IDENTITY_SEED_ADMIN_EMAIL:}
         phone: ${IDENTITY_SEED_ADMIN_PHONE:}
         password: ${IDENTITY_SEED_ADMIN_PASSWORD:}
+
+    # Datos de demostración (médicos, pacientes, agendadores, auditor; todos ficticios).
+    # Además de este opt-in exigen el perfil dev exclusivo: con prod, sin perfil o con un
+    # perfil desconocido no corren (DemoSeedCondition).
+    demo:
+      enabled: ${APP_DEMO_SEED_ENABLED:false}
 
 keycloak:
   server-url: ${KC_SERVER_URL:http://localhost:8180}

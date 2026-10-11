@@ -44,6 +44,17 @@
       GitHub Environment production-hetzner e inyectarse al paso de converge.
     quiet: true
 
+# Antes de escribir .env: con el bootstrap habilitado, sus entradas completas y válidas
+# (compara la contraseña con las credenciales técnicas y de la base tomadas arriba)
+- name: Tomar y validar las entradas del bootstrap del primer administrador
+  ansible.builtin.include_tasks: identity_seed_inputs.yml
+
+# También antes de escribir .env: una imagen del backend anterior al bootstrap create-only
+# no debe recibirlo (ni la contraseña llegar al host para ella)
+- name: Verificar que la imagen del backend admite el bootstrap del primer administrador
+  when: app_identity_seed_enabled | bool
+  ansible.builtin.include_tasks: identity_seed_image_gate.yml
+
 # Compose files
 - name: Copiar archivos compose al servidor
   ansible.builtin.copy:
@@ -100,6 +111,9 @@
 
 - name: Verificar la entrega de KC_BACKEND_CLIENT_SECRET al backend
   ansible.builtin.include_tasks: keycloak_backend_delivery.yml
+
+- name: Verificar la entrega del bootstrap del primer administrador al backend
+  ansible.builtin.include_tasks: identity_seed_delivery.yml
 
 # Base primero: ningún consumidor arranca con credenciales que postgres aún no acepta
 - name: Converger postgres y reconciliar autoridades de la base

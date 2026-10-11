@@ -33,6 +33,10 @@ infra/ansible/
         │   ├── setup.yml                # Copia archivos, genera .env, postgres, Traefik
         │   ├── keycloak_credentials.yml # Toma y valida las credenciales técnicas de Keycloak (setup)
         │   ├── keycloak_backend_delivery.yml # Verifica que el backend recibe su secreto intacto (setup)
+        │   ├── identity_seed_inputs.yml # Valida el bootstrap del primer ADMIN de negocio antes de .env (setup)
+        │   ├── identity_seed_image_gate.yml # Solo una imagen con el contrato create-only recibe el bootstrap (setup y deploy)
+        │   ├── identity_seed_delivery.yml # Entrega exacta (habilitado) o vacía (deshabilitado) al backend (setup)
+        │   ├── identity_seed_runtime.yml # Resultado del bootstrap o retiro del secreto en el backend (refresh y deploy)
         │   ├── keycloak_lifecycle.yml   # Ciclo técnico de Keycloak: P1/P2/P3 (converge)
         │   ├── keycloak_state.yml       # Clasificación por el estado de Keycloak (base + API)
         │   ├── keycloak_bootstrap.yml   # Evento con autoridad temporal (P2 o recuperación P3)
@@ -399,7 +403,25 @@ KC_PLATFORM_ADMIN_INITIAL_PASSWORD  # Un solo uso: contraseña inicial del admin
                                     # tras el primer login (docs/operations/runbooks/administrador-keycloak.md)
 CLOUDFLARE_DNS_API_TOKEN     # Token de Cloudflare para DNS challenge de Let's Encrypt
 ANSIBLE_SSH_KEY              # Clave privada SSH para que Ansible se conecte al servidor
+IDENTITY_SEED_ADMIN_PASSWORD # Un solo uso: contraseña temporal del primer ADMIN de negocio. Solo
+                             # se lee con la variable IDENTITY_SEED_ENABLED=true; se elimina tras
+                             # el primer login (docs/operations/runbooks/primer-admin-negocio.md)
 ```
+
+Bootstrap del primer `ADMIN` de negocio (variables `IDENTITY_SEED_*` del environment): con
+`IDENTITY_SEED_ENABLED=true`, `identity_seed_inputs.yml` valida las entradas antes de escribir
+`.env`, `identity_seed_delivery.yml` comprueba que Compose las entregaría intactas e
+`identity_seed_runtime.yml` (al final de `refresh_backend.yml` y de `deploy.yml`) exige que el
+backend en ejecución tenga en vigor la configuración del `.env` (sus `IDENTITY_SEED_*` son los
+que Compose entregaría) y que informe `CREATED` o `ALREADY_LINKED_READY`. El backend es
+fail-closed: con otro resultado no arranca. Deshabilitado, `.env` lleva las entradas vacías y
+esas mismas tareas comprueban que ni Compose ni el contenedor recreado conservan la contraseña.
+Un converge que no recrea el backend lo deja al deploy del mismo run (`app_deploy_follows`) o
+falla si el cambio queda pendiente; un deploy falla si el `.env` no corresponde a la decisión
+del environment (`app_identity_seed_intended`). Con el bootstrap habilitado, `identity_seed_image_gate.yml` rechaza una imagen
+del backend sin la etiqueta `org.piedrazul.identity-bootstrap=create-only-v1` antes de escribir
+`.env` (setup) y antes de migrar o arrancar (deploy).
+Procedimiento: [`primer-admin-negocio.md`](../../docs/operations/runbooks/primer-admin-negocio.md).
 
 El workflow los inyecta como variables de entorno antes de correr Ansible:
 

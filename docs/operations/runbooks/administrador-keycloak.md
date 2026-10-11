@@ -227,9 +227,9 @@ Asignación manual excepcional, con la cuenta de plataforma:
 Para quitarlo: mismo lugar, *Unassign*. Este camino solo cambia el rol en Keycloak: no pasa
 por el backend, así que no crea ni actualiza registros de la aplicación asociados al usuario.
 Las operaciones que dependan de esos registros siguen dependiendo de ellos. Es una
-posibilidad operativa manual: cuando exista el aprovisionamiento del primer `ADMIN` de
-negocio desde la aplicación, esta vía no se reemplaza automáticamente. No asignar roles de
-negocio a service accounts (`service-account-*`).
+posibilidad operativa manual: el primer `ADMIN` de negocio se crea con el bootstrap de la
+aplicación ([`primer-admin-negocio.md`](primer-admin-negocio.md)), que no reemplaza esta vía.
+No asignar roles de negocio a service accounts (`service-account-*`).
 
 ## Validación
 

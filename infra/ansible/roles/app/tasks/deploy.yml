@@ -7,7 +7,8 @@
 #
 # Orden:
 #   .env válido → imágenes por digest → image.env → postgres + reconciliación
-#   (db_converge.yml) → [migración con la misma identidad (migrate.yml)] → backend
+#   (db_converge.yml) → [migración con la misma identidad (migrate.yml)] → backend →
+#   bootstrap del primer administrador (identity_seed_runtime.yml)
 
 # Validar que .env existe y tiene claves críticas
 - name: Verificar que .env existe
@@ -76,6 +77,19 @@
 - name: Validar y descargar imágenes propias
   ansible.builtin.include_tasks: release_images.yml
 
+# Antes de migrar o arrancar nada: con el bootstrap habilitado en .env, solo una imagen que
+# implementa el bootstrap create-only puede recibirlo (p. ej. un rollback a una anterior no)
+- name: Leer si .env tiene el bootstrap del primer administrador habilitado
+  ansible.builtin.set_fact:
+    app_deploy_identity_seed_enabled: >-
+      {{ (app_env_file.content | b64decode).splitlines()
+         | select('match', '^IDENTITY_SEED_ENABLED=true$') | list | length > 0 }}
+  no_log: true
+
+- name: Verificar que la imagen del backend admite el bootstrap del primer administrador
+  when: app_deploy_identity_seed_enabled | bool
+  ansible.builtin.include_tasks: identity_seed_image_gate.yml
+
 # image.env es la entrada de Compose: referencias exactas, nunca tags. Puede quedar con
 # un candidato fallido; el último éxito vive aparte (release_state_file) y solo lo
 # escribe record_release.yml.
@@ -117,3 +131,9 @@
     env_files:
       - ../.env
       - ../image.env
+
+# Compose recrea el backend si cambió su configuración (p. ej. el bootstrap deshabilitado
+# en .env): el contenedor resultante no debe conservar la contraseña inicial y, con el
+# bootstrap habilitado, su resultado debe ser CREATED o ALREADY_LINKED
+- name: Verificar el bootstrap del primer administrador en el backend
+  ansible.builtin.include_tasks: identity_seed_runtime.yml

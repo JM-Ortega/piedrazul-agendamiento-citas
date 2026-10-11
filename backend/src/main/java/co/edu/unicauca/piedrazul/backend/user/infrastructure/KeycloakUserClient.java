@@ -12,6 +12,7 @@ import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
 import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsException;
+import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import org.keycloak.admin.client.Keycloak;
@@ -32,6 +33,8 @@ import java.util.*;
 public class KeycloakUserClient {
 
     private static final Logger log = LoggerFactory.getLogger(KeycloakUserClient.class);
+
+    public static final String UPDATE_PASSWORD_ACTION = "UPDATE_PASSWORD";
 
     private final Keycloak keycloak;
     private final KeycloakProperties props;
@@ -117,6 +120,136 @@ public class KeycloakUserClient {
                         actorRoles,
                         MDC.get("correlationId")));
         return user;
+    }
+
+    /**
+     * Crea una cuenta nueva desactivada, con correo no verificado y una contraseña
+     * temporal que exige {@code UPDATE_PASSWORD} en el primer login. Nunca adopta una
+     * cuenta existente ni asigna roles.
+     *
+     * <p>No lanza excepciones por el resultado de Keycloak: lo clasifica para que quien
+     * orquesta distinga una cuenta propia de un intento sin efectos y de un resultado
+     * incierto (ver {@link AccountCreationResult}). No registra el cuerpo de la respuesta
+     * ni ningún dato de la cuenta.
+     */
+    @Transactional
+    public AccountCreationResult createDisabledUserWithTemporaryPassword(
+            String username,
+            String firstName,
+            String lastName,
+            String email,
+            String temporaryPassword) {
+        CredentialRepresentation credential = new CredentialRepresentation();
+        credential.setType(CredentialRepresentation.PASSWORD);
+        credential.setValue(temporaryPassword);
+        credential.setTemporary(true);
+
+        UserRepresentation user = new UserRepresentation();
+        user.setUsername(username);
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setEmail(email);
+        user.setEnabled(false);
+        user.setEmailVerified(false);
+        user.setRequiredActions(List.of(UPDATE_PASSWORD_ACTION));
+        user.setCredentials(List.of(credential));
+
+        UUID userId;
+        try (Response response = keycloak.realm(props.getRealm()).users().create(user)) {
+            int status = response.getStatus();
+
+            if (status == Response.Status.CONFLICT.getStatusCode()) {
+                return new AccountCreationResult.Conflict();
+            }
+
+            if (status >= 400 && status < 500) {
+                return new AccountCreationResult.Rejected(status);
+            }
+
+            if (status != Response.Status.CREATED.getStatusCode()) {
+                return new AccountCreationResult.Uncertain("status_" + status);
+            }
+
+            String location = response.getHeaderString("Location");
+            try {
+                userId = UUID.fromString(location.substring(location.lastIndexOf('/') + 1));
+            } catch (RuntimeException unreadable) {
+                return new AccountCreationResult.Uncertain("created_without_readable_id");
+            }
+        } catch (RuntimeException transport) {
+            return new AccountCreationResult.Uncertain(transport.getClass().getSimpleName());
+        }
+
+        String actorId = securityExtractor.currentActorId(userId.toString());
+        String actorRoles = securityExtractor.currentActorRoles(userId.toString());
+        eventPublisher.publishEvent(
+                UserCreatedEvent.of(userId.toString(), actorId, actorRoles, MDC.get("correlationId")));
+
+        return new AccountCreationResult.Created(userId);
+    }
+
+    /**
+     * La cuenta con ese id, o vacío si Keycloak responde 404. Cualquier otro error se
+     * propaga: una lectura fallida no es evidencia de que la cuenta no exista.
+     */
+    public Optional<UserRepresentation> findUserById(UUID keycloakId) {
+        try {
+            return Optional.of(keycloak.realm(props.getRealm())
+                    .users()
+                    .get(keycloakId.toString())
+                    .toRepresentation());
+        } catch (NotFoundException missing) {
+            return Optional.empty();
+        }
+    }
+
+    /** Coincidencia exacta por correo (Keycloak lo compara en minúsculas). */
+    public Optional<UserRepresentation> findUserByEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return Optional.empty();
+        }
+
+        return keycloak.realm(props.getRealm())
+                .users()
+                .searchByEmail(email, true)
+                .stream()
+                .findFirst();
+    }
+
+    /** Roles de realm efectivos (directos y compuestos) de la cuenta. */
+    public List<String> getEffectiveRealmRoles(UUID keycloakId) {
+        return keycloak.realm(props.getRealm())
+                .users()
+                .get(keycloakId.toString())
+                .roles()
+                .realmLevel()
+                .listEffective()
+                .stream()
+                .map(RoleRepresentation::getName)
+                .toList();
+    }
+
+    public boolean hasPasswordCredential(UUID keycloakId) {
+        return keycloak.realm(props.getRealm())
+                .users()
+                .get(keycloakId.toString())
+                .credentials()
+                .stream()
+                .anyMatch(credential -> CredentialRepresentation.PASSWORD.equals(credential.getType()));
+    }
+
+    /**
+     * Activa la cuenta (solo el indicador {@code enabled}; no toca roles, credenciales ni
+     * acciones requeridas). Sin evento de auditoría de paciente: no es la cuenta de uno.
+     */
+    public void enableUser(UUID keycloakId) {
+        UserResource resource = keycloak.realm(props.getRealm())
+                .users()
+                .get(keycloakId.toString());
+
+        UserRepresentation user = resource.toRepresentation();
+        user.setEnabled(true);
+        resource.update(user);
     }
 
     public List<UserRepresentation> findUsersByRole(Role role) {

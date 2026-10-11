@@ -750,11 +750,20 @@ jobs:
           MIGRATION_DB_PASSWORD: ${{ secrets.MIGRATION_DB_PASSWORD }}
           KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
           CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
-          IDENTITY_SEED_ADMIN_PASSWORD: ${{ secrets.IDENTITY_SEED_ADMIN_PASSWORD }}
           KC_BACKEND_CLIENT_SECRET: ${{ secrets.KC_BACKEND_CLIENT_SECRET }}
           KC_AUTOMATION_CLIENT_SECRET: ${{ secrets.KC_AUTOMATION_CLIENT_SECRET }}
           PIEDRAZUL_BACKEND_MAIL_SEND: ${{ secrets.PIEDRAZUL_BACKEND_MAIL_SEND }}
           NOTIFICATION_ENCRYPTION_KEY: ${{ secrets.NOTIFICATION_ENCRYPTION_KEY }}
+          # Bootstrap del primer administrador de negocio: el secreto solo se lee si está
+          # habilitado (docs/operations/runbooks/primer-admin-negocio.md)
+          IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
+          IDENTITY_SEED_ADMIN_USERNAME: ${{ vars.IDENTITY_SEED_ADMIN_USERNAME }}
+          IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE: ${{ vars.IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE }}
+          IDENTITY_SEED_ADMIN_FIRST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_FIRST_NAME }}
+          IDENTITY_SEED_ADMIN_LAST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_LAST_NAME }}
+          IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
+          IDENTITY_SEED_ADMIN_PHONE: ${{ vars.IDENTITY_SEED_ADMIN_PHONE }}
+          IDENTITY_SEED_ADMIN_PASSWORD: ${{ vars.IDENTITY_SEED_ENABLED == 'true' && secrets.IDENTITY_SEED_ADMIN_PASSWORD || '' }}
         run: |
           set -euo pipefail
           MISSING=()
@@ -767,12 +776,27 @@ jobs:
           fi
           if [ "${RUN_HOST_CONFIG}" = "true" ] || [ "${RUN_APP_DEPLOY}" = "true" ]; then
             need POSTGRES_PASSWORD APP_DB_PASSWORD MIGRATION_DB_PASSWORD KC_DB_PASSWORD \
-              CLOUDFLARE_DNS_API_TOKEN IDENTITY_SEED_ADMIN_PASSWORD \
+              CLOUDFLARE_DNS_API_TOKEN \
               PIEDRAZUL_BACKEND_MAIL_SEND NOTIFICATION_ENCRYPTION_KEY
           fi
           if [ "${RUN_HOST_CONFIG}" = "true" ]; then
             need KC_BACKEND_CLIENT_SECRET KC_AUTOMATION_CLIENT_SECRET
           fi
+          # Solo el converge escribe el .env que entrega el bootstrap al backend
+          SEED_ENABLED="${IDENTITY_SEED_ENABLED:-}"
+          case "${SEED_ENABLED,,}" in
+            "" | false) ;;
+            true)
+              if [ "${RUN_HOST_CONFIG}" = "true" ]; then
+                need IDENTITY_SEED_ADMIN_USERNAME IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE \
+                  IDENTITY_SEED_ADMIN_FIRST_NAME IDENTITY_SEED_ADMIN_LAST_NAME \
+                  IDENTITY_SEED_ADMIN_EMAIL IDENTITY_SEED_ADMIN_PHONE IDENTITY_SEED_ADMIN_PASSWORD
+              else
+                echo "::warning title=Bootstrap del primer administrador::IDENTITY_SEED_ENABLED=true sin configuración del servidor: el .env del host no cambia en este run"
+              fi
+              ;;
+            *) MISSING+=("vars.IDENTITY_SEED_ENABLED (true|false)") ;;
+          esac
 
           if [ "${#MISSING[@]}" -gt 0 ]; then
             echo "::error title=Autoridad de producción::Faltan credenciales o variables: ${MISSING[*]}"
@@ -1054,12 +1078,18 @@ jobs:
           # exige y usa una instalación nueva (P2) dentro de Ansible; fuera de P2 puede faltar.
           # Se elimina del environment tras el primer login (administrador-keycloak.md).
           KC_PLATFORM_ADMIN_INITIAL_PASSWORD: ${{ secrets.KC_PLATFORM_ADMIN_INITIAL_PASSWORD }}
+          # Bootstrap del primer administrador de negocio (un solo uso). Solo habilitado se
+          # entrega la contraseña inicial; deshabilitado el converge deja vacías las entradas
+          # en .env y recrea el backend sin ellas. El secreto se elimina del environment tras
+          # el primer login (primer-admin-negocio.md).
           IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
           IDENTITY_SEED_ADMIN_USERNAME: ${{ vars.IDENTITY_SEED_ADMIN_USERNAME }}
+          IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE: ${{ vars.IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE }}
           IDENTITY_SEED_ADMIN_FIRST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_FIRST_NAME }}
           IDENTITY_SEED_ADMIN_LAST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_LAST_NAME }}
           IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
-          IDENTITY_SEED_ADMIN_PASSWORD: ${{ secrets.IDENTITY_SEED_ADMIN_PASSWORD }}
+          IDENTITY_SEED_ADMIN_PHONE: ${{ vars.IDENTITY_SEED_ADMIN_PHONE }}
+          IDENTITY_SEED_ADMIN_PASSWORD: ${{ vars.IDENTITY_SEED_ENABLED == 'true' && secrets.IDENTITY_SEED_ADMIN_PASSWORD || '' }}
           PIEDRAZUL_BACKEND_MAIL_SEND: ${{ secrets.PIEDRAZUL_BACKEND_MAIL_SEND }}
           NOTIFICATION_ENCRYPTION_KEY: ${{ secrets.NOTIFICATION_ENCRYPTION_KEY }}
         run: |
@@ -1070,6 +1100,8 @@ jobs:
             -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
             -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
             -e "keycloak_recovery=${KEYCLOAK_RECOVERY}" \
+            -e "app_deploy_follows=${RUN_APP_DEPLOY}" \
+            -e "app_identity_seed_intended=${IDENTITY_SEED_ENABLED:-false}" \
             infra/ansible/playbooks/converge.yml
 
       - name: Verificar postgres tras converge (identidad en ejecución)
@@ -1090,7 +1122,8 @@ jobs:
             infra/ansible/playbooks/verify-release.yml
 
       # deploy.yml: postgres + reconciliación → migración (solo backend construido en este
-      # run, con su misma identidad exacta) → backend. Usa el .env que dejó converge; no
+      # run, con su misma identidad exacta) → backend → bootstrap del primer administrador
+      # (resultado si está habilitado, retiro si no). Usa el .env que dejó converge; no
       # recibe credenciales de la base. Un rollback explícito no migra: el backend valida
       # el esquema al arrancar (JPA validate). Si la migración falla, el backend candidato
       # no arranca y este paso falla antes de la verificación y del registro.
@@ -1102,12 +1135,11 @@ jobs:
           POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
           APP_MIGRATE: ${{ steps.select.outputs.backend_source == 'build' }}
           CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
+          # Solo la decisión del bootstrap, sin entradas ni secreto: deploy.yml no escribe .env;
+          # el bootstrap (y su retiro) lo aplica el .env que dejó el converge. deploy.yml falla
+          # si ese .env no corresponde a esta decisión (habilitación o retiro pendientes de la
+          # configuración del servidor) o si el backend resultante no la tiene en vigor
           IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
-          IDENTITY_SEED_ADMIN_USERNAME: ${{ vars.IDENTITY_SEED_ADMIN_USERNAME }}
-          IDENTITY_SEED_ADMIN_FIRST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_FIRST_NAME }}
-          IDENTITY_SEED_ADMIN_LAST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_LAST_NAME }}
-          IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
-          IDENTITY_SEED_ADMIN_PASSWORD: ${{ secrets.IDENTITY_SEED_ADMIN_PASSWORD }}
           PIEDRAZUL_BACKEND_MAIL_SEND: ${{ secrets.PIEDRAZUL_BACKEND_MAIL_SEND }}
           NOTIFICATION_ENCRYPTION_KEY: ${{ secrets.NOTIFICATION_ENCRYPTION_KEY }}
         run: |
@@ -1118,6 +1150,7 @@ jobs:
             -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
             -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
             -e "app_migrate=${APP_MIGRATE}" \
+            -e "app_identity_seed_intended=${IDENTITY_SEED_ENABLED:-false}" \
             infra/ansible/playbooks/deploy.yml
 
       # ── Verificación posterior ──

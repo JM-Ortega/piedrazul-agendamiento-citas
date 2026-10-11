@@ -107,6 +107,10 @@ kc_platform_admin_role: admin
 # master recién creado sin política; nunca se reaplica. Sin hashAlgorithm: se mantiene el hash
 # por defecto de Keycloak.
 kc_master_password_policy: "length(16)"
+# Bootstrap del primer ADMIN de negocio: solo se entrega habilitado a una imagen del backend con
+# esta etiqueta (backend/Dockerfile). Ver app/tasks/identity_seed_image_gate.yml.
+identity_bootstrap_image_label: org.piedrazul.identity-bootstrap
+identity_bootstrap_image_contract: create-only-v1
 # Realm de la aplicación (fuente de la forma y los roles esperados del backend)
 kc_realm_file: "{{ repo_root }}/infra/keycloak/realm/piedrazul-realm.json"
 kc_health_enabled: true
