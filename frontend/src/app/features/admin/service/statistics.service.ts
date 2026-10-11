@@ -7,6 +7,7 @@ import {
   MonthlyBreakdown,
   MonthlyTotalStat,
   DailyWorkloadStat,
+  MotivoInasistencia,
 } from '../../../shared/models/dtos/statistics.dto';
 
 /**
@@ -124,26 +125,30 @@ export class StatisticsService {
     });
   }
 
-  /** Tasa de cancelación mensual y global del año indicado. */
-  getCancellationRate(year: number): Observable<CancellationStats> {
+  /** Tasa mensual y del año de citas canceladas o con inasistencia, con su cantidad. */
+  getCancellationRate(
+    year: number,
+    motivo: MotivoInasistencia = 'CANCELADA'
+  ): Observable<CancellationStats> {
     // TODO: Conectar con endpoint de estadísticas
-    // Ruta sugerida: GET `${apiUrl}/statistics/appointments/cancellation-rate?year=${year}`
+    // Ruta sugerida: GET `${apiUrl}/statistics/appointments/cancellation-rate?year=${year}&motivo=${motivo}`
     let totalYear = 0;
-    let cancelledYear = 0;
+    let countYear = 0;
     const months = this.MONTHS.map((month) => {
-      const cancelled = this.mockCount(year, month, ['CANCELADA']);
+      const count = this.mockCount(year, month, [motivo]);
       const total = this.mockCount(year, month, this.ESTADOS_TODOS);
       totalYear += total;
-      cancelledYear += cancelled;
+      countYear += count;
       return {
         month,
-        rate: total > 0 ? Math.round((cancelled / total) * 100) : 0,
+        rate: total > 0 ? Math.round((count / total) * 100) : 0,
+        count,
       };
     });
     return of({
       months,
-      yearRate:
-        totalYear > 0 ? Math.round((cancelledYear / totalYear) * 100) : 0,
+      yearRate: totalYear > 0 ? Math.round((countYear / totalYear) * 100) : 0,
+      yearCount: countYear,
     });
   }
 

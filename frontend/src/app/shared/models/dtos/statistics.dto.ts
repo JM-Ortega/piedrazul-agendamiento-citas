@@ -22,10 +22,16 @@ export interface MonthlyCancellationStat {
   rate: number;
 }
 
+/** Motivos por los que una cita no se realiza. */
+export type MotivoInasistencia = Extract<
+  EstadoCita,
+  'CANCELADA' | 'NO_ASISTIO'
+>;
+
 export interface CancellationStats {
-  months: MonthlyCancellationStat[];
-  /** Tasa de cancelación de todo el año, en porcentaje. */
+  months: { month: number; rate: number; count: number }[];
   yearRate: number;
+  yearCount: number;
 }
 
 export type EstadoCita = 'AGENDADA' | 'ATENDIDA' | 'NO_ASISTIO' | 'CANCELADA';
