@@ -38,6 +38,8 @@ export class SelectComponent implements ControlValueAccessor {
   @Input() id = `app-select-${Math.random().toString(36).slice(2, 10)}`;
   @Input() options: SelectOption[] = [];
   @Input() placeholder = 'Seleccione...';
+  /** `false` oculta la opción vacía; el padre debe dar siempre un valor inicial. */
+  @Input() allowEmpty = true;
   @Input() loading = false;
   @Input() loadingText = 'Cargando...';
   @Input() disabled = false;
