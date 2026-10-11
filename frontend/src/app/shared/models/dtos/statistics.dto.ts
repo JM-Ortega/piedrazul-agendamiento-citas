@@ -38,7 +38,17 @@ export type EstadoCita = 'AGENDADA' | 'ATENDIDA' | 'NO_ASISTIO' | 'CANCELADA';
 /** Estados disponibles en el desplegable*/
 export type EstadoFiltro = Exclude<EstadoCita, 'CANCELADA'>;
 
+/** Nivel de carga de un médico en el día */
+export type NivelCarga = 'NORMAL' | 'ALTA' | 'SOBRECARGA' | 'SIN_CITAS';
+
 export interface DailyWorkloadStat {
   doctor: string;
   total: number;
+  level: NivelCarga;
+}
+
+export interface DailyWorkload {
+  dayTotal: number;
+  averagePerDoctor: number;
+  doctors: DailyWorkloadStat[];
 }

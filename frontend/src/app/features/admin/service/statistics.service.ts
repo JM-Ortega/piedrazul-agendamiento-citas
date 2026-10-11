@@ -6,7 +6,8 @@ import {
   EstadoFiltro,
   MonthlyBreakdown,
   MonthlyTotalStat,
-  DailyWorkloadStat,
+  DailyWorkload,
+  NivelCarga,
   MotivoInasistencia,
 } from '../../../shared/models/dtos/statistics.dto';
 
@@ -44,37 +45,45 @@ export class StatisticsService {
   /** Años con citas registradas, del más reciente al más antiguo. */
   getAvailableYears(): Observable<number[]> {
     // TODO: Conectar con endpoint de estadísticas
-    // Ruta sugerida: GET `${apiUrl}/statistics/years`
+    // GET `${apiUrl}/statistics/years`
     const current = new Date().getFullYear();
     return of([current, current - 1]);
   }
 
-  /** Total de citas por mes. Sin `estado`, incluye todos (canceladas también). */
-  getMonthlyTotals(
-    year: number,
-    estado?: EstadoFiltro
-  ): Observable<MonthlyTotalStat[]> {
+  /** Citas atendidas por mes del año indicado. */
+  getMonthlyTotals(year: number): Observable<MonthlyTotalStat[]> {
     // TODO: Conectar con endpoint de estadísticas
-    // Ruta sugerida: GET `${apiUrl}/statistics/appointments/monthly?year=${year}&estado=${estado ?? ''}`
-    const estados = estado ? [estado] : this.ESTADOS_TODOS;
+    // GET `${apiUrl}/statistics/appointments/monthly?year=${year}`
     return of(
       this.MONTHS.map((month) => ({
         month,
-        total: this.mockCount(year, month, estados),
+        total: this.mockCount(year, month, ['ATENDIDA']),
       }))
     );
   }
 
-  /** Citas agendadas y atendidas por médico en una fecha (YYYY-MM-DD). */
-  getDailyWorkload(date: string): Observable<DailyWorkloadStat[]> {
+  /** Carga diaria por médico en una fecha (YYYY-MM-DD), con total, promedio y nivel. */
+  getDailyWorkload(date: string): Observable<DailyWorkload> {
     // TODO: Conectar con endpoint de estadísticas
-    // Ruta sugerida: GET `${apiUrl}/statistics/appointments/daily-workload?date=${date}`
-    return of(
-      this.MOCK_DOCTORS.map((d) => ({
-        doctor: d.name,
-        total: this.mockDailyCount(date, d.name),
-      }))
-    );
+    // GET `${apiUrl}/statistics/appointments/daily-workload?date=${date}`
+    const counts = this.MOCK_DOCTORS.map((d) => ({
+      doctor: d.name,
+      total: this.mockDailyCount(date, d.name),
+    }));
+    const withAppts = counts.filter((c) => c.total > 0);
+    const dayTotal = counts.reduce((sum, c) => sum + c.total, 0);
+    const average =
+      withAppts.length > 1
+        ? Math.round((dayTotal / withAppts.length) * 10) / 10
+        : 0;
+    return of({
+      dayTotal,
+      averagePerDoctor: average,
+      doctors: counts.map((c) => ({
+        ...c,
+        level: this.mockLoadLevel(c.total, average),
+      })),
+    });
   }
 
   /** Citas por médico y por mes. Sin `estado`, suma todos menos canceladas. */
@@ -83,7 +92,7 @@ export class StatisticsService {
     estado?: EstadoFiltro
   ): Observable<MonthlyBreakdown> {
     // TODO: Conectar con endpoint de estadísticas
-    // Ruta sugerida: GET `${apiUrl}/statistics/appointments/by-doctor?year=${year}&estado=${estado ?? ''}`
+    // GET `${apiUrl}/statistics/appointments/by-doctor?year=${year}&estado=${estado ?? ''}`
     const estados = estado ? [estado] : this.ESTADOS_AGENDADA_ATENDIDA;
     return of({
       series: this.MOCK_DOCTORS.map((d) => d.name),
@@ -105,7 +114,7 @@ export class StatisticsService {
     estado?: EstadoFiltro
   ): Observable<MonthlyBreakdown> {
     // TODO: Conectar con endpoint de estadísticas
-    // Ruta sugerida: GET `${apiUrl}/statistics/appointments/by-specialty?year=${year}&estado=${estado ?? ''}`
+    // GET `${apiUrl}/statistics/appointments/by-specialty?year=${year}&estado=${estado ?? ''}`
     const estados = estado ? [estado] : this.ESTADOS_AGENDADA_ATENDIDA;
     const specialties = [...new Set(this.MOCK_DOCTORS.map((d) => d.specialty))];
     return of({
@@ -153,6 +162,14 @@ export class StatisticsService {
   }
 
   // ── MOCK: helpers (eliminar al conectar el backend) ───────────────────────
+  private mockLoadLevel(total: number, avg: number): NivelCarga {
+    if (total === 0) return 'SIN_CITAS';
+    if (avg === 0) return 'NORMAL';
+    if (total >= avg * 2) return 'SOBRECARGA';
+    if (total > avg * 1.3) return 'ALTA';
+    return 'NORMAL';
+  }
+
   private mockIsFuture(year: number, month: number): boolean {
     const now = new Date();
     return (
