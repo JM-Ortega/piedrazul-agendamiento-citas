@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.port.output;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.DoctorDailyCount;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyGroupCount;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyStateCount;
 
@@ -51,4 +52,6 @@ public interface AppointmentRepository {
     List<MonthlyGroupCount> countByMonthAndSpecialty(int year, Collection<AppointmentState> states);
 
     List<MonthlyStateCount> countByMonthAndState(int year);
+
+    List<DoctorDailyCount> countByDateGroupedByDoctorExcludingState(LocalDate date, AppointmentState excludedState);
 }

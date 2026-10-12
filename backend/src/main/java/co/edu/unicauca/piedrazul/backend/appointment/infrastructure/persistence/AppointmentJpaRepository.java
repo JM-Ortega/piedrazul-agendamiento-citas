@@ -63,4 +63,13 @@ public interface AppointmentJpaRepository extends JpaRepository<AppointmentEntit
             group by extract(month from a.date), a.appointmentState
             """)
     List<MonthlyStateCountView> countByMonthAndState(@Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    @Query("""
+            select a.idDoctor as doctorId, count(a) as total
+            from AppointmentEntity a
+            where a.date = :date and a.appointmentState <> :excludedState
+            group by a.idDoctor
+            """)
+    List<DoctorDailyCountView> countByDateGroupedByDoctorExcludingState(@Param("date") LocalDate date,
+                                                                        @Param("excludedState") AppointmentState excludedState);
 }

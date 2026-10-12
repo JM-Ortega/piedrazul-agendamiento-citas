@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.DoctorDailyCount;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyGroupCount;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyStateCount;
 
@@ -215,6 +216,13 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     public List<MonthlyStateCount> countByMonthAndState(int year) {
         return jpaRepository.countByMonthAndState(startOf(year), startOf(year + 1)).stream()
                 .map(v -> new MonthlyStateCount(v.getMonthNumber() - 1, v.getState(), v.getTotal()))
+                .toList();
+    }
+
+    @Override
+    public List<DoctorDailyCount> countByDateGroupedByDoctorExcludingState(LocalDate date, AppointmentState excludedState) {
+        return jpaRepository.countByDateGroupedByDoctorExcludingState(date, excludedState).stream()
+                .map(v -> new DoctorDailyCount(v.getDoctorId(), v.getTotal()))
                 .toList();
     }
 
