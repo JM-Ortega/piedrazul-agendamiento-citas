@@ -19,6 +19,15 @@ import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.DoctorsAvaila
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.ScheduleAvailability;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.shared.enums.Workday;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.StatisticDimension;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAppointmentStatisticsUseCase;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.InvalidStatisticsStateException;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.DoctorAppointmentsCountDto;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.DoctorDailyCountDto;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.MonthlyCancellationDataDto;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.MonthlyTotalAppointmentDto;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.SpecialtyAppointmentsCountDto;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.StatisticsDtoMapper;
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
@@ -40,17 +49,20 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
     private final IsNewPatientUseCase isNewPatientUseCase;
     private final PatientConsultPort patientConsultPort;
     private final BusySlotService busySlotService;
+    private final GetAppointmentStatisticsUseCase getAppointmentStatisticsUseCase;
 
     public AppointmentExternalServiceImpl(AppointmentRepository appointmentRepository,
             DoctorConfigConsultPort doctorConfigConsultPort,
             GetAvailableDatesAndSlotsUseCase getAvailableDatesAndSlotsUseCase, IsNewPatientUseCase isNewPatientUseCase,
-            PatientConsultPort patientConsultPort, BusySlotService busySlotService) {
+            PatientConsultPort patientConsultPort, BusySlotService busySlotService,
+            GetAppointmentStatisticsUseCase getAppointmentStatisticsUseCase) {
         this.appointmentRepository = appointmentRepository;
         this.doctorConfigConsultPort = doctorConfigConsultPort;
         this.getAvailableDatesAndSlotsUseCase = getAvailableDatesAndSlotsUseCase;
         this.isNewPatientUseCase = isNewPatientUseCase;
         this.patientConsultPort = patientConsultPort;
         this.busySlotService = busySlotService;
+        this.getAppointmentStatisticsUseCase = getAppointmentStatisticsUseCase;
     }
 
     @Override
@@ -253,5 +265,41 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
     private boolean isWeekday(LocalDate date) {
         return date.getDayOfWeek() != DayOfWeek.SATURDAY
                 && date.getDayOfWeek() != DayOfWeek.SUNDAY;
+    }
+
+    @Override
+    public DoctorAppointmentsCountDto getAppointmentsCountByDoctor(int year, String state) {
+        return StatisticsDtoMapper.toDoctorDto(getAppointmentStatisticsUseCase
+                .getMonthlyBreakdown(year, StatisticDimension.DOCTOR, parseState(state)));
+    }
+
+    @Override
+    public List<MonthlyTotalAppointmentDto> getAttendedAppointmentsCountByMonth(int year) {
+        return StatisticsDtoMapper.toMonthlyTotals(getAppointmentStatisticsUseCase.getMonthlyStateCounts(year));
+    }
+
+    @Override
+    public SpecialtyAppointmentsCountDto getAppointmentsCountBySpecialty(int year, String state) {
+        return StatisticsDtoMapper.toSpecialtyDto(getAppointmentStatisticsUseCase
+                .getMonthlyBreakdown(year, StatisticDimension.SPECIALTY, parseState(state)));
+    }
+
+    @Override
+    public List<MonthlyCancellationDataDto> getCancellationData(int year, String state) {
+        AppointmentState parsed = state == null ? null : parseState(state);
+        return StatisticsDtoMapper.toCancellationData(getAppointmentStatisticsUseCase.getMonthlyStateCounts(year), parsed);
+    }
+
+    @Override
+    public List<DoctorDailyCountDto> getDoctorsAppointmentCountByDate(LocalDate date) {
+        return StatisticsDtoMapper.toDoctorDailyCountDtos(getAppointmentStatisticsUseCase.getDoctorDailyCounts(date));
+    }
+
+    private AppointmentState parseState(String state) {
+        try {
+            return state == null ? null : AppointmentState.valueOf(state.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new InvalidStatisticsStateException(state);
+        }
     }
 }

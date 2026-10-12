@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.DoctorDailyCount;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyBreakdown;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyStateCounts;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.*;
@@ -39,12 +40,21 @@ public final class StatisticsDtoMapper {
                 .toList();
     }
 
-    public static List<MonthlyCancellationDataDto> toCancellationData(List<MonthlyStateCounts> counts) {
+    /** @param state si es null, count = CANCELADA + NO_ASISTIO */
+    public static List<MonthlyCancellationDataDto> toCancellationData(List<MonthlyStateCounts> counts, AppointmentState state) {
         return counts.stream()
                 .map(c -> new MonthlyCancellationDataDto(
                         c.month(),
                         c.counts().values().stream().mapToInt(Integer::intValue).sum(),
-                        count(c, AppointmentState.CANCELADA)))
+                        state != null
+                                ? count(c, state)
+                                : count(c, AppointmentState.CANCELADA) + count(c, AppointmentState.NO_ASISTIO)))
+                .toList();
+    }
+
+    public static List<DoctorDailyCountDto> toDoctorDailyCountDtos(List<DoctorDailyCount> counts) {
+        return counts.stream()
+                .map(c -> new DoctorDailyCountDto(c.doctorId(), Math.toIntExact(c.total())))
                 .toList();
     }
 
