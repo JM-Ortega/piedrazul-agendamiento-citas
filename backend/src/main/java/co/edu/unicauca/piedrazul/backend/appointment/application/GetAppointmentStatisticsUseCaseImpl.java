@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.appointment.application;
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.DoctorDailyCount;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyBreakdown;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyBreakdown.MonthlyRow;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyGroupCount;
@@ -9,8 +10,11 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.Mon
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.StatisticDimension;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAppointmentStatisticsUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.InvalidStatisticsDateException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.InvalidStatisticsStateException;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.InvalidStatisticsYearException;
 
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.IntStream;
 
@@ -18,8 +22,6 @@ public class GetAppointmentStatisticsUseCaseImpl implements GetAppointmentStatis
 
     private static final int MIN_YEAR = 2000;
     private static final int MAX_YEAR = 2100;
-    private static final List<AppointmentState> DEFAULT_STATES =
-            List.of(AppointmentState.AGENDADA, AppointmentState.ATENDIDA);
 
     private final AppointmentRepository appointmentRepository;
 
@@ -32,7 +34,7 @@ public class GetAppointmentStatisticsUseCaseImpl implements GetAppointmentStatis
         validateYear(year);
         Objects.requireNonNull(dimension, "dimension is required");
 
-        List<AppointmentState> states = state == null ? DEFAULT_STATES : List.of(state);
+        List<AppointmentState> states = resolveStates(state);
 
         List<MonthlyGroupCount> counts = switch (dimension) {
             case DOCTOR -> appointmentRepository.countByMonthAndDoctor(year, states);
@@ -79,6 +81,28 @@ public class GetAppointmentStatisticsUseCaseImpl implements GetAppointmentStatis
                     return new MonthlyStateCounts(month, counts);
                 })
                 .toList();
+    }
+
+    @Override
+    public List<DoctorDailyCount> getDoctorDailyCounts(LocalDate date) {
+        if (date == null) {
+            throw new InvalidStatisticsDateException();
+        }
+        return appointmentRepository.countByDateGroupedByDoctorExcludingState(date, AppointmentState.CANCELADA).stream()
+                // Por String, no por UUID.compareTo (que compara con signo y desordena respecto a la BD/UI)
+                .sorted(Comparator.comparing(c -> c.doctorId().toString()))
+                .toList();
+    }
+
+    /** "Agendadas" = toda cita que alguna vez se agendó, es decir, todas las del sistema sin filtrar estado. */
+    private List<AppointmentState> resolveStates(AppointmentState state) {
+        if (state == AppointmentState.AGENDADA) {
+            return List.of(AppointmentState.values());
+        }
+        if (state == AppointmentState.ATENDIDA) {
+            return List.of(state);
+        }
+        throw new InvalidStatisticsStateException(String.valueOf(state));
     }
 
     private void validateYear(int year) {
