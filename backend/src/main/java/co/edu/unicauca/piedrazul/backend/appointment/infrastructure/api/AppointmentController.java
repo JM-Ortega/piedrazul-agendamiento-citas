@@ -150,18 +150,22 @@ public class AppointmentController {
         UUID userId = UUID.fromString(jwt.getSubject());
 
         if (hasRole(authentication, "SCHEDULER")) {
-            // Sin restricción
+            // sin restricción
+        } else if (hasRole(authentication, "DOCTOR")) {
+            if (request.getIdPatient() == null) {
+                // sin paciente: solo ve sus propias citas, ignora cualquier idDoctor que llegue
+                UUID idDoctor = doctorConfigConsultPort.findByUserId(userId)
+                        .orElseThrow(() -> new DoctorConfigInconsistentException(
+                                "Doctor no encontrado para el userId: " + userId));
+                request.setIdDoctor(idDoctor);
+            }
+            // con paciente: ve las citas de ese paciente con cualquier doctor
         } else if (hasRole(authentication, "PATIENT")) {
             UUID idPatient = patientConsultPort.findByUserId(userId)
                     .map(PatientSnapshot::idPatient)
                     .orElseThrow(() -> new AppointmentPatientNotFoundException(
                             "Paciente no encontrado para el userId: " + userId));
             request.setIdPatient(idPatient);
-        } else if (hasRole(authentication, "DOCTOR")) {
-            UUID idDoctor = doctorConfigConsultPort.findByUserId(userId)
-                    .orElseThrow(() -> new DoctorConfigInconsistentException(
-                            "Doctor no encontrado para el userId: " + userId));
-            request.setIdDoctor(idDoctor);
         }
 
         PageQuery pageQuery = request.toPageQuery();

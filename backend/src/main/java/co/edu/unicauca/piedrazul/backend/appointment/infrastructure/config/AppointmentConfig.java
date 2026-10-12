@@ -180,4 +180,8 @@ public class AppointmentConfig {
         return new CheckExistenceByDocAndStateUseCaseImpl(appointmentRepository);
     }
 
+    @Bean
+    public GetAppointmentStatisticsUseCase getAppointmentStatisticsUseCase(AppointmentRepository appointmentRepository) {
+        return new GetAppointmentStatisticsUseCaseImpl(appointmentRepository);
+    }
 }

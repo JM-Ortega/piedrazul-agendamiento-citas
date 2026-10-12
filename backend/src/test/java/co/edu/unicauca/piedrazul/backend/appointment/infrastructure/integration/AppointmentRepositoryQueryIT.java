@@ -6,6 +6,9 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTim
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PageQuery;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PagedResult;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.DoctorDailyCount;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyGroupCount;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyStateCount;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
@@ -22,6 +25,7 @@ import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 import co.edu.unicauca.piedrazul.backend.user.application.KeycloakUserService;
 import co.edu.unicauca.piedrazul.backend.user.application.PersonExternalServiceImp;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -234,6 +238,194 @@ class AppointmentRepositoryQueryIT extends PostgresIntegrationSupport {
 
             assertThat(result.content()).extracting(Appointment::getIdAppointment)
                     .containsExactly(inScope.getIdAppointment());
+        }
+    }
+
+    /**
+     * Estadísticas mensuales: valida el JPQL con {@code extract(month ...)}, los alias de las
+     * proyecciones y el mapeo (UUID / enum como Object en groupKey, mes 0-based).
+     *
+     * <p>Se usa un año lejano porque otras IT confirman citas relativas a {@code LocalDate.now()} y
+     * contaminarían los conteos del año en curso (el rollback de este test no las toca).
+     */
+    @Nested
+    class MonthlyStatisticsTests {
+
+        private static final int YEAR = 2040;
+        private static final List<AppointmentState> ALL_STATES = List.of(AppointmentState.values());
+
+        private UUID doctor1;
+        private UUID doctor2;
+
+        @BeforeEach
+        void seed() {
+            doctor1 = newDoctor();
+            doctor2 = newDoctor();
+            seedAppointment(doctor1, LocalDate.of(YEAR, 1, 15), 8, AppointmentState.ATENDIDA, SpecialtyCode.FISIOTERAPIA);
+            seedAppointment(doctor1, LocalDate.of(YEAR, 1, 20), 9, AppointmentState.CANCELADA, SpecialtyCode.FISIOTERAPIA);
+            seedAppointment(doctor2, LocalDate.of(YEAR, 1, 31), 10, AppointmentState.ATENDIDA, SpecialtyCode.TERAPIA_NEURAL);
+            seedAppointment(doctor1, LocalDate.of(YEAR, 2, 1), 11, AppointmentState.NO_ASISTIO, SpecialtyCode.TERAPIA_NEURAL);
+            seedAppointment(doctor2, LocalDate.of(YEAR, 12, 31), 8, AppointmentState.AGENDADA, SpecialtyCode.FISIOTERAPIA);
+            seedAppointment(doctor2, LocalDate.of(YEAR, 3, 10), 9, AppointmentState.REPROGRAMADA, SpecialtyCode.FISIOTERAPIA);
+            // fuera del año: 31-dic del año anterior y 1-ene del siguiente
+            seedAppointment(doctor1, LocalDate.of(YEAR - 1, 12, 31), 10, AppointmentState.ATENDIDA, SpecialtyCode.FISIOTERAPIA);
+            seedAppointment(doctor2, LocalDate.of(YEAR + 1, 1, 1), 11, AppointmentState.ATENDIDA, SpecialtyCode.TERAPIA_NEURAL);
+        }
+
+        private void seedAppointment(UUID doctor, LocalDate date, int hour, AppointmentState state,
+                SpecialtyCode specialty) {
+            save(doctor, newPatient(), date, LocalTime.of(hour, 0), state, specialty);
+        }
+
+        @Test
+        void countByMonthAndDoctorShouldGroupAllStatesByZeroBasedMonthAndDoctor() {
+            List<MonthlyGroupCount> result = appointmentRepository.countByMonthAndDoctor(YEAR, ALL_STATES);
+
+            assertThat(result).containsExactlyInAnyOrder(
+                    new MonthlyGroupCount(0, doctor1.toString(), 2),
+                    new MonthlyGroupCount(0, doctor2.toString(), 1),
+                    new MonthlyGroupCount(1, doctor1.toString(), 1),
+                    new MonthlyGroupCount(2, doctor2.toString(), 1),
+                    new MonthlyGroupCount(11, doctor2.toString(), 1));
+        }
+
+        @Test
+        void countByMonthAndDoctorShouldFilterByStates() {
+            List<MonthlyGroupCount> result = appointmentRepository.countByMonthAndDoctor(
+                    YEAR, List.of(AppointmentState.ATENDIDA));
+
+            assertThat(result).containsExactlyInAnyOrder(
+                    new MonthlyGroupCount(0, doctor1.toString(), 1),
+                    new MonthlyGroupCount(0, doctor2.toString(), 1));
+        }
+
+        @Test
+        void countByMonthAndSpecialtyShouldGroupAllStatesByZeroBasedMonthAndSpecialty() {
+            List<MonthlyGroupCount> result = appointmentRepository.countByMonthAndSpecialty(YEAR, ALL_STATES);
+
+            assertThat(result).containsExactlyInAnyOrder(
+                    new MonthlyGroupCount(0, "FISIOTERAPIA", 2),
+                    new MonthlyGroupCount(0, "TERAPIA_NEURAL", 1),
+                    new MonthlyGroupCount(1, "TERAPIA_NEURAL", 1),
+                    new MonthlyGroupCount(2, "FISIOTERAPIA", 1),
+                    new MonthlyGroupCount(11, "FISIOTERAPIA", 1));
+        }
+
+        @Test
+        void countByMonthAndSpecialtyShouldFilterByStates() {
+            List<MonthlyGroupCount> result = appointmentRepository.countByMonthAndSpecialty(
+                    YEAR, List.of(AppointmentState.ATENDIDA));
+
+            assertThat(result).containsExactlyInAnyOrder(
+                    new MonthlyGroupCount(0, "FISIOTERAPIA", 1),
+                    new MonthlyGroupCount(0, "TERAPIA_NEURAL", 1));
+        }
+
+        @Test
+        void countByMonthAndStateShouldGroupEveryStateByZeroBasedMonth() {
+            List<MonthlyStateCount> result = appointmentRepository.countByMonthAndState(YEAR);
+
+            assertThat(result).containsExactlyInAnyOrder(
+                    new MonthlyStateCount(0, AppointmentState.ATENDIDA, 2),
+                    new MonthlyStateCount(0, AppointmentState.CANCELADA, 1),
+                    new MonthlyStateCount(1, AppointmentState.NO_ASISTIO, 1),
+                    new MonthlyStateCount(2, AppointmentState.REPROGRAMADA, 1),
+                    new MonthlyStateCount(11, AppointmentState.AGENDADA, 1));
+        }
+
+        @Test
+        void shouldLeaveAppointmentsOfAdjacentYearsOutOfTheRange() {
+            // 31-dic del año anterior cae en diciembre (mes 11) SOLO de ese año, no del consultado
+            assertThat(appointmentRepository.countByMonthAndState(YEAR - 1))
+                    .containsExactly(new MonthlyStateCount(11, AppointmentState.ATENDIDA, 1));
+            // 1-ene del año siguiente cae en enero (mes 0) SOLO de ese año
+            assertThat(appointmentRepository.countByMonthAndState(YEAR + 1))
+                    .containsExactly(new MonthlyStateCount(0, AppointmentState.ATENDIDA, 1));
+            assertThat(appointmentRepository.countByMonthAndDoctor(YEAR - 1, ALL_STATES))
+                    .containsExactly(new MonthlyGroupCount(11, doctor1.toString(), 1));
+            assertThat(appointmentRepository.countByMonthAndSpecialty(YEAR + 1, ALL_STATES))
+                    .containsExactly(new MonthlyGroupCount(0, "TERAPIA_NEURAL", 1));
+        }
+
+        @Test
+        void shouldReturnNothingForAYearWithoutAppointments() {
+            assertThat(appointmentRepository.countByMonthAndState(YEAR + 5)).isEmpty();
+            assertThat(appointmentRepository.countByMonthAndDoctor(YEAR + 5, ALL_STATES)).isEmpty();
+            assertThat(appointmentRepository.countByMonthAndSpecialty(YEAR + 5, ALL_STATES)).isEmpty();
+        }
+    }
+
+    /**
+     * Conteo diario por doctor excluyendo un estado: valida el JPQL ({@code <> :excludedState},
+     * group by) y el mapeo de la proyección con UUID. Fechas lejanas para no chocar con otras IT.
+     */
+    @Nested
+    class DoctorDailyCountsTests {
+
+        private static final LocalDate DAY = LocalDate.of(2040, 3, 15);
+
+        private UUID doctor1;
+        private UUID doctor2;
+        private UUID doctor3;
+        private UUID doctor4;
+
+        @BeforeEach
+        void seed() {
+            doctor1 = newDoctor();
+            doctor2 = newDoctor();
+            doctor3 = newDoctor();
+            doctor4 = newDoctor();
+            seedAppointment(doctor1, DAY, 8, AppointmentState.AGENDADA);
+            seedAppointment(doctor1, DAY, 9, AppointmentState.ATENDIDA);
+            seedAppointment(doctor1, DAY, 10, AppointmentState.CANCELADA);
+            seedAppointment(doctor2, DAY, 8, AppointmentState.CANCELADA);
+            seedAppointment(doctor3, DAY, 8, AppointmentState.NO_ASISTIO);
+            seedAppointment(doctor3, DAY, 9, AppointmentState.REPROGRAMADA);
+            seedAppointment(doctor3, DAY, 10, AppointmentState.ATENDIDA);
+            // otras fechas: no deben contarse
+            seedAppointment(doctor1, DAY.plusDays(1), 8, AppointmentState.ATENDIDA);
+            seedAppointment(doctor4, DAY.minusDays(1), 8, AppointmentState.AGENDADA);
+        }
+
+        private void seedAppointment(UUID doctor, LocalDate date, int hour, AppointmentState state) {
+            save(doctor, newPatient(), date, LocalTime.of(hour, 0), state, SpecialtyCode.FISIOTERAPIA);
+        }
+
+        @Test
+        void shouldCountPerDoctorExcludingTheGivenStateAndOmitDoctorsWithoutRemainingAppointments() {
+            List<DoctorDailyCount> result =
+                    appointmentRepository.countByDateGroupedByDoctorExcludingState(DAY, AppointmentState.CANCELADA);
+
+            // doctor2 (solo una CANCELADA) y doctor4 (otra fecha) no aparecen
+            assertThat(result).containsExactlyInAnyOrder(
+                    new DoctorDailyCount(doctor1, 2),
+                    new DoctorDailyCount(doctor3, 3));
+        }
+
+        @Test
+        void shouldOnlyCountAppointmentsOfTheRequestedDate() {
+            assertThat(appointmentRepository.countByDateGroupedByDoctorExcludingState(
+                    DAY.plusDays(1), AppointmentState.CANCELADA))
+                    .containsExactly(new DoctorDailyCount(doctor1, 1));
+            assertThat(appointmentRepository.countByDateGroupedByDoctorExcludingState(
+                    DAY.minusDays(1), AppointmentState.CANCELADA))
+                    .containsExactly(new DoctorDailyCount(doctor4, 1));
+        }
+
+        @Test
+        void shouldReturnNothingForADateWithoutAppointments() {
+            assertThat(appointmentRepository.countByDateGroupedByDoctorExcludingState(
+                    DAY.plusDays(2), AppointmentState.CANCELADA)).isEmpty();
+        }
+
+        @Test
+        void shouldApplyTheExcludedStateReceivedAsParameter() {
+            // Excluyendo ATENDIDA en vez de CANCELADA: el estado no está fijo en el JPQL
+            assertThat(appointmentRepository.countByDateGroupedByDoctorExcludingState(
+                    DAY, AppointmentState.ATENDIDA)).containsExactlyInAnyOrder(
+                    new DoctorDailyCount(doctor1, 2),
+                    new DoctorDailyCount(doctor2, 1),
+                    new DoctorDailyCount(doctor3, 2));
         }
     }
 

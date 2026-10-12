@@ -8,12 +8,24 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAvailableDatesAndSlotsUseCase;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetAppointmentStatisticsUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.BusySlotService;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.DoctorDailyCount;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyBreakdown;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyStateCounts;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.StatisticDimension;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.InvalidStatisticsDateException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.InvalidStatisticsStateException;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.NoAvailableDoctorsException;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.DoctorAppointmentsCountDto;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.DoctorDailyCountDto;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.MonthlyCancellationDataDto;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.MonthlyTotalAppointmentDto;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.SpecialtyAppointmentsCountDto;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSummary;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.SchedulerAppointmentSummary;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.DoctorsAvailability;
@@ -30,10 +42,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -57,6 +71,8 @@ class AppointmentExternalServiceImplTest {
     private IsNewPatientUseCase isNewPatientUseCase;
     @Mock
     private PatientConsultPort patientConsultPort;
+    @Mock
+    private GetAppointmentStatisticsUseCase getAppointmentStatisticsUseCase;
 
     private AppointmentExternalServiceImpl service;
 
@@ -65,7 +81,7 @@ class AppointmentExternalServiceImplTest {
         // BusySlotService es lógica de dominio pura sin dependencias externas
         service = new AppointmentExternalServiceImpl(
                 appointmentRepository, doctorConfigConsultPort, getAvailableDatesAndSlotsUseCase,
-                isNewPatientUseCase, patientConsultPort, new BusySlotService());
+                isNewPatientUseCase, patientConsultPort, new BusySlotService(), getAppointmentStatisticsUseCase);
     }
 
     @Nested
@@ -308,6 +324,166 @@ class AppointmentExternalServiceImplTest {
             Set<UUID> result = service.calculateDoctorsAvailability(List.of(availableDoctor, busyDoctor));
 
             assertThat(result).containsExactly(availableDoctorId);
+        }
+    }
+
+    @Nested
+    class StatisticsTests {
+
+        private final UUID doctorId = UUID.randomUUID();
+
+        private MonthlyBreakdown doctorBreakdown() {
+            List<MonthlyBreakdown.MonthlyRow> rows = IntStream.range(0, 12)
+                    .mapToObj(m -> new MonthlyBreakdown.MonthlyRow(m, Map.of(doctorId.toString(), m == 0 ? 2 : 0)))
+                    .toList();
+            return new MonthlyBreakdown(List.of(doctorId.toString()), rows);
+        }
+
+        private MonthlyBreakdown specialtyBreakdown() {
+            List<MonthlyBreakdown.MonthlyRow> rows = IntStream.range(0, 12)
+                    .mapToObj(m -> new MonthlyBreakdown.MonthlyRow(m, Map.of("FISIOTERAPIA", m == 0 ? 2 : 0)))
+                    .toList();
+            return new MonthlyBreakdown(List.of("FISIOTERAPIA"), rows);
+        }
+
+        private List<MonthlyStateCounts> stateCounts() {
+            return IntStream.range(0, 12)
+                    .mapToObj(m -> new MonthlyStateCounts(m, new EnumMap<>(Map.of(
+                            AppointmentState.ATENDIDA, m == 0 ? 2 : 0,
+                            AppointmentState.CANCELADA, m == 0 ? 1 : 0))))
+                    .toList();
+        }
+
+        @Test
+        void getAppointmentsCountByDoctorShouldDelegateWithDoctorDimensionAndMapUuidKeys() {
+            when(getAppointmentStatisticsUseCase.getMonthlyBreakdown(
+                    2026, StatisticDimension.DOCTOR, AppointmentState.AGENDADA)).thenReturn(doctorBreakdown());
+
+            DoctorAppointmentsCountDto result = service.getAppointmentsCountByDoctor(2026, "AGENDADA");
+
+            assertThat(result.doctorIds()).containsExactly(doctorId);
+            assertThat(result.rows()).hasSize(12);
+            assertThat(result.rows().getFirst().values()).containsEntry(doctorId, 2);
+            verify(getAppointmentStatisticsUseCase).getMonthlyBreakdown(
+                    2026, StatisticDimension.DOCTOR, AppointmentState.AGENDADA);
+        }
+
+        @Test
+        void getAppointmentsCountByDoctorShouldParseStateIgnoringCaseAndSurroundingSpaces() {
+            when(getAppointmentStatisticsUseCase.getMonthlyBreakdown(
+                    2026, StatisticDimension.DOCTOR, AppointmentState.ATENDIDA)).thenReturn(doctorBreakdown());
+
+            service.getAppointmentsCountByDoctor(2026, "atendida ");
+
+            verify(getAppointmentStatisticsUseCase).getMonthlyBreakdown(
+                    2026, StatisticDimension.DOCTOR, AppointmentState.ATENDIDA);
+        }
+
+        @Test
+        void getAppointmentsCountByDoctorShouldThrowWhenStateIsUnknown() {
+            assertThatThrownBy(() -> service.getAppointmentsCountByDoctor(2026, "xyz"))
+                    .isInstanceOf(InvalidStatisticsStateException.class);
+
+            verifyNoInteractions(getAppointmentStatisticsUseCase);
+        }
+
+        @Test
+        void getAppointmentsCountByDoctorShouldDelegateNullStateToUseCaseWhichRejectsIt() {
+            // null no se rechaza en el parseo: lo rechaza el caso de uso (estado obligatorio en by-doctor)
+            when(getAppointmentStatisticsUseCase.getMonthlyBreakdown(2026, StatisticDimension.DOCTOR, null))
+                    .thenThrow(new InvalidStatisticsStateException("null"));
+
+            assertThatThrownBy(() -> service.getAppointmentsCountByDoctor(2026, null))
+                    .isInstanceOf(InvalidStatisticsStateException.class);
+        }
+
+        @Test
+        void getAppointmentsCountBySpecialtyShouldDelegateWithSpecialtyDimensionAndMapSpecialtyKeys() {
+            when(getAppointmentStatisticsUseCase.getMonthlyBreakdown(
+                    2026, StatisticDimension.SPECIALTY, AppointmentState.ATENDIDA)).thenReturn(specialtyBreakdown());
+
+            SpecialtyAppointmentsCountDto result = service.getAppointmentsCountBySpecialty(2026, " Atendida");
+
+            assertThat(result.specialtys()).containsExactly(SpecialtyCode.FISIOTERAPIA);
+            assertThat(result.rows().getFirst().values()).containsEntry(SpecialtyCode.FISIOTERAPIA, 2);
+            verify(getAppointmentStatisticsUseCase).getMonthlyBreakdown(
+                    2026, StatisticDimension.SPECIALTY, AppointmentState.ATENDIDA);
+        }
+
+        @Test
+        void getAppointmentsCountBySpecialtyShouldThrowWhenStateIsUnknown() {
+            assertThatThrownBy(() -> service.getAppointmentsCountBySpecialty(2026, "xyz"))
+                    .isInstanceOf(InvalidStatisticsStateException.class);
+
+            verifyNoInteractions(getAppointmentStatisticsUseCase);
+        }
+
+        @Test
+        void getAttendedAppointmentsCountByMonthShouldReturnOnlyAttendedCountsPerMonth() {
+            when(getAppointmentStatisticsUseCase.getMonthlyStateCounts(2026)).thenReturn(stateCounts());
+
+            List<MonthlyTotalAppointmentDto> result = service.getAttendedAppointmentsCountByMonth(2026);
+
+            assertThat(result).hasSize(12);
+            assertThat(result.getFirst()).isEqualTo(new MonthlyTotalAppointmentDto(0, 2));
+            assertThat(result.subList(1, 12)).allMatch(r -> r.total() == 0);
+        }
+
+        @Test
+        void getCancellationDataShouldCountCanceladaPlusNoAsistioWhenStateIsNull() {
+            when(getAppointmentStatisticsUseCase.getMonthlyStateCounts(2026)).thenReturn(stateCounts());
+
+            List<MonthlyCancellationDataDto> result = service.getCancellationData(2026, null);
+
+            assertThat(result.getFirst()).isEqualTo(new MonthlyCancellationDataDto(0, 3, 1));
+        }
+
+        @Test
+        void getCancellationDataShouldParseStateIgnoringCaseAndSurroundingSpaces() {
+            when(getAppointmentStatisticsUseCase.getMonthlyStateCounts(2026)).thenReturn(stateCounts());
+
+            List<MonthlyCancellationDataDto> result = service.getCancellationData(2026, " atendida ");
+
+            assertThat(result.getFirst()).isEqualTo(new MonthlyCancellationDataDto(0, 3, 2));
+        }
+
+        @Test
+        void getCancellationDataShouldThrowWhenStateIsUnknown() {
+            assertThatThrownBy(() -> service.getCancellationData(2026, "xyz"))
+                    .isInstanceOf(InvalidStatisticsStateException.class);
+
+            verifyNoInteractions(getAppointmentStatisticsUseCase);
+        }
+
+        @Test
+        void getDoctorsAppointmentCountByDateShouldDelegateToUseCaseAndMapToDtos() {
+            LocalDate date = LocalDate.of(2040, 3, 15);
+            UUID otherDoctorId = UUID.randomUUID();
+            when(getAppointmentStatisticsUseCase.getDoctorDailyCounts(date)).thenReturn(List.of(
+                    new DoctorDailyCount(doctorId, 2), new DoctorDailyCount(otherDoctorId, 3)));
+
+            List<DoctorDailyCountDto> result = service.getDoctorsAppointmentCountByDate(date);
+
+            assertThat(result).containsExactly(
+                    new DoctorDailyCountDto(doctorId, 2), new DoctorDailyCountDto(otherDoctorId, 3));
+            verify(getAppointmentStatisticsUseCase).getDoctorDailyCounts(date);
+        }
+
+        @Test
+        void getDoctorsAppointmentCountByDateShouldReturnEmptyListWhenUseCaseReturnsNothing() {
+            LocalDate date = LocalDate.of(2040, 3, 17);
+            when(getAppointmentStatisticsUseCase.getDoctorDailyCounts(date)).thenReturn(List.of());
+
+            assertThat(service.getDoctorsAppointmentCountByDate(date)).isEmpty();
+        }
+
+        @Test
+        void getDoctorsAppointmentCountByDateShouldPropagateInvalidDateFromUseCase() {
+            when(getAppointmentStatisticsUseCase.getDoctorDailyCounts(null))
+                    .thenThrow(new InvalidStatisticsDateException());
+
+            assertThatThrownBy(() -> service.getDoctorsAppointmentCountByDate(null))
+                    .isInstanceOf(InvalidStatisticsDateException.class);
         }
     }
 
