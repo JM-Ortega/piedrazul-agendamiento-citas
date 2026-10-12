@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
-import { map, Observable, of, tap } from 'rxjs';
+import { map, Observable, of, Subscription, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { PatientSuggestion } from '../../features/appointment/models/dtos/patientSuggestion.dto';
 import { withPagination } from '../../shared/helpers/httpPagination';
@@ -24,6 +24,8 @@ export class DoctorService {
   /** Historial clínico paginado del paciente actualmente visualizado. */
   readonly medicalRecordsState = new PaginatedState<MedicalRecord>();
   readonly isLoadingRecords = signal(false);
+  /** Petición en curso del historial clínico (se cancela si llega otra). */
+  private medicalRecordsRequest: Subscription | null = null;
   private meCache: Doctor | null = null;
   private meCacheTimestamp = 0;
   private readonly ME_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
@@ -122,18 +124,28 @@ export class DoctorService {
    * @param filters.patientId - Filtra además por un paciente específico (opcional).
    * @param filters.date - Filtra por fecha, formato `YYYY-MM-DD` (opcional).
    * @param filters.state - Filtra por estado de cita (opcional).
+   * @param filters.sortDirection - Orden por fecha (opcional). Si se omite,
+   * el backend ordena de forma ascendente.
    * @returns Observable con la respuesta paginada completa (content + metadata).
    */
   getAppointmentsByDoctor(
     doctorId: string,
     pageNumber = 0,
     pageSize = 4,
-    filters?: { patientId?: string; date?: string; state?: string }
+    filters?: {
+      patientId?: string;
+      date?: string;
+      state?: string;
+      sortDirection?: 'ASC' | 'DESC';
+    }
   ): Observable<PageResponse<AppointmentsPatient>> {
     let params = new HttpParams().set('idDoctor', doctorId);
     if (filters?.patientId) params = params.set('idPatient', filters.patientId);
     if (filters?.date) params = params.set('date', filters.date);
     if (filters?.state) params = params.set('state', filters.state);
+    if (filters?.sortDirection) {
+      params = params.set('sortDirection', filters.sortDirection);
+    }
     params = withPagination(params, pageNumber, pageSize);
 
     return this.http.get<PageResponse<AppointmentsPatient>>(
@@ -176,13 +188,15 @@ export class DoctorService {
   }
 
   /**
-   * Carga una página del historial clínico del paciente.
+   * Carga una página del historial clínico del paciente. Si ya hay una
+   * carga en curso (otra página u otro paciente), se cancela y prevalece
+   * la última solicitada.
    *
    * @param patientId - ID del paciente cuyo historial se desea cargar.
    * @param pageNumber - Índice de página (base 0). Por defecto 0.
    */
   loadMedicalRecordsByPatient(patientId: string, pageNumber = 0): void {
-    if (this.isLoadingRecords()) return;
+    this.medicalRecordsRequest?.unsubscribe();
 
     this.isLoadingRecords.set(true);
     const params = withPagination(
@@ -191,7 +205,7 @@ export class DoctorService {
       this.MEDICAL_RECORDS_PAGE_SIZE
     );
 
-    this.http
+    this.medicalRecordsRequest = this.http
       .get<PageResponse<MedicalRecord>>(
         `${this.apiUrl}/medical-check-up/patient/${patientId}`,
         { params }
@@ -231,6 +245,16 @@ export class DoctorService {
     return this.http.get<Patient>(
       `${this.apiUrl}/patients/${appointmentId}/patient-attended`
     );
+  }
+
+  /**
+   * Obtiene los datos completos de un paciente por su identificador.
+   *
+   * @param patientId - ID (UUID) del paciente.
+   * @returns Observable con los datos del paciente.
+   */
+  getPatientById(patientId: string): Observable<Patient> {
+    return this.http.get<Patient>(`${this.apiUrl}/patients/${patientId}`);
   }
 
   /**
@@ -311,10 +335,14 @@ export class DoctorService {
   }
 
   /**
-   * Reinicia el historial clínico paginado. Debe llamarse siempre que se
-   * cambie de paciente, antes de cargar la página 0.
+   * Reinicia el historial clínico paginado y cancela cualquier carga en
+   * curso, para que una respuesta tardía no repueble el estado. Debe
+   * llamarse siempre que se cambie de paciente, antes de cargar la página 0.
    */
   resetMedicalRecords(): void {
+    this.medicalRecordsRequest?.unsubscribe();
+    this.medicalRecordsRequest = null;
+    this.isLoadingRecords.set(false);
     this.medicalRecordsState.clear();
   }
   /**

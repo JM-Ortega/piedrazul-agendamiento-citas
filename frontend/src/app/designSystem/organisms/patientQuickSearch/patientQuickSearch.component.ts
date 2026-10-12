@@ -36,6 +36,12 @@ export class PatientQuickSearchComponent {
   private schedulerService = inject(SchedulerService);
 
   selectedPatient = input<PatientQuickResult | null>(null);
+  /** Texto de la acción en cada resultado del desplegable. */
+  ctaLabel = input('Ver citas');
+  /** Etiqueta accesible del botón que quita el paciente seleccionado. */
+  clearLabel = input('Quitar filtro de paciente');
+  /** Bloquea quitar el paciente seleccionado (p. ej. mientras se edita). */
+  disabled = input(false);
 
   patientSelected = output<PatientQuickResult>();
   cleared = output<void>();
@@ -82,6 +88,7 @@ export class PatientQuickSearchComponent {
   }
 
   clear(): void {
+    if (this.disabled()) return;
     this.cleared.emit();
   }
 }

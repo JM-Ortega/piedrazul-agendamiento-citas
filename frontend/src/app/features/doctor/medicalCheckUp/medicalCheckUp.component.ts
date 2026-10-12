@@ -10,35 +10,25 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   LucideArrowLeft,
-  LucideCalendar,
   LucideClipboardPen,
-  LucideFolderOpen,
-  LucidePencil,
   LucideSave,
   LucideTriangleAlert,
-  LucideUser,
 } from '@lucide/angular';
 import { CanComponentDeactivate } from '../../../core/guards/canDeactivate.guard';
 import { DoctorService } from '../../../core/services/doctor.service';
 import { ButtonComponent } from '../../../designSystem/atoms/button/button.component';
-import { TooltipDirective } from '../../../designSystem/atoms/tooltip/tooltip.directive';
-import { PaginationComponent } from '../../../designSystem/molecules/pagination/pagination.component';
 import {
   ToastComponent,
   ToastType,
 } from '../../../designSystem/molecules/toastMessage/toast.component';
 import { ConfirmModalComponent } from '../../../designSystem/organisms/confirmModal/confirmModal.component';
-import { calcAge } from '../../../shared/helpers/patientValidation';
-import {
-  parseLocalDateString,
-  toIsoDateString,
-} from '../../../shared/helpers/transformDateLocal';
+import { toIsoDateString } from '../../../shared/helpers/transformDateLocal';
 import { MedicalRecord } from '../../../shared/models/dtos/medicalRecord.dto';
 import { UnscheduledAttention } from '../../../shared/models/dtos/unscheduledAttention.dto';
 import { AppError } from '../../../shared/models/interfaces/apiError.model';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
-import { FormatoPipe } from '../../../shared/pipes/formatoPipe';
-import { PatientEditPanelComponent } from '../components/patientEditPanel/patientEditPanel.component';
+import { ClinicalHistoryListComponent } from '../components/clinicalHistoryList/clinicalHistoryList.component';
+import { PatientInfoCardComponent } from '../components/patientInfoCard/patientInfoCard.component';
 
 type MedicalHistoryContext = 'scheduled' | 'unscheduled';
 
@@ -51,18 +41,12 @@ type MedicalHistoryContext = 'scheduled' | 'unscheduled';
     LucideTriangleAlert,
     LucideClipboardPen,
     LucideSave,
-    LucideFolderOpen,
-    LucideCalendar,
-    LucideUser,
-    LucidePencil,
-    FormatoPipe,
     ButtonComponent,
-    PaginationComponent,
     ConfirmModalComponent,
     LucideArrowLeft,
-    TooltipDirective,
     ToastComponent,
-    PatientEditPanelComponent,
+    PatientInfoCardComponent,
+    ClinicalHistoryListComponent,
   ],
 })
 export class DoctorMedicalHistoryComponent
@@ -94,10 +78,8 @@ export class DoctorMedicalHistoryComponent
   // ── Estado: paciente ─────────────────────────────────────────────────────
   readonly patient = signal<Patient | undefined>(undefined);
   readonly isLoadingPatient = signal(true);
-  readonly mostrarInfo = signal(false);
 
   // ── Estado: edición de paciente ──────────────────────────────────────────
-  readonly isEditingPatient = signal(false);
   /** Toast de éxito exclusivo del flujo de edición de paciente. */
   readonly toastMessage = signal('');
   readonly toastType = signal<ToastType | null>(null);
@@ -125,23 +107,6 @@ export class DoctorMedicalHistoryComponent
   );
   readonly saveError = signal('');
   readonly isSaving = signal(false);
-
-  // ── Computed: datos derivados del paciente ───────────────────────────────
-  readonly patientBirthDateFormatted = computed(() => {
-    const p = this.patient();
-    if (!p?.birthDate) return 'No registra';
-    return parseLocalDateString(p.birthDate).toLocaleDateString('es-CO', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  });
-
-  readonly patientAge = computed(() => {
-    const p = this.patient();
-    if (!p?.birthDate) return null;
-    return calcAge(parseLocalDateString(p.birthDate));
-  });
 
   // ── Estado: salida de la ruta (CanDeactivate) ────────────────────────────
   readonly showExitConfirmModal = signal(false);
@@ -213,11 +178,6 @@ export class DoctorMedicalHistoryComponent
       return;
     }
     this.loadPatientByDocument(documentNumber);
-  }
-
-  // ── UI: sección de información del paciente ──────────────────────────────
-  toggleInfo(): void {
-    this.mostrarInfo.update((v) => !v);
   }
 
   // ── Contexto no programado (persistencia en sessionStorage) ──────────────
@@ -390,19 +350,9 @@ export class DoctorMedicalHistoryComponent
   }
 
   // ── Edición de datos del paciente ───────────────────────────────────────
-  startEditPatient(): void {
-    this.isEditingPatient.set(true);
-  }
-
-  /** Descarta la edición sin guardar y vuelve a la vista de solo lectura. */
-  cancelEditPatient(): void {
-    this.isEditingPatient.set(false);
-  }
-
   /** Recibe el paciente ya actualizado por el backend y muestra el toast de éxito. */
   onPatientSaved(updated: Patient): void {
     this.patient.set(updated);
-    this.isEditingPatient.set(false);
     this.showToast('Datos del paciente actualizados correctamente.', 'success');
   }
 

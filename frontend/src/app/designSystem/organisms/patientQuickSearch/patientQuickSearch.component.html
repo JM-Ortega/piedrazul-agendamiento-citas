@@ -51,7 +51,7 @@
             <span
               class="text-[#215c98] text-xs font-semibold flex items-center gap-1 shrink-0"
             >
-              Ver citas <svg lucideArrowRight [size]="14"></svg>
+              {{ ctaLabel() }} <svg lucideArrowRight [size]="14"></svg>
             </span>
           </button>
         }
@@ -90,8 +90,9 @@
       <button
         type="button"
         (click)="clear()"
-        class="text-[#4e92d9] hover:text-red-500 transition-colors cursor-pointer"
-        aria-label="Quitar filtro de paciente"
+        [disabled]="disabled()"
+        class="text-[#4e92d9] enabled:hover:text-red-500 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        [attr.aria-label]="clearLabel()"
       >
         <svg lucideX [size]="18"></svg>
       </button>

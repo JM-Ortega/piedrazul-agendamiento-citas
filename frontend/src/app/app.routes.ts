@@ -13,6 +13,7 @@ import { NewAppointmentSchedulerComponent } from './features/appointment/pages/s
 import { DoctorUnscheduledAttentionComponent } from './features/doctor/components/unscheduledAttention/doctorUnscheduledAttention/doctorUnscheduledAttention.component';
 import { DoctorAllAppointmentsComponent } from './features/doctor/doctorAllAppointments/doctorAllAppointments.component';
 import { DoctorDashboardComponent } from './features/doctor/doctorDashboard/doctorDashboard.component';
+import { DoctorPatientsComponent } from './features/doctor/doctorPatients/doctorPatients.component';
 import { DoctorMedicalHistoryComponent } from './features/doctor/medicalCheckUp/medicalCheckUp.component';
 import { PatientAppointmentHistoryComponent } from './features/patient/patientAppointmentHistory/patientAppointmentHistory.component';
 import { PatientDashboardComponent } from './features/patient/patientDashboard/patientDashboard.component';
@@ -82,6 +83,12 @@ export const routes: Routes = [
   {
     path: 'medico/citas',
     component: DoctorAllAppointmentsComponent,
+    canActivate: [AuthGuard],
+    data: { role: 'DOCTOR' },
+  },
+  {
+    path: 'medico/pacientes',
+    component: DoctorPatientsComponent,
     canActivate: [AuthGuard],
     data: { role: 'DOCTOR' },
   },
