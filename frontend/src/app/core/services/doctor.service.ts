@@ -124,29 +124,46 @@ export class DoctorService {
    * @param filters.patientId - Filtra además por un paciente específico (opcional).
    * @param filters.date - Filtra por fecha, formato `YYYY-MM-DD` (opcional).
    * @param filters.state - Filtra por estado de cita (opcional).
-   * @param filters.sortDirection - Orden por fecha (opcional). Si se omite,
-   * el backend ordena de forma ascendente.
    * @returns Observable con la respuesta paginada completa (content + metadata).
    */
   getAppointmentsByDoctor(
     doctorId: string,
     pageNumber = 0,
     pageSize = 4,
-    filters?: {
-      patientId?: string;
-      date?: string;
-      state?: string;
-      sortDirection?: 'ASC' | 'DESC';
-    }
+    filters?: { patientId?: string; date?: string; state?: string }
   ): Observable<PageResponse<AppointmentsPatient>> {
     let params = new HttpParams().set('idDoctor', doctorId);
     if (filters?.patientId) params = params.set('idPatient', filters.patientId);
     if (filters?.date) params = params.set('date', filters.date);
     if (filters?.state) params = params.set('state', filters.state);
-    if (filters?.sortDirection) {
-      params = params.set('sortDirection', filters.sortDirection);
-    }
     params = withPagination(params, pageNumber, pageSize);
+
+    return this.http.get<PageResponse<AppointmentsPatient>>(
+      `${this.apiUrl}/appointments`,
+      { params }
+    );
+  }
+
+  /**
+   * Obtiene una página con todas las citas de un paciente, con cualquier
+   * médico, de la más reciente a la más antigua. No envía `idDoctor` a
+   * propósito: si se enviara, el backend filtraría por ese médico.
+   *
+   * @param patientId - ID del paciente.
+   * @param pageNumber - Índice de página (base 0). Por defecto 0.
+   * @param pageSize - Cantidad de citas por página. Por defecto 5.
+   * @returns Observable con la respuesta paginada completa (content + metadata).
+   */
+  getPatientAppointments(
+    patientId: string,
+    pageNumber = 0,
+    pageSize = 5
+  ): Observable<PageResponse<AppointmentsPatient>> {
+    const params = withPagination(
+      new HttpParams().set('idPatient', patientId).set('sortDirection', 'DESC'),
+      pageNumber,
+      pageSize
+    );
 
     return this.http.get<PageResponse<AppointmentsPatient>>(
       `${this.apiUrl}/appointments`,

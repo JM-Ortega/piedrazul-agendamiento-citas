@@ -39,8 +39,8 @@ const PATIENT_QUERY_PARAM = 'paciente';
 
 /**
  * Vista "Pacientes" del médico. Permite buscar un paciente y, al
- * seleccionarlo, ver y editar su información, las citas que ha tenido con
- * el médico autenticado y su historial de consultas.
+ * seleccionarlo, ver y editar su información, todas sus citas (con
+ * cualquier médico) y su historial de consultas.
  *
  * El paciente seleccionado vive en la URL (`?paciente=<id>`): seleccionar o
  * quitar un paciente solo cambia ese parámetro, y un único flujo reactivo
@@ -96,7 +96,7 @@ export class DoctorPatientsComponent implements OnDestroy {
     () => this.infoCard()?.isEditingPatient() ?? false
   );
 
-  // ── Estado: citas del paciente con el médico ─────────────────────────────
+  // ── Estado: citas del paciente ───────────────────────────────────────────
   private readonly appointmentsState =
     new PaginatedState<AppointmentsPatient>();
   readonly appointments = this.appointmentsState.content;
@@ -184,9 +184,9 @@ export class DoctorPatientsComponent implements OnDestroy {
 
   // ── Citas ────────────────────────────────────────────────────────────────
   /**
-   * Carga una página de las citas del paciente con el médico autenticado,
-   * de la más reciente a la más antigua. Si hay otra carga en curso, la
-   * cancela.
+   * Carga una página con todas las citas del paciente (con cualquier
+   * médico), de la más reciente a la más antigua. Si hay otra carga en
+   * curso, la cancela.
    */
   private loadAppointments(pageNumber: number): void {
     const patient = this.patient();
@@ -197,16 +197,10 @@ export class DoctorPatientsComponent implements OnDestroy {
     this.isLoadingAppointments.set(true);
 
     this.appointmentsRequest = this.doctorService
-      .getMe()
-      .pipe(
-        switchMap((doctor) =>
-          this.doctorService.getAppointmentsByDoctor(
-            doctor.id,
-            pageNumber,
-            this.APPOINTMENTS_PAGE_SIZE,
-            { patientId: patient.id, sortDirection: 'DESC' }
-          )
-        )
+      .getPatientAppointments(
+        patient.id,
+        pageNumber,
+        this.APPOINTMENTS_PAGE_SIZE
       )
       .subscribe({
         next: (response) => {

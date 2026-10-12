@@ -3,7 +3,7 @@
   <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
     <h5 class="flex items-center gap-2 text-2sm font-semibold text-[#163c63]">
       <svg lucideCalendarDays [size]="28" class="text-[#163c63]"></svg>
-      Citas con usted
+      Historial de citas
       @if (pagination()?.totalElements; as total) {
         <span
           class="min-w-[22px] text-center text-xs font-bold text-[#215c98] bg-[#e8f0fa] rounded-full px-2 py-0.5"
@@ -34,7 +34,7 @@
       class="flex flex-col items-center gap-2 text-center py-10 text-gray-500"
     >
       <svg lucideCalendarX [size]="40" class="text-[#a7c9ec]"></svg>
-      <p>No tiene citas registradas con este paciente.</p>
+      <p>Este paciente no tiene citas registradas.</p>
     </div>
   } @else {
     <div
@@ -53,6 +53,11 @@
             <th class="text-left px-4 py-1 text-[#163c63] text-base">Hora</th>
             <th
               class="text-left px-4 py-1 text-[#163c63] text-base hidden sm:table-cell"
+            >
+              Médico
+            </th>
+            <th
+              class="text-left px-4 py-1 text-[#163c63] text-base hidden md:table-cell"
             >
               Especialidad
             </th>
@@ -100,6 +105,9 @@
                 </div>
               </td>
               <td class="px-4 py-2 text-gray-700 text-sm hidden sm:table-cell">
+                {{ apt.doctorName }}
+              </td>
+              <td class="px-4 py-2 text-gray-700 text-sm hidden md:table-cell">
                 {{ apt.specialty | formato }}
               </td>
               <td class="px-4 py-2">

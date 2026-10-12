@@ -22,8 +22,8 @@ import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
 /**
- * Tabla paginada con el histórico de citas de un paciente con el médico
- * autenticado. Es presentacional: recibe las citas de la página actual, la
+ * Tabla paginada con el histórico de citas de un paciente con todos los
+ * médicos. Es presentacional: recibe las citas de la página actual, la
  * metadata de paginación y el estado de carga, y emite `pageChange`.
  */
 @Component({
