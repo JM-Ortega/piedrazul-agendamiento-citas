@@ -181,7 +181,8 @@ mismo nombre y la misma configuración se ve igual que la original.
 
 ## Comportamiento comprobado y límites
 
-Contra Keycloak 26.5.6 con los flujos por defecto de `master`:
+Contra Keycloak 26.5.6 y 26.8.1 (también con la cuenta configurada en 26.5.6 y la base migrada
+a 26.8.1) con los flujos por defecto de `master`:
 
 - Con OTP enrolado, el login de navegador (consola de administración y de cuenta) pide el
   código después de la contraseña; un código incorrecto o reusado se rechaza.
@@ -234,7 +235,9 @@ No asignar roles de negocio a service accounts (`service-account-*`).
 ## Validación
 
 Ejercitado con `infra/tests/keycloak-lifecycle-harness.sh` contra PostgreSQL y Keycloak
-26.5.6 desechables, con credenciales sintéticas: creación en P2 (también con una contraseña
+26.5.6 y 26.8.1 desechables, con credenciales sintéticas (en 26.8.1 también con la cuenta creada
+y configurada —contraseña propia y OTP— en 26.5.6 antes de migrar la base: sin cambios en la
+cuenta ni en sus credenciales y login con OTP por navegador y por `admin-cli` después de migrar): creación en P2 (también con una contraseña
 inicial con `' " $ \ # &`, espacios, `{{ }}` y `{% %}`), exigencia de la contraseña antes del
 evento, política `length(16)` de `master` (sin tocar la de `piedrazul`), primer login de
 navegador real (OTP y cambio de contraseña: una de 14 caracteres rechazada, una de 16+ solo

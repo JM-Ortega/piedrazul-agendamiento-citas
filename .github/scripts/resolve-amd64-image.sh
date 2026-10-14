@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 # Resuelve UNA vez la identidad inmutable linux/amd64 de una imagen multi-plataforma.
 #
-# Uso: resolve-amd64-image.sh <repositorio>:<tag> | <repositorio>@sha256:<digest>
+# Uso: resolve-amd64-image.sh <repositorio>:<tag>
+#                            | <repositorio>@sha256:<digest>
+#                            | <repositorio>:<tag>@sha256:<digest>
 #
 # Lee el índice OCI una sola vez (docker buildx imagetools inspect --raw), calcula su
 # digest sobre los bytes exactos recibidos y elige su único hijo linux/amd64 que no sea
 # un manifiesto de attestation. Con una referencia por digest, exige que los bytes
 # coincidan con ese digest. Falla cerrado ante cualquier ambigüedad.
+#
+# <tag>@sha256:<digest> (referencia fijada de terceros, legible y revisable): el digest del
+# índice es la identidad; el tag solo se valida como etiqueta y nunca se resuelve en el
+# registry (se lee por digest, igual que Docker con esa misma referencia).
 #
 # Salida (formato GITHUB_OUTPUT), solo si todo validó:
 #   image_index_digest=sha256:<índice>
@@ -19,18 +25,30 @@ fail() {
   exit 1
 }
 
-[ "$#" -eq 1 ] || fail "uso: $0 <repositorio>:<tag> | <repositorio>@sha256:<digest>"
+[ "$#" -eq 1 ] || fail "uso: $0 <repositorio>:<tag> | <repositorio>@sha256:<digest> | <repositorio>:<tag>@sha256:<digest>"
 INPUT="$1"
 
 DIGEST_RE='^sha256:[0-9a-f]{64}$'
 TAG_RE='^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$'
 REPO_RE='^[a-z0-9]+([.-][a-z0-9]+)*(:[0-9]+)?(/[a-z0-9]+([._-]+[a-z0-9]+)*)+$'
 
+valid_tag() {
+  [[ "$1" =~ ${TAG_RE} ]] && ! [[ "${1,,}" =~ ^(none|null|undefined|latest)$ ]]
+}
+
 if [[ "${INPUT}" == *@* ]]; then
-  REPOSITORY="${INPUT%%@*}"
-  TAG=""
+  NAME="${INPUT%%@*}"
   EXPECTED_DIGEST="${INPUT#*@}"
   [[ "${EXPECTED_DIGEST}" =~ ${DIGEST_RE} ]] || fail "digest inválido en '${INPUT}'"
+  # Tag opcional antes del digest: solo etiqueta, la identidad es el digest
+  if [[ "${NAME##*/}" == *:* ]]; then
+    REPOSITORY="${NAME%:*}"
+    PINNED_TAG="${NAME##*:}"
+    valid_tag "${PINNED_TAG}" || fail "tag inválido en '${INPUT}'"
+  else
+    REPOSITORY="${NAME}"
+  fi
+  TAG=""
 else
   # El tag va después del último ':' del último segmento (el registry puede tener puerto)
   LAST_SEGMENT="${INPUT##*/}"
@@ -38,9 +56,7 @@ else
   REPOSITORY="${INPUT%:*}"
   TAG="${INPUT##*:}"
   EXPECTED_DIGEST=""
-  if ! [[ "${TAG}" =~ ${TAG_RE} ]] || [[ "${TAG,,}" =~ ^(none|null|undefined|latest)$ ]]; then
-    fail "tag inválido en '${INPUT}'"
-  fi
+  valid_tag "${TAG}" || fail "tag inválido en '${INPUT}'"
 fi
 
 # Nombre completo: sin host de registry explícito es Docker Hub (y library/ si es oficial)

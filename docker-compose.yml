@@ -30,7 +30,8 @@ services:
   # producción ningún valor del repositorio puede ser válido), así que este paso de un solo
   # uso fija en Keycloak el KC_BACKEND_CLIENT_SECRET del .env local. Idempotente.
   keycloak-dev-secret:
-    image: quay.io/keycloak/keycloak:26.5.6
+    # Misma referencia fijada que infra/compose/keycloak.yml
+    image: quay.io/keycloak/keycloak:26.8.1@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244
     restart: "no"
     depends_on:
       keycloak:

@@ -502,6 +502,11 @@ jobs:
     outputs:
       targets: ${{ steps.targets.outputs.targets }}
       unresolved: ${{ steps.targets.outputs.unresolved }}
+      # Keycloak (solo si converge corre): referencia fijada declarada, índice y manifiesto
+      # linux/amd64 que se escanea y que converge despliega
+      keycloak_label: ${{ steps.targets.outputs.keycloak_label }}
+      keycloak_index_digest: ${{ steps.targets.outputs.keycloak_index_digest }}
+      keycloak_image_ref: ${{ steps.targets.outputs.keycloak_image_ref }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -551,7 +556,8 @@ jobs:
 
           # Qué aplica este run en el servidor:
           #   converge (setup.yml) → postgres, keycloak, traefik
-          #   deploy.yml           → postgres y backend, y por depends_on keycloak
+          #   deploy.yml           → postgres y backend (conserva la identidad de keycloak
+          #                          que dejó el último converge; no la cambia)
           APPLIES_STACK=false
           if [ "${RUN_HOST_CONFIG}" = "true" ] || [ "${RUN_APP_DEPLOY}" = "true" ]; then
             APPLIES_STACK=true
@@ -576,15 +582,43 @@ jobs:
           own_surface postgres "${POSTGRES_SOURCE}" "${POSTGRES_TAG}" "${POSTGRES_INDEX_DIGEST}" "${POSTGRES_IMAGE_REF}" \
             "${BUILT_POSTGRES_TAG}" "${BUILT_POSTGRES_INDEX_DIGEST}" "${BUILT_POSTGRES_IMAGE_REF}"
 
-          # Terceros: la referencia configurada en Compose se resuelve una vez, solo si este
-          # run aplica ese servicio. Compose sigue desplegando por tag, así que esto no
-          # garantiza escaneado = desplegado.
-          for SURFACE in keycloak traefik; do
-            if [ "${SURFACE}" = "traefik" ] && [ "${RUN_HOST_CONFIG}" != "true" ]; then
-              add_not_applied "${SURFACE}"
-              continue
+          # Keycloak: referencia fijada <tag>@sha256:<índice OCI> declarada en Compose. Solo
+          # converge la aplica. Se resuelve una vez, por digest, a su manifiesto linux/amd64:
+          # ese mismo manifiesto se escanea y converge lo despliega (escaneado = desplegado).
+          # Sin referencia fijada o sin identidad resoluble no hay qué desplegar: el job falla
+          # y producción no empieza (no es un fallo operativo del escáner).
+          KEYCLOAK_LABEL="" KEYCLOAK_INDEX_DIGEST="" KEYCLOAK_IMAGE_REF=""
+          if [ "${RUN_HOST_CONFIG}" = "true" ]; then
+            KEYCLOAK_LABEL=$(yq -r '.services.keycloak.image' infra/compose/keycloak.yml)
+            if ! [[ "${KEYCLOAK_LABEL}" =~ ^quay\.io/keycloak/keycloak:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}@sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error title=Identidad de Keycloak::infra/compose/keycloak.yml debe fijar quay.io/keycloak/keycloak:<tag>@sha256:<índice OCI> (tiene '${KEYCLOAK_LABEL}')"
+              exit 1
             fi
-            if [ "${APPLIES_STACK}" != "true" ]; then
+            if ! IDENTITY=$(.github/scripts/resolve-amd64-image.sh "${KEYCLOAK_LABEL}"); then
+              echo "::error title=Identidad de Keycloak::No se pudo resolver ${KEYCLOAK_LABEL} a un manifiesto linux/amd64 único; converge no despliega Keycloak sin identidad exacta"
+              exit 1
+            fi
+            KEYCLOAK_INDEX_DIGEST=$(sed -n 's/^image_index_digest=//p' <<< "${IDENTITY}")
+            KEYCLOAK_IMAGE_REF=$(sed -n 's/^image_ref=//p' <<< "${IDENTITY}")
+            [ "${KEYCLOAK_INDEX_DIGEST}" = "${KEYCLOAK_LABEL#*@}" ] || {
+              echo "::error title=Identidad de Keycloak::el índice resuelto (${KEYCLOAK_INDEX_DIGEST}) no es el declarado"
+              exit 1
+            }
+            add_target keycloak "compose (fijada)" "${KEYCLOAK_LABEL}" "${KEYCLOAK_INDEX_DIGEST}" "${KEYCLOAK_IMAGE_REF}"
+          else
+            add_not_applied keycloak
+          fi
+          {
+            echo "keycloak_label=${KEYCLOAK_LABEL}"
+            echo "keycloak_index_digest=${KEYCLOAK_INDEX_DIGEST}"
+            echo "keycloak_image_ref=${KEYCLOAK_IMAGE_REF}"
+          } >> "$GITHUB_OUTPUT"
+
+          # Traefik: la referencia configurada en Compose se resuelve una vez, solo si este
+          # run aplica ese servicio. Compose sigue desplegándolo por tag, así que esto no
+          # garantiza escaneado = desplegado.
+          for SURFACE in traefik; do
+            if [ "${RUN_HOST_CONFIG}" != "true" ]; then
               add_not_applied "${SURFACE}"
               continue
             fi
@@ -633,8 +667,8 @@ jobs:
             echo
             echo "> Solo reporte: ni hallazgos ni fallos operativos bloquean. Producción espera a que"
             echo "> terminen estos intentos antes de mutar."
-            echo "> Backend y postgres se despliegan por la misma identidad exacta escaneada;"
-            echo "> keycloak y traefik todavía por tag."
+            echo "> Backend, postgres y keycloak se despliegan por la misma identidad exacta"
+            echo "> escaneada; traefik todavía por tag."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Reportar fallo operativo
@@ -734,6 +768,10 @@ jobs:
       RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
       RUN_APP_DEPLOY: ${{ needs.classify.outputs.run_app_deploy }}
       KEYCLOAK_RECOVERY: ${{ needs.classify.outputs.keycloak_recovery }}
+      # Identidad exacta de Keycloak que image_targets resolvió y escaneó (vacía sin converge)
+      KEYCLOAK_LABEL: ${{ needs.image_targets.outputs.keycloak_label }}
+      KEYCLOAK_INDEX_DIGEST: ${{ needs.image_targets.outputs.keycloak_index_digest }}
+      KEYCLOAK_IMAGE_REF: ${{ needs.image_targets.outputs.keycloak_image_ref }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -1099,12 +1137,14 @@ jobs:
             -i "${RUNNER_TEMP}/hosts.runtime.yml" \
             -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
             -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            -e "keycloak_image_ref=${KEYCLOAK_IMAGE_REF}" \
+            -e "keycloak_image_index_digest=${KEYCLOAK_INDEX_DIGEST}" \
             -e "keycloak_recovery=${KEYCLOAK_RECOVERY}" \
             -e "app_deploy_follows=${RUN_APP_DEPLOY}" \
             -e "app_identity_seed_intended=${IDENTITY_SEED_ENABLED:-false}" \
             infra/ansible/playbooks/converge.yml
 
-      - name: Verificar postgres tras converge (identidad en ejecución)
+      - name: Verificar postgres y keycloak tras converge (identidad en ejecución)
         id: converge_identity
         if: env.RUN_HOST_CONFIG == 'true'
         env:
@@ -1117,8 +1157,9 @@ jobs:
             -i "${RUNNER_TEMP}/hosts.runtime.yml" \
             -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
             -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            -e "keycloak_image_ref=${KEYCLOAK_IMAGE_REF}" \
             -e release_check=identity \
-            -e '{"app_release_services": ["postgres"]}' \
+            -e '{"app_release_services": ["postgres", "keycloak"]}' \
             infra/ansible/playbooks/verify-release.yml
 
       # deploy.yml: postgres + reconciliación → migración (solo backend construido en este
@@ -1177,7 +1218,7 @@ jobs:
         env:
           BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
           POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
-          SERVICES: ${{ env.RUN_APP_DEPLOY == 'true' && '["postgres", "backend"]' || '["postgres"]' }}
+          SERVICES: ${{ format('["postgres"{0}{1}]', env.RUN_APP_DEPLOY == 'true' && ', "backend"' || '', env.RUN_HOST_CONFIG == 'true' && ', "keycloak"' || '') }}
         run: |
           set -euo pipefail
           ansible-playbook \
@@ -1257,6 +1298,7 @@ jobs:
           POSTGRES_SOURCE: ${{ steps.select.outputs.postgres_source }}
           POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
           RUN_APP_DEPLOY_SUMMARY: ${{ env.RUN_APP_DEPLOY }}
+          RUN_HOST_CONFIG_SUMMARY: ${{ env.RUN_HOST_CONFIG }}
           PREVIOUS_BACKEND: ${{ steps.select.outputs.previous_backend_image_ref }}
           PREVIOUS_POSTGRES: ${{ steps.select.outputs.previous_postgres_image_ref }}
           STATE_STATUS: ${{ steps.select.outputs.state_status }}
@@ -1322,6 +1364,11 @@ jobs:
               echo "| último éxito leído | ${STATE_STATUS:-—} |"
               echo "| backend | ${BACKEND_SOURCE:-—} \`${BACKEND_IMAGE_REF:-—}\` (anterior \`${PREVIOUS_BACKEND:-—}\`) |"
               echo "| postgres | ${POSTGRES_SOURCE:-—} \`${POSTGRES_IMAGE_REF:-—}\` (anterior \`${PREVIOUS_POSTGRES:-—}\`) |"
+              if [ "${RUN_HOST_CONFIG_SUMMARY}" = "true" ]; then
+                echo "| keycloak | \`${KEYCLOAK_LABEL:-—}\` → \`${KEYCLOAK_IMAGE_REF:-—}\` (converge; la base de Keycloak solo migra hacia adelante) |"
+              else
+                echo "| keycloak | sin cambios: este run no corre converge (deploy conserva la identidad del servidor) |"
+              fi
               if [ "${RUN_APP_DEPLOY_SUMMARY}" = "true" ]; then
                 if [ "${BACKEND_SOURCE}" = "build" ]; then
                   echo "| migración de esquema | sí, con \`${BACKEND_IMAGE_REF}\` antes de arrancar el backend (dentro de deploy) |"

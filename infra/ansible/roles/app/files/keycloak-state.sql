@@ -37,6 +37,26 @@ SELECT 'schema=initialized';
 
 SELECT 'realm=' || name FROM realm WHERE name IN ('master', :'app_realm') ORDER BY name;
 
+-- Versión de Keycloak que migró esta base por última vez. Keycloak registra una fila por
+-- versión al migrar y toma como versión almacenada la de update_time más reciente. Decide si
+-- arrancar una imagen la migra hacia adelante o sería volver atrás sobre una base migrada.
+-- Contrato de Keycloak: MIGRATION_MODEL(ID, VERSION anulable, UPDATE_TIME no nulo) y, desde
+-- su changelog 26.2.6, VERSION y UPDATE_TIME únicos. Sin una versión conocida: absent (sin
+-- tabla), empty (sin filas), null (la fila más reciente sin versión) o ambiguous (más de una
+-- fila con el update_time más reciente; solo posible sin esas restricciones). Un valor sin la
+-- forma de una versión de Keycloak lo rechaza keycloak_lifecycle.yml.
+SELECT to_regclass('migration_model') IS NOT NULL AS kc_has_migration_model \gset
+\if :kc_has_migration_model
+SELECT 'migration_version=' || CASE WHEN count(*) = 0 THEN '?empty'
+                                    WHEN count(*) > 1 THEN '?ambiguous'
+                                    WHEN count(version) = 0 THEN '?null'
+                                    ELSE max(version) END
+  FROM migration_model
+ WHERE update_time = (SELECT max(update_time) FROM migration_model);
+\else
+SELECT 'migration_version=?absent';
+\endif
+
 -- Autoridad temporal: Keycloak marca con is_temporary_admin=true lo que crean
 -- kc.sh bootstrap-admin y KC_BOOTSTRAP_ADMIN_* (cliente o usuario, siempre en master).
 -- Propia solo si es inequívoca: cliente (no usuario) con el clientId exacto que generan los

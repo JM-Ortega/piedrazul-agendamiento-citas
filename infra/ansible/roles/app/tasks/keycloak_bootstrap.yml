@@ -2,8 +2,8 @@
 # Evento con autoridad temporal de Keycloak: P2 (base nueva) o recuperación P3 autorizada.
 # Lo incluye keycloak_lifecycle.yml; app_kc_event = fresh | recovery.
 #
-#   1. Keycloak detenido (kc.sh bootstrap-admin exige todos los nodos detenidos; 26.5 no lo
-#      verifica por sí mismo).
+#   1. Keycloak detenido (kc.sh bootstrap-admin exige todos los nodos detenidos; no se
+#      depende de que Keycloak lo verifique por sí mismo).
 #   2. kc.sh bootstrap-admin service en un contenedor de un solo uso con la misma
 #      configuración del servicio: cliente admin temporal en master, con id
 #      <kc_temp_admin_prefix>-<fecha>-<aleatorio> y secreto aleatorio generado aquí (runner).

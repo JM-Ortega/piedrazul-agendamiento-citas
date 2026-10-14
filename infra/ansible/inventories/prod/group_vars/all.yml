@@ -28,6 +28,10 @@ ghcr_registry: ghcr.io
 ghcr_namespace: jm-ortega/piedrazul-agendamiento-citas
 backend_image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/backend"
 postgres_image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/postgres"
+# Keycloak (tercero): repositorio y archivo Compose que declara su referencia fijada
+# <tag>@sha256:<índice OCI>. Ver app/tasks/keycloak_image.yml.
+keycloak_image: quay.io/keycloak/keycloak
+keycloak_compose_file: "{{ compose_src_dir }}/keycloak.yml"
 
 # Dominio base
 base_domain: piedrazul.org

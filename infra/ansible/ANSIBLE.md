@@ -226,7 +226,7 @@ Corre en cada `converge`. Pasos:
 4. Copia `infra/keycloak/` → `/opt/piedrazul/keycloak/` (realm JSON + theme JAR)
 5. Toma del entorno del runner las contraseñas de la base (`POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `MIGRATION_DB_PASSWORD`, `KC_DB_PASSWORD`) y falla, nombrando solo las claves, si alguna está vacía o contiene comilla simple o salto de línea
 6. Genera `.env` desde `env.j2`
-7. Valida y descarga por digest las imágenes propias → `image.env`
+7. Valida y descarga por digest las imágenes propias (`release_images.yml`) y Keycloak (`keycloak_image.yml`) → `image.env`
    - `keycloak_backend_delivery.yml`: comprueba con `docker compose config` que el backend recibiría `KC_BACKEND_CLIENT_SECRET` exactamente igual al declarado (en `.env` va entre comillas dobles con `\ " $` escapados); si no, falla sin mostrar el valor
 8. `db_converge.yml`: postgres con el `.env` vigente + reconciliación de autoridades
 9. Levanta Traefik (`docker_compose_v2 state: present`). No arranca Keycloak (lo hace `keycloak_lifecycle.yml`), el backend ni migra
@@ -244,11 +244,22 @@ El servidor guarda dos estados distintos:
 
 `record_release.yml` corre como último paso del workflow, después de que `deploy.yml` terminó, de que `verify-release.yml` confirmó identidad en ejecución y health de los contenedores, y de que pasaron los health checks públicos. Antes de escribir vuelve a verificar identidad y health. La escritura es atómica.
 
-Identidad en ejecución (`verify_running_images.yml`): el contenedor existe y corre, su `Config.Image` es la referencia exacta esperada (un contenedor creado desde un tag no cuenta, aunque el contenido coincida) y la imagen local que ejecuta está registrada por el daemon bajo ese digest (`RepoDigests`). El health (`verify_health.yml`) se verifica por separado: un backend `healthy` no prueba que corra el contenido esperado.
+Identidad en ejecución (`verify_running_images.yml`): el contenedor existe y corre, su `Config.Image` es la referencia exacta esperada (un contenedor creado desde un tag no cuenta, aunque el contenido coincida) y la imagen local que ejecuta está registrada por el daemon bajo ese digest (`RepoDigests`). El health (`verify_health.yml`) se verifica por separado: un backend `healthy` no prueba que corra el contenido esperado. Ambas tareas leen los contenedores sin mostrarlos (`no_log`) y verifican sobre un resumen sin el entorno: la salida nunca incluye las variables de entorno de los contenedores (contraseñas de la base, secretos de clientes). Sirven para `postgres`, `backend` y `keycloak`; una identidad esperada vacía o por tag falla.
 
 Si cualquier paso falla o el run se cancela antes del registro, `last-success.env` no cambia: el siguiente reuso vuelve al último éxito, aunque `image.env` o el contenedor tengan el candidato fallido. No hay rollback automático del contenedor; para eso existe el rollback explícito del backend. Un primer deploy fallido en un servidor nuevo no deja estado reusable.
 
-`last-success.env` es la única fuente de reuso y la lee el workflow, nunca Ansible (ver [Cadena de producción](#cadena-de-producción-workflow)). El formato anterior (`backend-deployed.env`, solo tag) no se migra: un servidor sin `last-success.env` necesita un deploy con build de backend y de postgres (o rollback de backend más build de postgres); un reuso falla cerrado.
+`last-success.env` es la única fuente de reuso y la lee el workflow, nunca Ansible (ver [Cadena de producción](#cadena-de-producción-workflow)). Keycloak no forma parte de `last-success.env`: su identidad sale del commit, no del reuso (ver abajo). El formato anterior (`backend-deployed.env`, solo tag) no se migra: un servidor sin `last-success.env` necesita un deploy con build de backend y de postgres (o rollback de backend más build de postgres); un reuso falla cerrado.
+
+#### Identidad de Keycloak (`keycloak_image.yml`)
+
+Keycloak es un tercero fijado: `infra/compose/keycloak.yml` declara `quay.io/keycloak/keycloak:<versión>@sha256:<índice OCI>` (hoy `26.8.1@sha256:79c623a2…`). El digest del índice es la identidad; el tag solo la hace legible. Desarrollo (`docker-compose.yml`, también `keycloak-dev-secret`) usa esa referencia tal cual y Docker elige el hijo de su plataforma. Producción nunca despliega el índice ni un tag: `prod.yml` reemplaza la imagen por `${KEYCLOAK_IMAGE:?}` de `image.env`, el manifiesto `linux/amd64` exacto de ese índice.
+
+- El workflow (`image_targets`, sin credenciales de producción) lee la referencia declarada, exige el formato fijado, la resuelve **una vez y por digest** con `resolve-amd64-image.sh` (el tag nunca se consulta en el registry) y pasa `keycloak_image_ref` (`quay.io/keycloak/keycloak@sha256:<linux/amd64>`) y `keycloak_image_index_digest`. Esa misma referencia se escanea y la recibe converge. Sin referencia fijada o sin identidad resoluble el job falla y producción no empieza.
+- `keycloak_image.yml` (desde `setup.yml`, antes de escribir `image.env`): el índice recibido debe ser el declarado en el `keycloak.yml` que este converge copia, la referencia debe ser un manifiesto (no el índice), se descarga por digest para `linux/amd64` y la etiqueta `org.opencontainers.image.version` de la imagen descargada debe coincidir con el tag declarado. Cualquier diferencia falla antes de tocar `image.env`.
+- Solo `setup.yml` (converge) escribe `KEYCLOAK_IMAGE`, y solo `keycloak_lifecycle.yml` arranca, recrea o actualiza Keycloak. `deploy.yml` nunca lo hace: antes de cualquier mutación exige exactamente una `KEYCLOAK_IMAGE` exacta en `image.env` y el contenedor `keycloak` existente, en ejecución, `healthy` y creado desde esa misma referencia; levanta postgres y backend **sin dependencias** (el `depends_on` del backend no puede arrancar ni recrear Keycloak) y al final verifica que `keycloak` es el mismo contenedor (Id e inicio). Ante `KEYCLOAK_IMAGE` ausente (también un `image.env` anterior a este contrato), duplicada o malformada, Keycloak ausente, detenido o no `healthy`, o un `image.env` que pide otra identidad que la que corre (p. ej. un converge interrumpido después de escribirlo), deploy falla sin escribir `image.env` ni tocar servicios: corre converge.
+- La identidad local que ejecuta el contenedor se comprueba por `Config.Image` y `RepoDigests` (como backend y postgres), nunca comparando el Id local con el índice o el manifiesto: según el almacén de imágenes del daemon, el Id es el digest de la configuración o del manifiesto.
+
+**Actualizar Keycloak** es cambiar la referencia fijada en `keycloak.yml` (y `docker-compose.yml`) por la nueva `<versión>@sha256:<índice>` y desplegar por la cadena normal: el cambio en `infra/compose` corre converge, que recrea Keycloak con la imagen nueva; Keycloak migra su base al arrancar. Esa migración es **solo hacia adelante**: volver a una imagen anterior no deshace el esquema ni los datos migrados y no es una vía de recuperación (ver [`recuperar-keycloak.md`](../../docs/operations/runbooks/recuperar-keycloak.md#actualización-de-la-versión-de-keycloak)).
 
 #### Ciclo técnico de Keycloak (`keycloak_lifecycle.yml`)
 
@@ -269,13 +280,21 @@ Corre en cada `converge`, después de `setup.yml` (base reconciliada, `.env` vig
 
 Si el schema está vacío pero el contenedor `keycloak` corre (p. ej. reiniciando sin conectar), se detiene antes del evento y se vuelve a leer; si entre tanto escribió en la base, ya no es P2.
 
+**Imagen y versión de la base**, antes de arrancar o tocar Keycloak (servicio o contenedor de un solo uso del evento):
+
+- `keycloak_image_ref` es obligatoria y exacta, está descargada y declara su versión, y la configuración de Compose arrancaría exactamente esa referencia (`KEYCLOAK_IMAGE` de `image.env`). Si no, falla sin clasificar ni arrancar nada.
+- `keycloak-state.sql` también lee `migration_version`: la versión que Keycloak toma como almacenada, la fila de `migration_model` con el `update_time` más reciente (Keycloak registra una por versión; `VERSION` y `UPDATE_TIME` únicos desde su changelog 26.2.6). Con la base inicializada y sin versión conocida —tabla ausente, sin filas, versión nula, más de una fila más reciente o un valor sin forma `X.Y.Z`— falla cerrado antes de arrancar o tocar Keycloak, también con `keycloak_recovery=true`: no se adivina ni se repara. Si la versión es **posterior** a la versión de la imagen, falla cerrado (también con `keycloak_recovery=true`) sin detener, recrear ni arrancar Keycloak: volver atrás sobre una base migrada no está soportado. Si es anterior, informa `base migrada por X, arrancar Y la migra hacia adelante (sin vuelta atrás)`; si es igual, `sin migración`.
+- Al final del ciclo verifica que el contenedor `keycloak` corre exactamente `keycloak_image_ref` (`verify_running_images.yml`) y que la base quedó migrada a la versión de la imagen; si no, falla sin informar éxito.
+
+Una actualización de versión sobre una base P1 no es un evento de identidad: `Levantar Keycloak sobre la base ya inicializada` recrea el contenedor con la imagen nueva (Keycloak migra la base al arrancar, dentro de `kc_start_timeout`) y sigue la clasificación normal. Si Keycloak no arranca o no migra, converge falla en ese paso y el workflow no llega a la verificación ni al registro; la convergencia siguiente vuelve a clasificar por la base.
+
 Keycloak de producción arranca con `start`, **sin `--import-realm`**: un reinicio nunca recrea un realm que falta. El realm del repositorio solo se importa dentro de un evento P2.
 
 **Reconciliación P1** (`keycloak-admin.sh reconcile`, con la automatización): sin leer el secreto vigente, prueba si el backend ya autentica con `KC_BACKEND_CLIENT_SECRET`; si Keycloak lo rechaza, lo fija. Después verifica el consumidor real: el backend autentica con ese secreto y lee su realm por la API de administración. Repetible: sin cambios no escribe nada.
 
 **Evento con autoridad temporal** (`keycloak_bootstrap.yml`, P2 o recuperación P3 autorizada):
 
-1. Detiene Keycloak: `kc.sh bootstrap-admin` exige todos los nodos detenidos (Keycloak 26.5 no lo verifica por sí mismo).
+1. Detiene Keycloak: `kc.sh bootstrap-admin` exige todos los nodos detenidos (no se depende de que Keycloak lo verifique por sí mismo).
 2. `docker compose run --rm --no-deps keycloak bootstrap-admin service` con la configuración del servicio: cliente admin temporal en `master` con id `piedrazul-tmp-admin-<fecha>-<aleatorio>` y secreto aleatorio generado en el runner. No se persiste en el host ni va en argv: viaja por entorno, en tránsito, al contenedor de un solo uso (`--rm`) y al exec de kcadm (sesión en `/dev/shm`, borrada al terminar). En una base nueva el mismo comando crea el esquema y el realm `master`.
 3. Solo P2: `docker compose run --rm --no-deps keycloak import --dir … --override false` importa el realm del repositorio (el cliente backend no trae secreto y Keycloak genera uno aleatorio). Una recuperación nunca importa ni recrea `master`, `piedrazul` ni `piedrazul-backend`; sí puede crear o corregir el cliente técnico `piedrazul-keycloak-automation` (paso 5).
 4. Arranca Keycloak (`start`).
@@ -311,7 +330,7 @@ La clasificación además informa **cuántos** usuarios humanos de `master` tien
 
 **Desarrollo local**: `docker-compose.yml` (raíz) agrega `KC_BOOTSTRAP_ADMIN_*` solo a su Keycloak de desarrollo, y el servicio de un solo uso `keycloak-dev-secret` fija en el realm local el `KC_BACKEND_CLIENT_SECRET` del `.env`.
 
-**Pruebas**: `infra/tests/keycloak-lifecycle-check.sh` (contrato estático: realm, `.env`, Compose, workflow, Ansible, desarrollo) e `infra/tests/keycloak-lifecycle-harness.sh` (P1/P2, rotaciones con caracteres especiales, P3 recuperable y su recuperación —también interrumpida o fallida a mitad—, P3 bloqueante con y sin recuperación: autoridad temporal ajena, realm ausente, esquema parcial, base inicializada fuera del ciclo; y el administrador humano: contraseña inicial exigida antes del evento, creación, primer login de navegador con OTP —`infra/tests/keycloak-browser-login.py`—, logins siguientes, colisión, OTP eliminado, borrado y creación interrumpida; con estos mismos task files contra PostgreSQL y Keycloak desechables).
+**Pruebas**: `infra/tests/keycloak-lifecycle-check.sh` (contrato estático: realm, `.env`, Compose, workflow, Ansible, desarrollo), `infra/tests/image-identity-check.sh` (resolución de referencias fijadas y contrato escaneado = desplegado de Keycloak, sin red) e `infra/tests/keycloak-lifecycle-harness.sh` (identidad de Keycloak inválida o distinta antes y después de arrancar; con `HARNESS_TARGET=upgrade`, P2 en la versión anterior y actualización real por converge con la base migrada, administrador humano con OTP e identidades pendientes preservados y vuelta atrás rechazada, seguidos de todos los escenarios sobre la base migrada; P1/P2, rotaciones con caracteres especiales, P3 recuperable y su recuperación —también interrumpida o fallida a mitad—, P3 bloqueante con y sin recuperación: autoridad temporal ajena, realm ausente, esquema parcial, base inicializada fuera del ciclo; y el administrador humano: contraseña inicial exigida antes del evento, creación, primer login de navegador con OTP —`infra/tests/keycloak-browser-login.py`—, logins siguientes, colisión, OTP eliminado, borrado y creación interrumpida; con estos mismos task files contra PostgreSQL y Keycloak desechables).
 
 #### `deploy.yml`
 
@@ -319,8 +338,10 @@ Rollout de las imágenes propias. Pasos:
 
 1. Verifica que `.env` existe y que `KC_BACKEND_CLIENT_SECRET` no está vacío
 2. Valida y descarga por digest `backend_image_ref` y `postgres_image_ref` (`release_images.yml`)
-3. Escribe `image.env` con esas referencias exactas
-4. `docker_compose_v2` de `postgres` y `backend` (`pull: missing`: las imágenes ya están por digest)
+3. Antes de mutar nada: `image.env` tiene exactamente una `KEYCLOAK_IMAGE` exacta y `keycloak` existe, corre `healthy` y fue creado desde ella (si no, falla: corre converge)
+4. Escribe `image.env` con esas referencias exactas y la misma `KEYCLOAK_IMAGE`
+5. `docker_compose_v2` de `postgres` y `backend` sin dependencias (`pull: missing`: las imágenes ya están por digest)
+6. Verifica que `keycloak` es el mismo contenedor, sin reinicio
 
 La verificación y el registro del último éxito son pasos posteriores del workflow (`verify-release.yml`, `record-release.yml`).
 
@@ -593,9 +614,9 @@ Dentro de `production`, en orden:
 3. **Outputs**: se leen de ese state version exacto, solo si sigue siendo el actual antes y después de leerlos. Sin Apply, el state version es el capturado al inicio.
 4. **Último éxito**: lectura (solo lectura) de `last-success.env` del servidor.
 5. **Selección** (`select-release.sh`): backend = rollback > build de este run > último éxito; postgres = build de este run > último éxito. Build y rollback llegan con la identidad inmutable resuelta antes del gate; el reuso toma la identidad exacta registrada. Ausente, malformada o ambigua falla cerrado. Sin deploy de aplicación ambas son reuso.
-6. **Escaneo antes de mutar** (`scan-evidence.sh`): para cada imagen que el run aplica, build/rollback y keycloak/traefik deben tener un `summary.json` válido de `image_scan` sobre la misma referencia exacta; el backend o postgres en reuso se escanea aquí, con la identidad recién leída, usando la misma acción. El resultado de cada intento (`scanned` con sus hallazgos, u `operational_failure`) se informa en el resumen pero no bloquea. Sí bloquea una cadena de escaneo incompleta o no verificable (ver abajo).
+6. **Escaneo antes de mutar** (`scan-evidence.sh`): para cada imagen que el run aplica, build/rollback y keycloak/traefik deben tener un `summary.json` válido de `image_scan` sobre la misma referencia exacta (keycloak, además, exactamente la `keycloak_image_ref` que recibe converge); el backend o postgres en reuso se escanea aquí, con la identidad recién leída, usando la misma acción. El resultado de cada intento (`scanned` con sus hallazgos, u `operational_failure`) se informa en el resumen pero no bloquea. Sí bloquea una cadena de escaneo incompleta o no verificable (ver abajo).
 7. **Converge / deploy** con esas referencias exactas (con frescura justo antes si no hubo Apply). Ambos convergen postgres y reconcilian las autoridades de la base antes de cualquier consumidor; deploy migra el esquema con el backend construido en este run (misma identidad exacta) antes de arrancarlo. Si la migración falla, el paso de deploy falla y no se llega a la verificación ni al registro.
-8. **Identidad en ejecución** y **health** (contenedores, y luego `actuator/health` del backend y el discovery OIDC de Keycloak).
+8. **Identidad en ejecución** (tras converge: postgres y keycloak; tras deploy: postgres y backend) y **health** (contenedores —keycloak también si corrió converge—, y luego `actuator/health` del backend y el discovery OIDC de Keycloak).
 9. **Registro** del último éxito, solo si hubo deploy de aplicación y todo lo anterior pasó.
 
 El resumen del job muestra el state version consumido, las identidades (y las anteriores) y la primera etapa que falló: credenciales, frescura, HCP, acceso al servidor, selección, escaneo previo, deploy, identidad en ejecución, health o registro. El job `conclude` hace que la conclusión del run sea success solo si producción terminó bien o no hacía falta; esa conclusión es la base del siguiente rango.
@@ -610,22 +631,23 @@ El resumen del job muestra el state version consumido, las identidades (y las an
 | backend, rollback | `resolve_rollback` lee el `image_tag` una vez (también verifica que exista en GHCR) |
 | backend / postgres, reuso | la registrada en `last-success.env`, leída tras el gate |
 | postgres, build | igual que backend build |
-| keycloak, traefik | fijada **solo para el escaneo**: se resuelve la referencia de `infra/compose/*.yml`, pero Compose sigue desplegando por tag |
+| keycloak | referencia fijada `<tag>@sha256:<índice>` de `infra/compose/keycloak.yml`, resuelta por digest en `image_targets` (solo si corre converge) |
+| traefik | fijada **solo para el escaneo**: se resuelve la referencia de `infra/compose/traefik.yml`, pero Compose sigue desplegando por tag |
 
-La misma referencia `repo@sha256:<linux/amd64>` es la que se escanea, la que recibe Ansible, la que se verifica en ejecución y la que se registra.
+La misma referencia `repo@sha256:<linux/amd64>` es la que se escanea, la que recibe Ansible, la que se verifica en ejecución y (backend y postgres) la que se registra. `resolve-amd64-image.sh` acepta `<repo>:<tag>`, `<repo>@sha256:<índice>` y `<repo>:<tag>@sha256:<índice>`; con digest lee solo por digest y el tag queda como etiqueta.
 
 ### Escaneo antes de mutar (solo reporte)
 
-`image_targets` reúne las imágenes cuya identidad se conoce antes del gate: backend y postgres de build o rollback (marcados "no desplegada" si el run no los despliega), keycloak si corre converge o deploy y traefik solo si corre converge. `image_scan` las escanea antes del gate y `production` espera a que esos intentos terminen. Las imágenes en reuso se escanean dentro de `production`, después de leer el último éxito y antes de cualquier mutación. Ambos escaneos usan la acción local `.github/actions/trivy-scan`: Trivy 0.74.0 (imagen oficial fijada por digest), `--image-src remote --platform linux/amd64 --scanners vuln`, sin socket de Docker, sin credenciales ni variables de entorno (el contenedor solo monta su caché y el directorio del reporte). Cada escaneo publica en el resumen el ref escaneado, la versión de Trivy, la fecha de la DB y los CRITICAL/HIGH, y sube `trivy.json`, `trivy-version.json` y `summary.json` como artifact `image-scan-<fase>-<imagen>-<run_id>` (30 días; fase `selected` antes del gate, `production` para el reuso).
+`image_targets` reúne las imágenes cuya identidad se conoce antes del gate: backend y postgres de build o rollback (marcados "no desplegada" si el run no los despliega), keycloak y traefik solo si corre converge. `image_scan` las escanea antes del gate y `production` espera a que esos intentos terminen. Las imágenes en reuso se escanean dentro de `production`, después de leer el último éxito y antes de cualquier mutación. Ambos escaneos usan la acción local `.github/actions/trivy-scan`: Trivy 0.74.0 (imagen oficial fijada por digest), `--image-src remote --platform linux/amd64 --scanners vuln`, sin socket de Docker, sin credenciales ni variables de entorno (el contenedor solo monta su caché y el directorio del reporte). Cada escaneo publica en el resumen el ref escaneado, la versión de Trivy, la fecha de la DB y los CRITICAL/HIGH, y sube `trivy.json`, `trivy-version.json` y `summary.json` como artifact `image-scan-<fase>-<imagen>-<run_id>` (30 días; fase `selected` antes del gate, `production` para el reuso).
 
 - Lo que se exige es el **orden**: el intento de escaneo de la identidad exacta termina antes de la mutación que puede aplicarla. Su resultado no autoriza ni bloquea mientras la política de vulnerabilidades no esté activa.
 - Cada intento deja un resultado explícito en `summary.json` (`outcome`) y en el resumen:
   - `scanned`: evaluado, con conteo de CRITICAL/HIGH (que puede ser cero). Los hallazgos **no bloquean** (`--exit-code 0`).
-  - `operational_failure`: registry, DB de vulnerabilidades o Trivy fallaron, el reporte no corresponde a la referencia, o la referencia de keycloak/traefik no se pudo resolver. Sin conteos (`null`), con anotación de error y `FALLO OPERATIVO`: **no equivale a cero hallazgos**. Transitorio: tampoco bloquea; cuando se active la política será bloqueante.
+  - `operational_failure`: registry, DB de vulnerabilidades o Trivy fallaron, el reporte no corresponde a la referencia, o la referencia de traefik no se pudo resolver (la de keycloak sin resolver falla `image_targets`: sin identidad no hay despliegue). Sin conteos (`null`), con anotación de error y `FALLO OPERATIVO`: **no equivale a cero hallazgos**. Transitorio: tampoco bloquea; cuando se active la política será bloqueante.
 - Solo el intento de Trivy (descarga del registry, DB, ejecución, reporte que no corresponde a la referencia) se registra como `operational_failure`; la acción termina bien y deja su `summary.json`. Cualquier otro error (entrada inválida, generación de la evidencia, subida del artifact, checkout) hace fallar el job.
 - **Cadena incompleta o no verificable → `production` no muta** (no es un `operational_failure`): `image_scan` fallido o cancelado, `summary.json` ausente, malformado, duplicado, de otra referencia o con un resultado incoherente, o una imagen aplicada sin intento de escaneo. Un artifact ausente no prueba que Trivy haya intentado el escaneo.
 - `production` descarga los `summary.json` previos, los valida y muestra el resultado de cada imagen que aplica.
-- El escaneo de keycloak y traefik describe el contenido actual de su tag, que puede no ser lo que corre en el servidor.
+- El escaneo de traefik describe el contenido actual de su tag, que puede no ser lo que corre en el servidor. El de keycloak es exactamente lo que converge despliega; con escaneo solo reporte, sus hallazgos tampoco autorizan ni bloquean.
 
 Los `FROM` de `backend/Dockerfile` e `infra/postgres/Dockerfile` están fijados por digest del índice OCI (`imagen:tag@sha256:…`), así buildx toma el hijo correcto para `linux/amd64` y `linux/arm64`. Para actualizar una base se resuelve el nuevo índice (`docker buildx imagetools inspect <imagen>:<tag>`) y se reemplaza el digest.
 
@@ -649,7 +671,7 @@ GitHub Actions (workflow)
         │     │   (KC_PLATFORM_ADMIN_INITIAL_PASSWORD se valida después, solo si Keycloak es P2)
         │     ├── copia compose files + keycloak/ + postgres/
         │     ├── genera .env
-        │     ├── valida y descarga por digest backend/postgres → image.env exacto
+        │     ├── valida y descarga por digest backend/postgres y keycloak → image.env exacto
         │     ├── postgres (PGDATA vacío → 01-init-databases.sh) + reconciliación
         │     └── levanta Traefik
         ├── keycloak_lifecycle.yml → P2 (schema keycloak vacío)
@@ -707,6 +729,8 @@ GitHub Actions (production-hetzner.yml — cambios en infra/ansible, infra/compo
         │     ├── postgres + reconciliación (idempotente)
         │     └── docker_compose_v2 Traefik → no-op
         ├── keycloak_lifecycle.yml
+        │     ├── identidad de Keycloak = la del commit; base no posterior a la imagen
+        │     ├── keycloak recreado solo si cambió su configuración (p. ej. versión nueva → migra la base)
         │     ├── P1 → secreto del backend sin cambios (o rotado) y verificado; sin autoridad temporal
         │     └── informa el estado del administrador humano (no lo toca)
         └── refresh_backend.yml → recrea el backend solo si cambió su configuración

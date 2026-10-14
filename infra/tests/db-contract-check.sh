@@ -108,7 +108,7 @@ done
 REQUIRED_BY_COMPOSE="$(grep -ohE '\$\{[A-Z_]+:\?' "${COMPOSE_DIR}"/*.yml | sed -E 's/^\$\{//; s/:\?$//' | sort -u)"
 for key in ${REQUIRED_BY_COMPOSE}; do
   case "${key}" in
-    BACKEND_IMAGE|POSTGRES_IMAGE) continue ;;  # image.env (release_images.yml)
+    BACKEND_IMAGE|POSTGRES_IMAGE|KEYCLOAK_IMAGE) continue ;;  # image.env (release_images.yml, keycloak_image.yml)
   esac
   check "Compose exige ${key} y env.j2 lo produce" env_has "${key}"
 done
@@ -116,7 +116,8 @@ done
 # ── 2-3. Consumidores: Compose de producción ─────────────────────────────────
 BACKEND_IMAGE="ghcr.io/example/backend@sha256:$(printf 'a%.0s' {1..64})"
 POSTGRES_IMAGE="ghcr.io/example/postgres@sha256:$(printf 'b%.0s' {1..64})"
-printf 'BACKEND_IMAGE=%s\nPOSTGRES_IMAGE=%s\n' "${BACKEND_IMAGE}" "${POSTGRES_IMAGE}" > "${TMP}/image.env"
+KEYCLOAK_IMAGE="quay.io/keycloak/keycloak@sha256:$(printf 'c%.0s' {1..64})"
+printf 'BACKEND_IMAGE=%s\nPOSTGRES_IMAGE=%s\nKEYCLOAK_IMAGE=%s\n' "${BACKEND_IMAGE}" "${POSTGRES_IMAGE}" "${KEYCLOAK_IMAGE}" > "${TMP}/image.env"
 
 compose_config() { # <env-file> [perfil]
   local profile=()

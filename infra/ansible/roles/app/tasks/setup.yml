@@ -1,4 +1,5 @@
-# Crea directorios, copia compose files y assets, genera .env, converge postgres y
+# Crea directorios, copia compose files y assets, genera .env e image.env (incluida la
+# identidad exacta de Keycloak, keycloak_image.yml), converge postgres y
 # reconcilia las autoridades de la base, y después levanta Traefik. Keycloak lo arranca
 # keycloak_lifecycle.yml (después de setup, en converge.yml). No arranca un backend nuevo
 # ni migra (eso es deploy.yml); refresh_backend.yml, al final de converge, solo recrea el
@@ -98,7 +99,12 @@
 - name: Validar y descargar imágenes propias
   ansible.builtin.include_tasks: release_images.yml
 
-# image.env es la entrada de Compose: referencias exactas, nunca tags
+# Identidad exacta de Keycloak: la que declara este commit, resuelta y escaneada por el workflow
+- name: Validar y descargar Keycloak
+  ansible.builtin.include_tasks: keycloak_image.yml
+
+# image.env es la entrada de Compose: referencias exactas, nunca tags. KEYCLOAK_IMAGE solo
+# cambia aquí (converge); deploy.yml la conserva.
 - name: Generar image.env con identidades exactas
   ansible.builtin.copy:
     dest: "{{ app_dir }}/image.env"
@@ -108,6 +114,7 @@
     content: |
       BACKEND_IMAGE={{ backend_image_ref }}
       POSTGRES_IMAGE={{ postgres_image_ref }}
+      KEYCLOAK_IMAGE={{ keycloak_image_ref }}
 
 - name: Verificar la entrega de KC_BACKEND_CLIENT_SECRET al backend
   ansible.builtin.include_tasks: keycloak_backend_delivery.yml

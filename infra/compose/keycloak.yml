@@ -1,6 +1,12 @@
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:26.5.6
+    # Referencia fijada: <tag>@sha256:<índice OCI>. El digest es la identidad (el tag solo
+    # la hace legible y Ansible lo contrasta con la versión de la imagen). Desarrollo la usa
+    # tal cual; en producción prod.yml la reemplaza por KEYCLOAK_IMAGE de image.env: el
+    # manifiesto linux/amd64 exacto de este índice, el mismo que se escaneó.
+    # Actualizar Keycloak migra su base solo hacia adelante: no hay vuelta a una versión
+    # anterior sobre una base ya migrada (ver docs/operations/runbooks/recuperar-keycloak.md).
+    image: quay.io/keycloak/keycloak:26.8.1@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244
     container_name: keycloak
     restart: unless-stopped
     # Sin KC_BOOTSTRAP_ADMIN_*: en producción la autoridad temporal la crea

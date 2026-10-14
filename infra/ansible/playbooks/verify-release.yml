@@ -1,9 +1,11 @@
 ---
-# Verificación posterior a converge/deploy de las imágenes propias. No modifica nada.
+# Verificación posterior a converge/deploy de las imágenes propias y de Keycloak (tercero
+# fijado). No modifica nada.
 #   -e release_check=identity → identidad exacta en ejecución
 #   -e release_check=health   → health de los contenedores
-#   -e '{"app_release_services": ["postgres", "backend"]}'
-#   -e backend_image_ref=... -e postgres_image_ref=...   (identidades esperadas)
+#   -e '{"app_release_services": ["postgres", "backend", "keycloak"]}'  (subconjunto)
+#   -e backend_image_ref=... -e postgres_image_ref=... -e keycloak_image_ref=...
+#      (identidades esperadas de los servicios a verificar)
 
 - name: Verificar imágenes propias
   hosts: vps

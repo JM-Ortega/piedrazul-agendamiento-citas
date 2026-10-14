@@ -7,7 +7,8 @@
 #                    contra la API (requiere el contenedor keycloak healthy)
 #   app_kc_expected  forma y roles esperados (keycloak_lifecycle.yml)
 # Salidas:
-#   app_kc_observed  hechos leídos (sin secretos ni nombres de usuarios humanos)
+#   app_kc_observed  hechos leídos (sin secretos ni nombres de usuarios humanos), incluida
+#                    migration_version: última versión de Keycloak que migró la base
 #   app_kc_state     P1 | P2 | P3 | unavailable
 #   app_kc_reasons   todos los motivos por los que no es P1 (vacío en P1 y P2)
 #   app_kc_blocking  subconjunto que ninguna automatización corrige, tampoco la recuperación
@@ -61,6 +62,9 @@
       schema: "{{ _lines | select('match', '^schema=') | map('regex_replace', '^schema=', '') | first | default('') }}"
       schema_objects: "{{ _lines | select('match', '^schema_objects=') | map('regex_replace', '^[^=]+=', '') | first | default('0') }}"
       realms: "{{ _lines | select('match', '^realm=') | map('regex_replace', '^realm=', '') | list }}"
+      # Última versión de Keycloak que migró la base (vacía si no hay base inicializada;
+      # ?absent / ?empty / ?null / ?ambiguous si inicializada sin versión conocida)
+      migration_version: "{{ _lines | select('match', '^migration_version=') | map('regex_replace', '^[^=]+=', '') | first | default('') }}"
       # owned:<tipo>:<nombre>:<uuid> / foreign:<tipo>:<nombre>:<uuid>
       temporary_owned: "{{ _lines | select('match', '^temporary_admin=owned:') | map('regex_replace', '^temporary_admin=owned:', '') | list }}"
       temporary_foreign: "{{ _lines | select('match', '^temporary_admin=foreign:') | map('regex_replace', '^temporary_admin=foreign:', '') | list }}"

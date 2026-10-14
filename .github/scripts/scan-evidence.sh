@@ -7,10 +7,12 @@
 #   backend / postgres con identidad conocida antes del gate (build, rollback), y
 #   keycloak / traefik → image_scan terminó en success y existe un summary.json válido
 #       de ESA referencia exacta
+#   keycloak además: esa referencia es exactamente KEYCLOAK_IMAGE_REF, la que converge
+#       despliega (escaneado = desplegado); sin ella no hay despliegue posible
 #   backend / postgres en reuso (identidad leída del servidor tras el gate)
 #       → se marca para escanear dentro de este job, antes de la mutación
-#   keycloak / traefik cuya referencia no se pudo resolver → operational_failure
-#       registrado por image_targets
+#   traefik cuya referencia no se pudo resolver → operational_failure registrado por
+#       image_targets
 #
 # A. Intento completado (continúa mientras el escaneo sea solo reporte):
 #      summary.json de la imagen, image_ref idéntico al esperado, y
@@ -22,11 +24,12 @@
 #
 # Qué aplica cada etapa:
 #   converge (setup.yml) → postgres, keycloak, traefik
-#   deploy.yml           → postgres, backend (y keycloak por depends_on)
+#   deploy.yml           → postgres, backend (conserva la identidad de keycloak del servidor)
 #
 # Entorno: TARGETS y UNRESOLVED (JSON de image_targets), SCAN_RESULT (resultado de
 #   image_scan), EVIDENCE_DIR (artifacts image-scan-selected-* descargados),
-#   RUN_HOST_CONFIG, RUN_APP_DEPLOY, {BACKEND,POSTGRES}_{SOURCE,IMAGE_REF}
+#   RUN_HOST_CONFIG, RUN_APP_DEPLOY, {BACKEND,POSTGRES}_{SOURCE,IMAGE_REF},
+#   KEYCLOAK_IMAGE_REF (la que recibe converge)
 # Salida (GITHUB_OUTPUT): scan_backend, scan_postgres (true = escanear el reuso aquí),
 #   evidence (JSON: imagen, referencia y resultado de cada intento previo)
 set -euo pipefail
@@ -46,9 +49,9 @@ EVIDENCE_DIR="${EVIDENCE_DIR:-/nonexistent}"
 
 applied() { # <surface>
   case "$1" in
-    postgres | keycloak) [ "${RUN_HOST_CONFIG:-}" = true ] || [ "${RUN_APP_DEPLOY:-}" = true ] ;;
+    postgres) [ "${RUN_HOST_CONFIG:-}" = true ] || [ "${RUN_APP_DEPLOY:-}" = true ] ;;
     backend) [ "${RUN_APP_DEPLOY:-}" = true ] ;;
-    traefik) [ "${RUN_HOST_CONFIG:-}" = true ] ;;
+    keycloak | traefik) [ "${RUN_HOST_CONFIG:-}" = true ] ;;
   esac
 }
 
@@ -110,7 +113,19 @@ for SURFACE in backend postgres; do
   fi
 done
 
-for SURFACE in keycloak traefik; do
+if applied keycloak; then
+  KEYCLOAK_IMAGE_REF="${KEYCLOAK_IMAGE_REF:-}"
+  [[ "${KEYCLOAK_IMAGE_REF}" =~ ^quay\.io/keycloak/keycloak@sha256:[0-9a-f]{64}$ ]] ||
+    fail "keycloak: sin identidad exacta para converge ('${KEYCLOAK_IMAGE_REF}')"
+  [ "$(jq --arg s keycloak '[.[] | select(.surface == $s)] | length' <<< "${TARGETS}")" -eq 1 ] ||
+    fail "keycloak: se aplica pero no hay exactamente un intento de escaneo de su identidad"
+  REF=$(jq -r '[.[] | select(.surface == "keycloak") | .image_ref][0]' <<< "${TARGETS}")
+  [ "${REF}" = "${KEYCLOAK_IMAGE_REF}" ] ||
+    fail "keycloak: se escaneó ${REF} pero converge desplegaría ${KEYCLOAK_IMAGE_REF}"
+  prior_outcome keycloak "${REF}"
+fi
+
+for SURFACE in traefik; do
   applied "${SURFACE}" || continue
   REF=$(jq -r --arg s "${SURFACE}" '[.[] | select(.surface == $s) | .image_ref][0] // ""' <<< "${TARGETS}")
   if [ -n "${REF}" ]; then

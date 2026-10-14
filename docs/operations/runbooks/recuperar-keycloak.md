@@ -124,12 +124,85 @@ ciclo no decide por sí mismo descartar el estado.
 - Un reintento de la recuperación es seguro: cada evento parte del estado observado, crea su
   propia autoridad temporal y elimina solo la propia.
 
+## Actualización de la versión de Keycloak
+
+Cambiar de versión **no es una recuperación** ni un evento con autoridad temporal: es una
+convergencia normal con otra imagen. Keycloak migra su base al arrancar y esa migración es
+**solo hacia adelante**.
+
+**Cómo se hace**: se reemplaza la referencia fijada en `infra/compose/keycloak.yml` y en
+`docker-compose.yml` (`keycloak-dev-secret`) por `quay.io/keycloak/keycloak:<versión>@sha256:<índice OCI>`
+(el índice se lee con `docker buildx imagetools inspect quay.io/keycloak/keycloak:<versión>`,
+campo `Digest`) después de revisar las notas de actualización de Keycloak, y se despliega por
+la cadena normal: un cambio en `infra/compose` corre converge. El workflow resuelve ese índice
+a su manifiesto `linux/amd64`, lo escanea (solo reporte) y converge despliega exactamente ese
+manifiesto (ver [`ANSIBLE.md`](../../../infra/ansible/ANSIBLE.md#identidad-de-keycloak-keycloak_imageyml)).
+
+**Qué hace converge** (`keycloak_lifecycle.yml`), antes de tocar Keycloak:
+
+- comprueba que Compose arrancaría exactamente la identidad recibida y que la versión de la
+  imagen coincide con el tag declarado;
+- lee la versión que migró la base por última vez (`migration_model`) e informa
+  `KEYCLOAK: base migrada por <anterior>, arrancar <nueva> la migra hacia adelante (sin vuelta atrás)`;
+- recrea Keycloak con la imagen nueva (`Levantar Keycloak sobre la base ya inicializada`) y
+  sigue la clasificación normal (P1, sin autoridad temporal);
+- al final verifica que el contenedor corre esa identidad exacta y que la base quedó en la
+  versión nueva (`KEYCLOAK <versión> en ejecución (…); base en <versión>`).
+
+**Sin vuelta atrás**: si la base ya fue migrada por una versión posterior a la imagen del
+converge, falla cerrado —también con `keycloak_recovery=true`— sin detener, recrear ni arrancar
+Keycloak:
+
+```
+KEYCLOAK: la base ya fue migrada por Keycloak <posterior> y la imagen de este converge es <anterior> (…).
+Volver atrás sobre una base migrada no está soportado
+```
+
+Revertir en `main` el commit que cambió la versión no restaura la anterior: el converge de ese
+revert falla así. Una actualización fallida se corrige hacia adelante (la misma versión o una
+posterior). La automatización no toma respaldos de la base de Keycloak: volver al estado
+anterior a una migración solo es posible restaurando un respaldo tomado antes, fuera de esta
+cadena.
+
+**Si Keycloak no arranca o no migra**: converge falla en `Levantar Keycloak sobre la base ya
+inicializada` (espera hasta `kc_start_timeout`, 600 s) y el workflow no llega a la verificación
+ni al registro. Revisar `docker logs keycloak`. La migración pudo quedar aplicada en parte:
+no arrancar la imagen anterior; corregir la causa y repetir converge con la misma versión.
+
+**Lo que no cambia Keycloak**: un deploy sin converge (p. ej. solo backend, o el rollback
+explícito del backend) nunca arranca, recrea ni actualiza Keycloak. Exige, antes de tocar nada,
+que `keycloak` corra `healthy` exactamente la `KEYCLOAK_IMAGE` de `image.env`; si no (por
+ejemplo, un converge de actualización interrumpido dejó en `image.env` la versión nueva y sigue
+corriendo la anterior, o Keycloak está detenido), falla sin cambios: repetir converge.
+
+**Versión de la base desconocida**: si la base de Keycloak está inicializada pero no registra
+una versión conocida (`migration_model` ausente, vacía, con versión nula o sin forma `X.Y.Z`),
+converge falla antes de arrancar Keycloak, también con `keycloak_recovery=true`:
+
+```
+KEYCLOAK: la base está inicializada pero su versión registrada (migration_model) es desconocida (…)
+```
+
+No se repara automáticamente: escalar (la base fue alterada fuera de Keycloak).
+
 ## Validación
 
-El procedimiento se ejercitó con estos mismos task files contra PostgreSQL y Keycloak 26.5.6
-desechables (`infra/tests/keycloak-lifecycle-harness.sh`). Soportados: rotación de la
+El procedimiento se ejercitó con estos mismos task files contra PostgreSQL y Keycloak
+desechables (`infra/tests/keycloak-lifecycle-harness.sh`): 26.5.6 y 26.8.1 desde una base
+nueva, y 26.8.1 sobre una base creada por 26.5.6 y migrada por converge
+(`HARNESS_TARGET=upgrade`). Soportados: rotación de la
 credencial de automatización (con caracteres especiales), escalada de roles, forma y roles del
 backend alterados, recuperación interrumpida (huérfana propia) y recuperación que falla después
 de reconciliar parcialmente. No soportados (bloquean también con recuperación, sin mutar):
 autoridad temporal ajena, realm de la aplicación ausente, esquema parcial y base inicializada
-fuera del ciclo. No se ha ejecutado contra producción.
+fuera del ciclo. Actualización 26.5.6 → 26.8.1 por converge normal: P1 sin evento, base migrada,
+clientes técnicos (secretos, forma y roles), administrador humano con OTP e identidades de
+negocio pendientes de su primer login sin cambios; un converge con la imagen anterior sobre la
+base migrada falla cerrado, también con `keycloak_recovery=true`, sin tocar Keycloak; una
+actualización interrumpida (Keycloak sin llegar a healthy en el plazo) falla sin informar
+éxito y el converge siguiente termina. Una base inicializada sin versión registrada conocida
+(tabla ausente, vacía, versión nula o sin forma de versión) falla cerrado, también con
+recuperación, sin tocar Keycloak (`HARNESS_TARGET=migration-version`). Un deploy sin converge
+con Keycloak ausente, detenido, con otra identidad que la de `image.env` (también tras un
+converge interrumpido que la adelantó) o con `KEYCLOAK_IMAGE` ausente, duplicada o malformada
+falla sin escribir `image.env` ni tocar contenedores. No se ha ejecutado contra producción.

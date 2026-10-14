@@ -3,8 +3,10 @@
 # imagen o de Compose). Independiente de la identidad: verify_running_images.yml.
 #
 # Variables:
-#   app_release_services → servicios a verificar (subconjunto de [postgres, backend])
+#   app_release_services → servicios a verificar (subconjunto de [postgres, backend, keycloak])
 
+# docker_container_info trae el entorno del contenedor (secretos): no se muestra; se verifica
+# solo el estado de health
 - name: Esperar health de las imágenes propias
   community.docker.docker_container_info:
     name: "{{ item }}"
@@ -16,17 +18,26 @@
   retries: 36
   delay: 10
   failed_when: false
+  no_log: true
+
+- name: Resumir el health de los contenedores
+  ansible.builtin.set_fact:
+    app_release_health_status: >-
+      {%- set r = {} -%}
+      {%- for c in app_release_health.results -%}
+        {%- set _ = r.update({c.item: (((c.container | default({}, true)).State | default({}, true)).Health
+                                       | default({}, true)).Status | default('sin healthcheck')
+                                      if c.exists | default(false) else 'contenedor ausente'}) -%}
+      {%- endfor -%}
+      {{ r }}
+  no_log: true
 
 - name: Verificar health de las imágenes propias
   ansible.builtin.assert:
     that:
-      - item.exists
-      - (item.container.State.Health.Status | default('none')) == 'healthy'
+      - app_release_health_status[item] == 'healthy'
     fail_msg: >-
-      HEALTH: {{ item.item }} no quedó healthy
-      (estado: {{ ((item.container | default({}, true)).State | default({})).Health.Status | default('sin healthcheck o contenedor ausente') }}).
+      HEALTH: {{ item }} no quedó healthy (estado: {{ app_release_health_status[item] }}).
       No se registra como éxito.
-    success_msg: "{{ item.item }} healthy"
-  loop: "{{ app_release_health.results }}"
-  loop_control:
-    label: "{{ item.item }}"
+    success_msg: "{{ item }} healthy"
+  loop: "{{ app_release_services }}"

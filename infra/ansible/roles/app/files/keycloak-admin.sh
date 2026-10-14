@@ -14,8 +14,8 @@
 #   platform-admin  autoridad temporal, solo P2: crea el administrador humano permanente de
 #              master. Nunca adopta ni modifica un usuario existente
 #
-# Secretos solo por entorno, nunca en argv ni en la salida. kcadm 26.5 ignora
-# KC_CLI_CLIENT_SECRET junto con --no-config, así que cada sesión se abre con
+# Secretos solo por entorno, nunca en argv ni en la salida. kcadm (desde 26.5)
+# ignora KC_CLI_CLIENT_SECRET junto con --no-config, así que cada sesión se abre con
 # `config credentials` sobre un archivo en /dev/shm (memoria, 0600), que guarda el secreto y
 # se borra al salir.
 #

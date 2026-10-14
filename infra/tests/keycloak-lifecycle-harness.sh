@@ -7,7 +7,16 @@
 #
 # Uso: infra/tests/keycloak-lifecycle-harness.sh [directorio de evidencia]
 #   HARNESS_TARGET=foreign-user → solo P2, el escenario de usuario temporal ajeno y fugas
-# Requiere: docker (compose v2), ansible-playbook con community.docker 5.x
+#   HARNESS_TARGET=migration-version → P2, IDENT y versión registrada de la base desconocida
+#     (MV) y fugas
+#   HARNESS_TARGET=upgrade      → P2 con la versión anterior de Keycloak
+#     (HARNESS_KC_FROM_REF, referencia fijada <tag>@sha256:<índice>), primer login del
+#     administrador humano en ella, actualización por convergencia normal a la versión que
+#     declara infra/compose/keycloak.yml (migración real de la base), intento de volver
+#     atrás, y después todos los escenarios P1/P3/REC/INT/ADMIN-H sobre la base migrada
+# Keycloak corre siempre por su identidad exacta: la referencia fijada se resuelve (como en
+# el workflow) a su manifiesto linux/amd64 y converge la recibe como keycloak_image_ref.
+# Requiere: docker (compose v2, buildx), jq, yq, ansible-playbook con community.docker 5.x
 #   (ANSIBLE_COLLECTIONS_PATH) y python con requests para el intérprete local
 #   (HARNESS_PYTHON, por defecto python3); la imagen HARNESS_PYTHON_IMAGE (por defecto
 #   python:3.12-slim) corre keycloak-browser-login.py dentro de la red de Keycloak.
@@ -16,6 +25,15 @@
 # se niega a correr si ya existen. Proyecto Compose propio y volumen propio; limpia al salir.
 #
 # Escenarios:
+#   IDENT   identidad de Keycloak: declaración por tag, índice distinto del declarado,
+#           índice en vez de manifiesto, image.env distinta de la recibida → falla antes de
+#           tocar Keycloak; identidad en ejecución distinta → la verificación falla
+#   MV      (solo migration-version) base inicializada sin versión registrada conocida
+#           (tabla migration_model ausente, vacía, ambigua o con otra forma) → falla cerrado
+#           antes de tocar Keycloak, también con recuperación; restaurada → P1
+#   UPG     (solo upgrade) migración hacia adelante con el administrador humano, OTP,
+#           acciones requeridas, clientes, roles y secretos preservados; volver atrás falla
+#           cerrado sin tocar Keycloak
 #   P2      base nueva → evento → P1; ninguna credencial del repositorio válida en ningún
 #           momento (sondeo continuo durante el evento); sin autoridad temporal al final
 #   P1      dos convergencias más: sin evento, idempotentes, sin recrear el realm
@@ -39,10 +57,13 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ANSIBLE_DIR="${ROOT}/infra/ansible"
 PYTHON="${HARNESS_PYTHON:-python3}"
-KC_IMAGE="$(sed -n 's/^ *image: *//p' "${ROOT}/infra/compose/keycloak.yml" | head -1)"
 PROJECT=piedrazul-kchl
+TARGET="${HARNESS_TARGET:-}"
+# Keycloak: la referencia fijada que declara el repositorio y, para upgrade, la anterior
+KC_TO_DECLARED="$(yq -r '.services.keycloak.image' "${ROOT}/infra/compose/keycloak.yml")"
+KC_FROM_DECLARED="${HARNESS_KC_FROM_REF:-quay.io/keycloak/keycloak:26.5.6@sha256:8d44614c74798322c4e07fbe0ecb15cfbb5879d69b484628555f58ade06f0d8c}"
 
-for bin in docker ansible-playbook; do
+for bin in docker ansible-playbook jq yq; do
   command -v "${bin}" >/dev/null || { echo "falta ${bin}" >&2; exit 2; }
 done
 for name in postgres keycloak; do
@@ -81,7 +102,23 @@ cp -r "${ROOT}/infra/compose" "${W}/compose"
 cp -r "${ROOT}/infra/keycloak" "${W}/keycloak"
 cp -r "${ROOT}/infra/traefik" "${W}/traefik"
 docker build -q -t "${PROJECT}-postgres:local" "${ROOT}/infra/postgres" >/dev/null
-printf 'BACKEND_IMAGE=%s\nPOSTGRES_IMAGE=%s\n' "busybox:harness-never-started" "${PROJECT}-postgres:local" > "${W}/image.env"
+# use_keycloak <referencia fijada>: como el workflow (image_targets) la resuelve una vez a su
+# manifiesto linux/amd64; como setup.yml, escribe esa identidad en image.env. La declaración
+# que lee keycloak_image.yml es ${W}/declared/keycloak.yml (el compose/keycloak.yml del commit).
+use_keycloak() {
+  local identity
+  identity="$("${ROOT}/.github/scripts/resolve-amd64-image.sh" "$1")" || { echo "no se pudo resolver $1" >&2; exit 2; }
+  KC_DECLARED="$1"
+  KC_INDEX="$(sed -n 's/^image_index_digest=//p' <<< "${identity}")"
+  KC_REF="$(sed -n 's/^image_ref=//p' <<< "${identity}")"
+  mkdir -p "${W}/declared"
+  printf 'services:\n  keycloak:\n    image: %s\n' "${KC_DECLARED}" > "${W}/declared/keycloak.yml"
+  write_image_env "${KC_REF}"
+}
+write_image_env() { # <KEYCLOAK_IMAGE>
+  printf 'BACKEND_IMAGE=%s\nPOSTGRES_IMAGE=%s\nKEYCLOAK_IMAGE=%s\n' "busybox:harness-never-started" "${PROJECT}-postgres:local" "$1" > "${W}/image.env"
+}
+if [ "${TARGET}" = upgrade ]; then use_keycloak "${KC_FROM_DECLARED}"; else use_keycloak "${KC_TO_DECLARED}"; fi
 printf 'all:\n  hosts:\n    vps:\n      ansible_connection: local\n      ansible_python_interpreter: %s\n' \
   "$(command -v "${PYTHON}")" > "${W}/hosts.yml"
 
@@ -132,7 +169,16 @@ cat > "${W}/converge.yml" <<'EOF'
     - ansible.builtin.include_role: {name: app, tasks_from: keycloak_credentials.yml}
     - ansible.builtin.include_role: {name: app, tasks_from: keycloak_backend_delivery.yml}
     - ansible.builtin.include_role: {name: app, tasks_from: db_converge.yml}
+    - ansible.builtin.include_role: {name: app, tasks_from: keycloak_image.yml}
     - ansible.builtin.include_role: {name: app, tasks_from: keycloak_lifecycle.yml}
+EOF
+# Verificación de la identidad en ejecución (la misma tarea que verify-release.yml)
+cat > "${W}/verify.yml" <<'EOF'
+- hosts: vps
+  gather_facts: false
+  tasks:
+    - ansible.builtin.include_role: {name: app, tasks_from: verify_running_images.yml}
+      vars: {app_release_services: [keycloak]}
 EOF
 
 ansible_run() { # <log> <playbook> [extra args...]
@@ -145,7 +191,9 @@ ansible_run() { # <log> <playbook> [extra args...]
       ANSIBLE_BECOME=false ANSIBLE_NOCOLOR=1 \
     ansible-playbook -i "${ANSIBLE_DIR}/inventories/prod" -i "${W}/hosts.yml" "${W}/${pb}" \
       -e "app_dir=${W}" -e "compose_project_name=${PROJECT}" -e "db_lock_file=${W}/db.lock" \
-      -e "repo_root=${ROOT}" "$@" </dev/null > "${LOGS}/${log}.log" 2>&1
+      -e "repo_root=${ROOT}" -e "keycloak_compose_file=${W}/declared/keycloak.yml" \
+      -e "keycloak_image_ref=${KC_REF}" -e "keycloak_image_index_digest=${KC_INDEX}" \
+      "$@" </dev/null > "${LOGS}/${log}.log" 2>&1
 }
 render_env() { ansible_run "render-$1" render.yml; }
 converge() { # <etiqueta> [true|false (recuperación)] [extra args...]
@@ -164,6 +212,15 @@ sa_roles() { sql "select string_agg(coalesce(rc.client_id,'realm')||':'||k.name,
 # task_ran <log> <prefijo del nombre>: la tarea corrió (no "skipping") en ese log
 task_ran() { grep -A1 -F "TASK [app : $2" "${LOGS}/$1.log" | grep -qE '^(changed|ok): '; }
 users_in_realm() { sql "select string_agg(username, ',' order by username) from keycloak.user_entity u join keycloak.realm r on r.id=u.realm_id where r.name='piedrazul'"; }
+# Versión de Keycloak que migró la base por última vez / versión declarada por una imagen
+kc_db_version() { sql "select version from keycloak.migration_model order by update_time desc, id desc limit 1"; }
+kc_image_version() { docker image inspect "$1" --format '{{index .Config.Labels "org.opencontainers.image.version"}}'; }
+kc_container() { docker inspect keycloak --format '{{.Id}}|{{.State.StartedAt}}|{{.State.Running}}|{{.Config.Image}}' 2>/dev/null; }
+# Clientes técnicos: secreto (solo su hash) y roles, para comparar antes y después
+technical_row() {
+  sql "select string_agg(c.client_id||':'||md5(coalesce(c.secret,''))||':'||c.enabled, ',' order by c.client_id) from keycloak.client c where c.client_id in ('piedrazul-backend','piedrazul-keycloak-automation')"
+  sa_roles piedrazul-backend; sa_roles piedrazul-keycloak-automation
+}
 
 # kc_client_auth <realm> <clientId> <secret> → ok|rejected|unavailable (secreto por entorno del exec)
 kc_client_auth() {
@@ -172,6 +229,15 @@ kc_client_auth() {
     if out="$(KC_CLI_CLIENT_SECRET="$S" /opt/keycloak/bin/kcadm.sh config credentials --config "$c" \
         --server http://localhost:8180 --realm "$0" --client "$1" 2>&1)"; then echo ok
     elif grep -qiE "invalid client|unauthorized_client|401" <<<"$out"; then echo rejected
+    else echo unavailable; fi' "$1" "$2" 2>/dev/null || echo unavailable
+}
+kc_user_state() { # <realm> <user> <password> → ok|not_set_up|rejected|unavailable
+  docker exec -e "S=$3" keycloak bash -c '
+    c="$(mktemp -u /dev/shm/h.XXXXXX)"; trap "rm -f $c" EXIT
+    if out="$(KC_CLI_PASSWORD="$S" /opt/keycloak/bin/kcadm.sh config credentials --config "$c" \
+        --server http://localhost:8180 --realm "$0" --user "$1" 2>&1)"; then echo ok
+    elif grep -qi "not fully set up" <<<"$out"; then echo not_set_up
+    elif grep -qiE "invalid user|invalid_grant|401" <<<"$out"; then echo rejected
     else echo unavailable; fi' "$1" "$2" 2>/dev/null || echo unavailable
 }
 kc_user_auth() { # <realm> <user> <password>
@@ -229,6 +295,7 @@ browser() {
 browser_has() { grep -qxF -- "$2" "${LOGS}/browser-$1.txt"; }
 # check usa bash -c: las comprobaciones necesitan estas funciones en el subshell
 export -f sql temp_count realm_id realms sa_roles users_in_realm kc_env_keys kc_client_auth kc_user_auth log_has task_ran
+export -f kc_db_version kc_image_version kc_container kc_user_state
 export -f platform_row platform_facts platform_count platform_status browser_has
 export LOGS PLATFORM_USER
 
@@ -331,8 +398,187 @@ PLATFORM_ENV_PW=""
 kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul create users -r piedrazul -s username=harness-sentinel -s enabled=true >/dev/null 2>&1
 check "sentinela de negocio creado por el backend" bash -c "users_in_realm | grep -q harness-sentinel"
 
-TARGET="${HARNESS_TARGET:-}"
-if [ -z "${TARGET}" ]; then
+check "P2: Keycloak corre la identidad exacta recibida (manifiesto linux/amd64 de ${KC_DECLARED})" \
+  test "$(docker inspect keycloak --format '{{.Config.Image}}')" = "${KC_REF}"
+check "P2: la base quedó en la versión de la imagen ($(kc_image_version "${KC_REF}"))" \
+  test "$(kc_db_version)" = "$(kc_image_version "${KC_REF}")"
+check "P2: converge informó base nueva y verificó identidad en ejecución y versión de la base" \
+  bash -c "log_has p2 'base nueva; la inicializa' && log_has p2 'en ejecución (${KC_REF}); base en'"
+PLATFORM_STATUS_P1='CREADA, primer login pendiente'
+
+# ══ UPG: actualización de Keycloak sobre una base existente ══════════════════
+if [ "${TARGET}" = upgrade ]; then
+KC_FROM_REF="${KC_REF}"
+FROM_VERSION="$(kc_image_version "${KC_FROM_REF}")"
+section "UPG — estado previo en ${KC_FROM_DECLARED} (${FROM_VERSION})"
+# Primer login del administrador humano en la versión anterior: contraseña propia y OTP
+KBL_PASSWORD="${PLATFORM_PW}" KBL_NEW_PASSWORD="${PLATFORM_NEW_PW}" KBL_SHORT_PASSWORD="${PLATFORM_SHORT_PW}" \
+  browser first-login first-login KBL_PASSWORD KBL_NEW_PASSWORD KBL_SHORT_PASSWORD
+check "previo: primer login del administrador humano completo (contraseña nueva y OTP)" \
+  bash -c "browser_has first-login 'first_login.actions=CONFIGURE_TOTP,UPDATE_PASSWORD' && browser_has first-login 'browser.token=ok'"
+check "previo: administrador humano configurado (OTP, sin acciones pendientes)" \
+  test "$(platform_facts)" = "true||admin,default-roles-master|password:1,otp:1|false"
+# Identidad de negocio pendiente de su primer login (contraseña temporal + UPDATE_PASSWORD),
+# como el primer ADMIN de negocio: creada con la autoridad real del backend
+PENDING_PW="$(synthetic pending)"; SECRETS_SEEN+=("${PENDING_PW}")
+kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul create users -r piedrazul -s username=harness-pending -s enabled=true \
+  -s 'requiredActions=["UPDATE_PASSWORD"]' >/dev/null 2>&1
+PENDING_ID="$(kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q username=harness-pending -q exact=true --fields id --format csv --noquotes 2>/dev/null)"
+jq -cn --arg p "${PENDING_PW}" '{type: "password", value: $p, temporary: true}' \
+  | kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul update "users/${PENDING_ID}/reset-password" -r piedrazul -f - -n >/dev/null 2>&1
+check "previo: identidad de negocio pendiente: la contraseña temporal sola no da acceso" \
+  test "$(kc_user_state piedrazul harness-pending "${PENDING_PW}")" = not_set_up
+pending_row() {
+  sql "select u.id||'|'||u.enabled||'|'||coalesce((select string_agg(required_action,'+' order by required_action) from keycloak.user_required_action where user_id=u.id),'')
+         ||'|'||coalesce((select string_agg(c.id||':'||c.type||':'||md5(coalesce(c.secret_data,'')||coalesce(c.credential_data,'')),',' order by c.id) from keycloak.credential c where c.user_id=u.id),'')
+       from keycloak.user_entity u join keycloak.realm r on r.id=u.realm_id and r.name='piedrazul' where u.username='harness-pending'"
+}
+PLATFORM_SNAP="$(platform_row)"
+PENDING_SNAP="$(pending_row)"
+TECH_SNAP="$(technical_row)"
+USERS_SNAP="$(users_in_realm)"
+CONTAINER_BEFORE="$(kc_container)"
+check "previo: la base está en ${FROM_VERSION}" test "$(kc_db_version)" = "${FROM_VERSION}"
+
+section "UPG — actualización por convergencia normal a ${KC_TO_DECLARED}"
+use_keycloak "${KC_TO_DECLARED}"
+TO_VERSION="$(docker pull -q --platform linux/amd64 "${KC_REF}" >/dev/null; kc_image_version "${KC_REF}")"
+converge upgrade false; RC=$?
+check "UPG: la convergencia normal termina bien (rc=${RC})" test "${RC}" -eq 0
+check "UPG: informa la migración hacia adelante ${FROM_VERSION} → ${TO_VERSION} antes de arrancar" \
+  bash -c "log_has upgrade 'base migrada por ${FROM_VERSION}, arrancar ${TO_VERSION} la migra hacia adelante (sin vuelta atrás)'"
+check "UPG: P1 sin evento ni autoridad temporal (la actualización no es un evento de identidad)" \
+  bash -c "log_has upgrade 'KEYCLOAK: estado P1' && ! log_has upgrade 'Crear la autoridad temporal' && test \$(temp_count) = 0"
+check "UPG: Keycloak recreado con la identidad exacta nueva" \
+  bash -c "c=\"\$(kc_container)\"; test \"\${c%%|*}\" != '${CONTAINER_BEFORE%%|*}' && test \"\${c##*|}\" = '${KC_REF}'"
+check "UPG: la base quedó migrada a ${TO_VERSION} (y conserva el registro de ${FROM_VERSION})" \
+  bash -c "test \"\$(kc_db_version)\" = '${TO_VERSION}' && test \"\$(sql \"select count(*) from keycloak.migration_model where version='${FROM_VERSION}'\")\" = 1"
+check "UPG: converge verificó identidad en ejecución y versión de la base" \
+  log_has upgrade "KEYCLOAK ${TO_VERSION} en ejecución (${KC_REF}); base en ${TO_VERSION}"
+check "UPG: mismo realm, mismas identidades de negocio" \
+  bash -c "test '$(realm_id)' = '${REALM_ID}' && test \"\$(users_in_realm)\" = '${USERS_SNAP}'"
+check "UPG: clientes técnicos con el mismo secreto (hash), forma y roles" test "$(technical_row)" = "${TECH_SNAP}"
+check "UPG: backend y automatización autentican con sus secretos; el del repositorio sigue rechazado" \
+  bash -c "test \"\$(kc_client_auth piedrazul piedrazul-backend '${BACKEND_SECRET}')\" = ok && test \"\$(kc_client_auth master piedrazul-keycloak-automation '${AUTOMATION_SECRET}')\" = ok && test \"\$(kc_client_auth piedrazul piedrazul-backend '${REPO_BACKEND_SECRET}')\" = rejected"
+check "UPG: administrador humano intacto (id, estado, acciones, roles, atributos, credenciales)" \
+  test "$(platform_row)" = "${PLATFORM_SNAP}"
+check "UPG: informa la preparación humana: CONFIGURADA" platform_status upgrade 'CONFIGURADA'
+check "UPG: identidad de negocio pendiente intacta (acción UPDATE_PASSWORD y contraseña temporal)" \
+  test "$(pending_row)" = "${PENDING_SNAP}"
+check "UPG: su contraseña temporal sigue sin dar acceso sola (Keycloak exige la acción)" \
+  test "$(kc_user_state piedrazul harness-pending "${PENDING_PW}")" = not_set_up
+KBL_PASSWORD="${PLATFORM_NEW_PW}" browser login upg-login KBL_PASSWORD
+check "UPG: login del administrador humano en ${TO_VERSION}: pide OTP, rechaza uno incorrecto, entra con el correcto" \
+  bash -c "browser_has upg-login 'browser.otp_challenge=yes' && browser_has upg-login 'browser.wrong_otp=rejected' && browser_has upg-login 'browser.token=ok'"
+KBL_PASSWORD="${PLATFORM_NEW_PW}" browser direct-grant upg-dg KBL_PASSWORD
+check "UPG: admin-cli sin OTP no entrega token; con OTP sí" \
+  bash -c "browser_has upg-dg 'direct_grant.without_otp=invalid_user_credentials' && browser_has upg-dg 'direct_grant.with_otp=token'"
+ansible_run upg-verify-ok verify.yml; RC=$?
+check "UPG: verificación de identidad en ejecución con la identidad nueva: pasa (rc=${RC})" test "${RC}" -eq 0
+ansible_run upg-verify-old verify.yml -e "keycloak_image_ref=${KC_FROM_REF}"; RC=$?
+check "UPG: verificación con la identidad anterior: falla y no se registra como éxito (rc=${RC})" \
+  bash -c "test ${RC} -ne 0 && log_has upg-verify-old 'IDENTIDAD EN EJECUCIÓN: keycloak no corre ${KC_FROM_REF}'"
+converge upgrade-again false; RC=$?
+check "UPG: la convergencia siguiente no recrea ni migra (misma versión) (rc=${RC})" \
+  bash -c "test ${RC} -eq 0 && log_has upgrade-again 'misma versión que la imagen: sin migración' && log_has upgrade-again 'KEYCLOAK: estado P1'"
+KC_TO_REF="${KC_REF}"
+
+section "UPG — volver atrás a ${KC_FROM_DECLARED} sobre la base migrada: falla cerrado"
+CONTAINER_UPGRADED="$(kc_container)"
+use_keycloak "${KC_FROM_DECLARED}"
+for mode in false true; do
+  converge "downgrade-rec-${mode}" "${mode}"; RC=$?
+  check "vuelta atrás (recuperación=${mode}): falla (rc=${RC})" test "${RC}" -ne 0
+  check "vuelta atrás (recuperación=${mode}): motivo visible (base migrada por ${TO_VERSION}, imagen ${FROM_VERSION})" \
+    log_has "downgrade-rec-${mode}" "la base ya fue migrada por Keycloak ${TO_VERSION} y la imagen de este converge es ${FROM_VERSION}"
+  check "vuelta atrás (recuperación=${mode}): Keycloak no se detuvo, recreó ni arrancó con la imagen anterior" \
+    test "$(kc_container)" = "${CONTAINER_UPGRADED}"
+  check "vuelta atrás (recuperación=${mode}): sin evento, autoridad temporal ni reconciliación" \
+    bash -c "! log_has downgrade-rec-${mode} 'Crear la autoridad temporal' && ! log_has downgrade-rec-${mode} 'Reconciliar el secreto' && test \$(temp_count) = 0"
+  check "vuelta atrás (recuperación=${mode}): la base sigue en ${TO_VERSION}" test "$(kc_db_version)" = "${TO_VERSION}"
+done
+use_keycloak "${KC_TO_DECLARED}"
+check "vuelta atrás: restaurada la identidad nueva para lo que sigue" test "${KC_REF}" = "${KC_TO_REF}"
+PLATFORM_STATUS_P1='CONFIGURADA'
+fi
+
+# ══ IDENT: identidad de Keycloak inválida o distinta ═════════════════════════
+section "IDENT — identidad de Keycloak inválida o distinta: falla antes de tocar Keycloak"
+declare_keycloak() { printf 'services:\n  keycloak:\n    image: %s\n' "$1" > "${W}/declared/keycloak.yml"; }
+ident_expect() { # <etiqueta> <motivo> [extra args]
+  local label="$1" reason="$2" before rc; shift 2
+  before="$(kc_container)"
+  converge "${label}" false "$@"; rc=$?
+  check "${label}: falla (rc=${rc})" test "${rc}" -ne 0
+  check "${label}: motivo visible: ${reason}" log_has "${label}" "${reason}"
+  check "${label}: Keycloak intacto (mismo contenedor, sin reinicio); sin clasificar ni reconciliar" \
+    bash -c "test \"\$(kc_container)\" = '${before}' && ! log_has '${label}' 'KEYCLOAK: estado' && ! log_has '${label}' 'Reconciliar el secreto'"
+}
+check "IDENT: preparación: Keycloak corre ${KC_REF}" \
+  bash -c "c=\"\$(kc_container)\"; [[ \"\${c}\" == *'|true|${KC_REF}' ]]"
+FAKE_DIGEST="sha256:$(printf '0%.0s' {1..64})"
+declare_keycloak "${KC_DECLARED%@*}"
+ident_expect ident-tag-only 'IDENTIDAD DE KEYCLOAK inválida o distinta de la declarada'
+declare_keycloak "${KC_DECLARED%%:*}:$(sed 's/[0-9]*$/999/' <<< "${TO_VERSION:-$(kc_image_version "${KC_REF}")}")@${KC_INDEX}"
+ident_expect ident-tag-mismatch 'no es la imagen linux/amd64 de la versión declarada'
+declare_keycloak "${KC_DECLARED}"
+ident_expect ident-index-mismatch 'IDENTIDAD DE KEYCLOAK inválida o distinta de la declarada' -e "keycloak_image_index_digest=${FAKE_DIGEST}"
+ident_expect ident-index-as-ref 'IDENTIDAD DE KEYCLOAK inválida o distinta de la declarada' -e "keycloak_image_ref=quay.io/keycloak/keycloak@${KC_INDEX}"
+ident_expect ident-other-repo 'IDENTIDAD DE KEYCLOAK inválida o distinta de la declarada' -e "keycloak_image_ref=docker.io/keycloak/keycloak@${KC_REF#*@}"
+ident_expect ident-tag-ref 'IDENTIDAD DE KEYCLOAK inválida o distinta de la declarada' -e "keycloak_image_ref=${KC_DECLARED%@*}"
+write_image_env "quay.io/keycloak/keycloak@${FAKE_DIGEST}"
+ident_expect ident-image-env 'no arrancaría exactamente'
+write_image_env "${KC_REF}"
+ansible_run ident-running-other verify.yml -e "keycloak_image_ref=quay.io/keycloak/keycloak@${FAKE_DIGEST}"; RC=$?
+check "IDENT: verificación en ejecución contra otra identidad: falla (rc=${RC})" \
+  bash -c "test ${RC} -ne 0 && log_has ident-running-other 'IDENTIDAD EN EJECUCIÓN: keycloak no corre'"
+ansible_run ident-running-tag verify.yml -e "keycloak_image_ref=${KC_DECLARED%@*}"; RC=$?
+check "IDENT: verificación en ejecución con una identidad esperada por tag: falla (rc=${RC})" \
+  bash -c "test ${RC} -ne 0 && log_has ident-running-tag 'no es exacta'"
+ansible_run ident-running-ok verify.yml; RC=$?
+check "IDENT: verificación en ejecución con la identidad exacta: pasa (rc=${RC})" test "${RC}" -eq 0
+
+# ══ MV: versión registrada de la base desconocida ════════════════════════════
+if [ "${TARGET}" = migration-version ]; then
+section "MV — base inicializada sin versión registrada conocida: falla antes de tocar Keycloak"
+sql "drop table if exists public.harness_mv_backup; create table public.harness_mv_backup as table keycloak.migration_model" >/dev/null
+check "MV: preparación: la base registra $(kc_db_version) (copia guardada)" \
+  test "$(sql "select count(*) from public.harness_mv_backup")" -ge 1
+mv_restore() {
+  sql "alter table if exists keycloak.harness_mv_renamed rename to migration_model" >/dev/null 2>&1
+  sql "delete from keycloak.migration_model; insert into keycloak.migration_model select * from public.harness_mv_backup" >/dev/null
+}
+mv_expect() { # <etiqueta> <valor informado> <preparación SQL>
+  local label="$1" shown="$2" before rc mode
+  mv_restore
+  sql "$3" >/dev/null
+  before="$(kc_container)"
+  for mode in false true; do
+    converge "${label}-rec-${mode}" "${mode}"; rc=$?
+    check "${label} (recuperación=${mode}): falla (rc=${rc})" test "${rc}" -ne 0
+    check "${label} (recuperación=${mode}): motivo visible: versión desconocida '${shown}'" \
+      bash -c "log_has '${label}-rec-${mode}' 'su versión registrada (migration_model) es desconocida' && log_has '${label}-rec-${mode}' '${shown}'"
+    check "${label} (recuperación=${mode}): Keycloak intacto (mismo contenedor, sin reinicio)" test "$(kc_container)" = "${before}"
+    check "${label} (recuperación=${mode}): sin clasificar, evento, autoridad temporal ni reconciliación" \
+      bash -c "! log_has '${label}-rec-${mode}' 'KEYCLOAK: estado' && ! log_has '${label}-rec-${mode}' 'Crear la autoridad temporal' && ! log_has '${label}-rec-${mode}' 'Reconciliar el secreto' && test \$(temp_count) = 0"
+  done
+}
+mv_expect mv-absent '?absent' "alter table keycloak.migration_model rename to harness_mv_renamed"
+mv_expect mv-empty '?empty' "delete from keycloak.migration_model"
+# Ambigua (dos filas con el update_time más reciente) no se puede construir: Keycloak la
+# impide con UK_MIGRATION_UPDATE_TIME (changelog 26.2.6)
+check "MV: Keycloak rechaza dos registros con el mismo update_time (contrato de la tabla)" \
+  bash -c "! sql \"insert into keycloak.migration_model(id, version, update_time) select 'harness-mv', '26.7.0', max(update_time) from keycloak.migration_model\""
+mv_expect mv-null '?null' "update keycloak.migration_model set version=null where update_time=(select max(update_time) from keycloak.migration_model)"
+mv_expect mv-malformed 'harness-not-a-version' "update keycloak.migration_model set version='harness-not-a-version' where update_time=(select max(update_time) from keycloak.migration_model)"
+mv_restore
+sql "drop table public.harness_mv_backup" >/dev/null
+converge mv-restored false; RC=$?
+check "MV: restaurada la versión registrada, la convergencia vuelve a P1 sin evento (rc=${RC})" \
+  bash -c "test ${RC} -eq 0 && log_has mv-restored 'misma versión que la imagen: sin migración' && log_has mv-restored 'KEYCLOAK: estado P1' && ! log_has mv-restored 'Crear la autoridad temporal'"
+fi
+
+if [ -z "${TARGET}" ] || [ "${TARGET}" = upgrade ]; then
 # ══ P1: convergencias repetidas ══════════════════════════════════════════════
 section "P1 — conocido/reconciliado, repetible"
 for n in 1 2; do
@@ -346,7 +592,7 @@ for n in 1 2; do
   check "P1#${n}: sin autoridad temporal en la base" test "$(temp_count)" = 0
   check "P1#${n}: no exige KC_PLATFORM_ADMIN_INITIAL_PASSWORD (ausente) y no toca al administrador humano" \
     bash -c "test '$(platform_row)' = '${PLATFORM_SNAP}' && ! task_ran p1-${n} 'Crear el administrador humano'"
-  check "P1#${n}: informa la preparación humana aparte: primer login pendiente" platform_status "p1-${n}" 'CREADA, primer login pendiente'
+  check "P1#${n}: informa la preparación humana aparte: ${PLATFORM_STATUS_P1}" platform_status "p1-${n}" "${PLATFORM_STATUS_P1}"
   check "P1#${n}: la política de master sigue length(16) y no se reaplica (sin evento)" \
     bash -c "test \"\$(sql \"select password_policy from keycloak.realm where name='master'\")\" = 'length(16)' && ! task_ran p1-${n} 'Crear el administrador humano'"
 done
@@ -377,6 +623,8 @@ check "ROT-B: mismo realm y sentinela intacto" bash -c "test '$(realm_id)' = '${
 check "ROT-B: administrador humano intacto" test "$(platform_row)" = "${PLATFORM_SNAP}"
 
 # ══ ADMIN-H: primer login y OTP ══════════════════════════════════════════════
+# En upgrade el primer login ya ocurrió en la versión anterior (UPG)
+if [ "${TARGET}" != upgrade ]; then
 section "ADMIN-H — primer login de navegador: cambio de contraseña y enrolamiento OTP"
 KBL_PASSWORD="${PLATFORM_PW}" KBL_NEW_PASSWORD="${PLATFORM_NEW_PW}" KBL_SHORT_PASSWORD="${PLATFORM_SHORT_PW}" \
   browser first-login first-login KBL_PASSWORD KBL_NEW_PASSWORD KBL_SHORT_PASSWORD
@@ -391,6 +639,7 @@ check "primer login: queda OTP enrolado y sin acciones pendientes" \
   test "$(platform_facts)" = "true||admin,default-roles-master|password:1,otp:1|false"
 KBL_PASSWORD="${PLATFORM_PW}" browser password old-pw KBL_PASSWORD
 check "primer login: la contraseña temporal deja de valer" browser_has old-pw 'browser.code=none'
+fi
 converge admin-configured false; RC=$?
 check "ADMIN-H: la convergencia sigue P1 (rc=${RC})" bash -c "test ${RC} -eq 0 && log_has admin-configured 'KEYCLOAK: estado P1'"
 check "ADMIN-H: informa CONFIGURADA y que el login con OTP se verifica a mano" \
@@ -516,7 +765,7 @@ converge after-foreign-user false; RC=$?
 check "usuario-ajeno: retirado por el operador, la convergencia vuelve a P1 (rc=${RC})" \
   bash -c "test ${RC} -eq 0 && log_has after-foreign-user 'KEYCLOAK: estado P1'"
 
-if [ -z "${TARGET}" ]; then
+if [ -z "${TARGET}" ] || [ "${TARGET}" = upgrade ]; then
 section "P3/REC — rotación de KC_AUTOMATION_CLIENT_SECRET (credencial rechazada)"
 OLD_AUTOMATION="${AUTOMATION_SECRET}"
 AUTOMATION_SECRET="$(synthetic automation2)${TRICKY}"; SECRETS_SEEN+=("${AUTOMATION_SECRET}")
