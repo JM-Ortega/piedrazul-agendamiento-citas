@@ -36,11 +36,13 @@
     fail_msg: "KC_BACKEND_CLIENT_SECRET está vacío en .env — corre converge primero"
   no_log: true
 
-# Contrato de base de datos: un .env anterior (DB_USER/DB_PASSWORD) no lo cumple
+# Contrato de base de datos: un .env anterior (DB_USER/DB_PASSWORD) no lo cumple.
+# splitlines() y no split('\n'): en set_fact el "\n" llega escapado y no parte el archivo
+# (ver identity_seed_runtime.yml); con split('\n') toda clave se informaba ausente.
 - name: Buscar claves de base de datos vacías o ausentes en .env
   ansible.builtin.set_fact:
     app_env_db_missing: >-
-      {{ app_db_env_keys | reject('in', (app_env_file.content | b64decode).split('\n')
+      {{ app_db_env_keys | reject('in', (app_env_file.content | b64decode).splitlines()
          | select('match', '^[A-Z_]+=.+') | map('regex_replace', '=.*$', '') | list) | list }}
   vars:
     app_db_env_keys:
