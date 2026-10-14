@@ -11,6 +11,7 @@ import { KEYCLOAK_EVENT_SIGNAL, KeycloakEventType } from 'keycloak-angular';
 import { AppHealthService } from './core/services/app-health.service';
 import { NavbarComponent } from './shared/components/navbar/navbar.component';
 import { ConfirmModalComponent } from './designSystem/organisms/confirmModal/confirmModal.component';
+import { HelpWidgetComponent } from './designSystem/organisms/helpWidget/helpWidget.component';
 import { AppService } from './core/services/app.service';
 import { SessionInactivityService } from './core/services/sessionInactivity.service';
 
@@ -19,7 +20,12 @@ type BootstrapState = 'loading' | 'ready' | 'keycloak-error' | 'backend-error';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, NavbarComponent, ConfirmModalComponent],
+  imports: [
+    RouterOutlet,
+    NavbarComponent,
+    ConfirmModalComponent,
+    HelpWidgetComponent,
+  ],
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './app.component.css',
