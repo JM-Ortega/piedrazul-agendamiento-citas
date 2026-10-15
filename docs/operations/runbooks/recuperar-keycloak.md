@@ -135,7 +135,7 @@ convergencia normal con otra imagen. Keycloak migra su base al arrancar y esa mi
 (el índice se lee con `docker buildx imagetools inspect quay.io/keycloak/keycloak:<versión>`,
 campo `Digest`) después de revisar las notas de actualización de Keycloak, y se despliega por
 la cadena normal: un cambio en `infra/compose` corre converge. El workflow resuelve ese índice
-a su manifiesto `linux/amd64`, lo escanea (solo reporte) y converge despliega exactamente ese
+a su manifiesto `linux/amd64`, lo escanea, la política de vulnerabilidades lo autoriza y converge despliega exactamente ese
 manifiesto (ver [`ANSIBLE.md`](../../../infra/ansible/ANSIBLE.md#identidad-de-keycloak-keycloak_imageyml)).
 
 **Qué hace converge** (`keycloak_lifecycle.yml`), antes de tocar Keycloak:

@@ -1,12 +1,12 @@
-name: Escanear imagen con Trivy (solo reporte)
+name: Escanear imagen con Trivy
 description: >-
   Intenta escanear con Trivy el manifiesto linux/amd64 exacto de una imagen, directo del
-  registry, y deja evidencia explícita del resultado: "scanned" (con conteo de hallazgos,
-  que puede ser cero) u "operational_failure" (registry, DB de vulnerabilidades o Trivy
-  fallaron: no hay evaluación, nunca equivale a cero hallazgos). Mientras la política de
-  vulnerabilidades no esté activa ninguno de esos dos resultados hace fallar el paso;
-  cualquier otro error (entrada inválida, evidencia, artifact) sí lo hace. El escáner no
-  recibe secretos ni el socket de Docker.
+  registry, y deja evidencia explícita del resultado: "scanned" (con los hallazgos, que
+  pueden ser cero) u "operational_failure" (registry, DB de vulnerabilidades o Trivy
+  fallaron: no hay evaluación, nunca equivale a cero hallazgos). La acción solo produce
+  evidencia: la decisión (autorizar o bloquear) es de vuln-policy.sh, que bloquea un
+  operational_failure. Cualquier otro error (entrada inválida, evidencia, artifact) falla
+  el paso. El escáner no recibe secretos ni el socket de Docker.
 
 inputs:
   surface:
@@ -38,11 +38,11 @@ runs:
   steps:
     # Sin socket de Docker ni credenciales: Trivy lee las capas directo del registry
     # (--image-src remote) y solo monta su caché y el directorio del reporte.
-    # --exit-code 0: los hallazgos nunca son error. Un error del intento de Trivy (registry,
-    # DB, ejecución o reporte que no corresponde) se registra como operational_failure en
-    # vez de fallar el paso (transitorio mientras el escaneo sea solo reporte; con la
-    # política activa será bloqueante). Cualquier otro error (entrada inválida, evidencia,
-    # artifact) SÍ falla el paso: no hay evidencia verificable y producción no muta.
+    # --exit-code 0: los hallazgos nunca son error del paso. Un error del intento de Trivy
+    # (registry, DB, ejecución o reporte que no corresponde) se registra como
+    # operational_failure en vez de fallar el paso, para que quede evidencia explícita; la
+    # política (vuln-policy.sh) lo bloquea. Cualquier otro error (entrada inválida,
+    # evidencia, artifact) SÍ falla el paso: no hay evidencia verificable y producción no muta.
     - name: Escanear con Trivy
       id: scan
       shell: bash
@@ -84,7 +84,8 @@ runs:
             "${TRIVY_IMAGE}" version --format json > "${SCAN_DIR}/trivy-version.json"
 
           jq -e --arg ref "${IMAGE_REF}" \
-            '.SchemaVersion == 2 and .ArtifactName == $ref and (.Results | type == "array" or . == null)' \
+            '.SchemaVersion == 2 and .ArtifactName == $ref and (.CreatedAt | type == "string")
+             and (.Results | type == "array" or . == null)' \
             "${SCAN_DIR}/trivy.json" > /dev/null || {
               echo "Error: el reporte de Trivy no corresponde a ${IMAGE_REF} o está incompleto"
               exit 1
@@ -101,7 +102,7 @@ runs:
           echo "outcome=scanned" >> "$GITHUB_OUTPUT"
         else
           echo "outcome=operational_failure" >> "$GITHUB_OUTPUT"
-          echo "::error title=Escaneo de imagen: FALLO OPERATIVO::No se pudo evaluar ${IMAGE_REF} (código ${RC}). No equivale a cero hallazgos. Solo reporte: no bloquea mientras la política de vulnerabilidades no esté activa."
+          echo "::error title=Escaneo de imagen: FALLO OPERATIVO::No se pudo evaluar ${IMAGE_REF} (código ${RC}). No equivale a cero hallazgos: la política de vulnerabilidades bloquea la mutación."
         fi
 
     - name: Evidencia del escaneo
@@ -125,7 +126,7 @@ runs:
           --arg surface "${SURFACE}" --arg source "${SOURCE}" --arg label "${LABEL}" \
           --arg index "${INDEX_DIGEST}" --arg ref "${IMAGE_REF}" --arg outcome "${OUTCOME}" \
           '{surface: $surface, source: $source, label: $label, image_index_digest: $index,
-            image_ref: $ref, platform: "linux/amd64", outcome: $outcome, enforcement: "report-only"}')
+            image_ref: $ref, platform: "linux/amd64", outcome: $outcome, enforcement: "policy"}')
 
         if [ "${OUTCOME}" = "scanned" ]; then
           jq --slurpfile report "${SCAN_DIR}/trivy.json" --slurpfile version "${SCAN_DIR}/trivy-version.json" '
@@ -133,14 +134,16 @@ runs:
             | def sev($s): [$v[] | select(.Severity == $s)]
                 | {findings: length, unique_ids: ([.[].VulnerabilityID] | unique | length)};
             . + {
+              scanned_at: $report[0].CreatedAt,
               trivy_version: $version[0].Version,
               vulnerability_db: $version[0].VulnerabilityDB,
-              critical: sev("CRITICAL"),
+              java_db: ($version[0].JavaDB // null),
+              critical: (sev("CRITICAL") + {ids: ([$v[] | select(.Severity == "CRITICAL") | .VulnerabilityID] | unique)}),
               high: sev("HIGH")
             }' <<< "${BASE}" > "${SCAN_DIR}/summary.json"
 
           jq -r '
-            "## Escaneo de `\(.surface)`: evaluado (solo reporte)",
+            "## Escaneo de `\(.surface)`: evaluado",
             "",
             "| campo | valor |",
             "|---|---|",
@@ -149,25 +152,26 @@ runs:
             "| índice OCI | `\(.image_index_digest)` |",
             "| escaneado (linux/amd64) | `\(.image_ref)` |",
             "| Trivy | \(.trivy_version) |",
+            "| escaneado | \(.scanned_at) |",
             "| DB de vulnerabilidades | v\(.vulnerability_db.Version), actualizada \(.vulnerability_db.UpdatedAt) |",
-            "| CRITICAL | \(.critical.findings) hallazgos, \(.critical.unique_ids) CVE únicos |",
+            "| CRITICAL | \(.critical.findings) hallazgos, \(.critical.unique_ids) CVE únicos\(if .critical.unique_ids > 0 then ": " + (.critical.ids | join(", ")) else "" end) |",
             "| HIGH | \(.high.findings) hallazgos, \(.high.unique_ids) CVE únicos |",
             "",
-            "> Solo reporte: los hallazgos no bloquean; la política de vulnerabilidades todavía no está activa."
+            "> Evidencia: la decisión es de la política de vulnerabilidades (CRITICAL sin disposición válida bloquea; HIGH solo se informa)."
           ' "${SCAN_DIR}/summary.json" >> "$GITHUB_STEP_SUMMARY"
         else
           # Sin conteos: un fallo operativo no es una evaluación (y nunca es "0 hallazgos")
           jq '. + {critical: null, high: null}' <<< "${BASE}" > "${SCAN_DIR}/summary.json"
           {
-            echo "## Escaneo de \`${SURFACE}\`: FALLO OPERATIVO (solo reporte)"
+            echo "## Escaneo de \`${SURFACE}\`: FALLO OPERATIVO"
             echo
             echo "| campo | valor |"
             echo "|---|---|"
             echo "| resultado | operational_failure |"
             echo "| imagen | \`${IMAGE_REF}\` |"
             echo
-            echo "> No se pudo evaluar esta imagen: **no equivale a cero hallazgos**. Transitorio mientras la"
-            echo "> política no esté activa: no bloquea producción."
+            echo "> No se pudo evaluar esta imagen: **no equivale a cero hallazgos**. La política de"
+            echo "> vulnerabilidades bloquea su mutación (salvo break-glass autorizado con evidencia histórica)."
           } >> "$GITHUB_STEP_SUMMARY"
         fi
 

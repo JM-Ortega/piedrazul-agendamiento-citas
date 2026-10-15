@@ -3,24 +3,27 @@ name: Producción — Hetzner
 # Única cadena de producción de Hetzner: Terraform Apply y deploy de la aplicación.
 #
 #   classify ─┬─ resolve_rollback ─┐
-#             ├─ app_build ────────┼─ select_images ─ image_targets ─ image_scan ─┐
-#             └─ postgres_build ───┘                                             │
-#                                    production (gate production-hetzner) ◄──────┘
+#             ├─ app_build ────────┼─ select_images ─ image_targets ─ image_scan ─ image_policy ─┐
+#             └─ postgres_build ───┘                                                            │
+#                                    production (gate production-hetzner) ◄─────────────────────┘
 #                                      └─ conclude
 #
 # Solo `production` usa el environment production-hetzner y credenciales de producción
 # (HCP Terraform, SSH, secretos de la app). Clasificación, builds, selección y escaneo de
 # identidades conocidas corren antes del gate y solo con GITHUB_TOKEN.
 #
-# Escaneo antes de mutar: ninguna mutación que pueda aplicar una imagen empieza antes de
-# que termine el intento de escaneo de esa identidad exacta. Identidades conocidas antes
-# del gate → image_scan (production espera a que termine). Reuso de backend/postgres → se
-# lee tras el gate y se escanea dentro de production antes de converge/deploy.
-# Solo reporte: cada intento queda como "scanned" (con hallazgos, que no bloquean) u
-# "operational_failure" (registry/DB/Trivy; sin evaluación, nunca "0 hallazgos", tampoco
-# bloquea mientras la política no esté activa). Bloquea la mutación una cadena de
-# escaneo incompleta o no verificable: job de escaneo fallido o cancelado, evidencia
-# ausente, malformada o de otra referencia. Eso NO es un operational_failure.
+# Escaneo y política antes de mutar: ninguna mutación que pueda aplicar una imagen empieza
+# sin que la política de vulnerabilidades (vuln-policy.sh) autorice el escaneo fresco de
+# esa identidad exacta (escaneado = autorizado = desplegado). Identidades conocidas antes
+# del gate → image_scan + image_policy (evaluación preliminar: un bloqueo evita el gate y
+# el Apply). Reuso de backend/postgres → se lee tras el gate y se escanea dentro de
+# production. Dentro de production, la evaluación autoritativa de TODAS las imágenes que
+# el run aplica va justo antes de converge/deploy.
+# CRITICAL sin disposición aprobada por un humano autorizado → BLOCK; HIGH → solo se
+# informa; "operational_failure" (registry/DB/Trivy; nunca "0 hallazgos") → BLOCK;
+# evidencia incompleta, vencida o no verificable → BLOCK. Break-glass (solo dispatch,
+# autorización aprobada y evidencia histórica verificada) queda registrado en un issue
+# security-break-glass antes de mutar y nunca se informa como escaneo fresco.
 
 on:
   # Todo push a main corre la clasificación (sin filtro de rutas): si un commit ajeno a
@@ -59,6 +62,14 @@ on:
         description: "Recuperación P3 de Keycloak autorizada: autoridad temporal con kc.sh bootstrap-admin, detiene Keycloak durante el evento (requiere configuración del servidor; docs/operations/runbooks/recuperar-keycloak.md)"
         type: boolean
         default: false
+      break_glass_authorization:
+        description: "Break-glass de escaneo (BG-AAAA-NNN): solo ante un fallo operativo del escáner; requiere security/break-glass/<id>.json aprobado (docs/operations/runbooks/politica-vulnerabilidades-imagenes.md)"
+        type: string
+        default: ""
+      break_glass_justification:
+        description: "Justificación de ESTA operación de break-glass (obligatoria con break_glass_authorization)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -92,6 +103,7 @@ jobs:
       run_app_deploy: ${{ steps.intent.outputs.run_app_deploy }}
       image_tag: ${{ steps.intent.outputs.image_tag }}
       keycloak_recovery: ${{ steps.intent.outputs.keycloak_recovery }}
+      break_glass_authorization: ${{ steps.intent.outputs.break_glass_authorization }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -111,6 +123,8 @@ jobs:
           IN_APP_DEPLOY: ${{ inputs.run_app_deploy }}
           IN_IMAGE_TAG: ${{ inputs.image_tag }}
           IN_KEYCLOAK_RECOVERY: ${{ inputs.keycloak_recovery }}
+          IN_BREAK_GLASS: ${{ inputs.break_glass_authorization }}
+          IN_BREAK_GLASS_JUSTIFICATION: ${{ inputs.break_glass_justification }}
         run: |
           set -euo pipefail
 
@@ -130,6 +144,7 @@ jobs:
             {
               echo "image_tag="
               echo "keycloak_recovery=false"
+              echo "break_glass_authorization="
             } >> "${OUT}"
           else
             if [ "${IN_TERRAFORM}" = "false" ] && [ "${IN_HOST_CONFIG}" = "false" ] && \
@@ -157,6 +172,31 @@ jobs:
               echo "::error title=Intención de producción::keycloak_recovery requiere run_host_config=true"
               exit 1
             fi
+            # Break-glass: solo aquí (dispatch); la autorización la verifica vuln-policy.sh
+            if [ -n "${IN_BREAK_GLASS}" ]; then
+              if ! [[ "${IN_BREAK_GLASS}" =~ ^BG-[0-9]{4}-[0-9]{3}$ ]]; then
+                echo "::error title=Intención de producción::break_glass_authorization '${IN_BREAK_GLASS}' no es un identificador BG-AAAA-NNN"
+                exit 1
+              fi
+              JUSTIFICATION_TRIMMED="${IN_BREAK_GLASS_JUSTIFICATION//[[:space:]]/}"
+              if [ "${#JUSTIFICATION_TRIMMED}" -lt 20 ]; then
+                echo "::error title=Intención de producción::break_glass_authorization requiere break_glass_justification (mínimo 20 caracteres)"
+                exit 1
+              fi
+              if [ "${IN_HOST_CONFIG}" != "true" ] && [ "${IN_APP_DEPLOY}" != "true" ]; then
+                echo "::error title=Intención de producción::break_glass_authorization solo tiene efecto con configuración del servidor o deploy de aplicación"
+                exit 1
+              fi
+              # El Apply es la primera mutación de production y va antes de la decisión
+              # autoritativa y del registro de auditoría: no se combina con break-glass
+              if [ "${IN_TERRAFORM}" != "false" ]; then
+                echo "::error title=Intención de producción::break_glass_authorization no admite run_terraform_apply: el Apply mutaría antes de autorizar y registrar la excepción"
+                exit 1
+              fi
+            elif [ -n "${IN_BREAK_GLASS_JUSTIFICATION}" ]; then
+              echo "::error title=Intención de producción::break_glass_justification sin break_glass_authorization"
+              exit 1
+            fi
 
             DEPLOY=false
             if [ "${IN_HOST_CONFIG}" = "true" ] || [ "${IN_APP_DEPLOY}" = "true" ]; then
@@ -180,6 +220,7 @@ jobs:
               echo "intent=${INTENT}"
               echo "image_tag=${IN_IMAGE_TAG}"
               echo "keycloak_recovery=${IN_KEYCLOAK_RECOVERY}"
+              echo "break_glass_authorization=${IN_BREAK_GLASS}"
             } > "${OUT}"
           fi
 
@@ -209,6 +250,9 @@ jobs:
             fi
             if [ "$(get keycloak_recovery)" = "true" ]; then
               echo "| recuperación de Keycloak (P3) | **autorizada**: autoridad temporal con bootstrap-admin, Keycloak detenido durante el evento |"
+            fi
+            if [ -n "$(get break_glass_authorization)" ]; then
+              echo "| break-glass de escaneo | **pedido**: \`$(get break_glass_authorization)\` (lo verifica la política; solo cubre fallos operativos del escáner) |"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -479,14 +523,14 @@ jobs:
             emit postgres reuse "${POSTGRES_REPOSITORY}" "" "" "" ""
           fi
 
-  # ── Escaneo de imágenes conocidas antes del gate (solo reporte) ─────────────
+  # ── Escaneo de imágenes conocidas antes del gate ─────────────────────────────
   # Intenta escanear con Trivy el manifiesto linux/amd64 exacto de cada imagen que este
-  # run construye o aplica en el servidor y cuya identidad se conoce antes del gate. El
-  # job de producción espera a que estos intentos terminen antes de mutar. Las identidades
-  # de reuso solo se conocen dentro de production y se escanean allí antes de mutar.
-  # Ni los hallazgos ni un fallo operativo (resolución, registry, DB o Trivy) bloquean
-  # todavía: la acción trivy-scan registra el fallo como operational_failure (anotación
-  # de error, resumen y summary.json) y termina bien; es distinto de cero hallazgos.
+  # run construye o aplica en el servidor y cuya identidad se conoce antes del gate.
+  # image_policy evalúa esa evidencia antes del gate; production vuelve a evaluarla, con la
+  # del reuso (que solo se conoce y escanea dentro de production), antes de mutar.
+  # La acción trivy-scan registra un fallo operativo (registry, DB o Trivy) como
+  # operational_failure (anotación de error, resumen y summary.json) y termina bien: es
+  # evidencia, distinta de cero hallazgos, y la política la bloquea.
   # Un job de escaneo que FALLA es otra cosa (error fuera del intento modelado: checkout,
   # evidencia, artifact): no hay evidencia verificable y production no empieza.
   image_targets:
@@ -542,10 +586,12 @@ jobs:
           PENDING='[]'
           NOT_APPLIED='[]'
 
-          add_target() {
+          # applied: este run la aplica en el servidor (la política la exige); una imagen
+          # construida y no desplegada se escanea pero no se autoriza
+          add_target() { # <surface> <source> <label> <índice> <ref> <applied>
             TARGETS=$(jq -c --arg surface "$1" --arg source "$2" --arg label "$3" \
-              --arg index "$4" --arg ref "$5" \
-              '. + [{surface: $surface, source: $source, label: $label, image_index_digest: $index, image_ref: $ref}]' \
+              --arg index "$4" --arg ref "$5" --argjson applied "$6" \
+              '. + [{surface: $surface, source: $source, label: $label, image_index_digest: $index, image_ref: $ref, applied: $applied}]' \
               <<< "${TARGETS}")
           }
           add_pending() {
@@ -569,9 +615,9 @@ jobs:
           # sin desplegarla, la imagen construida. El reuso se escanea en production antes de mutar.
           own_surface() { # <surface> <source> <tag> <index> <ref> <built_tag> <built_index> <built_ref>
             if [ "$2" != "reuse" ]; then
-              add_target "$1" "$2" "$3" "$4" "$5"
+              add_target "$1" "$2" "$3" "$4" "$5" true
             elif [ -n "$8" ]; then
-              add_target "$1" "build (no desplegada en este run)" "$6" "$7" "$8"
+              add_target "$1" "build (no desplegada en este run)" "$6" "$7" "$8" false
             fi
             if [ "$2" = "reuse" ] && [ "${APPLIES_STACK}" = "true" ]; then
               add_pending "$1" "reuso: la identidad exacta del último éxito se lee en el servidor tras el gate y se escanea en production antes de mutar"
@@ -606,7 +652,7 @@ jobs:
               echo "::error title=Identidad de Keycloak::el índice resuelto (${KEYCLOAK_INDEX_DIGEST}) no es el declarado"
               exit 1
             }
-            add_target keycloak "compose (fijada)" "${KEYCLOAK_LABEL}" "${KEYCLOAK_INDEX_DIGEST}" "${KEYCLOAK_IMAGE_REF}"
+            add_target keycloak "compose (fijada)" "${KEYCLOAK_LABEL}" "${KEYCLOAK_INDEX_DIGEST}" "${KEYCLOAK_IMAGE_REF}" true
           else
             add_not_applied keycloak
           fi
@@ -636,7 +682,7 @@ jobs:
               echo "::error title=Identidad de Traefik::el índice resuelto (${TRAEFIK_INDEX_DIGEST}) no es el declarado"
               exit 1
             }
-            add_target traefik "compose (fijada)" "${TRAEFIK_LABEL}" "${TRAEFIK_INDEX_DIGEST}" "${TRAEFIK_IMAGE_REF}"
+            add_target traefik "compose (fijada)" "${TRAEFIK_LABEL}" "${TRAEFIK_INDEX_DIGEST}" "${TRAEFIK_IMAGE_REF}" true
           else
             add_not_applied traefik
           fi
@@ -669,10 +715,9 @@ jobs:
               echo "No aplicadas por este run: $(jq -r 'join(", ")' <<< "${NOT_APPLIED}")."
             fi
             echo
-            echo "> Solo reporte: ni hallazgos ni fallos operativos bloquean. Producción espera a que"
-            echo "> terminen estos intentos antes de mutar."
-            echo "> Backend, postgres, keycloak y traefik se despliegan por la misma identidad"
-            echo "> exacta escaneada."
+            echo "> La política de vulnerabilidades evalúa estos escaneos antes del gate y otra vez,"
+            echo "> con los del reuso, justo antes de mutar. Backend, postgres, keycloak y traefik se"
+            echo "> despliegan por la misma identidad exacta escaneada y autorizada."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Reportar fallo operativo
@@ -686,7 +731,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   image_scan:
-    name: Escanear ${{ matrix.surface }} (solo reporte)
+    name: Escanear ${{ matrix.surface }}
     runs-on: ubuntu-latest
     needs: image_targets
     if: |
@@ -716,13 +761,92 @@ jobs:
           image_ref: ${{ matrix.image_ref }}
           phase: selected
 
+  # ── Política de vulnerabilidades antes del gate (preliminar) ────────────────
+  # Evalúa los escaneos de las identidades conocidas antes del gate que este run aplica.
+  # Un bloqueo aquí evita pedir la aprobación del environment y no llega al Apply. Solo
+  # GITHUB_TOKEN de lectura: verifica en GitHub la procedencia de disposiciones y de un
+  # break-glass (PR y revisiones, artifacts históricos). La decisión que habilita la
+  # mutación es la autoritativa dentro de production (vence o cambia con el tiempo).
+  image_policy:
+    name: Política de vulnerabilidades (preliminar)
+    runs-on: ubuntu-latest
+    needs: [classify, image_targets, image_scan]
+    if: |
+      !cancelled() &&
+      needs.classify.outputs.deploy_required == 'true' &&
+      needs.image_targets.result == 'success' &&
+      (needs.image_scan.result == 'success' ||
+        (needs.image_scan.result == 'skipped' && needs.image_targets.outputs.targets == '[]'))
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      decision: ${{ steps.policy.outputs.decision }}
+      # Huella de vars.VULNERABILITY_RISK_APPROVERS vista sin environment: production la exige igual
+      approvers_fingerprint: ${{ steps.policy.outputs.approvers_fingerprint }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Historia completa: la procedencia de una disposición se busca en main
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Origen (este run) y digest registrado por GitHub verificados; un fallo bloquea
+      - name: Descargar y verificar evidencia de escaneos
+        if: needs.image_targets.outputs.targets != '[]'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/current-scan-evidence.sh "${RUNNER_TEMP}/scan-evidence"
+
+      - name: Evaluar política
+        id: policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGETS: ${{ needs.image_targets.outputs.targets }}
+          EVIDENCE_DIR: ${{ runner.temp }}/scan-evidence
+          POLICY_PHASE: preliminar
+          RESULT_FILE: ${{ runner.temp }}/policy-result.json
+          RISK_APPROVERS: ${{ vars.VULNERABILITY_RISK_APPROVERS }}
+          BREAK_GLASS_ID: ${{ needs.classify.outputs.break_glass_authorization }}
+          BREAK_GLASS_JUSTIFICATION: ${{ inputs.break_glass_justification }}
+          EVENT_NAME: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          OP_RUN_TERRAFORM_APPLY: ${{ needs.classify.outputs.terraform_required }}
+          OP_RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
+          OP_RUN_APP_DEPLOY: ${{ needs.classify.outputs.run_app_deploy }}
+          OP_RUN_BUILD: ${{ needs.classify.outputs.run_build }}
+          OP_RUN_BUILD_POSTGRES: ${{ needs.classify.outputs.run_build_postgres }}
+          OP_IMAGE_TAG: ${{ needs.classify.outputs.image_tag }}
+          OP_KEYCLOAK_RECOVERY: ${{ needs.classify.outputs.keycloak_recovery }}
+        run: |
+          set -euo pipefail
+          # Solo lo que este run aplica; cada una con el directorio de su artifact
+          POLICY_INPUT=$(jq -c --arg d "${EVIDENCE_DIR}" --arg run "${GITHUB_RUN_ID}" \
+            '[.[] | select(.applied == true)
+              | {surface, image_ref, dir: "\($d)/image-scan-selected-\(.surface)-\($run)"}]' <<< "${TARGETS}")
+          export POLICY_INPUT
+          set +e
+          .github/scripts/vuln-policy.sh > "${RUNNER_TEMP}/policy.env"
+          RC=$?
+          set -e
+          cat "${RUNNER_TEMP}/policy.env" >> "$GITHUB_OUTPUT"
+          if [ "${RC}" -ne 0 ]; then
+            echo "::error title=Política de vulnerabilidades: BLOQUEO::$(jq -r '[.global_errors[]?, (.surfaces[]? | select(.verdict == "blocked") | "\(.surface): \(.reason_code)")] | join("; ")' "${RESULT_FILE}" 2>/dev/null || echo "entrada inválida")"
+            exit "${RC}"
+          fi
+
   # ── Autoridad de producción ────────────────────────────────────────────────
   # Único job con el environment production-hetzner y credenciales de producción. Una
   # aprobación cubre toda la cadena:
   #
-  #   [escaneo de identidades conocidas: image_scan] → frescura → Apply (si aplica) →
-  #   state version exacto → outputs → SSH → último éxito del servidor → identidades
-  #   exactas → evidencia de escaneo + escaneo del reuso → [frescura si no hubo Apply] →
+  #   [escaneo de identidades conocidas: image_scan + image_policy] → frescura → Apply (si
+  #   aplica) → state version exacto → outputs → SSH → último éxito del servidor →
+  #   identidades exactas → evidencia de escaneo + escaneo del reuso → política de
+  #   vulnerabilidades (autoritativa) [→ registro de break-glass] → [frescura si no hubo Apply] →
   #   converge (postgres + reconciliación de autoridades de la base → Keycloak/Traefik) /
   #   deploy (postgres + reconciliación → migración del backend construido → backend) →
   #   identidad en ejecución → health (contenedores + públicos) → registro del último éxito
@@ -736,12 +860,11 @@ jobs:
   production:
     name: Producción
     runs-on: ubuntu-latest
-    needs: [classify, select_images, image_targets, image_scan]
+    needs: [classify, select_images, image_targets, image_scan, image_policy]
     # Con deploy, espera a que el escaneo de las identidades conocidas antes del gate haya
-    # terminado en success: todos los intentos completados con evidencia (scanned u
-    # operational_failure, ambos aceptables mientras el escaneo sea solo reporte). Fallido
-    # o cancelado = cadena no verificable. Sin objetivos, image_scan se salta y la lista
-    # debe estar vacía. Los hallazgos no autorizan ni bloquean.
+    # terminado en success (todos los intentos completados con evidencia; fallido o
+    # cancelado = cadena no verificable; sin objetivos, image_scan se salta y la lista debe
+    # estar vacía) y a que la política preliminar no haya bloqueado.
     if: |
       !cancelled() &&
       needs.classify.result == 'success' &&
@@ -749,6 +872,7 @@ jobs:
       (needs.classify.outputs.terraform_required == 'true' || needs.classify.outputs.deploy_required == 'true') &&
       (needs.classify.outputs.deploy_required != 'true' ||
         (needs.image_targets.result == 'success' &&
+          needs.image_policy.result == 'success' &&
           (needs.image_scan.result == 'success' ||
             (needs.image_scan.result == 'skipped' && needs.image_targets.outputs.targets == '[]'))))
     timeout-minutes: 90
@@ -759,6 +883,13 @@ jobs:
       queue: max
     permissions:
       contents: read
+      # Política: procedencia de disposiciones (PR y revisiones) y de evidencia histórica
+      actions: read
+      pull-requests: read
+      # Solo break-glass: consumo de la autorización (commit status, no editable ni borrable)
+      # e issue de auditoría security-break-glass, ambos antes de mutar
+      statuses: write
+      issues: write
     env:
       ANSIBLE_CONFIG: infra/ansible/ansible.cfg
       ANSIBLE_HOST_KEY_CHECKING: "False"
@@ -784,6 +915,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          # Historia completa: la procedencia de una disposición se busca en main
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Verificar credenciales de producción
@@ -1041,21 +1174,21 @@ jobs:
             echo "::warning title=Último éxito del servidor::Inválido ($(sed -n 's/^state_error=//p' "${RUNNER_TEMP}/release/selected.env")); no se usó. Un deploy exitoso lo reemplaza."
           fi
 
-      # ── Escaneo antes de mutar ──
-      # Build/rollback y terceros: summary.json válido de image_scan sobre la misma
-      # referencia exacta (scanned u operational_failure). Reuso: se escanea aquí, con la identidad recién leída del
-      # servidor. El escáner (acción trivy-scan) no recibe secretos ni el socket de Docker.
-      # Resultados (scanned / operational_failure) solo se informan: no autorizan ni
-      # bloquean mientras la política de vulnerabilidades no esté activa.
-      # Solo datos (summary.json de cada intento). Si falta, scan-evidence.sh bloquea: un
-      # artifact ausente no prueba que Trivy haya intentado el escaneo.
-      - name: Descargar evidencia de escaneos previos
+      # ── Escaneo y política antes de mutar ──
+      # Build/rollback y terceros: evidencia válida de image_scan sobre la misma referencia
+      # exacta. Reuso: se escanea aquí, con la identidad recién leída del servidor. El
+      # escáner (acción trivy-scan) no recibe secretos ni el socket de Docker. Después, la
+      # política decide sobre TODAS las imágenes que el run aplica.
+      # Solo datos (summary.json, trivy.json y trivy-version.json de cada intento), con origen
+      # (este run) y digest registrado por GitHub verificados: un artifact alterado, ajeno o
+      # repetido falla aquí. Si falta, scan-evidence.sh bloquea: un artifact ausente no prueba
+      # que Trivy haya intentado el escaneo.
+      - name: Descargar y verificar evidencia de escaneos previos
         id: scan_download
         if: env.DEPLOY_REQUIRED == 'true' && needs.image_scan.result != 'skipped'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          pattern: image-scan-selected-*-${{ github.run_id }}
-          path: ${{ runner.temp }}/scan-evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/current-scan-evidence.sh "${RUNNER_TEMP}/scan-evidence"
 
       - name: Verificar evidencia de escaneo
         id: scan_evidence
@@ -1068,6 +1201,7 @@ jobs:
           BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
           POSTGRES_SOURCE: ${{ steps.select.outputs.postgres_source }}
           POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+          REUSE_SCAN_ROOT: ${{ github.workspace }}
         run: |
           set -euo pipefail
           .github/scripts/scan-evidence.sh > "${RUNNER_TEMP}/scan-evidence.env"
@@ -1098,7 +1232,78 @@ jobs:
           image_ref: ${{ steps.select.outputs.postgres_image_ref }}
           phase: production
 
+      # Decisión autoritativa, justo antes de mutar: todas las imágenes que el run aplica
+      # (incluido el reuso recién escaneado), con vigencias y procedencia verificadas ahora.
+      # Bloqueo después de la aprobación del environment: visible en el resumen y en una
+      # anotación; el reuso solo se conoce aquí.
+      - name: Autorizar imágenes (política de vulnerabilidades)
+        id: policy
+        if: env.DEPLOY_REQUIRED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          POLICY_INPUT: ${{ steps.scan_evidence.outputs.policy_input }}
+          POLICY_PHASE: autoritativa
+          RESULT_FILE: ${{ runner.temp }}/policy-result.json
+          RISK_APPROVERS: ${{ vars.VULNERABILITY_RISK_APPROVERS }}
+          # Un environment que ensombrece la variable del repositorio no cambia la autoridad
+          EXPECTED_APPROVERS_FINGERPRINT: ${{ needs.image_policy.outputs.approvers_fingerprint }}
+          BREAK_GLASS_ID: ${{ needs.classify.outputs.break_glass_authorization }}
+          BREAK_GLASS_JUSTIFICATION: ${{ inputs.break_glass_justification }}
+          EVENT_NAME: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          OP_RUN_TERRAFORM_APPLY: ${{ needs.classify.outputs.terraform_required }}
+          OP_RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
+          OP_RUN_APP_DEPLOY: ${{ needs.classify.outputs.run_app_deploy }}
+          OP_RUN_BUILD: ${{ needs.classify.outputs.run_build }}
+          OP_RUN_BUILD_POSTGRES: ${{ needs.classify.outputs.run_build_postgres }}
+          OP_IMAGE_TAG: ${{ needs.classify.outputs.image_tag }}
+          OP_KEYCLOAK_RECOVERY: ${{ needs.classify.outputs.keycloak_recovery }}
+        run: |
+          set -euo pipefail
+          set +e
+          .github/scripts/vuln-policy.sh > "${RUNNER_TEMP}/policy.env"
+          RC=$?
+          set -e
+          cat "${RUNNER_TEMP}/policy.env" >> "$GITHUB_OUTPUT"
+          if [ "${RC}" -ne 0 ]; then
+            echo "::error title=Política de vulnerabilidades: BLOQUEO::$(jq -r '[.global_errors[]?, (.surfaces[]? | select(.verdict == "blocked") | "\(.surface): \(.reason_code)")] | join("; ")' "${RESULT_FILE}" 2>/dev/null || echo "entrada inválida")"
+            exit "${RC}"
+          fi
+
+      # Break-glass: aprobación humana del environment en este run, consumo único de la
+      # autorización (commit status inmutable) e issue security-break-glass, ANTES de mutar;
+      # si algo falla, no hay mutación
+      - name: Registrar break-glass
+        id: break_glass
+        if: env.DEPLOY_REQUIRED == 'true' && steps.policy.outputs.decision == 'break_glass'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          POLICY_RESULT: ${{ runner.temp }}/policy-result.json
+          ENVIRONMENT_NAME: production-hetzner
+        run: |
+          set -euo pipefail
+          .github/scripts/break-glass-record.sh > "${RUNNER_TEMP}/break-glass.env"
+          cat "${RUNNER_TEMP}/break-glass.env" >> "$GITHUB_OUTPUT"
+          echo "::warning title=BREAK-GLASS::Imágenes autorizadas sin escaneo fresco: $(sed -n 's/^issue_url=//p' "${RUNNER_TEMP}/break-glass.env")"
+
+      # Una decisión ausente o desconocida falla el job: nunca deja seguir sin mutar y
+      # registrar un éxito falso
+      - name: Exigir autorización de imágenes
+        id: authorization
+        if: |
+          env.DEPLOY_REQUIRED == 'true' &&
+          !(steps.policy.outputs.decision == 'authorized' ||
+            (steps.policy.outputs.decision == 'break_glass' && steps.break_glass.outcome == 'success'))
+        env:
+          DECISION: ${{ steps.policy.outputs.decision }}
+        run: |
+          echo "::error title=Política de vulnerabilidades::Sin autorización de imágenes (decisión '${DECISION}'); producción no muta"
+          exit 1
+
       # ── Mutaciones del servidor ──
+      # Converge y deploy exigen además, explícitamente, la decisión de la política (y el
+      # registro del break-glass): un paso saltado por error nunca equivale a autorización.
       - name: Verificar frescura antes de mutar el servidor
         id: fresh_deploy
         if: env.DEPLOY_REQUIRED == 'true' && env.TERRAFORM_REQUIRED != 'true'
@@ -1108,7 +1313,10 @@ jobs:
 
       - name: Correr converge
         id: converge
-        if: env.RUN_HOST_CONFIG == 'true'
+        if: |
+          env.RUN_HOST_CONFIG == 'true' &&
+          (steps.policy.outputs.decision == 'authorized' ||
+            (steps.policy.outputs.decision == 'break_glass' && steps.break_glass.outcome == 'success'))
         env:
           BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
           POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
@@ -1180,7 +1388,10 @@ jobs:
       # no arranca y este paso falla antes de la verificación y del registro.
       - name: Correr deploy
         id: deploy
-        if: env.RUN_APP_DEPLOY == 'true'
+        if: |
+          env.RUN_APP_DEPLOY == 'true' &&
+          (steps.policy.outputs.decision == 'authorized' ||
+            (steps.policy.outputs.decision == 'break_glass' && steps.break_glass.outcome == 'success'))
         env:
           BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
           POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
@@ -1318,6 +1529,11 @@ jobs:
           O_ACCESS: ${{ steps.access.outcome }}/${{ steps.readiness.outcome }}/${{ steps.host_state.outcome }}
           O_SELECT: ${{ steps.select.outcome }}
           O_SCAN: ${{ steps.scan_download.outcome }}/${{ steps.scan_evidence.outcome }}/${{ steps.scan_backend.outcome }}/${{ steps.scan_postgres.outcome }}
+          O_POLICY: ${{ steps.policy.outcome }}/${{ steps.authorization.outcome }}
+          O_BREAK_GLASS: ${{ steps.break_glass.outcome }}
+          POLICY_DECISION: ${{ steps.policy.outputs.decision }}
+          BREAK_GLASS_ISSUE: ${{ steps.break_glass.outputs.issue_url }}
+          POLICY_RESULT: ${{ runner.temp }}/policy-result.json
           SCAN_EVIDENCE: ${{ steps.scan_evidence.outputs.evidence }}
           REUSE_BACKEND_SCAN: ${{ steps.scan_backend.outputs.outcome }}
           REUSE_POSTGRES_SCAN: ${{ steps.scan_postgres.outputs.outcome }}
@@ -1341,6 +1557,8 @@ jobs:
           first_failure "Acceso al servidor" "${O_ACCESS}"
           first_failure "Identidad de imagen (selección)" "${O_SELECT}"
           first_failure "Evidencia de escaneo incompleta o no verificable" "${O_SCAN}"
+          first_failure "Política de vulnerabilidades (bloqueo)" "${O_POLICY}"
+          first_failure "Registro de break-glass" "${O_BREAK_GLASS}"
           first_failure "Frescura (main avanzó o ref no es main)" "${O_FRESH_DEPLOY}"
           first_failure "Deploy" "${O_DEPLOY}"
           first_failure "Identidad en ejecución" "${O_IDENTITY}"
@@ -1349,6 +1567,9 @@ jobs:
 
           if [ "${O_RECORD}" = "success" ]; then
             RESULT="último éxito registrado: backend \`${BACKEND_IMAGE_REF}\`, postgres \`${POSTGRES_IMAGE_REF}\`"
+            if [ "${POLICY_DECISION}" = "break_glass" ]; then
+              RESULT="${RESULT} — **BREAK-GLASS: sin escaneo fresco de alguna imagen** (${BREAK_GLASS_ISSUE})"
+            fi
           elif [ -n "${CATEGORY}" ]; then
             RESULT="**FALLÓ: ${CATEGORY}** — el último éxito del servidor no cambió"
             echo "::error title=Producción: ${CATEGORY}::El último éxito del servidor no cambió. Ver el resumen del run."
@@ -1402,7 +1623,14 @@ jobs:
             fi
             [ -z "${REUSE_BACKEND_SCAN}" ] || echo "| escaneo backend (reuso) | ${REUSE_BACKEND_SCAN} |"
             [ -z "${REUSE_POSTGRES_SCAN}" ] || echo "| escaneo postgres (reuso) | ${REUSE_POSTGRES_SCAN} |"
-            echo "| política de vulnerabilidades | solo reporte: ni hallazgos ni fallos operativos bloquean |"
+            if [ "${DEPLOY_REQUIRED}" = "true" ]; then
+              echo "| política de vulnerabilidades (evaluación/exigencia) | ${O_POLICY} — decisión **${POLICY_DECISION:-sin decisión}** |"
+              if [ -f "${POLICY_RESULT}" ]; then
+                jq -r '.surfaces[] | "| política \(.surface) | \(.verdict)\(if .reason_code then " (\(.reason_code))" else "" end)\(if .evaluation == "historical" then " — evidencia HISTÓRICA, sin escaneo fresco" else "" end) |"' "${POLICY_RESULT}"
+              fi
+              [ -z "${O_BREAK_GLASS}" ] || [ "${O_BREAK_GLASS}" = "skipped" ] ||
+                echo "| break-glass | ${O_BREAK_GLASS} ${BREAK_GLASS_ISSUE:-} |"
+            fi
             echo "| deploy (converge/deploy) | ${O_DEPLOY} |"
             echo "| identidad en ejecución (converge/deploy) | ${O_IDENTITY} |"
             echo "| health (contenedores/público) | ${O_HEALTH} |"

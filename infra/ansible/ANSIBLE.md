@@ -624,7 +624,7 @@ Last profile that met the validation criteria was 'production'.
 
 Solo el job `production` usa el environment `production-hetzner` y credenciales de producción (HCP Terraform, SSH, secretos de la app); una aprobación cubre toda la cadena. Clasificación, builds, selección y escaneo corren antes, solo con `GITHUB_TOKEN`. No hay acceso SSH ni lectura de HCP antes del gate. La concurrencia (`piedrazul-production-hetzner`, `cancel-in-progress: false`, `queue: max`) se aplica a ese job: los jobs pendientes esperan en cola en vez de reemplazarse. El orden de la cola no define la corrección; la frescura y el rango acumulado sí.
 
-Con deploy, `production` no empieza hasta que `image_scan` terminó en éxito (todos los intentos de escaneo de las identidades conocidas antes del gate completados con evidencia) (ver [Escaneo](#escaneo-antes-de-mutar-solo-reporte)).
+Con deploy, `production` no empieza hasta que `image_scan` terminó en éxito (todos los intentos de escaneo de las identidades conocidas antes del gate completados con evidencia) y `image_policy` (evaluación preliminar de la política de vulnerabilidades sobre esas identidades) no bloqueó: un bloqueo ahí no pide la aprobación del environment ni llega al Apply (ver [Escaneo y política](#escaneo-y-política-de-vulnerabilidades-antes-de-mutar)).
 
 Dentro de `production`, en orden:
 
@@ -633,12 +633,12 @@ Dentro de `production`, en orden:
 3. **Outputs**: se leen de ese state version exacto, solo si sigue siendo el actual antes y después de leerlos. Sin Apply, el state version es el capturado al inicio.
 4. **Último éxito**: lectura (solo lectura) de `last-success.env` del servidor.
 5. **Selección** (`select-release.sh`): backend = rollback > build de este run > último éxito; postgres = build de este run > último éxito. Build y rollback llegan con la identidad inmutable resuelta antes del gate; el reuso toma la identidad exacta registrada. Ausente, malformada o ambigua falla cerrado. Sin deploy de aplicación ambas son reuso.
-6. **Escaneo antes de mutar** (`scan-evidence.sh`): para cada imagen que el run aplica, build/rollback y keycloak/traefik deben tener un `summary.json` válido de `image_scan` sobre la misma referencia exacta (keycloak y traefik, además, exactamente la `keycloak_image_ref` / `traefik_image_ref` que recibe converge); el backend o postgres en reuso se escanea aquí, con la identidad recién leída, usando la misma acción. El resultado de cada intento (`scanned` con sus hallazgos, u `operational_failure`) se informa en el resumen pero no bloquea. Sí bloquea una cadena de escaneo incompleta o no verificable (ver abajo).
+6. **Escaneo y política antes de mutar** (`scan-evidence.sh` + `vuln-policy.sh`): para cada imagen que el run aplica, build/rollback y keycloak/traefik deben tener un `summary.json` válido de `image_scan` sobre la misma referencia exacta (keycloak y traefik, además, exactamente la `keycloak_image_ref` / `traefik_image_ref` que recibe converge); el backend o postgres en reuso se escanea aquí, con la identidad recién leída, usando la misma acción. Después, la política decide sobre **todas** esas imágenes (evaluación autoritativa): CRITICAL sin disposición aprobada, fallo operativo del escáner o evidencia incompleta/vencida → el paso falla y no hay mutación. Un break-glass autorizado se registra en un issue `security-break-glass` antes de mutar. Bloquea también una cadena de escaneo incompleta o no verificable (ver abajo).
 7. **Converge / deploy** con esas referencias exactas (con frescura justo antes si no hubo Apply). Ambos convergen postgres y reconcilian las autoridades de la base antes de cualquier consumidor; deploy migra el esquema con el backend construido en este run (misma identidad exacta) antes de arrancarlo. Si la migración falla, el paso de deploy falla y no se llega a la verificación ni al registro.
 8. **Identidad en ejecución** (tras converge: postgres, keycloak y traefik; tras deploy: postgres y backend) y **health** (contenedores —keycloak también si corrió converge—, y luego `actuator/health` del backend y el discovery OIDC de Keycloak).
 9. **Registro** del último éxito, solo si hubo deploy de aplicación y todo lo anterior pasó.
 
-El resumen del job muestra el state version consumido, las identidades (y las anteriores) y la primera etapa que falló: credenciales, frescura, HCP, acceso al servidor, selección, escaneo previo, deploy, identidad en ejecución, health o registro. El job `conclude` hace que la conclusión del run sea success solo si producción terminó bien o no hacía falta; esa conclusión es la base del siguiente rango.
+El resumen del job muestra el state version consumido, las identidades (y las anteriores), el veredicto de la política por imagen y la primera etapa que falló: credenciales, frescura, HCP, acceso al servidor, selección, escaneo previo, política de vulnerabilidades, registro de break-glass, deploy, identidad en ejecución, health o registro. El job `conclude` hace que la conclusión del run sea success solo si producción terminó bien o no hacía falta; esa conclusión es la base del siguiente rango.
 
 ### Identidad inmutable
 
@@ -655,18 +655,18 @@ El resumen del job muestra el state version consumido, las identidades (y las an
 
 La misma referencia `repo@sha256:<linux/amd64>` es la que se escanea, la que recibe Ansible, la que se verifica en ejecución y (backend y postgres) la que se registra. `resolve-amd64-image.sh` acepta `<repo>:<tag>`, `<repo>@sha256:<índice>` y `<repo>:<tag>@sha256:<índice>`; con digest lee solo por digest y el tag queda como etiqueta.
 
-### Escaneo antes de mutar (solo reporte)
+### Escaneo y política de vulnerabilidades antes de mutar
 
-`image_targets` reúne las imágenes cuya identidad se conoce antes del gate: backend y postgres de build o rollback (marcados "no desplegada" si el run no los despliega), keycloak y traefik solo si corre converge. `image_scan` las escanea antes del gate y `production` espera a que esos intentos terminen. Las imágenes en reuso se escanean dentro de `production`, después de leer el último éxito y antes de cualquier mutación. Ambos escaneos usan la acción local `.github/actions/trivy-scan`: Trivy 0.74.0 (imagen oficial fijada por digest), `--image-src remote --platform linux/amd64 --scanners vuln`, sin socket de Docker, sin credenciales ni variables de entorno (el contenedor solo monta su caché y el directorio del reporte). Cada escaneo publica en el resumen el ref escaneado, la versión de Trivy, la fecha de la DB y los CRITICAL/HIGH, y sube `trivy.json`, `trivy-version.json` y `summary.json` como artifact `image-scan-<fase>-<imagen>-<run_id>` (30 días; fase `selected` antes del gate, `production` para el reuso).
+`image_targets` reúne las imágenes cuya identidad se conoce antes del gate: backend y postgres de build o rollback (marcados "no desplegada" y `applied: false` si el run no los despliega), keycloak y traefik solo si corre converge. `image_scan` las escanea antes del gate, `image_policy` evalúa la política sobre las que el run aplica y `production` espera a ambos. Las imágenes en reuso se escanean dentro de `production`, después de leer el último éxito y antes de cualquier mutación. Ambos escaneos usan la acción local `.github/actions/trivy-scan`: Trivy 0.74.0 (imagen oficial fijada por digest), `--image-src remote --platform linux/amd64 --scanners vuln`, sin socket de Docker, sin credenciales ni variables de entorno (el contenedor solo monta su caché y el directorio del reporte). Cada escaneo publica en el resumen el ref escaneado, la fecha del escaneo, la versión de Trivy, la fecha de la DB y los CRITICAL/HIGH, y sube `trivy.json`, `trivy-version.json` y `summary.json` como artifact `image-scan-<fase>-<imagen>-<run_id>` (30 días; fase `selected` antes del gate, `production` para el reuso). Esos artifacts son también la única evidencia histórica elegible para un break-glass.
 
-- Lo que se exige es el **orden**: el intento de escaneo de la identidad exacta termina antes de la mutación que puede aplicarla. Su resultado no autoriza ni bloquea mientras la política de vulnerabilidades no esté activa.
 - Cada intento deja un resultado explícito en `summary.json` (`outcome`) y en el resumen:
-  - `scanned`: evaluado, con conteo de CRITICAL/HIGH (que puede ser cero). Los hallazgos **no bloquean** (`--exit-code 0`).
-  - `operational_failure`: registry, DB de vulnerabilidades o Trivy fallaron, o el reporte no corresponde a la referencia (una referencia de keycloak o traefik sin resolver falla `image_targets`: sin identidad no hay despliegue). Sin conteos (`null`), con anotación de error y `FALLO OPERATIVO`: **no equivale a cero hallazgos**. Transitorio: tampoco bloquea; cuando se active la política será bloqueante.
+  - `scanned`: evaluado, con los CRITICAL/HIGH (que pueden ser cero). La acción no falla por hallazgos (`--exit-code 0`): decide la política.
+  - `operational_failure`: registry, DB de vulnerabilidades o Trivy fallaron, o el reporte no corresponde a la referencia (una referencia de keycloak o traefik sin resolver falla `image_targets`: sin identidad no hay despliegue). Sin conteos (`null`), con anotación de error y `FALLO OPERATIVO`: **no equivale a cero hallazgos**, y la política lo bloquea.
 - Solo el intento de Trivy (descarga del registry, DB, ejecución, reporte que no corresponde a la referencia) se registra como `operational_failure`; la acción termina bien y deja su `summary.json`. Cualquier otro error (entrada inválida, generación de la evidencia, subida del artifact, checkout) hace fallar el job.
+- **Política** (`.github/scripts/vuln-policy.sh`, contrato completo en [politica-vulnerabilidades-imagenes.md](../../docs/operations/runbooks/politica-vulnerabilidades-imagenes.md)): lee `trivy.json` hallazgo por hallazgo y exige referencia, plataforma `linux/amd64`, conteos coherentes con `summary.json`, escaneo de menos de 24 h y DB de menos de 48 h al escanear. CRITICAL → necesita una disposición vigente cuya aprobación humana se verifica en GitHub (PR fusionado a `main`, revisor en `vars.VULNERABILITY_RISK_APPROVERS`, mismo contenido aprobado); HIGH → solo se informa. Rollback y reuso no tienen excepción implícita: se escanean y evalúan igual que un build.
 - **Cadena incompleta o no verificable → `production` no muta** (no es un `operational_failure`): `image_scan` fallido o cancelado, `summary.json` ausente, malformado, duplicado, de otra referencia o con un resultado incoherente, o una imagen aplicada sin intento de escaneo. Un artifact ausente no prueba que Trivy haya intentado el escaneo.
-- `production` descarga los `summary.json` previos, los valida y muestra el resultado de cada imagen que aplica.
-- Los escaneos de keycloak y traefik son exactamente lo que converge despliega; con escaneo solo reporte, sus hallazgos tampoco autorizan ni bloquean.
+- `image_policy` y `production` descargan la evidencia previa con `current-scan-evidence.sh` (no con `actions/download-artifact`, que ante un digest distinto solo advierte): artifacts de este run, sin nombres repetidos, con el digest que registró GitHub; cualquier diferencia falla el paso. Después la validan y muestran el resultado de cada imagen que aplica.
+- Los escaneos de keycloak y traefik son exactamente lo que converge despliega y pasan por la misma política.
 
 Los `FROM` de `backend/Dockerfile` e `infra/postgres/Dockerfile` están fijados por digest del índice OCI (`imagen:tag@sha256:…`), así buildx toma el hijo correcto para `linux/amd64` y `linux/arm64`. Para actualizar una base se resuelve el nuevo índice (`docker buildx imagetools inspect <imagen>:<tag>`) y se reemplaza el digest.
 
@@ -717,10 +717,11 @@ GitHub Actions (workflow)
 GitHub Actions (production-hetzner.yml)
   │
   ├── build multi-arch → push a GHCR → identidad exacta backend@sha256:<linux/amd64>
-  ├── escaneo Trivy de esa misma identidad (solo reporte; production espera a que termine)
+  ├── escaneo Trivy de esa misma identidad + política preliminar (production espera a ambos)
   └── job production (gate production-hetzner)
         ├── state version actual → IP; lee last-success.env (postgres en reuso)
         ├── evidencia: escaneo previo del backend; escaneo aquí del postgres en reuso
+        ├── política de vulnerabilidades (autoritativa) sobre backend y postgres
         ├── frescura: el commit es la punta de main
         ├── deploy.yml -e backend_image_ref=<build> -e postgres_image_ref=<último éxito> -e app_migrate=true
         │     ├── pull por digest → image.env exacto
