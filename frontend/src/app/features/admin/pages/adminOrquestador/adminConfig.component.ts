@@ -5,6 +5,7 @@ import {
   inject,
   OnInit,
   signal,
+  viewChild,
 } from '@angular/core';
 import {
   LucideCalendarCheck,
@@ -14,6 +15,7 @@ import {
   LucidePencil,
   LucideSettings,
   LucideX,
+  LucideRefreshCw,
 } from '@lucide/angular';
 import { catchError, finalize, forkJoin, Observable, of } from 'rxjs';
 import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
@@ -74,6 +76,7 @@ type AdminView = 'horarios' | 'estadisticas';
     AdminStatisticsComponent,
     LucideChartNoAxesColumn,
     DoctorTimeOffDrawerComponent,
+    LucideRefreshCw,
   ],
 })
 export class AdminConfigComponent implements OnInit {
@@ -112,6 +115,13 @@ export class AdminConfigComponent implements OnInit {
   totalPages = signal(0);
   totalElements = signal(0);
   readonly PAGE_SIZE = 4;
+
+  // ── Botón de refrescar de estadísticas ──────────────────────────────────────────────────────────
+  /** Referencia al hijo de estadísticas; solo existe mientras esa vista está activa. */
+  private statistics = viewChild(AdminStatisticsComponent);
+  refreshStatistics(): void {
+    this.statistics()?.refresh();
+  }
 
   // ── Agendamiento autónomo ────────────────────────────────────────────────
   /** Estado del agendamiento autónomo de pacientes. TODO: cargar del backend cuando exista el endpoint. */

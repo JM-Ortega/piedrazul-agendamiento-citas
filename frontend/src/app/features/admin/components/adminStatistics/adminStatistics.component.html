@@ -7,6 +7,92 @@
     </div>
   }
 
+  <!-- Carga de trabajo diaria -->
+  <section
+    class="bg-white rounded-xl shadow-md p-4 md:p-5 border border-[#d9e9f8]"
+  >
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+      <div class="flex items-center gap-3">
+        <div class="bg-blue-50 rounded-lg p-2">
+          <svg lucideCalendarDays [size]="22" class="text-[#215c98]"></svg>
+        </div>
+        <div>
+          <h2 class="text-[#163c63] text-lg font-semibold">
+            Carga de Trabajo Diaria
+          </h2>
+          <p class="text-gray-500 text-sm">
+            Citas agendadas y atendidas por médico en una fecha
+          </p>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center justify-end gap-3">
+        <div class="flex items-center gap-2">
+          <label for="workload-date" class="text-sm font-semibold text-gray-500"
+            >Fecha:</label
+          >
+          <app-datepicker
+            [id]="'workload-date'"
+            [fullWidth]="false"
+            inputClass="w-36 py-1 !pl-3 !pr-9 !text-sm !rounded-lg"
+            [ngModel]="workloadDateDraft()"
+            (valueChange)="onWorkloadDateChange($event)"
+          ></app-datepicker>
+        </div>
+        <app-button
+          variant="primary"
+          [disabled]="!workloadDirty()"
+          extraClass="!py-1 !px-2.5 !text-sm"
+          (buttonClick)="applyWorkloadFilters()"
+        >
+          Filtrar
+        </app-button>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <p class="text-[#215c98] text-sm font-semibold">
+        {{ workloadDateLabel() }}
+      </p>
+      <div
+        class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 font-medium"
+      >
+        <span
+          >Total del día:
+          <strong class="text-[#215c98]"
+            >{{ workloadTotal() }}
+            {{ workloadTotal() === 1 ? 'cita' : 'citas' }}</strong
+          ></span
+        >
+        @if (workloadAvg() > 0) {
+          <span
+            >Promedio por médico:
+            <strong class="text-[#215c98]">{{ workloadAvg() }}</strong></span
+          >
+        }
+      </div>
+    </div>
+
+    @if (workloadTotal() === 0) {
+      <div class="h-40 flex items-center justify-center text-gray-400 text-sm">
+        Sin citas para esta fecha
+      </div>
+    } @else {
+      <div class="relative h-65">
+        <canvas
+          baseChart
+          type="bar"
+          [data]="workloadChart()"
+          [options]="workloadOptions"
+          [plugins]="workloadPlugins()"
+        ></canvas>
+      </div>
+      <ng-container
+        [ngTemplateOutlet]="legendTpl"
+        [ngTemplateOutletContext]="{ $implicit: workloadLegend }"
+      />
+    }
+  </section>
+
   <!-- Citas por mes -->
   <section
     class="bg-white rounded-xl shadow-md p-4 md:p-5 border border-[#d9e9f8]"
@@ -18,36 +104,49 @@
         </div>
         <div>
           <h2 class="text-[#163c63] text-lg font-semibold">Citas por Mes</h2>
-          <p class="text-gray-500 text-sm">Total de todas las especialidades</p>
+          <p class="text-gray-500 text-sm">Todas las citas atendidas por mes</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <label for="monthly-year" class="text-sm font-semibold text-gray-500"
-          >Año:</label
-        >
-        <app-select
-          [id]="'monthly-year'"
-          size="sm"
-          [options]="yearOptions()"
-          [fullWidth]="false"
-          [ngModel]="monthlyYear().toString()"
-          (valueChange)="onMonthlyYearChange($event)"
-        ></app-select>
-      </div>
-    </div>
-    <div class="flex flex-wrap gap-2 mb-3">
-      @for (opt of presetOptions; track opt.value) {
+      <div class="flex flex-wrap items-center justify-end gap-3">
+        <div class="flex items-center gap-2">
+          <label
+            for="monthly-preset"
+            class="text-sm font-semibold text-gray-500"
+            >Rango:</label
+          >
+          <app-select
+            [id]="'monthly-preset'"
+            size="sm"
+            [options]="presetOptions"
+            [allowEmpty]="false"
+            [fullWidth]="false"
+            [ngModel]="monthlyPreset()"
+            (valueChange)="onMonthlyPresetChange($event)"
+          ></app-select>
+        </div>
+        <div class="flex items-center gap-2">
+          <label for="monthly-year" class="text-sm font-semibold text-gray-500"
+            >Año:</label
+          >
+          <app-select
+            [id]="'monthly-year'"
+            size="sm"
+            [options]="yearOptions()"
+            [allowEmpty]="false"
+            [fullWidth]="false"
+            [ngModel]="monthlyYearDraft().toString()"
+            (valueChange)="onMonthlyYearChange($event)"
+          ></app-select>
+        </div>
         <app-button
-          variant="chip"
-          [active]="monthlyPreset() === opt.value"
-          [activeChipClasses]="presetActiveClasses"
-          [inactiveChipClasses]="presetInactiveClasses"
-          [extraClass]="presetExtraClass"
-          (buttonClick)="monthlyPreset.set(opt.value)"
+          variant="primary"
+          [disabled]="!monthlyDirty()"
+          extraClass="!py-1 !px-2.5 !text-sm"
+          (buttonClick)="applyMonthlyFilters()"
         >
-          {{ opt.label }}
+          Filtrar
         </app-button>
-      }
+      </div>
     </div>
     <div class="relative h-65">
       <canvas
@@ -71,36 +170,61 @@
         </div>
         <div>
           <h2 class="text-[#163c63] text-lg font-semibold">Citas por Médico</h2>
-          <p class="text-gray-500 text-sm">Mes a mes · sin canceladas</p>
+          <p class="text-gray-500 text-sm">{{ doctorSubtitle() }}</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <label for="doctor-year" class="text-sm font-semibold text-gray-500"
-          >Año:</label
-        >
-        <app-select
-          [id]="'doctor-year'"
-          size="sm"
-          [options]="yearOptions()"
-          [fullWidth]="false"
-          [ngModel]="doctorYear().toString()"
-          (valueChange)="onDoctorYearChange($event)"
-        ></app-select>
-      </div>
-    </div>
-    <div class="flex flex-wrap gap-2 mb-3">
-      @for (opt of presetOptions; track opt.value) {
+      <div class="flex flex-wrap items-center justify-end gap-3">
+        <div class="flex items-center gap-2">
+          <label for="doctor-preset" class="text-sm font-semibold text-gray-500"
+            >Rango:</label
+          >
+          <app-select
+            [id]="'doctor-preset'"
+            size="sm"
+            [options]="presetOptions"
+            [allowEmpty]="false"
+            [fullWidth]="false"
+            [ngModel]="doctorPreset()"
+            (valueChange)="onDoctorPresetChange($event)"
+          ></app-select>
+        </div>
+        <div class="flex items-center gap-2">
+          <label for="doctor-year" class="text-sm font-semibold text-gray-500"
+            >Año:</label
+          >
+          <app-select
+            [id]="'doctor-year'"
+            size="sm"
+            [options]="yearOptions()"
+            [allowEmpty]="false"
+            [fullWidth]="false"
+            [ngModel]="doctorYearDraft().toString()"
+            (valueChange)="onDoctorYearChange($event)"
+          ></app-select>
+        </div>
+        <div class="flex items-center gap-2">
+          <label for="doctor-estado" class="text-sm font-semibold text-gray-500"
+            >Estado:</label
+          >
+          <app-select
+            [id]="'doctor-estado'"
+            size="sm"
+            [options]="estadoOptions"
+            [allowEmpty]="false"
+            [fullWidth]="false"
+            [ngModel]="doctorEstadoDraft()"
+            (valueChange)="onDoctorEstadoChange($event)"
+          ></app-select>
+        </div>
         <app-button
-          variant="chip"
-          [active]="doctorPreset() === opt.value"
-          [activeChipClasses]="presetActiveClasses"
-          [inactiveChipClasses]="presetInactiveClasses"
-          [extraClass]="presetExtraClass"
-          (buttonClick)="doctorPreset.set(opt.value)"
+          variant="primary"
+          [disabled]="!doctorDirty()"
+          extraClass="!py-1 !px-2.5 !text-sm"
+          (buttonClick)="applyDoctorFilters()"
         >
-          {{ opt.label }}
+          Filtrar
         </app-button>
-      }
+      </div>
     </div>
     @let doctors = doctorChart();
     @if (doctors.legend.length === 0) {
@@ -124,7 +248,7 @@
     }
   </section>
 
-  <!-- Comparativo por especialidad -->
+  <!-- Comparativo por Tipo de Atención -->
   <section
     class="bg-white rounded-xl shadow-md p-4 md:p-5 border border-[#d9e9f8]"
   >
@@ -135,38 +259,69 @@
         </div>
         <div>
           <h2 class="text-[#163c63] text-lg font-semibold">
-            Comparativo por Especialidad
+            Comparativo por Tipo de Atención
           </h2>
-          <p class="text-gray-500 text-sm">Mes a mes · sin canceladas</p>
+          <p class="text-gray-500 text-sm">{{ specialtySubtitle() }}</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <label for="specialty-year" class="text-sm font-semibold text-gray-500"
-          >Año:</label
-        >
-        <app-select
-          [id]="'specialty-year'"
-          [options]="yearOptions()"
-          [fullWidth]="false"
-          [ngModel]="specialtyYear().toString()"
-          (valueChange)="onSpecialtyYearChange($event)"
-          size="sm"
-        ></app-select>
-      </div>
-    </div>
-    <div class="flex flex-wrap gap-2 mb-3">
-      @for (opt of presetOptions; track opt.value) {
+      <div class="flex flex-wrap items-center justify-end gap-3">
+        <div class="flex items-center gap-2">
+          <label
+            for="specialty-preset"
+            class="text-sm font-semibold text-gray-500"
+            >Rango:</label
+          >
+          <app-select
+            [id]="'specialty-preset'"
+            size="sm"
+            [options]="presetOptions"
+            [allowEmpty]="false"
+            [fullWidth]="false"
+            [ngModel]="specialtyPreset()"
+            (valueChange)="onSpecialtyPresetChange($event)"
+          ></app-select>
+        </div>
+        <div class="flex items-center gap-2">
+          <label
+            for="specialty-year"
+            class="text-sm font-semibold text-gray-500"
+            >Año:</label
+          >
+          <app-select
+            [id]="'specialty-year'"
+            [options]="yearOptions()"
+            [allowEmpty]="false"
+            [fullWidth]="false"
+            [ngModel]="specialtyYearDraft().toString()"
+            (valueChange)="onSpecialtyYearChange($event)"
+            size="sm"
+          ></app-select>
+        </div>
+        <div class="flex items-center gap-2">
+          <label
+            for="specialty-estado"
+            class="text-sm font-semibold text-gray-500"
+            >Estado:</label
+          >
+          <app-select
+            [id]="'specialty-estado'"
+            [options]="estadoOptions"
+            [allowEmpty]="false"
+            [fullWidth]="false"
+            [ngModel]="specialtyEstadoDraft()"
+            (valueChange)="onSpecialtyEstadoChange($event)"
+            size="sm"
+          ></app-select>
+        </div>
         <app-button
-          variant="chip"
-          [active]="specialtyPreset() === opt.value"
-          [activeChipClasses]="presetActiveClasses"
-          [inactiveChipClasses]="presetInactiveClasses"
-          [extraClass]="presetExtraClass"
-          (buttonClick)="specialtyPreset.set(opt.value)"
+          variant="primary"
+          [disabled]="!specialtyDirty()"
+          extraClass="!py-1 !px-2.5 !text-sm"
+          (buttonClick)="applySpecialtyFilters()"
         >
-          {{ opt.label }}
+          Filtrar
         </app-button>
-      }
+      </div>
     </div>
     @let specialties = specialtyChart();
     @if (specialties.legend.length === 0) {
@@ -190,7 +345,7 @@
     }
   </section>
 
-  <!-- Tasa de cancelación -->
+  <!-- Tasa de no asistencia -->
   <section
     class="bg-white rounded-xl shadow-md p-4 md:p-5 border border-[#d9e9f8]"
   >
@@ -201,11 +356,9 @@
         </div>
         <div>
           <h2 class="text-[#163c63] text-lg font-semibold">
-            Tasa de Cancelación
+            Tasa de No Asistencia
           </h2>
-          <p class="text-gray-500 text-sm">
-            Porcentaje de citas canceladas mes a mes
-          </p>
+          <p class="text-gray-500 text-sm">Porcentaje mes a mes según motivo</p>
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-3">
@@ -216,18 +369,37 @@
           <app-select
             [id]="'cancel-year'"
             [options]="yearOptions()"
+            [allowEmpty]="false"
             [fullWidth]="false"
             size="sm"
             [ngModel]="cancelYear().toString()"
             (valueChange)="onCancelYearChange($event)"
           ></app-select>
         </div>
+        <div class="flex items-center gap-2">
+          <label for="cancel-motivo" class="text-sm font-semibold text-gray-500"
+            >Motivo:</label
+          >
+          <app-select
+            [id]="'cancel-motivo'"
+            [options]="motivoOptions"
+            [allowEmpty]="false"
+            [fullWidth]="false"
+            size="sm"
+            [ngModel]="cancelMotivo()"
+            (valueChange)="onCancelMotivoChange($event)"
+          ></app-select>
+        </div>
         <div
           class="bg-red-50 border border-red-200 rounded-xl px-4 py-2 flex flex-col items-center min-w-24"
-          [appTooltip]="'Citas canceladas sobre el total del año seleccionado'"
+          [appTooltip]="'Citas del motivo seleccionado sobre el total del año seleccionado'"
         >
           <p class="text-2xl font-extrabold text-red-600 leading-none">
             {{ cancelYearRate() }}%
+          </p>
+          <p class="text-red-500 text-xs font-bold mt-0.5">
+            = {{ cancelYearCount() }}
+            {{ cancelYearCount() === 1 ? 'cita' : 'citas' }}
           </p>
           <p class="text-gray-500 text-xs font-semibold mt-0.5 text-center">
             Tasa del período

@@ -41,26 +41,43 @@
       </div>
     </div>
 
-    <!-- Selector de vista -->
-    <div
-      class="bg-white rounded-xl shadow-sm p-1.5 flex gap-1.5 w-fit border border-[#d9e9f8]"
-    >
-      <button
-        type="button"
-        [class]="viewTabClass('horarios')"
-        (click)="activeView.set('horarios')"
+    <!-- Selector de vista + acciones -->
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <div
+        class="bg-white rounded-xl shadow-sm p-1.5 flex gap-1.5 w-fit border border-[#d9e9f8]"
       >
-        <svg lucideChartNoAxesColumn [size]="15"></svg>
-        Horarios
-      </button>
-      <button
-        type="button"
-        [class]="viewTabClass('estadisticas')"
-        (click)="activeView.set('estadisticas')"
-      >
-        <svg lucideBarChart2 [size]="15"></svg>
-        Estadísticas
-      </button>
+        <button
+          type="button"
+          [class]="viewTabClass('horarios')"
+          (click)="activeView.set('horarios')"
+        >
+          <svg lucideChartNoAxesColumn [size]="15"></svg>
+          Horarios
+        </button>
+        <button
+          type="button"
+          [class]="viewTabClass('estadisticas')"
+          (click)="activeView.set('estadisticas')"
+        >
+          <svg lucideBarChart2 [size]="15"></svg>
+          Estadísticas
+        </button>
+      </div>
+
+      @if (activeView() === 'estadisticas') {
+        <app-button
+          variant="primary"
+          size="sm"
+          [active]="false"
+          extraClass="!w-auto"
+          (buttonClick)="refreshStatistics()"
+        >
+          <span class="flex items-center gap-2">
+            <svg lucideRefreshCw [size]="16"></svg>
+            Refrescar
+          </span>
+        </app-button>
+      }
     </div>
 
     <!-- Vista: Horarios (contenido existente, sin cambios) -->

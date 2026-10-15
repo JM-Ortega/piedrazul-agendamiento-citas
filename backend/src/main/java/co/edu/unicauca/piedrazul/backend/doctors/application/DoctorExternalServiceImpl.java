@@ -87,6 +87,15 @@ public class DoctorExternalServiceImpl implements DoctorExternalService {
     }
 
     @Override
+    public Map<UUID, String> getDoctorNamesByIds() {
+        List<UUID> existingDoctorIds = doctorRepository.findAll().stream()
+                .map(Doctor::getPersonId)
+                .toList();
+
+        return personExternalService.getPersonNames(existingDoctorIds);
+    }
+
+    @Override
     public Map<UUID, List<SpecialtyCode>> findSpecialtiesByPersonIds(Collection<UUID> personIds){
 
         List<DoctorSpecialtyProjection> projections = doctorRepository.findSpecialtiesByPersonIds(personIds);

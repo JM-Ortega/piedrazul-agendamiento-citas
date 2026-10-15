@@ -16,6 +16,7 @@ import {
   LucideStethoscope,
   LucideTrendingDown,
   LucideUsers,
+  LucideCalendarDays,
 } from '@lucide/angular';
 import { ChartData, ChartOptions } from 'chart.js';
 import {
@@ -43,19 +44,38 @@ import {
   resolveMonths,
   thresholdPlugin,
   valueLabelsPlugin,
+  averageLinePlugin,
 } from '../../../../shared/helpers/statisticsCharts';
 import {
   CancellationStats,
+  EstadoAgendaFiltro,
   MonthlyBreakdown,
   MonthlySeriesStat,
   MonthlyTotalStat,
+  DailyWorkload,
+  NivelCarga,
+  MotivoInasistencia,
 } from '../../../../shared/models/dtos/statistics.dto';
 import { StatisticsService } from '../../service/statistics.service';
+import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
+import { toIsoDateString } from '../../../../shared/helpers/transformDateLocal';
+import { DatepickerComponent } from '../../../../designSystem/molecules/datepicker/datepicker.component';
+
+/** Color de cada nivel de carga. */
+const WORKLOAD_COLORS: Record<NivelCarga, string> = {
+  NORMAL: PRIMARY,
+  ALTA: '#f59e0b',
+  SOBRECARGA: '#dc2626',
+  SIN_CITAS: '#e2e8f0',
+};
 
 /**
  * Vista de estadísticas del panel de administración: citas por mes, por
  * médico, por especialidad y tasa de cancelación. Los datos vienen de
  * `StatisticsService` (hoy simulados) y se grafican con Chart.js.
+ *
+ * Año y estado se editan como borrador y solo se consultan al pulsar
+ * "Filtrar"; el rango de meses se aplica al instante sobre los datos en caché.
  */
 @Component({
   selector: 'app-admin-statistics',
@@ -72,6 +92,8 @@ import { StatisticsService } from '../../service/statistics.service';
     LucideStethoscope,
     LucideUsers,
     LucideTrendingDown,
+    LucideCalendarDays,
+    DatepickerComponent,
   ],
   providers: [provideCharts(withDefaultRegisterables())],
   templateUrl: './adminStatistics.component.html',
@@ -80,18 +102,38 @@ export class AdminStatisticsComponent implements OnInit {
   private statisticsService = inject(StatisticsService);
   private destroyRef = inject(DestroyRef);
 
-  readonly presetOptions: { value: MonthPreset; label: string }[] = [
+  readonly presetOptions: SelectOption[] = [
     { value: '3', label: 'Últ. 3 meses' },
     { value: '6', label: 'Últ. 6 meses' },
     { value: 'all', label: 'Todo el año' },
   ];
 
-  // ── Estilos de los chips de rango (app-button variant="chip") ─────────────
-  readonly presetExtraClass = '!w-auto !py-1.5 !px-3 !text-xs !rounded-lg';
-  readonly presetActiveClasses =
-    'border-[#215c98] bg-[#215c98] text-white shadow-sm';
-  readonly presetInactiveClasses =
-    'border-[#a7c9ec] bg-blue-50 text-[#215c98] hover:bg-[#d9e9f8]';
+  /** Filtro de estado: siempre hay una opción elegida (por defecto, Agendada). */
+  readonly estadoOptions: SelectOption[] = [
+    { value: 'AGENDADA', label: 'Agendada' },
+    { value: 'ATENDIDA', label: 'Atendida' },
+  ];
+
+  /** Motivo de la tasa de no asistencia. */
+  readonly motivoOptions: SelectOption[] = [
+    { value: 'CANCELADA', label: 'Cancelada' },
+    { value: 'NO_ASISTIO', label: 'No asistió' },
+  ];
+
+  // ── Carga de trabajo diaria: leyenda y opciones ───────────────────────────
+  readonly workloadLegend: LegendItem[] = [
+    { name: 'Normal', color: WORKLOAD_COLORS.NORMAL },
+    {
+      name: 'Carga alta (>30% sobre el promedio)',
+      color: WORKLOAD_COLORS.ALTA,
+    },
+    {
+      name: 'Sobrecarga (≥ 2× el promedio)',
+      color: WORKLOAD_COLORS.SOBRECARGA,
+    },
+    { name: 'Sin citas', color: WORKLOAD_COLORS.SIN_CITAS },
+  ];
+  readonly workloadOptions = this.buildWorkloadOptions();
 
   // ── Opciones y plugins de cada gráfica (constantes) ───────────────────────
   readonly monthlyOptions = barOptions(false);
@@ -113,8 +155,16 @@ export class AdminStatisticsComponent implements OnInit {
         titleColor: '#7f1d1d',
         displayColors: false,
         callbacks: {
-          label: (item) => `${item.parsed.y}%`,
-          afterLabel: () => 'tasa de cancelación',
+          label: (item) => {
+            const count = this.cancelData().months[item.dataIndex]?.count ?? 0;
+            const citaTexto = count === 1 ? 'cita' : 'citas';
+            return `${item.parsed.y}% = ${count} ${citaTexto}`;
+          },
+          afterLabel: () => {
+            return this.cancelMotivo() === 'CANCELADA'
+              ? 'tasa de cancelación'
+              : 'tasa de inasistencia';
+          },
         },
       },
     },
@@ -148,28 +198,104 @@ export class AdminStatisticsComponent implements OnInit {
     this.years().map((y) => ({ value: String(y), label: String(y) }))
   );
 
-  // ── Citas por mes ─────────────────────────────────────────────────────────
+  // ── Carga de trabajo diaria ───────────────────────────────────────────────
+  // `workloadDate` es la fecha aplicada; `workloadDateDraft` es la del input.
+  workloadDate = signal(toIsoDateString(new Date()));
+  workloadDateDraft = signal<string | null>(this.workloadDate());
+  private workloadData = signal<DailyWorkload>({
+    dayTotal: 0,
+    averagePerDoctor: 0,
+    doctors: [],
+  });
+  readonly workloadDirty = computed(() => {
+    const draft = this.workloadDateDraft();
+    return draft !== null && draft !== this.workloadDate();
+  });
+  readonly workloadDateLabel = computed(() =>
+    formatLongDateEs(this.workloadDate())
+  );
+  readonly workloadTotal = computed(() => this.workloadData().dayTotal);
+  /** Promedio entre médicos con citas; 0 si hay menos de dos (no es comparable). */
+  readonly workloadAvg = computed(() => this.workloadData().averagePerDoctor);
+
+  // ── Citas por mes (solo atendidas) ────────────────────────────────────────
+  // `monthlyYear` es el año aplicado; `monthlyYearDraft` es lo que muestra el select.
   monthlyYear = signal(new Date().getFullYear());
+  monthlyYearDraft = signal(new Date().getFullYear());
   monthlyPreset = signal<MonthPreset>('6');
   private monthlyData = signal<MonthlyTotalStat[]>([]);
+  readonly monthlyDirty = computed(
+    () => this.monthlyYearDraft() !== this.monthlyYear()
+  );
 
   // ── Citas por médico ──────────────────────────────────────────────────────
   doctorYear = signal(new Date().getFullYear());
+  doctorYearDraft = signal(new Date().getFullYear());
+  doctorEstado = signal<EstadoAgendaFiltro>('AGENDADA');
+  doctorEstadoDraft = signal<EstadoAgendaFiltro>('AGENDADA');
   doctorPreset = signal<MonthPreset>('6');
   private doctorData = signal<MonthlyBreakdown>({ series: [], rows: [] });
+  readonly doctorDirty = computed(
+    () =>
+      this.doctorYearDraft() !== this.doctorYear() ||
+      this.doctorEstadoDraft() !== this.doctorEstado()
+  );
+  readonly doctorSubtitle = computed(() =>
+    this.breakdownSubtitle(this.doctorEstado())
+  );
 
   // ── Comparativo por especialidad ──────────────────────────────────────────
   specialtyYear = signal(new Date().getFullYear());
+  specialtyYearDraft = signal(new Date().getFullYear());
+  specialtyEstado = signal<EstadoAgendaFiltro>('AGENDADA');
+  specialtyEstadoDraft = signal<EstadoAgendaFiltro>('AGENDADA');
   specialtyPreset = signal<MonthPreset>('6');
   private specialtyData = signal<MonthlyBreakdown>({ series: [], rows: [] });
+  readonly specialtyDirty = computed(
+    () =>
+      this.specialtyYearDraft() !== this.specialtyYear() ||
+      this.specialtyEstadoDraft() !== this.specialtyEstado()
+  );
+  readonly specialtySubtitle = computed(() =>
+    this.breakdownSubtitle(this.specialtyEstado())
+  );
 
-  // ── Tasa de cancelación ───────────────────────────────────────────────────
+  // ── Tasa de no asistencia ─────────────────────────────────────────────────
   cancelYear = signal(new Date().getFullYear());
-  private cancelData = signal<CancellationStats>({ months: [], yearRate: 0 });
+  cancelMotivo = signal<MotivoInasistencia>('CANCELADA');
+  private cancelData = signal<CancellationStats>({
+    months: [],
+    yearRate: 0,
+    yearCount: 0,
+  });
 
   readonly cancelYearRate = computed(() => this.cancelData().yearRate);
+  readonly cancelYearCount = computed(() => this.cancelData().yearCount);
 
   // ── Datos de las gráficas (computed) ──────────────────────────────────────
+  readonly workloadChart = computed<ChartData<'bar'>>(() => {
+    const { doctors } = this.workloadData();
+    return {
+      labels: doctors.map((d) => d.doctor),
+      datasets: [
+        {
+          label: 'Citas',
+          data: doctors.map((d) => d.total),
+          backgroundColor: doctors.map((d) => WORKLOAD_COLORS[d.level]),
+          borderRadius: { topLeft: 8, topRight: 8 },
+          borderSkipped: false,
+          maxBarThickness: 64,
+        },
+      ],
+    };
+  });
+
+  readonly workloadPlugins = computed(() => [
+    hoverColumnPlugin,
+    valueLabelsPlugin,
+    averageLinePlugin(this.workloadAvg()),
+  ]);
+
   readonly monthlyChart = computed<ChartData<'bar'>>(() => {
     const rows = this.filterMonths(
       this.monthlyData(),
@@ -241,65 +367,158 @@ export class AdminStatisticsComponent implements OnInit {
           this.years.set(years);
           const year = years[0] ?? new Date().getFullYear();
           this.monthlyYear.set(year);
+          this.monthlyYearDraft.set(year);
           this.doctorYear.set(year);
+          this.doctorYearDraft.set(year);
           this.specialtyYear.set(year);
+          this.specialtyYearDraft.set(year);
           this.cancelYear.set(year);
-          this.load(
-            this.statisticsService.getMonthlyTotals(year),
-            this.monthlyData
-          );
-          this.load(
-            this.statisticsService.getMonthlyByDoctor(year),
-            this.doctorData
-          );
-          this.load(
-            this.statisticsService.getMonthlyBySpecialty(year),
-            this.specialtyData
-          );
-          this.load(
-            this.statisticsService.getCancellationRate(year),
-            this.cancelData
-          );
+          this.refresh();
         },
         error: () =>
           this.errorMessage.set('No se pudieron cargar las estadísticas.'),
       });
   }
 
-  // ── Handlers de año ───────────────────────────────────────────────────────
-  // `app-select` siempre incluye una opción vacía ("Seleccione..."): se ignora.
-  onMonthlyYearChange(value: string): void {
-    if (!value) return;
-    const year = Number(value);
-    this.monthlyYear.set(year);
-    this.load(this.statisticsService.getMonthlyTotals(year), this.monthlyData);
+  // ── Refresco (siempre con los filtros aplicados, no con los borradores) ───
+  /** Botón global "Refrescar": vuelve a consultar todas las secciones. */
+  refresh(): void {
+    this.refreshWorkload();
+    this.refreshMonthly();
+    this.refreshDoctor();
+    this.refreshSpecialty();
+    this.refreshCancel();
   }
 
-  onDoctorYearChange(value: string): void {
-    if (!value) return;
-    const year = Number(value);
-    this.doctorYear.set(year);
-    this.load(this.statisticsService.getMonthlyByDoctor(year), this.doctorData);
-  }
-
-  onSpecialtyYearChange(value: string): void {
-    if (!value) return;
-    const year = Number(value);
-    this.specialtyYear.set(year);
+  private refreshWorkload(): void {
     this.load(
-      this.statisticsService.getMonthlyBySpecialty(year),
+      this.statisticsService.getDailyWorkload(this.workloadDate()),
+      this.workloadData
+    );
+  }
+
+  /** Handler de borrador: se actualiza `workloadDateDraft` al cambiar la fecha en el input.
+   * `null` = fecha incompleta o inválida: deshabilita "Filtrar".
+   */
+  onWorkloadDateChange(date: Date | null): void {
+    this.workloadDateDraft.set(date ? toIsoDateString(date) : null);
+  }
+
+  // Botón "Filtrar"
+  applyWorkloadFilters(): void {
+    const draft = this.workloadDateDraft();
+    if (!draft) return;
+    this.workloadDate.set(draft);
+    this.refreshWorkload();
+  }
+
+  private refreshMonthly(): void {
+    this.load(
+      this.statisticsService.getMonthlyTotals(this.monthlyYear()),
+      this.monthlyData
+    );
+  }
+
+  private refreshDoctor(): void {
+    this.load(
+      this.statisticsService.getMonthlyByDoctor(
+        this.doctorYear(),
+        this.doctorEstado()
+      ),
+      this.doctorData
+    );
+  }
+
+  private refreshSpecialty(): void {
+    this.load(
+      this.statisticsService.getMonthlyBySpecialty(
+        this.specialtyYear(),
+        this.specialtyEstado()
+      ),
       this.specialtyData
     );
   }
 
-  onCancelYearChange(value: string): void {
-    if (!value) return;
-    const year = Number(value);
-    this.cancelYear.set(year);
+  private refreshCancel(): void {
     this.load(
-      this.statisticsService.getCancellationRate(year),
+      this.statisticsService.getCancellationRate(
+        this.cancelYear(),
+        this.cancelMotivo()
+      ),
       this.cancelData
     );
+  }
+
+  onCancelMotivoChange(value: string): void {
+    if (!value) return;
+    this.cancelMotivo.set(value as MotivoInasistencia);
+    this.refreshCancel();
+  }
+
+  // ── Handlers de borrador (no consultan) ───────────────────────────────────
+  // `app-select` incluye una opción vacía ("Seleccione..."): se ignora, tanto en año como en estado.
+  onMonthlyYearChange(value: string): void {
+    if (!value) return;
+    this.monthlyYearDraft.set(Number(value));
+  }
+
+  onDoctorYearChange(value: string): void {
+    if (!value) return;
+    this.doctorYearDraft.set(Number(value));
+  }
+
+  onDoctorEstadoChange(value: string): void {
+    this.doctorEstadoDraft.set(value as EstadoAgendaFiltro);
+  }
+
+  onSpecialtyYearChange(value: string): void {
+    if (!value) return;
+    this.specialtyYearDraft.set(Number(value));
+  }
+
+  onSpecialtyEstadoChange(value: string): void {
+    this.specialtyEstadoDraft.set(value as EstadoAgendaFiltro);
+  }
+
+  // ── Botones "Filtrar": aplican el borrador y consultan ────────────────────
+  applyMonthlyFilters(): void {
+    this.monthlyYear.set(this.monthlyYearDraft());
+    this.refreshMonthly();
+  }
+
+  applyDoctorFilters(): void {
+    this.doctorYear.set(this.doctorYearDraft());
+    this.doctorEstado.set(this.doctorEstadoDraft());
+    this.refreshDoctor();
+  }
+
+  applySpecialtyFilters(): void {
+    this.specialtyYear.set(this.specialtyYearDraft());
+    this.specialtyEstado.set(this.specialtyEstadoDraft());
+    this.refreshSpecialty();
+  }
+
+  // ── Handlers que se aplican al instante ───────────────────────────────────
+  // El rango solo filtra en el cliente sobre los datos en caché.
+  onMonthlyPresetChange(value: string): void {
+    if (!value) return;
+    this.monthlyPreset.set(value as MonthPreset);
+  }
+
+  onDoctorPresetChange(value: string): void {
+    if (!value) return;
+    this.doctorPreset.set(value as MonthPreset);
+  }
+
+  onSpecialtyPresetChange(value: string): void {
+    if (!value) return;
+    this.specialtyPreset.set(value as MonthPreset);
+  }
+
+  onCancelYearChange(value: string): void {
+    if (!value) return;
+    this.cancelYear.set(Number(value));
+    this.refreshCancel();
   }
 
   // ── Private ───────────────────────────────────────────────────────────────
@@ -310,6 +529,12 @@ export class AdminStatisticsComponent implements OnInit {
       error: () =>
         this.errorMessage.set('No se pudieron cargar las estadísticas.'),
     });
+  }
+
+  private breakdownSubtitle(estado: EstadoAgendaFiltro): string {
+    return estado === 'ATENDIDA'
+      ? 'Mes a mes · citas atendidas'
+      : 'Mes a mes · todas las citas (agendadas, atendidas, no asistidas y canceladas)';
   }
 
   private filterMonths<T extends { month: number }>(
@@ -352,6 +577,25 @@ export class AdminStatisticsComponent implements OnInit {
           borderSkipped: false,
           maxBarThickness: 36,
         })),
+      },
+    };
+  }
+
+  /** Igual que el gráfico mensual, pero el tooltip muestra "N citas". */
+  private buildWorkloadOptions(): ChartOptions<'bar'> {
+    const base = barOptions(false);
+    return {
+      ...base,
+      plugins: {
+        ...base.plugins,
+        tooltip: {
+          ...base.plugins?.tooltip,
+          displayColors: false,
+          callbacks: {
+            label: (item) =>
+              `${item.parsed.y} ${item.parsed.y === 1 ? 'cita' : 'citas'}`,
+          },
+        },
       },
     };
   }
