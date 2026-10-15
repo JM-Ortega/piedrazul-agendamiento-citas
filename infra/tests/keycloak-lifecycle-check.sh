@@ -102,8 +102,8 @@ check ".env: KC_BACKEND_CLIENT_SECRET entre comillas dobles con escape" \
   grep -qE '^KC_BACKEND_CLIENT_SECRET="' "${TMP}/.env"
 
 # ── 3. Servicios de Compose ──────────────────────────────────────────────────
-printf 'BACKEND_IMAGE=ghcr.io/example/backend@sha256:%s\nPOSTGRES_IMAGE=ghcr.io/example/postgres@sha256:%s\nKEYCLOAK_IMAGE=quay.io/keycloak/keycloak@sha256:%s\n' \
-  "$(printf 'a%.0s' {1..64})" "$(printf 'b%.0s' {1..64})" "$(printf 'c%.0s' {1..64})" > "${TMP}/image.env"
+printf 'BACKEND_IMAGE=ghcr.io/example/backend@sha256:%s\nPOSTGRES_IMAGE=ghcr.io/example/postgres@sha256:%s\nKEYCLOAK_IMAGE=quay.io/keycloak/keycloak@sha256:%s\nTRAEFIK_IMAGE=docker.io/library/traefik@sha256:%s\n' \
+  "$(printf 'a%.0s' {1..64})" "$(printf 'b%.0s' {1..64})" "$(printf 'c%.0s' {1..64})" "$(printf 'd%.0s' {1..64})" > "${TMP}/image.env"
 docker compose --project-name piedrazul-kc-contract --file "${COMPOSE_DIR}/prod.yml" \
   --env-file "${TMP}/.env" --env-file "${TMP}/image.env" --profile migrate config --format json > "${TMP}/config.json"
 holders() { jq -r --arg k "$1" '.services | to_entries[] | select(.value.environment // {} | has($k)) | .key' "${TMP}/config.json" | sort | tr '\n' ' '; }

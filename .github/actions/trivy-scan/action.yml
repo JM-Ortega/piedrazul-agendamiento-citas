@@ -13,7 +13,7 @@ inputs:
     description: "Imagen lógica (backend, postgres, keycloak, traefik)"
     required: true
   source:
-    description: "Origen de la identidad (build, rollback, reuse, compose (tag), ...)"
+    description: "Origen de la identidad (build, rollback, reuse, compose (fijada), ...)"
     required: true
   label:
     description: "Referencia legible (tag) asociada a la identidad"

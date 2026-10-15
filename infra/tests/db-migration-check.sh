@@ -89,8 +89,8 @@ if [ -z "${BACKEND_IMAGE:-}" ]; then
   docker build -q -t "${BACKEND_IMAGE}" "${ROOT}/backend" >/dev/null
 fi
 # Keycloak no arranca en esta prueba: solo satisface la interpolación de prod.yml
-printf 'BACKEND_IMAGE=%s\nPOSTGRES_IMAGE=%s\nKEYCLOAK_IMAGE=quay.io/keycloak/keycloak@sha256:%s\n' \
-  "${BACKEND_IMAGE}" "${POSTGRES_IMAGE}" "$(printf 'c%.0s' {1..64})" > "${TMP}/image.env"
+printf 'BACKEND_IMAGE=%s\nPOSTGRES_IMAGE=%s\nKEYCLOAK_IMAGE=quay.io/keycloak/keycloak@sha256:%s\nTRAEFIK_IMAGE=docker.io/library/traefik@sha256:%s\n' \
+  "${BACKEND_IMAGE}" "${POSTGRES_IMAGE}" "$(printf 'c%.0s' {1..64})" "$(printf 'd%.0s' {1..64})" > "${TMP}/image.env"
 echo "backend=${BACKEND_IMAGE} postgres=${POSTGRES_IMAGE}"
 
 # ── Entorno sintético (mismos nombres que group_vars de producción) ──────────

@@ -1,11 +1,13 @@
 ---
-# Rollout de las imágenes propias. No toca Keycloak ni secretos. Keycloak es de converge
+# Rollout de las imágenes propias. No toca Keycloak, Traefik ni secretos. Keycloak es de converge
 # (keycloak_lifecycle.yml): deploy nunca lo arranca, recrea, actualiza ni migra su base.
 #   - Antes de cualquier mutación exige que image.env tenga exactamente una KEYCLOAK_IMAGE
 #     exacta y que el contenedor keycloak exista, corra healthy y haya sido creado desde esa
 #     misma referencia. Si no (falta, duplicada, malformada, anterior a este contrato, keycloak
 #     ausente o detenido, o un converge interrumpido dejó en image.env otra identidad que la
 #     que corre), falla sin escribir image.env ni tocar servicios: corre converge.
+#   - Conserva la TRAEFIK_IMAGE exacta de image.env (también la escribe solo converge); si
+#     falta o está malformada, falla igual, antes de mutar.
 #   - Compose levanta postgres y backend sin dependencias: depends_on del backend no puede
 #     arrancar ni recrear keycloak. Después se verifica que keycloak es el mismo contenedor.
 # backend_image_ref y postgres_image_ref (inyectados por el workflow) son obligatorios y exactos.
@@ -110,6 +112,26 @@
       (run_host_config=true).
     quiet: true
 
+# Traefik tampoco se selecciona en deploy: se conserva la identidad que escribió converge
+# (deploy no lo arranca ni recrea). Sin ella Compose no puede interpolar prod.yml.
+- name: Tomar la identidad de Traefik de image.env
+  ansible.builtin.set_fact:
+    app_deploy_traefik_image: >-
+      {{ (app_image_env_file.content | default('') | b64decode).splitlines()
+         | select('match', '^ *TRAEFIK_IMAGE *=') | map('regex_replace', '^ *TRAEFIK_IMAGE *=', '') | list }}
+
+- name: Validar la identidad de Traefik de image.env
+  ansible.builtin.assert:
+    that:
+      - app_deploy_traefik_image | length == 1
+      - app_deploy_traefik_image[0] is match('^' ~ (traefik_image | regex_escape) ~ '@sha256:[0-9a-f]{64}\Z')
+    fail_msg: >-
+      TRAEFIK: image.env no tiene exactamente una TRAEFIK_IMAGE={{ traefik_image }}@sha256:<digest>
+      (encontradas {{ app_deploy_traefik_image | length }}: {{ app_deploy_traefik_image | join(', ') or 'ninguna' }}).
+      Deploy no selecciona la identidad de Traefik y no tocó nada: corre converge
+      (run_host_config=true).
+    quiet: true
+
 # El resultado de docker_container_info trae el entorno del contenedor (secretos): solo se
 # usa el resumen
 - name: Leer el contenedor keycloak (antes de desplegar)
@@ -182,6 +204,7 @@
       BACKEND_IMAGE={{ backend_image_ref }}
       POSTGRES_IMAGE={{ postgres_image_ref }}
       KEYCLOAK_IMAGE={{ app_deploy_keycloak_image[0] }}
+      TRAEFIK_IMAGE={{ app_deploy_traefik_image[0] }}
 
 - name: Converger postgres y reconciliar autoridades de la base
   ansible.builtin.include_tasks: db_converge.yml

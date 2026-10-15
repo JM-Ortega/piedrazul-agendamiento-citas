@@ -116,7 +116,7 @@ use_keycloak() {
   write_image_env "${KC_REF}"
 }
 write_image_env() { # <KEYCLOAK_IMAGE>
-  printf 'BACKEND_IMAGE=%s\nPOSTGRES_IMAGE=%s\nKEYCLOAK_IMAGE=%s\n' "busybox:harness-never-started" "${PROJECT}-postgres:local" "$1" > "${W}/image.env"
+  printf 'BACKEND_IMAGE=%s\nPOSTGRES_IMAGE=%s\nKEYCLOAK_IMAGE=%s\nTRAEFIK_IMAGE=%s\n' "busybox:harness-never-started" "${PROJECT}-postgres:local" "$1" "busybox:harness-never-started" > "${W}/image.env"
 }
 if [ "${TARGET}" = upgrade ]; then use_keycloak "${KC_FROM_DECLARED}"; else use_keycloak "${KC_TO_DECLARED}"; fi
 printf 'all:\n  hosts:\n    vps:\n      ansible_connection: local\n      ansible_python_interpreter: %s\n' \

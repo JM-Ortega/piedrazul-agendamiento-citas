@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Contrato de identidad de imagen: resolución de referencias (resolve-amd64-image.sh),
-# referencia fijada de Keycloak de punta a punta en el repositorio y continuidad
-# escaneado = desplegado de Keycloak (scan-evidence.sh). Sin red ni contenedores: el
+# referencias fijadas de Keycloak y Traefik de punta a punta en el repositorio y continuidad
+# escaneado = desplegado de ambas (scan-evidence.sh). Sin red ni contenedores: el
 # registry es un `docker` falso que sirve bytes fijos y registra qué referencia se leyó.
 # La prueba ejecutable contra Keycloak real es keycloak-lifecycle-harness.sh (IDENT, UPG).
 #
@@ -17,8 +17,11 @@
 #      referencia; producción usa KEYCLOAK_IMAGE (image.env), que solo escribe converge;
 #      deploy exige Keycloak ya convergido antes de mutar y nunca lo arranca ni recrea; el workflow resuelve, escanea y pasa a converge esa identidad y
 #      verifica keycloak en ejecución; ya no queda ninguna referencia por tag a Keycloak.
-#   3. Evidencia de escaneo: keycloak solo se exige cuando corre converge, y su evidencia debe
-#      ser exactamente la identidad que converge despliega.
+#   3. Traefik: mismo contrato que Keycloak (traefik.yml fijado, TRAEFIK_IMAGE obligatoria en
+#      producción, escrita solo por converge y conservada por deploy, resuelta, escaneada,
+#      pasada a converge y verificada en ejecución por el workflow).
+#   4. Evidencia de escaneo: keycloak y traefik solo se exigen cuando corre converge, y su
+#      evidencia debe ser exactamente la identidad que converge despliega.
 # Salida: 0 si todo pasa; 1 si algo falla.
 set -euo pipefail
 
@@ -175,7 +178,40 @@ check "workflow: tras converge verifica keycloak en ejecución con esa misma ide
 check "workflow: deploy no recibe identidad de Keycloak" \
   bash -c "! yq -r '.jobs.production.steps[] | select(.id == \"deploy\") | .run' '${WORKFLOW}' | grep -q keycloak_image"
 
-# ── 3. Evidencia de escaneo: escaneado = desplegado ─────────────────────────
+# ── 3. Referencia fijada de Traefik en el repositorio ───────────────────────
+TRAEFIK_DECLARED="$(yq -r '.services.traefik.image' "${ROOT}/infra/compose/traefik.yml")"
+TRAEFIK_RUN="$(yq -r '.jobs.image_targets.steps[] | select(.id == "targets") | .run' "${WORKFLOW}")"
+check "traefik.yml declara traefik:<tag>@sha256:<índice OCI>" \
+  bash -c "[[ '${TRAEFIK_DECLARED}' =~ ^traefik:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}@sha256:[0-9a-f]{64}$ ]]"
+check "producción: prod.yml reemplaza la referencia por TRAEFIK_IMAGE obligatoria" \
+  bash -c "yq -r '.services.traefik.image' '${ROOT}/infra/compose/prod.yml' | grep -q '^\${TRAEFIK_IMAGE:?'"
+check "ninguna referencia a Traefik por tag solo (compose, Ansible, workflow)" \
+  bash -c "! grep -rhoE '(docker\\.io/(library/)?)?traefik:v?[0-9][A-Za-z0-9_.-]*([^@A-Za-z0-9_.-]|$)' '${ROOT}/infra/compose' '${ROOT}/infra/ansible' '${WORKFLOW}'"
+check "setup.yml escribe TRAEFIK_IMAGE en image.env después de validar traefik_image.yml" \
+  bash -c "grep -q 'TRAEFIK_IMAGE={{ traefik_image_ref }}' '${TASKS}/setup.yml' && test \$(grep -n 'include_tasks: traefik_image.yml' '${TASKS}/setup.yml' | cut -d: -f1) -lt \$(grep -n 'TRAEFIK_IMAGE=' '${TASKS}/setup.yml' | cut -d: -f1)"
+check "traefik_image.yml exige índice declarado, manifiesto distinto del índice, linux/amd64 y versión del tag" \
+  bash -c "grep -q 'traefik_image_index_digest == app_traefik_declared_ref.split' '${TASKS}/traefik_image.yml' && grep -q 'traefik_image_ref.split(.@.)\[1\] != traefik_image_index_digest' '${TASKS}/traefik_image.yml' && grep -q \"Architecture == 'amd64'\" '${TASKS}/traefik_image.yml' && grep -q 'org.opencontainers.image.version' '${TASKS}/traefik_image.yml'"
+check "deploy.yml no selecciona Traefik: conserva exactamente una TRAEFIK_IMAGE exacta de image.env" \
+  bash -c "! grep -q 'traefik_image_ref' '${TASKS}/deploy.yml' && grep -q 'app_deploy_traefik_image | length == 1' '${TASKS}/deploy.yml' && grep -q 'TRAEFIK_IMAGE={{ app_deploy_traefik_image\[0\] }}' '${TASKS}/deploy.yml'"
+D_TRAEFIK_GATE="$(yq -r 'to_entries[] | select(.value.name == "Validar la identidad de Traefik de image.env") | .key' "${TASKS}/deploy.yml")"
+check "deploy.yml: la validación de TRAEFIK_IMAGE va antes de toda mutación" \
+  bash -c "[ -n '${D_TRAEFIK_GATE}' ] && [ '${D_TRAEFIK_GATE}' -lt '${D_FIRST_MUTATION}' ]"
+check "workflow: image_targets exige la referencia fijada de Traefik y la resuelve con resolve-amd64-image.sh" \
+  bash -c "grep -q 'resolve-amd64-image.sh \"\${TRAEFIK_LABEL}\"' <<< \"\$1\"" _ "${TRAEFIK_RUN}"
+check "workflow: una referencia de Traefik sin resolver falla el job (no es fallo operativo del escáner)" \
+  bash -c "grep -A2 'resolve-amd64-image.sh \"\${TRAEFIK_LABEL}\"' <<< \"\$1\" | grep -q 'exit 1'" _ "${TRAEFIK_RUN}"
+check "workflow: ya no se escanea Traefik por tag ni se tolera una referencia sin resolver" \
+  bash -c "! grep -q -e 'compose (tag)' -e UNRESOLVED <<< \"\$1\" && ! grep -q -e UNRESOLVED -e unresolved '${WORKFLOW}' '${SCAN_EVIDENCE}'" _ "${TRAEFIK_RUN}"
+check "workflow: converge recibe traefik_image_ref y traefik_image_index_digest de image_targets" \
+  bash -c "yq -r '.jobs.production.steps[] | select(.id == \"converge\") | .run' '${WORKFLOW}' | grep -q 'traefik_image_ref=\${TRAEFIK_IMAGE_REF}' && yq -r '.jobs.production.steps[] | select(.id == \"converge\") | .run' '${WORKFLOW}' | grep -q 'traefik_image_index_digest=\${TRAEFIK_INDEX_DIGEST}' && yq -r '.jobs.production.env.TRAEFIK_IMAGE_REF' '${WORKFLOW}' | grep -q 'needs.image_targets.outputs.traefik_image_ref'"
+check "workflow: tras converge verifica traefik en ejecución con esa misma identidad" \
+  bash -c "yq -r '.jobs.production.steps[] | select(.id == \"converge_identity\") | .run' '${WORKFLOW}' | grep -q '\"traefik\"' && yq -r '.jobs.production.steps[] | select(.id == \"converge_identity\") | .run' '${WORKFLOW}' | grep -q 'traefik_image_ref=\${TRAEFIK_IMAGE_REF}'"
+check "workflow: deploy no recibe identidad de Traefik" \
+  bash -c "! yq -r '.jobs.production.steps[] | select(.id == \"deploy\") | .run' '${WORKFLOW}' | grep -q traefik_image"
+check "verify_running_images.yml admite traefik y compara sin el prefijo docker.io/library/" \
+  bash -c "grep -q \"'keycloak', 'traefik'\" '${TASKS}/verify_running_images.yml' && grep -q 'traefik_image_ref' '${TASKS}/verify_running_images.yml' && grep -q \"_hub: '\\^docker\\\\\\\\.io/library/'\" '${TASKS}/verify_running_images.yml'"
+
+# ── 4. Evidencia de escaneo: escaneado = desplegado ─────────────────────────
 KC_REF="${REPO}@${AMD64}"
 evidence() { # <dir> <surface> <ref>
   mkdir -p "$1/image-scan-selected-$2-1"
@@ -183,12 +219,14 @@ evidence() { # <dir> <surface> <ref>
     > "$1/image-scan-selected-$2-1/summary.json"
 }
 evidence "${TMP}/ev" keycloak "${KC_REF}"
-evidence "${TMP}/ev" traefik "docker.io/library/traefik@sha256:$(d64 d)"
-TARGETS_KC="$(jq -cn --arg r "${KC_REF}" --arg t "docker.io/library/traefik@sha256:$(d64 d)" \
+TRAEFIK_REF="docker.io/library/traefik@sha256:$(d64 d)"
+evidence "${TMP}/ev" traefik "${TRAEFIK_REF}"
+TARGETS_KC="$(jq -cn --arg r "${KC_REF}" --arg t "${TRAEFIK_REF}" \
   '[{surface: "keycloak", image_ref: $r}, {surface: "traefik", image_ref: $t}]')"
-run_evidence() { # <RUN_HOST_CONFIG> <RUN_APP_DEPLOY> <TARGETS> <KEYCLOAK_IMAGE_REF>
-  env -i PATH="${PATH}" TARGETS="$3" UNRESOLVED='[]' SCAN_RESULT=success EVIDENCE_DIR="${TMP}/ev" \
+run_evidence() { # <RUN_HOST_CONFIG> <RUN_APP_DEPLOY> <TARGETS> <KEYCLOAK_IMAGE_REF> [TRAEFIK_IMAGE_REF]
+  env -i PATH="${PATH}" TARGETS="$3" SCAN_RESULT=success EVIDENCE_DIR="${TMP}/ev" \
     RUN_HOST_CONFIG="$1" RUN_APP_DEPLOY="$2" KEYCLOAK_IMAGE_REF="$4" \
+    TRAEFIK_IMAGE_REF="${5-docker.io/library/traefik@sha256:$(d64 d)}" \
     BACKEND_SOURCE=reuse BACKEND_IMAGE_REF="ghcr.io/x/backend@sha256:$(d64 1)" \
     POSTGRES_SOURCE=reuse POSTGRES_IMAGE_REF="ghcr.io/x/postgres@sha256:$(d64 2)" \
     "${SCAN_EVIDENCE}"
@@ -203,6 +241,14 @@ check "evidencia: converge sin intento de escaneo de keycloak: falla" \
   bash -c "$(declare -f run_evidence d64); TMP='${TMP}' SCAN_EVIDENCE='${SCAN_EVIDENCE}'; ! run_evidence true true \"\$(jq -c 'map(select(.surface != \"keycloak\"))' <<< '${TARGETS_KC}')\" '${KC_REF}'"
 check "evidencia: deploy sin converge no exige ni registra keycloak (no lo aplica)" \
   bash -c "$(declare -f run_evidence d64); TMP='${TMP}' SCAN_EVIDENCE='${SCAN_EVIDENCE}'; run_evidence false true '[]' '' | grep -q '^evidence=\\[\\]$'"
+check "evidencia: converge con la identidad escaneada de traefik: pasa y la registra" \
+  bash -c "$(declare -f run_evidence d64); TMP='${TMP}' SCAN_EVIDENCE='${SCAN_EVIDENCE}'; run_evidence true true '${TARGETS_KC}' '${KC_REF}' '${TRAEFIK_REF}' | grep '^evidence=' | grep -q '\"surface\":\"traefik\"'"
+check "evidencia: converge desplegaría otro traefik que el escaneado: falla" \
+  bash -c "$(declare -f run_evidence d64); TMP='${TMP}' SCAN_EVIDENCE='${SCAN_EVIDENCE}'; ! run_evidence true true '${TARGETS_KC}' '${KC_REF}' 'docker.io/library/traefik@sha256:$(d64 e)'"
+check "evidencia: converge sin identidad exacta de traefik (tag o vacía): falla" \
+  bash -c "$(declare -f run_evidence d64); TMP='${TMP}' SCAN_EVIDENCE='${SCAN_EVIDENCE}'; ! run_evidence true true '${TARGETS_KC}' '${KC_REF}' 'traefik:v3.7.14' && ! run_evidence true true '${TARGETS_KC}' '${KC_REF}' ''"
+check "evidencia: converge sin intento de escaneo de traefik: falla" \
+  bash -c "$(declare -f run_evidence d64); TMP='${TMP}' SCAN_EVIDENCE='${SCAN_EVIDENCE}'; ! run_evidence true true \"\$(jq -c 'map(select(.surface != \"traefik\"))' <<< '${TARGETS_KC}')\" '${KC_REF}' '${TRAEFIK_REF}'"
 
 echo
 if [ "${FAILS}" -gt 0 ]; then

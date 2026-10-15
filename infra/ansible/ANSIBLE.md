@@ -30,7 +30,7 @@ infra/ansible/
     └── app/                             # Gestión del stack de la aplicación
         ├── tasks/
         │   ├── main.yml                 # Punto de entrada (importa setup.yml)
-        │   ├── setup.yml                # Copia archivos, genera .env, postgres, Traefik
+        │   ├── setup.yml                # Copia archivos, genera .env y rutas de Traefik, postgres, Traefik
         │   ├── keycloak_credentials.yml # Toma y valida las credenciales técnicas de Keycloak (setup)
         │   ├── keycloak_backend_delivery.yml # Verifica que el backend recibe su secreto intacto (setup)
         │   ├── identity_seed_inputs.yml # Valida el bootstrap del primer ADMIN de negocio antes de .env (setup)
@@ -153,7 +153,7 @@ converge.yml
 ├── role: common        → apt update, paquetes base, timezone
 ├── role: docker_host   → instala Docker CE + Compose plugin, daemon.json
 ├── role: hardening     → fail2ban, sysctl, deshabilita servicios innecesarios
-├── app/setup.yml       → copia archivos, genera .env, postgres + reconciliación, Traefik
+├── app/setup.yml       → copia archivos, genera .env y rutas de Traefik, postgres + reconciliación, Traefik
 ├── app/keycloak_lifecycle.yml → ciclo técnico de Keycloak (P1/P2/P3, ver abajo)
 └── app/refresh_backend.yml → recrea el backend en ejecución si cambió su configuración (sin imagen nueva)
 ```
@@ -223,13 +223,32 @@ Corre en cada `converge`. Pasos:
 1. Crea `/opt/piedrazul/`
 2. `keycloak_credentials.yml`: toma `KC_BACKEND_CLIENT_SECRET` y `KC_AUTOMATION_CLIENT_SECRET` del entorno del runner y falla, nombrando solo la regla, si alguno está vacío, si son iguales (el de automatización no debe persistirse en el host) o si coinciden con un valor del repositorio (`.env.example`, realm). Sin lista de caracteres prohibidos ni requisito de formato nuevo: el valor (con el `trim` de extremos que ya se aplicaba) llega a Keycloak en JSON armado por Ansible y al backend por `.env` con escape
 3. Copia `infra/compose/` → `/opt/piedrazul/`
-4. Copia `infra/keycloak/` → `/opt/piedrazul/keycloak/` (realm JSON + theme JAR)
+4. Copia `infra/keycloak/` → `/opt/piedrazul/keycloak/` (realm JSON + theme JAR) e `infra/traefik/` → `/opt/piedrazul/traefik/` (opciones TLS de AOP y CA de Cloudflare); `traefik_routes.yml` genera `traefik/dynamic/routes.yml` (ver [Traefik](#traefik))
 5. Toma del entorno del runner las contraseñas de la base (`POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `MIGRATION_DB_PASSWORD`, `KC_DB_PASSWORD`) y falla, nombrando solo las claves, si alguna está vacía o contiene comilla simple o salto de línea
 6. Genera `.env` desde `env.j2`
-7. Valida y descarga por digest las imágenes propias (`release_images.yml`) y Keycloak (`keycloak_image.yml`) → `image.env`
+7. Valida y descarga por digest las imágenes propias (`release_images.yml`), Keycloak (`keycloak_image.yml`) y Traefik (`traefik_image.yml`) → `image.env`
    - `keycloak_backend_delivery.yml`: comprueba con `docker compose config` que el backend recibiría `KC_BACKEND_CLIENT_SECRET` exactamente igual al declarado (en `.env` va entre comillas dobles con `\ " $` escapados); si no, falla sin mostrar el valor
 8. `db_converge.yml`: postgres con el `.env` vigente + reconciliación de autoridades
-9. Levanta Traefik (`docker_compose_v2 state: present`). No arranca Keycloak (lo hace `keycloak_lifecycle.yml`), el backend ni migra
+9. Levanta Traefik (`docker_compose_v2 state: present`, imagen ya descargada por digest). No arranca Keycloak (lo hace `keycloak_lifecycle.yml`), el backend ni migra
+
+#### Traefik
+
+Traefik enruta solo con el **file provider**: no tiene Docker provider ni socket de Docker montado, y ningún servicio lleva labels `traefik.*`. Lee `/opt/piedrazul/traefik/dynamic/` (montado de solo lectura, con `watch`):
+
+| Archivo | Contenido | Origen |
+|---|---|---|
+| `tls.yml` | opción TLS `cloudflare-aop` (certificado de cliente de Cloudflare obligatorio, CA en `traefik/certs/`) | `infra/traefik/dynamic/tls.yml`, copiado tal cual |
+| `routes.yml` | routers `backend` (`Host(api_public_domain)`) y `keycloak` (`Host(kc_hostname)`), entrypoint `websecure`, TLS `cloudflare-aop` + resolver `letsencrypt`; servicios `http://backend:<server_port>` y `http://keycloak:<kc_port>` | generado por `traefik_routes.yml` desde `templates/traefik-routes.yml.j2` con las mismas variables del inventario que `.env` |
+
+- Para cambiar un host o puerto se cambia el inventario (`host_vars`/`group_vars`) y se corre converge; `routes.yml` no se edita en el servidor (converge lo sobrescribe). Antes de escribirlo, `traefik_routes.yml` valida las entradas (nombres DNS en minúsculas, distintos; puertos numéricos) y el documento generado; si algo falla, converge se detiene sin tocar el archivo vigente. Traefik recarga el cambio sin reiniciarse.
+- Los servicios apuntan al nombre del contenedor en `piedrazul_net`; Traefik lo resuelve en cada conexión nueva, así que recrear o reiniciar backend o Keycloak no deja rutas obsoletas ni necesita la API de Docker. Mientras un upstream no existe o no responde, su host devuelve `502` (antes, con el Docker provider, `404`); un host sin ruta devuelve `404`.
+- `--core.strictTLSOptions=true`: si dos routers del mismo host pidieran opciones TLS distintas, Traefik desactiva esos routers en vez de servirlos con las opciones por defecto (sin certificado de cliente de AOP).
+- HTTP (`:80`) redirige de forma permanente a HTTPS (`301` para GET/HEAD, `308` para otros métodos). Los certificados los emite Let's Encrypt por DNS de Cloudflare (`CF_DNS_API_TOKEN`) y persisten en el volumen `traefik_letsencrypt`, que sobrevive a recrear el contenedor.
+- `X-Forwarded-*`: los entrypoints no confían en cabeceras entrantes (sin `forwardedHeaders.trustedIPs`); Traefik las reemplaza con lo que ve (Proto `https`, Host pedido, For = IP del par TCP, es decir, Cloudflare).
+- Un archivo dinámico malformado lo registra Traefik como error en su log: en caliente conserva la última configuración válida; si arranca con él, no carga las rutas (los hosts responden `404`). El health público del workflow lo detecta.
+- Diagnóstico en el servidor: `docker logs traefik` (errores del file provider y de ACME), `docker inspect traefik --format '{{.Config.Image}}'` (identidad en ejecución) y `cat /opt/piedrazul/traefik/dynamic/routes.yml`.
+
+La imagen es un tercero fijado con el mismo contrato que Keycloak: `infra/compose/traefik.yml` declara `traefik:<versión>@sha256:<índice OCI>`; el workflow la resuelve una vez a su manifiesto `linux/amd64`, la escanea y la pasa a converge (`traefik_image_ref`, `traefik_image_index_digest`); `traefik_image.yml` exige que corresponda a la declaración, la descarga por digest y comprueba plataforma y versión (`org.opencontainers.image.version` igual al tag); `image.env` la recibe como `TRAEFIK_IMAGE` y `prod.yml` la exige (`${TRAEFIK_IMAGE:?}`). Deploy conserva la `TRAEFIK_IMAGE` de `image.env` (si falta o está malformada falla antes de mutar: corre converge). Tras converge, `verify_running_images.yml` comprueba que el contenedor `traefik` ejecuta esa identidad. Para actualizar Traefik: revisar notas de migración y avisos de seguridad, reemplazar tag y digest del índice en `traefik.yml` (`docker buildx imagetools inspect traefik:<versión>`) y desplegar con converge.
 
 #### Identidad de las imágenes propias
 
@@ -614,9 +633,9 @@ Dentro de `production`, en orden:
 3. **Outputs**: se leen de ese state version exacto, solo si sigue siendo el actual antes y después de leerlos. Sin Apply, el state version es el capturado al inicio.
 4. **Último éxito**: lectura (solo lectura) de `last-success.env` del servidor.
 5. **Selección** (`select-release.sh`): backend = rollback > build de este run > último éxito; postgres = build de este run > último éxito. Build y rollback llegan con la identidad inmutable resuelta antes del gate; el reuso toma la identidad exacta registrada. Ausente, malformada o ambigua falla cerrado. Sin deploy de aplicación ambas son reuso.
-6. **Escaneo antes de mutar** (`scan-evidence.sh`): para cada imagen que el run aplica, build/rollback y keycloak/traefik deben tener un `summary.json` válido de `image_scan` sobre la misma referencia exacta (keycloak, además, exactamente la `keycloak_image_ref` que recibe converge); el backend o postgres en reuso se escanea aquí, con la identidad recién leída, usando la misma acción. El resultado de cada intento (`scanned` con sus hallazgos, u `operational_failure`) se informa en el resumen pero no bloquea. Sí bloquea una cadena de escaneo incompleta o no verificable (ver abajo).
+6. **Escaneo antes de mutar** (`scan-evidence.sh`): para cada imagen que el run aplica, build/rollback y keycloak/traefik deben tener un `summary.json` válido de `image_scan` sobre la misma referencia exacta (keycloak y traefik, además, exactamente la `keycloak_image_ref` / `traefik_image_ref` que recibe converge); el backend o postgres en reuso se escanea aquí, con la identidad recién leída, usando la misma acción. El resultado de cada intento (`scanned` con sus hallazgos, u `operational_failure`) se informa en el resumen pero no bloquea. Sí bloquea una cadena de escaneo incompleta o no verificable (ver abajo).
 7. **Converge / deploy** con esas referencias exactas (con frescura justo antes si no hubo Apply). Ambos convergen postgres y reconcilian las autoridades de la base antes de cualquier consumidor; deploy migra el esquema con el backend construido en este run (misma identidad exacta) antes de arrancarlo. Si la migración falla, el paso de deploy falla y no se llega a la verificación ni al registro.
-8. **Identidad en ejecución** (tras converge: postgres y keycloak; tras deploy: postgres y backend) y **health** (contenedores —keycloak también si corrió converge—, y luego `actuator/health` del backend y el discovery OIDC de Keycloak).
+8. **Identidad en ejecución** (tras converge: postgres, keycloak y traefik; tras deploy: postgres y backend) y **health** (contenedores —keycloak también si corrió converge—, y luego `actuator/health` del backend y el discovery OIDC de Keycloak).
 9. **Registro** del último éxito, solo si hubo deploy de aplicación y todo lo anterior pasó.
 
 El resumen del job muestra el state version consumido, las identidades (y las anteriores) y la primera etapa que falló: credenciales, frescura, HCP, acceso al servidor, selección, escaneo previo, deploy, identidad en ejecución, health o registro. El job `conclude` hace que la conclusión del run sea success solo si producción terminó bien o no hacía falta; esa conclusión es la base del siguiente rango.
@@ -632,7 +651,7 @@ El resumen del job muestra el state version consumido, las identidades (y las an
 | backend / postgres, reuso | la registrada en `last-success.env`, leída tras el gate |
 | postgres, build | igual que backend build |
 | keycloak | referencia fijada `<tag>@sha256:<índice>` de `infra/compose/keycloak.yml`, resuelta por digest en `image_targets` (solo si corre converge) |
-| traefik | fijada **solo para el escaneo**: se resuelve la referencia de `infra/compose/traefik.yml`, pero Compose sigue desplegando por tag |
+| traefik | referencia fijada `<tag>@sha256:<índice>` de `infra/compose/traefik.yml`, resuelta por digest en `image_targets` (solo si corre converge) |
 
 La misma referencia `repo@sha256:<linux/amd64>` es la que se escanea, la que recibe Ansible, la que se verifica en ejecución y (backend y postgres) la que se registra. `resolve-amd64-image.sh` acepta `<repo>:<tag>`, `<repo>@sha256:<índice>` y `<repo>:<tag>@sha256:<índice>`; con digest lee solo por digest y el tag queda como etiqueta.
 
@@ -643,11 +662,11 @@ La misma referencia `repo@sha256:<linux/amd64>` es la que se escanea, la que rec
 - Lo que se exige es el **orden**: el intento de escaneo de la identidad exacta termina antes de la mutación que puede aplicarla. Su resultado no autoriza ni bloquea mientras la política de vulnerabilidades no esté activa.
 - Cada intento deja un resultado explícito en `summary.json` (`outcome`) y en el resumen:
   - `scanned`: evaluado, con conteo de CRITICAL/HIGH (que puede ser cero). Los hallazgos **no bloquean** (`--exit-code 0`).
-  - `operational_failure`: registry, DB de vulnerabilidades o Trivy fallaron, el reporte no corresponde a la referencia, o la referencia de traefik no se pudo resolver (la de keycloak sin resolver falla `image_targets`: sin identidad no hay despliegue). Sin conteos (`null`), con anotación de error y `FALLO OPERATIVO`: **no equivale a cero hallazgos**. Transitorio: tampoco bloquea; cuando se active la política será bloqueante.
+  - `operational_failure`: registry, DB de vulnerabilidades o Trivy fallaron, o el reporte no corresponde a la referencia (una referencia de keycloak o traefik sin resolver falla `image_targets`: sin identidad no hay despliegue). Sin conteos (`null`), con anotación de error y `FALLO OPERATIVO`: **no equivale a cero hallazgos**. Transitorio: tampoco bloquea; cuando se active la política será bloqueante.
 - Solo el intento de Trivy (descarga del registry, DB, ejecución, reporte que no corresponde a la referencia) se registra como `operational_failure`; la acción termina bien y deja su `summary.json`. Cualquier otro error (entrada inválida, generación de la evidencia, subida del artifact, checkout) hace fallar el job.
 - **Cadena incompleta o no verificable → `production` no muta** (no es un `operational_failure`): `image_scan` fallido o cancelado, `summary.json` ausente, malformado, duplicado, de otra referencia o con un resultado incoherente, o una imagen aplicada sin intento de escaneo. Un artifact ausente no prueba que Trivy haya intentado el escaneo.
 - `production` descarga los `summary.json` previos, los valida y muestra el resultado de cada imagen que aplica.
-- El escaneo de traefik describe el contenido actual de su tag, que puede no ser lo que corre en el servidor. El de keycloak es exactamente lo que converge despliega; con escaneo solo reporte, sus hallazgos tampoco autorizan ni bloquean.
+- Los escaneos de keycloak y traefik son exactamente lo que converge despliega; con escaneo solo reporte, sus hallazgos tampoco autorizan ni bloquean.
 
 Los `FROM` de `backend/Dockerfile` e `infra/postgres/Dockerfile` están fijados por digest del índice OCI (`imagen:tag@sha256:…`), así buildx toma el hijo correcto para `linux/amd64` y `linux/arm64`. Para actualizar una base se resuelve el nuevo índice (`docker buildx imagetools inspect <imagen>:<tag>`) y se reemplaza el digest.
 
@@ -671,7 +690,8 @@ GitHub Actions (workflow)
         │     │   (KC_PLATFORM_ADMIN_INITIAL_PASSWORD se valida después, solo si Keycloak es P2)
         │     ├── copia compose files + keycloak/ + postgres/
         │     ├── genera .env
-        │     ├── valida y descarga por digest backend/postgres y keycloak → image.env exacto
+        │     ├── genera traefik/dynamic/routes.yml (file provider)
+        │     ├── valida y descarga por digest backend/postgres, keycloak y traefik → image.env exacto
         │     ├── postgres (PGDATA vacío → 01-init-databases.sh) + reconciliación
         │     └── levanta Traefik
         ├── keycloak_lifecycle.yml → P2 (schema keycloak vacío)

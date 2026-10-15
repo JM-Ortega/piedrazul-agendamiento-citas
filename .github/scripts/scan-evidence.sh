@@ -7,12 +7,11 @@
 #   backend / postgres con identidad conocida antes del gate (build, rollback), y
 #   keycloak / traefik → image_scan terminó en success y existe un summary.json válido
 #       de ESA referencia exacta
-#   keycloak además: esa referencia es exactamente KEYCLOAK_IMAGE_REF, la que converge
-#       despliega (escaneado = desplegado); sin ella no hay despliegue posible
+#   keycloak / traefik además: esa referencia es exactamente KEYCLOAK_IMAGE_REF /
+#       TRAEFIK_IMAGE_REF, la que converge despliega (escaneado = desplegado); sin ella no
+#       hay despliegue posible
 #   backend / postgres en reuso (identidad leída del servidor tras el gate)
 #       → se marca para escanear dentro de este job, antes de la mutación
-#   traefik cuya referencia no se pudo resolver → operational_failure registrado por
-#       image_targets
 #
 # A. Intento completado (continúa mientras el escaneo sea solo reporte):
 #      summary.json de la imagen, image_ref idéntico al esperado, y
@@ -26,10 +25,10 @@
 #   converge (setup.yml) → postgres, keycloak, traefik
 #   deploy.yml           → postgres, backend (conserva la identidad de keycloak del servidor)
 #
-# Entorno: TARGETS y UNRESOLVED (JSON de image_targets), SCAN_RESULT (resultado de
+# Entorno: TARGETS (JSON de image_targets), SCAN_RESULT (resultado de
 #   image_scan), EVIDENCE_DIR (artifacts image-scan-selected-* descargados),
 #   RUN_HOST_CONFIG, RUN_APP_DEPLOY, {BACKEND,POSTGRES}_{SOURCE,IMAGE_REF},
-#   KEYCLOAK_IMAGE_REF (la que recibe converge)
+#   KEYCLOAK_IMAGE_REF y TRAEFIK_IMAGE_REF (las que recibe converge)
 # Salida (GITHUB_OUTPUT): scan_backend, scan_postgres (true = escanear el reuso aquí),
 #   evidence (JSON: imagen, referencia y resultado de cada intento previo)
 set -euo pipefail
@@ -41,10 +40,7 @@ fail() {
 
 TARGETS="${TARGETS:-}"
 [ -n "${TARGETS}" ] || TARGETS='[]'
-UNRESOLVED="${UNRESOLVED:-}"
-[ -n "${UNRESOLVED}" ] || UNRESOLVED='[]'
 jq -e 'type == "array"' <<< "${TARGETS}" > /dev/null || fail "TARGETS no es un arreglo JSON"
-jq -e 'type == "array"' <<< "${UNRESOLVED}" > /dev/null || fail "UNRESOLVED no es un arreglo JSON"
 EVIDENCE_DIR="${EVIDENCE_DIR:-/nonexistent}"
 
 applied() { # <surface>
@@ -113,28 +109,23 @@ for SURFACE in backend postgres; do
   fi
 done
 
-if applied keycloak; then
-  KEYCLOAK_IMAGE_REF="${KEYCLOAK_IMAGE_REF:-}"
-  [[ "${KEYCLOAK_IMAGE_REF}" =~ ^quay\.io/keycloak/keycloak@sha256:[0-9a-f]{64}$ ]] ||
-    fail "keycloak: sin identidad exacta para converge ('${KEYCLOAK_IMAGE_REF}')"
-  [ "$(jq --arg s keycloak '[.[] | select(.surface == $s)] | length' <<< "${TARGETS}")" -eq 1 ] ||
-    fail "keycloak: se aplica pero no hay exactamente un intento de escaneo de su identidad"
-  REF=$(jq -r '[.[] | select(.surface == "keycloak") | .image_ref][0]' <<< "${TARGETS}")
-  [ "${REF}" = "${KEYCLOAK_IMAGE_REF}" ] ||
-    fail "keycloak: se escaneó ${REF} pero converge desplegaría ${KEYCLOAK_IMAGE_REF}"
-  prior_outcome keycloak "${REF}"
-fi
-
-for SURFACE in traefik; do
+# Terceros fijados que aplica converge: el escaneo es exactamente la identidad desplegada
+for SURFACE in keycloak traefik; do
   applied "${SURFACE}" || continue
-  REF=$(jq -r --arg s "${SURFACE}" '[.[] | select(.surface == $s) | .image_ref][0] // ""' <<< "${TARGETS}")
-  if [ -n "${REF}" ]; then
-    prior_outcome "${SURFACE}" "${REF}"
-  elif jq -e --arg s "${SURFACE}" 'any(.[]; .surface == $s)' <<< "${UNRESOLVED}" > /dev/null; then
-    record "${SURFACE}" "(sin resolver)" "operational_failure (resolución de la referencia)"
-  else
-    fail "${SURFACE}: se aplica pero no hubo intento de escaneo"
-  fi
+  case "${SURFACE}" in
+    keycloak) PATTERN='^quay\.io/keycloak/keycloak@sha256:[0-9a-f]{64}$' ;;
+    traefik) PATTERN='^docker\.io/library/traefik@sha256:[0-9a-f]{64}$' ;;
+  esac
+  DEPLOY_VAR="${SURFACE^^}_IMAGE_REF"
+  DEPLOY_REF="${!DEPLOY_VAR:-}"
+  [[ "${DEPLOY_REF}" =~ ${PATTERN} ]] ||
+    fail "${SURFACE}: sin identidad exacta para converge ('${DEPLOY_REF}')"
+  [ "$(jq --arg s "${SURFACE}" '[.[] | select(.surface == $s)] | length' <<< "${TARGETS}")" -eq 1 ] ||
+    fail "${SURFACE}: se aplica pero no hay exactamente un intento de escaneo de su identidad"
+  REF=$(jq -r --arg s "${SURFACE}" '[.[] | select(.surface == $s) | .image_ref][0]' <<< "${TARGETS}")
+  [ "${REF}" = "${DEPLOY_REF}" ] ||
+    fail "${SURFACE}: se escaneó ${REF} pero converge desplegaría ${DEPLOY_REF}"
+  prior_outcome "${SURFACE}" "${REF}"
 done
 
 echo "scan_backend=${SCAN_BACKEND}"

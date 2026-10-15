@@ -501,12 +501,15 @@ jobs:
       contents: read
     outputs:
       targets: ${{ steps.targets.outputs.targets }}
-      unresolved: ${{ steps.targets.outputs.unresolved }}
       # Keycloak (solo si converge corre): referencia fijada declarada, índice y manifiesto
       # linux/amd64 que se escanea y que converge despliega
       keycloak_label: ${{ steps.targets.outputs.keycloak_label }}
       keycloak_index_digest: ${{ steps.targets.outputs.keycloak_index_digest }}
       keycloak_image_ref: ${{ steps.targets.outputs.keycloak_image_ref }}
+      # Traefik (solo si converge corre): mismo contrato que Keycloak
+      traefik_label: ${{ steps.targets.outputs.traefik_label }}
+      traefik_index_digest: ${{ steps.targets.outputs.traefik_index_digest }}
+      traefik_image_ref: ${{ steps.targets.outputs.traefik_image_ref }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -538,7 +541,6 @@ jobs:
           TARGETS='[]'
           PENDING='[]'
           NOT_APPLIED='[]'
-          UNRESOLVED='[]'
 
           add_target() {
             TARGETS=$(jq -c --arg surface "$1" --arg source "$2" --arg label "$3" \
@@ -614,29 +616,37 @@ jobs:
             echo "keycloak_image_ref=${KEYCLOAK_IMAGE_REF}"
           } >> "$GITHUB_OUTPUT"
 
-          # Traefik: la referencia configurada en Compose se resuelve una vez, solo si este
-          # run aplica ese servicio. Compose sigue desplegándolo por tag, así que esto no
-          # garantiza escaneado = desplegado.
-          for SURFACE in traefik; do
-            if [ "${RUN_HOST_CONFIG}" != "true" ]; then
-              add_not_applied "${SURFACE}"
-              continue
+          # Traefik: mismo contrato que Keycloak. Referencia fijada traefik:<tag>@sha256:<índice>
+          # en Compose, resuelta una vez a su manifiesto linux/amd64: ese manifiesto se escanea y
+          # converge lo despliega. Sin identidad exacta el job falla y producción no empieza.
+          TRAEFIK_LABEL="" TRAEFIK_INDEX_DIGEST="" TRAEFIK_IMAGE_REF=""
+          if [ "${RUN_HOST_CONFIG}" = "true" ]; then
+            TRAEFIK_LABEL=$(yq -r '.services.traefik.image' infra/compose/traefik.yml)
+            if ! [[ "${TRAEFIK_LABEL}" =~ ^traefik:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}@sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error title=Identidad de Traefik::infra/compose/traefik.yml debe fijar traefik:<tag>@sha256:<índice OCI> (tiene '${TRAEFIK_LABEL}')"
+              exit 1
             fi
-            CONFIGURED=$(yq -r ".services.${SURFACE}.image" "infra/compose/${SURFACE}.yml")
-            # Un fallo de resolución es operativo: se registra y no bloquea (solo reporte)
-            if ! IDENTITY=$(.github/scripts/resolve-amd64-image.sh "${CONFIGURED}"); then
-              echo "::error title=Escaneo de imagen: FALLO OPERATIVO::No se pudo resolver ${CONFIGURED}; ${SURFACE} no se evalúa en este run. No equivale a cero hallazgos."
-              UNRESOLVED=$(jq -c --arg surface "${SURFACE}" --arg label "${CONFIGURED}" \
-                '. + [{surface: $surface, label: $label, outcome: "operational_failure"}]' <<< "${UNRESOLVED}")
-              continue
+            if ! IDENTITY=$(.github/scripts/resolve-amd64-image.sh "${TRAEFIK_LABEL}"); then
+              echo "::error title=Identidad de Traefik::No se pudo resolver ${TRAEFIK_LABEL} a un manifiesto linux/amd64 único; converge no despliega Traefik sin identidad exacta"
+              exit 1
             fi
-            INDEX_DIGEST=$(sed -n 's/^image_index_digest=//p' <<< "${IDENTITY}")
-            IMAGE_REF=$(sed -n 's/^image_ref=//p' <<< "${IDENTITY}")
-            add_target "${SURFACE}" "compose (tag)" "${CONFIGURED}" "${INDEX_DIGEST}" "${IMAGE_REF}"
-          done
+            TRAEFIK_INDEX_DIGEST=$(sed -n 's/^image_index_digest=//p' <<< "${IDENTITY}")
+            TRAEFIK_IMAGE_REF=$(sed -n 's/^image_ref=//p' <<< "${IDENTITY}")
+            [ "${TRAEFIK_INDEX_DIGEST}" = "${TRAEFIK_LABEL#*@}" ] || {
+              echo "::error title=Identidad de Traefik::el índice resuelto (${TRAEFIK_INDEX_DIGEST}) no es el declarado"
+              exit 1
+            }
+            add_target traefik "compose (fijada)" "${TRAEFIK_LABEL}" "${TRAEFIK_INDEX_DIGEST}" "${TRAEFIK_IMAGE_REF}"
+          else
+            add_not_applied traefik
+          fi
+          {
+            echo "traefik_label=${TRAEFIK_LABEL}"
+            echo "traefik_index_digest=${TRAEFIK_INDEX_DIGEST}"
+            echo "traefik_image_ref=${TRAEFIK_IMAGE_REF}"
+          } >> "$GITHUB_OUTPUT"
 
           echo "targets=${TARGETS}" >> "$GITHUB_OUTPUT"
-          echo "unresolved=${UNRESOLVED}" >> "$GITHUB_OUTPUT"
 
           {
             echo "## Identidades de imagen a escanear"
@@ -654,12 +664,6 @@ jobs:
               echo
               jq -r '.[] | "- \(.surface): \(.reason)"' <<< "${PENDING}"
             fi
-            if [ "$(jq 'length' <<< "${UNRESOLVED}")" -gt 0 ]; then
-              echo
-              echo "**FALLO OPERATIVO (sin evaluar, no equivale a cero hallazgos):**"
-              echo
-              jq -r '.[] | "- \(.surface): no se pudo resolver `\(.label)`"' <<< "${UNRESOLVED}"
-            fi
             if [ "$(jq 'length' <<< "${NOT_APPLIED}")" -gt 0 ]; then
               echo
               echo "No aplicadas por este run: $(jq -r 'join(", ")' <<< "${NOT_APPLIED}")."
@@ -667,8 +671,8 @@ jobs:
             echo
             echo "> Solo reporte: ni hallazgos ni fallos operativos bloquean. Producción espera a que"
             echo "> terminen estos intentos antes de mutar."
-            echo "> Backend, postgres y keycloak se despliegan por la misma identidad exacta"
-            echo "> escaneada; traefik todavía por tag."
+            echo "> Backend, postgres, keycloak y traefik se despliegan por la misma identidad"
+            echo "> exacta escaneada."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Reportar fallo operativo
@@ -772,6 +776,10 @@ jobs:
       KEYCLOAK_LABEL: ${{ needs.image_targets.outputs.keycloak_label }}
       KEYCLOAK_INDEX_DIGEST: ${{ needs.image_targets.outputs.keycloak_index_digest }}
       KEYCLOAK_IMAGE_REF: ${{ needs.image_targets.outputs.keycloak_image_ref }}
+      # Identidad exacta de Traefik que image_targets resolvió y escaneó (vacía sin converge)
+      TRAEFIK_LABEL: ${{ needs.image_targets.outputs.traefik_label }}
+      TRAEFIK_INDEX_DIGEST: ${{ needs.image_targets.outputs.traefik_index_digest }}
+      TRAEFIK_IMAGE_REF: ${{ needs.image_targets.outputs.traefik_image_ref }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -1054,7 +1062,6 @@ jobs:
         if: env.DEPLOY_REQUIRED == 'true'
         env:
           TARGETS: ${{ needs.image_targets.outputs.targets }}
-          UNRESOLVED: ${{ needs.image_targets.outputs.unresolved }}
           SCAN_RESULT: ${{ needs.image_scan.result }}
           EVIDENCE_DIR: ${{ runner.temp }}/scan-evidence
           BACKEND_SOURCE: ${{ steps.select.outputs.backend_source }}
@@ -1139,12 +1146,14 @@ jobs:
             -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
             -e "keycloak_image_ref=${KEYCLOAK_IMAGE_REF}" \
             -e "keycloak_image_index_digest=${KEYCLOAK_INDEX_DIGEST}" \
+            -e "traefik_image_ref=${TRAEFIK_IMAGE_REF}" \
+            -e "traefik_image_index_digest=${TRAEFIK_INDEX_DIGEST}" \
             -e "keycloak_recovery=${KEYCLOAK_RECOVERY}" \
             -e "app_deploy_follows=${RUN_APP_DEPLOY}" \
             -e "app_identity_seed_intended=${IDENTITY_SEED_ENABLED:-false}" \
             infra/ansible/playbooks/converge.yml
 
-      - name: Verificar postgres y keycloak tras converge (identidad en ejecución)
+      - name: Verificar postgres, keycloak y traefik tras converge (identidad en ejecución)
         id: converge_identity
         if: env.RUN_HOST_CONFIG == 'true'
         env:
@@ -1158,8 +1167,9 @@ jobs:
             -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
             -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
             -e "keycloak_image_ref=${KEYCLOAK_IMAGE_REF}" \
+            -e "traefik_image_ref=${TRAEFIK_IMAGE_REF}" \
             -e release_check=identity \
-            -e '{"app_release_services": ["postgres", "keycloak"]}' \
+            -e '{"app_release_services": ["postgres", "keycloak", "traefik"]}' \
             infra/ansible/playbooks/verify-release.yml
 
       # deploy.yml: postgres + reconciliación → migración (solo backend construido en este
@@ -1368,6 +1378,11 @@ jobs:
                 echo "| keycloak | \`${KEYCLOAK_LABEL:-—}\` → \`${KEYCLOAK_IMAGE_REF:-—}\` (converge; la base de Keycloak solo migra hacia adelante) |"
               else
                 echo "| keycloak | sin cambios: este run no corre converge (deploy conserva la identidad del servidor) |"
+              fi
+              if [ "${RUN_HOST_CONFIG_SUMMARY}" = "true" ]; then
+                echo "| traefik | \`${TRAEFIK_LABEL:-—}\` → \`${TRAEFIK_IMAGE_REF:-—}\` (converge) |"
+              else
+                echo "| traefik | sin cambios: este run no corre converge |"
               fi
               if [ "${RUN_APP_DEPLOY_SUMMARY}" = "true" ]; then
                 if [ "${BACKEND_SOURCE}" = "build" ]; then

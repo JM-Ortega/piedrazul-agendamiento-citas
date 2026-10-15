@@ -1,11 +1,11 @@
 ---
-# Verifica que los contenedores de las imágenes propias (y de Keycloak, tercero fijado)
+# Verifica que los contenedores de las imágenes propias (y de Keycloak y Traefik, terceros fijados)
 # corren exactamente la identidad esperada. No mira health: eso es verify_health.yml, y un health OK no prueba que corra
 # el contenido esperado.
 #
 # Variables:
-#   app_release_services → servicios a verificar (subconjunto de [postgres, backend, keycloak])
-#   backend_image_ref / postgres_image_ref / keycloak_image_ref → identidades exactas
+#   app_release_services → servicios a verificar (subconjunto de [postgres, backend, keycloak, traefik])
+#   backend_image_ref / postgres_image_ref / keycloak_image_ref / traefik_image_ref → identidades exactas
 #     esperadas (repo@sha256:<manifiesto linux/amd64>); solo se exigen las de los servicios
 #     a verificar
 #
@@ -14,13 +14,16 @@
 # registró bajo ese digest (RepoDigests). Es el manifiesto de plataforma, no el índice OCI:
 # no se compara con el Id local (que según el almacén de imágenes del daemon es el digest
 # de la configuración o del manifiesto).
+# Docker abrevia las imágenes oficiales de Docker Hub (docker.io/library/traefik → traefik)
+# en RepoDigests: las comparaciones quitan ese prefijo de ambos lados (misma referencia; no
+# cambia las de ghcr.io ni quay.io).
 
 - name: Validar servicios a verificar
   ansible.builtin.assert:
     that:
       - app_release_services | length > 0
-      - app_release_services | difference(['postgres', 'backend', 'keycloak']) | length == 0
-    fail_msg: "app_release_services debe ser un subconjunto no vacío de [postgres, backend, keycloak]"
+      - app_release_services | difference(['postgres', 'backend', 'keycloak', 'traefik']) | length == 0
+    fail_msg: "app_release_services debe ser un subconjunto no vacío de [postgres, backend, keycloak, traefik]"
     quiet: true
 
 - name: Definir identidades esperadas
@@ -29,6 +32,7 @@
       backend: "{{ backend_image_ref | default('') | string }}"
       postgres: "{{ postgres_image_ref | default('') | string }}"
       keycloak: "{{ keycloak_image_ref | default('') | string }}"
+      traefik: "{{ traefik_image_ref | default('') | string }}"
 
 # Una identidad esperada vacía o por tag nunca puede "coincidir"
 - name: Validar las identidades esperadas
@@ -75,10 +79,10 @@
     that:
       - _c.exists
       - _c.running
-      - _c.config_image == app_release_expected[item]
+      - _c.config_image | regex_replace(_hub, '') == _expected
       - _i | length == 1
       - _i[0].Id == _c.image
-      - app_release_expected[item] in (_i[0].RepoDigests | default([]))
+      - _expected in (_i[0].RepoDigests | default([]) | map('regex_replace', _hub, '') | list)
     fail_msg: >-
       IDENTIDAD EN EJECUCIÓN: {{ item }} no corre {{ app_release_expected[item] }}
       (contenedor: {{ _c.config_image if _c.exists else 'ausente' }}, en ejecución: {{ _c.running }},
@@ -89,4 +93,6 @@
   loop: "{{ app_release_services }}"
   vars:
     _c: "{{ app_release_running[item] }}"
+    _hub: '^docker\.io/library/'
+    _expected: "{{ app_release_expected[item] | regex_replace(_hub, '') }}"
     _i: "{{ (app_release_images.results | selectattr('item', 'equalto', item) | first).images | default([], true) }}"
