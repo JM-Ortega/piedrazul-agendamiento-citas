@@ -9,6 +9,7 @@ import co.edu.unicauca.piedrazul.backend.user.domain.Person;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.AccountCreationResult;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.KeycloakUserClient;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.persistence.PersonRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -74,10 +75,32 @@ class AdminBootstrapPersistenceIT extends PostgresIntegrationSupport {
     @Autowired
     private PersonRepository personRepository;
 
+    /** Personas en la base ajenas a este test (otros *IT confirman las suyas); fijado tras limpiar. */
+    private long baselinePersons;
+
     @BeforeEach
     void clean() {
-        personRepository.deleteAll();
+        deleteOwnPersons();
+        baselinePersons = personRepository.count();
         reset(keycloak);
+    }
+
+    @AfterEach
+    void cleanUp() {
+        deleteOwnPersons();
+    }
+
+    /**
+     * Borra solo las Person con las claves de este test (identificación, correo, cuenta): el
+     * contenedor se comparte entre clases y borrar todo rompería datos ajenos, p. ej. Person
+     * referenciadas por un patient (fk_patient_person).
+     */
+    private void deleteOwnPersons() {
+        personRepository.deleteAll(personRepository.findAll().stream()
+                .filter(p -> USERNAME.equals(p.getIdentification())
+                        || EMAIL.equalsIgnoreCase(p.getEmail())
+                        || ACCOUNT.equals(p.getUserId()))
+                .toList());
     }
 
     private static AdminBootstrapRequest request() {
@@ -117,7 +140,8 @@ class AdminBootstrapPersistenceIT extends PostgresIntegrationSupport {
             assertThat(result.outcome()).isEqualTo(AdminBootstrapOutcome.BUSY);
             verify(keycloak, never()).createDisabledUserWithTemporaryPassword(any(), any(), any(), any(), any());
         }
-        assertThat(personRepository.count()).isZero();
+        assertThat(personRepository.findByIdentification(USERNAME)).isEmpty();
+        assertThat(personRepository.count()).isEqualTo(baselinePersons);
     }
 
     @Test
@@ -155,7 +179,7 @@ class AdminBootstrapPersistenceIT extends PostgresIntegrationSupport {
         verify(keycloak, never()).createDisabledUserWithTemporaryPassword(any(), any(), any(), any(), any());
         verify(keycloak, never()).assignRoleIfMissing(any(), any());
         verify(keycloak, never()).enableUser(any());
-        assertThat(personRepository.count()).isEqualTo(1);
+        assertThat(personRepository.count()).isEqualTo(baselinePersons + 1);
     }
 
     @Test
