@@ -615,19 +615,20 @@ Last profile that met the validation criteria was 'production'.
 
 ## Cadena de producción (workflow)
 
-`.github/workflows/production-hetzner.yml` es la única cadena de producción de Hetzner: reemplaza al deploy y al Apply de Terraform separados. Esta sección describe lo que el repositorio declara. La configuración externa (reglas del environment `production-hetzner`, alcance de los secretos, comportamiento de HCP Terraform) vive fuera del repositorio y la cadena no se ha ejercido todavía contra producción.
+`.github/workflows/production-hetzner.yml` es la única cadena de producción de Hetzner: reemplaza al deploy y al Apply de Terraform separados, y también define la publicación del frontend en Cloudflare Pages (contrato y requisitos operativos en [Publicación del frontend](../../docs/architecture/overview.md#publicación-del-frontend-cloudflare-pages)). Esta sección describe lo que el repositorio declara. La configuración externa (reglas del environment `production-hetzner`, alcance de los secretos, comportamiento de HCP Terraform, Branch control de Pages) vive fuera del repositorio y no se puede verificar desde él.
 
 ### Intención
 
 - **push a `main`**: todo push a `main` dispara el workflow (sin filtro de rutas). Clasifica el rango desde el commit del último run *push* exitoso de este workflow hasta el commit actual (`.github/scripts/production-range-base.sh` + `classify-production.sh`). Si no hay un run exitoso previo, o su commit no es ancestro del actual, clasifica el árbol completo. Así un run fallido, cancelado o que quedó obsoleto porque otro commit (aunque no toque producción) avanzó `main` queda cubierto por el run de ese commit. Fallido, cancelado o reemplazado nunca avanza la base; un rango sin cambios de producción termina como no-op limpio.
-- La documentación (`*.md`) bajo `infra/ansible` e `infra/terraform` no cuenta como cambio de producción.
-- **workflow_dispatch**: intención explícita por inputs (`run_terraform_apply`, builds, configuración, deploy, rollback); no avanza el rango.
+- La documentación (`*.md`) bajo `infra/ansible` e `infra/terraform` no cuenta como cambio de producción; tampoco `frontend/README.md`.
+- **workflow_dispatch**: intención explícita por inputs (`run_terraform_apply`, builds, configuración, deploy, rollback, `run_frontend_publish`); no avanza el rango. `run_frontend_publish` es `false` por defecto (un dispatch existente se comporta igual) y no se combina con un break-glass.
 - Dos conceptos independientes, `terraform_required` y `deploy_required`, dan cuatro clases: solo Apply, solo Deploy, Apply → Deploy, o no-op limpio (el run termina en éxito sin pasar por el gate).
+- Un tercero, `frontend_required` (cambios bajo `frontend/`), agrega la publicación en Pages al final de esa clase: `frontend_only`, `apply_then_frontend`, `deploy_then_frontend` o `apply_then_deploy_then_frontend`. Sin cambios del frontend las cuatro clases anteriores no cambian; un cambio solo del frontend no construye imágenes, no lee HCP ni toca el servidor, y no requiere `TF_API_TOKEN`.
 - Solo `main` puede iniciar producción.
 
 ### Autoridad
 
-Solo el job `production` usa el environment `production-hetzner` y credenciales de producción (HCP Terraform, SSH, secretos de la app); una aprobación cubre toda la cadena. Clasificación, builds, selección y escaneo corren antes, solo con `GITHUB_TOKEN`. No hay acceso SSH ni lectura de HCP antes del gate. La concurrencia (`piedrazul-production-hetzner`, `cancel-in-progress: false`, `queue: max`) se aplica a ese job: los jobs pendientes esperan en cola en vez de reemplazarse. El orden de la cola no define la corrección; la frescura y el rango acumulado sí.
+Solo el job `production` usa el environment `production-hetzner` y credenciales de producción (HCP Terraform, SSH, secretos de la app, token de Pages); una aprobación cubre toda la cadena, incluida la publicación del frontend. Clasificación, builds, selección y escaneo corren antes, solo con `GITHUB_TOKEN`. No hay acceso SSH ni lectura de HCP antes del gate. La concurrencia (`piedrazul-production-hetzner`, `cancel-in-progress: false`, `queue: max`) se aplica a ese job: los jobs pendientes esperan en cola en vez de reemplazarse. El orden de la cola no define la corrección; la frescura y el rango acumulado sí.
 
 Con deploy, `production` no empieza hasta que `image_scan` terminó en éxito (todos los intentos de escaneo de las identidades conocidas antes del gate completados con evidencia) y `image_policy` (evaluación preliminar de la política de vulnerabilidades sobre esas identidades) no bloqueó: un bloqueo ahí no pide la aprobación del environment ni llega al Apply (ver [Escaneo y política](#escaneo-y-política-de-vulnerabilidades-antes-de-mutar)).
 
@@ -642,8 +643,9 @@ Dentro de `production`, en orden:
 7. **Converge / deploy** con esas referencias exactas (con frescura justo antes si no hubo Apply). Ambos convergen postgres y reconcilian las autoridades de la base antes de cualquier consumidor; deploy migra el esquema con el backend construido en este run (misma identidad exacta) antes de arrancarlo. Si la migración falla, el paso de deploy falla y no se llega a la verificación ni al registro.
 8. **Identidad en ejecución** (tras converge: postgres, keycloak y traefik; tras deploy: postgres y backend) y **health** (contenedores —keycloak también si corrió converge—, y luego `actuator/health` del backend y el discovery OIDC de Keycloak).
 9. **Registro** del último éxito, solo si hubo deploy de aplicación y todo lo anterior pasó.
+10. **Publicación del frontend** (si `frontend_required`): con frescura justo antes si el run no hizo antes otra mutación de producción; `wrangler pages deploy` del artefacto validado y verificación del deployment creado por esa invocación. La preparación (destino, artefacto, wrangler, credencial de Pages y autoridad única: la integración Git no puede publicar producción) ocurre antes del paso 1 y solo lee; si falla, el run no hace ninguna mutación de producción (ni Apply, ni servidor, ni Pages), aunque los jobs previos sin privilegios del run pueden haber producido ya artefactos (imágenes en GHCR, el artifact del frontend, evidencia de escaneo). Ver [Publicación del frontend](../../docs/architecture/overview.md#publicación-del-frontend-cloudflare-pages).
 
-El resumen del job muestra el state version consumido, las identidades (y las anteriores), el veredicto de la política por imagen y la primera etapa que falló: credenciales, frescura, HCP, acceso al servidor, selección, escaneo previo, política de vulnerabilidades, registro de break-glass, deploy, identidad en ejecución, health o registro. El job `conclude` hace que la conclusión del run sea success solo si producción terminó bien o no hacía falta; esa conclusión es la base del siguiente rango.
+El resumen del job muestra el state version consumido, las identidades (y las anteriores), el veredicto de la política por imagen y la primera etapa que falló: credenciales, preparación del frontend, frescura, HCP, acceso al servidor, selección, escaneo previo, política de vulnerabilidades, registro de break-glass, deploy, identidad en ejecución, health, registro o publicación en Pages. El job `conclude` hace que la conclusión del run sea success solo si producción terminó bien (incluida la publicación del frontend cuando hacía falta) o no hacía falta; esa conclusión es la base del siguiente rango.
 
 ### Identidad inmutable
 
@@ -674,6 +676,7 @@ La misma referencia `repo@sha256:<linux/amd64>` es la que se escanea, la que rec
 - Los escaneos de keycloak y traefik son exactamente lo que converge despliega y pasan por la misma política.
 
 Los `FROM` de `backend/Dockerfile` e `infra/postgres/Dockerfile` están fijados por digest del índice OCI (`imagen:tag@sha256:…`), así buildx toma el hijo correcto para `linux/amd64` y `linux/arm64`. Para actualizar una base se resuelve el nuevo índice (`docker buildx imagetools inspect <imagen>:<tag>`) y se reemplaza el digest.
+
 
 ---
 

@@ -54,6 +54,7 @@ declare -A AUTH=(
   [TF_API_TOKEN]="production-hetzner terraform-plan"
   [ANSIBLE_SSH_KEY]="production-hetzner"
   [CLOUDFLARE_DNS_API_TOKEN]="production-hetzner"
+  [CLOUDFLARE_PAGES_API_TOKEN]="production-hetzner"
   [KC_BOOTSTRAP_ADMIN_PASSWORD]="production-hetzner"
   [KC_ADMIN_PASSWORD]="production-hetzner"
   [KC_AUTOMATION_CLIENT_SECRET]="production-hetzner"

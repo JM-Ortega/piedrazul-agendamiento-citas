@@ -17,7 +17,12 @@
 #   terraform_required=true|false
 #   deploy_required=true|false    (= run_build || run_build_postgres || run_host_config || run_app_deploy)
 #   run_build, run_build_postgres, run_host_config, run_app_deploy
-#   intent=apply_only|deploy_only|apply_then_deploy|noop
+#   frontend_required=true|false  (publicar en Cloudflare Pages el build de frontend/)
+#   intent=apply_only|deploy_only|apply_then_deploy|noop                    sin frontend
+#          frontend_only|apply_then_frontend|deploy_then_frontend|
+#          apply_then_deploy_then_frontend                                  con frontend
+#   La publicación del frontend va siempre al final: después del Apply y del deploy (y
+#   de sus verificaciones) que el mismo rango requiera.
 set -euo pipefail
 
 fail() {
@@ -60,6 +65,9 @@ TERRAFORM=(
 BACKEND=(backend ':(exclude)backend/.idea' ':(exclude)backend/target')
 POSTGRES=(infra/postgres)
 ANSIBLE=(infra/ansible "${DOCS[1]}")
+# Lo que el build de producción del frontend consume (el README no entra al sitio)
+FRONTEND=(frontend ':(exclude)frontend/node_modules' ':(exclude)frontend/dist'
+  ':(exclude)frontend/.angular' ':(exclude)frontend/README.md')
 # Lo que app/setup.yml copia al servidor o Compose monta
 APP=(
   infra/compose
@@ -81,6 +89,7 @@ RUN_BUILD="$(flag "${BACKEND[@]}")"
 RUN_BUILD_POSTGRES="$(flag "${POSTGRES[@]}")"
 ANSIBLE_CHANGED="$(flag "${ANSIBLE[@]}")"
 APP_CHANGED="$(flag "${APP[@]}")"
+FRONTEND_REQUIRED="$(flag "${FRONTEND[@]}")"
 
 RUN_HOST_CONFIG=false
 if [ "${ANSIBLE_CHANGED}" = true ] || [ "${APP_CHANGED}" = true ]; then
@@ -103,6 +112,14 @@ case "${TERRAFORM_REQUIRED}/${DEPLOY_REQUIRED}" in
   false/true) INTENT=deploy_only ;;
   false/false) INTENT=noop ;;
 esac
+if [ "${FRONTEND_REQUIRED}" = true ]; then
+  case "${INTENT}" in
+    noop) INTENT=frontend_only ;;
+    apply_only) INTENT=apply_then_frontend ;;
+    deploy_only) INTENT=deploy_then_frontend ;;
+    apply_then_deploy) INTENT=apply_then_deploy_then_frontend ;;
+  esac
+fi
 
 echo "range_mode=${MODE}"
 echo "range_base=${BASE}"
@@ -112,4 +129,5 @@ echo "run_build=${RUN_BUILD}"
 echo "run_build_postgres=${RUN_BUILD_POSTGRES}"
 echo "run_host_config=${RUN_HOST_CONFIG}"
 echo "run_app_deploy=${RUN_APP_DEPLOY}"
+echo "frontend_required=${FRONTEND_REQUIRED}"
 echo "intent=${INTENT}"
