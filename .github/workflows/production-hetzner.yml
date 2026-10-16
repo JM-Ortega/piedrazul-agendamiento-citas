@@ -1,16 +1,24 @@
 name: Producción — Hetzner
 
-# Única cadena de producción de Hetzner: Terraform Apply y deploy de la aplicación.
+# Única cadena de producción: Terraform Apply, deploy de la aplicación en Hetzner y
+# publicación del frontend en Cloudflare Pages.
 #
 #   classify ─┬─ resolve_rollback ─┐
 #             ├─ app_build ────────┼─ select_images ─ image_targets ─ image_scan ─ image_policy ─┐
-#             └─ postgres_build ───┘                                                            │
+#             ├─ postgres_build ───┘                                                            │
+#             └─ frontend_build ───────────────────────────────────────────────────────────────┤
 #                                    production (gate production-hetzner) ◄─────────────────────┘
 #                                      └─ conclude
 #
 # Solo `production` usa el environment production-hetzner y credenciales de producción
-# (HCP Terraform, SSH, secretos de la app). Clasificación, builds, selección y escaneo de
-# identidades conocidas corren antes del gate y solo con GITHUB_TOKEN.
+# (HCP Terraform, SSH, secretos de la app, token de Pages). Clasificación, builds,
+# selección y escaneo de identidades conocidas corren antes del gate y solo con
+# GITHUB_TOKEN.
+#
+# Frontend: frontend_build construye y valida el sitio una sola vez y lo sube como
+# artifact; production descarga ESE artifact (id y sha256 como outputs de job, digest de
+# GitHub verificado) y lo publica con `wrangler pages deploy`, sin volver a construir, al
+# final de la cadena: después del Apply, del deploy y de sus verificaciones de health.
 #
 # Escaneo y política antes de mutar: ninguna mutación que pueda aplicar una imagen empieza
 # sin que la política de vulnerabilidades (vuln-policy.sh) autorice el escaneo fresco de
@@ -54,6 +62,10 @@ on:
         description: "Desplegar aplicación"
         type: boolean
         default: true
+      run_frontend_publish:
+        description: "Construir el frontend de este commit y publicarlo en Cloudflare Pages (producción)"
+        type: boolean
+        default: false
       image_tag:
         description: "Tag específico del backend para rollback (vacío = construir nueva o reusar)"
         type: string
@@ -101,6 +113,7 @@ jobs:
       run_build_postgres: ${{ steps.intent.outputs.run_build_postgres }}
       run_host_config: ${{ steps.intent.outputs.run_host_config }}
       run_app_deploy: ${{ steps.intent.outputs.run_app_deploy }}
+      frontend_required: ${{ steps.intent.outputs.frontend_required }}
       image_tag: ${{ steps.intent.outputs.image_tag }}
       keycloak_recovery: ${{ steps.intent.outputs.keycloak_recovery }}
       break_glass_authorization: ${{ steps.intent.outputs.break_glass_authorization }}
@@ -121,6 +134,7 @@ jobs:
           IN_BUILD: ${{ inputs.run_build }}
           IN_BUILD_POSTGRES: ${{ inputs.run_build_postgres }}
           IN_APP_DEPLOY: ${{ inputs.run_app_deploy }}
+          IN_FRONTEND: ${{ inputs.run_frontend_publish }}
           IN_IMAGE_TAG: ${{ inputs.image_tag }}
           IN_KEYCLOAK_RECOVERY: ${{ inputs.keycloak_recovery }}
           IN_BREAK_GLASS: ${{ inputs.break_glass_authorization }}
@@ -149,7 +163,7 @@ jobs:
           else
             if [ "${IN_TERRAFORM}" = "false" ] && [ "${IN_HOST_CONFIG}" = "false" ] && \
                [ "${IN_BUILD}" = "false" ] && [ "${IN_BUILD_POSTGRES}" = "false" ] && \
-               [ "${IN_APP_DEPLOY}" = "false" ]; then
+               [ "${IN_APP_DEPLOY}" = "false" ] && [ "${IN_FRONTEND}" = "false" ]; then
               echo "::error title=Intención de producción::Todos los flags están en false; no hay nada que hacer"
               exit 1
             fi
@@ -187,6 +201,12 @@ jobs:
                 echo "::error title=Intención de producción::break_glass_authorization solo tiene efecto con configuración del servidor o deploy de aplicación"
                 exit 1
               fi
+              # La autorización liga una operación sobre imágenes; publicar el frontend es
+              # otra operación y va en otro dispatch
+              if [ "${IN_FRONTEND}" != "false" ]; then
+                echo "::error title=Intención de producción::break_glass_authorization no admite run_frontend_publish: publique el frontend en otro dispatch"
+                exit 1
+              fi
               # El Apply es la primera mutación de production y va antes de la decisión
               # autoritativa y del registro de auditoría: no se combina con break-glass
               if [ "${IN_TERRAFORM}" != "false" ]; then
@@ -208,6 +228,14 @@ jobs:
               false/true) INTENT=deploy_only ;;
               *) INTENT=noop ;;
             esac
+            if [ "${IN_FRONTEND}" = "true" ]; then
+              case "${INTENT}" in
+                noop) INTENT=frontend_only ;;
+                apply_only) INTENT=apply_then_frontend ;;
+                deploy_only) INTENT=deploy_then_frontend ;;
+                apply_then_deploy) INTENT=apply_then_deploy_then_frontend ;;
+              esac
+            fi
             {
               echo "range_mode=manual"
               echo "range_base="
@@ -217,6 +245,7 @@ jobs:
               echo "run_build_postgres=${IN_BUILD_POSTGRES}"
               echo "run_host_config=${IN_HOST_CONFIG}"
               echo "run_app_deploy=${IN_APP_DEPLOY}"
+              echo "frontend_required=${IN_FRONTEND}"
               echo "intent=${INTENT}"
               echo "image_tag=${IN_IMAGE_TAG}"
               echo "keycloak_recovery=${IN_KEYCLOAK_RECOVERY}"
@@ -245,6 +274,7 @@ jobs:
             echo "| build backend / postgres | $(get run_build) / $(get run_build_postgres) |"
             echo "| configuración del servidor | $(get run_host_config) |"
             echo "| deploy de aplicación | $(get run_app_deploy) |"
+            echo "| publicación del frontend (Pages) | $(get frontend_required) |"
             if [ -n "$(get image_tag)" ]; then
               echo "| rollback backend | \`$(get image_tag)\` |"
             fi
@@ -425,6 +455,81 @@ jobs:
           IDENTITY=$(.github/scripts/resolve-amd64-image.sh "${BUILT_IMAGE}")
           echo "${IDENTITY}" >> "$GITHUB_OUTPUT"
           echo "${IDENTITY}"
+
+  # ── Frontend (sin privilegios de producción) ──────────────────────────────
+  # Único build del frontend de producción de este commit: mismo comando y misma versión
+  # de Node que CI Frontend y que el build Git de Pages (frontend/.node-version, npm ci,
+  # `npm run build`), sin caché. Valida el sitio y lo sube como artifact; id, nombre y
+  # sha256 viajan como outputs de job, y production publica exactamente ese contenido.
+  # El nombre lleva el intento: un re-run completo produce otro artifact y production
+  # sigue el id de su propio frontend_build, nunca "el más reciente".
+  frontend_build:
+    name: Build frontend
+    runs-on: ubuntu-latest
+    needs: classify
+    if: needs.classify.outputs.frontend_required == 'true'
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_name: ${{ steps.package.outputs.artifact_name }}
+      dist_sha256: ${{ steps.package.outputs.dist_sha256 }}
+      entry_asset: ${{ steps.package.outputs.entry_asset }}
+      file_count: ${{ steps.package.outputs.file_count }}
+      frontend_tree: ${{ steps.package.outputs.frontend_tree }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: frontend/.node-version
+          package-manager-cache: false
+
+      - name: Instalar dependencias
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Build de producción
+        working-directory: frontend
+        run: npm run build
+
+      - name: Validar y empaquetar el sitio
+        id: package
+        run: |
+          set -euo pipefail
+          NAME="frontend-dist-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          .github/scripts/frontend-artifact.sh package frontend/dist/frontend/browser \
+            "${RUNNER_TEMP}/frontend-artifact" > "${RUNNER_TEMP}/frontend.env"
+          echo "artifact_name=${NAME}" >> "${RUNNER_TEMP}/frontend.env"
+          cat "${RUNNER_TEMP}/frontend.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/frontend.env"
+          get() { sed -n "s/^$1=//p" "${RUNNER_TEMP}/frontend.env"; }
+          {
+            echo "## Artefacto del frontend"
+            echo
+            echo "| campo | valor |"
+            echo "|---|---|"
+            echo "| commit | \`${GITHUB_SHA}\` (árbol frontend/ \`$(get frontend_tree)\`) |"
+            echo "| artifact | \`${NAME}\` |"
+            echo "| sha256 del sitio (tar) | \`$(get dist_sha256)\` |"
+            echo "| archivos / entrada | $(get file_count) / \`$(get entry_asset)\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Subir artefacto
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: |
+            ${{ runner.temp }}/frontend-artifact/frontend-dist.tar
+            ${{ runner.temp }}/frontend-artifact/frontend-manifest.json
+          if-no-files-found: error
+          retention-days: 30
 
   # Fuente de la identidad de backend y postgres que recibe el job de producción.
   # Precedencia backend: rollback explícito > imagen construida en este run > reuso.
@@ -850,6 +955,16 @@ jobs:
   #   converge (postgres + reconciliación de autoridades de la base → Keycloak/Traefik) /
   #   deploy (postgres + reconciliación → migración del backend construido → backend) →
   #   identidad en ejecución → health (contenedores + públicos) → registro del último éxito
+  #   → [frescura si nada mutó antes] → publicación del frontend en Pages → verificación
+  #
+  # Pages: el artefacto de frontend_build se descarga y verifica, wrangler se instala desde
+  # un lockfile fijado, el token de Pages se prueba contra el proyecto declarado y se exige
+  # que la integración Git no publique producción por su cuenta (autoridad única), ANTES de
+  # la primera mutación; así un artefacto, una herramienta, una credencial o una segunda
+  # autoridad no dejan un backend nuevo con el frontend sin publicar. La publicación va al final: Cloudflare y
+  # Hetzner no son atómicos entre sí, y un fallo de Pages deja el backend ya registrado en
+  # el servidor (last-success.env) pero el run en failure, así que el rango no avanza y el
+  # siguiente run (o el re-run) vuelve a publicar.
   #
   # Frescura: solo la punta actual de main inicia una mutación, verificado justo antes
   # de la primera. Iniciada la cadena, termina aunque main avance. Un re-run de un commit
@@ -860,7 +975,8 @@ jobs:
   production:
     name: Producción
     runs-on: ubuntu-latest
-    needs: [classify, select_images, image_targets, image_scan, image_policy]
+    needs: [classify, select_images, image_targets, image_scan, image_policy, frontend_build]
+    # Con frontend, espera a que frontend_build haya construido y validado el artefacto.
     # Con deploy, espera a que el escaneo de las identidades conocidas antes del gate haya
     # terminado en success (todos los intentos completados con evidencia; fallido o
     # cancelado = cadena no verificable; sin objetivos, image_scan se salta y la lista debe
@@ -869,7 +985,10 @@ jobs:
       !cancelled() &&
       needs.classify.result == 'success' &&
       needs.select_images.result == 'success' &&
-      (needs.classify.outputs.terraform_required == 'true' || needs.classify.outputs.deploy_required == 'true') &&
+      (needs.classify.outputs.terraform_required == 'true' ||
+        needs.classify.outputs.deploy_required == 'true' ||
+        needs.classify.outputs.frontend_required == 'true') &&
+      (needs.classify.outputs.frontend_required != 'true' || needs.frontend_build.result == 'success') &&
       (needs.classify.outputs.deploy_required != 'true' ||
         (needs.image_targets.result == 'success' &&
           needs.image_policy.result == 'success' &&
@@ -903,6 +1022,7 @@ jobs:
       RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
       RUN_APP_DEPLOY: ${{ needs.classify.outputs.run_app_deploy }}
       KEYCLOAK_RECOVERY: ${{ needs.classify.outputs.keycloak_recovery }}
+      FRONTEND_REQUIRED: ${{ needs.classify.outputs.frontend_required }}
       # Identidad exacta de Keycloak que image_targets resolvió y escaneó (vacía sin converge)
       KEYCLOAK_LABEL: ${{ needs.image_targets.outputs.keycloak_label }}
       KEYCLOAK_INDEX_DIGEST: ${{ needs.image_targets.outputs.keycloak_index_digest }}
@@ -933,6 +1053,8 @@ jobs:
           KC_AUTOMATION_CLIENT_SECRET: ${{ secrets.KC_AUTOMATION_CLIENT_SECRET }}
           PIEDRAZUL_BACKEND_MAIL_SEND: ${{ secrets.PIEDRAZUL_BACKEND_MAIL_SEND }}
           NOTIFICATION_ENCRYPTION_KEY: ${{ secrets.NOTIFICATION_ENCRYPTION_KEY }}
+          # Token dedicado de Pages (Cloudflare Pages: Edit en la cuenta); nunca el de DNS
+          CLOUDFLARE_PAGES_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
           # Bootstrap del primer administrador de negocio: el secreto solo se lee si está
           # habilitado (docs/operations/runbooks/primer-admin-negocio.md)
           IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
@@ -948,8 +1070,18 @@ jobs:
           MISSING=()
           need() { for NAME in "$@"; do [ -n "${!NAME:-}" ] || MISSING+=("${NAME}"); done; }
 
-          need TF_API_TOKEN
-          [[ "${HCP_WORKSPACE_ID}" =~ ^ws-[A-Za-z0-9]+$ ]] || MISSING+=("vars.TF_WORKSPACE_HETZNER_ID")
+          # HCP solo hace falta si el run aplica o despliega; publicar solo el frontend no lo lee
+          if [ "${TERRAFORM_REQUIRED:-}" = "true" ] || [ "${DEPLOY_REQUIRED}" = "true" ]; then
+            need TF_API_TOKEN
+            [[ "${HCP_WORKSPACE_ID}" =~ ^ws-[A-Za-z0-9]+$ ]] || MISSING+=("vars.TF_WORKSPACE_HETZNER_ID")
+          fi
+          if [ "${FRONTEND_REQUIRED:-}" = "true" ]; then
+            need CLOUDFLARE_PAGES_API_TOKEN
+            if [ -n "${CLOUDFLARE_PAGES_API_TOKEN:-}" ] && [ "${CLOUDFLARE_PAGES_API_TOKEN}" = "${CLOUDFLARE_DNS_API_TOKEN:-}" ]; then
+              echo "::error title=Autoridad de producción::CLOUDFLARE_PAGES_API_TOKEN no puede ser el token de DNS: Pages usa un token propio de alcance mínimo"
+              exit 1
+            fi
+          fi
           if [ "${DEPLOY_REQUIRED}" = "true" ]; then
             need ANSIBLE_SSH_KEY
           fi
@@ -983,15 +1115,81 @@ jobs:
           fi
           echo "Credenciales requeridas presentes"
 
+      # ── Frontend: preparación antes de la primera mutación ──
+      # Todo lo que la publicación necesita se obtiene y verifica aquí, sin mutar nada:
+      # destino declarado, artefacto validado de este run, wrangler fijado y token de Pages
+      # con acceso de lectura al proyecto declarado.
+      - name: Destino de Pages declarado
+        id: pages_target
+        if: env.FRONTEND_REQUIRED == 'true'
+        run: |
+          set -euo pipefail
+          .github/scripts/pages-release.sh target > "${RUNNER_TEMP}/pages-target.env"
+          cat "${RUNNER_TEMP}/pages-target.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/pages-target.env"
+
+      - name: Descargar y verificar el artefacto del frontend
+        id: pages_artifact
+        if: env.FRONTEND_REQUIRED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_ARTIFACT_ID: ${{ needs.frontend_build.outputs.artifact_id }}
+          EXPECTED_ARTIFACT_NAME: ${{ needs.frontend_build.outputs.artifact_name }}
+          EXPECTED_DIST_SHA256: ${{ needs.frontend_build.outputs.dist_sha256 }}
+        run: |
+          set -euo pipefail
+          rm -rf "${RUNNER_TEMP}/frontend"
+          .github/scripts/frontend-artifact.sh fetch "${RUNNER_TEMP}/frontend" > "${RUNNER_TEMP}/frontend.env"
+          cat "${RUNNER_TEMP}/frontend.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/frontend.env"
+
+      - name: Configurar Node para wrangler
+        id: pages_node
+        if: env.FRONTEND_REQUIRED == 'true'
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: frontend/.node-version
+          package-manager-cache: false
+
+      # Versión y dependencias fijadas por lockfile (integridad de npm); sin scripts de
+      # instalación: nada corre al instalar en el job que tiene credenciales
+      - name: Instalar wrangler fijado
+        id: pages_tooling
+        if: env.FRONTEND_REQUIRED == 'true'
+        working-directory: .github/pages-publish
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          WRANGLER_SEND_METRICS=false node_modules/.bin/wrangler --version
+
+      # Autoridad única: si la integración Git de Pages puede publicar producción por su
+      # cuenta, falla aquí, antes de cualquier mutación del run (también del backend)
+      - name: Verificar proyecto de Pages, token y autoridad única (solo lectura)
+        id: pages_preflight
+        if: env.FRONTEND_REQUIRED == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          PAGES_ACCOUNT_ID: ${{ steps.pages_target.outputs.account_id }}
+          PAGES_PROJECT: ${{ steps.pages_target.outputs.project_name }}
+          PAGES_BRANCH: ${{ steps.pages_target.outputs.production_branch }}
+          PAGES_DOMAIN: ${{ steps.pages_target.outputs.custom_domain }}
+        run: |
+          set -euo pipefail
+          .github/scripts/pages-release.sh preflight > "${RUNNER_TEMP}/pages-preflight.env"
+          cat "${RUNNER_TEMP}/pages-preflight.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/pages-preflight.env"
+
       # ── Terraform ──
       - name: Esperar a que HCP Terraform esté libre
         id: hcp_idle
+        if: env.TERRAFORM_REQUIRED == 'true' || env.DEPLOY_REQUIRED == 'true'
         env:
           TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
         run: .github/scripts/hcp-state.sh wait-idle
 
       - name: Capturar state version previo
         id: hcp_before
+        if: env.TERRAFORM_REQUIRED == 'true' || env.DEPLOY_REQUIRED == 'true'
         env:
           TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
         run: |
@@ -1505,6 +1703,38 @@ jobs:
             -e "release_run=${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}" \
             infra/ansible/playbooks/record-release.yml
 
+      # ── Publicación del frontend ──
+      # Última operación de la cadena: solo llega aquí si todo lo anterior que el run
+      # requería (Apply, converge/deploy, identidad, health y registro) terminó bien.
+      # Si nada mutó antes (solo frontend), la frescura se comprueba aquí; si ya hubo una
+      # mutación, la cadena iniciada termina aunque main haya avanzado.
+      - name: Verificar frescura antes de publicar el frontend
+        id: fresh_frontend
+        if: env.FRONTEND_REQUIRED == 'true' && env.TERRAFORM_REQUIRED != 'true' && env.DEPLOY_REQUIRED != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/verify-main-tip.sh
+
+      - name: Publicar frontend en Cloudflare Pages
+        id: pages_publish
+        if: env.FRONTEND_REQUIRED == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          PAGES_ACCOUNT_ID: ${{ steps.pages_target.outputs.account_id }}
+          PAGES_PROJECT: ${{ steps.pages_target.outputs.project_name }}
+          PAGES_BRANCH: ${{ steps.pages_target.outputs.production_branch }}
+          PAGES_DOMAIN: ${{ steps.pages_target.outputs.custom_domain }}
+          PREVIOUS_DEPLOYMENT_ID: ${{ steps.pages_preflight.outputs.previous_deployment_id }}
+          PRODUCTION_URL: ${{ steps.pages_preflight.outputs.production_url }}
+          SITE_DIR: ${{ steps.pages_artifact.outputs.site_dir }}
+          ENTRY_ASSET: ${{ steps.pages_artifact.outputs.entry_asset }}
+          WRANGLER_BIN: ${{ github.workspace }}/.github/pages-publish/node_modules/.bin/wrangler
+        run: |
+          set -euo pipefail
+          .github/scripts/pages-release.sh publish "${SITE_DIR}" > "${RUNNER_TEMP}/pages-publish.env"
+          cat "${RUNNER_TEMP}/pages-publish.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/pages-publish.env"
+
       - name: Resumen de producción
         if: always()
         env:
@@ -1542,6 +1772,19 @@ jobs:
           O_IDENTITY: ${{ steps.converge_identity.outcome }}/${{ steps.running_identity.outcome }}
           O_HEALTH: ${{ steps.container_health.outcome }}/${{ steps.public_health.outcome }}
           O_RECORD: ${{ steps.record.outcome }}
+          O_PAGES_PREP: ${{ steps.pages_target.outcome }}/${{ steps.pages_artifact.outcome }}/${{ steps.pages_node.outcome }}/${{ steps.pages_tooling.outcome }}/${{ steps.pages_preflight.outcome }}
+          O_FRESH_FRONTEND: ${{ steps.fresh_frontend.outcome }}
+          O_PAGES_PUBLISH: ${{ steps.pages_publish.outcome }}
+          PAGES_PROJECT: ${{ steps.pages_target.outputs.project_name }}
+          PAGES_BRANCH: ${{ steps.pages_target.outputs.production_branch }}
+          PAGES_ARTIFACT: ${{ needs.frontend_build.outputs.artifact_name }}
+          PAGES_DIST_SHA256: ${{ needs.frontend_build.outputs.dist_sha256 }}
+          PAGES_ENTRY_ASSET: ${{ needs.frontend_build.outputs.entry_asset }}
+          PAGES_GIT_PRODUCTION: ${{ steps.pages_preflight.outputs.git_production_deploys }}
+          PAGES_PREVIOUS_ID: ${{ steps.pages_preflight.outputs.previous_deployment_id }}
+          PAGES_PREVIOUS_COMMIT: ${{ steps.pages_preflight.outputs.previous_deployment_commit }}
+          PAGES_DEPLOYMENT_ID: ${{ steps.pages_publish.outputs.deployment_id }}
+          PAGES_DEPLOYMENT_URL: ${{ steps.pages_publish.outputs.deployment_url }}
         run: |
           set -euo pipefail
 
@@ -1552,6 +1795,7 @@ jobs:
             return 0
           }
           first_failure "Autoridad de producción (credenciales)" "${O_CREDENTIALS}"
+          first_failure "Preparación del frontend (destino, artefacto, wrangler, proyecto/token de Pages o autoridad única)" "${O_PAGES_PREP}"
           first_failure "Frescura (main avanzó o ref no es main)" "${O_FRESH_APPLY}"
           first_failure "Causalidad/estado de HCP Terraform" "${O_HCP}"
           first_failure "Acceso al servidor" "${O_ACCESS}"
@@ -1564,11 +1808,17 @@ jobs:
           first_failure "Identidad en ejecución" "${O_IDENTITY}"
           first_failure "Health" "${O_HEALTH}"
           first_failure "Registro del último éxito" "${O_RECORD}"
+          first_failure "Frescura (main avanzó o ref no es main)" "${O_FRESH_FRONTEND}"
+          first_failure "Publicación del frontend en Pages" "${O_PAGES_PUBLISH}"
 
           if [ "${O_RECORD}" = "success" ]; then
             RESULT="último éxito registrado: backend \`${BACKEND_IMAGE_REF}\`, postgres \`${POSTGRES_IMAGE_REF}\`"
             if [ "${POLICY_DECISION}" = "break_glass" ]; then
               RESULT="${RESULT} — **BREAK-GLASS: sin escaneo fresco de alguna imagen** (${BREAK_GLASS_ISSUE})"
+            fi
+            if [ -n "${CATEGORY}" ]; then
+              RESULT="${RESULT} — pero **FALLÓ: ${CATEGORY}** (release parcial: el servidor quedó en este backend)"
+              echo "::error title=Producción: ${CATEGORY}::El backend quedó desplegado y registrado en el servidor; la publicación del frontend no terminó. Ver el resumen del run."
             fi
           elif [ -n "${CATEGORY}" ]; then
             RESULT="**FALLÓ: ${CATEGORY}** — el último éxito del servidor no cambió"
@@ -1579,11 +1829,30 @@ jobs:
             RESULT="sin deploy de aplicación — el último éxito del servidor no cambia"
           fi
 
+          # Pages es independiente del último éxito del servidor: su propio resultado
+          PAGES_RESULT=""
+          if [ "${FRONTEND_REQUIRED}" = "true" ]; then
+            case "${O_PAGES_PUBLISH}" in
+              success) PAGES_RESULT="frontend publicado en Pages y verificado: deployment \`${PAGES_DEPLOYMENT_ID}\` (${PAGES_DEPLOYMENT_URL}) sirve \`${PAGES_ENTRY_ASSET}\` de \`${GITHUB_SHA}\`" ;;
+              failure) PAGES_RESULT="**frontend NO verificado como publicado**: wrangler o la verificación falló; Pages pudo haber recibido o no el deployment. Producción de Pages anterior: \`${PAGES_PREVIOUS_ID:-—}\` (commit \`${PAGES_PREVIOUS_COMMIT:-—}\`)" ;;
+              *) PAGES_RESULT="**frontend no publicado**: la cadena se detuvo antes de la publicación; producción de Pages no cambió (vigente: \`${PAGES_PREVIOUS_ID:-no leída}\`)" ;;
+            esac
+          fi
+
           {
             echo "## Producción: \`${INTENT}\`"
             echo
             echo "${RESULT}"
             echo
+            if [ -n "${PAGES_RESULT}" ]; then
+              echo "${PAGES_RESULT}"
+              echo
+            fi
+            if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+              echo "> El rango procesado (base del siguiente push) avanza solo si este run termina en success."
+              echo "> Con cualquier fallo, el re-run o el siguiente push vuelve a cubrir todo lo pendiente (incluida la publicación del frontend)."
+              echo
+            fi
             echo "| etapa | valor |"
             echo "|---|---|"
             echo "| HCP state version previo | \`${STATE_BEFORE:-—}\` |"
@@ -1635,15 +1904,25 @@ jobs:
             echo "| identidad en ejecución (converge/deploy) | ${O_IDENTITY} |"
             echo "| health (contenedores/público) | ${O_HEALTH} |"
             echo "| registro del último éxito | ${O_RECORD} |"
+            if [ "${FRONTEND_REQUIRED}" = "true" ]; then
+              echo "| Pages: destino | proyecto \`${PAGES_PROJECT:-—}\`, rama \`${PAGES_BRANCH:-—}\` |"
+              echo "| Pages: artefacto | \`${PAGES_ARTIFACT:-—}\` \`${PAGES_DIST_SHA256:-—}\` (entrada \`${PAGES_ENTRY_ASSET:-—}\`) |"
+              echo "| Pages: preparación (destino/artefacto/node/wrangler/proyecto) | ${O_PAGES_PREP} |"
+              echo "| Pages: publicación de producción desde Git | ${PAGES_GIT_PRODUCTION:-no verificada (la cadena no publica)} |"
+              echo "| Pages: producción anterior | \`${PAGES_PREVIOUS_ID:-—}\` (commit \`${PAGES_PREVIOUS_COMMIT:-—}\`) |"
+              echo "| Pages: frescura / publicación | ${O_FRESH_FRONTEND:-—} / ${O_PAGES_PUBLISH:-—} |"
+              echo "| Pages: deployment publicado | \`${PAGES_DEPLOYMENT_ID:-—}\` ${PAGES_DEPLOYMENT_URL:-} |"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── Resultado ─────────────────────────────────────────────────────────────
   # La conclusión del run es la base del siguiente rango (production-range-base.sh):
-  # solo puede ser success si producción corrió y terminó bien, o si no hacía falta.
+  # solo puede ser success si producción corrió y terminó bien (incluida la publicación
+  # del frontend cuando el rango la requiere), o si no hacía falta.
   conclude:
     name: Resultado de producción
     runs-on: ubuntu-latest
-    needs: [classify, select_images, production]
+    needs: [classify, select_images, frontend_build, production]
     if: always()
     timeout-minutes: 2
     steps:
@@ -1654,12 +1933,17 @@ jobs:
           PRODUCTION: ${{ needs.production.result }}
           TERRAFORM_REQUIRED: ${{ needs.classify.outputs.terraform_required }}
           DEPLOY_REQUIRED: ${{ needs.classify.outputs.deploy_required }}
+          FRONTEND_REQUIRED: ${{ needs.classify.outputs.frontend_required }}
+          FRONTEND_BUILD: ${{ needs.frontend_build.result }}
         run: |
           set -euo pipefail
-          echo "classify=${CLASSIFY} select_images=${SELECT} production=${PRODUCTION}"
+          echo "classify=${CLASSIFY} select_images=${SELECT} frontend_build=${FRONTEND_BUILD} production=${PRODUCTION}"
           [ "${CLASSIFY}" = "success" ] || { echo "Error: la intención no se pudo clasificar"; exit 1; }
           [ "${SELECT}" = "success" ] || { echo "Error: la selección de imágenes no terminó (${SELECT})"; exit 1; }
-          if [ "${TERRAFORM_REQUIRED}" = "true" ] || [ "${DEPLOY_REQUIRED}" = "true" ]; then
+          if [ "${FRONTEND_REQUIRED}" = "true" ]; then
+            [ "${FRONTEND_BUILD}" = "success" ] || { echo "Error: el build del frontend requerido terminó en '${FRONTEND_BUILD}'"; exit 1; }
+          fi
+          if [ "${TERRAFORM_REQUIRED}" = "true" ] || [ "${DEPLOY_REQUIRED}" = "true" ] || [ "${FRONTEND_REQUIRED}" = "true" ]; then
             [ "${PRODUCTION}" = "success" ] || { echo "Error: producción requerida terminó en '${PRODUCTION}'"; exit 1; }
           else
             [ "${PRODUCTION}" = "skipped" ] || { echo "Error: producción no requerida terminó en '${PRODUCTION}'"; exit 1; }

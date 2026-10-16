@@ -9,7 +9,7 @@ en `infra/terraform/modules/`.
 - **Firewall** — Reglas de entrada y salida en Hetzner Cloud
 - **Servidor** — VPS Ubuntu 24.04 en Hetzner Falkenstein (fsn1), cx33
 - **DNS** — Registros A y CNAME en Cloudflare para los tres subdominios
-- **Pages** — Proyecto de Cloudflare Pages con integración GitHub para el frontend Angular
+- **Pages** — Proyecto de Cloudflare Pages del frontend Angular, conectado a GitHub (previews) y dominio propio
 - **Ajustes de zona** — Configuración TLS/HTTPS de la zona de Cloudflare
 - **Origen protegido** — Authenticated Origin Pulls (`tls_client_auth`) de la zona
 
@@ -163,6 +163,26 @@ en su edge. El servidor no necesita IPv6 porque Cloudflare actúa como intermedi
 en logs — los accesos de Ansible y los accesos manuales de emergencia aparecen
 con usuarios distintos en `auth.log`.
 
-**`path_includes = ["frontend/**"]`en Pages** — Monorepo con backend y frontend.
-Solo rebuilde el frontend cuando cambia algo en`frontend/`. Cambios en el backend
-o en `infra/` no disparan builds innecesarios en Cloudflare Pages.
+**`path_includes = ["frontend/**"]` en Pages** — Monorepo con backend y frontend.
+La integración Git de Pages solo construye cuando cambia algo en `frontend/`; cambios en
+el backend o en `infra/` no disparan builds en Cloudflare Pages.
+
+**Pages: Git para previews, la cadena de producción para producción** — El repositorio
+define la publicación de producción del frontend desde
+`.github/workflows/production-hetzner.yml` con wrangler. Requisito operativo: la
+integración Git del proyecto no debe poder publicar producción por su cuenta (*Branch
+control → automatic production branch deployments* deshabilitado); si puede, la cadena
+falla antes de cualquier mutación de producción (los jobs previos sin privilegios pueden
+haber producido ya artefactos, p. ej. imágenes en GHCR). Proyecto, cuenta y dominio se leen de `piedrazul.auto.tfvars`
+(`infra/tests/pages-release-check.sh` falla si cambia esa correspondencia). Contrato:
+[`docs/architecture/overview.md`](../../../../docs/architecture/overview.md#publicación-del-frontend-cloudflare-pages).
+
+`source` en `modules/cloudflare/pages` es una declaración de **creación**: fija
+`production_deployments_enabled = true` y `ignore_changes = [source]` evita que Terraform
+compare o cambie después la configuración Git del proyecto. Con el provider fijado
+(`cloudflare/cloudflare` 5.18.0), un Apply que actualiza el proyecto en el lugar envía
+solo los atributos que cambian, así que no revierte un Branch control cambiado a mano; por
+lo mismo, `terraform plan` no muestra esa diferencia entre lo declarado y lo efectivo. Un
+reemplazo del recurso (cambio de `name` o `account_id`, `-replace`, o recrearlo tras un
+borrado) crea el proyecto con la declaración, es decir con la publicación automática de
+producción habilitada: hasta deshabilitarla otra vez, la cadena no publica.

@@ -166,7 +166,8 @@ check "workflow: deploy no recibe credenciales técnicas de Keycloak" \
 # Todo secreto de la app que el job production referencia tiene un consumidor en Ansible
 MISSING_CONSUMER=""
 for s in $(grep -oE 'secrets\.[A-Z_]+' "${WORKFLOW}" | sed 's/secrets\.//' | sort -u); do
-  case "$s" in GITHUB_TOKEN|TF_API_TOKEN|ANSIBLE_SSH_KEY) continue ;; esac
+  # Credenciales de la cadena (no de la app): HCP, SSH y publicación de Pages (wrangler)
+  case "$s" in GITHUB_TOKEN|TF_API_TOKEN|ANSIBLE_SSH_KEY|CLOUDFLARE_PAGES_API_TOKEN) continue ;; esac
   grep -rqE "lookup\('env', '${s}'\)" "${ANSIBLE_DIR}/roles" || MISSING_CONSUMER+="${s} "
 done
 check "workflow: cada secreto de la app referenciado tiene consumidor en Ansible (${MISSING_CONSUMER:-todos})" test -z "${MISSING_CONSUMER}"
