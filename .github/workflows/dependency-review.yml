@@ -136,8 +136,15 @@ jobs:
             gh api -i -X GET "${R}/dependency-graph/compare/${BASE_SHA}...${HEAD_SHA}?per_page=1" \
               < /dev/null > "${T}/compare" 2> "${T}/err" ||
               fail "la API de comparación falló; ¿está activado el Dependency graph?"
-            tr -d '\r' < "${T}/compare" | sed '/^$/q' |
-              sed -n 's/^x-github-dependency-graph-snapshot-warnings: *//Ip' | base64 -d > "${T}/warnings"
+            # awk lee el archivo y no una tubería: salir al final de las cabeceras no deja a
+            # nadie escribiendo en una tubería cerrada (SIGPIPE con pipefail si el cuerpo es grande).
+            # Sin línea de estado HTTP o sin fin de cabeceras, la respuesta no es válida.
+            awk 'NR == 1 && !/^HTTP\// { exit 2 }
+                 { sub(/\r$/, "") }
+                 $0 == "" { headers = 1; exit }
+                 tolower($0) ~ /^x-github-dependency-graph-snapshot-warnings:/ { sub(/^[^:]*:[ \t]*/, ""); print }
+                 END { if (!headers) exit 2 }' "${T}/compare" | base64 -d > "${T}/warnings" ||
+              fail "respuesta de la API de comparación ilegible"
           }
           # 0 si algún job "Grafo Maven" de JOBS terminó bien con el envío aceptado
           job_snapshot_ok() { # job_snapshot_ok JOBS
