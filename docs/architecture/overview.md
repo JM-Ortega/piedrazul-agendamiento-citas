@@ -15,7 +15,7 @@ Piedra Azul es una clínica cuyo proceso de agendamiento de citas se ha basado h
 
 - **Backend**: monolito modular construido con Spring Boot y Spring Modulith, organizado en módulos con responsabilidades y límites arquitectónicos bien definidos (ADR-003).
 - **Frontend**: aplicación SPA construida con Angular (ADR-004).
-- **Identidad y acceso**: Keycloak como proveedor de identidad (IdP), responsable de la autenticación, gestión de usuarios, credenciales y roles (ADR-001).
+- **Identidad y acceso**: Keycloak como proveedor de identidad (IdP), responsable de la autenticación, gestión de usuarios, credenciales y roles (ADR-001). Sus pantallas de autenticación usan un tema propio construido con Keycloakify (ADR-006).
 - **Base de datos**: PostgreSQL como motor relacional principal (ADR-002).
 
 ## Dependencias
@@ -100,3 +100,4 @@ El entorno OCI (`infra/terraform/live/oci/`) es histórico e inactivo y no es un
 - ADR-003: Implementar el backend como un monolito modular utilizando Spring Boot y Spring Modulith.
 - ADR-004: Adopción de Angular como framework para el frontend.
 - ADR-005: Orquestación local con Docker Compose para servicios de soporte.
+- ADR-006: Personalización de la interfaz de autenticación de Keycloak con Keycloakify.
