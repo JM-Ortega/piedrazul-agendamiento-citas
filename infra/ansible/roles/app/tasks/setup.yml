@@ -57,6 +57,21 @@
   when: app_identity_seed_enabled | bool
   ansible.builtin.include_tasks: identity_seed_image_gate.yml
 
+# Antes de copiar Compose o escribir .env: compose/keycloak.yml exige FRONTEND_PUBLIC_URL y
+# env.j2 la produce desde frontend_public_domain. Un valor ausente o malformado falla aquí,
+# sin dejar en el servidor archivos Compose nuevos junto a un .env que no los cumple.
+- name: Validar el dominio público del frontend
+  ansible.builtin.assert:
+    that:
+      - frontend_public_domain | default('') | string is match(_host_re)
+    fail_msg: >-
+      FRONTEND: frontend_public_domain='{{ frontend_public_domain | default('') }}' debe ser un
+      nombre DNS en minúsculas (el tema de login usa https://<dominio>). No se copió Compose
+      ni se escribió .env.
+    quiet: true
+  vars:
+    _host_re: '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\Z'
+
 # Compose files
 - name: Copiar archivos compose al servidor
   ansible.builtin.copy:

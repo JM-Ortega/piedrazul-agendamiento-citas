@@ -27,6 +27,10 @@
 #      validada antes del evento, y la lectura de su estado no expone nombres ni credenciales.
 #   6. Desarrollo: docker-compose.yml raíz con .env.example sigue siendo válido y aplica el
 #      secreto local con keycloak-dev-secret.
+#   7. Frontend del tema de login: el realm mantiene deshabilitado el registro nativo; solo
+#      keycloak recibe FRONTEND_PUBLIC_URL (https://<frontend_public_domain> en producción,
+#      el valor de .env.example en desarrollo); sin ella Compose falla, y setup.yml valida
+#      el dominio antes de copiar Compose o escribir .env.
 # Salida: 0 si todo pasa; 1 si algo falla.
 set -euo pipefail
 
@@ -116,6 +120,23 @@ check "Compose: keycloak solo recibe credenciales de su base (KC_DB_PASSWORD)" \
   test "$(jq -r '.services.keycloak.environment | keys[] | select(test("PASSWORD|SECRET|TOKEN|KEY"))' "${TMP}/config.json" | tr '\n' ' ')" = "KC_DB_PASSWORD "
 check "Compose: keycloak de producción arranca con start, sin --import-realm (ni start-dev)" \
   jq -e '.services.keycloak.command == ["start"]' "${TMP}/config.json"
+
+# ── 7a. Frontend del tema de login (producción) ──────────────────────────────
+# frontend_public_domain (host_vars) es "{{ base_domain }}": el valor esperado sale de group_vars
+FRONTEND_EXPECTED="https://$(yq -r '.base_domain' "${ANSIBLE_DIR}/inventories/prod/group_vars/all.yml")"
+check "realm: registro nativo de Keycloak deshabilitado (registrationAllowed=false)" \
+  jq -e '.registrationAllowed == false' "${REALM}"
+check "Compose: solo keycloak recibe FRONTEND_PUBLIC_URL" test "$(holders FRONTEND_PUBLIC_URL)" = "keycloak "
+check "Compose: keycloak recibe FRONTEND_PUBLIC_URL=https://<frontend_public_domain> de env.j2 (${FRONTEND_EXPECTED})" \
+  bash -c "grep -qxF 'FRONTEND_PUBLIC_URL=${FRONTEND_EXPECTED}' '${TMP}/.env' && jq -e --arg v '${FRONTEND_EXPECTED}' '.services.keycloak.environment.FRONTEND_PUBLIC_URL == \$v' '${TMP}/config.json'"
+grep -v '^FRONTEND_PUBLIC_URL=' "${TMP}/.env" > "${TMP}/no-frontend.env"
+check "Compose: sin FRONTEND_PUBLIC_URL el render de producción falla" \
+  bash -c "! docker compose --project-name piedrazul-kc-contract --file '${COMPOSE_DIR}/prod.yml' --env-file '${TMP}/no-frontend.env' --env-file '${TMP}/image.env' --profile migrate config -q"
+sed -E 's/^FRONTEND_PUBLIC_URL=.*/FRONTEND_PUBLIC_URL=/' "${TMP}/.env" > "${TMP}/empty-frontend.env"
+check "Compose: FRONTEND_PUBLIC_URL vacía hace fallar el render de producción" \
+  bash -c "! docker compose --project-name piedrazul-kc-contract --file '${COMPOSE_DIR}/prod.yml' --env-file '${TMP}/empty-frontend.env' --env-file '${TMP}/image.env' --profile migrate config -q"
+check "setup.yml: valida frontend_public_domain antes de copiar Compose y de escribir .env" \
+  bash -c "names=\$(yq -r '.[].name' '${TASKS}/setup.yml'); v=\$(echo \"\$names\" | grep -nx 'Validar el dominio público del frontend' | cut -d: -f1); c=\$(echo \"\$names\" | grep -nx 'Copiar archivos compose al servidor' | cut -d: -f1); e=\$(echo \"\$names\" | grep -nx 'Generar .env desde template' | cut -d: -f1); [ -n \"\$v\" ] && [ \"\$v\" -lt \"\$c\" ] && [ \"\$v\" -lt \"\$e\" ]"
 
 # ── 4. Workflow ──────────────────────────────────────────────────────────────
 check "workflow: sin KC_BOOTSTRAP_ADMIN_PASSWORD ni KC_ADMIN_PASSWORD" \
@@ -218,6 +239,9 @@ check "desarrollo: keycloak con start-dev y admin de bootstrap de desarrollo" \
   jq -e '.services.keycloak.command == ["start-dev", "--import-realm"] and (.services.keycloak.environment | has("KC_BOOTSTRAP_ADMIN_USERNAME"))' "${TMP}/dev.json"
 check "desarrollo: keycloak-dev-secret depende de keycloak healthy y usa la misma imagen" \
   jq -e '.services["keycloak-dev-secret"].depends_on.keycloak.condition == "service_healthy" and .services["keycloak-dev-secret"].image == .services.keycloak.image' "${TMP}/dev.json"
+# ── 7b. Frontend del tema de login (desarrollo) ──────────────────────────────
+check "desarrollo: keycloak recibe FRONTEND_PUBLIC_URL de .env.example" \
+  jq -e --arg v "$(grep -E '^FRONTEND_PUBLIC_URL=' "${ROOT}/.env.example" | cut -d= -f2-)" '.services.keycloak.environment.FRONTEND_PUBLIC_URL == $v and $v == "http://localhost:4200"' "${TMP}/dev.json"
 
 echo
 if [ "${FAILS}" -gt 0 ]; then

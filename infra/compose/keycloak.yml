@@ -24,6 +24,11 @@ services:
       KC_HTTP_PORT: ${KC_PORT}
       KC_HEALTH_ENABLED: ${KC_HEALTH_ENABLED}
       KC_METRICS_ENABLED: ${KC_METRICS_ENABLED}
+      # Dirección pública del frontend Angular. El tema de login la lee en ejecución (enlaces
+      # de inicio y de registro de pacientes), así el mismo JAR sirve en desarrollo y
+      # producción. No es configuración de Keycloak (sin prefijo KC_). Desarrollo la toma de
+      # .env (.env.example); producción, de env.j2 (frontend_public_domain).
+      FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL:?FRONTEND_PUBLIC_URL es requerido}
     volumes:
       - ../keycloak/realm:/opt/keycloak/data/import
       - ../keycloak/themes/keycloak-theme/keycloak-theme-for-kc-all-other-versions.jar:/opt/keycloak/providers/keycloak-theme.jar

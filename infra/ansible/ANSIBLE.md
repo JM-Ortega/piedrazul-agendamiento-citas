@@ -127,10 +127,15 @@ kc_realm_file: "{{ repo_root }}/infra/keycloak/realm/piedrazul-realm.json"
 ### `host_vars/vps.yml` (Hetzner)
 
 ```yaml
-kc_hostname: auth.piedrazul.narvaezlab.dev
-api_public_domain: api.piedrazul.narvaezlab.dev
+kc_hostname: "auth.{{ base_domain }}"
+api_public_domain: "api.{{ base_domain }}"
+frontend_public_domain: "{{ base_domain }}"
 acme_email: jortegan@unicauca.edu.co
+
+cors_allowed_origins: "https://{{ frontend_public_domain }}"
 ```
+
+`frontend_public_domain` también llega a Keycloak: `env.j2` escribe `FRONTEND_PUBLIC_URL=https://<frontend_public_domain>`, que `compose/keycloak.yml` exige y el tema de login usa para los enlaces al frontend (ver el [README del tema](../keycloak/themes/piedrazul/keycloakify-starter/README.md)).
 
 ### `host_vars/vps_oci.yml` (OCI)
 
@@ -222,7 +227,7 @@ Corre en cada `converge`. Pasos:
 
 1. Crea `/opt/piedrazul/`
 2. `keycloak_credentials.yml`: toma `KC_BACKEND_CLIENT_SECRET` y `KC_AUTOMATION_CLIENT_SECRET` del entorno del runner y falla, nombrando solo la regla, si alguno está vacío, si son iguales (el de automatización no debe persistirse en el host) o si coinciden con un valor del repositorio (`.env.example`, realm). Sin lista de caracteres prohibidos ni requisito de formato nuevo: el valor (con el `trim` de extremos que ya se aplicaba) llega a Keycloak en JSON armado por Ansible y al backend por `.env` con escape
-3. Copia `infra/compose/` → `/opt/piedrazul/`
+3. Valida `frontend_public_domain` (nombre DNS en minúsculas; si no, falla sin copiar Compose ni escribir `.env`) y copia `infra/compose/` → `/opt/piedrazul/`
 4. Copia `infra/keycloak/` → `/opt/piedrazul/keycloak/` (realm JSON + theme JAR) e `infra/traefik/` → `/opt/piedrazul/traefik/` (opciones TLS de AOP y CA de Cloudflare); `traefik_routes.yml` genera `traefik/dynamic/routes.yml` (ver [Traefik](#traefik))
 5. Toma del entorno del runner las contraseñas de la base (`POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `MIGRATION_DB_PASSWORD`, `KC_DB_PASSWORD`) y falla, nombrando solo las claves, si alguna está vacía o contiene comilla simple o salto de línea
 6. Genera `.env` desde `env.j2`

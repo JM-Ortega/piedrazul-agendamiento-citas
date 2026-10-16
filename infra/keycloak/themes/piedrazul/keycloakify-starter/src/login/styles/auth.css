@@ -1,0 +1,701 @@
+/*
+ * Estilos de las páginas de autenticación de Piedra Azul.
+ *
+ * Los valores replican la identidad del frontend Angular (frontend/src/app): azul
+ * institucional #215c98, azul oscuro #163c63, acento/foco #4e92d9, borde de formulario
+ * #c2d8f0, grises de Tailwind y la pila de fuentes del sistema. Todo cuelga de .pz-auth.
+ */
+
+:root {
+    --pz-primary: #215c98;
+    --pz-primary-dark: #163c63;
+    --pz-accent: #4e92d9;
+    --pz-border: #c2d8f0;
+    --pz-tint: #e6f0fa;
+    --pz-tint-strong: #d9e9f8;
+    --pz-tint-border: #a7c9ec;
+    --pz-surface: #ffffff;
+    --pz-text: #111827;
+    --pz-text-muted: #6b7280;
+    --pz-text-label: #374151;
+    --pz-placeholder: #9ca3af;
+    --pz-neutral-border: #d1d5db;
+    --pz-neutral-hover: #f9fafb;
+    --pz-danger: #dc2626;
+    --pz-danger-border: #f87171;
+    --pz-danger-bg: #fef2f2;
+    --pz-danger-edge: #fecaca;
+    --pz-success: #15803d;
+    --pz-success-bg: #f0fdf4;
+    --pz-success-edge: #bbf7d0;
+    --pz-warning: #92400e;
+    --pz-warning-bg: #fffbeb;
+    --pz-warning-edge: #fde68a;
+    --pz-focus-ring: 0 0 0 3px rgb(78 146 217 / 0.3);
+    --pz-radius-control: 12px;
+    --pz-radius-button: 8px;
+    --pz-font: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+        "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    background: var(--pz-surface);
+}
+
+.pz-auth,
+.pz-auth *,
+.pz-auth *::before,
+.pz-auth *::after {
+    box-sizing: border-box;
+}
+
+.pz-auth :where(h1, p, ul, form) {
+    margin: 0;
+    padding: 0;
+}
+
+.pz-auth {
+    display: flex;
+    min-height: 100vh;
+    font-family: var(--pz-font);
+    color: var(--pz-text);
+    background: var(--pz-surface);
+    -webkit-font-smoothing: antialiased;
+}
+
+.pz-icon {
+    flex-shrink: 0;
+}
+
+/* ── Foco visible en todos los controles ── */
+.pz-auth :where(a, button, input[type="checkbox"], input[type="button"]):focus-visible {
+    outline: 2px solid var(--pz-accent);
+    outline-offset: 2px;
+}
+
+/* ── Panel de marca ── */
+.pz-brand-panel {
+    position: relative;
+    display: flex;
+    flex: 1.1;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 32px;
+    padding: 40px 44px;
+    overflow: hidden;
+    color: #ffffff;
+    background: linear-gradient(
+        160deg,
+        var(--pz-primary) 0%,
+        #1b4b7e 55%,
+        var(--pz-primary-dark) 100%
+    );
+}
+
+.pz-brand-panel::before,
+.pz-brand-panel::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.pz-brand-panel::before {
+    width: 320px;
+    height: 320px;
+    bottom: -80px;
+    left: -80px;
+    border: 1px solid rgb(255 255 255 / 0.08);
+    background: rgb(255 255 255 / 0.03);
+}
+
+.pz-brand-panel::after {
+    width: 160px;
+    height: 160px;
+    top: 100px;
+    right: -40px;
+    border: 1px solid rgb(255 255 255 / 0.07);
+    background: rgb(255 255 255 / 0.02);
+}
+
+.pz-brand-bar,
+.pz-hero,
+.pz-features {
+    position: relative;
+    z-index: 1;
+}
+
+.pz-brand-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.pz-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+/* Mismo tratamiento que la marca del navbar: calendario azul en círculo blanco */
+.pz-brand-mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    color: var(--pz-primary);
+    background: #ffffff;
+}
+
+.pz-brand-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.pz-brand-name {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.025em;
+    line-height: 1.3;
+}
+
+.pz-brand-descriptor {
+    font-size: 14px;
+    color: #bfdbfe;
+}
+
+.pz-home-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 42px;
+    padding: 0 16px;
+    border: 1px solid rgb(255 255 255 / 0.35);
+    border-radius: var(--pz-radius-button);
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    transition:
+        background-color 0.2s,
+        border-color 0.2s;
+}
+
+.pz-home-link:hover {
+    background: rgb(255 255 255 / 0.12);
+    border-color: rgb(255 255 255 / 0.55);
+}
+
+.pz-brand-panel .pz-home-link:focus-visible {
+    outline-color: #ffffff;
+}
+
+.pz-hero-title {
+    margin-bottom: 14px;
+    max-width: 460px;
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+}
+
+.pz-hero-description {
+    max-width: 380px;
+    font-size: 16px;
+    line-height: 1.6;
+    color: #dbeafe;
+}
+
+.pz-features {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    list-style: none;
+    font-size: 15px;
+    color: #dbeafe;
+}
+
+.pz-features li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.pz-features li::before {
+    content: "";
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.5);
+}
+
+/* ── Columna del formulario ── */
+.pz-form-panel {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 32px;
+    background: var(--pz-surface);
+}
+
+.pz-form-container {
+    width: 100%;
+    max-width: 400px;
+}
+
+.pz-form-header {
+    margin-bottom: 24px;
+}
+
+.pz-eyebrow {
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--pz-primary);
+}
+
+.pz-title {
+    margin-bottom: 6px;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    color: var(--pz-primary-dark);
+}
+
+.pz-subtitle {
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--pz-text-muted);
+}
+
+/* Usuario ya identificado (acción requerida o reautenticación) */
+.pz-attempted-user {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    margin-bottom: 20px;
+    padding: 10px 14px;
+    border: 1px solid var(--pz-tint-border);
+    border-radius: var(--pz-radius-control);
+    color: var(--pz-primary-dark);
+    background: var(--pz-tint);
+    font-size: 14px;
+}
+
+.pz-attempted-user-name {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.pz-attempted-user-restart {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+}
+
+/* ── Alertas ── */
+.pz-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 12px 14px;
+    border: 1px solid;
+    border-radius: var(--pz-radius-control);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.pz-alert .pz-icon {
+    margin-top: 1px;
+}
+
+.pz-alert-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.pz-alert-error {
+    color: #b91c1c;
+    background: var(--pz-danger-bg);
+    border-color: var(--pz-danger-edge);
+}
+
+.pz-alert-success {
+    color: var(--pz-success);
+    background: var(--pz-success-bg);
+    border-color: var(--pz-success-edge);
+}
+
+.pz-alert-warning {
+    color: var(--pz-warning);
+    background: var(--pz-warning-bg);
+    border-color: var(--pz-warning-edge);
+}
+
+.pz-alert-info {
+    color: var(--pz-primary-dark);
+    background: var(--pz-tint);
+    border-color: var(--pz-tint-border);
+}
+
+/* ── Formulario ── */
+.pz-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.pz-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pz-field-label-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 12px;
+}
+
+.pz-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--pz-text-label);
+}
+
+.pz-input {
+    width: 100%;
+    height: 46px;
+    padding: 0 16px;
+    border: 1px solid var(--pz-border);
+    border-radius: var(--pz-radius-control);
+    font-family: inherit;
+    font-size: 16px;
+    color: var(--pz-text);
+    background: var(--pz-surface);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+    outline: none;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s;
+}
+
+.pz-input::placeholder {
+    color: var(--pz-placeholder);
+}
+
+/* El anillo de foco se mantiene (más visible que el borde solo del frontend) */
+.pz-input:focus {
+    border-color: var(--pz-accent);
+    box-shadow: var(--pz-focus-ring);
+}
+
+.pz-input[aria-invalid="true"] {
+    border-color: var(--pz-danger-border);
+}
+
+.pz-input[aria-invalid="true"]:focus {
+    border-color: var(--pz-danger);
+    box-shadow: 0 0 0 3px rgb(220 38 38 / 0.18);
+}
+
+.pz-field-error {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--pz-danger);
+}
+
+.pz-field-error .pz-icon {
+    margin-top: 2px;
+}
+
+.pz-password {
+    position: relative;
+}
+
+.pz-password .pz-input {
+    padding-right: 50px;
+}
+
+.pz-password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: var(--pz-radius-button);
+    color: var(--pz-text-muted);
+    background: none;
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition:
+        color 0.15s,
+        background-color 0.15s;
+}
+
+.pz-password-toggle:hover {
+    color: var(--pz-primary-dark);
+    background: var(--pz-tint);
+}
+
+.pz-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--pz-text-label);
+    cursor: pointer;
+}
+
+.pz-checkbox input {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--pz-primary);
+    cursor: pointer;
+}
+
+/* ── Botones y enlaces ── */
+.pz-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pz-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 46px;
+    padding: 10px 16px;
+    border: 1px solid transparent;
+    border-radius: var(--pz-radius-button);
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+        background-color 0.2s,
+        border-color 0.2s,
+        transform 0.1s;
+}
+
+.pz-button-primary {
+    color: #ffffff;
+    background: var(--pz-primary);
+}
+
+.pz-button-primary:hover {
+    background: var(--pz-primary-dark);
+}
+
+.pz-button-primary:active {
+    transform: scale(0.98);
+}
+
+.pz-button-secondary {
+    color: var(--pz-text-label);
+    background: var(--pz-surface);
+    border-color: var(--pz-neutral-border);
+}
+
+.pz-button-secondary:hover {
+    background: var(--pz-neutral-hover);
+}
+
+.pz-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.pz-form .pz-button-primary {
+    margin-top: 4px;
+}
+
+.pz-webauthn {
+    margin-top: 12px;
+}
+
+.pz-link,
+.pz-link-button {
+    color: var(--pz-primary);
+    font-weight: 500;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: color 0.15s;
+}
+
+.pz-link:hover,
+.pz-link-button:hover {
+    color: var(--pz-primary-dark);
+    text-decoration: underline;
+}
+
+.pz-link-small {
+    font-size: 13px;
+}
+
+.pz-link-button {
+    padding: 0;
+    border: none;
+    background: none;
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.pz-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pz-form-footer,
+.pz-try-another-way {
+    margin-top: 20px;
+    font-size: 14px;
+    text-align: center;
+    color: var(--pz-text-muted);
+}
+
+.pz-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 22px 0 14px;
+    font-size: 13px;
+    color: var(--pz-text-muted);
+}
+
+.pz-divider::before,
+.pz-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #e5e7eb;
+}
+
+.pz-social-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* ── Responsive: misma frontera que el menú del frontend (md = 768px) ── */
+@media (max-width: 768px) {
+    .pz-auth {
+        flex-direction: column;
+    }
+
+    .pz-brand-panel {
+        flex: none;
+        padding: 16px 24px;
+    }
+
+    .pz-brand-panel::before,
+    .pz-brand-panel::after,
+    .pz-hero,
+    .pz-features {
+        display: none;
+    }
+
+    .pz-form-panel {
+        flex: 1;
+        align-items: flex-start;
+        padding: 32px 24px 40px;
+    }
+}
+
+@media (max-width: 480px) {
+    .pz-brand-panel {
+        padding: 14px 16px;
+    }
+
+    .pz-brand-bar {
+        flex-wrap: nowrap;
+    }
+
+    .pz-brand-mark {
+        width: 40px;
+        height: 40px;
+    }
+
+    .pz-brand-name {
+        font-size: 17px;
+    }
+
+    .pz-brand-descriptor {
+        font-size: 13px;
+    }
+
+    /* Solo el ícono; el texto queda para lectores de pantalla */
+    .pz-home-link {
+        width: 42px;
+        padding: 0;
+        justify-content: center;
+    }
+
+    .pz-home-link-text {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    .pz-form-panel {
+        padding: 28px 16px 36px;
+    }
+
+    .pz-title {
+        font-size: 23px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pz-auth *,
+    .pz-auth *::before,
+    .pz-auth *::after {
+        transition: none !important;
+    }
+}
