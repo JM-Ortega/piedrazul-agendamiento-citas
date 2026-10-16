@@ -29,6 +29,8 @@ public interface PersonRepository extends JpaRepository<Person, UUID> {
 
     boolean existsByUserId(UUID userId);
 
+    boolean existsByEmailIgnoreCase(String email);
+
     @Query("""
     SELECT p.userId
     FROM Person p

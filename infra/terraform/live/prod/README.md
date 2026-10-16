@@ -49,8 +49,8 @@ El stack del servidor se define en `infra/compose/prod.yml` (que incluye `db.yml
 - `module "zone_settings"` declara SSL `strict`, TLS mínimo 1.2, TLS 1.3 y
   `always_use_https`, entre otros ajustes.
 - `module "origin_security"` declara `tls_client_auth = on` (Authenticated Origin
-  Pulls). En el origen, las rutas de Traefik en `infra/compose/prod.yml` usan la
-  opción TLS `cloudflare-aop@file` (`infra/traefik/dynamic/tls.yml`), que exige
+  Pulls). En el origen, las rutas de Traefik (file provider, `routes.yml` generado por
+  Ansible) usan la opción TLS `cloudflare-aop` (`infra/traefik/dynamic/tls.yml`), que exige
   certificado de cliente firmado por la CA de Cloudflare
   (`infra/traefik/certs/`). Los certificados del servidor los emite Let's Encrypt
   mediante desafío DNS de Cloudflare.

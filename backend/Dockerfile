@@ -1,5 +1,5 @@
 # ── Build stage ────────────────────────────────────────────
-FROM eclipse-temurin:21-jdk-alpine AS builder
+FROM eclipse-temurin:21-jdk-alpine@sha256:0bfc69a4758a86710e5c474032d28400a8bd00874766f9e8b1642ac2fd293159 AS builder
 
 WORKDIR /app
 
@@ -24,7 +24,13 @@ RUN --mount=type=cache,target=/root/.m2,id=maven-$TARGETARCH \
     ./mvnw -q -B package -Dmaven.test.skip=true
 
 # ── Runtime stage ──────────────────────────────────────────
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21-jre-alpine@sha256:51ab5e3302e7141ce665ca3ea85e8b5cd648eafbc3c0c90dd79d6537684e4555
+
+# Contrato del bootstrap del primer administrador que implementa esta imagen (create-only,
+# fail-closed). El despliegue solo entrega IDENTITY_SEED_* habilitado a una imagen con esta
+# etiqueta: una imagen anterior lo procesaría con su código (adopción de cuentas, contraseña
+# permanente, personal de demostración). Ver infra/ansible/roles/app/tasks/identity_seed_image_gate.yml.
+LABEL org.piedrazul.identity-bootstrap="create-only-v1"
 
 # Usuario no root para reducir superficie de ataque
 RUN addgroup -S spring && adduser -S spring -G spring

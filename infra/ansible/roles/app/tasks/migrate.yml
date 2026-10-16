@@ -1,0 +1,59 @@
+---
+# Migración de esquema de un solo uso, antes de arrancar el backend.
+#
+# Requiere que image.env ya tenga la identidad exacta seleccionada y que db_converge.yml
+# haya reconciliado las credenciales. Corre el servicio migrate de compose/migrate.yml:
+# misma imagen exacta que el backend (BACKEND_IMAGE), punto de entrada
+# SchemaMigrationApplication, autoridad MIGRATION_DB_*. Termina; no queda contenedor (--rm).
+#
+# Exclusividad: flock sobre db_lock_file durante toda la ejecución (se libera al terminar
+# el proceso, también si falla).
+#
+# Si falla, este play falla: el backend candidato no se arranca, no hay verificación de
+# health ni registro del último éxito. No se repara el historial de Flyway: un reintento
+# vuelve a correr la migración desde el estado que dejó PostgreSQL.
+
+- name: Leer la configuración efectiva de Compose
+  ansible.builtin.command:
+    argv: "{{ compose_cli + ['--profile', 'migrate', 'config', '--format', 'json'] }}"
+    chdir: "{{ app_dir }}/compose"
+  register: app_compose_config
+  changed_when: false
+  # Contiene el entorno interpolado (credenciales)
+  no_log: true
+
+- name: Extraer las imágenes de migrate y backend
+  ansible.builtin.set_fact:
+    app_migrate_image: "{{ (app_compose_config.stdout | from_json).services.migrate.image | default('') }}"
+    app_backend_image: "{{ (app_compose_config.stdout | from_json).services.backend.image | default('') }}"
+
+- name: Verificar que migración y runtime usan la identidad seleccionada
+  ansible.builtin.assert:
+    that:
+      - app_migrate_image == backend_image_ref
+      - app_backend_image == backend_image_ref
+    fail_msg: >-
+      MIGRACIÓN: identidad incoherente (seleccionada {{ backend_image_ref }},
+      migrate {{ app_migrate_image }}, backend {{ app_backend_image }}). No se migra.
+    success_msg: "migrate y backend = {{ backend_image_ref }}"
+
+- name: Migrar esquema
+  block:
+    - name: Correr migración (un solo uso, exclusiva en el host)
+      ansible.builtin.command:
+        argv: >-
+          {{ ['flock', '--exclusive', '--timeout', db_lock_timeout | string, db_lock_file]
+             + compose_cli
+             + ['--profile', 'migrate', 'run', '--rm', '--no-deps', 'migrate'] }}
+        chdir: "{{ app_dir }}/compose"
+      register: app_migration
+      changed_when: true
+
+  rescue:
+    - name: Fallar la migración de forma visible
+      ansible.builtin.fail:
+        msg: >-
+          MIGRACIÓN: falló con {{ backend_image_ref }} (rc={{ app_migration.rc | default('n/a') }}).
+          El backend candidato no se arranca y el último éxito no avanza. No se repara el
+          historial de Flyway automáticamente. Últimas líneas:
+          {{ ((app_migration.stdout_lines | default([])) + (app_migration.stderr_lines | default([])))[-25:] | join(' | ') }}

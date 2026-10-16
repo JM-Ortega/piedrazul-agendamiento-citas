@@ -1,0 +1,17 @@
+---
+# Registra el último despliegue exitoso de las imágenes propias en el servidor.
+# Lo corre el workflow de producción solo después de deploy.yml (identidad en ejecución
+# + health de contenedores) y de los health checks públicos. Requiere las mismas
+# identidades exactas que deploy.yml y los metadatos del despliegue:
+#   backend_image_index_digest, backend_image_tag, postgres_image_index_digest,
+#   postgres_image_tag, release_commit, release_run
+
+- name: Registrar despliegue exitoso
+  hosts: vps
+  gather_facts: false
+
+  tasks:
+    - name: Registrar último despliegue exitoso
+      ansible.builtin.include_role:
+        name: app
+        tasks_from: record_release.yml

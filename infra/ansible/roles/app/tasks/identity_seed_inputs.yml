@@ -1,0 +1,108 @@
+---
+# Bootstrap del primer administrador de negocio (IDENTITY_SEED_*; rol ADMIN del realm de la
+# aplicación, no autoridad de Keycloak). Ver docs/operations/runbooks/primer-admin-negocio.md.
+#
+# Solo con IDENTITY_SEED_ENABLED=true se toman y validan las entradas, antes de escribir el
+# .env y de cualquier mutación. Deshabilitado no se lee ni se exige ninguna (tampoco la
+# contraseña): env.j2 las deja vacías, así el .env y el backend recreado dejan de contenerlas.
+# Mensajes con nombres y reglas, nunca valores. Las reglas de documento según su tipo las
+# aplica además el backend (mismas anotaciones que la creación de cuentas).
+
+# Se evalúa en una sola expresión: Ansible convierte un "true" guardado en booleano
+- name: Tomar la decisión de bootstrap del primer administrador
+  ansible.builtin.set_fact:
+    app_identity_seed_flag_valid: "{{ (lookup('env', 'IDENTITY_SEED_ENABLED') | trim | lower) in ['', 'true', 'false'] }}"
+    app_identity_seed_enabled: "{{ (lookup('env', 'IDENTITY_SEED_ENABLED') | trim | lower) == 'true' }}"
+
+- name: Verificar la decisión de bootstrap del primer administrador
+  ansible.builtin.assert:
+    that:
+      - app_identity_seed_flag_valid | bool
+    fail_msg: "IDENTITY_SEED_ENABLED debe ser true, false o no estar definida (variable del GitHub Environment)"
+    quiet: true
+
+# Sin `trim`: un valor con espacios en los extremos se rechaza, no se recorta en silencio
+- name: Tomar las entradas del bootstrap desde el entorno
+  when: app_identity_seed_enabled | bool
+  ansible.builtin.set_fact:
+    app_identity_seed:
+      USERNAME: "{{ lookup('env', 'IDENTITY_SEED_ADMIN_USERNAME') | string }}"
+      IDENTIFICATION_TYPE: "{{ lookup('env', 'IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE') | string }}"
+      FIRST_NAME: "{{ lookup('env', 'IDENTITY_SEED_ADMIN_FIRST_NAME') | string }}"
+      LAST_NAME: "{{ lookup('env', 'IDENTITY_SEED_ADMIN_LAST_NAME') | string }}"
+      EMAIL: "{{ lookup('env', 'IDENTITY_SEED_ADMIN_EMAIL') | string }}"
+      PHONE: "{{ lookup('env', 'IDENTITY_SEED_ADMIN_PHONE') | string }}"
+      PASSWORD: "{{ lookup('env', 'IDENTITY_SEED_ADMIN_PASSWORD') | string }}"
+  no_log: true
+
+# Contraseña temporal: mínimo de 16, sin espacios en los extremos ni caracteres de control
+# (saltos de línea incluidos), sin el documento ni el correo, distinta de toda credencial
+# técnica y de todo valor de referencia del repositorio (.env.example). No es la política del
+# realm ni garantiza la fuerza de la contraseña definitiva (UPDATE_PASSWORD en el primer login).
+- name: Detectar entradas del bootstrap inválidas
+  when: app_identity_seed_enabled | bool
+  ansible.builtin.set_fact:
+    app_identity_seed_invalid: >-
+      {{ (app_identity_seed | dict2items | selectattr('value', 'equalto', '') | map(attribute='key')
+          | map('regex_replace', '^', 'IDENTITY_SEED_ADMIN_') | map('regex_replace', '$', ' vacío') | list)
+         + (['IDENTITY_SEED_ADMIN_USERNAME no es un documento (6 a 20 letras o dígitos)']
+              if _s.USERNAME | length > 0 and _s.USERNAME is not match(_document) else [])
+         + (['IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE no es un tipo de documento conocido']
+              if _s.IDENTIFICATION_TYPE | length > 0 and _s.IDENTIFICATION_TYPE not in _types else [])
+         + (['IDENTITY_SEED_ADMIN_FIRST_NAME con espacios en los extremos, saltos de línea o fuera de 2 a 60 caracteres']
+              if _s.FIRST_NAME | length > 0 and (_s.FIRST_NAME != _s.FIRST_NAME | trim or _s.FIRST_NAME is search(_line_break)
+                                                 or not (2 <= _s.FIRST_NAME | length <= 60)) else [])
+         + (['IDENTITY_SEED_ADMIN_LAST_NAME con espacios en los extremos, saltos de línea o fuera de 2 a 60 caracteres']
+              if _s.LAST_NAME | length > 0 and (_s.LAST_NAME != _s.LAST_NAME | trim or _s.LAST_NAME is search(_line_break)
+                                                or not (2 <= _s.LAST_NAME | length <= 60)) else [])
+         + (['IDENTITY_SEED_ADMIN_EMAIL no es un correo']
+              if _s.EMAIL | length > 0 and _s.EMAIL is not match(_email) else [])
+         + (['IDENTITY_SEED_ADMIN_PHONE no es un celular de 10 dígitos']
+              if _s.PHONE | length > 0 and _s.PHONE is not match(_phone) else [])
+         + (['IDENTITY_SEED_ADMIN_PASSWORD con menos de 16 caracteres']
+              if 0 < _pw | length < 16 else [])
+         + (['IDENTITY_SEED_ADMIN_PASSWORD con espacios o saltos de línea en los extremos']
+              if _pw | length > 0 and _pw != _pw | trim else [])
+         + (['IDENTITY_SEED_ADMIN_PASSWORD con saltos de línea u otros caracteres de control']
+              if _pw is search(_control) else [])
+         + (['IDENTITY_SEED_ADMIN_PASSWORD contiene el documento']
+              if _pw | length > 0 and _s.USERNAME | length > 0 and _s.USERNAME | lower in _pw | lower else [])
+         + (['IDENTITY_SEED_ADMIN_PASSWORD contiene el correo']
+              if _pw | length > 0 and _s.EMAIL | length > 0
+                 and (_s.EMAIL | lower in _pw | lower
+                      or (_local | length >= 4 and _local in _pw | lower)) else [])
+         + (['IDENTITY_SEED_ADMIN_PASSWORD coincide con una credencial técnica o de otra cuenta']
+              if _pw | length > 0 and _pw in _technical else [])
+         + (['IDENTITY_SEED_ADMIN_PASSWORD coincide con un valor de referencia de .env.example']
+              if _pw | length > 0 and _pw in _known else []) }}
+  vars:
+    _s: "{{ app_identity_seed }}"
+    _pw: "{{ app_identity_seed.PASSWORD }}"
+    _local: "{{ app_identity_seed.EMAIL | lower | regex_replace('@.*$', '') }}"
+    # Patrones como escalares YAML (sin escapes de literales Jinja)
+    _document: '^[A-Za-z0-9]{6,20}$'
+    _phone: '^[0-9]{10}$'
+    _email: '^[^@\s"''\\$]+@[^@\s"''\\$]+\.[^@\s"''\\$]+$'
+    _line_break: '[\r\n]'
+    _control: '[\x00-\x1f\x7f]'
+    _types: [CEDULA, TARJETA_IDENTIDAD, REGISTRO_NACIMIENTO, PASAPORTE, CEDULA_EXTRANJERIA]
+    _technical: >-
+      {{ [app_kc_backend_secret | default(''), app_kc_automation_secret | default(''),
+          app_kc_platform_admin_password | default('')]
+         + (app_db_secrets | default({}) | dict2items | map(attribute='value') | list) }}
+    _example: "{{ lookup('ansible.builtin.file', repo_root ~ '/.env.example') }}"
+    _known: >-
+      {{ _example.splitlines() | select('match', '^[A-Z_]*(SECRET|PASSWORD|KEY)=.')
+         | map('regex_replace', '^[^=]+=', '') | list }}
+  no_log: true
+
+- name: Verificar las entradas del bootstrap del primer administrador
+  when: app_identity_seed_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - app_identity_seed_invalid | length == 0
+    fail_msg: >-
+      Bootstrap del primer administrador habilitado con entradas inválidas:
+      {{ app_identity_seed_invalid | join('; ') }}. Variables y secreto del GitHub Environment
+      production-hetzner (docs/operations/runbooks/primer-admin-negocio.md).
+    quiet: true

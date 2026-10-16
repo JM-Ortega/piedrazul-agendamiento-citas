@@ -126,8 +126,9 @@ class AuditEventQueryIT extends PostgresIntegrationSupport {
     void withOnlyTheStartTheRangeIsOpenAtTheEnd() {
         var page = repository.findByCriteria(query(BASE.plus(Duration.ofHours(3)), null, null, null, null, 0, 50));
 
-        assertThat(ids(page)).startsWith(r5, r4);
-        assertThat(ids(page)).doesNotContain(r3, r2, r1);
+        // Sin fin, el rango alcanza también registros ya confirmados por otros tests (p. ej. los
+        // del listener, en REQUIRES_NEW, que no se revierten): el orden se comprueba sobre los propios.
+        assertThat(ids(page)).filteredOn(List.of(r1, r2, r3, r4, r5)::contains).containsExactly(r5, r4);
     }
 
     @Test

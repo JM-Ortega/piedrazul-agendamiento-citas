@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ghcr.io/${GITHUB_OWNER}/${GITHUB_REPO}/backend:${IMAGE_TAG}
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE no definido — image.env debe contener la identidad exacta del backend (repo@sha256)}
     container_name: backend
     restart: unless-stopped
     environment:
@@ -8,18 +8,19 @@ services:
       SERVER_PORT: ${SERVER_PORT}
       SERVER_FORWARD_HEADERS_STRATEGY: ${SERVER_FORWARD_HEADERS_STRATEGY}
 
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_NAME: ${DB_NAME}
-      DB_SCHEMA: ${DB_SCHEMA}
+      DB_HOST: ${DB_HOST:?DB_HOST es requerido}
+      DB_PORT: ${DB_PORT:?DB_PORT es requerido}
+      DB_NAME: ${DB_NAME:?DB_NAME es requerido}
+      DB_SCHEMA: ${DB_SCHEMA:?DB_SCHEMA es requerido}
 
-      APP_DB_USERNAME: ${APP_DB_USERNAME}
-      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      # Solo la autoridad de la aplicación. Sin MIGRATION_DB_*: el esquema lo evoluciona
+      # el servicio migrate (migrate.yml) antes de arrancar este contenedor.
+      APP_DB_USERNAME: ${APP_DB_USERNAME:?APP_DB_USERNAME es requerido}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD es requerido}
 
-      MIGRATION_DB_USERNAME: ${MIGRATION_DB_USERNAME}
-      MIGRATION_DB_PASSWORD: ${MIGRATION_DB_PASSWORD}
-
-      JPA_DDL_AUTO: ${JPA_DDL_AUTO}
+      # Contrato fijo, no configurable desde .env: el runtime no migra ni repara esquema
+      SPRING_FLYWAY_ENABLED: "false"
+      JPA_DDL_AUTO: validate
       JPA_SHOW_SQL: ${JPA_SHOW_SQL}
       JPA_FORMAT_SQL: ${JPA_FORMAT_SQL}
 
@@ -48,12 +49,17 @@ services:
       LOG_LEVEL_SQL_BIND: ${LOG_LEVEL_SQL_BIND}
       LOG_LEVEL_MODULITH: ${LOG_LEVEL_MODULITH}
 
-      IDENTITY_SEED_ENABLED: ${IDENTITY_SEED_ENABLED}
-      IDENTITY_SEED_ADMIN_USERNAME: ${IDENTITY_SEED_ADMIN_USERNAME}
-      IDENTITY_SEED_ADMIN_FIRST_NAME: ${IDENTITY_SEED_ADMIN_FIRST_NAME}
-      IDENTITY_SEED_ADMIN_LAST_NAME: ${IDENTITY_SEED_ADMIN_LAST_NAME}
-      IDENTITY_SEED_ADMIN_EMAIL: ${IDENTITY_SEED_ADMIN_EMAIL}
-      IDENTITY_SEED_ADMIN_PASSWORD: ${IDENTITY_SEED_ADMIN_PASSWORD}
+      # Bootstrap del primer administrador de negocio: solo con IDENTITY_SEED_ENABLED=true las
+      # entradas tienen valor; deshabilitado llegan vacías (env.j2) y el backend no las usa.
+      # Sin APP_DEMO_SEED_ENABLED: producción nunca crea identidades de demostración.
+      IDENTITY_SEED_ENABLED: ${IDENTITY_SEED_ENABLED:-false}
+      IDENTITY_SEED_ADMIN_USERNAME: ${IDENTITY_SEED_ADMIN_USERNAME:-}
+      IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE: ${IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE:-}
+      IDENTITY_SEED_ADMIN_FIRST_NAME: ${IDENTITY_SEED_ADMIN_FIRST_NAME:-}
+      IDENTITY_SEED_ADMIN_LAST_NAME: ${IDENTITY_SEED_ADMIN_LAST_NAME:-}
+      IDENTITY_SEED_ADMIN_EMAIL: ${IDENTITY_SEED_ADMIN_EMAIL:-}
+      IDENTITY_SEED_ADMIN_PHONE: ${IDENTITY_SEED_ADMIN_PHONE:-}
+      IDENTITY_SEED_ADMIN_PASSWORD: ${IDENTITY_SEED_ADMIN_PASSWORD:-}
 
       NOTIFICATION_ENCRYPTION_KEY: ${NOTIFICATION_ENCRYPTION_KEY}
       NOTIFICATIONS_SENDGRID_ENABLED: ${NOTIFICATIONS_SENDGRID_ENABLED}

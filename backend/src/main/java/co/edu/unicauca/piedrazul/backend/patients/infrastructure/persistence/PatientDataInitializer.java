@@ -8,6 +8,7 @@ import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserProvisioningApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserPayload;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.input.CreateSystemUserRequest;
+import co.edu.unicauca.piedrazul.backend.shared.seed.DemoSeedOnly;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
@@ -16,7 +17,12 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Pacientes de demostración (datos ficticios) para desarrollo. Solo existe con
+ * {@link DemoSeedOnly}: perfil {@code dev} exclusivo y {@code APP_DEMO_SEED_ENABLED=true}.
+ */
 @Component
+@DemoSeedOnly
 @Order(3)
 public class PatientDataInitializer implements ApplicationRunner {
 
@@ -43,23 +49,23 @@ public class PatientDataInitializer implements ApplicationRunner {
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000003",
-                "Juan",
-                "Pérez",
-                "3201112233",
+                "Alan",
+                "Demo",
+                "3000000201",
                 null,
                 null,
                 PatientSex.MASCULINO,
                 LocalDate.of(2000, 3, 10),
-                "3204445566"
+                "3000000299"
         );
 
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000004",
-                "Sofia",
-                "Char",
-                "3109876543",
-                "sofia.char@email.com",
+                "Bruna",
+                "Demo",
+                "3000000202",
+                "bruna.demo@demo.piedrazul.test",
                 null,
                 PatientSex.FEMENINO,
                 LocalDate.of(1985, 8, 22),
@@ -69,10 +75,10 @@ public class PatientDataInitializer implements ApplicationRunner {
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000005",
-                "María",
-                "López",
-                "3001234567",
-                "maria.lopez@email.com",
+                "Carla",
+                "Demo",
+                "3000000203",
+                "carla.demo@demo.piedrazul.test",
                 null,
                 PatientSex.FEMENINO,
                 LocalDate.of(1990, 5, 15),
@@ -82,10 +88,10 @@ public class PatientDataInitializer implements ApplicationRunner {
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000006",
-                "Carlos",
-                "Ramírez",
-                "3201112233",
-                "carlos.ramirez@email.com",
+                "Dario",
+                "Demo",
+                "3000000204",
+                "dario.demo@demo.piedrazul.test",
                 null,
                 PatientSex.MASCULINO,
                 LocalDate.of(1992, 3, 10),
@@ -95,10 +101,10 @@ public class PatientDataInitializer implements ApplicationRunner {
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000007",
-                "Laura",
-                "Gómez",
-                "3212223344",
-                "laura.gomez@email.com",
+                "Elena",
+                "Demo",
+                "3000000205",
+                "elena.demo@demo.piedrazul.test",
                 null,
                 PatientSex.FEMENINO,
                 LocalDate.of(1988, 11, 5),
@@ -108,10 +114,10 @@ public class PatientDataInitializer implements ApplicationRunner {
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000008",
-                "Andrés",
-                "Martínez",
-                "3223334455",
-                "andres.martinez@email.com",
+                "Fabio",
+                "Demo",
+                "3000000206",
+                "fabio.demo@demo.piedrazul.test",
                 null,
                 PatientSex.MASCULINO,
                 LocalDate.of(1995, 7, 18),
@@ -121,10 +127,10 @@ public class PatientDataInitializer implements ApplicationRunner {
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000009",
-                "Valentina",
-                "Torres",
-                "3234445566",
-                "valentina.torres@email.com",
+                "Gala",
+                "Demo",
+                "3000000207",
+                "gala.demo@demo.piedrazul.test",
                 null,
                 PatientSex.FEMENINO,
                 LocalDate.of(2000, 1, 27),
@@ -134,10 +140,10 @@ public class PatientDataInitializer implements ApplicationRunner {
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000010",
-                "Juan",
-                "Herrera",
-                "3245556677",
-                "juan.herrera@email.com",
+                "Hugo",
+                "Demo",
+                "3000000208",
+                "hugo.demo@demo.piedrazul.test",
                 null,
                 PatientSex.MASCULINO,
                 LocalDate.of(1983, 9, 14),
@@ -147,10 +153,10 @@ public class PatientDataInitializer implements ApplicationRunner {
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000011",
-                "Natalia",
-                "Castro",
-                "3256667788",
-                "natalia.castro@email.com",
+                "Inés",
+                "Demo",
+                "3000000209",
+                "ines.demo@demo.piedrazul.test",
                 null,
                 PatientSex.FEMENINO,
                 LocalDate.of(1991, 4, 12),
@@ -160,10 +166,10 @@ public class PatientDataInitializer implements ApplicationRunner {
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000012",
-                "Diego",
-                "Morales",
-                "3267778899",
-                "diego.morales@email.com",
+                "Julio",
+                "Demo",
+                "3000000210",
+                "julio.demo@demo.piedrazul.test",
                 null,
                 PatientSex.MASCULINO,
                 LocalDate.of(1987, 6, 25),
@@ -173,10 +179,10 @@ public class PatientDataInitializer implements ApplicationRunner {
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000013",
-                "Camila",
-                "Rojas",
-                "3278889900",
-                "camila.rojas@email.com",
+                "Karen",
+                "Demo",
+                "3000000211",
+                "karen.demo@demo.piedrazul.test",
                 null,
                 PatientSex.FEMENINO,
                 LocalDate.of(1998, 2, 8),
@@ -186,10 +192,10 @@ public class PatientDataInitializer implements ApplicationRunner {
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000014",
-                "Felipe",
-                "Vargas",
-                "3289990011",
-                "felipe.vargas@email.com",
+                "Leo",
+                "Demo",
+                "3000000212",
+                "leo.demo@demo.piedrazul.test",
                 null,
                 PatientSex.MASCULINO,
                 LocalDate.of(1993, 10, 30),
@@ -199,10 +205,10 @@ public class PatientDataInitializer implements ApplicationRunner {
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000015",
-                "Daniela",
-                "Mendoza",
-                "3290001122",
-                "daniela.mendoza@email.com",
+                "Mara",
+                "Demo",
+                "3000000213",
+                "mara.demo@demo.piedrazul.test",
                 null,
                 PatientSex.FEMENINO,
                 LocalDate.of(1989, 12, 17),
@@ -212,10 +218,10 @@ public class PatientDataInitializer implements ApplicationRunner {
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000016",
-                "Sebastián",
-                "Ortega",
-                "3301112233",
-                "sebastian.ortega@email.com",
+                "Nico",
+                "Demo",
+                "3000000214",
+                "nico.demo@demo.piedrazul.test",
                 null,
                 PatientSex.MASCULINO,
                 LocalDate.of(1996, 8, 21),
@@ -225,10 +231,10 @@ public class PatientDataInitializer implements ApplicationRunner {
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000017",
-                "Paula",
-                "Jiménez",
-                "3312223344",
-                "paula.jimenez@email.com",
+                "Olga",
+                "Demo",
+                "3000000215",
+                "olga.demo@demo.piedrazul.test",
                 null,
                 PatientSex.FEMENINO,
                 LocalDate.of(1994, 6, 9),
@@ -238,10 +244,10 @@ public class PatientDataInitializer implements ApplicationRunner {
         patientService.createPatient(
                 IdentificationType.CEDULA,
                 "33000018",
-                "Miguel",
-                "Salazar",
-                "3323334455",
-                "miguel.salazar@email.com",
+                "Pedro",
+                "Demo",
+                "3000000216",
+                "pedro.demo@demo.piedrazul.test",
                 null,
                 PatientSex.MASCULINO,
                 LocalDate.of(1986, 11, 28),
@@ -252,10 +258,10 @@ public class PatientDataInitializer implements ApplicationRunner {
                 new CreateSystemUserRequest(
                         "33000002",
                         IdentificationType.CEDULA,
-                        "José",
-                        "Paz",
-                        "jose@gmail.com",
-                        "3001234567",
+                        "Pablo",
+                        "Demo",
+                        "pablo.demo@demo.piedrazul.test",
+                        "3000000217",
                         "Patient123!"
                 ), null,
                 new CreatePatientUserRequest(

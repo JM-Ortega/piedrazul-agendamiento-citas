@@ -4,11 +4,22 @@ set -Eeuo pipefail
 # -----------------------------------------------------------------------------
 # 01-init-databases.sh
 #
-# Este script se ejecuta únicamente en la primera inicialización del contenedor
-# PostgreSQL, cuando el directorio PGDATA está vacío.
+# Reconciliación idempotente de roles, credenciales, schemas y permisos base.
+#
+# Se ejecuta en dos momentos, siempre con la misma lógica:
+#   - Primera inicialización: el entrypoint de la imagen lo corre cuando PGDATA está
+#     vacío.
+#   - Convergencia: Ansible lo vuelve a correr sobre una base ya inicializada
+#     (docker exec -u postgres postgres /docker-entrypoint-initdb.d/01-init-databases.sh),
+#     antes de migrar o de recrear a los consumidores (Keycloak, backend).
+#
+# Se conecta por el socket local como POSTGRES_USER (trust local de la imagen oficial),
+# así que no necesita las contraseñas anteriores de ningún rol: fija las declaradas en el
+# entorno del contenedor y las anteriores dejan de autenticar.
 #
 # Responsabilidad:
-#   - Crear roles de base de datos.
+#   - Crear roles de base de datos y fijar sus contraseñas declaradas (incluido
+#     POSTGRES_USER con POSTGRES_PASSWORD).
 #   - Crear schemas base para Piedrazul, extensiones y Keycloak.
 #   - Configurar permisos mínimos.
 #   - Configurar search_path por rol.
@@ -59,6 +70,8 @@ read_secret() {
 : "${POSTGRES_USER:?POSTGRES_USER es requerido}"
 : "${POSTGRES_DB:?POSTGRES_DB es requerido}"
 
+POSTGRES_PASSWORD_VALUE="$(read_secret POSTGRES_PASSWORD)"
+
 : "${APP_DB_USERNAME:?APP_DB_USERNAME es requerido}"
 : "${MIGRATION_DB_USERNAME:?MIGRATION_DB_USERNAME es requerido}"
 : "${KC_DB_USERNAME:?KC_DB_USERNAME es requerido}"
@@ -67,7 +80,7 @@ APP_DB_PASSWORD_VALUE="$(read_secret APP_DB_PASSWORD)"
 MIGRATION_DB_PASSWORD_VALUE="$(read_secret MIGRATION_DB_PASSWORD)"
 KC_DB_PASSWORD_VALUE="$(read_secret KC_DB_PASSWORD)"
 
-echo "==> Inicializando infraestructura de PostgreSQL..."
+echo "==> Reconciliando infraestructura de PostgreSQL..."
 echo "    Base de datos      : ${POSTGRES_DB}"
 echo "    Rol bootstrap      : ${POSTGRES_USER}"
 echo "    Rol aplicación     : ${APP_DB_USERNAME}"
@@ -77,6 +90,8 @@ echo "    Rol Keycloak       : ${KC_DB_USERNAME}"
 psql \
   -v ON_ERROR_STOP=1 \
   -v app_db="${POSTGRES_DB}" \
+  -v postgres_role="${POSTGRES_USER}" \
+  -v postgres_password="${POSTGRES_PASSWORD_VALUE}" \
   -v app_role="${APP_DB_USERNAME}" \
   -v app_password="${APP_DB_PASSWORD_VALUE}" \
   -v migration_role="${MIGRATION_DB_USERNAME}" \
@@ -100,6 +115,12 @@ psql \
 -- kc_role:
 --   Usuario usado exclusivamente por Keycloak.
 --   Trabaja dentro del schema keycloak.
+--
+-- postgres_role (POSTGRES_USER):
+--   Superusuario administrativo creado por la imagen. Solo se reconcilia su
+--   contraseña; ningún servicio de la aplicación se conecta con él.
+
+ALTER ROLE :"postgres_role" PASSWORD :'postgres_password';
 
 SELECT NOT EXISTS (
     SELECT 1
@@ -269,6 +290,23 @@ ALTER DEFAULT PRIVILEGES FOR ROLE :"migration_role" IN SCHEMA extensions
 
 
 -- =====================================================
+-- 6b. Historial de Flyway: solo migration_role
+-- =====================================================
+-- Los default privileges de arriba también alcanzan a flyway_schema_history, que
+-- crea migration_role. La migración (SchemaMigrationApplication) lo revoca al
+-- terminar; aquí se reaplica en cada reconciliación para que ningún camino (base
+-- migrada antes, sin migración en este deploy) le deje escritura a app_role.
+-- ALTER DEFAULT PRIVILEGES no afecta a tablas existentes, así que no lo deshace.
+
+SELECT to_regclass('piedrazul.flyway_schema_history') IS NOT NULL AS has_flyway_history
+\gset
+
+\if :has_flyway_history
+    REVOKE ALL ON TABLE piedrazul.flyway_schema_history FROM :"app_role";
+\endif
+
+
+-- =====================================================
 -- 7. Bloqueo del schema public
 -- =====================================================
 -- Evita que objetos de la aplicación, Keycloak o Flyway terminen
@@ -291,4 +329,4 @@ REVOKE ALL ON SCHEMA public FROM :"kc_role";
 
 EOSQL
 
-echo "==> Inicialización de PostgreSQL completada correctamente."
+echo "==> Reconciliación de PostgreSQL completada correctamente."
