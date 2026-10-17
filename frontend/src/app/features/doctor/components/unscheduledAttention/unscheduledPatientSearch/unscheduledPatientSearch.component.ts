@@ -78,9 +78,14 @@ export class UnscheduledPatientSearchComponent {
   isNotFoundError = (err: { errorCode?: string }) =>
     err.errorCode === 'PATIENT_NOT_FOUND';
 
+  /** Primera especialidad del doctor; '' si aún no hay opciones. */
+  private get defaultSpecialty(): string {
+    return this.specialtyOptions[0]?.value ?? '';
+  }
+
   onResultFound(patient: Patient): void {
     this.foundPatient.set(patient);
-    this.selectedSpecialty.set('');
+    this.selectedSpecialty.set(this.defaultSpecialty);
   }
 
   onResultNotFound(identification: string): void {
