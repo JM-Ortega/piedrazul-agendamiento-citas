@@ -9,7 +9,7 @@ en `infra/terraform/modules/`.
 - **Firewall** — Reglas de entrada y salida en Hetzner Cloud
 - **Servidor** — VPS Ubuntu 24.04 en Hetzner Falkenstein (fsn1), cx33
 - **DNS** — Registros A y CNAME en Cloudflare para los tres subdominios
-- **Pages** — Proyecto de Cloudflare Pages del frontend Angular, conectado a GitHub (previews) y dominio propio
+- **Pages** — Proyecto de Cloudflare Pages del frontend Angular, de subida directa (sin integración Git ni previews automáticas), con dominio propio
 - **Ajustes de zona** — Configuración TLS/HTTPS de la zona de Cloudflare
 - **Origen protegido** — Authenticated Origin Pulls (`tls_client_auth`) de la zona
 
@@ -89,8 +89,8 @@ live/prod/
 El bloque `cloud` de `versions.tf` apunta al workspace `piedrazul-hetzner` de la
 organización `Piedrazul` en HCP Terraform. Las variables con valor en
 `piedrazul.auto.tfvars` (`project`, `base_domain`, `cloudflare_account_id`,
-`cloudflare_zone_id`, `github_owner`, `github_repo`, `server_type`, `location`,
-`image`) están declaradas en el repositorio; las demás deben existir en el
+`cloudflare_zone_id`, `server_type`, `location`, `image`) están declaradas en el
+repositorio; las demás deben existir en el
 workspace, cuyo contenido no es verificable desde el repositorio.
 
 | Variable                 | Tipo      | Sensitive | Descripción                               |
@@ -99,8 +99,6 @@ workspace, cuyo contenido no es verificable desde el repositorio.
 | `base_domain`            | terraform | No        | Dominio base — `piedrazul.org` en tfvars  |
 | `cloudflare_account_id`  | terraform | No        | Account ID de Cloudflare                  |
 | `cloudflare_zone_id`     | terraform | No        | Zone ID de la zona del dominio base       |
-| `github_owner`           | terraform | No        | Usuario GitHub — `JM-Ortega`              |
-| `github_repo`            | terraform | No        | Repositorio GitHub                        |
 | `ansible_ssh_public_key` | terraform | No        | Llave pública SSH de Ansible              |
 | `ops_ssh_public_key`     | terraform | No        | Llave pública SSH del usuario ops         |
 | `server_type`            | terraform | No        | Tipo de servidor — default `cx33`         |
@@ -108,6 +106,11 @@ workspace, cuyo contenido no es verificable desde el repositorio.
 | `image`                  | terraform | No        | Imagen OS — default `ubuntu-24.04`        |
 | `HCLOUD_TOKEN`           | env       | Sí        | Token de API de Hetzner Cloud             |
 | `CLOUDFLARE_API_TOKEN`   | env       | Sí        | Token de API de Cloudflare                |
+
+La cuenta y la zona son las dedicadas de Piedrazul (`cloudflare_account_id`,
+`cloudflare_zone_id` en `piedrazul.auto.tfvars`). `github_owner` y `github_repo` ya no
+existen: el proyecto de Pages no se conecta a GitHub. Si el workspace todavía define esas
+variables, Terraform solo advierte que no están declaradas; conviene quitarlas.
 
 ## Outputs
 
@@ -123,9 +126,15 @@ workspace, cuyo contenido no es verificable desde el repositorio.
 
 ## Cómo se ejecuta
 
-Este workspace usa HCP Terraform en modo API-driven. No se ejecuta localmente
-en producción. Los cambios se aplican a través de GitHub Actions que envía
-el plan a HCP Terraform.
+Este workspace usa HCP Terraform en modo API-driven con ejecución remota. No se
+ejecuta localmente en producción. La cadena de producción
+(`.github/workflows/production-hetzner.yml`) sube la configuración, crea el run con
+`auto-apply=false` y describe el plan; **una persona revisa y confirma ese mismo run en
+HCP** (nada en GitHub lo confirma). Requisitos del workspace, que la cadena verifica antes
+de crear el run: ejecución `remote` (o `agent`), *Apply method* manual (`auto-apply` y
+`auto-apply-run-trigger` deshabilitados) y un `TF_API_TOKEN` que pueda leer el estado y
+encolar runs. Un workspace sin estado es una instalación nueva válida (ver
+[`instalacion-nueva.md`](../../../../docs/operations/runbooks/instalacion-nueva.md)).
 
 Para un plan local de validación (sin apply):
 
@@ -142,7 +151,7 @@ terraform plan
 | ----------------- | -------------------------------- | --------------------------------------------------------- |
 | `firewall`        | `modules/hetzner/firewall`       | Firewall Hetzner (SSH, HTTP/HTTPS, ICMP y salida)         |
 | `server`          | `modules/hetzner/server`         | VPS Hetzner + cloud-init hardening                        |
-| `pages`           | `modules/cloudflare/pages`       | Proyecto Cloudflare Pages con integración GitHub          |
+| `pages`           | `modules/cloudflare/pages`       | Proyecto Cloudflare Pages de subida directa + dominio propio |
 | `dns`             | `modules/cloudflare/dns`         | Registros DNS de frontend, API y autenticación            |
 | `zone_settings`   | `modules/cloudflare/zone_settings` | Ajustes TLS/HTTPS de la zona de Cloudflare              |
 | `origin_security` | `modules/cloudflare/origin_security` | Authenticated Origin Pulls de la zona                 |
@@ -163,26 +172,21 @@ en su edge. El servidor no necesita IPv6 porque Cloudflare actúa como intermedi
 en logs — los accesos de Ansible y los accesos manuales de emergencia aparecen
 con usuarios distintos en `auth.log`.
 
-**`path_includes = ["frontend/**"]` en Pages** — Monorepo con backend y frontend.
-La integración Git de Pages solo construye cuando cambia algo en `frontend/`; cambios en
-el backend o en `infra/` no disparan builds en Cloudflare Pages.
-
-**Pages: Git para previews, la cadena de producción para producción** — El repositorio
-define la publicación de producción del frontend desde
-`.github/workflows/production-hetzner.yml` con wrangler. Requisito operativo: la
-integración Git del proyecto no debe poder publicar producción por su cuenta (*Branch
-control → automatic production branch deployments* deshabilitado); si puede, la cadena
-falla antes de cualquier mutación de producción (los jobs previos sin privilegios pueden
-haber producido ya artefactos, p. ej. imágenes en GHCR). Proyecto, cuenta y dominio se leen de `piedrazul.auto.tfvars`
-(`infra/tests/pages-release-check.sh` falla si cambia esa correspondencia). Contrato:
+**Pages de subida directa** — El proyecto no tiene `source` ni `build_config`: Cloudflare
+no construye nada, no hay previews automáticas y la única autoridad de publicación es la
+cadena de producción, que sube con wrangler el artefacto ya validado. Proyecto, cuenta y
+dominio se leen de `piedrazul.auto.tfvars` (`infra/tests/pages-release-check.sh` falla si
+cambia esa correspondencia o si el módulo vuelve a declarar un origen Git). El tipo del
+proyecto se fija al crearlo: Cloudflare no convierte un proyecto de subida directa en uno
+con Git ni al revés, y la cadena rechaza cualquier proyecto con `source`. Contrato:
 [`docs/architecture/overview.md`](../../../../docs/architecture/overview.md#publicación-del-frontend-cloudflare-pages).
 
-`source` en `modules/cloudflare/pages` es una declaración de **creación**: fija
-`production_deployments_enabled = true` y `ignore_changes = [source]` evita que Terraform
-compare o cambie después la configuración Git del proyecto. Con el provider fijado
-(`cloudflare/cloudflare` 5.18.0), un Apply que actualiza el proyecto en el lugar envía
-solo los atributos que cambian, así que no revierte un Branch control cambiado a mano; por
-lo mismo, `terraform plan` no muestra esa diferencia entre lo declarado y lo efectivo. Un
-reemplazo del recurso (cambio de `name` o `account_id`, `-replace`, o recrearlo tras un
-borrado) crea el proyecto con la declaración, es decir con la publicación automática de
-producción habilitada: hasta deshabilitarla otra vez, la cadena no publica.
+**Dominio propio: un dueño por recurso y orden explícito** — El módulo `dns` es el único
+dueño del CNAME `piedrazul.org → <proyecto>.pages.dev`; el módulo `pages` es dueño del
+proyecto y de la asociación del dominio (`cloudflare_pages_domain`). La asociación recibe el
+id del registro DNS (`custom_domain_dns_record_id`) y lo referencia en una precondición:
+esa referencia ordena el grafo proyecto → CNAME → asociación sin ciclos, así la API de Pages
+encuentra el registro ya creado y Terraform no compite con un registro que la asociación
+pudiera crear por su cuenta. Si la API de Pages modificara ese registro al asociar el
+dominio, el siguiente plan lo mostraría como diferencia: un plan limpio después de la
+instalación es parte de la verificación contra el entorno.

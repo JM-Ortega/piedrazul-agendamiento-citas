@@ -3,6 +3,7 @@
 #
 # Uso:
 #   pages-release.sh target
+#   pages-release.sh probe
 #   pages-release.sh preflight
 #   pages-release.sh publish <site_dir>
 #
@@ -14,20 +15,51 @@
 #   ausente o con otra forma falla.
 #   Salida: project_name, account_id, production_branch, custom_domain.
 #
-# preflight (solo lectura; CLOUDFLARE_API_TOKEN de Pages, PAGES_ACCOUNT_ID, PAGES_PROJECT,
-#   PAGES_BRANCH, PAGES_DOMAIN): antes de cualquier mutación del run, el token lee el
-#   proyecto y el proyecto es el declarado (nombre, rama de producción, dominio propio).
-#   Autoridad única: falla si la integración Git del proyecto puede publicar producción
-#   por su cuenta. Solo se acepta production_deployments_enabled=false (o el
-#   deployments_enabled=false heredado, que apaga también las previews); true, ausente,
-#   ilegible o un proyecto sin integración Git reconocible fallan cerrado.
-#   Salida: git_production_deploys=disabled, previous_deployment_id,
-#   previous_deployment_commit, production_url (alias *.pages.dev de producción).
+# Modelo: proyecto de subida directa (Direct Upload) creado por Terraform, sin integración
+#   Git ni builds de Cloudflare. Autoridad única = el proyecto NO tiene `source`; el único
+#   publicador es esta cadena (wrangler). Un proyecto con cualquier `source` (GitHub,
+#   GitLab u otro) falla cerrado.
+#
+# Lectura del proyecto: GET del proyecto con el código HTTP explícito. 200 con un proyecto
+#   válido = presente. 404 con el error de Pages "proyecto inexistente" (8000007) = ausente,
+#   pero solo después de comprobar que el token sí lista los proyectos de esa cuenta y que
+#   el nombre no está en la lista (una cuenta equivocada, un token sin permiso o un 404 de
+#   otra cosa nunca se leen como "ausente"). Cualquier otro código, cuerpo ilegible o
+#   contradicción falla.
+#
+# Dos niveles de comprobación de un proyecto existente:
+#   identidad y seguridad (siempre, falla cerrado): nombre, rama de producción, subdominio
+#     *.pages.dev y autoridad única (subida directa, sin source);
+#   completitud (lo que Terraform reconcilia): el dominio propio asociado.
+#
+# probe (antes de la primera mutación; CLOUDFLARE_API_TOKEN de Pages, PAGES_ACCOUNT_ID,
+#   PAGES_PROJECT, PAGES_BRANCH, PAGES_DOMAIN, PAGES_ALLOW_PROVISIONING=true|false). El
+#   workflow fija PAGES_ALLOW_PROVISIONING=true únicamente cuando este run aplica Terraform.
+#   - Existe, identidad correcta y completo → project_state=present (+ salidas de preflight).
+#   - Existe, identidad correcta, incompleto (p. ej. un Apply anterior creó el proyecto y
+#     falló antes de asociar el dominio) → project_state=incomplete solo con
+#     PAGES_ALLOW_PROVISIONING=true; si no, falla.
+#   - No existe → project_state=absent solo con PAGES_ALLOW_PROVISIONING=true; si no, falla.
+#   - Identidad o autoridad incorrectas → falla siempre, antes de mutar.
+#   Con absent o incomplete, el workflow exige además que el plan de este run muestre la
+#   creación de lo que falta (acción observada, nunca inferida) y preflight exige el
+#   proyecto completo después del Apply.
+#
+# preflight (estricto, solo lectura; mismas PAGES_*): después de Terraform y antes de la
+#   primera mutación del servidor y de wrangler. El proyecto existe y es el declarado
+#   (nombre, rama de producción, dominio propio asociado, subdominio *.pages.dev) y es de
+#   subida directa. El estado del dominio propio (activación/certificado) se informa y no
+#   bloquea: pendiente no prueba ni activación ni fallo permanente (p. ej. Cloudflare Access
+#   o la emisión del certificado), y la publicación no se verifica por el dominio propio.
+#   Salida: project_state=present, pages_source=direct_upload, previous_deployment_id
+#   (vacío en un proyecto sin publicaciones), previous_deployment_commit, production_url
+#   (alias *.pages.dev de producción), custom_domain_status.
 #
 # publish (CLOUDFLARE_API_TOKEN, mismas PAGES_*, PREVIOUS_DEPLOYMENT_ID y PRODUCTION_URL del
 #   preflight, GITHUB_SHA, GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT, ENTRY_ASSET, WRANGLER_BIN):
-#   1. vuelve a exigir la autoridad única y que el deployment de producción vigente siga
-#      siendo PREVIOUS_DEPLOYMENT_ID (nadie publicó durante el run);
+#   1. vuelve a exigir la autoridad única (subida directa) y que el deployment de producción
+#      vigente siga siendo PREVIOUS_DEPLOYMENT_ID (nadie publicó durante el run; vacío =
+#      primera publicación de un proyecto nuevo, y debe seguir sin producción);
 #   2. sube <site_dir> tal cual con `wrangler pages deploy` (sin build) a la rama de
 #      producción, con el commit y un mensaje propio de este intento
 #      ("production-hetzner <run_id>/<intento>");
@@ -43,8 +75,9 @@
 #      y el alias de producción sirven un index.html que carga ENTRY_ASSET con los mismos
 #      bytes que el artefacto validado; y sigue siendo el canonical después de comprobar
 #      el contenido (un reemplazo entre ambas lecturas falla).
-#   No se verifica el dominio propio: puede estar detrás de Cloudflare Access.
-#   Salida: deployment_id, deployment_url.
+#   No se verifica el dominio propio: puede estar detrás de Cloudflare Access; su estado se
+#   informa aparte (custom_domain_status), sin bloquear.
+#   Salida: deployment_id, deployment_url, custom_domain_status.
 #
 # El token nunca va en la línea de comandos. CF_API_URL, PAGES_POLL_ATTEMPTS y
 # PAGES_POLL_INTERVAL existen para las pruebas.
@@ -74,13 +107,58 @@ require_target() {
   [ "${PAGES_BRANCH}" = "${PRODUCTION_BRANCH}" ] || fail "la rama de producción de Pages debe ser ${PRODUCTION_BRANCH}"
 }
 
+# cf_status <ruta> <archivo>: GET sin --fail; el cuerpo va a <archivo> y el código HTTP a
+# la salida ("000" si no hubo respuesta)
+cf_status() {
+  local code
+  code=$(curl -sS --max-time 30 -o "$2" -w '%{http_code}' \
+    -H @<(printf 'Authorization: Bearer %s\n' "${CLOUDFLARE_API_TOKEN}") \
+    "${API}$1") || code="000"
+  echo "${code}"
+}
+
+# project_lookup: PROJECT_STATE=present (PROJECT_JSON = el proyecto) | absent. Cualquier
+# otra respuesta falla: solo un "proyecto inexistente" comprobado es ausencia.
+PROJECT_STATE="" PROJECT_JSON=""
+project_lookup() {
+  local body code list
+  body=$(mktemp)
+  code=$(cf_status "/accounts/${PAGES_ACCOUNT_ID}/pages/projects/${PAGES_PROJECT}" "${body}")
+  case "${code}" in
+    200)
+      jq -e '.success == true and (.result | type == "object")' "${body}" > /dev/null 2>&1 ||
+        fail "respuesta inválida al leer el proyecto ${PAGES_PROJECT}"
+      PROJECT_STATE=present
+      PROJECT_JSON=$(jq -c '.result' "${body}")
+      ;;
+    404)
+      jq -e '.success == false and ([.errors[]?.code] | index(8000007) != null)' "${body}" > /dev/null 2>&1 ||
+        fail "HTTP 404 al leer ${PAGES_PROJECT} sin el error de proyecto inexistente de Pages (cuenta o ruta incorrectas)"
+      # La ausencia solo cuenta si el token lista los proyectos de ESTA cuenta y el nombre
+      # no está entre ellos
+      list=$(mktemp)
+      code=$(cf_status "/accounts/${PAGES_ACCOUNT_ID}/pages/projects" "${list}")
+      [ "${code}" = 200 ] ||
+        fail "no se pudieron listar los proyectos de Pages de la cuenta ${PAGES_ACCOUNT_ID} (HTTP ${code}): token sin permiso o cuenta incorrecta"
+      jq -e '.success == true and (.result | type == "array")' "${list}" > /dev/null 2>&1 ||
+        fail "respuesta inválida al listar los proyectos de Pages"
+      jq -e '(.result_info.total_pages // 1) <= 1' "${list}" > /dev/null 2>&1 ||
+        fail "la cuenta tiene más de una página de proyectos: no se puede confirmar la ausencia de ${PAGES_PROJECT}"
+      jq -e --arg n "${PAGES_PROJECT}" '[.result[].name] | index($n) == null' "${list}" > /dev/null 2>&1 ||
+        fail "la API dice que ${PAGES_PROJECT} no existe pero aparece en la lista de la cuenta: respuesta contradictoria"
+      PROJECT_STATE=absent
+      PROJECT_JSON=""
+      ;;
+    000) fail "sin respuesta de la API de Cloudflare al leer ${PAGES_PROJECT}" ;;
+    *) fail "no se pudo leer el proyecto ${PAGES_PROJECT} (HTTP ${code}: token sin permiso de Pages o cuenta incorrecta)" ;;
+  esac
+}
+
+# project: el proyecto JSON; ausente o ilegible falla
 project() {
-  local body
-  body=$(cf "/accounts/${PAGES_ACCOUNT_ID}/pages/projects/${PAGES_PROJECT}") ||
-    fail "no se pudo leer el proyecto ${PAGES_PROJECT} (token sin permiso de Pages, cuenta u proyecto incorrectos)"
-  jq -e '.success == true and (.result | type == "object")' <<< "${body}" > /dev/null ||
-    fail "respuesta inválida al leer el proyecto ${PAGES_PROJECT}"
-  jq -c '.result' <<< "${body}"
+  project_lookup
+  [ "${PROJECT_STATE}" = present ] || fail "el proyecto ${PAGES_PROJECT} no existe en la cuenta ${PAGES_ACCOUNT_ID}"
+  echo "${PROJECT_JSON}"
 }
 
 cmd_target() {
@@ -104,40 +182,100 @@ cmd_target() {
   echo "custom_domain=${domain}"
 }
 
-# git_production_deploys <proyecto JSON> → disabled | enabled | unknown
-git_production_deploys() {
+# pages_source <proyecto JSON> → direct_upload | git | unknown
+# Subida directa: el proyecto no tiene `source` (ausente o null). Cualquier otro valor es
+# una integración (git) o algo no reconocido (unknown): ambos fallan.
+pages_source() {
   jq -r '
-    if (.source | type) != "object" or ((.source.type // "") | IN("github", "gitlab") | not) then "unknown"
-    elif .source.config.deployments_enabled == false then "disabled"
-    elif .source.config.production_deployments_enabled == false then "disabled"
-    elif .source.config.production_deployments_enabled == true then "enabled"
+    if (has("source") | not) or .source == null then "direct_upload"
+    elif (.source | type) == "object" and ((.source.type // "") | IN("github", "gitlab")) then "git"
     else "unknown" end' <<< "$1"
 }
 
 require_single_authority() { # <proyecto JSON>
   local state
-  state=$(git_production_deploys "$1")
-  [ "${state}" = disabled ] ||
-    fail "la integración Git de ${PAGES_PROJECT} puede publicar producción por su cuenta (deployments automáticos de producción: ${state}); la cadena no publica mientras haya dos autoridades. Requiere desactivar 'automatic production branch deployments' (Branch control)"
+  state=$(pages_source "$1")
+  [ "${state}" = direct_upload ] ||
+    fail "${PAGES_PROJECT} no es un proyecto de subida directa (source: ${state}): una integración Git (o un origen desconocido) puede publicar por su cuenta; la cadena no publica mientras haya otra autoridad. El proyecto lo crea Terraform sin source (modules/cloudflare/pages); un proyecto con Git no se convierte: hay que recrearlo"
 }
 
-cmd_preflight() {
-  local p subdomain
-  require_target
-  p=$(project)
+# domain_status: estado de activación del dominio propio, solo informativo (nunca falla)
+domain_status() {
+  local body code
+  body=$(mktemp)
+  code=$(cf_status "/accounts/${PAGES_ACCOUNT_ID}/pages/projects/${PAGES_PROJECT}/domains/${PAGES_DOMAIN}" "${body}")
+  if [ "${code}" = 200 ] &&
+     jq -e '.success == true and ((.result.status // "") | test("^[a-z_]+$"))' "${body}" > /dev/null 2>&1; then
+    jq -r '.result.status' "${body}"
+  else
+    echo "unreadable"
+  fi
+}
+
+# validate_identity <proyecto JSON>: es el declarado y de subida directa (siempre exigido)
+validate_identity() {
+  local p="$1" subdomain
   jq -e --arg n "${PAGES_PROJECT}" '.name == $n' <<< "${p}" > /dev/null ||
     fail "el proyecto leído no es ${PAGES_PROJECT}"
   jq -e --arg b "${PAGES_BRANCH}" '.production_branch == $b' <<< "${p}" > /dev/null ||
     fail "la rama de producción de ${PAGES_PROJECT} es '$(jq -r '.production_branch' <<< "${p}")', no ${PAGES_BRANCH}"
-  jq -e --arg d "${PAGES_DOMAIN}" '(.domains // []) | index($d) != null' <<< "${p}" > /dev/null ||
-    fail "${PAGES_PROJECT} no sirve el dominio declarado ${PAGES_DOMAIN}"
   subdomain=$(jq -r '.subdomain // ""' <<< "${p}")
   [[ "${subdomain}" =~ ^[a-z0-9-]+\.pages\.dev$ ]] || fail "subdominio de producción inválido: '${subdomain}'"
   require_single_authority "${p}"
-  echo "git_production_deploys=disabled"
-  echo "previous_deployment_id=$(jq -r '.canonical_deployment.id // ""' <<< "${p}")"
-  echo "previous_deployment_commit=$(jq -r '.canonical_deployment.deployment_trigger.metadata.commit_hash // ""' <<< "${p}")"
-  echo "production_url=https://${subdomain}"
+}
+
+# is_complete <proyecto JSON>: tiene asociado el dominio declarado
+is_complete() {
+  jq -e --arg d "${PAGES_DOMAIN}" '(.domains // []) | (type == "array") and (index($d) != null)' <<< "$1" > /dev/null
+}
+
+# validate_project <proyecto JSON>: identidad y completitud (preflight estricto)
+validate_project() {
+  validate_identity "$1"
+  is_complete "$1" || fail "${PAGES_PROJECT} no tiene asociado el dominio declarado ${PAGES_DOMAIN}"
+}
+
+emit_present() { # <proyecto JSON>
+  echo "project_state=present"
+  echo "pages_source=direct_upload"
+  echo "previous_deployment_id=$(jq -r '.canonical_deployment.id // ""' <<< "$1")"
+  echo "previous_deployment_commit=$(jq -r '.canonical_deployment.deployment_trigger.metadata.commit_hash // ""' <<< "$1")"
+  echo "production_url=https://$(jq -r '.subdomain' <<< "$1")"
+  echo "custom_domain_status=$(domain_status)"
+}
+
+cmd_probe() {
+  require_target
+  case "${PAGES_ALLOW_PROVISIONING:-}" in
+    true | false) ;;
+    *) fail "PAGES_ALLOW_PROVISIONING debe ser true o false" ;;
+  esac
+  project_lookup
+  if [ "${PROJECT_STATE}" = present ]; then
+    validate_identity "${PROJECT_JSON}"
+    if is_complete "${PROJECT_JSON}"; then
+      emit_present "${PROJECT_JSON}"
+    elif [ "${PAGES_ALLOW_PROVISIONING}" = true ]; then
+      echo "${PAGES_PROJECT} existe con la identidad declarada pero sin el dominio ${PAGES_DOMAIN} asociado: lo debe completar el Apply de este run; preflight lo exige después" >&2
+      echo "project_state=incomplete"
+      echo "pages_source=direct_upload"
+    else
+      fail "${PAGES_PROJECT} no tiene asociado el dominio declarado ${PAGES_DOMAIN} y este run no aplica Terraform (que es quien lo completa)"
+    fi
+  elif [ "${PAGES_ALLOW_PROVISIONING}" = true ]; then
+    echo "El proyecto ${PAGES_PROJECT} no existe en la cuenta ${PAGES_ACCOUNT_ID}: lo debe crear el Apply de este run; preflight lo exige después" >&2
+    echo "project_state=absent"
+  else
+    fail "el proyecto ${PAGES_PROJECT} no existe en la cuenta ${PAGES_ACCOUNT_ID} y este run no aplica Terraform (que es quien lo crea)"
+  fi
+}
+
+cmd_preflight() {
+  local p
+  require_target
+  p=$(project)
+  validate_project "${p}"
+  emit_present "${p}"
 }
 
 sha_of() { sha256sum | cut -d' ' -f1; }
@@ -262,11 +400,13 @@ cmd_publish() {
   echo "Pages: ${id} (${url}) es producción y sirve ${GITHUB_SHA}" >&2
   echo "deployment_id=${id}"
   echo "deployment_url=${url}"
+  echo "custom_domain_status=$(domain_status)"
 }
 
-[ "$#" -ge 1 ] || fail "uso: $0 target | preflight | publish <site_dir>"
+[ "$#" -ge 1 ] || fail "uso: $0 target | probe | preflight | publish <site_dir>"
 case "$1" in
   target) [ "$#" -eq 1 ] || fail "uso: $0 target"; cmd_target ;;
+  probe) [ "$#" -eq 1 ] || fail "uso: $0 probe"; cmd_probe ;;
   preflight) [ "$#" -eq 1 ] || fail "uso: $0 preflight"; cmd_preflight ;;
   publish) [ "$#" -eq 2 ] || fail "uso: $0 publish <site_dir>"; cmd_publish "$2" ;;
   *) fail "subcomando desconocido: $1" ;;

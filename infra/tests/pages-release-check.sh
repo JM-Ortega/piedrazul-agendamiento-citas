@@ -238,13 +238,24 @@ publish_artifact "${TMP}/pkg"
 
 # ── 4. Destino, preflight y publicación (pages-release.sh) ──────────────────
 check "target: proyecto, cuenta, rama y dominio salen de la declaración de Terraform" \
-  bash -c "cd '${ROOT}' && out=\$('${PAGES}' target) && grep -qx project_name=piedrazul <<< \"\$out\" && grep -qx account_id=3962a117c8b14a746eec13702d330b42 <<< \"\$out\" && grep -qx production_branch=main <<< \"\$out\" && grep -qx custom_domain=piedrazul.org <<< \"\$out\""
-printf 'project = "a"\nproject = "b"\ncloudflare_account_id = "3962a117c8b14a746eec13702d330b42"\nbase_domain = "x.org"\n' > "${TMP}/dup.tfvars"
+  bash -c "cd '${ROOT}' && out=\$('${PAGES}' target) && grep -qx project_name=piedrazul <<< \"\$out\" && grep -qx account_id=ab4f90b9b70538731273c3fdf9548f07 <<< \"\$out\" && grep -qx production_branch=main <<< \"\$out\" && grep -qx custom_domain=piedrazul.org <<< \"\$out\""
+printf 'project = "a"\nproject = "b"\ncloudflare_account_id = "ab4f90b9b70538731273c3fdf9548f07"\nbase_domain = "x.org"\n' > "${TMP}/dup.tfvars"
 fails "target: variable declarada dos veces" env PAGES_TFVARS="${TMP}/dup.tfvars" "${PAGES}" target
 printf 'project = "a"\nbase_domain = "x.org"\n' > "${TMP}/missing.tfvars"
 fails "target: cuenta ausente" env PAGES_TFVARS="${TMP}/missing.tfvars" "${PAGES}" target
 check "Terraform: el proyecto de Pages es var.project, rama main, dominio base_domain" \
   bash -c "grep -qE '^[[:space:]]*pages_name[[:space:]]*=[[:space:]]*var\\.project\$' '${TF}/locals.tf' && grep -qE '^[[:space:]]*frontend_domain[[:space:]]*=[[:space:]]*var\\.base_domain\$' '${TF}/locals.tf' && sed -n '/^module \"pages\"/,/^}/p' '${TF}/main.tf' | grep -qE 'production_branch[[:space:]]*=[[:space:]]*\"main\"' && sed -n '/^module \"pages\"/,/^}/p' '${TF}/main.tf' | grep -qE 'project_name[[:space:]]*=[[:space:]]*local\\.pages_name' && sed -n '/^module \"pages\"/,/^}/p' '${TF}/main.tf' | grep -qE 'custom_domain[[:space:]]*=[[:space:]]*local\\.frontend_domain'"
+PAGES_MOD="${ROOT}/infra/terraform/modules/cloudflare/pages"
+# Sin comentarios: solo lo que Terraform interpreta
+tf_code() { sed -E 's/#.*$//' "$@"; }
+check "Terraform: proyecto de Pages de subida directa (sin source, sin build_config, sin lifecycle que oculte el origen)" \
+  bash -c "$(declare -f tf_code); ! tf_code '${PAGES_MOD}/main.tf' | grep -qE '^[[:space:]]*(source|build_config|ignore_changes|deployment_configs|preview_deployment_setting|production_deployments_enabled|pr_comments_enabled)\\b' && tf_code '${PAGES_MOD}/main.tf' | sed -n '/resource \"cloudflare_pages_project\" \"main\"/,/^}/p' | grep -q account_id && ! tf_code '${PAGES_MOD}/main.tf' | sed -n '/resource \"cloudflare_pages_project\" \"main\"/,/^}/p' | grep -q lifecycle"
+check "Terraform: sin variables de integración Git (github_*, build_command, output_dir, root_dir)" \
+  bash -c "$(declare -f tf_code); ! tf_code '${PAGES_MOD}'/*.tf '${TF}'/*.tf | grep -qE 'github_owner|github_repo|build_command|output_dir|root_dir' && ! grep -qE '^[[:space:]]*github_(owner|repo)[[:space:]]*=' '${TF}/piedrazul.auto.tfvars'"
+check "Terraform: cuenta y zona dedicadas declaradas" \
+  bash -c "grep -qx 'cloudflare_account_id = \"ab4f90b9b70538731273c3fdf9548f07\"' '${TF}/piedrazul.auto.tfvars' && grep -qx 'cloudflare_zone_id = \"b663ee4c0c9adb151120634cb7b84e7b\"' '${TF}/piedrazul.auto.tfvars' && grep -qx 'base_domain = \"piedrazul.org\"' '${TF}/piedrazul.auto.tfvars' && grep -qx 'project = \"piedrazul\"' '${TF}/piedrazul.auto.tfvars'"
+check "Terraform: orden proyecto → CNAME (módulo dns) → asociación del dominio, un solo dueño del registro" \
+  bash -c "$(declare -f tf_code); sed -n '/^module \"pages\"/,/^}/p' '${TF}/main.tf' | grep -qE 'custom_domain_dns_record_id[[:space:]]*=[[:space:]]*module\\.dns\\.frontend_record_id' && sed -n '/resource \"cloudflare_pages_domain\"/,/^}/p' '${PAGES_MOD}/main.tf' | grep -q 'var.custom_domain_dns_record_id' && grep -q 'cloudflare_dns_record.frontend.id' '${ROOT}/infra/terraform/modules/cloudflare/dns/outputs.tf' && sed -n '/^module \"dns\"/,/^}/p' '${TF}/main.tf' | grep -qE 'pages_hostname[[:space:]]*=[[:space:]]*module\\.pages\\.pages_hostname' && [ \"\$(tf_code '${ROOT}'/infra/terraform/modules/*/*/*.tf | grep -c 'resource \"cloudflare_dns_record\"')\" = 3 ] && ! tf_code '${PAGES_MOD}'/*.tf | grep -q cloudflare_dns_record"
 
 # ── curl y wrangler falsos ──
 # curl: sirve, por URL, una secuencia de respuestas (<clave>.1, .2, …; la última se repite)
@@ -253,23 +264,40 @@ check "Terraform: el proyecto de Pages es var.project, rama main, dominio base_d
 mkdir -p "${TMP}/cf"
 export FAKE_CF_DIR="${TMP}/cf" FAKE_CF_LOG="${TMP}/cf.log" FAKE_WRANGLER_LOG="${TMP}/wrangler.log" \
   FAKE_WRANGLER_OUT="${TMP}/wrangler-out.ndjson"
+# Una respuesta puede empezar con una línea "@status NNN" (código HTTP; si no, 200). Sin
+# respuesta registrada: con -w imprime 000 y sale 7 (sin conexión); sin -w sale 22.
 cat > "${TMP}/bin/curl" << 'EOF'
 #!/usr/bin/env bash
-url="" auth=""
+url="" auth="" out="" fmt="" failflag="" method=GET
 while [ $# -gt 0 ]; do
   case "$1" in
     -H) [[ "$2" == @* ]] && auth=$(cat "${2#@}"); shift 2 ;;
-    --max-time) shift 2 ;;
+    -o) out="$2"; shift 2 ;;
+    -w) fmt="$2"; shift 2 ;;
+    -X) method="$2"; shift 2 ;;
+    --max-time | --data-binary) shift 2 ;;
+    --fail | --fail-with-body | -sSf | -f) failflag=1; shift ;;
     -*) shift ;;
     *) url="$1"; shift ;;
   esac
 done
-printf '%s|%s|%s\n' "${url}" "${auth}" "$*" >> "${FAKE_CF_LOG}"
+printf '%s|%s|%s\n' "${url}" "${auth}" "${method}" >> "${FAKE_CF_LOG}"
 k="${FAKE_CF_DIR:?}/$(printf '%s' "${url}" | sha256sum | cut -c1-32)"
 f=$(ls "${k}".* 2> /dev/null | sort -V | head -1)
-[ -n "${f}" ] || exit 22
-cat "${f}"
+if [ -z "${f}" ]; then
+  [ -z "${fmt}" ] || { printf '000'; exit 7; }
+  exit 22
+fi
+code=200 body="${f}"
+if head -1 "${f}" | grep -qE '^@status [0-9]{3}$'; then
+  code=$(head -1 "${f}" | cut -d' ' -f2)
+  body=$(mktemp); tail -n +2 "${f}" > "${body}"
+fi
+if [ -n "${out}" ]; then cat "${body}" > "${out}"; else cat "${body}"; fi
 [ "$(ls "${k}".* | wc -l)" -le 1 ] || rm -f -- "${f:?}"
+[ -z "${fmt}" ] || printf '%s' "${code}"
+if [ -n "${failflag}" ] && [ "${code}" -ge 400 ]; then exit 22; fi
+exit 0
 EOF
 cat > "${TMP}/bin/wrangler" << 'EOF'
 #!/usr/bin/env bash
@@ -285,8 +313,10 @@ echo "✨ Deployment complete!"
 EOF
 chmod +x "${TMP}/bin/curl" "${TMP}/bin/wrangler"
 CF=https://cf.test/client/v4
-ACC=3962a117c8b14a746eec13702d330b42
-PROJ_URL="${CF}/accounts/${ACC}/pages/projects/piedrazul"
+ACC=ab4f90b9b70538731273c3fdf9548f07
+PROJECTS_URL="${CF}/accounts/${ACC}/pages/projects"
+PROJ_URL="${PROJECTS_URL}/piedrazul"
+DOMAIN_URL="${PROJ_URL}/domains/piedrazul.org"
 LIST_URL="${PROJ_URL}/deployments?env=production&per_page=25"
 PROD_URL=https://piedrazul.pages.dev
 PREV=0a000000-0000-4000-8000-000000000000
@@ -303,18 +333,26 @@ cf_seq() {
   for r in "$@"; do printf '%s' "${r}" > "${FAKE_CF_DIR:?}/$(key "${url}").${n}"; n=$((n + 1)); done
 }
 cf_file() { cf_clear "$1"; cp "$2" "${FAKE_CF_DIR:?}/$(key "$1").1"; }
-# project_json <canónico> [git: disabled|enabled|missing|nosource|legacy] [rama] [dominios]
+# project_json <canónico> [origen: direct|null|github-off|github-on|gitlab|other] [rama] [dominios]
 project_json() {
-  jq -cn --arg c "$1" --arg g "${2:-disabled}" --arg b "${3:-main}" --arg other "${SHA_OTHER}" \
+  jq -cn --arg c "$1" --arg g "${2:-direct}" --arg b "${3:-main}" --arg other "${SHA_OTHER}" \
     --argjson d "${4:-[\"piedrazul.org\",\"piedrazul.pages.dev\"]}" '
     {success: true, result: ({name: "piedrazul", subdomain: "piedrazul.pages.dev", production_branch: $b, domains: $d,
       canonical_deployment: (if $c == "" then null else {id: $c, deployment_trigger: {metadata: {commit_hash: $other}}} end)}
-      + (if $g == "nosource" then {} else {source: {type: "github", config: (
-          {disabled: {production_deployments_enabled: false, preview_deployment_setting: "all"},
-           enabled: {production_deployments_enabled: true, preview_deployment_setting: "all"},
-           missing: {preview_deployment_setting: "all"},
-           legacy: {deployments_enabled: false}}[$g])}} end))}'
+      + ({direct: {},
+          null: {source: null},
+          "github-off": {source: {type: "github", config: {production_deployments_enabled: false, preview_deployment_setting: "none"}}},
+          "github-on": {source: {type: "github", config: {production_deployments_enabled: true, preview_deployment_setting: "all"}}},
+          gitlab: {source: {type: "gitlab", config: {production_deployments_enabled: false}}},
+          other: {source: {type: "bitbucket"}}}[$g]))}'
 }
+# Respuestas de error de la API de Cloudflare
+NOT_FOUND=$'@status 404\n{"success":false,"errors":[{"code":8000007,"message":"Project not found. The specified project name does not match any of your existing projects."}],"result":null}'
+cf_error() { printf '@status %s\n{"success":false,"errors":[{"code":%s,"message":"x"}],"result":null}' "$1" "$2"; }
+projects_list() { # [nombres...]
+  jq -cn '$ARGS.positional | {success: true, result: [.[] | {name: .}], result_info: {page: 1, total_pages: 1}}' --args "$@"
+}
+domain_json() { jq -cn --arg s "$1" '{success: true, result: {name: "piedrazul.org", status: $s}}'; }
 # deployment <id> [jq de ajuste]: deployment de producción ad_hoc de este intento, terminado
 deployment() {
   jq -cn --arg id "$1" --arg url "$(dep_url "$1")" --arg sha "${SITE_SHA}" --arg m "production-hetzner ${RUN_ID}/${ATTEMPT:-1}" '
@@ -342,8 +380,9 @@ pages_env() {
 }
 PAGES_DEF="$(declare -f pages_env); TMP='${TMP}' CF='${CF}' ACC='${ACC}'"
 
-# ── Autoridad única (preflight) ──
-preflight_case() { # <descripción> <pasa|falla> <estado git>
+# ── Autoridad única (preflight estricto, tras Terraform) ──
+cf_seq "${DOMAIN_URL}" "$(domain_json pending)"
+preflight_case() { # <descripción> <pasa|falla> <origen>
   local rc=0
   cf_seq "${PROJ_URL}" "$(project_json "${PREV}" "$3")"
   bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight" > "${TMP}/pf.env" 2> /dev/null || rc=$?
@@ -353,22 +392,115 @@ preflight_case() { # <descripción> <pasa|falla> <estado git>
     ko "preflight: $1 (rc=${rc})"
   fi
 }
-preflight_case "publicación de producción desde Git deshabilitada → autoridad única" pasa disabled
-check "preflight: informa la producción vigente y su alias *.pages.dev" \
-  bash -c "grep -qx git_production_deploys=disabled '${TMP}/pf.env' && grep -qx 'previous_deployment_id=${PREV}' '${TMP}/pf.env' && grep -qx 'production_url=${PROD_URL}' '${TMP}/pf.env'"
-preflight_case "deployments_enabled=false heredado (sin deploys automáticos) → autoridad única" pasa legacy
-preflight_case "deploys automáticos de producción habilitados → falla (dos autoridades)" falla enabled
-preflight_case "estado de los deploys automáticos ausente → falla (desconocido)" falla missing
-preflight_case "proyecto sin integración Git reconocible → falla (desconocido)" falla nosource
+preflight_case "proyecto de subida directa (sin source) → autoridad única" pasa direct
+check "preflight: informa origen, producción vigente, alias *.pages.dev y estado del dominio" \
+  bash -c "grep -qx project_state=present '${TMP}/pf.env' && grep -qx pages_source=direct_upload '${TMP}/pf.env' && grep -qx 'previous_deployment_id=${PREV}' '${TMP}/pf.env' && grep -qx 'production_url=${PROD_URL}' '${TMP}/pf.env' && grep -qx custom_domain_status=pending '${TMP}/pf.env'"
+preflight_case "source: null (subida directa) → autoridad única" pasa null
+preflight_case "integración GitHub aunque no publique producción → falla (la arquitectura es sin Git)" falla github-off
+preflight_case "integración GitHub con deploys automáticos → falla (dos autoridades)" falla github-on
+preflight_case "integración GitLab → falla" falla gitlab
+preflight_case "origen no reconocido → falla (desconocido)" falla other
 check "preflight: el token va en una cabecera, nunca en la línea de comandos" \
   bash -c "grep -q '|Authorization: Bearer tok-pages-SECRET|' '${FAKE_CF_LOG}' && ! cut -d'|' -f1,3 '${FAKE_CF_LOG}' | grep -q SECRET"
-cf_seq "${PROJ_URL}" "$(project_json "${PREV}" disabled develop)"
+cf_seq "${PROJ_URL}" "$(project_json "${PREV}" direct develop)"
 fails "preflight: rama de producción distinta de main" bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight"
-cf_seq "${PROJ_URL}" "$(project_json "${PREV}" disabled main '["otro.org"]')"
-fails "preflight: el proyecto no sirve el dominio declarado" bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight"
+cf_seq "${PROJ_URL}" "$(project_json "${PREV}" direct main '["otro.org"]')"
+fails "preflight: el proyecto no tiene asociado el dominio declarado" bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight"
+cf_seq "${PROJ_URL}" "$(project_json "${PREV}" | jq -c '.result.name = "otro"')"
+fails "preflight: el proyecto leído no es el declarado" bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight"
+cf_seq "${PROJ_URL}" "$(project_json "${PREV}" | jq -c '.result.subdomain = "piedrazul.example.com"')"
+fails "preflight: subdominio que no es *.pages.dev" bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight"
+cf_seq "${PROJ_URL}" "${NOT_FOUND}"
+cf_seq "${PROJECTS_URL}" "$(projects_list)"
+fails "preflight: proyecto inexistente (tras Terraform debe existir)" bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight"
+cf_seq "${PROJ_URL}" "$(cf_error 403 10000)"
+fails "preflight: token sin permiso (HTTP 403)" bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight"
+cf_seq "${PROJ_URL}" '{"success":true,"result":[]}'
+fails "preflight: respuesta malformada (result no es un objeto)" bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight"
 cf_clear "${PROJ_URL}"
-fails "preflight: token sin acceso o proyecto inexistente (HTTP de error)" bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight"
+fails "preflight: sin respuesta de la API" bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight"
 fails "preflight: sin token" bash -c "${PAGES_DEF}; pages_env env -u CLOUDFLARE_API_TOKEN '${PAGES}' preflight"
+# Estado del dominio propio: informativo, nunca bloquea ni se toma por activación
+cf_seq "${PROJ_URL}" "$(project_json "")"
+cf_seq "${DOMAIN_URL}" "$(cf_error 500 1)"
+check "preflight: dominio ilegible → custom_domain_status=unreadable, sin fallar; proyecto sin publicaciones → previous vacío" \
+  bash -c "${PAGES_DEF}; out=\$(pages_env '${PAGES}' preflight) && grep -qx custom_domain_status=unreadable <<< \"\$out\" && grep -qx previous_deployment_id= <<< \"\$out\""
+cf_seq "${DOMAIN_URL}" "$(domain_json active)"
+check "preflight: dominio activo se informa como active" \
+  bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight | grep -qx custom_domain_status=active"
+cf_seq "${DOMAIN_URL}" "$(domain_json pending)"
+
+# ── Sondeo antes de Terraform (probe) ──
+probe_case() { # <descripción> <pasa|falla> <PAGES_ALLOW_PROVISIONING> [estado esperado]
+  local rc=0
+  bash -c "${PAGES_DEF}; pages_env PAGES_ALLOW_PROVISIONING='$3' '${PAGES}' probe" > "${TMP}/probe.env" 2> /dev/null || rc=$?
+  if { [ "$2" = pasa ] && [ "${rc}" -eq 0 ] && { [ -z "${4:-}" ] || grep -qx "project_state=$4" "${TMP}/probe.env"; }; } ||
+     { [ "$2" = falla ] && [ "${rc}" -ne 0 ]; }; then
+    ok "probe: $1"
+  else
+    ko "probe: $1 (rc=${rc}; $(paste -sd' ' "${TMP}/probe.env"))"
+  fi
+}
+cf_seq "${PROJ_URL}" "${NOT_FOUND}"
+cf_seq "${PROJECTS_URL}" "$(projects_list otro-proyecto)"
+probe_case "ausente con Terraform en este run → project_state=absent (instalación nueva)" pasa true absent
+probe_case "ausente sin Terraform (p. ej. solo frontend) → falla" falla false
+probe_case "PAGES_ALLOW_PROVISIONING ausente o inválido → falla" falla ""
+cf_seq "${PROJECTS_URL}" "$(projects_list piedrazul)"
+probe_case "404 pero el proyecto aparece en la lista de la cuenta → falla (contradicción)" falla true
+cf_seq "${PROJECTS_URL}" "$(cf_error 403 10000)"
+probe_case "404 y la cuenta no lista sus proyectos (token/cuenta) → falla, nunca 'ausente'" falla true
+cf_seq "${PROJECTS_URL}" "$(projects_list | jq -c '.result_info.total_pages = 2')"
+probe_case "404 con más de una página de proyectos (ausencia no verificable) → falla" falla true
+cf_seq "${PROJECTS_URL}" "$(projects_list)"
+cf_seq "${PROJ_URL}" "$(cf_error 404 7003)"
+probe_case "404 sin el error de proyecto inexistente (cuenta o ruta incorrectas) → falla" falla true
+cf_seq "${PROJ_URL}" "$(cf_error 401 10000)"
+probe_case "token inválido (HTTP 401) → falla" falla true
+cf_seq "${PROJ_URL}" "$(cf_error 403 10000)"
+probe_case "cuenta equivocada o token sin permiso (HTTP 403) → falla" falla true
+cf_seq "${PROJ_URL}" "$(cf_error 500 8000000)"
+probe_case "error de la API (HTTP 500) → falla" falla true
+cf_seq "${PROJ_URL}" '@status 404
+<html>not json</html>'
+probe_case "404 con cuerpo ilegible → falla" falla true
+cf_clear "${PROJ_URL}"
+probe_case "sin respuesta (red) → falla" falla true
+cf_seq "${PROJ_URL}" "$(project_json "${PREV}")"
+probe_case "presente y correcto → project_state=present con las comprobaciones estrictas" pasa true present
+cf_seq "${PROJ_URL}" "$(project_json "${PREV}" github-on)"
+probe_case "presente con integración Git → falla antes de cualquier mutación, aunque haya Terraform" falla true
+# Proyecto existente pero incompleto (sin el dominio asociado): p. ej. un Apply anterior creó
+# el proyecto y falló antes del CNAME o de la asociación. La identidad se exige siempre.
+INCOMPLETE="$(project_json "" direct main '["piedrazul.pages.dev"]')"
+cf_seq "${PROJ_URL}" "${INCOMPLETE}"
+probe_case "incompleto (sin dominio) con Terraform en este run → project_state=incomplete (Terraform lo completa)" pasa true incomplete
+check "probe: incompleto no informa salidas de publicación (la publicación exige el preflight estricto)" \
+  bash -c "! grep -q '^previous_deployment_id=\|^production_url=' '${TMP}/probe.env'"
+probe_case "incompleto sin Terraform (solo frontend o deploy) → falla: nunca un destino incompleto" falla false
+cf_seq "${PROJ_URL}" "$(project_json "" direct main '["otro.org"]')"
+probe_case "con otro dominio asociado (no el declarado) y sin Terraform → falla" falla false
+cf_seq "${PROJ_URL}" "$(project_json "" github-off main '["piedrazul.pages.dev"]')"
+probe_case "incompleto con integración Git → falla aunque haya Terraform (identidad primero)" falla true
+cf_seq "${PROJ_URL}" "$(project_json "" direct develop '["piedrazul.pages.dev"]')"
+probe_case "incompleto con otra rama de producción → falla aunque haya Terraform" falla true
+cf_seq "${PROJ_URL}" "$(project_json "" | jq -c '.result.name = "otro" | .result.domains = []')"
+probe_case "incompleto con otro nombre → falla aunque haya Terraform" falla true
+cf_seq "${PROJ_URL}" "$(project_json "" | jq -c '.result.subdomain = "x.example.com" | .result.domains = []')"
+probe_case "incompleto con subdominio que no es *.pages.dev → falla aunque haya Terraform" falla true
+cf_seq "${PROJ_URL}" "$(project_json "" | jq -c '.result.domains = "piedrazul.org"')"
+probe_case "domains malformado (no es una lista) sin Terraform → falla" falla false
+
+# Apply parcial y reintento: 1) el Apply anterior creó el proyecto y falló antes del
+# dominio; 2) el reintento lo sondea como incompleto; 3) el preflight tras el Apply exige el
+# proyecto completo (si el Apply del reintento tampoco asoció el dominio, falla antes de tocar
+# el servidor y de publicar)
+cf_seq "${PROJ_URL}" "${INCOMPLETE}" "$(project_json "")"
+check "reintento tras Apply parcial: sondeo incompleto → Apply completa → preflight estricto pasa (primera publicación)" \
+  bash -c "${PAGES_DEF}; pages_env PAGES_ALLOW_PROVISIONING=true '${PAGES}' probe | grep -qx project_state=incomplete && out=\$(pages_env '${PAGES}' preflight) && grep -qx project_state=present <<< \"\$out\" && grep -qx previous_deployment_id= <<< \"\$out\""
+cf_seq "${PROJ_URL}" "${INCOMPLETE}" "${INCOMPLETE}"
+fails "reintento tras Apply parcial: si el dominio sigue sin asociar, el preflight estricto falla" \
+  bash -c "${PAGES_DEF}; pages_env PAGES_ALLOW_PROVISIONING=true '${PAGES}' probe > /dev/null && pages_env '${PAGES}' preflight"
 
 # ── Publicación ligada al deployment de esta invocación ──
 # El sitio validado (fetch ya demostró que el extraído es idéntico)
@@ -387,7 +519,7 @@ publish_setup() {
 }
 publish() {
   pages_env GITHUB_SHA="${SITE_SHA}" GITHUB_RUN_ID="${RUN_ID}" GITHUB_RUN_ATTEMPT="${ATTEMPT:-1}" ENTRY_ASSET=main-EF56.js \
-    PREVIOUS_DEPLOYMENT_ID="${PREV}" PRODUCTION_URL="${PROD_URL}" WRANGLER_BIN="${TMP}/bin/wrangler" "${PAGES}" publish "${SITE}"
+    PREVIOUS_DEPLOYMENT_ID="${PREV?}" PRODUCTION_URL="${PROD_URL}" WRANGLER_BIN="${TMP}/bin/wrangler" "${PAGES}" publish "${SITE}"
 }
 PUBLISH_DEF="${PAGES_DEF}; $(declare -f publish); SITE='${SITE}' SITE_SHA='${SITE_SHA}' RUN_ID='${RUN_ID}' PAGES='${PAGES}' PREV='${PREV}' PROD_URL='${PROD_URL}'"
 publish_ok() {
@@ -421,10 +553,28 @@ cf_seq "${LIST_URL}" "$(envelope "[$(deployment "${OURS}"), $(ATTEMPT=1 deployme
 publish_ok "re-run (intento 2) con el intento 1 del mismo commit ya publicado: se identifica por su propio id y mensaje"
 ATTEMPT=1
 
+# Primera publicación: proyecto recién creado, sin producción anterior
+publish_setup
+cf_seq "${PROJ_URL}" "$(project_json "")" "$(project_json "${OURS}")" "$(project_json "${OURS}")"
+cf_seq "${LIST_URL}" "$(envelope "[$(deployment "${OURS}")]")"
+if bash -c "${PUBLISH_DEF}; ATTEMPT=1; PREV=''; publish" > "${TMP}/pub-first.env" 2> "${TMP}/pub-first.err" &&
+   grep -qx "deployment_id=${OURS}" "${TMP}/pub-first.env" && grep -qx custom_domain_status=pending "${TMP}/pub-first.env"; then
+  ok "publish: primera publicación en un proyecto sin producción (PREVIOUS_DEPLOYMENT_ID vacío) e informa el dominio sin bloquear"
+else
+  ko "publish: primera publicación ($(tail -1 "${TMP}/pub-first.err"))"
+fi
+publish_setup
+cf_seq "${PROJ_URL}" "$(project_json "${OTHER}")"
+if bash -c "${PUBLISH_DEF}; ATTEMPT=1; PREV=''; publish" > /dev/null 2>&1; then
+  ko "publish rechaza: proyecto que se esperaba vacío ya tiene otra producción (no falló)"
+else
+  ok "publish rechaza: proyecto que se esperaba vacío ya tiene otra producción"
+fi
+
 # Autoridad única y estado previo, antes de wrangler
 publish_setup
-cf_seq "${PROJ_URL}" "$(project_json "${PREV}" enabled)"
-publish_fails "deploys automáticos de producción re-habilitados durante el run"
+cf_seq "${PROJ_URL}" "$(project_json "${PREV}" github-on)"
+publish_fails "el proyecto pasó a tener integración Git durante el run"
 check "publish: con dos autoridades no se invoca wrangler" test ! -s "${FAKE_WRANGLER_LOG}"
 publish_setup
 cf_seq "${PROJ_URL}" "$(project_json "${OTHER}")"
@@ -508,28 +658,34 @@ check "production: espera a frontend_build y exige su éxito cuando hay frontend
   bash -c "yq -r '.jobs.production.needs[]' '${WORKFLOW}' | grep -qx frontend_build && yq -r '.jobs.production.if' '${WORKFLOW}' | grep -q \"needs.classify.outputs.frontend_required != 'true' || needs.frontend_build.result == 'success'\""
 check "production: environment y concurrencia sin cambios" \
   test "$(yq -r '.jobs.production | .environment + "/" + .concurrency.group + "/" + (.concurrency."cancel-in-progress" | tostring) + "/" + .concurrency.queue' "${WORKFLOW}")" = "production-hetzner/piedrazul-production-hetzner/false/max"
-check "credencial: CLOUDFLARE_PAGES_API_TOKEN solo en production (credenciales, preflight, publicación)" \
-  bash -c "[ \"\$(yq -r '.jobs | to_entries[] | select(.key != \"production\") | .value' '${WORKFLOW}' | grep -c CLOUDFLARE_PAGES_API_TOKEN)\" = 0 ] && [ \"\$(yq -r '.jobs.production.steps[] | select(.env.CLOUDFLARE_API_TOKEN != null or .env.CLOUDFLARE_PAGES_API_TOKEN != null) | .id' '${WORKFLOW}' | paste -sd,)\" = credentials,pages_preflight,pages_publish ] && ! grep -q 'secrets.CLOUDFLARE_PAGES_API_TOKEN' <<< \"\$(yq '.env' '${WORKFLOW}')\""
+check "credencial: CLOUDFLARE_PAGES_API_TOKEN solo en production (credenciales, sondeo, preflight, publicación)" \
+  bash -c "[ \"\$(yq -r '.jobs | to_entries[] | select(.key != \"production\") | .value' '${WORKFLOW}' | grep -c CLOUDFLARE_PAGES_API_TOKEN)\" = 0 ] && [ \"\$(yq -r '.jobs.production.steps[] | select(.env.CLOUDFLARE_API_TOKEN != null or .env.CLOUDFLARE_PAGES_API_TOKEN != null) | .id' '${WORKFLOW}' | paste -sd,)\" = credentials,pages_probe,pages_preflight,pages_publish ] && ! grep -q 'secrets.CLOUDFLARE_PAGES_API_TOKEN' <<< \"\$(yq '.env' '${WORKFLOW}')\""
 check "credencial: Pages nunca usa el token de DNS" \
-  bash -c "! yq -r '.jobs.production.steps[] | select(.id == \"pages_preflight\" or .id == \"pages_publish\") | .env.CLOUDFLARE_API_TOKEN' '${WORKFLOW}' | grep -v -x '\${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}' | grep -q . && yq -r '.jobs.production.steps[] | select(.id == \"credentials\") | .run' '${WORKFLOW}' | grep -q 'no puede ser el token de DNS'"
+  bash -c "! yq -r '.jobs.production.steps[] | select(.id == \"pages_probe\" or .id == \"pages_preflight\" or .id == \"pages_publish\") | .env.CLOUDFLARE_API_TOKEN' '${WORKFLOW}' | grep -v -x '\${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}' | grep -q . && yq -r '.jobs.production.steps[] | select(.id == \"credentials\") | .run' '${WORKFLOW}' | grep -q 'no puede ser el token de DNS'"
 check "credencial: el token de Pages nunca llega a Ansible ni al servidor" \
   bash -c "! grep -rq --exclude='*.md' CLOUDFLARE_PAGES_API_TOKEN '${ROOT}/infra/ansible' '${ROOT}/infra/compose' && ! yq -r '.jobs.production.steps[] | select(.run // \"\" | test(\"(^|[[:space:]])ansible(-playbook)?[[:space:]]\")) | .env // {} | keys[]' '${WORKFLOW}' | grep -qE '^(CLOUDFLARE_API_TOKEN|CLOUDFLARE_PAGES_API_TOKEN)\$'"
 check "credencial: alcance declarado solo en production-hetzner (auditoría de confianza)" \
   grep -q '^  \[CLOUDFLARE_PAGES_API_TOKEN\]="production-hetzner"$' "${ROOT}/.github/scripts/audit-github-trust.sh"
-check "orden: destino, artefacto, wrangler y preflight de Pages antes de cualquier mutación (frescura/Apply)" \
-  bash -c "[ $(idx pages_preflight) -gt $(idx pages_tooling) ] && [ $(idx pages_tooling) -gt $(idx pages_artifact) ] && [ $(idx pages_artifact) -gt $(idx pages_target) ] && [ $(idx pages_preflight) -lt $(idx hcp_idle) ] && [ $(idx pages_preflight) -lt $(idx fresh_apply) ] && [ $(idx pages_preflight) -lt $(idx hcp_upload) ]"
-check "orden: la publicación va después del deploy, la identidad, el health y el registro" \
-  bash -c "for s in hcp_apply converge deploy running_identity container_health public_health record; do [ $(idx pages_publish) -gt \$(grep -nx \"\$s\" <<< \"\$1\" | cut -d: -f1) ] || exit 1; done" _ "${PROD_STEPS}"
+check "orden: destino, artefacto, wrangler y sondeo de Pages antes de cualquier mutación (frescura/plan/Apply/servidor)" \
+  bash -c "[ $(idx pages_probe) -gt $(idx pages_tooling) ] && [ $(idx pages_tooling) -gt $(idx pages_artifact) ] && [ $(idx pages_artifact) -gt $(idx pages_target) ] && for s in hcp_workspace hcp_idle fresh_apply hcp_upload hcp_run fresh_deploy converge deploy; do [ $(idx pages_probe) -lt \$(grep -nx \"\$s\" <<< \"\$1\" | cut -d: -f1) ] || exit 1; done" _ "${PROD_STEPS}"
+check "sondeo: un proyecto ausente o incompleto solo se admite cuando este run aplica Terraform" \
+  test "$(yq -r '.jobs.production.steps[] | select(.id == "pages_probe") | .env.PAGES_ALLOW_PROVISIONING' "${WORKFLOW}")" = "\${{ env.TERRAFORM_REQUIRED == 'true' }}"
+check "sondeo: ausente o incompleto exige que el plan observe la creación de proyecto y dominio (o no se aplica)" \
+  bash -c "w=\$(yq -r '.jobs.production.steps[] | select(.id == \"hcp_plan\") | .env.PLAN_WATCH' '${WORKFLOW}'); grep -q 'pages_project=module.pages.cloudflare_pages_project.main' <<< \"\$w\" && grep -q 'pages_domain=module.pages.cloudflare_pages_domain.main' <<< \"\$w\" && yq -r '.jobs.production.steps[] | select(.id == \"hcp_plan\") | .run' '${WORKFLOW}' | grep -q 'incomplete) need=\"pages_domain\"' && [ $(idx hcp_plan) -lt $(idx hcp_confirm) ]"
+check "orden: preflight estricto de Pages después de Terraform (plan, confirmación, estado, outputs) y antes del servidor y de wrangler" \
+  bash -c "for s in hcp_plan hcp_confirm hcp_state tf_outputs; do [ $(idx pages_preflight) -gt \$(grep -nx \"\$s\" <<< \"\$1\" | cut -d: -f1) ] || exit 1; done; for s in access readiness host_state fresh_deploy converge deploy record pages_publish; do [ $(idx pages_preflight) -lt \$(grep -nx \"\$s\" <<< \"\$1\" | cut -d: -f1) ] || exit 1; done" _ "${PROD_STEPS}"
+check "orden: la publicación va después de Terraform, el deploy, la identidad, el health y el registro" \
+  bash -c "for s in hcp_confirm hcp_state converge deploy running_identity container_health public_health record; do [ $(idx pages_publish) -gt \$(grep -nx \"\$s\" <<< \"\$1\" | cut -d: -f1) ] || exit 1; done" _ "${PROD_STEPS}"
 check "frescura: solo frontend → verify-main-tip.sh justo antes de publicar" \
   bash -c "[ $(idx fresh_frontend) -eq $(( $(idx pages_publish) - 1 )) ] && yq -r '.jobs.production.steps[] | select(.id == \"fresh_frontend\") | .if' '${WORKFLOW}' | grep -q \"env.TERRAFORM_REQUIRED != 'true' && env.DEPLOY_REQUIRED != 'true'\" && yq -r '.jobs.production.steps[] | select(.id == \"fresh_frontend\") | .run' '${WORKFLOW}' | grep -q verify-main-tip.sh"
 check "frescura previa sin cambios: Apply y servidor siguen comprobándola (sin regresión)" \
   bash -c "yq -r '.jobs.production.steps[] | select(.id == \"fresh_apply\") | .if' '${WORKFLOW}' | grep -qx \"env.TERRAFORM_REQUIRED == 'true'\" && yq -r '.jobs.production.steps[] | select(.id == \"fresh_deploy\") | .if' '${WORKFLOW}' | grep -qx \"env.DEPLOY_REQUIRED == 'true' && env.TERRAFORM_REQUIRED != 'true'\""
-check "autoridad única: el preflight falla (sin continue-on-error ni advertencia que deje seguir) antes de toda mutación" \
-  bash -c "[ \"\$(yq -r '.jobs.production.steps[] | select(.id == \"pages_preflight\") | .[\"continue-on-error\"] // false' '${WORKFLOW}')\" = false ] && ! yq -r '.jobs.production.steps[] | select(.id == \"pages_preflight\") | .run' '${WORKFLOW}' | grep -q '::warning' && [ $(idx pages_preflight) -lt $(idx fresh_apply) ] && [ $(idx pages_preflight) -lt $(idx fresh_deploy) ] && [ $(idx pages_preflight) -lt $(idx converge) ]"
+check "autoridad única: sondeo y preflight fallan (sin continue-on-error ni advertencia que deje seguir) antes de mutar el servidor" \
+  bash -c "for s in pages_probe pages_preflight; do [ \"\$(yq -r \".jobs.production.steps[] | select(.id == \\\"\$s\\\") | .[\\\"continue-on-error\\\"] // false\" '${WORKFLOW}')\" = false ] && ! yq -r \".jobs.production.steps[] | select(.id == \\\"\$s\\\") | .run\" '${WORKFLOW}' | grep -q '::warning' || exit 1; done && [ $(idx pages_preflight) -lt $(idx fresh_deploy) ] && [ $(idx pages_preflight) -lt $(idx converge) ]"
 check "identidad: publish recibe del preflight la producción anterior y el alias de producción" \
   bash -c "yq -r '.jobs.production.steps[] | select(.id == \"pages_publish\") | .env.PREVIOUS_DEPLOYMENT_ID + \" \" + .env.PRODUCTION_URL' '${WORKFLOW}' | grep -qx '\${{ steps.pages_preflight.outputs.previous_deployment_id }} \${{ steps.pages_preflight.outputs.production_url }}'"
-check "publicación: sin condición de estado propia (solo corre si todo lo anterior pasó)" \
-  test "$(yq -r '.jobs.production.steps[] | select(.id == "pages_publish") | .if' "${WORKFLOW}")" = "env.FRONTEND_REQUIRED == 'true'"
+check "publicación: solo si todo lo anterior pasó (sin always/failure) y con el preflight estricto en success" \
+  test "$(yq -r '.jobs.production.steps[] | select(.id == "pages_publish") | .if' "${WORKFLOW}")" = "env.FRONTEND_REQUIRED == 'true' && steps.pages_preflight.outcome == 'success'"
 check "artefacto: production lo descarga con frontend-artifact.sh (verificado), no con download-artifact" \
   bash -c "! grep -q 'actions/download-artifact' '${WORKFLOW}' && yq -r '.jobs.production.steps[] | select(.id == \"pages_artifact\") | .run' '${WORKFLOW}' | grep -q 'frontend-artifact.sh fetch' && yq -r '.jobs.production.steps[] | select(.id == \"pages_artifact\") | .env.EXPECTED_ARTIFACT_ID' '${WORKFLOW}' | grep -q 'needs.frontend_build.outputs.artifact_id'"
 check "wrangler: versión exacta fijada, lockfile con integridad, instalado sin scripts" \
