@@ -1,4 +1,0 @@
-package co.edu.unicauca.piedrazul.backend.statistics.dtos;
-
-public class AppointmentStatisticsDto {
-}
