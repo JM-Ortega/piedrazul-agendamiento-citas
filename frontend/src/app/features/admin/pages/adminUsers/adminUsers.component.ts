@@ -72,7 +72,7 @@ export class AdminUsersComponent implements OnInit {
   loadingStats = signal(false);
 
   // ── Ordenamiento ──────────────────────────────────────────────────────────
-  sortField = signal('lastName');
+  sortField = signal('firstName');
   sortDirection = signal<SortDirection>('asc');
 
   readonly sortOptions: SortOption[] = [
