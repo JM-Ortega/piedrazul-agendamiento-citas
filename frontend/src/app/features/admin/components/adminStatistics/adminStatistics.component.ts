@@ -24,7 +24,7 @@ import {
   provideCharts,
   withDefaultRegisterables,
 } from 'ng2-charts';
-import { Observable } from 'rxjs';
+import { Observable, Subscription } from 'rxjs';
 import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
 import {
   SelectComponent,
@@ -72,7 +72,7 @@ const WORKLOAD_COLORS: Record<NivelCarga, string> = {
 /**
  * Vista de estadísticas del panel de administración: citas por mes, por
  * médico, por especialidad y tasa de cancelación. Los datos vienen de
- * `StatisticsService` (hoy simulados) y se grafican con Chart.js.
+ * `StatisticsService` y se grafican con Chart.js.
  *
  * Año y estado se editan como borrador y solo se consultan al pulsar
  * "Filtrar"; el rango de meses se aplica al instante sobre los datos en caché.
@@ -365,7 +365,10 @@ export class AdminStatisticsComponent implements OnInit {
       .subscribe({
         next: (years) => {
           this.years.set(years);
-          const year = years[0] ?? new Date().getFullYear();
+          const current = new Date().getFullYear();
+          const year = years.includes(current)
+            ? current
+            : (years[0] ?? current);
           this.monthlyYear.set(year);
           this.monthlyYearDraft.set(year);
           this.doctorYear.set(year);
@@ -522,13 +525,19 @@ export class AdminStatisticsComponent implements OnInit {
   }
 
   // ── Private ───────────────────────────────────────────────────────────────
+  private inFlight = new Map<object, Subscription>();
+
   private load<T>(source$: Observable<T>, target: WritableSignal<T>): void {
     this.errorMessage.set('');
-    source$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (value) => target.set(value),
-      error: () =>
-        this.errorMessage.set('No se pudieron cargar las estadísticas.'),
-    });
+    this.inFlight.get(target)?.unsubscribe();
+    this.inFlight.set(
+      target,
+      source$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: (value) => target.set(value),
+        error: () =>
+          this.errorMessage.set('No se pudieron cargar las estadísticas.'),
+      })
+    );
   }
 
   private breakdownSubtitle(estado: EstadoAgendaFiltro): string {
