@@ -110,6 +110,7 @@ MIGRATION_DB_PASSWORD='${PW[migration]}'
 KC_DB_USERNAME=keycloak_user
 KC_DB_PASSWORD='${PW[kc]}'
 KC_DB_SCHEMA=keycloak
+FRONTEND_PUBLIC_URL=https://piedrazul.test
 EOF
 }
 new_passwords() { for r in postgres app migration kc; do PW[$r]="$(synthetic "$r")"; done; }
