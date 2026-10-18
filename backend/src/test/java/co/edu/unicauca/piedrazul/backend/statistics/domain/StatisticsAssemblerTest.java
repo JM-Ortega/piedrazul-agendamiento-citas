@@ -48,12 +48,12 @@ class StatisticsAssemblerTest {
     class AvailableYears {
 
         @Test
-        void goesFromNextYearDownTo2000() {
+        void goesFromNextYearDownTo2023() {
             List<Integer> years = assembler.availableYears(2026);
 
-            assertThat(years).hasSize(28);
+            assertThat(years).hasSize(5);
             assertThat(years.getFirst()).isEqualTo(2027);
-            assertThat(years.getLast()).isEqualTo(2000);
+            assertThat(years.getLast()).isEqualTo(2023);
             assertThat(years).isSortedAccordingTo(Comparator.reverseOrder());
         }
     }

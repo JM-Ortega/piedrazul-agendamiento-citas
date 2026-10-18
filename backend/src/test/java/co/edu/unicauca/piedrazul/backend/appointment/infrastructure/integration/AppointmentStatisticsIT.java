@@ -304,7 +304,7 @@ class AppointmentStatisticsIT extends PostgresIntegrationSupport {
 
     @Test
     void invalidInputsShouldBeRejected() {
-        assertThatThrownBy(() -> appointmentExternalService.getAppointmentsCountByDoctor(1999, "AGENDADA"))
+        assertThatThrownBy(() -> appointmentExternalService.getAppointmentsCountByDoctor(2022, "AGENDADA"))
                 .isInstanceOf(InvalidStatisticsYearException.class);
         assertThatThrownBy(() -> appointmentExternalService.getAttendedAppointmentsCountByMonth(2101))
                 .isInstanceOf(InvalidStatisticsYearException.class);

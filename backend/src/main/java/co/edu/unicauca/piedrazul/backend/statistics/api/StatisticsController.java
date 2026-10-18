@@ -34,7 +34,7 @@ public class StatisticsController {
     }
 
     @GetMapping("/years")
-    @Operation(summary = "Años disponibles", description = "Años que se pueden consultar, desde el año siguiente al actual hasta el 2000, en orden descendente.")
+    @Operation(summary = "Años disponibles", description = "Años que se pueden consultar, desde el año siguiente al actual hasta el 2023, en orden descendente.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Años obtenidos correctamente"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),

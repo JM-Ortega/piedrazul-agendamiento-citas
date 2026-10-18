@@ -53,7 +53,7 @@ class GetAppointmentStatisticsUseCaseImplTest {
     class YearValidationTests {
 
         @ParameterizedTest
-        @ValueSource(ints = {1999, 2101})
+        @ValueSource(ints = {2022, 2101})
         void getMonthlyBreakdownShouldThrowWhenYearIsOutOfRange(int year) {
             assertThatThrownBy(() -> useCase.getMonthlyBreakdown(
                     year, StatisticDimension.DOCTOR, AppointmentState.AGENDADA))
@@ -63,7 +63,7 @@ class GetAppointmentStatisticsUseCaseImplTest {
         }
 
         @ParameterizedTest
-        @ValueSource(ints = {2000, 2100})
+        @ValueSource(ints = {2023, 2100})
         void getMonthlyBreakdownShouldAcceptBoundaryYears(int year) {
             when(appointmentRepository.countByMonthAndDoctor(year, ALL_STATES)).thenReturn(List.of());
 
@@ -74,7 +74,7 @@ class GetAppointmentStatisticsUseCaseImplTest {
         }
 
         @ParameterizedTest
-        @ValueSource(ints = {1999, 2101})
+        @ValueSource(ints = {2022, 2101})
         void getMonthlyStateCountsShouldThrowWhenYearIsOutOfRange(int year) {
             assertThatThrownBy(() -> useCase.getMonthlyStateCounts(year))
                     .isInstanceOf(InvalidStatisticsYearException.class);
@@ -83,7 +83,7 @@ class GetAppointmentStatisticsUseCaseImplTest {
         }
 
         @ParameterizedTest
-        @ValueSource(ints = {2000, 2100})
+        @ValueSource(ints = {2023, 2100})
         void getMonthlyStateCountsShouldAcceptBoundaryYears(int year) {
             when(appointmentRepository.countByMonthAndState(year)).thenReturn(List.of());
 

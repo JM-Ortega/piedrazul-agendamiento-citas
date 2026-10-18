@@ -20,7 +20,7 @@ import java.util.stream.IntStream;
 
 public class GetAppointmentStatisticsUseCaseImpl implements GetAppointmentStatisticsUseCase {
 
-    private static final int MIN_YEAR = 2000;
+    private static final int MIN_YEAR = 2023;
     private static final int MAX_YEAR = 2100;
 
     private final AppointmentRepository appointmentRepository;

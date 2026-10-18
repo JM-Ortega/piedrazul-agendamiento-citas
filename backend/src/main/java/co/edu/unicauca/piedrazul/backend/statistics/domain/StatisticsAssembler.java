@@ -33,7 +33,7 @@ import java.util.stream.IntStream;
 @Component
 public class StatisticsAssembler {
 
-    public static final int MIN_YEAR = 2000;
+    public static final int MIN_YEAR = 2023;
 
     /** ALTA: más de un 30% sobre el promedio. */
     private static final double HIGH_LOAD_FACTOR = 1.3;
