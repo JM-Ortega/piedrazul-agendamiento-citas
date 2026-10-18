@@ -3,7 +3,7 @@ export interface AppointmentsPatient {
   date: string;
   startTime: string;
   appointmentState:
-    'AGENDADA' | 'ATENDIDA' | 'CANCELADA' | 'NO_ASISTIO' | 'REPROGRAMADA';
+    'AGENDADA' | 'ATENDIDA' | 'CANCELADA' | 'NO_ASISTIO';
   doctorName: string;
   specialty: string;
   patientFirstName: string;

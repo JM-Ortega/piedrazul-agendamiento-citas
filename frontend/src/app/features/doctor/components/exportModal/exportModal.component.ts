@@ -94,7 +94,6 @@ const EXT_MAP: Record<ExportFormat, string> = {
 
 const EXPORT_STATUSES = [
   'AGENDADA',
-  'REPROGRAMADA',
   'CANCELADA',
   'NO_ASISTIO',
   'ATENDIDA',
@@ -202,7 +201,6 @@ export class ExportModalComponent {
   readonly statusLabels: Record<string, string> = {
     all: 'Todos los estados',
     AGENDADA: 'Agendadas',
-    REPROGRAMADA: 'Reprogramadas',
     CANCELADA: 'Canceladas',
     NO_ASISTIO: 'No asistió',
     ATENDIDA: 'Atendidas',

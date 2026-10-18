@@ -155,7 +155,6 @@ export class DoctorAllAppointmentsComponent {
   filterFields = computed<FilterFieldConfig[]>(() => {
     const statusOptions = [
       { value: 'AGENDADA', label: 'Agendadas' },
-      { value: 'REPROGRAMADA', label: 'Reprogramadas' },
       { value: 'CANCELADA', label: 'Canceladas' },
       { value: 'NO_ASISTIO', label: 'No asistió' },
       { value: 'ATENDIDA', label: 'Atendidas' },
