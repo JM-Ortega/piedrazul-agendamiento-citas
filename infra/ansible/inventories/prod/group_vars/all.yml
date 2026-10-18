@@ -126,8 +126,10 @@ kc_metrics_enabled: true
 kc_db_username: keycloak_user
 kc_db_schema: keycloak
 
-# Notificaciones
-notifications_sendgrid_enabled: true
+# Notificaciones. SendGrid desactivado: el backend arranca sin su clave y no hay envío
+# externo de correo. Activarlo exige PIEDRAZUL_BACKEND_MAIL_SEND en el entorno del converge
+# (setup.yml falla antes de escribir .env si falta; el backend tampoco arranca sin ella).
+notifications_sendgrid_enabled: false
 notifications_sendgrid_sandbox_mode: false
 notifications_email_from: no-reply@mail.piedrazul.org
 notifications_email_from_name: Piedrazul Salud

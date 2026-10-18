@@ -465,7 +465,7 @@ yq -r '.jobs.production.steps[] | select(.name == "Verificar credenciales de pro
 credentials() { # [CLAVE=valor ...] → código de salida del script
   env -i PATH="${PATH}" HCP_WORKSPACE_ID=ws-abc DEPLOY_REQUIRED=true RUN_HOST_CONFIG=true RUN_APP_DEPLOY=true \
     TF_API_TOKEN=x ANSIBLE_SSH_KEY=x POSTGRES_PASSWORD=x APP_DB_PASSWORD=x MIGRATION_DB_PASSWORD=x KC_DB_PASSWORD=x \
-    CLOUDFLARE_DNS_API_TOKEN=x PIEDRAZUL_BACKEND_MAIL_SEND=x NOTIFICATION_ENCRYPTION_KEY=x \
+    CLOUDFLARE_DNS_API_TOKEN=x \
     KC_BACKEND_CLIENT_SECRET=x KC_AUTOMATION_CLIENT_SECRET=x "$@" bash "${TMP}/credentials.sh" > "${TMP}/credentials.log" 2>&1
 }
 check "credenciales: deshabilitado no exige la contraseña inicial" credentials IDENTITY_SEED_ENABLED=false

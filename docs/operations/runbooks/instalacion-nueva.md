@@ -50,10 +50,15 @@ nueva, para el desafío de Let's Encrypt), `ANSIBLE_SSH_KEY`, contraseñas de la
 secretos de Keycloak, `KC_PLATFORM_ADMIN_INITIAL_PASSWORD` (solo la instalación nueva, P2;
 ver [administrador-keycloak.md](administrador-keycloak.md)) y, si se habilita, el primer
 administrador de negocio ([primer-admin-negocio.md](primer-admin-negocio.md)).
-`PIEDRAZUL_BACKEND_MAIL_SEND` debe existir y no estar vacío: la verificación de credenciales
-lo exige y el backend no arranca con el envío de correo habilitado y la clave vacía. Solo se
-exige su presencia; el proveedor de correo (SendGrid, en retiro) no forma parte de esta
-instalación ni de su verificación.
+
+**Correo.** SendGrid está deshabilitado en producción (`notifications_sendgrid_enabled: false`
+en `group_vars`): la cadena no exige ni entrega `PIEDRAZUL_BACKEND_MAIL_SEND`, el `.env`
+queda con `SENDGRID_API_KEY` vacía y el backend arranca sin ella. No hay envío externo de
+correo: las notificaciones (incluidos los códigos de verificación) caen al proveedor de
+consola, que solo registra en el log del backend y oculta el contenido sensible. Los flujos que
+dependen de recibir un correo quedan fuera de esta instalación y de su verificación. Si se
+habilita SendGrid sin entregar la clave al converge, la configuración del servidor falla antes
+de escribir `.env`. `NOTIFICATION_ENCRYPTION_KEY` no es un requisito: ningún componente la usa.
 
 ## Cómo se inicia
 

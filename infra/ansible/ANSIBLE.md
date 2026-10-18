@@ -428,6 +428,11 @@ El archivo `.env` se genera en cada converge desde este template. Las variables 
 | `host_vars/vps.yml` | `kc_hostname`, `api_public_domain`, `acme_email` |
 | Variables de entorno del runner (secretos de GitHub) | `POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `MIGRATION_DB_PASSWORD`, `KC_DB_PASSWORD`, `KC_BACKEND_CLIENT_SECRET` (vía `app_kc_backend_secret`), `CLOUDFLARE_DNS_API_TOKEN` |
 
+SendGrid está deshabilitado (`notifications_sendgrid_enabled: false`): `.env` lleva
+`NOTIFICATIONS_SENDGRID_ENABLED=false` y `SENDGRID_API_KEY` vacía, y el converge no recibe
+`PIEDRAZUL_BACKEND_MAIL_SEND`. Con el proveedor habilitado, `env.j2` escribe esa variable del
+runner como `SENDGRID_API_KEY` y `setup.yml` falla antes de generar `.env` si está vacía.
+
 `.env` no lleva credenciales de administración de Keycloak ni `KC_AUTOMATION_CLIENT_SECRET`: el secreto de automatización y el de la autoridad temporal de un evento no se persisten en el host; Ansible solo los entrega en tránsito al exec administrativo de Keycloak (ver [Ciclo técnico de Keycloak](#ciclo-técnico-de-keycloak-keycloak_lifecycleyml)).
 
 ---
@@ -452,6 +457,13 @@ IDENTITY_SEED_ADMIN_PASSWORD # Un solo uso: contraseña temporal del primer ADMI
                              # se lee con la variable IDENTITY_SEED_ENABLED=true; se elimina tras
                              # el primer login (docs/operations/runbooks/primer-admin-negocio.md)
 ```
+
+Qué exige la verificación de credenciales depende del modo del run: con configuración del
+servidor (`run_host_config`) exige las contraseñas de la base, `CLOUDFLARE_DNS_API_TOKEN`,
+`KC_BACKEND_CLIENT_SECRET` y `KC_AUTOMATION_CLIENT_SECRET`, que solo recibe el converge. Un
+deploy sin configuración del servidor no las recibe ni las exige (solo `TF_API_TOKEN` y
+`ANSIBLE_SSH_KEY`): usa el `.env` que dejó el converge, y `deploy.yml` falla antes de mutar si
+falta o le falta una clave de la base o `KC_BACKEND_CLIENT_SECRET` ("corre converge primero").
 
 Bootstrap del primer `ADMIN` de negocio (variables `IDENTITY_SEED_*` del environment): con
 `IDENTITY_SEED_ENABLED=true`, `identity_seed_inputs.yml` valida las entradas antes de escribir

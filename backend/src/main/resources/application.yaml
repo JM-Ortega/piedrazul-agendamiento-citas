@@ -104,9 +104,6 @@ audit:
     fixed-delay: ${AUDIT_LOGIN_EVENTS_FIXED_DELAY:120000}
 
 notifications:
-  encryption:
-    key: ${NOTIFICATION_ENCRYPTION_KEY:}
-
   console:
     show-sensitive-content: ${NOTIFICATIONS_CONSOLE_SHOW_SENSITIVE:false}
   email:

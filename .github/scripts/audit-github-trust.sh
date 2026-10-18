@@ -49,20 +49,21 @@ done
 # de producción conocido. El repositorio no es alcance autorizado para ninguno (objetivo:
 # 0 copias de repo) y ningún otro environment lo es. No es un inventario obligatorio: que
 # un secreto deba existir lo decide un consumidor real en el árbol analizado (--ref), no
-# esta tabla. Un secreto nuevo entra aquí cuando se decida su alcance, no antes.
+# esta tabla. Un secreto nuevo entra aquí cuando se decida su alcance, no antes. Un nombre
+# retirado (DB_PASSWORD, KC_ADMIN_PASSWORD, KC_BOOTSTRAP_ADMIN_PASSWORD,
+# NOTIFICATION_ENCRYPTION_KEY) sale de la tabla: cualquier copia o referencia restante queda
+# sin clasificar (FAIL) hasta retirarla. PIEDRAZUL_BACKEND_MAIL_SEND conserva su alcance:
+# SendGrid sigue implementado aunque producción lo tenga deshabilitado.
 declare -A AUTH=(
   [TF_API_TOKEN]="production-hetzner terraform-plan"
   [ANSIBLE_SSH_KEY]="production-hetzner"
   [CLOUDFLARE_DNS_API_TOKEN]="production-hetzner"
   [CLOUDFLARE_PAGES_API_TOKEN]="production-hetzner"
-  [KC_BOOTSTRAP_ADMIN_PASSWORD]="production-hetzner"
-  [KC_ADMIN_PASSWORD]="production-hetzner"
   [KC_AUTOMATION_CLIENT_SECRET]="production-hetzner"
   [KC_BACKEND_CLIENT_SECRET]="production-hetzner"
   [KC_PLATFORM_ADMIN_INITIAL_PASSWORD]="production-hetzner"
   [IDENTITY_SEED_ADMIN_PASSWORD]="production-hetzner"
   [PIEDRAZUL_BACKEND_MAIL_SEND]="production-hetzner"
-  [NOTIFICATION_ENCRYPTION_KEY]="production-hetzner"
   [POSTGRES_PASSWORD]="production-hetzner"
   [APP_DB_PASSWORD]="production-hetzner"
   [MIGRATION_DB_PASSWORD]="production-hetzner"
