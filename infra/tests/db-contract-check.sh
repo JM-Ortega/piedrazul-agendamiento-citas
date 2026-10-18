@@ -20,6 +20,11 @@
 #   5. Orden: deploy.yml reconcilia → migra → arranca backend; setup.yml reconcilia antes de
 #      Traefik y converge.yml arranca Keycloak (keycloak_lifecycle.yml) después; el workflow migra solo un backend construido y no pasa credenciales de la
 #      base al paso de deploy.
+#   6. Credenciales por modo: solo el converge (configuración del servidor) recibe y exige
+#      las de la base, Keycloak y Cloudflare DNS; un deploy sin configuración no las exige y
+#      sigue exigiendo HCP y SSH. Su requisito real, el .env del host, lo validan las tareas
+#      reales de deploy.yml antes de la primera mutación (sin .env, o con una clave de la base
+#      o KC_BACKEND_CLIENT_SECRET vacía, falla sin mostrar valores).
 # Salida: 0 si todo pasa; 1 si algo falla.
 set -euo pipefail
 
@@ -217,6 +222,80 @@ check "workflow: deploy (con migración) antes de verificar y registrar el últi
   test "$(pos deploy)" -lt "$(pos running_identity)" -a "$(pos running_identity)" -lt "$(pos record)"
 check "workflow: el registro del último éxito no corre tras un fallo" \
   test "$(step record '.if')" = "env.RUN_APP_DEPLOY == 'true'"
+
+# ── 6. Credenciales por modo: solo el converge recibe las de la base ────────
+# Un deploy sin configuración del servidor no recibe credenciales de la base ni de Cloudflare
+# (ningún paso que corre en ese modo las lee): no se exigen en el runner. Su requisito real
+# es el .env del host, que deploy.yml valida antes de mutar nada.
+HOST_CONFIG_SECRETS="POSTGRES_PASSWORD APP_DB_PASSWORD MIGRATION_DB_PASSWORD KC_DB_PASSWORD CLOUDFLARE_DNS_API_TOKEN KC_BACKEND_CLIENT_SECRET KC_AUTOMATION_CLIENT_SECRET"
+HOST_CONFIG_RE="$(tr ' ' '|' <<< "${HOST_CONFIG_SECRETS}")"
+check "workflow: solo el converge recibe credenciales de la base, de Keycloak y de Cloudflare DNS" \
+  test "$(yq -r "[.jobs.production.steps[] | select(.id != \"credentials\") | select((.env // {}) | to_entries | map(select(.value | test(\"secrets\\\\.(${HOST_CONFIG_RE})\"))) | length > 0) | .id] | join(\" \")" "${WORKFLOW}")" = "converge"
+check "workflow: el converge solo corre con configuración del servidor" \
+  grep -qF "env.RUN_HOST_CONFIG == 'true'" <(yq -r '.jobs.production.steps[] | select(.id == "converge") | .if' "${WORKFLOW}")
+
+yq -r '.jobs.production.steps[] | select(.id == "credentials") | .run' "${WORKFLOW}" > "${TMP}/credentials.sh"
+credentials() { # <RUN_HOST_CONFIG> <RUN_APP_DEPLOY> [CLAVE=valor ...] → código de salida
+  local host="$1" app="$2"; shift 2
+  env -i PATH="${PATH}" HCP_WORKSPACE_ID=ws-abc DEPLOY_REQUIRED=true RUN_HOST_CONFIG="${host}" RUN_APP_DEPLOY="${app}" \
+    TF_API_TOKEN=x ANSIBLE_SSH_KEY=x "$@" bash "${TMP}/credentials.sh" > "${TMP}/credentials.log" 2>&1
+}
+missing_is() { grep -qx "::error title=Autoridad de producción::Faltan credenciales o variables: $1" "${TMP}/credentials.log"; }
+fails_naming() { # <clave> <comando...>: el comando falla y el error nombra solo esa clave
+  local key="$1"; shift
+  ! "$@" && missing_is "${key}"
+}
+read -r -a HOST_SECRET_ARGS <<< "$(for k in ${HOST_CONFIG_SECRETS}; do printf '%s=x ' "${k}"; done)"
+
+check "credenciales: deploy sin configuración del servidor pasa sin credenciales de la base, de Keycloak ni de Cloudflare DNS" \
+  credentials false true
+check "credenciales: deploy sin configuración del servidor sigue exigiendo ANSIBLE_SSH_KEY" \
+  fails_naming ANSIBLE_SSH_KEY credentials false true ANSIBLE_SSH_KEY=
+check "credenciales: deploy sin configuración del servidor sigue exigiendo TF_API_TOKEN" \
+  fails_naming TF_API_TOKEN credentials false true TF_API_TOKEN=
+check "credenciales: configuración del servidor completa pasa" credentials true false "${HOST_SECRET_ARGS[@]}"
+check "credenciales: configuración del servidor + deploy completa pasa" credentials true true "${HOST_SECRET_ARGS[@]}"
+for key in ${HOST_CONFIG_SECRETS}; do
+  for app in false true; do
+    check "credenciales: configuración del servidor (deploy=${app}) sin ${key} falla y lo nombra" \
+      fails_naming "${key}" credentials true "${app}" "${HOST_SECRET_ARGS[@]}" "${key}="
+  done
+done
+
+# Requisito real del deploy sin configuración: el .env del host. Las tareas reales de
+# deploy.yml que lo validan, aisladas y sobre un host local sintético.
+GATE_TASKS=("Verificar que .env existe" "Fallar si .env no existe" "Leer .env para validación"
+  "Validar que KC_BACKEND_CLIENT_SECRET no está vacío" "Buscar claves de base de datos vacías o ausentes en .env"
+  "Validar el contrato de base de datos en .env")
+GATE_LAST="$(task_index "${TASKS}/deploy.yml" 'Validar el contrato de base de datos en .env')"
+check "deploy.yml: valida el .env del host antes de la primera mutación (reconciliación de la base)" \
+  test -n "${GATE_LAST}" -a -n "${D_CONVERGE}" -a "${GATE_LAST:-99}" -lt "${D_CONVERGE:-0}"
+GATE_SELECT="$(printf '.name == "%s" or ' "${GATE_TASKS[@]}")"
+yq "[.[] | select(${GATE_SELECT% or })]" "${TASKS}/deploy.yml" > "${TMP}/gate.yml"
+check "deploy.yml: se aislaron las ${#GATE_TASKS[@]} tareas de validación del .env" \
+  test "$(yq 'length' "${TMP}/gate.yml")" = "${#GATE_TASKS[@]}"
+printf -- '- hosts: vps\n  gather_facts: false\n  connection: local\n  tasks:\n    - ansible.builtin.include_tasks: %s\n' \
+  "${TMP}/gate.yml" > "${TMP}/gate-play.yml"
+gate() { # <.env o "-" si el host no tiene> → código de salida de la validación
+  rm -rf "${TMP}/host"; mkdir -p "${TMP}/host"
+  [ "$1" = "-" ] || cp "$1" "${TMP}/host/.env"
+  ANSIBLE_CONFIG="${ANSIBLE_DIR}/ansible.cfg" ANSIBLE_BECOME=false \
+    ansible-playbook -i "${ANSIBLE_DIR}/inventories/prod" -i "${TMP}/hosts.yml" "${TMP}/gate-play.yml" \
+    -e "app_dir=${TMP}/host" </dev/null > "${TMP}/gate.log" 2>&1
+}
+gate_fails_with() { ! gate "$1" && grep -qF -- "$2" "${TMP}/gate.log"; }
+check "deploy.yml: el .env del host producido por converge pasa la validación" gate "${TMP}/.env"
+check "deploy.yml: host sin .env falla (corre converge primero)" gate_fails_with - 'corre converge primero'
+for key in POSTGRES_PASSWORD APP_DB_PASSWORD MIGRATION_DB_PASSWORD KC_DB_PASSWORD; do
+  sed -E "s/^${key}=.*/${key}=/" "${TMP}/.env" > "${TMP}/gate-${key}.env"
+  check "deploy.yml: .env del host con ${key} vacía falla y la nombra" \
+    gate_fails_with "${TMP}/gate-${key}.env" "Faltan o están vacías en .env: ${key} "
+done
+sed -E 's/^KC_BACKEND_CLIENT_SECRET=.*/KC_BACKEND_CLIENT_SECRET=/' "${TMP}/.env" > "${TMP}/gate-kcb.env"
+check "deploy.yml: .env del host con KC_BACKEND_CLIENT_SECRET vacía falla" \
+  gate_fails_with "${TMP}/gate-kcb.env" 'Validar que KC_BACKEND_CLIENT_SECRET no está vacío'
+for f in "${TMP}"/gate-*.env "${TMP}/.env"; do gate "${f}" || true; cat "${TMP}/gate.log"; done > "${TMP}/gate-all.log"
+check "deploy.yml: los logs de la validación no muestran contraseñas" bash -c "grep -q 'Validar el contrato de base de datos' '${TMP}/gate-all.log' && ! grep -q 'synthetic-' '${TMP}/gate-all.log'"
 
 echo
 if [ "${FAILS}" -gt 0 ]; then

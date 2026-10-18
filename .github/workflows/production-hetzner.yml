@@ -1066,8 +1066,6 @@ jobs:
           CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
           KC_BACKEND_CLIENT_SECRET: ${{ secrets.KC_BACKEND_CLIENT_SECRET }}
           KC_AUTOMATION_CLIENT_SECRET: ${{ secrets.KC_AUTOMATION_CLIENT_SECRET }}
-          PIEDRAZUL_BACKEND_MAIL_SEND: ${{ secrets.PIEDRAZUL_BACKEND_MAIL_SEND }}
-          NOTIFICATION_ENCRYPTION_KEY: ${{ secrets.NOTIFICATION_ENCRYPTION_KEY }}
           # Token dedicado de Pages (Cloudflare Pages: Edit en la cuenta); nunca el de DNS
           CLOUDFLARE_PAGES_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
           # Bootstrap del primer administrador de negocio: el secreto solo se lee si está
@@ -1100,13 +1098,12 @@ jobs:
           if [ "${DEPLOY_REQUIRED}" = "true" ]; then
             need ANSIBLE_SSH_KEY
           fi
-          if [ "${RUN_HOST_CONFIG}" = "true" ] || [ "${RUN_APP_DEPLOY}" = "true" ]; then
-            need POSTGRES_PASSWORD APP_DB_PASSWORD MIGRATION_DB_PASSWORD KC_DB_PASSWORD \
-              CLOUDFLARE_DNS_API_TOKEN \
-              PIEDRAZUL_BACKEND_MAIL_SEND NOTIFICATION_ENCRYPTION_KEY
-          fi
+          # Solo el converge entrega credenciales de la base, de Keycloak y de Cloudflare (las
+          # escribe en .env o las usa en tránsito). Un deploy sin configuración del servidor no
+          # las recibe: usa el .env del host y deploy.yml falla antes de mutar si le faltan.
           if [ "${RUN_HOST_CONFIG}" = "true" ]; then
-            need KC_BACKEND_CLIENT_SECRET KC_AUTOMATION_CLIENT_SECRET
+            need POSTGRES_PASSWORD APP_DB_PASSWORD MIGRATION_DB_PASSWORD KC_DB_PASSWORD \
+              CLOUDFLARE_DNS_API_TOKEN KC_BACKEND_CLIENT_SECRET KC_AUTOMATION_CLIENT_SECRET
           fi
           # Solo el converge escribe el .env que entrega el bootstrap al backend
           SEED_ENABLED="${IDENTITY_SEED_ENABLED:-}"
@@ -1717,8 +1714,8 @@ jobs:
           IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
           IDENTITY_SEED_ADMIN_PHONE: ${{ vars.IDENTITY_SEED_ADMIN_PHONE }}
           IDENTITY_SEED_ADMIN_PASSWORD: ${{ vars.IDENTITY_SEED_ENABLED == 'true' && secrets.IDENTITY_SEED_ADMIN_PASSWORD || '' }}
-          PIEDRAZUL_BACKEND_MAIL_SEND: ${{ secrets.PIEDRAZUL_BACKEND_MAIL_SEND }}
-          NOTIFICATION_ENCRYPTION_KEY: ${{ secrets.NOTIFICATION_ENCRYPTION_KEY }}
+          # SendGrid está deshabilitado (group_vars: notifications_sendgrid_enabled): el converge
+          # no recibe PIEDRAZUL_BACKEND_MAIL_SEND y setup.yml falla si se habilita sin ella.
         run: |
           set -euo pipefail
           ansible-playbook \
@@ -1757,7 +1754,7 @@ jobs:
       # deploy.yml: postgres + reconciliación → migración (solo backend construido en este
       # run, con su misma identidad exacta) → backend → bootstrap del primer administrador
       # (resultado si está habilitado, retiro si no). Usa el .env que dejó converge; no
-      # recibe credenciales de la base. Un rollback explícito no migra: el backend valida
+      # recibe secretos (ni de la base, ni de Cloudflare, ni de correo). Un rollback explícito no migra: el backend valida
       # el esquema al arrancar (JPA validate). Si la migración falla, el backend candidato
       # no arranca y este paso falla antes de la verificación y del registro.
       - name: Correr deploy
@@ -1770,14 +1767,11 @@ jobs:
           BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
           POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
           APP_MIGRATE: ${{ steps.select.outputs.backend_source == 'build' }}
-          CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
           # Solo la decisión del bootstrap, sin entradas ni secreto: deploy.yml no escribe .env;
           # el bootstrap (y su retiro) lo aplica el .env que dejó el converge. deploy.yml falla
           # si ese .env no corresponde a esta decisión (habilitación o retiro pendientes de la
           # configuración del servidor) o si el backend resultante no la tiene en vigor
           IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
-          PIEDRAZUL_BACKEND_MAIL_SEND: ${{ secrets.PIEDRAZUL_BACKEND_MAIL_SEND }}
-          NOTIFICATION_ENCRYPTION_KEY: ${{ secrets.NOTIFICATION_ENCRYPTION_KEY }}
         run: |
           set -euo pipefail
           ansible-playbook \

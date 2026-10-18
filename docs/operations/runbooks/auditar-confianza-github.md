@@ -19,6 +19,13 @@ es `FAIL` hasta que se decida su alcance: el hecho se puede verificar y contradi
 contrato, así que no es `UNKNOWN`. `secrets.GITHUB_TOKEN` es un mecanismo de GitHub, no un
 secreto del repositorio, y no cuenta como nombre sin clasificar.
 
+Los nombres retirados de producción (`DB_PASSWORD`, `KC_ADMIN_PASSWORD`,
+`KC_BOOTSTRAP_ADMIN_PASSWORD`, `NOTIFICATION_ENCRYPTION_KEY`) no tienen alcance en la tabla:
+una copia o referencia restante sale como `sin alcance decidido` y se resuelve retirándola,
+no agregándola. `PIEDRAZUL_BACKEND_MAIL_SEND` conserva su alcance (`production-hetzner`)
+aunque SendGrid esté deshabilitado y ningún job lo consuma: guardado ahí aparece como secreto
+sin consumidor (`INFO`); una copia de repositorio sigue siendo `FAIL`.
+
 ## Cuándo ejecutarla
 
 - Después de cambiar a mano environments, revisores, secretos, rulesets o la política de

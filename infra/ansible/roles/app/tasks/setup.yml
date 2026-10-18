@@ -105,6 +105,16 @@
 - name: Generar las rutas de Traefik
   ansible.builtin.include_tasks: traefik_routes.yml
 
+# SendGrid habilitado sin clave: falla antes de escribir .env (el backend tampoco arrancaría)
+- name: Validar la clave de SendGrid si el proveedor está habilitado
+  ansible.builtin.assert:
+    that:
+      - lookup('env', 'PIEDRAZUL_BACKEND_MAIL_SEND') | trim | length > 0
+    fail_msg: "notifications_sendgrid_enabled=true requiere PIEDRAZUL_BACKEND_MAIL_SEND no vacío en el entorno del converge"
+    quiet: true
+  when: notifications_sendgrid_enabled | bool
+  no_log: true
+
 # .env
 - name: Generar .env desde template
   ansible.builtin.template:
