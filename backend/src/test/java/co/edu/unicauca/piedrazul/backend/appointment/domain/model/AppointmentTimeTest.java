@@ -15,14 +15,26 @@ class AppointmentTimeTest {
 
     @Test
     void constructorShouldCreateTimeWhenHourIsAtLowerBound() {
-        AppointmentTime time = new AppointmentTime(LocalTime.of(7, 0));
-        assertThat(time.getTime()).isEqualTo(LocalTime.of(7, 0));
+        AppointmentTime time = new AppointmentTime(LocalTime.of(6, 0));
+        assertThat(time.getTime()).isEqualTo(LocalTime.of(6, 0));
+    }
+
+    @Test
+    void constructorShouldCreateTimeWhenHourIsJustAboveLowerBound() {
+        AppointmentTime time = new AppointmentTime(LocalTime.of(6, 59));
+        assertThat(time.getTime()).isEqualTo(LocalTime.of(6, 59));
     }
 
     @Test
     void constructorShouldCreateTimeWhenHourIsAtUpperBound() {
-        AppointmentTime time = new AppointmentTime(LocalTime.of(12, 0));
-        assertThat(time.getTime()).isEqualTo(LocalTime.of(12, 0));
+        AppointmentTime time = new AppointmentTime(LocalTime.of(13, 0));
+        assertThat(time.getTime()).isEqualTo(LocalTime.of(13, 0));
+    }
+
+    @Test
+    void constructorShouldCreateTimeWhenHourIsAfterOldClosingTime() {
+        AppointmentTime time = new AppointmentTime(LocalTime.of(12, 30));
+        assertThat(time.getTime()).isEqualTo(LocalTime.of(12, 30));
     }
 
     @Test
@@ -43,24 +55,36 @@ class AppointmentTimeTest {
     }
 
     @Test
-    void constructorShouldThrowWhenHourIsBeforeSevenAm() {
-        assertThatThrownBy(() -> new AppointmentTime(LocalTime.of(6, 59)))
+    void constructorShouldThrowWhenHourIsBeforeSixAm() {
+        assertThatThrownBy(() -> new AppointmentTime(LocalTime.of(5, 59)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Piedrazul atiende entre 7:00 am y 12:00 pm");
+                .hasMessageContaining("Piedrazul atiende entre 6:00 am y 1:00 pm");
     }
 
     @Test
-    void constructorShouldThrowWhenHourIsAfterNoon() {
-        assertThatThrownBy(() -> new AppointmentTime(LocalTime.of(12, 1)))
+    void constructorShouldThrowWhenHourIsAfterOnePm() {
+        assertThatThrownBy(() -> new AppointmentTime(LocalTime.of(13, 1)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Piedrazul atiende entre 7:00 am y 12:00 pm");
+                .hasMessageContaining("Piedrazul atiende entre 6:00 am y 1:00 pm");
     }
 
     @Test
     void constructorShouldThrowWhenHourIsMidnight() {
         assertThatThrownBy(() -> new AppointmentTime(LocalTime.of(0, 0)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Piedrazul atiende entre 7:00 am y 12:00 pm");
+                .hasMessageContaining("Piedrazul atiende entre 6:00 am y 1:00 pm");
+    }
+
+    // ─────────────────────────────────────────────
+    // withoutBusinessHoursRestriction — sin validación de horario
+    // ─────────────────────────────────────────────
+
+    @Test
+    void withoutBusinessHoursRestrictionShouldAcceptAnyHour() {
+        assertThat(AppointmentTime.withoutBusinessHoursRestriction(LocalTime.of(5, 0)).getTime())
+                .isEqualTo(LocalTime.of(5, 0));
+        assertThat(AppointmentTime.withoutBusinessHoursRestriction(LocalTime.of(18, 0)).getTime())
+                .isEqualTo(LocalTime.of(18, 0));
     }
 
     // ─────────────────────────────────────────────

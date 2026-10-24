@@ -188,6 +188,18 @@ class AppointmentSchedulingHappyPathIT extends PostgresIntegrationSupport {
     }
 
     @Test
+    void shouldPersistAppointmentScheduledAfterOldClosingTime() {
+        LocalDate date = LocalDate.now().plusDays(1);
+
+        schedulingService.scheduleManual(manualContext(), doctorId, SpecialtyCode.TERAPIA_NEURAL, date,
+                new AppointmentTime(LocalTime.of(12, 30)), UUID.randomUUID(), manualStrategy);
+
+        List<AppointmentEntity> saved = appointmentJpaRepository.findByIdDoctorAndDate(doctorId, date);
+        assertThat(saved).hasSize(1);
+        assertThat(saved.getFirst().getStartTime()).isEqualTo(LocalTime.of(12, 30));
+    }
+
+    @Test
     void shouldThrowWhenAutonomousSchedulingIsDisabled() {
         appointmentConfigRepository.setAutonomousSchedulingEnabled(false);
 
