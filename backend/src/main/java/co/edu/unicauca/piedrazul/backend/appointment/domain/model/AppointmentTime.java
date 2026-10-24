@@ -6,8 +6,8 @@ import java.util.Objects;
 
 public final class AppointmentTime {
 
-    private static final LocalTime OPENING_TIME = LocalTime.of(7, 0);
-    private static final LocalTime CLOSING_TIME = LocalTime.of(12, 0);
+    private static final LocalTime OPENING_TIME = LocalTime.of(6, 0);
+    private static final LocalTime CLOSING_TIME = LocalTime.of(13, 0);
 
     private final LocalTime time;
 
@@ -24,7 +24,7 @@ public final class AppointmentTime {
     private AppointmentTime(LocalTime time, boolean enforceBusinessHours) {
         Objects.requireNonNull(time, "La hora no puede ser nula");
         if (enforceBusinessHours && (time.isBefore(OPENING_TIME) || time.isAfter(CLOSING_TIME))) {
-            throw new IllegalArgumentException("Piedrazul atiende entre 7:00 am y 12:00 pm");
+            throw new IllegalArgumentException("Piedrazul atiende entre 6:00 am y 1:00 pm");
         }
         this.time = time;
     }
