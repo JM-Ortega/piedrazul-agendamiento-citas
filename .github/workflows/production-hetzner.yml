@@ -7,13 +7,20 @@ name: Producción — Hetzner
 #             ├─ app_build ────────┼─ select_images ─ image_targets ─ image_scan ─ image_policy ─┐
 #             ├─ postgres_build ───┘                                                            │
 #             └─ frontend_build ───────────────────────────────────────────────────────────────┤
-#                                    production (gate production-hetzner) ◄─────────────────────┘
-#                                      └─ conclude
+#                 terraform_plan (gate production-hetzner; solo con Terraform) ◄─────────────────┤
+#                   └─ production (gate production-hetzner) ◄────────────────────────────────────┘
+#                        └─ conclude
 #
-# Solo `production` usa el environment production-hetzner y credenciales de producción
-# (HCP Terraform, SSH, secretos de la app, token de Pages). Clasificación, builds,
-# selección y escaneo de identidades conocidas corren antes del gate y solo con
-# GITHUB_TOKEN.
+# Solo `terraform_plan` y `production` usan el environment production-hetzner y credenciales
+# de producción (terraform_plan: solo HCP Terraform; production: HCP Terraform, SSH,
+# secretos de la app, token de Pages). Clasificación, builds, selección y escaneo de
+# identidades conocidas corren antes de los gates y solo con GITHUB_TOKEN.
+#
+# Con Terraform hay dos aprobaciones del mismo environment, con propósitos distintos: la de
+# terraform_plan autoriza usar las credenciales de producción para planificar este commit;
+# la de production llega DESPUÉS de que el plan definitivo está revisado en el resumen de
+# este mismo run y autoriza aplicar ese plan exacto y seguir con el deploy. Sin Terraform
+# (solo deploy o solo frontend) hay una sola, la de production.
 #
 # Frontend: frontend_build construye y valida el sitio una sola vez y lo sube como
 # artifact; production descarga ESE artifact (id y sha256 como outputs de job, digest de
@@ -944,15 +951,261 @@ jobs:
             exit "${RC}"
           fi
 
+  # ── Plan de Terraform (primera aprobación) ─────────────────────────────────
+  # Solo cuando el run aplica Terraform. Mismo environment que production: su aprobación
+  # autoriza usar las credenciales de HCP para planificar este commit, nada más. Mismas
+  # condiciones previas que production (imágenes y frontend), así un run ya bloqueado no
+  # pide aprobación.
+  #
+  #   workspace verificado (sin auto-apply, con permiso de encolar y confirmar) → libre →
+  #   state version previo (o `none`) → frescura → configuración PROVISIONAL subida →
+  #   saved plan (save-plan, auto-apply=false) → plan terminado, ligado al estado previo y a
+  #   esa configuración → revisión saneada en el resumen → frescura
+  #
+  # Un saved plan nunca se aplica solo y no ocupa la cola del workspace: HCP lo descarta si
+  # el estado cambia antes de confirmarlo. La configuración provisional no pasa a ser la
+  # actual del workspace salvo que su run se aplique. Sin cambios, el run termina en
+  # planned_and_finished (nada que aplicar ni que descartar). Si este job falla o se
+  # cancela después de crear el run, hcp_cleanup lo descarta o cancela; un run confirmado
+  # fuera de GitHub no se toca y el job falla (production no corre).
+  #
+  # Salidas: identidad exacta del plan (run, plan, configuración, state version de entrada,
+  # mensaje del run) y has_changes (true|false; cualquier otro valor deja production sin
+  # correr y conclude en fallo).
+  terraform_plan:
+    name: Plan de Terraform
+    runs-on: ubuntu-latest
+    needs: [classify, select_images, image_targets, image_scan, image_policy, frontend_build]
+    if: |
+      !cancelled() &&
+      needs.classify.result == 'success' &&
+      needs.select_images.result == 'success' &&
+      needs.classify.outputs.terraform_required == 'true' &&
+      (needs.classify.outputs.frontend_required != 'true' || needs.frontend_build.result == 'success') &&
+      (needs.classify.outputs.deploy_required != 'true' ||
+        (needs.image_targets.result == 'success' &&
+          needs.image_policy.result == 'success' &&
+          (needs.image_scan.result == 'success' ||
+            (needs.image_scan.result == 'skipped' && needs.image_targets.outputs.targets == '[]'))))
+    timeout-minutes: 45
+    environment: production-hetzner
+    concurrency:
+      group: piedrazul-production-hetzner
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+    outputs:
+      run_id: ${{ steps.hcp_run.outputs.run_id }}
+      run_link: ${{ steps.hcp_run.outputs.run_link }}
+      run_message: ${{ steps.hcp_run.outputs.run_message }}
+      configuration_version_id: ${{ steps.hcp_plan.outputs.configuration_version_id }}
+      plan_id: ${{ steps.hcp_plan.outputs.plan_id }}
+      state_before: ${{ steps.hcp_before.outputs.state_version_id }}
+      input_state_version: ${{ steps.hcp_plan.outputs.input_state_version }}
+      has_changes: ${{ steps.hcp_plan.outputs.has_changes }}
+      counts: ${{ steps.hcp_plan.outputs.additions }}/${{ steps.hcp_plan.outputs.changes }}/${{ steps.hcp_plan.outputs.destructions }}/${{ steps.hcp_plan.outputs.imports }}
+      watch_pages_project: ${{ steps.hcp_plan.outputs.watch_pages_project }}
+      watch_pages_domain: ${{ steps.hcp_plan.outputs.watch_pages_domain }}
+    env:
+      TF_CLOUD_ORGANIZATION: Piedrazul
+      TF_WORKSPACE: piedrazul-hetzner
+      HCP_WORKSPACE_ID: ${{ vars.TF_WORKSPACE_HETZNER_ID }}
+      # Identifica el run de HCP de ESTE intento: production y la limpieza solo tocan ese run
+      HCP_RUN_MESSAGE: "Producción ${{ github.sha }} — run ${{ github.run_id }}/${{ github.run_attempt }}"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Verificar credenciales de HCP Terraform
+        id: credentials
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          MISSING=()
+          [ -n "${TF_API_TOKEN:-}" ] || MISSING+=("TF_API_TOKEN")
+          [[ "${HCP_WORKSPACE_ID}" =~ ^ws-[A-Za-z0-9]+$ ]] || MISSING+=("vars.TF_WORKSPACE_HETZNER_ID")
+          if [ "${#MISSING[@]}" -gt 0 ]; then
+            echo "::error title=Plan de Terraform::Faltan credenciales o variables: ${MISSING[*]}"
+            exit 1
+          fi
+          echo "Credenciales de HCP presentes"
+
+      # Workspace verificado (identidad, permisos, ejecución remota, sin auto-apply) antes de
+      # leer su estado. Un workspace sin estado es `none` solo si HCP lo confirma por dos
+      # lecturas; un error nunca se lee como instalación limpia.
+      - name: Verificar workspace de HCP Terraform
+        id: hcp_workspace
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          .github/scripts/hcp-state.sh workspace apply > "${RUNNER_TEMP}/hcp-workspace.env"
+          cat "${RUNNER_TEMP}/hcp-workspace.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/hcp-workspace.env"
+
+      - name: Esperar a que HCP Terraform esté libre
+        id: hcp_idle
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: .github/scripts/hcp-state.sh wait-idle
+
+      - name: Capturar state version previo
+        id: hcp_before
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          SV=$(.github/scripts/hcp-state.sh current)
+          echo "state_version_id=${SV}" >> "$GITHUB_OUTPUT"
+          if [ "${SV}" = none ]; then
+            echo "El workspace no tiene state version (instalación nueva, confirmado por HCP)"
+          else
+            echo "State version previo: ${SV}"
+          fi
+
+      - name: Verificar frescura antes del plan
+        id: fresh_plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/verify-main-tip.sh
+
+      # Configuración PROVISIONAL (sin auto-queue-runs): no pasa a ser la actual del workspace
+      # salvo que su run se aplique. Sin provisional confirmado por HCP, falla: nunca se sube
+      # una configuración no provisional
+      - name: Subir configuración provisional a HCP Terraform
+        id: hcp_upload
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          .github/scripts/hcp-state.sh upload infra/terraform > "${RUNNER_TEMP}/hcp-upload.env"
+          cat "${RUNNER_TEMP}/hcp-upload.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/hcp-upload.env"
+
+      # Saved plan con auto-apply=false explícito; HCP_RUN_MESSAGE lo identifica como propio
+      - name: Crear saved plan de Terraform
+        id: hcp_run
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          RUN_MESSAGE: ${{ env.HCP_RUN_MESSAGE }}
+          CONFIGURATION_VERSION: ${{ steps.hcp_upload.outputs.configuration_version_id }}
+        run: |
+          set -euo pipefail
+          .github/scripts/hcp-state.sh create-run "${CONFIGURATION_VERSION}" > "${RUNNER_TEMP}/hcp-run.env"
+          echo "run_message=${RUN_MESSAGE}" >> "${RUNNER_TEMP}/hcp-run.env"
+          cat "${RUNNER_TEMP}/hcp-run.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/hcp-run.env"
+
+      # Plan terminado, ligado al estado previo y a la configuración subida, con su revisión
+      # saneada en el resumen (el repositorio es público: solo rutas y valores clasificados,
+      # ver plan-review.sh). La frescura se vuelve a comprobar: un commit viejo no sigue y su
+      # saved plan se descarta.
+      - name: Revisar plan de Terraform
+        id: hcp_plan
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          RUN_MESSAGE: ${{ env.HCP_RUN_MESSAGE }}
+          GH_TOKEN: ${{ github.token }}
+          FRESHNESS_CMD: .github/scripts/verify-main-tip.sh
+          RUN_ID: ${{ steps.hcp_run.outputs.run_id }}
+          RUN_LINK: ${{ steps.hcp_run.outputs.run_link }}
+          CONFIGURATION_VERSION: ${{ steps.hcp_upload.outputs.configuration_version_id }}
+          ARCHIVE_SHA256: ${{ steps.hcp_upload.outputs.archive_sha256 }}
+          STATE_BEFORE: ${{ steps.hcp_before.outputs.state_version_id }}
+          PLAN_WATCH: >-
+            pages_project=module.pages.cloudflare_pages_project.main
+            pages_domain=module.pages.cloudflare_pages_domain.main
+        run: |
+          set -euo pipefail
+          export PLAN_REVIEW_FILE="${RUNNER_TEMP}/plan-review.md"
+          .github/scripts/hcp-state.sh plan "${RUN_ID}" > "${RUNNER_TEMP}/hcp-plan.env"
+          get() { sed -n "s/^$1=//p" "${RUNNER_TEMP}/hcp-plan.env"; }
+          # El plan debe partir del estado capturado y de la configuración subida por este job
+          if [ "$(get input_state_version)" != "${STATE_BEFORE}" ]; then
+            echo "::error title=Terraform::El plan del run ${RUN_ID} partió del estado $(get input_state_version), no del capturado (${STATE_BEFORE}): no se revisa ni se aplica"
+            exit 1
+          fi
+          if [ "$(get configuration_version_id)" != "${CONFIGURATION_VERSION}" ]; then
+            echo "::error title=Terraform::El run ${RUN_ID} usa la configuración $(get configuration_version_id), no la subida por este job (${CONFIGURATION_VERSION})"
+            exit 1
+          fi
+          case "$(get has_changes)" in
+            true | false) ;;
+            *) echo "::error title=Terraform::Resultado del plan inválido: has_changes='$(get has_changes)'"; exit 1 ;;
+          esac
+          cat "${RUNNER_TEMP}/hcp-plan.env" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Plan de Terraform"
+            echo
+            if [ "$(get has_changes)" = true ]; then
+              echo "**Con cambios.** Revisar los efectos de abajo; aprobar el environment \`production-hetzner\` del job *Producción* de este run aplica **exactamente** este saved plan (y sigue con el deploy). Si algo no corresponde, rechazar: el plan se descarta sin Apply."
+            else
+              echo "**Sin cambios:** nada que aplicar. *Producción* solo corre si este run también despliega o publica el frontend."
+            fi
+            echo
+            echo "| identidad | valor |"
+            echo "|---|---|"
+            echo "| workspace | \`${TF_CLOUD_ORGANIZATION}/${TF_WORKSPACE}\` (\`${HCP_WORKSPACE_ID}\`) |"
+            echo "| commit | \`${GITHUB_SHA}\` |"
+            echo "| run / plan | [\`${RUN_ID}\`](${RUN_LINK}) / \`$(get plan_id)\` ($(get run_status)) |"
+            echo "| configuración (provisional) | \`${CONFIGURATION_VERSION}\` — sha256 del archivo subido \`${ARCHIVE_SHA256}\` |"
+            echo "| state version de entrada | \`$(get input_state_version)\` |"
+            echo "| crear / cambiar / destruir / importar (HCP) | $(get additions) / $(get changes) / $(get destructions) / $(get imports) |"
+            echo "| intento | run ${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT} |"
+            echo
+            echo "### Efectos"
+            echo
+            cat "${PLAN_REVIEW_FILE}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$(get has_changes)" = true ]; then
+            echo "::notice title=Terraform::Plan listo para revisión: run ${RUN_ID}, plan $(get plan_id), commit ${GITHUB_SHA}. Revisar el resumen de este run y aprobar el job Producción para aplicarlo"
+            if [ "$(get review_deletes)" != 0 ] || [ "$(get review_replaces)" != 0 ]; then
+              echo "::warning title=Terraform::Plan destructivo: $(get review_deletes) destrucción(es) y $(get review_replaces) reemplazo(s). Revisar cada uno antes de aprobar"
+            fi
+          fi
+
+      # Si este job falla o se cancela después de intentar crear el run, el run propio se
+      # descarta (o se cancela si sigue planificando); uno confirmado no se toca. Si la
+      # creación se cortó antes de registrar el id, se busca por el mensaje. Con éxito no
+      # corre: el saved plan queda para production.
+      - name: Liberar el run de Terraform de este intento
+        id: hcp_cleanup
+        if: |
+          always() && (failure() || cancelled()) &&
+          (steps.hcp_run.outcome == 'success' || steps.hcp_run.outcome == 'failure' || steps.hcp_run.outcome == 'cancelled')
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          RUN_MESSAGE: ${{ env.HCP_RUN_MESSAGE }}
+          RUN_ID: ${{ steps.hcp_run.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          .github/scripts/hcp-state.sh cleanup ${RUN_ID:+"${RUN_ID}"} > "${RUNNER_TEMP}/hcp-cleanup.env"
+          cat "${RUNNER_TEMP}/hcp-cleanup.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/hcp-cleanup.env"
+          {
+            echo
+            case "$(sed -n 's/^cleanup=//p' "${RUNNER_TEMP}/hcp-cleanup.env")" in
+              discarded) echo "**Run de este intento descartado** (no hubo Apply)." ;;
+              canceled) echo "**Run de este intento cancelado** durante el plan (no hubo Apply)." ;;
+              *apply_accepted*) echo "**El run de este intento ya había sido confirmado en HCP** (Apply aceptado fuera de GitHub; no se deshace). La cadena no sigue." ;;
+              *) echo "Run de este intento: sin acción de limpieza." ;;
+            esac
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # ── Autoridad de producción ────────────────────────────────────────────────
-  # Único job con el environment production-hetzner y credenciales de producción. Una
-  # aprobación cubre toda la cadena:
+  # Única aprobación sin Terraform; con Terraform, la segunda, pedida cuando el plan
+  # definitivo ya está en el resumen de terraform_plan. Cubre toda la cadena:
   #
   #   [escaneo de identidades conocidas: image_scan + image_policy] → [sondeo de Pages] →
-  #   workspace verificado → state version previo (o `none`) → frescura → plan (si aplica) →
-  #   confirmación humana en HCP (si el plan tiene cambios) → Apply → state version exacto →
-  #   outputs → preflight estricto de Pages → SSH → cloud-init terminado (si converge) →
-  #   último éxito del servidor →
+  #   workspace verificado → state version previo (o `none`) → [con cambios: evidencia del
+  #   plan sobre Pages → frescura → revalidación y confirmación del saved plan revisado
+  #   (una sola solicitud)] → resultado del Apply y state version exacto (o, sin cambios,
+  #   el estado sin cambios) → outputs → preflight estricto de Pages → SSH → cloud-init
+  #   terminado (si converge) → último éxito del servidor →
   #   identidades exactas → evidencia de escaneo + escaneo del reuso → política de
   #   vulnerabilidades (autoritativa) [→ registro de break-glass] → [frescura si no hubo Apply] →
   #   converge (postgres + reconciliación de autoridades de la base → Keycloak/Traefik) /
@@ -960,12 +1213,17 @@ jobs:
   #   identidad en ejecución → health (contenedores + públicos) → registro del último éxito
   #   → [frescura si nada mutó antes] → publicación del frontend en Pages → verificación
   #
-  # Terraform: el run lo crea esta cadena con auto-apply=false y el workspace se exige sin
-  # auto-apply; nada en GitHub lo confirma. Con cambios, una persona revisa y confirma ESE
-  # run en HCP (la aprobación del environment autoriza la cadena, no un plan que todavía no
-  # existe). Sin cambios no hay nada que confirmar. Si main avanza mientras espera, vence el
-  # plazo o el job se cancela/falla antes de la confirmación, el run propio se descarta
-  # (hcp_cleanup); un Apply que HCP ya aceptó no se deshace y se informa como tal.
+  # Terraform: solo se confirma el saved plan de terraform_plan de este run (mensaje, run,
+  # plan, configuración y state version de entrada), y solo si en ese momento siguen
+  # vigentes: workspace sin auto-apply, el estado actual es el del plan, el plan tiene
+  # como mucho una hora, ningún otro run ocupa el workspace y main no avanzó. Una única
+  # solicitud de Apply; una respuesta incierta se reconcilia leyendo el run, nunca
+  # repitiéndola. Aceptar la solicitud no es aplicar: el resultado lo da hcp_state. Si el
+  # run aparece confirmado fuera de GitHub, se observa sin cancelarlo y la cadena falla
+  # antes del servidor y de Pages. Si production falla o se cancela antes de confirmar, el
+  # saved plan se descarta (hcp_cleanup); un Apply que HCP ya aceptó no se deshace y se
+  # informa como tal. Si production nunca corre (aprobación rechazada o vencida), el saved
+  # plan queda sin confirmar: no ocupa el workspace y HCP lo descarta si el estado cambia.
   #
   # Pages (subida directa, sin Git): el artefacto de frontend_build se descarga y verifica,
   # wrangler se instala desde un lockfile fijado y el proyecto se sondea ANTES de la primera
@@ -987,26 +1245,36 @@ jobs:
   production:
     name: Producción
     runs-on: ubuntu-latest
-    needs: [classify, select_images, image_targets, image_scan, image_policy, frontend_build]
+    needs: [classify, select_images, image_targets, image_scan, image_policy, frontend_build, terraform_plan]
     # Con frontend, espera a que frontend_build haya construido y validado el artefacto.
     # Con deploy, espera a que el escaneo de las identidades conocidas antes del gate haya
     # terminado en success (todos los intentos completados con evidencia; fallido o
     # cancelado = cadena no verificable; sin objetivos, image_scan se salta y la lista debe
     # estar vacía) y a que la política preliminar no haya bloqueado.
+    # Terraform: sin Terraform, terraform_plan debe estar saltado (nunca "sin plan" por un
+    # fallo); con Terraform, debe haber terminado en success con has_changes exactamente
+    # true (aplicar) o false (solo si además hay deploy o frontend). Cualquier otro
+    # resultado (failure, cancelled, salida vacía o inválida) deja production sin correr y
+    # conclude en fallo.
     if: |
       !cancelled() &&
       needs.classify.result == 'success' &&
       needs.select_images.result == 'success' &&
-      (needs.classify.outputs.terraform_required == 'true' ||
-        needs.classify.outputs.deploy_required == 'true' ||
-        needs.classify.outputs.frontend_required == 'true') &&
       (needs.classify.outputs.frontend_required != 'true' || needs.frontend_build.result == 'success') &&
       (needs.classify.outputs.deploy_required != 'true' ||
         (needs.image_targets.result == 'success' &&
           needs.image_policy.result == 'success' &&
           (needs.image_scan.result == 'success' ||
-            (needs.image_scan.result == 'skipped' && needs.image_targets.outputs.targets == '[]'))))
-    # Incluye hasta 30 min de espera de la confirmación humana del plan en HCP
+            (needs.image_scan.result == 'skipped' && needs.image_targets.outputs.targets == '[]')))) &&
+      ((needs.classify.outputs.terraform_required != 'true' &&
+          needs.terraform_plan.result == 'skipped' &&
+          (needs.classify.outputs.deploy_required == 'true' || needs.classify.outputs.frontend_required == 'true')) ||
+        (needs.classify.outputs.terraform_required == 'true' &&
+          needs.terraform_plan.result == 'success' &&
+          (needs.terraform_plan.outputs.has_changes == 'true' ||
+            (needs.terraform_plan.outputs.has_changes == 'false' &&
+              (needs.classify.outputs.deploy_required == 'true' || needs.classify.outputs.frontend_required == 'true')))))
+    # Incluye el Apply (hasta 15 min de seguimiento) y el deploy completo
     timeout-minutes: 120
     environment: production-hetzner
     concurrency:
@@ -1029,10 +1297,15 @@ jobs:
       TF_CLOUD_ORGANIZATION: Piedrazul
       TF_WORKSPACE: piedrazul-hetzner
       HCP_WORKSPACE_ID: ${{ vars.TF_WORKSPACE_HETZNER_ID }}
-      # Identifica el run de HCP de ESTE intento: cleanup y la espera solo tocan ese run
-      HCP_RUN_MESSAGE: "Producción ${{ github.sha }} — run ${{ github.run_id }}/${{ github.run_attempt }}"
+      # Saved plan revisado en terraform_plan de este run: el Apply, el estado y la limpieza
+      # solo tocan ese run (mismo mensaje, aunque production se vuelva a correr sola)
+      HCP_RUN_ID: ${{ needs.terraform_plan.outputs.run_id }}
+      HCP_RUN_MESSAGE: ${{ needs.terraform_plan.outputs.run_message }}
+      HCP_STATE_BEFORE_PLAN: ${{ needs.terraform_plan.outputs.state_before }}
       KC_REALM: piedrazul
+      # Este run pasa por Terraform (plan en terraform_plan) / aplica su saved plan
       TERRAFORM_REQUIRED: ${{ needs.classify.outputs.terraform_required }}
+      TF_APPLY_REQUIRED: ${{ needs.classify.outputs.terraform_required == 'true' && needs.terraform_plan.outputs.has_changes == 'true' }}
       DEPLOY_REQUIRED: ${{ needs.classify.outputs.deploy_required }}
       RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
       RUN_APP_DEPLOY: ${{ needs.classify.outputs.run_app_deploy }}
@@ -1187,17 +1460,18 @@ jobs:
           PAGES_PROJECT: ${{ steps.pages_target.outputs.project_name }}
           PAGES_BRANCH: ${{ steps.pages_target.outputs.production_branch }}
           PAGES_DOMAIN: ${{ steps.pages_target.outputs.custom_domain }}
-          PAGES_ALLOW_PROVISIONING: ${{ env.TERRAFORM_REQUIRED == 'true' }}
+          PAGES_ALLOW_PROVISIONING: ${{ env.TF_APPLY_REQUIRED == 'true' }}
         run: |
           set -euo pipefail
           .github/scripts/pages-release.sh probe > "${RUNNER_TEMP}/pages-probe.env"
           cat "${RUNNER_TEMP}/pages-probe.env" >> "$GITHUB_OUTPUT"
           cat "${RUNNER_TEMP}/pages-probe.env"
 
-      # ── Terraform: plan revisado y confirmado por una persona en HCP ──
-      # El workspace se verifica (identidad, permisos, ejecución remota y, si este run aplica,
-      # sin auto-apply) antes de leer su estado. Un workspace sin estado es `none` solo si
-      # HCP lo confirma por dos lecturas; un error nunca se lee como instalación limpia.
+      # ── Terraform: confirmación del saved plan revisado ──
+      # El workspace se verifica (identidad, permisos, ejecución remota y, si este run
+      # aplica, sin auto-apply y con permiso de confirmar) antes de leer su estado. Un
+      # workspace sin estado es `none` solo si HCP lo confirma por dos lecturas; un error
+      # nunca se lee como instalación limpia.
       - name: Verificar workspace de HCP Terraform
         id: hcp_workspace
         if: env.TERRAFORM_REQUIRED == 'true' || env.DEPLOY_REQUIRED == 'true'
@@ -1205,7 +1479,7 @@ jobs:
           TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
         run: |
           set -euo pipefail
-          .github/scripts/hcp-state.sh workspace ${{ env.TERRAFORM_REQUIRED == 'true' && 'apply' || 'read' }} > "${RUNNER_TEMP}/hcp-workspace.env"
+          .github/scripts/hcp-state.sh workspace ${{ env.TF_APPLY_REQUIRED == 'true' && 'apply' || 'read' }} > "${RUNNER_TEMP}/hcp-workspace.env"
           cat "${RUNNER_TEMP}/hcp-workspace.env" >> "$GITHUB_OUTPUT"
           cat "${RUNNER_TEMP}/hcp-workspace.env"
 
@@ -1231,154 +1505,79 @@ jobs:
             echo "State version previo: ${SV}"
           fi
 
-      - name: Verificar frescura antes del Apply
-        id: fresh_apply
-        if: env.TERRAFORM_REQUIRED == 'true'
+      # Un proyecto de Pages ausente o incompleto solo se admitió porque este Apply debía
+      # crear lo que falta: hace falta la acción OBSERVADA en el plan revisado (unknown,
+      # ambiguous o cualquier otra no basta; nunca se infiere). Antes de confirmar nada.
+      - name: Verificar evidencia del plan sobre Pages
+        id: pages_plan
+        if: env.FRONTEND_REQUIRED == 'true' && env.TF_APPLY_REQUIRED == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: .github/scripts/verify-main-tip.sh
-
-      # Solo sube la configuración (configuration version sin auto-queue-runs): no crea runs
-      - name: Subir configuración a HCP Terraform
-        id: hcp_upload
-        if: env.TERRAFORM_REQUIRED == 'true'
-        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@8e08d1ba957673f5fbf971a22b3219639dc45661 # v1.3.2
-        env:
-          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
-        with:
-          workspace: ${{ env.TF_WORKSPACE }}
-          directory: infra/terraform
-
-      # Run aplicable con auto-apply=false explícito (la acción create-run no lo admite y
-      # heredaría el auto-apply del workspace); HCP_RUN_MESSAGE lo identifica como propio
-      - name: Crear run de Terraform (sin auto-apply)
-        id: hcp_run
-        if: env.TERRAFORM_REQUIRED == 'true'
-        env:
-          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
-          RUN_MESSAGE: ${{ env.HCP_RUN_MESSAGE }}
-          CONFIGURATION_VERSION: ${{ steps.hcp_upload.outputs.configuration_version_id }}
-        run: |
-          set -euo pipefail
-          .github/scripts/hcp-state.sh create-run "${CONFIGURATION_VERSION}" > "${RUNNER_TEMP}/hcp-run.env"
-          cat "${RUNNER_TEMP}/hcp-run.env" >> "$GITHUB_OUTPUT"
-          cat "${RUNNER_TEMP}/hcp-run.env"
-
-      # Plan terminado y descrito (log y resumen). Sin cambios: nada que confirmar. Con
-      # cambios: la confirmación es humana, en HCP, sobre este mismo run, y el procedimiento
-      # exige hacerla solo DESPUÉS de que este paso termine en éxito (aviso "Plan revisado por
-      # GitHub"). HCP permite confirmar en cuanto el plan es confirmable, también antes: eso
-      # no se puede impedir desde aquí; se detecta (already_confirmed) y se informa. La
-      # frescura se vuelve a comprobar aquí: si main avanzó y nada mutó, el run propio se
-      # descarta (o, sin cambios, la cadena no sigue); si alguien ya confirmó el run, el Apply
-      # empezó y no se corta (confirmed_while_stale, ver hcp-state.sh).
-      - name: Revisar plan de Terraform
-        id: hcp_plan
-        if: env.TERRAFORM_REQUIRED == 'true'
-        env:
-          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
-          RUN_MESSAGE: ${{ env.HCP_RUN_MESSAGE }}
-          GH_TOKEN: ${{ github.token }}
-          FRESHNESS_CMD: .github/scripts/verify-main-tip.sh
-          RUN_ID: ${{ steps.hcp_run.outputs.run_id }}
-          PLAN_WATCH: >-
-            pages_project=module.pages.cloudflare_pages_project.main
-            pages_domain=module.pages.cloudflare_pages_domain.main
           PAGES_PROJECT_STATE: ${{ steps.pages_probe.outputs.project_state }}
+          WATCH_PAGES_PROJECT: ${{ needs.terraform_plan.outputs.watch_pages_project }}
+          WATCH_PAGES_DOMAIN: ${{ needs.terraform_plan.outputs.watch_pages_domain }}
         run: |
           set -euo pipefail
-          export PLAN_CHANGES_FILE="${RUNNER_TEMP}/plan-changes.txt"
-          .github/scripts/hcp-state.sh plan "${RUN_ID}" > "${RUNNER_TEMP}/hcp-plan.env"
-          cat "${RUNNER_TEMP}/hcp-plan.env" >> "$GITHUB_OUTPUT"
-          get() { sed -n "s/^$1=//p" "${RUNNER_TEMP}/hcp-plan.env"; }
-          {
-            echo "## Plan de Terraform"
-            echo
-            echo "| campo | valor |"
-            echo "|---|---|"
-            echo "| workspace | \`${TF_CLOUD_ORGANIZATION}/${TF_WORKSPACE}\` (\`${HCP_WORKSPACE_ID}\`) |"
-            echo "| commit | \`${GITHUB_SHA}\` |"
-            echo "| run / plan | [\`${RUN_ID}\`]($(get run_link)) / \`$(get plan_id)\` |"
-            echo "| crear / cambiar / destruir / importar | $(get additions) / $(get changes) / $(get destructions) / $(get imports) |"
-            if [ "$(get already_confirmed)" = true ]; then
-              echo "| confirmación | **confirmado en HCP antes de que GitHub terminara de revisar este plan** (procedimiento: confirmar solo después de este paso) |"
-            elif [ "$(get needs_confirmation)" = true ]; then
-              echo "| confirmación | requiere confirmación humana en HCP, **solo cuando este paso termine en éxito** (aviso \"Plan revisado por GitHub\"), sobre este run y este commit |"
-            else
-              echo "| confirmación | sin cambios: nada que aplicar |"
-            fi
-            echo
-            echo '```'
-            cat "${PLAN_CHANGES_FILE}"
-            echo '```'
-          } | tee -a "$GITHUB_STEP_SUMMARY"
-          if [ "$(get already_confirmed)" = true ]; then
-            echo "::warning title=Terraform::El run ${RUN_ID} se confirmó en HCP antes de que GitHub terminara de revisar el plan (fuera del procedimiento): HCP ya aceptó el Apply y no se interrumpe"
-          fi
-          if [ "$(get confirmed_while_stale)" = true ]; then
-            echo "::warning title=Terraform::El run ${RUN_ID} se confirmó en HCP cuando main ya había avanzado: el Apply empezó y esta cadena termina; el run del commit nuevo sigue después"
-          fi
-          # Un proyecto de Pages ausente o incompleto solo se admitió porque este Apply debía
-          # crear lo que falta: hace falta la acción OBSERVADA en el plan (unknown, ambiguous o
-          # cualquier otra no basta; nunca se infiere)
           case "${PAGES_PROJECT_STATE}" in
             absent) need="pages_project pages_domain" ;;
             incomplete) need="pages_domain" ;;
             *) need="" ;;
           esac
           for w in ${need}; do
-            if [ "$(get "watch_${w}")" != create ]; then
-              if [ "$(get already_confirmed)" = true ]; then
-                # La comprobación no puede impedir una confirmación hecha antes en HCP
-                echo "::error title=Pages::El proyecto de Pages está ${PAGES_PROJECT_STATE} y el plan no muestra la creación de ${w} (acción observada: $(get "watch_${w}")), pero el run ya se confirmó en HCP: el Apply fue aceptado y no se deshace. La cadena se detiene antes del servidor y de Pages"
-              else
-                echo "::error title=Pages::El proyecto de Pages está ${PAGES_PROJECT_STATE} y el plan no muestra la creación de ${w} (acción observada: $(get "watch_${w}"); unknown = el JSON del plan no se pudo leer o interpretar); no se aplica: el run se descarta"
-              fi
+            v="WATCH_${w^^}"
+            if [ "${!v}" != create ]; then
+              echo "::error title=Pages::El proyecto de Pages está ${PAGES_PROJECT_STATE} y el plan revisado no muestra la creación de ${w} (acción observada: ${!v:-sin dato}; unknown = el JSON del plan no se pudo leer o interpretar); no se aplica: el saved plan se descarta"
               exit 1
             fi
           done
-          # Única señal para el operador: GitHub terminó de revisar ESTE run (identidad,
-          # frescura, evidencia de Pages). Confirmar antes no lo impide HCP, pero queda fuera
-          # del procedimiento (docs/operations/runbooks/instalacion-nueva.md)
-          if [ "$(get needs_confirmation)" = true ] && [ "$(get already_confirmed)" != true ]; then
-            echo "::notice title=Terraform::Plan revisado por GitHub: ya se puede revisar y confirmar en HCP el run ${RUN_ID} (plan $(get plan_id), commit ${GITHUB_SHA}): $(get run_link)"
-          fi
+          echo "Evidencia del plan sobre Pages suficiente (proyecto ${PAGES_PROJECT_STATE:-sin sondear})"
 
-      # Única autoridad del Apply: una persona confirma en HCP el run que el paso anterior
-      # describió. Si main avanza o vence el plazo, el run propio se descarta y no hay Apply.
-      - name: Esperar confirmación humana en HCP
-        id: hcp_confirm
-        if: |
-          env.TERRAFORM_REQUIRED == 'true' &&
-          steps.hcp_plan.outputs.needs_confirmation == 'true' &&
-          steps.hcp_plan.outputs.already_confirmed != 'true'
-        timeout-minutes: 35
+      - name: Verificar frescura antes del Apply
+        id: fresh_apply
+        if: env.TF_APPLY_REQUIRED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/verify-main-tip.sh
+
+      # Única confirmación del Apply: el saved plan que terraform_plan revisó en este run,
+      # después de la aprobación de este job y revalidado ahora (ver hcp-state.sh apply).
+      # Una sola solicitud; nunca se repite. Confirmado fuera de GitHub → se observa sin
+      # cancelarlo y la cadena se detiene aquí.
+      - name: Confirmar el saved plan revisado (Apply)
+        id: hcp_apply
+        if: env.TF_APPLY_REQUIRED == 'true'
         env:
           TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
           GH_TOKEN: ${{ github.token }}
           RUN_MESSAGE: ${{ env.HCP_RUN_MESSAGE }}
-          RUN_ID: ${{ steps.hcp_run.outputs.run_id }}
-          HCP_CONFIRM_ATTEMPTS: "120"
           FRESHNESS_CMD: .github/scripts/verify-main-tip.sh
+          EXPECTED_PLAN_ID: ${{ needs.terraform_plan.outputs.plan_id }}
+          EXPECTED_CONFIGURATION_VERSION: ${{ needs.terraform_plan.outputs.configuration_version_id }}
+          EXPECTED_STATE: ${{ needs.terraform_plan.outputs.input_state_version }}
+          PLAN_MAX_AGE_SECONDS: "3600"
+          APPLY_COMMENT: "Aprobado en GitHub: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }} (commit ${{ github.sha }})"
         run: |
           set -euo pipefail
-          echo "::notice title=Terraform::Revisar y confirmar (o descartar) el run ${RUN_ID} en HCP: ${{ steps.hcp_plan.outputs.run_link }}"
-          .github/scripts/hcp-state.sh await-confirm "${RUN_ID}" > "${RUNNER_TEMP}/hcp-confirm.env"
-          cat "${RUNNER_TEMP}/hcp-confirm.env" >> "$GITHUB_OUTPUT"
-          cat "${RUNNER_TEMP}/hcp-confirm.env"
-          if grep -qx confirmed_while_stale=true "${RUNNER_TEMP}/hcp-confirm.env"; then
-            echo "::warning title=Terraform::El run ${RUN_ID} se confirmó en HCP mientras main avanzaba: el Apply empezó y esta cadena termina; el run del commit nuevo sigue después"
+          if [ "${EXPECTED_STATE}" != "${HCP_STATE_BEFORE_PLAN}" ]; then
+            echo "::error title=Terraform::El plan revisado partió de ${EXPECTED_STATE}, no del estado capturado por terraform_plan (${HCP_STATE_BEFORE_PLAN})"
+            exit 1
           fi
+          rc=0
+          .github/scripts/hcp-state.sh apply "${HCP_RUN_ID}" > "${RUNNER_TEMP}/hcp-apply.env" || rc=$?
+          cat "${RUNNER_TEMP}/hcp-apply.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/hcp-apply.env"
+          exit "${rc}"
 
-      # El Deploy solo consume el state version que produjo el run de esta misma
-      # ejecución (o, si no produjo estado, el previo sin cambios). Ver hcp-state.sh.
+      # Resultado real del Apply (no la aceptación de la solicitud): el Deploy solo consume el
+      # state version que produjo el saved plan de este run o, sin cambios
+      # (planned_and_finished), el estado del plan, que debe seguir siendo el actual.
+      # Ver hcp-state.sh run-state.
       - name: Resolver state version del Apply
         id: hcp_state
         if: env.TERRAFORM_REQUIRED == 'true'
         env:
           TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
-          RUN_ID: ${{ steps.hcp_run.outputs.run_id }}
-          STATE_BEFORE: ${{ steps.hcp_before.outputs.state_version_id }}
+          RUN_ID: ${{ env.HCP_RUN_ID }}
+          STATE_BEFORE: ${{ env.HCP_STATE_BEFORE_PLAN }}
         run: |
           set -euo pipefail
           .github/scripts/hcp-state.sh run-state "${RUN_ID}" "${STATE_BEFORE}" > "${RUNNER_TEMP}/hcp-state.env"
@@ -1677,7 +1876,7 @@ jobs:
       # registro del break-glass): un paso saltado por error nunca equivale a autorización.
       - name: Verificar frescura antes de mutar el servidor
         id: fresh_deploy
-        if: env.DEPLOY_REQUIRED == 'true' && env.TERRAFORM_REQUIRED != 'true'
+        if: env.DEPLOY_REQUIRED == 'true' && env.TF_APPLY_REQUIRED != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: .github/scripts/verify-main-tip.sh
@@ -1880,7 +2079,7 @@ jobs:
       # mutación, la cadena iniciada termina aunque main haya avanzado.
       - name: Verificar frescura antes de publicar el frontend
         id: fresh_frontend
-        if: env.FRONTEND_REQUIRED == 'true' && env.TERRAFORM_REQUIRED != 'true' && env.DEPLOY_REQUIRED != 'true'
+        if: env.FRONTEND_REQUIRED == 'true' && env.TF_APPLY_REQUIRED != 'true' && env.DEPLOY_REQUIRED != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: .github/scripts/verify-main-tip.sh
@@ -1906,25 +2105,22 @@ jobs:
           cat "${RUNNER_TEMP}/pages-publish.env" >> "$GITHUB_OUTPUT"
           cat "${RUNNER_TEMP}/pages-publish.env"
 
-      # Siempre que este intento intentó crear un run: si quedó esperando confirmación
-      # (fallo, cancelación o vencimiento del job) se descarta; si estaba planificando, se
-      # cancela; si HCP ya aceptó el Apply, no se toca (cancelar el job no lo deshace) y se
-      # informa. Solo actúa sobre runs con HCP_RUN_MESSAGE de este intento. Si la creación
-      # falló o se cortó antes de registrar el id (p. ej. después del POST), lo busca por ese
-      # mensaje. Si este paso no llega a correr (runner terminado de golpe), ver
-      # docs/operations/runbooks/instalacion-nueva.md (run huérfano).
-      - name: Liberar el run de Terraform de este intento
+      # Siempre que este run debía aplicar un saved plan: si production falló o se canceló
+      # antes de confirmarlo, se descarta (nunca queda un plan revisado confirmable en HCP);
+      # si HCP ya aceptó el Apply (por esta cadena o fuera de GitHub), no se toca (cancelar
+      # el job no lo deshace) y se informa. Solo actúa sobre el run con el mensaje de
+      # terraform_plan de este run. Si este paso no llega a correr (runner terminado de
+      # golpe), ver docs/operations/runbooks/instalacion-nueva.md (run huérfano).
+      - name: Liberar el saved plan de este run
         id: hcp_cleanup
-        if: |
-          always() &&
-          (steps.hcp_run.outcome == 'success' || steps.hcp_run.outcome == 'failure' || steps.hcp_run.outcome == 'cancelled')
+        if: always() && env.TF_APPLY_REQUIRED == 'true'
         env:
           TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
           RUN_MESSAGE: ${{ env.HCP_RUN_MESSAGE }}
-          RUN_ID: ${{ steps.hcp_run.outputs.run_id }}
+          RUN_ID: ${{ env.HCP_RUN_ID }}
         run: |
           set -euo pipefail
-          .github/scripts/hcp-state.sh cleanup ${RUN_ID:+"${RUN_ID}"} > "${RUNNER_TEMP}/hcp-cleanup.env"
+          .github/scripts/hcp-state.sh cleanup "${RUN_ID}" > "${RUNNER_TEMP}/hcp-cleanup.env"
           cat "${RUNNER_TEMP}/hcp-cleanup.env" >> "$GITHUB_OUTPUT"
           cat "${RUNNER_TEMP}/hcp-cleanup.env"
 
@@ -1932,7 +2128,6 @@ jobs:
         if: always()
         env:
           INTENT: ${{ needs.classify.outputs.intent }}
-          HCP_RUN: ${{ steps.hcp_state.outputs.run_id }}
           HCP_RUN_STATUS: ${{ steps.hcp_state.outputs.run_status }}
           STATE_BEFORE: ${{ steps.hcp_before.outputs.state_version_id }}
           STATE_USED: ${{ steps.tf_outputs.outputs.state_version_id || steps.hcp_state.outputs.state_version_id }}
@@ -1948,16 +2143,17 @@ jobs:
           STATE_STATUS: ${{ steps.select.outputs.state_status }}
           O_CREDENTIALS: ${{ steps.credentials.outcome }}
           O_FRESH_APPLY: ${{ steps.fresh_apply.outcome }}
-          O_HCP: ${{ steps.hcp_workspace.outcome }}/${{ steps.hcp_idle.outcome }}/${{ steps.hcp_before.outcome }}/${{ steps.hcp_upload.outcome }}/${{ steps.hcp_run.outcome }}/${{ steps.hcp_plan.outcome }}/${{ steps.hcp_confirm.outcome }}/${{ steps.hcp_state.outcome }}/${{ steps.tf_outputs.outcome }}
-          HCP_PLAN_LINK: ${{ steps.hcp_plan.outputs.run_link }}
-          HCP_PLAN_COUNTS: ${{ steps.hcp_plan.outputs.additions }}/${{ steps.hcp_plan.outputs.changes }}/${{ steps.hcp_plan.outputs.destructions }}/${{ steps.hcp_plan.outputs.imports }}
-          HCP_NEEDS_CONFIRMATION: ${{ steps.hcp_plan.outputs.needs_confirmation }}
-          O_HCP_CONFIRM: ${{ steps.hcp_confirm.outcome }}
+          O_HCP: ${{ steps.hcp_workspace.outcome }}/${{ steps.hcp_idle.outcome }}/${{ steps.hcp_before.outcome }}/${{ steps.hcp_state.outcome }}/${{ steps.tf_outputs.outcome }}
+          O_PAGES_PLAN: ${{ steps.pages_plan.outcome }}
+          O_HCP_APPLY: ${{ steps.hcp_apply.outcome }}
+          HCP_PLAN_LINK: ${{ needs.terraform_plan.outputs.run_link }}
+          HCP_PLAN_ID: ${{ needs.terraform_plan.outputs.plan_id }}
+          HCP_PLAN_COUNTS: ${{ needs.terraform_plan.outputs.counts }}
+          HCP_APPLY_REQUEST: ${{ steps.hcp_apply.outputs.apply_request }}
           HCP_CLEANUP: ${{ steps.hcp_cleanup.outputs.cleanup }}
           O_HCP_CLEANUP: ${{ steps.hcp_cleanup.outcome }}
           O_ACCESS: ${{ steps.access.outcome }}/${{ steps.readiness.outcome }}/${{ steps.host_init.outcome }}/${{ steps.host_state.outcome }}
           CLOUD_INIT: ${{ steps.host_init.outputs.cloud_init_status }}
-          CONFIRMED_WHILE_STALE: ${{ steps.hcp_confirm.outputs.confirmed_while_stale || steps.hcp_plan.outputs.confirmed_while_stale }}
           O_SELECT: ${{ steps.select.outcome }}
           O_SCAN: ${{ steps.scan_download.outcome }}/${{ steps.scan_evidence.outcome }}/${{ steps.scan_backend.outcome }}/${{ steps.scan_postgres.outcome }}
           O_POLICY: ${{ steps.policy.outcome }}/${{ steps.authorization.outcome }}
@@ -2000,8 +2196,14 @@ jobs:
           }
           first_failure "Autoridad de producción (credenciales)" "${O_CREDENTIALS}"
           first_failure "Preparación del frontend (destino, artefacto, wrangler, proyecto/token de Pages o autoridad única)" "${O_PAGES_PREP}"
+          first_failure "Evidencia del plan sobre Pages (el plan revisado no crea lo que falta)" "${O_PAGES_PLAN}"
           first_failure "Frescura (main avanzó o ref no es main)" "${O_FRESH_APPLY}"
-          first_failure "HCP Terraform (workspace, plan, confirmación humana, causalidad del estado)" "${O_HCP}"
+          first_failure "HCP Terraform (workspace, estado previo)" "$(cut -d/ -f1-3 <<< "${O_HCP}")"
+          if [ "${HCP_APPLY_REQUEST}" = out_of_band ]; then
+            first_failure "Apply confirmado fuera de GitHub (no autorizado por esta cadena; no se sigue mutando)" "${O_HCP_APPLY}"
+          fi
+          first_failure "Confirmación del saved plan (revalidación o solicitud de Apply)" "${O_HCP_APPLY}"
+          first_failure "Resultado del Apply y causalidad del estado" "$(cut -d/ -f4-5 <<< "${O_HCP}")"
           first_failure "Proyecto de Pages tras Terraform (destino real, autoridad única)" "${O_PAGES_PREFLIGHT}"
           first_failure "Acceso al servidor" "${O_ACCESS}"
           first_failure "Identidad de imagen (selección)" "${O_SELECT}"
@@ -2062,22 +2264,25 @@ jobs:
             echo "|---|---|"
             echo "| HCP state version previo | \`${STATE_BEFORE:-—}\` |"
             if [ "${TERRAFORM_REQUIRED}" = "true" ]; then
-              echo "| plan (crear/cambiar/destruir/importar) | ${HCP_PLAN_COUNTS:-—} — ${HCP_PLAN_LINK:-sin run} |"
-              case "${HCP_NEEDS_CONFIRMATION}" in
-                true) echo "| confirmación del plan | humana en HCP (espera: ${O_HCP_CONFIRM:-—}) |" ;;
-                false) echo "| confirmación del plan | no requerida: plan sin cambios |" ;;
-              esac
-              echo "| run de Apply | \`${HCP_RUN:-—}\` (${HCP_RUN_STATUS:-sin terminar}) |"
-              if [ "${CONFIRMED_WHILE_STALE}" = true ]; then
-                echo "| frescura del Apply | **confirmado en HCP cuando main ya había avanzado**: el Apply empezó y la cadena terminó; el run del commit nuevo reconcilia después |"
+              echo "| saved plan revisado (crear/cambiar/destruir/importar) | ${HCP_PLAN_COUNTS:-—} — \`${HCP_RUN_ID:-—}\` / \`${HCP_PLAN_ID:-—}\` ${HCP_PLAN_LINK:-} |"
+              if [ "${TF_APPLY_REQUIRED}" = "true" ]; then
+                case "${HCP_APPLY_REQUEST}" in
+                  accepted) echo "| solicitud de Apply | aceptada por HCP tras la aprobación de este job (una sola solicitud) |" ;;
+                  accepted_after_ambiguous) echo "| solicitud de Apply | respuesta incierta; HCP muestra el run confirmado después de la solicitud (sin reintento) |" ;;
+                  out_of_band) echo "| solicitud de Apply | **no enviada: el run se confirmó fuera de GitHub**; observado sin cancelarlo, la cadena no siguió |" ;;
+                  *) echo "| solicitud de Apply | **no aceptada o no enviada** (${O_HCP_APPLY:-—}): sin Apply de esta cadena |" ;;
+                esac
+                echo "| resultado del Apply | ${HCP_RUN_STATUS:-**sin resultado verificado**} |"
+              else
+                echo "| Apply | no requerido: plan sin cambios (${HCP_RUN_STATUS:-sin verificar}) |"
               fi
               if [ -n "${HCP_CLEANUP}" ] || [ "${O_HCP_CLEANUP:-skipped}" != skipped ]; then
                 case "${HCP_CLEANUP}" in
-                  discarded) echo "| run de este intento | **descartado** (no hubo Apply) |" ;;
-                  canceled) echo "| run de este intento | **cancelado** durante el plan (no hubo Apply) |" ;;
-                  apply_accepted) echo "| run de este intento | confirmado: HCP aceptó el Apply (no se deshace al cancelar o fallar el job) |" ;;
-                  none) echo "| run de este intento | terminado, sin acción de limpieza |" ;;
-                  *) echo "| run de este intento | **limpieza no verificada (${O_HCP_CLEANUP})**: revisar el run en HCP |" ;;
+                  discarded) echo "| saved plan de este run | **descartado** (no hubo Apply) |" ;;
+                  canceled) echo "| saved plan de este run | **cancelado** durante el plan (no hubo Apply) |" ;;
+                  apply_accepted) echo "| saved plan de este run | confirmado: HCP aceptó el Apply (no se deshace al cancelar o fallar el job) |" ;;
+                  none) echo "| saved plan de este run | terminado, sin acción de limpieza |" ;;
+                  *) echo "| saved plan de este run | **limpieza no verificada (${O_HCP_CLEANUP})**: revisar el run en HCP |" ;;
                 esac
               fi
             fi
@@ -2105,7 +2310,7 @@ jobs:
               fi
             fi
             echo "| credenciales / frescura | ${O_CREDENTIALS} / ${O_FRESH_APPLY:-—} ${O_FRESH_DEPLOY:-} |"
-            echo "| HCP (idle/previo/upload/run/apply/state/outputs) | ${O_HCP} |"
+            echo "| HCP (workspace/idle/previo/estado/outputs) | ${O_HCP} — confirmación ${O_HCP_APPLY:-—} |"
             echo "| acceso (ssh/espera/cloud-init/último éxito) | ${O_ACCESS} (cloud-init: ${CLOUD_INIT:-no comprobado}) |"
             echo "| selección | ${O_SELECT} |"
             echo "| escaneo antes de mutar (descarga/evidencia/backend reuso/postgres reuso) | ${O_SCAN} |"
@@ -2145,12 +2350,14 @@ jobs:
 
   # ── Resultado ─────────────────────────────────────────────────────────────
   # La conclusión del run es la base del siguiente rango (production-range-base.sh):
-  # solo puede ser success si producción corrió y terminó bien (incluida la publicación
-  # del frontend cuando el rango la requiere), o si no hacía falta.
+  # solo puede ser success si cada job requerido corrió y terminó bien (incluida la
+  # publicación del frontend cuando el rango la requiere) y cada job no requerido quedó
+  # saltado. Un job saltado nunca cuenta como trabajo hecho: con Terraform, terraform_plan
+  # debe terminar en success con has_changes exactamente true o false.
   conclude:
     name: Resultado de producción
     runs-on: ubuntu-latest
-    needs: [classify, select_images, frontend_build, production]
+    needs: [classify, select_images, frontend_build, terraform_plan, production]
     if: always()
     timeout-minutes: 2
     steps:
@@ -2159,21 +2366,41 @@ jobs:
           CLASSIFY: ${{ needs.classify.result }}
           SELECT: ${{ needs.select_images.result }}
           PRODUCTION: ${{ needs.production.result }}
+          TERRAFORM_PLAN: ${{ needs.terraform_plan.result }}
+          HAS_CHANGES: ${{ needs.terraform_plan.outputs.has_changes }}
           TERRAFORM_REQUIRED: ${{ needs.classify.outputs.terraform_required }}
           DEPLOY_REQUIRED: ${{ needs.classify.outputs.deploy_required }}
           FRONTEND_REQUIRED: ${{ needs.classify.outputs.frontend_required }}
           FRONTEND_BUILD: ${{ needs.frontend_build.result }}
         run: |
           set -euo pipefail
-          echo "classify=${CLASSIFY} select_images=${SELECT} frontend_build=${FRONTEND_BUILD} production=${PRODUCTION}"
+          echo "classify=${CLASSIFY} select_images=${SELECT} frontend_build=${FRONTEND_BUILD} terraform_plan=${TERRAFORM_PLAN} (has_changes=${HAS_CHANGES:-—}) production=${PRODUCTION}"
           [ "${CLASSIFY}" = "success" ] || { echo "Error: la intención no se pudo clasificar"; exit 1; }
           [ "${SELECT}" = "success" ] || { echo "Error: la selección de imágenes no terminó (${SELECT})"; exit 1; }
           if [ "${FRONTEND_REQUIRED}" = "true" ]; then
             [ "${FRONTEND_BUILD}" = "success" ] || { echo "Error: el build del frontend requerido terminó en '${FRONTEND_BUILD}'"; exit 1; }
           fi
-          if [ "${TERRAFORM_REQUIRED}" = "true" ] || [ "${DEPLOY_REQUIRED}" = "true" ] || [ "${FRONTEND_REQUIRED}" = "true" ]; then
+          PRODUCTION_REQUIRED=false
+          if [ "${TERRAFORM_REQUIRED}" = "true" ]; then
+            [ "${TERRAFORM_PLAN}" = "success" ] || { echo "Error: el plan de Terraform requerido terminó en '${TERRAFORM_PLAN}'"; exit 1; }
+            case "${HAS_CHANGES}" in
+              true) PRODUCTION_REQUIRED=true ;;
+              false) ;;
+              *) echo "Error: el plan de Terraform no informó un resultado válido (has_changes='${HAS_CHANGES}')"; exit 1 ;;
+            esac
+          else
+            [ "${TERRAFORM_PLAN}" = "skipped" ] || { echo "Error: plan de Terraform no requerido terminó en '${TERRAFORM_PLAN}'"; exit 1; }
+          fi
+          if [ "${DEPLOY_REQUIRED}" = "true" ] || [ "${FRONTEND_REQUIRED}" = "true" ]; then
+            PRODUCTION_REQUIRED=true
+          fi
+          if [ "${PRODUCTION_REQUIRED}" = "true" ]; then
             [ "${PRODUCTION}" = "success" ] || { echo "Error: producción requerida terminó en '${PRODUCTION}'"; exit 1; }
           else
             [ "${PRODUCTION}" = "skipped" ] || { echo "Error: producción no requerida terminó en '${PRODUCTION}'"; exit 1; }
-            echo "Sin cambios de producción en el rango: no-op limpio"
+            if [ "${TERRAFORM_REQUIRED}" = "true" ]; then
+              echo "Plan de Terraform sin cambios y nada que desplegar: no-op limpio"
+            else
+              echo "Sin cambios de producción en el rango: no-op limpio"
+            fi
           fi

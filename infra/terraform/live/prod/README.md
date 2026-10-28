@@ -128,12 +128,15 @@ variables, Terraform solo advierte que no están declaradas; conviene quitarlas.
 
 Este workspace usa HCP Terraform en modo API-driven con ejecución remota. No se
 ejecuta localmente en producción. La cadena de producción
-(`.github/workflows/production-hetzner.yml`) sube la configuración, crea el run con
-`auto-apply=false` y describe el plan; **una persona revisa y confirma ese mismo run en
-HCP** (nada en GitHub lo confirma). Requisitos del workspace, que la cadena verifica antes
-de crear el run: ejecución `remote` (o `agent`), *Apply method* manual (`auto-apply` y
-`auto-apply-run-trigger` deshabilitados) y un `TF_API_TOKEN` que pueda leer el estado y
-encolar runs. Un workspace sin estado es una instalación nueva válida (ver
+(`.github/workflows/production-hetzner.yml`) sube la configuración como versión
+provisional, crea un saved plan con `auto-apply=false` y publica una revisión saneada del
+plan en el resumen del run de GitHub; con una segunda aprobación del environment
+`production-hetzner`, confirma **ese** saved plan por la API (una sola solicitud) y sigue el
+Apply hasta su resultado. La UI de HCP queda para diagnóstico excepcional. Requisitos del
+workspace, que la cadena verifica antes de crear el run y otra vez antes de confirmar:
+ejecución `remote` (o `agent`), *Apply method* manual (`auto-apply` y
+`auto-apply-run-trigger` deshabilitados) y un `TF_API_TOKEN` que pueda leer el estado,
+encolar y confirmar runs y leer el JSON del plan. Un workspace sin estado es una instalación nueva válida (ver
 [`instalacion-nueva.md`](../../../../docs/operations/runbooks/instalacion-nueva.md)).
 
 Para un plan local de validación (sin apply):

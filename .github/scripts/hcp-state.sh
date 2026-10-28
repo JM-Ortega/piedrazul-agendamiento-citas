@@ -1,76 +1,95 @@
 #!/usr/bin/env bash
-# Workspace, run y estado de HCP Terraform para la cadena Plan → confirmación → Apply → Deploy.
+# Workspace, configuración, saved plan, Apply y estado de HCP Terraform para la cadena
+# Plan → revisión en GitHub → Apply → Deploy.
 #
 # Uso:
 #   hcp-state.sh workspace [apply]
 #   hcp-state.sh wait-idle
 #   hcp-state.sh current
+#   hcp-state.sh upload <directorio>
 #   hcp-state.sh create-run <configuration_version_id>
 #   hcp-state.sh plan <run_id>
-#   hcp-state.sh await-confirm <run_id>
+#   hcp-state.sh apply <run_id>
 #   hcp-state.sh cleanup [run_id]
 #   hcp-state.sh run-state <run_id> <state_version_antes|none>
 #   hcp-state.sh outputs <state_version_id>
 #
 # Entorno: TF_API_TOKEN, HCP_WORKSPACE_ID, HCP_ORGANIZATION (o TF_CLOUD_ORGANIZATION),
 #   HCP_WORKSPACE_NAME (o TF_WORKSPACE); HCP_API_URL (por defecto app.terraform.io/api/v2),
-#   HCP_APP_URL (enlaces; por defecto https://app.terraform.io). create-run, plan,
-#   await-confirm y cleanup además: RUN_MESSAGE (el mensaje exacto del run de esta
-#   ejecución: identifica al run propio).
+#   HCP_APP_URL (enlaces; por defecto https://app.terraform.io). create-run, plan, apply y
+#   cleanup además: RUN_MESSAGE (el mensaje exacto del run de esta ejecución: identifica al
+#   run propio).
 #
 # Contrato:
 #   - workspace: el id es el workspace declarado (nombre y organización), el token lo lee y
 #     puede leer su estado, y la ejecución es remota (remote/agent). Con `apply`, además: el
-#     token puede encolar runs y el workspace NO aplica solo (auto-apply y
-#     auto-apply-run-trigger en false). Un 401/403/404 es credencial o workspace incorrectos,
-#     nunca "workspace vacío".
-#   - wait-idle: espera a que el último run del workspace esté en un estado final
-#     (applied, planned_and_finished, discarded, canceled, force_canceled, errored,
-#     policy_soft_failed). Un run final fallido no bloquea; uno activo o a la espera de
-#     una resolución (p. ej. policy_override, planned) sí.
+#     token puede encolar runs y confirmarlos (can-queue-run y can-queue-apply) y el
+#     workspace NO aplica solo (auto-apply y auto-apply-run-trigger en false). Un
+#     401/403/404 es credencial o workspace incorrectos, nunca "workspace vacío".
+#   - wait-idle: espera a que ningún run reciente del workspace (los 20 más recientes) esté
+#     activo o a la espera de una resolución. Terminados (applied, planned_and_finished,
+#     discarded, canceled, force_canceled, errored, policy_soft_failed) y saved plans sin
+#     confirmar (planned_and_saved: HCP los deja fuera de la cola y los descarta si el estado
+#     cambia) no ocupan el workspace; cualquier otro estado sí.
 #   - current: id del state version actual, o `none` si el workspace (verificado como en
 #     `workspace`) no tiene ninguno: solo cuando current-state-version responde 404 Y la
 #     lista de state versions del workspace está vacía. Cualquier otro código, cuerpo
 #     ilegible o contradicción falla: un error nunca se lee como instalación limpia.
-#   - create-run: crea, con la configuración subida por esta ejecución, un run aplicable
-#     (no speculative, no destroy, no saved plan) con auto-apply=false explícito, y verifica
-#     en la respuesta que HCP lo registró así (auto-apply, workspace, configuración,
-#     mensaje). Nada lo confirma: solo una persona en HCP.
-#   - plan: espera a que el plan del run termine y lo describe. Sin cambios
-#     (planned_and_finished) → needs_confirmation=false. Con cambios y esperando
-#     confirmación → needs_confirmation=true. Si una persona ya lo confirmó en HCP antes de
-#     esta lectura (con auto-apply=false verificado), already_confirmed=true. Fallo,
-#     descarte, cancelación, override de políticas o saved plan fallan.
+#   - upload: sube <directorio> como configuration version PROVISIONAL (no pasa a ser la
+#     configuración actual del workspace salvo que su run se aplique), sin auto-queue-runs y
+#     no speculative, y espera a que HCP la procese (uploaded). La respuesta de HCP debe
+#     confirmar los tres atributos; si no (o si la subida falla, vence o HCP la marca
+#     errored), falla: nunca se recurre a una configuración no provisional. El archivo es un
+#     tar.gz reproducible (sin .terraform/, .git/ ni *.tfstate*). La URL de subida es una
+#     credencial temporal: nunca se imprime. Salida: configuration_version_id y
+#     archive_sha256 (sha256 del archivo subido, no un hash del plan).
+#   - create-run: crea, con esa configuración (uploaded, provisional, no speculative), un
+#     saved plan (save-plan=true, no plan-only, no destroy) con auto-apply=false explícito, y
+#     verifica en la respuesta que HCP lo registró así (workspace, configuración, mensaje).
+#     HCP nunca aplica solo un saved plan: solo se aplica confirmándolo (subcomando apply).
+#   - plan: espera a que el saved plan termine y lo clasifica:
+#       * planned_and_saved, confirmable, con cambios → has_changes=true (espera el Apply);
+#       * planned_and_finished sin cambios → has_changes=false (terminal: nada que aplicar
+#         ni que descartar);
+#       * planned_and_saved sin cambios, una contradicción, fallo, descarte, cancelación,
+#         override de políticas o run tasks → falla;
+#       * confirmado (Apply aceptado) antes de la revisión de GitHub → confirmación fuera de
+#         GitHub: se observa hasta que termina (sin cancelarla) y falla.
+#     Con cambios, el JSON del plan es obligatorio: se lee una vez a un archivo privado
+#     temporal (nunca se imprime ni se sube), plan-review.sh lo convierte en la revisión
+#     saneada (PLAN_REVIEW_FILE) y sus conteos deben coincidir con los del plan de HCP.
 #     PLAN_WATCH (opcional): "<nombre>=<dirección> …"; por cada uno informa la acción
 #     OBSERVADA en el JSON del plan, watch_<nombre>=create|delete|replace|update|no-op|none,
-#     o unknown (JSON ilegible, sin permiso o malformado) o ambiguous (la dirección aparece
-#     más de una vez). Una creación observada con resource-additions=0 es una contradicción
-#     y falla. PLAN_CHANGES_FILE (opcional): una línea "<acciones> <dirección>" por cambio.
-#   - Frescura (FRESHNESS_CMD, opcional; p. ej. verify-main-tip.sh) en plan y await-confirm:
-#     mientras ninguna mutación empezó (plan sin cambios, o con cambios sin confirmar), un
-#     commit que dejó de ser la punta de main falla (y el run propio se descarta si espera
-#     confirmación). Si el run YA fue confirmado en HCP, el Apply empezó y no se interrumpe:
-#     se informa confirmed_while_stale=true y la cadena termina coherentemente (el run del
-#     commit nuevo sigue en la cola). GitHub y HCP no ofrecen una operación atómica
-#     "confirmar si main no avanzó", y HCP deja confirmar en cuanto el plan es confirmable,
-#     antes de que este subcomando termine: una confirmación temprana no se puede impedir,
-#     solo detectar (already_confirmed). Confirmando después de que el paso del plan termina
-#     (procedimiento), la ventana es de, como mucho, un intervalo de sondeo; confirmando
-#     antes, es todo el tiempo desde la última comprobación previa al plan.
-#   - await-confirm: espera la confirmación humana en HCP del run propio que espera
-#     confirmación. Confirmado (apply en curso o terminado) → 0 (con confirmed_while_stale).
-#     Descartado/cancelado/fallido → falla. Main avanzado mientras espera → descarta y
-#     falla. Sin confirmación dentro de HCP_CONFIRM_ATTEMPTS × HCP_POLL_INTERVAL → descarta
-#     el run propio y falla.
+#     o unknown (JSON ilegible) o ambiguous (la dirección aparece más de una vez).
+#     FRESHNESS_CMD (opcional; p. ej. verify-main-tip.sh): si el commit dejó de ser la punta
+#     de main, el run propio se descarta (si espera el Apply) y falla.
+#   - apply: confirma el saved plan propio, una sola vez, después de revalidar en ese momento:
+#     workspace (apply), run propio (mensaje, save-plan, auto-apply=false, no destroy),
+#     planned_and_saved y confirmable con cambios, plan (EXPECTED_PLAN_ID), configuración
+#     (EXPECTED_CONFIGURATION_VERSION), state version de entrada del run y actual del
+#     workspace (EXPECTED_STATE, sv-… o none), antigüedad del run (PLAN_MAX_AGE_SECONDS, por
+#     defecto 3600), ningún otro run activo y frescura (FRESHNESS_CMD). Envía UN solo
+#     POST /runs/<id>/actions/apply y nunca lo repite:
+#       * 202 → apply_request=accepted cuando HCP muestra el run confirmado;
+#       * 409 → se relee: descartado (estado cambiado) falla; confirmado por otro es una
+#         confirmación fuera de GitHub;
+#       * sin respuesta, 5xx u otro código → se relee con plazo: confirmado después de la
+#         solicitud (confirmed-at) → apply_request=accepted_after_ambiguous; si no se puede
+#         atribuir, es una confirmación fuera de GitHub; si sigue sin confirmar, falla sin
+#         reintentar (cleanup lo descarta).
+#     Una confirmación fuera de GitHub nunca se atribuye a la aprobación de GitHub: se
+#     observa hasta que termina (sin cancelarla), se informa (apply_request=out_of_band) y
+#     falla, así la cadena no sigue mutando el servidor. Aceptar la solicitud no es aplicar:
+#     el resultado lo determina run-state.
 #   - cleanup: solo sobre runs propios (este workspace y exactamente RUN_MESSAGE; uno ajeno
 #     no se toca y falla). Sin run_id (GitHub no llegó a registrarlo: la creación falló o se
 #     cortó después del POST), busca el run por RUN_MESSAGE entre los 20 más recientes del
-#     workspace. Esperando confirmación → lo descarta. Planificando → lo cancela.
+#     workspace. Descartable (is-discardable) → lo descarta. Planificando → lo cancela.
 #     Confirmado o aplicando → no lo toca: un Apply que HCP ya aceptó no se deshace cancelando
-#     el job (lo informa). Terminado → nada. Salida: cleanup=discarded|canceled|
-#     apply_accepted|none (varios valores separados por coma si hubiera más de un run).
-#   - run-state: espera a que <run_id> (creado por esta misma ejecución) termine y
-#     determina el state version exacto que el Deploy debe consumir:
+#     el job (lo informa). Terminado (también planned_and_finished) → nada. Salida:
+#     cleanup=discarded|canceled|apply_accepted|none (separados por coma si hay varios).
+#   - run-state: espera a que <run_id> (creado por esta misma cadena) termine y determina el
+#     state version exacto que el Deploy debe consumir:
 #       * si el apply del run tiene state versions enlazados, el actual del workspace
 #         debe ser uno de ellos (si no, otro run lo reemplazó: falla);
 #       * si no tiene, el run debe ser planned_and_finished y el actual debe seguir
@@ -80,12 +99,22 @@
 #     actual antes y después de leerlos.
 #
 # Salida en formato GITHUB_OUTPUT. El token nunca va en la línea de comandos.
+#
+# Archivos temporales: todos (respuestas de HCP, la URL de subida, el archivo de la
+# configuración, el JSON del plan) van a un directorio privado propio (0700), que se borra
+# al salir, con éxito, con fallo o por INT/TERM. Su contenido nunca se imprime.
 set -euo pipefail
 
 fail() {
   echo "Error: $*" >&2
   exit 1
 }
+
+WORK_DIR="$(umask 077 && mktemp -d)"
+trap 'rm -rf "${WORK_DIR}"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+export TMPDIR="${WORK_DIR}"
 
 : "${TF_API_TOKEN:?TF_API_TOKEN no definido}"
 : "${HCP_WORKSPACE_ID:?HCP_WORKSPACE_ID no definido}"
@@ -95,17 +124,21 @@ ORGANIZATION="${HCP_ORGANIZATION:-${TF_CLOUD_ORGANIZATION:-}}"
 WORKSPACE_NAME="${HCP_WORKSPACE_NAME:-${TF_WORKSPACE:-}}"
 POLL_INTERVAL="${HCP_POLL_INTERVAL:-15}"
 POLL_ATTEMPTS="${HCP_POLL_ATTEMPTS:-60}"
-CONFIRM_ATTEMPTS="${HCP_CONFIRM_ATTEMPTS:-120}"
+ACK_ATTEMPTS="${HCP_ACK_ATTEMPTS:-8}"
+UPLOAD_ATTEMPTS="${HCP_UPLOAD_ATTEMPTS:-20}"
 OUTPUTS_INTERVAL="${HCP_OUTPUTS_INTERVAL:-5}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 [[ "${HCP_WORKSPACE_ID}" =~ ^ws-[A-Za-z0-9]+$ ]] || fail "HCP_WORKSPACE_ID inválido"
 
 # Estados de un run (API de HCP Terraform)
 PLANNING_STATES=" pending fetching fetching_completed pre_plan_running pre_plan_completed queuing plan_queued planning planned cost_estimating cost_estimated policy_checking policy_checked post_plan_running post_plan_completed "
-# Esperando confirmación (con actions.is-confirmable)
-CONFIRMABLE_STATES=" planned cost_estimated policy_checked post_plan_completed "
 # Confirmado: HCP ya aceptó el Apply
 APPLY_STATES=" confirmed apply_queued queuing_apply pre_apply_running pre_apply_completed applying applied "
+# No ocupan el workspace: terminados y saved plans sin confirmar
+IDLE_STATES=" applied planned_and_finished discarded canceled force_canceled errored policy_soft_failed planned_and_saved "
+# Terminados sin Apply en curso (para observar un Apply ajeno sin cancelarlo)
+FINAL_STATES=" applied planned_and_finished discarded canceled force_canceled errored policy_soft_failed "
 in_set() { [[ "$2" == *" $1 "* ]]; }
 
 api() {
@@ -119,7 +152,7 @@ api() {
 hcp() {
   local code data=()
   [ -z "${4:-}" ] || data=(--data-binary "@$4")
-  code=$(curl -sS -X "$1" -o "$3" -w '%{http_code}' \
+  code=$(curl -sS -X "$1" -o "$3" -w '%{http_code}' --max-time 60 \
     -H @<(printf 'Authorization: Bearer %s\n' "${TF_API_TOKEN}") \
     -H "Content-Type: application/vnd.api+json" \
     "${data[@]}" "${API}$2") || code="000"
@@ -164,6 +197,8 @@ cmd_workspace() {
   if [ "${mode}" = apply ]; then
     jq -e '.attributes.permissions["can-queue-run"] == true' <<< "${ws}" > /dev/null ||
       fail "el token no puede crear runs en ${WORKSPACE_NAME} (can-queue-run)"
+    jq -e '.attributes.permissions["can-queue-apply"] == true' <<< "${ws}" > /dev/null ||
+      fail "el token no puede confirmar runs en ${WORKSPACE_NAME} (can-queue-apply)"
     jq -e '.attributes["auto-apply"] == false' <<< "${ws}" > /dev/null ||
       fail "${WORKSPACE_NAME} tiene auto-apply habilitado: un plan se aplicaría sin revisión. Deshabilitarlo en HCP (Settings → General → Apply method: Manual)"
     jq -e '(.attributes["auto-apply-run-trigger"] // false) == false' <<< "${ws}" > /dev/null ||
@@ -221,11 +256,11 @@ require_mine() {
     fail "el run $(jq -r .id <<< "$1") no es el de esta ejecución (mensaje distinto): no se toca"
 }
 
-# require_owned <run JSON>: propio y nunca aplica solo
+# require_owned <run JSON>: propio, saved plan, y nunca aplica solo
 require_owned() {
   require_mine "$1"
-  jq -e '.attributes["auto-apply"] == false and .attributes["plan-only"] == false and .attributes["is-destroy"] == false' <<< "$1" > /dev/null ||
-    fail "el run $(jq -r .id <<< "$1") no es un run aplicable con auto-apply=false"
+  jq -e '.attributes["auto-apply"] == false and .attributes["plan-only"] == false and .attributes["is-destroy"] == false and .attributes["save-plan"] == true' <<< "$1" > /dev/null ||
+    fail "el run $(jq -r .id <<< "$1") no es un saved plan aplicable con auto-apply=false"
 }
 
 status_of() { jq -r '.attributes.status // ""' <<< "$1"; }
@@ -249,34 +284,110 @@ discard_owned() {
 # fresh: 0 si el commit sigue siendo la punta de main (o no hay FRESHNESS_CMD)
 fresh() { [ -z "${FRESHNESS_CMD:-}" ] || bash -c "${FRESHNESS_CMD}" >&2; }
 
-cmd_wait_idle() {
-  local status
+# observe_out_of_band <run_id>: un Apply confirmado fuera de GitHub se observa (nunca se
+# cancela) hasta que termina o vence el plazo; escribe lo observado y falla
+observe_out_of_band() {
+  local run_id="$1" run status confirmed
+  run=$(run_json "${run_id}")
+  confirmed=$(jq -r '.attributes["status-timestamps"]["confirmed-at"] // "?"' <<< "${run}")
+  echo "::error title=Terraform::El run ${run_id} se confirmó fuera de la autorización de GitHub (confirmado: ${confirmed}). No se cancela un Apply aceptado; la cadena no sigue mutando el servidor ni Pages: $(run_link "${run_id}")" >&2
+  status=$(status_of "${run}")
   for i in $(seq 1 "${POLL_ATTEMPTS}"); do
-    status="$(api "/workspaces/${HCP_WORKSPACE_ID}/runs?page%5Bsize%5D=1" |
-      jq -r '.data[0].attributes.status // "none"')" ||
-      fail "no se pudo leer el último run del workspace"
-    case "${status}" in
-      applied | planned_and_finished | discarded | canceled | force_canceled | none)
-        echo "Terraform libre (status: ${status})" >&2
-        return 0
-        ;;
-      errored | policy_soft_failed)
-        # Estados finales: el run ya no ocupa el workspace. Un fallo anterior no bloquea
-        # esta ejecución; su propio Apply y el state version que consume se verifican
-        # después (run-state / outputs).
-        echo "Terraform libre: el último run terminó en un estado final fallido (${status})" >&2
-        return 0
-        ;;
-      *)
-        # Cualquier otro estado (pending, planning, planned, policy_override,
-        # apply_queued, applying, planned_and_saved, ...) puede seguir avanzando o
-        # espera una resolución: no se compite con él.
-        echo "Terraform no está libre (status: ${status}) — esperando ${POLL_INTERVAL}s ($i/${POLL_ATTEMPTS})" >&2
-        sleep "${POLL_INTERVAL}"
-        ;;
-    esac
+    in_set "${status}" "${FINAL_STATES}" && break
+    echo "Apply fuera de GitHub en '${status}' — observando ${POLL_INTERVAL}s ($i/${POLL_ATTEMPTS})" >&2
+    sleep "${POLL_INTERVAL}"
+    status=$(status_of "$(run_json "${run_id}")")
+  done
+  echo "apply_request=out_of_band"
+  echo "run_status=${status}"
+  echo "confirmed_at=${confirmed}"
+  fail "Apply del run ${run_id} confirmado fuera de GitHub (estado observado: ${status}); revisar el resultado y volver a correr la cadena completa"
+}
+
+# idle_runs: 0 si ningún run reciente distinto de <excluir> ocupa el workspace
+busy_runs() { # [run_id a excluir] → ids y estados de los runs que ocupan el workspace
+  local body code
+  body=$(mktemp)
+  code=$(hcp GET "/workspaces/${HCP_WORKSPACE_ID}/runs?page%5Bsize%5D=20" "${body}")
+  [ "${code}" = 200 ] || fail "no se pudieron listar los runs del workspace (HTTP ${code})"
+  jq -r --arg x "${1:-}" --arg idle "${IDLE_STATES}" '
+      .data | if type == "array" then .[] else error("x") end
+      | select(.id != $x)
+      | (.attributes.status // "?") as $s
+      | select(($idle | contains(" " + $s + " ")) | not)
+      | "\(.id):\($s)"' "${body}" 2> /dev/null || fail "lista de runs ilegible"
+}
+
+cmd_wait_idle() {
+  local busy
+  for i in $(seq 1 "${POLL_ATTEMPTS}"); do
+    busy=$(busy_runs)
+    if [ -z "${busy}" ]; then
+      echo "Terraform libre: ningún run activo ni a la espera de una resolución" >&2
+      return 0
+    fi
+    # Activo o esperando una resolución (pending, planning, planned, policy_override,
+    # apply_queued, applying, ...): no se compite con él
+    echo "Terraform no está libre ($(paste -sd' ' <<< "${busy}")) — esperando ${POLL_INTERVAL}s ($i/${POLL_ATTEMPTS})" >&2
+    sleep "${POLL_INTERVAL}"
   done
   fail "Terraform no liberó el workspace a tiempo"
+}
+
+cmd_upload() {
+  local dir="$1" archive body data code cv cv_id url sha status
+  require_identity
+  [ -d "${dir}" ] || fail "directorio de configuración inexistente: ${dir}"
+  # Archivo, respuestas y URL de subida solo en el directorio temporal privado (ver arriba);
+  # además se borran apenas dejan de hacer falta
+  archive=$(mktemp)
+  # Reproducible: orden, fechas y dueños fijos; sin metadatos de gzip
+  tar -C "${dir}" --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \
+    --exclude='.terraform' --exclude='.git' --exclude='*.tfstate' --exclude='*.tfstate.*' \
+    -cf - . | gzip -n > "${archive}" || fail "no se pudo empaquetar ${dir}"
+  sha=$(sha256sum "${archive}" | cut -d' ' -f1)
+
+  body=$(mktemp) data=$(mktemp)
+  jq -n '{data: {type: "configuration-versions",
+            attributes: {"auto-queue-runs": false, speculative: false, provisional: true}}}' > "${data}"
+  code=$(hcp POST "/workspaces/${HCP_WORKSPACE_ID}/configuration-versions" "${body}" "${data}")
+  [ "${code}" = 201 ] || fail "HCP no creó la configuración (HTTP ${code}): $(jq -r '[.errors[]?.detail // .errors[]?.title] | join("; ")' "${body}" 2> /dev/null || true)"
+  cv=$(jq -c '.data' "${body}" 2> /dev/null) || fail "respuesta ilegible al crear la configuración"
+  cv_id=$(jq -r '.id // ""' <<< "${cv}")
+  [[ "${cv_id}" =~ ^cv-[A-Za-z0-9]+$ ]] || fail "id de configuración inválido en la respuesta: '${cv_id}'"
+  # Sin provisional confirmado por HCP no se sube nada: nunca una configuración no provisional
+  jq -e '.attributes.provisional == true and .attributes.speculative == false and .attributes["auto-queue-runs"] == false' <<< "${cv}" > /dev/null ||
+    fail "HCP no registró la configuración ${cv_id} como provisional, no speculative y sin auto-queue-runs: no se sube"
+  url=$(jq -r '.attributes["upload-url"] // ""' <<< "${cv}")
+  [[ "${url}" =~ ^https://[^[:space:]]+$ ]] || fail "la configuración ${cv_id} no trae una URL de subida válida"
+
+  # La URL es una credencial temporal: ni el token ni la URL se imprimen
+  code=$(curl -sS -X PUT -o /dev/null -w '%{http_code}' --max-time 120 \
+    -H "Content-Type: application/octet-stream" --data-binary "@${archive}" "${url}" 2> /dev/null) || code="000"
+  rm -f "${archive}" "${body}" "${data}"
+  url="" cv=""
+  [ "${code}" = 200 ] || fail "HCP no aceptó el archivo de la configuración ${cv_id} (HTTP ${code})"
+
+  status=""
+  for i in $(seq 1 "${UPLOAD_ATTEMPTS}"); do
+    code=$(hcp GET "/configuration-versions/${cv_id}" "${body}")
+    [ "${code}" = 200 ] || fail "no se pudo leer la configuración ${cv_id} (HTTP ${code})"
+    jq -e '.data.attributes.provisional == true and .data.attributes.speculative == false' "${body}" > /dev/null 2>&1 ||
+      fail "la configuración ${cv_id} dejó de ser provisional o es speculative"
+    status=$(jq -r '.data.attributes.status // ""' "${body}")
+    case "${status}" in
+      uploaded) break ;;
+      errored) fail "HCP no pudo procesar la configuración ${cv_id} (errored)" ;;
+      pending | fetching) ;;
+      *) fail "estado inesperado de la configuración ${cv_id}: '${status}'" ;;
+    esac
+    echo "Configuración ${cv_id} en '${status}' — esperando ${POLL_INTERVAL}s ($i/${UPLOAD_ATTEMPTS})" >&2
+    status=""
+    sleep "${POLL_INTERVAL}"
+  done
+  [ "${status}" = uploaded ] || fail "la configuración ${cv_id} no terminó de procesarse a tiempo"
+  echo "configuration_version_id=${cv_id}"
+  echo "archive_sha256=${sha}"
 }
 
 cmd_create_run() {
@@ -289,12 +400,14 @@ cmd_create_run() {
   [ "${code}" = 200 ] || fail "no se pudo leer la configuración ${cv} (HTTP ${code})"
   jq -e '.data.attributes.status == "uploaded" and .data.attributes.speculative == false' "${body}" > /dev/null 2>&1 ||
     fail "la configuración ${cv} no está subida o es speculative"
+  jq -e '.data.attributes.provisional == true' "${body}" > /dev/null 2>&1 ||
+    fail "la configuración ${cv} no es provisional: un saved plan sin aplicar la dejaría como configuración actual"
 
   data=$(mktemp)
   jq -n --arg m "${RUN_MESSAGE}" --arg ws "${HCP_WORKSPACE_ID}" --arg cv "${cv}" '
     {data: {type: "runs",
       attributes: {message: $m, "auto-apply": false, "plan-only": false, "is-destroy": false,
-                   "save-plan": false, refresh: true},
+                   "save-plan": true, refresh: true},
       relationships: {workspace: {data: {type: "workspaces", id: $ws}},
                       "configuration-version": {data: {type: "configuration-versions", id: $cv}}}}}' > "${data}"
   code=$(hcp POST "/runs" "${body}" "${data}")
@@ -310,23 +423,20 @@ cmd_create_run() {
   echo "run_link=$(run_link "${run_id}")"
 }
 
-# plan_changes <plan_id>: lista "<acciones> <dirección>" en PLAN_CHANGES_FILE (si está) y
-# escribe una línea watch_<nombre>=<acción> por cada entrada de PLAN_WATCH. Solo acciones
-# observadas: sin JSON legible todas son unknown (nunca se infiere una creación).
-plan_changes() {
-  local json out name addr
-  out="${PLAN_CHANGES_FILE:-/dev/null}"
-  json=$(mktemp)
-  if ! curl -sSfL -o "${json}" \
-       -H @<(printf 'Authorization: Bearer %s\n' "${TF_API_TOKEN}") \
-       "${API}/plans/$1/json-output" 2> /dev/null ||
-     ! jq -e '(.resource_changes | type == "array") and all(.resource_changes[]; (.address | type == "string") and (.change.actions | type == "array"))' "${json}" > /dev/null 2>&1; then
-    echo "(el JSON del plan no se pudo leer o interpretar con este token; revisar el plan en HCP)" > "${out}"
-    json=""
-  else
-    jq -r '.resource_changes[] | select(.change.actions != ["no-op"] and .change.actions != ["read"])
-           | "\(.change.actions | join(",")) \(.address)"' "${json}" > "${out}"
-  fi
+# input_state <run JSON>: sv-… o none (relación presente y nula); falla si HCP no la informa
+input_state() {
+  jq -e '.relationships | has("input-state-version")' <<< "$1" > /dev/null ||
+    fail "el run $(jq -r .id <<< "$1") no informa su state version de entrada: no se puede ligar el plan al estado"
+  local sv
+  sv=$(jq -r '.relationships["input-state-version"].data.id // "none"' <<< "$1")
+  [[ "${sv}" =~ ^sv-[A-Za-z0-9]+$ ]] || [ "${sv}" = none ] || fail "state version de entrada inválido: '${sv}'"
+  echo "${sv}"
+}
+
+# watch_actions <plan JSON|vacío>: watch_<nombre>=<acción observada> por cada entrada de
+# PLAN_WATCH. Solo acciones observadas: sin JSON legible todas son unknown.
+watch_actions() {
+  local json="$1" name addr
   for entry in ${PLAN_WATCH:-}; do
     name="${entry%%=*}" addr="${entry#*=}"
     [[ "${name}" =~ ^[a-z_]+$ ]] && [ -n "${addr}" ] && [ "${addr}" != "${entry}" ] || fail "PLAN_WATCH inválido: '${entry}'"
@@ -346,7 +456,7 @@ plan_changes() {
 }
 
 cmd_plan() {
-  local run_id="$1" run status plan_id body code confirmed=false needs watches stale=false
+  local run_id="$1" run status plan_id body code has json review counts in_sv cv
   [[ "${run_id}" =~ ^run-[A-Za-z0-9]+$ ]] || fail "run_id inválido: '${run_id}'"
   require_identity
   status=""
@@ -354,24 +464,29 @@ cmd_plan() {
     run=$(run_json "${run_id}")
     require_owned "${run}"
     status=$(status_of "${run}")
-    if in_set "${status}" "${CONFIRMABLE_STATES}" &&
-       jq -e '.attributes.actions["is-confirmable"] == true' <<< "${run}" > /dev/null; then
-      needs=true
-      break
-    fi
     case "${status}" in
-      planned_and_finished) needs=false; break ;;
+      planned_and_saved)
+        jq -e '.attributes["has-changes"] == true' <<< "${run}" > /dev/null ||
+          fail "el saved plan del run ${run_id} quedó en planned_and_saved sin cambios: resultado no admitido (se esperaba planned_and_finished)"
+        jq -e '.attributes.actions["is-confirmable"] == true' <<< "${run}" > /dev/null ||
+          fail "el saved plan del run ${run_id} tiene cambios pero HCP no lo admite como confirmable"
+        has=true
+        break
+        ;;
+      planned_and_finished)
+        jq -e '.attributes["has-changes"] == false' <<< "${run}" > /dev/null ||
+          fail "el run ${run_id} terminó sin aplicar (planned_and_finished) pero informa cambios: contradicción"
+        has=false
+        break
+        ;;
       errored | canceled | force_canceled) fail "el plan del run ${run_id} terminó en '${status}' ($(run_link "${run_id}"))" ;;
-      discarded) fail "el run ${run_id} fue descartado antes de terminar el plan" ;;
+      discarded) fail "el run ${run_id} fue descartado antes de terminar la revisión" ;;
       policy_override | policy_soft_failed | post_plan_awaiting_decision)
         fail "el run ${run_id} requiere una decisión de políticas o run tasks (${status}) que la cadena no admite ($(run_link "${run_id}"))" ;;
-      planned_and_saved) fail "el run ${run_id} quedó como saved plan; la cadena no crea saved plans" ;;
     esac
-    if in_set "${status}" "${APPLY_STATES}"; then
-      # auto-apply=false verificado: solo una confirmación en HCP lo lleva aquí
-      needs=true confirmed=true
-      break
-    fi
+    # Un saved plan solo se aplica confirmándolo: si ya está aquí, alguien lo confirmó
+    # fuera de GitHub antes de que terminara la revisión
+    in_set "${status}" "${APPLY_STATES}" && observe_out_of_band "${run_id}"
     in_set "${status}" "${PLANNING_STATES}" || fail "el run ${run_id} está en un estado inesperado: '${status}'"
     echo "Run ${run_id} en '${status}' — esperando ${POLL_INTERVAL}s ($i/${POLL_ATTEMPTS})" >&2
     status=""
@@ -379,90 +494,179 @@ cmd_plan() {
   done
   [ -n "${status}" ] || fail "el plan del run ${run_id} no terminó a tiempo"
 
-  if [ "${needs}" = false ]; then
-    jq -e '.attributes["has-changes"] == false' <<< "${run}" > /dev/null ||
-      fail "el run ${run_id} terminó sin aplicar (planned_and_finished) pero informa cambios: contradicción"
-  else
-    jq -e '.attributes["has-changes"] == true' <<< "${run}" > /dev/null ||
-      fail "el run ${run_id} espera confirmación pero no informa cambios: contradicción"
-  fi
-
   plan_id=$(jq -r '.relationships.plan.data.id // ""' <<< "${run}")
   [[ "${plan_id}" =~ ^plan-[A-Za-z0-9]+$ ]] || fail "el run ${run_id} no tiene un plan válido"
+  cv=$(jq -r '.relationships["configuration-version"].data.id // ""' <<< "${run}")
+  [[ "${cv}" =~ ^cv-[A-Za-z0-9]+$ ]] || fail "el run ${run_id} no informa su configuración"
+  in_sv=$(input_state "${run}")
   body=$(mktemp)
   code=$(hcp GET "/plans/${plan_id}" "${body}")
   [ "${code}" = 200 ] || fail "no se pudo leer el plan ${plan_id} (HTTP ${code})"
   jq -e '.data.attributes.status == "finished"' "${body}" > /dev/null 2>&1 ||
     fail "el plan ${plan_id} no terminó (status: $(jq -r '.data.attributes.status // "?"' "${body}" 2> /dev/null))"
-  watches=$(plan_changes "${plan_id}")
-  if grep -qx 'watch_[a-z_]*=create' <<< "${watches}" &&
-     jq -e '(.data.attributes["resource-additions"] // 0) == 0' "${body}" > /dev/null; then
-    fail "el JSON del plan ${plan_id} muestra creaciones pero el plan informa 0 recursos a crear: contradicción"
+
+  # JSON del plan: contiene valores sensibles. Archivo privado (directorio temporal propio),
+  # nunca impreso ni subido, borrado al salir. Con cambios es obligatorio: sin él no hay
+  # revisión posible.
+  json=$(mktemp)
+  if ! curl -sSfL -o "${json}" --max-time 120 \
+       -H @<(printf 'Authorization: Bearer %s\n' "${TF_API_TOKEN}") \
+       "${API}/plans/${plan_id}/json-output" 2> /dev/null ||
+     ! jq -e '(.resource_changes // [] | type == "array") and all(.resource_changes[]?; (.address | type == "string") and (.change.actions | type == "array"))' "${json}" > /dev/null 2>&1; then
+    [ "${has}" = false ] ||
+      fail "el JSON del plan ${plan_id} no se pudo leer o interpretar con este token: sin revisión del plan no hay Apply"
+    : > "${json}"
   fi
 
-  # Frescura: mientras nada mutó, un commit viejo no sigue; un Apply ya confirmado no se corta
+  review="${PLAN_REVIEW_FILE:-/dev/null}"
+  if [ -s "${json}" ]; then
+    counts=$("${SCRIPT_DIR}/plan-review.sh" "${json}" "${review}") ||
+      fail "la revisión saneada del plan ${plan_id} no se pudo generar (acción desconocida, JSON inesperado o revisión demasiado grande)"
+    # Los conteos de la revisión deben ser los del plan de HCP
+    jq -e --argjson c "$(sed 's/^\([a-z_]*\)=\(.*\)$/"\1":\2/' <<< "${counts}" | paste -sd, | sed 's/^/{/; s/$/}/')" '
+        .data.attributes as $a
+        | ($a["resource-additions"] // 0) == ($c.review_creates + $c.review_replaces)
+        and ($a["resource-changes"] // 0) == $c.review_updates
+        and ($a["resource-destructions"] // 0) == ($c.review_deletes + $c.review_replaces)
+        and ($a["resource-imports"] // 0) == $c.review_imports' "${body}" > /dev/null ||
+      fail "los cambios del JSON del plan ${plan_id} no coinciden con los conteos del plan de HCP: contradicción"
+  else
+    counts=""
+    printf '_Plan sin cambios: el JSON del plan no se pudo leer; no hay cambios que revisar._\n' > "${review}"
+  fi
+
+  # Frescura: un commit viejo no sigue; el saved plan propio se descarta
   if ! fresh; then
-    if [ "${confirmed}" = true ]; then
-      echo "AVISO: el run ${run_id} se confirmó en HCP pero main ya avanzó: el Apply empezó y la cadena termina; el run del commit nuevo sigue después" >&2
-      stale=true
-    elif [ "${needs}" = true ]; then
-      discard_owned "${run_id}" "main avanzó antes de la confirmación; este run ya no puede aplicar" || true
-      fail "main avanzó antes de que el plan del run ${run_id} se confirmara: run descartado, sin Apply"
-    else
-      fail "main avanzó: el plan del run ${run_id} no tiene cambios y la cadena no sigue con un commit viejo (nada mutó)"
+    if [ "${has}" = true ]; then
+      discard_owned "${run_id}" "main avanzó antes de la revisión; este saved plan ya no puede aplicarse" || true
+      fail "main avanzó antes de terminar la revisión del run ${run_id}: saved plan descartado, sin Apply"
     fi
+    fail "main avanzó: el plan del run ${run_id} no tiene cambios y la cadena no sigue con un commit viejo (nada mutó)"
   fi
 
   echo "run_status=${status}"
-  echo "has_changes=$(jq -r '.attributes["has-changes"]' <<< "${run}")"
-  echo "needs_confirmation=${needs}"
-  echo "already_confirmed=${confirmed}"
+  echo "has_changes=${has}"
   echo "plan_id=${plan_id}"
+  echo "configuration_version_id=${cv}"
+  echo "input_state_version=${in_sv}"
+  echo "created_at=$(jq -r '.attributes["created-at"] // ""' <<< "${run}")"
   jq -r '.data.attributes | "additions=\(.["resource-additions"] // 0)\nchanges=\(.["resource-changes"] // 0)\ndestructions=\(.["resource-destructions"] // 0)\nimports=\(.["resource-imports"] // 0)"' "${body}"
-  [ -z "${watches}" ] || echo "${watches}"
-  echo "confirmed_while_stale=${stale}"
+  [ -z "${counts}" ] || echo "${counts}"
+  if [ -s "${json}" ]; then watch_actions "${json}"; else watch_actions ""; fi
   echo "run_link=$(run_link "${run_id}")"
 }
 
-cmd_await_confirm() {
-  local run_id="$1" run status
+# confirmed_after <run JSON> <epoch>: el run se confirmó en <epoch> o después
+confirmed_after() {
+  local at epoch
+  at=$(jq -r '.attributes["status-timestamps"]["confirmed-at"] // ""' <<< "$1")
+  [ -n "${at}" ] || return 1
+  epoch=$(date -d "${at}" +%s 2> /dev/null) || return 1
+  [ "${epoch}" -ge "$(($2 - 5))" ]
+}
+
+cmd_apply() {
+  local run_id="$1" run status in_sv current created age busy body data code requested
   [[ "${run_id}" =~ ^run-[A-Za-z0-9]+$ ]] || fail "run_id inválido: '${run_id}'"
-  require_identity
-  echo "Esperando la confirmación humana del run ${run_id} en HCP: $(run_link "${run_id}")" >&2
-  for i in $(seq 1 "${CONFIRM_ATTEMPTS}"); do
-    run=$(run_json "${run_id}")
-    require_owned "${run}"
-    status=$(status_of "${run}")
-    if in_set "${status}" "${APPLY_STATES}"; then
-      echo "Run ${run_id} confirmado en HCP (status: ${status}, confirmado: $(jq -r '.attributes["status-timestamps"]["confirmed-at"] // "?"' <<< "${run}"))" >&2
-      echo "confirmed=true"
-      echo "run_status=${status}"
-      # El Apply ya empezó: si main avanzó en la última ventana de sondeo, solo se informa
-      if fresh; then
-        echo "confirmed_while_stale=false"
-      else
-        echo "AVISO: el run ${run_id} se confirmó en HCP mientras main avanzaba: el Apply empezó y la cadena termina; el run del commit nuevo sigue después" >&2
-        echo "confirmed_while_stale=true"
-      fi
-      return 0
-    fi
-    case "${status}" in
-      discarded) fail "el plan del run ${run_id} fue rechazado (descartado) en HCP: no hay Apply" ;;
-      errored | canceled | force_canceled) fail "el run ${run_id} terminó en '${status}' sin aplicar" ;;
-    esac
-    in_set "${status}" "${CONFIRMABLE_STATES}" ||
-      fail "transición inesperada del run ${run_id} mientras esperaba confirmación: '${status}'"
-    if ! fresh; then
-      discard_owned "${run_id}" "main avanzó mientras el plan esperaba confirmación; este run ya no puede aplicar" || true
-      fail "main avanzó mientras el run ${run_id} esperaba confirmación: run descartado, sin Apply"
-    fi
-    if [ $((i % 4)) -eq 1 ]; then
-      echo "Esperando confirmación en HCP ($i/${CONFIRM_ATTEMPTS}): $(run_link "${run_id}")" >&2
-    fi
-    sleep "${POLL_INTERVAL}"
-  done
-  discard_owned "${run_id}" "Sin confirmación dentro del plazo de la cadena de producción" || true
-  fail "el run ${run_id} no se confirmó a tiempo: run descartado (si HCP no aceptó el descarte, revisar el run)"
+  [[ "${EXPECTED_PLAN_ID:-}" =~ ^plan-[A-Za-z0-9]+$ ]] || fail "EXPECTED_PLAN_ID inválido"
+  [[ "${EXPECTED_CONFIGURATION_VERSION:-}" =~ ^cv-[A-Za-z0-9]+$ ]] || fail "EXPECTED_CONFIGURATION_VERSION inválido"
+  [[ "${EXPECTED_STATE:-}" =~ ^sv-[A-Za-z0-9]+$ ]] || [ "${EXPECTED_STATE:-}" = none ] || fail "EXPECTED_STATE inválido"
+  local max_age="${PLAN_MAX_AGE_SECONDS:-3600}"
+  [[ "${max_age}" =~ ^[0-9]+$ ]] || fail "PLAN_MAX_AGE_SECONDS inválido"
+
+  # Workspace: sin auto-apply y con permiso de confirmar, leído ahora
+  cmd_workspace apply > /dev/null
+
+  run=$(run_json "${run_id}")
+  require_owned "${run}"
+  status=$(status_of "${run}")
+  in_set "${status}" "${APPLY_STATES}" && observe_out_of_band "${run_id}"
+  case "${status}" in
+    planned_and_saved) ;;
+    discarded) fail "el saved plan del run ${run_id} fue descartado (HCP lo descarta si el estado cambió): sin Apply" ;;
+    *) fail "el run ${run_id} no es un saved plan a la espera de confirmación (status: ${status})" ;;
+  esac
+  jq -e '.attributes["has-changes"] == true and .attributes.actions["is-confirmable"] == true' <<< "${run}" > /dev/null ||
+    fail "el run ${run_id} no es confirmable o no tiene cambios"
+  jq -e --arg p "${EXPECTED_PLAN_ID}" '.relationships.plan.data.id == $p' <<< "${run}" > /dev/null ||
+    fail "el plan del run ${run_id} no es el revisado (${EXPECTED_PLAN_ID})"
+  jq -e --arg c "${EXPECTED_CONFIGURATION_VERSION}" '.relationships["configuration-version"].data.id == $c' <<< "${run}" > /dev/null ||
+    fail "la configuración del run ${run_id} no es la revisada (${EXPECTED_CONFIGURATION_VERSION})"
+  in_sv=$(input_state "${run}")
+  [ "${in_sv}" = "${EXPECTED_STATE}" ] ||
+    fail "el plan del run ${run_id} partió de ${in_sv}, no del estado revisado (${EXPECTED_STATE})"
+  current=$(current_state)
+  [ "${current}" = "${EXPECTED_STATE}" ] ||
+    fail "el estado del workspace cambió desde el plan (${EXPECTED_STATE} → ${current}): el saved plan ya no corresponde"
+
+  created=$(jq -r '.attributes["created-at"] // ""' <<< "${run}")
+  created=$(date -d "${created}" +%s 2> /dev/null) || fail "el run ${run_id} no informa una fecha de creación legible"
+  age=$(($(date +%s) - created))
+  [ "${age}" -ge -300 ] || fail "la fecha de creación del run ${run_id} está en el futuro"
+  [ "${age}" -le "${max_age}" ] ||
+    fail "el saved plan del run ${run_id} tiene ${age}s (máximo ${max_age}s): volver a correr la cadena completa para un plan nuevo"
+
+  busy=$(busy_runs "${run_id}")
+  [ -z "${busy}" ] || fail "otro run ocupa el workspace ($(paste -sd' ' <<< "${busy}")): no se confirma detrás de él"
+
+  fresh || fail "main avanzó: el saved plan del run ${run_id} no se confirma"
+
+  # Última lectura antes de la solicitud: una confirmación ajena en la ventana se detecta
+  run=$(run_json "${run_id}")
+  status=$(status_of "${run}")
+  in_set "${status}" "${APPLY_STATES}" && observe_out_of_band "${run_id}"
+  [ "${status}" = planned_and_saved ] || fail "el run ${run_id} cambió a '${status}' antes de confirmarlo"
+
+  body=$(mktemp) data=$(mktemp)
+  jq -n --arg c "${APPLY_COMMENT:-Confirmado por la cadena de producción de GitHub}" '{comment: $c}' > "${data}"
+  requested=$(date +%s)
+  code=$(hcp POST "/runs/${run_id}/actions/apply" "${body}" "${data}")
+  echo "Solicitud de Apply del run ${run_id}: HTTP ${code} (una sola solicitud; nunca se repite)" >&2
+
+  case "${code}" in
+    202)
+      # Aceptada: HCP encola el Apply; se espera a verlo confirmado
+      for i in $(seq 1 "${ACK_ATTEMPTS}"); do
+        run=$(run_json "${run_id}")
+        status=$(status_of "${run}")
+        if in_set "${status}" "${APPLY_STATES}"; then
+          echo "apply_request=accepted"
+          echo "run_status=${status}"
+          return 0
+        fi
+        [ "${status}" = planned_and_saved ] ||
+          fail "HCP aceptó la solicitud pero el run ${run_id} terminó en '${status}' sin aplicar"
+        sleep "${POLL_INTERVAL}"
+      done
+      fail "HCP aceptó la solicitud pero el run ${run_id} no empezó el Apply a tiempo (sin reintento; la limpieza lo descarta si todavía puede)"
+      ;;
+    409)
+      run=$(run_json "${run_id}")
+      status=$(status_of "${run}")
+      in_set "${status}" "${APPLY_STATES}" && observe_out_of_band "${run_id}"
+      [ "${status}" != discarded ] ||
+        fail "HCP rechazó la confirmación (409): el saved plan fue descartado (el estado cambió); sin Apply"
+      fail "HCP rechazó la confirmación (409) con el run en '${status}': sin Apply y sin reintento"
+      ;;
+    *)
+      # Resultado incierto (sin respuesta, 5xx u otro código): se relee, nunca se repite
+      for i in $(seq 1 "${ACK_ATTEMPTS}"); do
+        run=$(run_json "${run_id}")
+        status=$(status_of "${run}")
+        if in_set "${status}" "${APPLY_STATES}"; then
+          confirmed_after "${run}" "${requested}" || observe_out_of_band "${run_id}"
+          echo "::warning title=Terraform::La solicitud de Apply del run ${run_id} tuvo una respuesta incierta (HTTP ${code}); HCP muestra el run confirmado después de la solicitud" >&2
+          echo "apply_request=accepted_after_ambiguous"
+          echo "run_status=${status}"
+          return 0
+        fi
+        [ "${status}" = planned_and_saved ] ||
+          fail "respuesta incierta (HTTP ${code}) y el run ${run_id} terminó en '${status}' sin aplicar"
+        sleep "${POLL_INTERVAL}"
+      done
+      fail "respuesta incierta (HTTP ${code}) y el run ${run_id} sigue sin confirmar: sin reintento (la limpieza lo descarta si todavía puede)"
+      ;;
+  esac
 }
 
 # cleanup_one <run_id>: libera un run propio; escribe el resultado (una palabra)
@@ -472,7 +676,7 @@ cleanup_one() {
   require_mine "${run}"
   status=$(status_of "${run}")
   if jq -e '.attributes.actions["is-discardable"] == true' <<< "${run}" > /dev/null; then
-    if discard_owned "${run_id}" "Cadena de producción interrumpida antes de la confirmación"; then
+    if discard_owned "${run_id}" "Cadena de producción interrumpida antes de confirmar el plan"; then
       echo discarded
       return 0
     fi
@@ -615,7 +819,7 @@ cmd_outputs() {
   echo "auth_fqdn=${auth_fqdn}"
 }
 
-USAGE="workspace [apply] | wait-idle | current | create-run <cv> | plan <run> | await-confirm <run> | cleanup [run] | run-state <run> <sv_antes|none> | outputs <sv>"
+USAGE="workspace [apply] | wait-idle | current | upload <dir> | create-run <cv> | plan <run> | apply <run> | cleanup [run] | run-state <run> <sv_antes|none> | outputs <sv>"
 [ "$#" -ge 1 ] || fail "uso: $0 ${USAGE}"
 case "$1" in
   workspace)
@@ -625,9 +829,10 @@ case "$1" in
     ;;
   wait-idle) [ "$#" -eq 1 ] || fail "uso: $0 wait-idle"; cmd_wait_idle ;;
   current) [ "$#" -eq 1 ] || fail "uso: $0 current"; current_state ;;
+  upload) [ "$#" -eq 2 ] || fail "uso: $0 upload <directorio>"; cmd_upload "$2" ;;
   create-run) [ "$#" -eq 2 ] || fail "uso: $0 create-run <configuration_version_id>"; cmd_create_run "$2" ;;
   plan) [ "$#" -eq 2 ] || fail "uso: $0 plan <run_id>"; cmd_plan "$2" ;;
-  await-confirm) [ "$#" -eq 2 ] || fail "uso: $0 await-confirm <run_id>"; cmd_await_confirm "$2" ;;
+  apply) [ "$#" -eq 2 ] || fail "uso: $0 apply <run_id>"; cmd_apply "$2" ;;
   cleanup) [ "$#" -le 2 ] || fail "uso: $0 cleanup [run_id]"; cmd_cleanup "${2:-}" ;;
   run-state) [ "$#" -eq 3 ] || fail "uso: $0 run-state <run_id> <sv_antes|none>"; cmd_run_state "$2" "$3" ;;
   outputs) [ "$#" -eq 2 ] || fail "uso: $0 outputs <sv>"; cmd_outputs "$2" ;;

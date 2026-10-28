@@ -666,20 +666,20 @@ check "credencial: el token de Pages nunca llega a Ansible ni al servidor" \
   bash -c "! grep -rq --exclude='*.md' CLOUDFLARE_PAGES_API_TOKEN '${ROOT}/infra/ansible' '${ROOT}/infra/compose' && ! yq -r '.jobs.production.steps[] | select(.run // \"\" | test(\"(^|[[:space:]])ansible(-playbook)?[[:space:]]\")) | .env // {} | keys[]' '${WORKFLOW}' | grep -qE '^(CLOUDFLARE_API_TOKEN|CLOUDFLARE_PAGES_API_TOKEN)\$'"
 check "credencial: alcance declarado solo en production-hetzner (auditoría de confianza)" \
   grep -q '^  \[CLOUDFLARE_PAGES_API_TOKEN\]="production-hetzner"$' "${ROOT}/.github/scripts/audit-github-trust.sh"
-check "orden: destino, artefacto, wrangler y sondeo de Pages antes de cualquier mutación (frescura/plan/Apply/servidor)" \
-  bash -c "[ $(idx pages_probe) -gt $(idx pages_tooling) ] && [ $(idx pages_tooling) -gt $(idx pages_artifact) ] && [ $(idx pages_artifact) -gt $(idx pages_target) ] && for s in hcp_workspace hcp_idle fresh_apply hcp_upload hcp_run fresh_deploy converge deploy; do [ $(idx pages_probe) -lt \$(grep -nx \"\$s\" <<< \"\$1\" | cut -d: -f1) ] || exit 1; done" _ "${PROD_STEPS}"
+check "orden: destino, artefacto, wrangler y sondeo de Pages antes de cualquier mutación (frescura/Apply/servidor)" \
+  bash -c "[ $(idx pages_probe) -gt $(idx pages_tooling) ] && [ $(idx pages_tooling) -gt $(idx pages_artifact) ] && [ $(idx pages_artifact) -gt $(idx pages_target) ] && for s in hcp_workspace hcp_idle pages_plan fresh_apply hcp_apply fresh_deploy converge deploy; do [ $(idx pages_probe) -lt \$(grep -nx \"\$s\" <<< \"\$1\" | cut -d: -f1) ] || exit 1; done" _ "${PROD_STEPS}"
 check "sondeo: un proyecto ausente o incompleto solo se admite cuando este run aplica Terraform" \
-  test "$(yq -r '.jobs.production.steps[] | select(.id == "pages_probe") | .env.PAGES_ALLOW_PROVISIONING' "${WORKFLOW}")" = "\${{ env.TERRAFORM_REQUIRED == 'true' }}"
+  test "$(yq -r '.jobs.production.steps[] | select(.id == "pages_probe") | .env.PAGES_ALLOW_PROVISIONING' "${WORKFLOW}")" = "\${{ env.TF_APPLY_REQUIRED == 'true' }}"
 check "sondeo: ausente o incompleto exige que el plan observe la creación de proyecto y dominio (o no se aplica)" \
-  bash -c "w=\$(yq -r '.jobs.production.steps[] | select(.id == \"hcp_plan\") | .env.PLAN_WATCH' '${WORKFLOW}'); grep -q 'pages_project=module.pages.cloudflare_pages_project.main' <<< \"\$w\" && grep -q 'pages_domain=module.pages.cloudflare_pages_domain.main' <<< \"\$w\" && yq -r '.jobs.production.steps[] | select(.id == \"hcp_plan\") | .run' '${WORKFLOW}' | grep -q 'incomplete) need=\"pages_domain\"' && [ $(idx hcp_plan) -lt $(idx hcp_confirm) ]"
-check "orden: preflight estricto de Pages después de Terraform (plan, confirmación, estado, outputs) y antes del servidor y de wrangler" \
-  bash -c "for s in hcp_plan hcp_confirm hcp_state tf_outputs; do [ $(idx pages_preflight) -gt \$(grep -nx \"\$s\" <<< \"\$1\" | cut -d: -f1) ] || exit 1; done; for s in access readiness host_state fresh_deploy converge deploy record pages_publish; do [ $(idx pages_preflight) -lt \$(grep -nx \"\$s\" <<< \"\$1\" | cut -d: -f1) ] || exit 1; done" _ "${PROD_STEPS}"
+  bash -c "w=\$(yq -r '.jobs.terraform_plan.steps[] | select(.id == \"hcp_plan\") | .env.PLAN_WATCH' '${WORKFLOW}'); grep -q 'pages_project=module.pages.cloudflare_pages_project.main' <<< \"\$w\" && grep -q 'pages_domain=module.pages.cloudflare_pages_domain.main' <<< \"\$w\" && yq -r '.jobs.production.steps[] | select(.id == \"pages_plan\") | .run' '${WORKFLOW}' | grep -q 'incomplete) need=\"pages_domain\"' && [ \"\$(yq -r '.jobs.production.steps[] | select(.id == \"pages_plan\") | .env.WATCH_PAGES_DOMAIN' '${WORKFLOW}')\" = '\${{ needs.terraform_plan.outputs.watch_pages_domain }}' ] && [ $(idx pages_plan) -lt $(idx hcp_apply) ]"
+check "orden: preflight estricto de Pages después de Terraform (confirmación, estado, outputs) y antes del servidor y de wrangler" \
+  bash -c "for s in pages_plan hcp_apply hcp_state tf_outputs; do [ $(idx pages_preflight) -gt \$(grep -nx \"\$s\" <<< \"\$1\" | cut -d: -f1) ] || exit 1; done; for s in access readiness host_state fresh_deploy converge deploy record pages_publish; do [ $(idx pages_preflight) -lt \$(grep -nx \"\$s\" <<< \"\$1\" | cut -d: -f1) ] || exit 1; done" _ "${PROD_STEPS}"
 check "orden: la publicación va después de Terraform, el deploy, la identidad, el health y el registro" \
-  bash -c "for s in hcp_confirm hcp_state converge deploy running_identity container_health public_health record; do [ $(idx pages_publish) -gt \$(grep -nx \"\$s\" <<< \"\$1\" | cut -d: -f1) ] || exit 1; done" _ "${PROD_STEPS}"
+  bash -c "for s in hcp_apply hcp_state converge deploy running_identity container_health public_health record; do [ $(idx pages_publish) -gt \$(grep -nx \"\$s\" <<< \"\$1\" | cut -d: -f1) ] || exit 1; done" _ "${PROD_STEPS}"
 check "frescura: solo frontend → verify-main-tip.sh justo antes de publicar" \
-  bash -c "[ $(idx fresh_frontend) -eq $(( $(idx pages_publish) - 1 )) ] && yq -r '.jobs.production.steps[] | select(.id == \"fresh_frontend\") | .if' '${WORKFLOW}' | grep -q \"env.TERRAFORM_REQUIRED != 'true' && env.DEPLOY_REQUIRED != 'true'\" && yq -r '.jobs.production.steps[] | select(.id == \"fresh_frontend\") | .run' '${WORKFLOW}' | grep -q verify-main-tip.sh"
-check "frescura previa sin cambios: Apply y servidor siguen comprobándola (sin regresión)" \
-  bash -c "yq -r '.jobs.production.steps[] | select(.id == \"fresh_apply\") | .if' '${WORKFLOW}' | grep -qx \"env.TERRAFORM_REQUIRED == 'true'\" && yq -r '.jobs.production.steps[] | select(.id == \"fresh_deploy\") | .if' '${WORKFLOW}' | grep -qx \"env.DEPLOY_REQUIRED == 'true' && env.TERRAFORM_REQUIRED != 'true'\""
+  bash -c "[ $(idx fresh_frontend) -eq $(( $(idx pages_publish) - 1 )) ] && yq -r '.jobs.production.steps[] | select(.id == \"fresh_frontend\") | .if' '${WORKFLOW}' | grep -q \"env.TF_APPLY_REQUIRED != 'true' && env.DEPLOY_REQUIRED != 'true'\" && yq -r '.jobs.production.steps[] | select(.id == \"fresh_frontend\") | .run' '${WORKFLOW}' | grep -q verify-main-tip.sh"
+check "frescura previa sin cambios: Apply y servidor siguen comprobándola (también con un plan sin cambios, que no muta)" \
+  bash -c "yq -r '.jobs.production.steps[] | select(.id == \"fresh_apply\") | .if' '${WORKFLOW}' | grep -qx \"env.TF_APPLY_REQUIRED == 'true'\" && yq -r '.jobs.production.steps[] | select(.id == \"fresh_deploy\") | .if' '${WORKFLOW}' | grep -qx \"env.DEPLOY_REQUIRED == 'true' && env.TF_APPLY_REQUIRED != 'true'\""
 check "autoridad única: sondeo y preflight fallan (sin continue-on-error ni advertencia que deje seguir) antes de mutar el servidor" \
   bash -c "for s in pages_probe pages_preflight; do [ \"\$(yq -r \".jobs.production.steps[] | select(.id == \\\"\$s\\\") | .[\\\"continue-on-error\\\"] // false\" '${WORKFLOW}')\" = false ] && ! yq -r \".jobs.production.steps[] | select(.id == \\\"\$s\\\") | .run\" '${WORKFLOW}' | grep -q '::warning' || exit 1; done && [ $(idx pages_preflight) -lt $(idx fresh_deploy) ] && [ $(idx pages_preflight) -lt $(idx converge) ]"
 check "identidad: publish recibe del preflight la producción anterior y el alias de producción" \
@@ -695,9 +695,10 @@ check "conclude: con frontend requerido, solo es success si frontend_build y pro
 
 # conclude ejecutado: la conclusión es la base del rango procesado
 CONCLUDE_RUN="$(yq -r '.jobs.conclude.steps[0].run' "${WORKFLOW}")"
-conclude() { # <tf> <deploy> <frontend> <frontend_build> <production>
+conclude() { # <tf> <deploy> <frontend> <frontend_build> <production> (sin Terraform: terraform_plan saltado)
   env -i PATH="${PATH}" CLASSIFY=success SELECT=success TERRAFORM_REQUIRED="$1" DEPLOY_REQUIRED="$2" \
-    FRONTEND_REQUIRED="$3" FRONTEND_BUILD="$4" PRODUCTION="$5" bash -c "${CONCLUDE_RUN}" > /dev/null 2>&1
+    FRONTEND_REQUIRED="$3" FRONTEND_BUILD="$4" PRODUCTION="$5" TERRAFORM_PLAN=skipped HAS_CHANGES= \
+    bash -c "${CONCLUDE_RUN}" > /dev/null 2>&1
 }
 CONCLUDE_DEF="$(declare -f conclude); CONCLUDE_RUN=\$1"
 check "conclude: solo frontend publicado → success (el rango avanza)" bash -c "${CONCLUDE_DEF}; conclude false false true success success" _ "${CONCLUDE_RUN}"
