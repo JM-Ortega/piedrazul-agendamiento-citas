@@ -84,10 +84,14 @@ Todo ocurre en el run de GitHub; el operador no necesita abrir HCP.
    aprobación solo autoriza usar las credenciales de HCP para planificar este commit.
 2. **Espera el plan.** El job sube la configuración como versión **provisional** (no pasa a
    ser la configuración actual del workspace salvo que se aplique), crea un **saved plan**
-   (`save-plan`, `auto-apply=false`: HCP nunca lo aplica solo) y comprueba que el plan partió
-   del estado capturado y de esa configuración. El resumen del run muestra:
+   (`save-plan`, `auto-apply=false`: HCP nunca lo aplica solo) y liga el plan al estado
+   capturado antes de crear el run y a esa configuración: si HCP informa el state version de
+   entrada debe ser el capturado, y en todo caso el estado actual, releído después del plan,
+   debe seguir siendo el capturado. El resumen del run muestra:
    - la identidad: workspace, commit, run y plan, configuración provisional (con el sha256
-     del archivo subido), state version de entrada e intento de GitHub;
+     del archivo subido), state version del plan con su ligadura (`relationship`: informado
+     por HCP; `bracketed`: capturado antes y releído sin cambios después del plan) e intento
+     de GitHub;
    - los **efectos**, primero los destructivos: destruir, reemplazar (con el motivo y las
      rutas que lo fuerzan), actualizar, crear, olvidar, importar, drift y outputs. Por cada
      recurso se ven las rutas de los atributos que cambian; un valor solo se muestra si está
@@ -105,8 +109,9 @@ Todo ocurre en el run de GitHub; el operador no necesita abrir HCP.
    deploy.
 4. **Producción revalida y confirma.** Justo antes de confirmar comprueba: workspace sin
    auto-apply y con permiso de confirmar, el run es el de este run de GitHub (mensaje, plan,
-   configuración, state version de entrada), el estado actual sigue siendo el del plan, el
-   plan tiene como mucho una hora, ningún otro run ocupa el workspace y `main` no avanzó.
+   configuración), el plan tiene como mucho una hora, ningún otro run ocupa el workspace,
+   `main` no avanzó y, por último, el estado actual (y el de entrada, si HCP lo informa)
+   sigue siendo el del plan.
    Envía **una sola** solicitud de Apply (nunca la repite) y espera el resultado real del
    Apply antes de seguir.
 5. El resto es automático: state version exacto del Apply → outputs → preflight estricto de
@@ -142,7 +147,7 @@ cualquier deploy: una instalación nueva no tiene excepciones.
 | credenciales, workspace (auto-apply, permisos, identidad), frescura antes del plan | nada mutado | corregir y re-run |
 | subida de la configuración (HCP no la registra como provisional, la subida falla o no se procesa) | una configuración sin run (provisional: no pasa a ser la actual) | corregir y re-run; nunca se recurre a una configuración no provisional |
 | creación del saved plan (falla o se corta después de crearlo) | el run propio, si existe, se busca por su mensaje y se descarta o cancela | re-run |
-| plan (falla, override de políticas, JSON ilegible con cambios, acción desconocida, conteos contradictorios, estado de entrada o configuración distintos, `main` avanzó) | sin Apply; el saved plan propio se descarta (o terminó sin cambios) | corregir y re-run |
+| plan (falla, override de políticas, JSON ilegible con cambios, acción desconocida, conteos contradictorios, estado de entrada contradictorio, estado cambiado desde la captura, configuración distinta, `main` avanzó) | sin Apply; el saved plan propio se descarta (o terminó sin cambios) | corregir y re-run |
 | segunda aprobación rechazada o vencida | sin Apply; el saved plan queda sin confirmar: no ocupa el workspace y HCP lo descarta si el estado cambia | re-run completo (o el run del commit nuevo) |
 | evidencia del plan sobre Pages insuficiente, frescura o revalidación antes de confirmar (estado cambiado, plan de más de una hora, otro run activo, auto-apply) | sin Apply; el saved plan se descarta | re-run completo: un plan nuevo |
 | solicitud de Apply rechazada (409) o incierta y sin confirmación | sin Apply; el saved plan se descarta si todavía se puede | re-run completo |
@@ -226,8 +231,14 @@ desde la cadena) y vuelve a comprobar el estado en el siguiente run o en el dash
   que la respuesta los confirme (`provisional`, `auto-queue-runs`, `save-plan`).
 - Que un saved plan con cambios termine en `planned_and_saved` con `is-confirmable`, y uno sin
   cambios en `planned_and_finished` (la cadena falla cerrado ante `planned_and_saved` sin
-  cambios); que el run informe `input-state-version` (nulo en un workspace sin estado),
-  `created-at` y, al confirmarse, `status-timestamps.confirmed-at`.
+  cambios); que el run informe `created-at` y, al confirmarse, `status-timestamps.confirmed-at`.
+- `input-state-version` es **opcional**: en el ensayo del 2026-10-28 (run
+  `run-Y3WYSQ3tawEn5DQQ`, `planned_and_saved`) HCP la omitió, y la cadena se liga al estado
+  por captura y relectura (`bracketed`). Queda por observar: si alguna vez aparece (y con qué
+  forma) en saved plans, y si aparece con `data: null` en un workspace **con** estado (la
+  cadena lo trata como contradicción y falla cerrado).
+- Que HCP descarte un saved plan cuando el estado cambia antes de confirmarlo (documentado,
+  no ensayado): la cadena lo ve como `discarded` o como `409` al confirmar y falla sin Apply.
 - Que `TF_API_TOKEN` tenga `can-queue-run` y `can-queue-apply`, pueda leer el JSON del plan y
   pueda confirmar, descartar y cancelar; y que los conteos del plan de HCP coincidan con las
   acciones del JSON (la cadena falla cerrado si no).

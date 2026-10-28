@@ -1002,7 +1002,7 @@ jobs:
       configuration_version_id: ${{ steps.hcp_plan.outputs.configuration_version_id }}
       plan_id: ${{ steps.hcp_plan.outputs.plan_id }}
       state_before: ${{ steps.hcp_before.outputs.state_version_id }}
-      input_state_version: ${{ steps.hcp_plan.outputs.input_state_version }}
+      plan_state_version: ${{ steps.hcp_plan.outputs.plan_state_version }}
       has_changes: ${{ steps.hcp_plan.outputs.has_changes }}
       counts: ${{ steps.hcp_plan.outputs.additions }}/${{ steps.hcp_plan.outputs.changes }}/${{ steps.hcp_plan.outputs.destructions }}/${{ steps.hcp_plan.outputs.imports }}
       watch_pages_project: ${{ steps.hcp_plan.outputs.watch_pages_project }}
@@ -1100,7 +1100,8 @@ jobs:
           cat "${RUNNER_TEMP}/hcp-run.env" >> "$GITHUB_OUTPUT"
           cat "${RUNNER_TEMP}/hcp-run.env"
 
-      # Plan terminado, ligado al estado previo y a la configuración subida, con su revisión
+      # Plan terminado, ligado al estado previo (EXPECTED_STATE: el de entrada si HCP lo informa
+      # y el actual después del plan; ver hcp-state.sh plan) y a la configuración subida, con su revisión
       # saneada en el resumen (el repositorio es público: solo rutas y valores clasificados,
       # ver plan-review.sh). La frescura se vuelve a comprobar: un commit viejo no sigue y su
       # saved plan se descarta.
@@ -1116,6 +1117,7 @@ jobs:
           CONFIGURATION_VERSION: ${{ steps.hcp_upload.outputs.configuration_version_id }}
           ARCHIVE_SHA256: ${{ steps.hcp_upload.outputs.archive_sha256 }}
           STATE_BEFORE: ${{ steps.hcp_before.outputs.state_version_id }}
+          EXPECTED_STATE: ${{ steps.hcp_before.outputs.state_version_id }}
           PLAN_WATCH: >-
             pages_project=module.pages.cloudflare_pages_project.main
             pages_domain=module.pages.cloudflare_pages_domain.main
@@ -1125,10 +1127,14 @@ jobs:
           .github/scripts/hcp-state.sh plan "${RUN_ID}" > "${RUNNER_TEMP}/hcp-plan.env"
           get() { sed -n "s/^$1=//p" "${RUNNER_TEMP}/hcp-plan.env"; }
           # El plan debe partir del estado capturado y de la configuración subida por este job
-          if [ "$(get input_state_version)" != "${STATE_BEFORE}" ]; then
-            echo "::error title=Terraform::El plan del run ${RUN_ID} partió del estado $(get input_state_version), no del capturado (${STATE_BEFORE}): no se revisa ni se aplica"
+          if [ "$(get plan_state_version)" != "${STATE_BEFORE}" ]; then
+            echo "::error title=Terraform::El plan del run ${RUN_ID} quedó ligado al estado $(get plan_state_version), no al capturado (${STATE_BEFORE}): no se revisa ni se aplica"
             exit 1
           fi
+          case "$(get state_binding)" in
+            relationship | bracketed) ;;
+            *) echo "::error title=Terraform::Ligadura del plan al estado inválida: state_binding='$(get state_binding)'"; exit 1 ;;
+          esac
           if [ "$(get configuration_version_id)" != "${CONFIGURATION_VERSION}" ]; then
             echo "::error title=Terraform::El run ${RUN_ID} usa la configuración $(get configuration_version_id), no la subida por este job (${CONFIGURATION_VERSION})"
             exit 1
@@ -1153,7 +1159,7 @@ jobs:
             echo "| commit | \`${GITHUB_SHA}\` |"
             echo "| run / plan | [\`${RUN_ID}\`](${RUN_LINK}) / \`$(get plan_id)\` ($(get run_status)) |"
             echo "| configuración (provisional) | \`${CONFIGURATION_VERSION}\` — sha256 del archivo subido \`${ARCHIVE_SHA256}\` |"
-            echo "| state version de entrada | \`$(get input_state_version)\` |"
+            echo "| state version del plan | \`$(get plan_state_version)\` ($(get state_binding)) |"
             echo "| crear / cambiar / destruir / importar (HCP) | $(get additions) / $(get changes) / $(get destructions) / $(get imports) |"
             echo "| intento | run ${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT} |"
             echo
@@ -1552,13 +1558,13 @@ jobs:
           FRESHNESS_CMD: .github/scripts/verify-main-tip.sh
           EXPECTED_PLAN_ID: ${{ needs.terraform_plan.outputs.plan_id }}
           EXPECTED_CONFIGURATION_VERSION: ${{ needs.terraform_plan.outputs.configuration_version_id }}
-          EXPECTED_STATE: ${{ needs.terraform_plan.outputs.input_state_version }}
+          EXPECTED_STATE: ${{ needs.terraform_plan.outputs.plan_state_version }}
           PLAN_MAX_AGE_SECONDS: "3600"
           APPLY_COMMENT: "Aprobado en GitHub: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }} (commit ${{ github.sha }})"
         run: |
           set -euo pipefail
           if [ "${EXPECTED_STATE}" != "${HCP_STATE_BEFORE_PLAN}" ]; then
-            echo "::error title=Terraform::El plan revisado partió de ${EXPECTED_STATE}, no del estado capturado por terraform_plan (${HCP_STATE_BEFORE_PLAN})"
+            echo "::error title=Terraform::El plan revisado está ligado a ${EXPECTED_STATE}, no al estado capturado por terraform_plan (${HCP_STATE_BEFORE_PLAN})"
             exit 1
           fi
           rc=0

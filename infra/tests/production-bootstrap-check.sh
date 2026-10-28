@@ -386,6 +386,8 @@ check "create-run: con una configuración no provisional no se crea ningún run"
 # ── 5. Plan: saved plan con cambios, sin cambios, revisión saneada ──────────
 plan_setup() { # <respuestas del run>...
   reset_hcp
+  hcp_seq "GET ${API}/workspaces/${WS}" "$(workspace_json)"
+  hcp_seq "GET ${API}/workspaces/${WS}/current-state-version" '{"data":{"id":"sv-Old1"}}'
   hcp_seq "GET ${API}/runs/${RUN}" "$@"
   local out
   out="$(plan_output create)"
@@ -397,13 +399,13 @@ plan_with() { # <JSON del plan>: JSON del plan y conteos coherentes
   hcp_seq "GET ${API}/plans/${PLAN}" "$(plan_json_for "$1")"
 }
 WATCH='pages_project=module.pages.cloudflare_pages_project.main pages_domain=module.pages.cloudflare_pages_domain.main'
-plan_cmd() { # [FRESHNESS_CMD]
-  printf '%q ' bash -c "${HCP_DEF}; hcp_env PLAN_WATCH='${WATCH}' FRESHNESS_CMD='${1:-}' PLAN_REVIEW_FILE='${TMP}/review.md' '${HCP}' plan '${RUN}'"
+plan_cmd() { # [FRESHNESS_CMD] [EXPECTED_STATE]
+  printf '%q ' bash -c "${HCP_DEF}; hcp_env PLAN_WATCH='${WATCH}' FRESHNESS_CMD='${1:-}' EXPECTED_STATE='${2-sv-Old1}' PLAN_REVIEW_FILE='${TMP}/review.md' '${HCP}' plan '${RUN}'"
 }
 PLAN_CMD="$(plan_cmd)"
 plan_setup "$(run_json planning)" "$(run_json planned)" "$(run_json planned_and_saved)"
 check "plan: saved plan con cambios → has_changes=true con identidad (plan, configuración, estado de entrada) y conteos" \
-  bash -c "out=\$(eval \"\$0\") && grep -qx has_changes=true <<< \"\$out\" && grep -qx plan_id=${PLAN} <<< \"\$out\" && grep -qx configuration_version_id=${CV} <<< \"\$out\" && grep -qx input_state_version=sv-Old1 <<< \"\$out\" && grep -qx additions=4 <<< \"\$out\" && grep -qx review_creates=4 <<< \"\$out\" && grep -qx watch_pages_project=create <<< \"\$out\" && grep -qx watch_pages_domain=create <<< \"\$out\"" "${PLAN_CMD}"
+  bash -c "out=\$(eval \"\$0\") && grep -qx has_changes=true <<< \"\$out\" && grep -qx plan_id=${PLAN} <<< \"\$out\" && grep -qx configuration_version_id=${CV} <<< \"\$out\" && grep -qx plan_state_version=sv-Old1 <<< \"\$out\" && grep -qx state_binding=relationship <<< \"\$out\" && grep -qx additions=4 <<< \"\$out\" && grep -qx review_creates=4 <<< \"\$out\" && grep -qx watch_pages_project=create <<< \"\$out\" && grep -qx watch_pages_domain=create <<< \"\$out\"" "${PLAN_CMD}"
 check "plan: 'planned' de un saved plan no se confunde con la espera de confirmación (sigue esperando)" \
   test "$(grep -c "^GET ${API}/runs/${RUN}|" "${FAKE_HCP_LOG}")" = 3
 check "plan: la revisión lista los cambios materiales (sin no-op) con valores clasificados" \
@@ -474,7 +476,7 @@ check "diagnóstico: por hcp-state.sh plan, un error interno de la revisión tam
   bash -c "grep -q 'revisión saneada' '${TMP}/badplan.err' && ! grep -q CANARY '${TMP}/badplan.out' '${TMP}/badplan.err'"
 mkdir -p "${TMP}/plan-tmp"
 plan_setup "$(run_json planned_and_saved)"
-bash -c "$(printf '%q ' bash -c "${HCP_DEF}; hcp_env TMPDIR='${TMP}/plan-tmp' PLAN_REVIEW_FILE='${TMP}/review.md' '${HCP}' plan '${RUN}'")" > /dev/null 2>&1 || true
+bash -c "$(printf '%q ' bash -c "${HCP_DEF}; hcp_env TMPDIR='${TMP}/plan-tmp' EXPECTED_STATE=sv-Old1 PLAN_REVIEW_FILE='${TMP}/review.md' '${HCP}' plan '${RUN}'")" > /dev/null 2>&1 || true
 check "confidencialidad: el JSON del plan (con valores sensibles) no queda en disco al terminar" \
   bash -c "! grep -rlq CANARY '${TMP}/plan-tmp'"
 plan_setup "$(run_json planned_and_saved)"
@@ -506,11 +508,117 @@ fails "plan rechaza: revisión demasiado grande para leerse con seguridad" bash 
 plan_setup "$(run_json planned_and_saved)"
 plan_with '{"resource_changes":[],"deferred_changes":[{"reason":"x"}]}'
 fails "plan rechaza: cambios diferidos" bash -c "${PLAN_CMD}"
-plan_setup "$(run_json planned true '.data.attributes["save-plan"] = true')" "$(run_json planned_and_saved true 'del(.data.relationships["input-state-version"])')"
-fails "plan rechaza: el run no informa su state version de entrada" bash -c "${PLAN_CMD}"
-plan_setup "$(run_json planned_and_saved true '.data.relationships["input-state-version"].data = null')"
-check "plan: workspace sin estado (instalación nueva) → input_state_version=none" \
-  bash -c "eval \"\$0\" | grep -qx input_state_version=none" "${PLAN_CMD}"
+
+# ── 5b. Ligadura del saved plan al estado (input-state-version opcional) ────
+# Evidencia real (2026-10-28): un saved plan planned_and_saved sin la relación
+# input-state-version. El plan se liga al estado capturado antes de crear el run si sigue
+# siendo el actual después del plan; una relación informada distinta es una contradicción.
+no_rel() { echo 'del(.data.relationships["input-state-version"])'; }
+set_rel() { echo ".data.relationships[\"input-state-version\"] = $1"; }
+state_now() { # <sv-…|none|lista no vacía|lista 403|500>: estado actual que lee el plan
+  case "$1" in
+    none) hcp_seq "GET ${API}/workspaces/${WS}/current-state-version" "$(status 404)"; hcp_seq "GET ${STATE_LIST_URL}" '{"data":[]}' ;;
+    listed) hcp_seq "GET ${API}/workspaces/${WS}/current-state-version" "$(status 404)"; hcp_seq "GET ${STATE_LIST_URL}" '{"data":[{"id":"sv-X"}]}' ;;
+    list403) hcp_seq "GET ${API}/workspaces/${WS}/current-state-version" "$(status 404)"; hcp_seq "GET ${STATE_LIST_URL}" "$(status 403)" ;;
+    500) hcp_seq "GET ${API}/workspaces/${WS}/current-state-version" "$(status 500)" ;;
+    *) hcp_seq "GET ${API}/workspaces/${WS}/current-state-version" "{\"data\":{\"id\":\"$1\"}}" ;;
+  esac
+}
+bind_case() { # <descripción> <pasa|falla> <EXPECTED_STATE> <estado actual> <ajuste jq del run> [salidas esperadas...]
+  local d="$1" exp="$2" es="$3" now="$4" adj="$5" out rc=0 line
+  shift 5
+  plan_setup "$(run_json planning true "${adj}")" "$(run_json planned_and_saved true "${adj}")"
+  state_now "${now}"
+  out=$(bash -c "$(plan_cmd '' "${es}")" 2> "${TMP}/bind.err") || rc=$?
+  if [ "${exp}" = pasa ]; then
+    [ "${rc}" -eq 0 ] || { ko "ligadura: ${d} (rc=${rc}: $(tail -1 "${TMP}/bind.err"))"; return; }
+    for line in "$@"; do grep -qx -- "${line}" <<< "${out}" || { ko "ligadura: ${d} (falta ${line})"; return; }; done
+  else
+    [ "${rc}" -ne 0 ] || { ko "ligadura: ${d} (no falló)"; return; }
+    ! grep -q '^plan_state_version=' <<< "${out}" || { ko "ligadura: ${d} (publicó plan_state_version)"; return; }
+  fi
+  [ "$(grep -c '^POST' "${FAKE_HCP_LOG}" || true)" = 0 ] || { ko "ligadura: ${d} (hizo un POST)"; return; }
+  ok "ligadura: ${d}"
+}
+# La respuesta real observada: planned_and_saved, save-plan, has-changes, sin la relación
+LIVE_ADJ='del(.data.relationships["input-state-version"]) | .data.attributes["has-changes"] = true'
+bind_case "evidencia real: planned_and_saved sin input-state-version y estado capturado sin cambios → revisión completa (bracketed)" pasa sv-Old1 sv-Old1 "${LIVE_ADJ}" \
+  has_changes=true run_status=planned_and_saved plan_state_version=sv-Old1 state_binding=bracketed plan_id="${PLAN}" configuration_version_id="${CV}" review_creates=4
+check "ligadura: sin relación, la revisión saneada se genera igual (efectos listados)" grep -q 'module.server.hcloud_server.main' "${TMP}/review.md"
+bind_case "relación presente sin clave data → no informada (bracketed), nunca none" pasa sv-Old1 sv-Old1 "$(set_rel '{links: {related: "/x"}}')" plan_state_version=sv-Old1 state_binding=bracketed
+bind_case "relación presente e igual al estado capturado → relationship" pasa sv-Old1 sv-Old1 . plan_state_version=sv-Old1 state_binding=relationship
+bind_case "relación presente y CONTRADICTORIA (sv-Otro) con el estado actual igual al capturado → falla (sin fallback)" falla sv-Old1 sv-Old1 "$(set_rel '{data: {id: "sv-Otro", type: "state-versions"}}')"
+bind_case "relación nula (sin estado) pero se capturó sv-Old1 → contradicción, falla" falla sv-Old1 sv-Old1 "$(set_rel '{data: null}')"
+bind_case "relación sv-Old1 pero se capturó none → contradicción, falla" falla none none .
+bind_case "estado cambió durante el plan (sin relación): actual sv-New9 → falla" falla sv-Old1 sv-New9 "$(no_rel)"
+bind_case "estado cambió durante el plan (relación igual a la captura): actual sv-New9 → falla" falla sv-Old1 sv-New9 .
+bind_case "no se puede leer el estado actual (HTTP 500) → falla" falla sv-Old1 500 "$(no_rel)"
+bind_case "relación malformada (data no es objeto) → falla" falla sv-Old1 sv-Old1 "$(set_rel '{data: "sv-Old1"}')"
+bind_case "relación malformada (id inválido) → falla" falla sv-Old1 sv-Old1 "$(set_rel '{data: {id: "nope", type: "state-versions"}}')"
+bind_case "relación con tipo incorrecto (runs) aunque el id coincida → falla" falla sv-Old1 sv-Old1 "$(set_rel '{data: {id: "sv-Old1", type: "runs"}}')"
+bind_case "relación sin tipo aunque el id coincida → falla" falla sv-Old1 sv-Old1 "$(set_rel '{data: {id: "sv-Old1"}}')"
+bind_case "relación con tipo no textual aunque el id coincida → falla" falla sv-Old1 sv-Old1 "$(set_rel '{data: {id: "sv-Old1", type: null}}')"
+bind_case "relación sin id (solo tipo) → falla" falla sv-Old1 sv-Old1 "$(set_rel '{data: {type: "state-versions"}}')"
+bind_case "relación presente con valor null → falla (no es ausencia)" falla sv-Old1 sv-Old1 "$(set_rel 'null')"
+bind_case "relationships null → falla (no es ausencia)" falla sv-Old1 sv-Old1 '.data.relationships = null'
+# Parser aislado: ausencia real frente a estructura inválida (sin depender de otras validaciones)
+parse_input_state() { # <run JSON (data)> → salida de input_state, o FAIL
+  bash -c 'fail() { echo FAIL; exit 1; }; '"$(sed -n '/^input_state() {/,/^}/p' "${HCP}")"'; input_state "$1"' _ "$1" 2> /dev/null || true
+}
+parse_case() { # <JSON> <esperado: unreported|none|sv-…|FAIL>
+  local got
+  got=$(parse_input_state "$1")
+  if [ "${got}" = "$2" ]; then ok "input_state: $1 → $2"; else ko "input_state: $1 → '${got}', esperado $2"; fi
+}
+parse_case '{"id":"run-X","relationships":{}}' unreported
+parse_case '{"id":"run-X","relationships":{"input-state-version":{}}}' unreported
+parse_case '{"id":"run-X","relationships":{"input-state-version":{"links":{"related":"/x"}}}}' unreported
+parse_case '{"id":"run-X","relationships":{"input-state-version":{"data":null}}}' none
+parse_case '{"id":"run-X","relationships":{"input-state-version":{"data":{"id":"sv-A1","type":"state-versions"}}}}' sv-A1
+parse_case '{"id":"run-X","relationships":{"input-state-version":null}}' FAIL
+parse_case '{"id":"run-X","relationships":null}' FAIL
+parse_case '{"id":"run-X"}' FAIL
+parse_case '{"id":"run-X","relationships":[]}' FAIL
+parse_case '{"id":"run-X","relationships":"x"}' FAIL
+parse_case '{"id":"run-X","relationships":{"input-state-version":[]}}' FAIL
+parse_case '{"id":"run-X","relationships":{"input-state-version":"sv-A1"}}' FAIL
+parse_case '{"id":"run-X","relationships":{"input-state-version":{"data":{"id":"sv-A1","type":"runs"}}}}' FAIL
+parse_case '{"id":"run-X","relationships":{"input-state-version":{"data":{"id":"sv-A1"}}}}' FAIL
+bind_case "relación malformada (data es una lista) → falla" falla sv-Old1 sv-Old1 "$(set_rel '{data: [{id: "sv-Old1"}]}')"
+bind_case "relación malformada (no es objeto) → falla" falla sv-Old1 sv-Old1 "$(set_rel '"sv-Old1"')"
+bind_case "EXPECTED_STATE ausente → falla, nunca none" falla "" sv-Old1 "$(no_rel)"
+bind_case "EXPECTED_STATE malformado ('None') → falla" falla None none "$(no_rel)"
+bind_case "EXPECTED_STATE malformado ('sv-') → falla" falla sv- sv-Old1 "$(no_rel)"
+bind_case "EXPECTED_STATE con caracteres extra → falla" falla 'sv-Old1;x' sv-Old1 "$(no_rel)"
+check "ligadura: EXPECTED_STATE inválido falla antes de leer el run" bash -c "! grep -q '^GET ${API}/runs/' '${FAKE_HCP_LOG}'"
+# Instalación nueva (none) frente a un estado existente vacío (sv-…, cero recursos)
+bind_case "instalación nueva: relación nula y none confirmado por dos lecturas → none (relationship)" pasa none none "$(set_rel '{data: null}')" plan_state_version=none state_binding=relationship
+bind_case "instalación nueva sin relación: none confirmado por dos lecturas → none (bracketed)" pasa none none "$(no_rel)" plan_state_version=none state_binding=bracketed
+bind_case "none capturado pero la lista de state versions no está vacía → falla" falla none listed "$(no_rel)"
+bind_case "none capturado y la lista de state versions responde 403 → falla (nunca 'vacío')" falla none list403 "$(no_rel)"
+bind_case "none capturado pero ahora hay un state version (vacío o no) → falla" falla none sv-Empty0 "$(no_rel)"
+bind_case "estado existente vacío (sv-Empty0, cero recursos) sin cambios → sv-Empty0, no none" pasa sv-Empty0 sv-Empty0 "$(no_rel)" plan_state_version=sv-Empty0 state_binding=bracketed
+bind_case "estado existente vacío capturado pero el actual dice none → falla" falla sv-Empty0 none "$(no_rel)"
+# Sin cambios: terminal igual que antes, también sin relación
+plan_setup "$(run_json planned_and_finished false "$(no_rel)")"
+plan_with '{"resource_changes":[]}'
+check "ligadura: plan sin cambios sin relación y estado sin cambios → has_changes=false, terminal, sin POST" \
+  bash -c "out=\$(eval \"\$0\") && grep -qx has_changes=false <<< \"\$out\" && grep -qx run_status=planned_and_finished <<< \"\$out\" && grep -qx state_binding=bracketed <<< \"\$out\" && [ \"\$(grep -c '^POST' '${FAKE_HCP_LOG}' || true)\" = 0 ]" "${PLAN_CMD}"
+plan_setup "$(run_json planned_and_finished false "$(no_rel)")"
+plan_with '{"resource_changes":[]}'
+state_now sv-New9
+fails "ligadura: plan sin cambios y el estado cambió → falla (la cadena no sigue con otro estado)" bash -c "${PLAN_CMD}"
+# Estados terminales o inesperados sin relación: nunca llegan a la ligadura ni al Apply
+for st in errored discarded canceled force_canceled policy_soft_failed weird_state; do
+  plan_setup "$(run_json "${st}" true "$(no_rel)")"
+  if bash -c "${PLAN_CMD}" > "${TMP}/bind.out" 2> /dev/null; then ko "ligadura: run ${st} sin relación → falla (no falló)"
+  elif grep -q '^plan_state_version=' "${TMP}/bind.out"; then ko "ligadura: run ${st} sin relación publicó plan_state_version"
+  else ok "ligadura: run ${st} sin relación → falla sin publicar el plan"; fi
+done
+plan_setup "$(run_json apply_queued true "$(no_rel)")" "$(run_json applied true "$(no_rel)")"
+if bash -c "${PLAN_CMD}" > "${TMP}/bind.out" 2> /dev/null; then ko "ligadura: confirmado fuera de GitHub sin relación → falla (no falló)"; else ok "ligadura: confirmado fuera de GitHub sin relación → falla"; fi
+check "ligadura: confirmación ajena sin relación se informa out_of_band, sin POST" \
+  bash -c "grep -qx apply_request=out_of_band '${TMP}/bind.out' && [ \"\$(grep -c '^POST' '${FAKE_HCP_LOG}' || true)\" = 0 ]"
 PLAN_CMD="$(plan_cmd)"
 
 # Sin cambios: planned_and_finished es terminal; no se descarta nada
@@ -603,8 +711,41 @@ A="$(apply_cmd)"
 apply_fails "otro plan que el revisado" 0 "$(apply_cmd EXPECTED_PLAN_ID=plan-Otro)" "${SAVED}"
 apply_fails "otra configuración que la revisada" 0 "$(apply_cmd EXPECTED_CONFIGURATION_VERSION=cv-Otra)" "${SAVED}"
 apply_fails "el plan partió de otro estado" 0 "${A}" "$(run_json planned_and_saved true '.data.relationships["input-state-version"].data.id = "sv-Otro"')"
-apply_fails "el run no informa su estado de entrada" 0 "${A}" "$(run_json planned_and_saved true 'del(.data.relationships["input-state-version"])')"
 apply_fails "el estado del workspace cambió desde el plan" 0 "$(apply_cmd EXPECTED_STATE=sv-Prev0)" "$(run_json planned_and_saved true '.data.relationships["input-state-version"].data.id = "sv-Prev0"')"
+NOREL_SAVED="$(run_json planned_and_saved true 'del(.data.relationships["input-state-version"])')"
+apply_fails "sin relación de entrada y el estado cambió desde el plan (aprobación tardía)" 0 "$(apply_cmd EXPECTED_STATE=sv-Prev0)" "${NOREL_SAVED}"
+apply_fails "relación nula (sin estado) pero el plan revisado es sv-Old1 → contradicción" 0 "${A}" "$(run_json planned_and_saved true '.data.relationships["input-state-version"].data = null')"
+apply_fails "relación malformada" 0 "${A}" "$(run_json planned_and_saved true '.data.relationships["input-state-version"].data = {id: "nope", type: "state-versions"}')"
+apply_fails "relación con tipo incorrecto (runs) aunque el id coincida" 0 "${A}" "$(run_json planned_and_saved true '.data.relationships["input-state-version"].data.type = "runs"')"
+apply_fails "relación presente con valor null (no es ausencia)" 0 "${A}" "$(run_json planned_and_saved true '.data.relationships["input-state-version"] = null')"
+apply_fails "relationships null (no es ausencia)" 0 "${A}" "$(run_json planned_and_saved true '.data.relationships = null')"
+apply_fails "relación sin tipo aunque el id coincida" 0 "${A}" "$(run_json planned_and_saved true 'del(.data.relationships["input-state-version"].data.type)')"
+apply_fails "EXPECTED_STATE ausente" 0 "$(apply_cmd EXPECTED_STATE=)" "${NOREL_SAVED}"
+apply_fails "EXPECTED_STATE malformado" 0 "$(apply_cmd EXPECTED_STATE=None)" "${NOREL_SAVED}"
+apply_fails "plan revisado none pero el workspace ahora tiene estado" 0 "$(apply_cmd EXPECTED_STATE=none)" "${NOREL_SAVED}"
+apply_setup "${NOREL_SAVED}" "${NOREL_SAVED}" "$(run_json apply_queued true 'del(.data.relationships["input-state-version"])')"
+check "apply: sin relación de entrada (evidencia real) y estado sin cambios → una sola solicitud, aceptada" \
+  bash -c "out=\$(eval \"\$0\") && grep -qx apply_request=accepted <<< \"\$out\" && [ \"\$(grep -c '^POST ${API}/runs/${RUN}/actions/apply|' '${FAKE_HCP_LOG}')\" = 1 ]" "${A}"
+apply_setup "${NOREL_SAVED}" "${NOREL_SAVED}" "$(run_json apply_queued true 'del(.data.relationships["input-state-version"])')"
+hcp_seq "GET ${API}/workspaces/${WS}/current-state-version" "$(status 404)"
+hcp_seq "GET ${STATE_LIST_URL}" '{"data":[]}'
+check "apply: instalación nueva (none confirmado por dos lecturas, sin relación) → una sola solicitud" \
+  bash -c "eval \"\$0\" | grep -qx apply_request=accepted && [ \"\$(grep -c '^POST ${API}/runs/${RUN}/actions/apply|' '${FAKE_HCP_LOG}')\" = 1 ]" "$(apply_cmd EXPECTED_STATE=none)"
+apply_setup "${NOREL_SAVED}"
+hcp_seq "GET ${API}/workspaces/${WS}/current-state-version" "$(status 404)"
+hcp_seq "GET ${STATE_LIST_URL}" "$(status 403)"
+fails "apply rechaza: none esperado pero la ausencia de estado no se puede confirmar (lista 403)" bash -c "$(apply_cmd EXPECTED_STATE=none)"
+check "apply: ausencia no confirmada → ninguna solicitud" test "$(applies)" = 0
+# Después de la última lectura del estado: HCP descarta el saved plan y la última lectura del run lo ve
+apply_fails "el estado cambia tras la revalidación: HCP descarta el saved plan antes de la solicitud" 0 "${A}" "${NOREL_SAVED}" "$(run_json discarded true 'del(.data.relationships["input-state-version"])')"
+apply_order() { # líneas de fresh, bind_state y la última lectura del run en cmd_apply, en orden
+  local f b l
+  f=$(awk '/^cmd_apply\(\) \{/,/^}/' "${HCP}" | grep -n '^  fresh || fail' | cut -d: -f1)
+  b=$(awk '/^cmd_apply\(\) \{/,/^}/' "${HCP}" | grep -n '^  bind_state ' | cut -d: -f1)
+  l=$(awk '/^cmd_apply\(\) \{/,/^}/' "${HCP}" | grep -n '^  # Última lectura antes de la solicitud' | cut -d: -f1)
+  [[ "${f}" =~ ^[0-9]+$ && "${b}" =~ ^[0-9]+$ && "${l}" =~ ^[0-9]+$ ]] && [ "${f}" -lt "${b}" ] && [ "${b}" -lt "${l}" ]
+}
+check "apply: la revalidación del estado es posterior a la frescura y anterior a la última lectura del run" apply_order
 apply_fails "plan más viejo que el máximo (aprobación vencida)" 0 "${A}" "$(run_json planned_and_saved true ".data.attributes[\"created-at\"] = \"${OLD_ISO}\"")"
 apply_fails "fecha de creación del run en el futuro" 0 "${A}" "$(run_json planned_and_saved true '.data.attributes["created-at"] = "2099-01-01T00:00:00Z"')"
 apply_fails "fecha de creación ilegible" 0 "${A}" "$(run_json planned_and_saved true '.data.attributes["created-at"] = "ayer"')"
@@ -812,7 +953,7 @@ check "terraform_plan: workspace en modo apply (sin auto-apply y con permiso de 
 check "terraform_plan: configuración provisional con hcp-state.sh upload y saved plan con esa configuración" \
   bash -c "${SDEF}; pstep hcp_upload .run | grep -q 'hcp-state.sh upload infra/terraform' && pstep hcp_run .run | grep -q 'hcp-state.sh create-run' && [ \"\$(pstep hcp_run .env.CONFIGURATION_VERSION)\" = '\${{ steps.hcp_upload.outputs.configuration_version_id }}' ]"
 check "terraform_plan: el plan comprueba frescura, vigila Pages y se liga al estado previo y a la configuración subida" \
-  bash -c "${SDEF}; [ \"\$(pstep hcp_plan .env.FRESHNESS_CMD)\" = .github/scripts/verify-main-tip.sh ] && pstep hcp_plan .env.PLAN_WATCH | grep -q 'pages_domain=module.pages.cloudflare_pages_domain.main' && pstep hcp_plan .run | grep -q 'get input_state_version)\" != \"\${STATE_BEFORE}\"' && pstep hcp_plan .run | grep -q 'get configuration_version_id)\" != \"\${CONFIGURATION_VERSION}\"'"
+  bash -c "${SDEF}; [ \"\$(pstep hcp_plan .env.FRESHNESS_CMD)\" = .github/scripts/verify-main-tip.sh ] && pstep hcp_plan .env.PLAN_WATCH | grep -q 'pages_domain=module.pages.cloudflare_pages_domain.main' && pstep hcp_plan .run | grep -q 'get plan_state_version)\" != \"\${STATE_BEFORE}\"' && [ \"\$(pstep hcp_plan .env.EXPECTED_STATE)\" = '\${{ steps.hcp_before.outputs.state_version_id }}' ] && [ \"\$(yq -r '.jobs.terraform_plan.outputs.plan_state_version' '${WORKFLOW}')\" = '\${{ steps.hcp_plan.outputs.plan_state_version }}' ] && pstep hcp_plan .run | grep -q 'get configuration_version_id)\" != \"\${CONFIGURATION_VERSION}\"'"
 check "terraform_plan: el mensaje del run identifica el intento (sha, run_id y run_attempt) y viaja como salida" \
   bash -c "${SDEF}; yq -r '.jobs.terraform_plan.env.HCP_RUN_MESSAGE' '${WORKFLOW}' | grep -qF '\${{ github.sha }} — run \${{ github.run_id }}/\${{ github.run_attempt }}' && for s in hcp_run hcp_plan hcp_cleanup; do [ \"\$(pstep \$s .env.RUN_MESSAGE)\" = '\${{ env.HCP_RUN_MESSAGE }}' ] || exit 1; done && [ \"\$(yq -r '.jobs.terraform_plan.outputs.run_message' '${WORKFLOW}')\" = '\${{ steps.hcp_run.outputs.run_message }}' ]"
 check "terraform_plan: la limpieza solo corre si el job falló o se canceló tras intentar crear el run (con éxito, el saved plan queda para production)" \
@@ -820,7 +961,7 @@ check "terraform_plan: la limpieza solo corre si el job falló o se canceló tra
 check "production: usa el run, el mensaje y el estado de terraform_plan (no los recalcula)" \
   bash -c "${SDEF}; [ \"\$(yq -r '.jobs.production.env.HCP_RUN_MESSAGE' '${WORKFLOW}')\" = '\${{ needs.terraform_plan.outputs.run_message }}' ] && [ \"\$(yq -r '.jobs.production.env.HCP_RUN_ID' '${WORKFLOW}')\" = '\${{ needs.terraform_plan.outputs.run_id }}' ] && for s in hcp_apply hcp_cleanup; do [ \"\$(step \$s .env.RUN_MESSAGE)\" = '\${{ env.HCP_RUN_MESSAGE }}' ] || exit 1; done && [ \"\$(step hcp_state .env.RUN_ID)\" = '\${{ env.HCP_RUN_ID }}' ]"
 check "production: la confirmación exige el plan, la configuración y el estado revisados, frescura y antigüedad máxima" \
-  bash -c "${SDEF}; [ \"\$(step hcp_apply .env.EXPECTED_PLAN_ID)\" = '\${{ needs.terraform_plan.outputs.plan_id }}' ] && [ \"\$(step hcp_apply .env.EXPECTED_CONFIGURATION_VERSION)\" = '\${{ needs.terraform_plan.outputs.configuration_version_id }}' ] && [ \"\$(step hcp_apply .env.EXPECTED_STATE)\" = '\${{ needs.terraform_plan.outputs.input_state_version }}' ] && [ \"\$(step hcp_apply .env.FRESHNESS_CMD)\" = .github/scripts/verify-main-tip.sh ] && [ \"\$(step hcp_apply .env.PLAN_MAX_AGE_SECONDS)\" -le 3600 ]"
+  bash -c "${SDEF}; [ \"\$(step hcp_apply .env.EXPECTED_PLAN_ID)\" = '\${{ needs.terraform_plan.outputs.plan_id }}' ] && [ \"\$(step hcp_apply .env.EXPECTED_CONFIGURATION_VERSION)\" = '\${{ needs.terraform_plan.outputs.configuration_version_id }}' ] && [ \"\$(step hcp_apply .env.EXPECTED_STATE)\" = '\${{ needs.terraform_plan.outputs.plan_state_version }}' ] && [ \"\$(step hcp_apply .env.FRESHNESS_CMD)\" = .github/scripts/verify-main-tip.sh ] && [ \"\$(step hcp_apply .env.PLAN_MAX_AGE_SECONDS)\" -le 3600 ]"
 check "production: TF_APPLY_REQUIRED solo con Terraform requerido y has_changes exactamente true" \
   test "$(yq -r '.jobs.production.env.TF_APPLY_REQUIRED' "${WORKFLOW}")" = "\${{ needs.classify.outputs.terraform_required == 'true' && needs.terraform_plan.outputs.has_changes == 'true' }}"
 check "production: orden workspace → libre → estado → evidencia de Pages → frescura → confirmación → resultado del Apply → outputs" \
@@ -1152,7 +1293,7 @@ step_case() { # <descripción> <pasa|falla> <job> <id> [VAR=valor...]
   run_step "$@" || rc=$?
   if { [ "${exp}" = pasa ] && [ "${rc}" -eq 0 ]; } || { [ "${exp}" = falla ] && [ "${rc}" -ne 0 ]; }; then ok "$1/$2: ${d}"; else ko "$1/$2: ${d} (rc=${rc}: $(tail -1 "${SD}/log"))"; fi
 }
-PLAN_OUT="run_status=planned_and_saved\nhas_changes=true\nplan_id=${PLAN}\nconfiguration_version_id=${CV}\ninput_state_version=sv-Old1\nadditions=4\nchanges=0\ndestructions=1\nimports=0\nreview_creates=3\nreview_replaces=1\nreview_deletes=0\nwatch_pages_project=create\nwatch_pages_domain=create\nrun_link=https://x"
+PLAN_OUT="run_status=planned_and_saved\nhas_changes=true\nplan_id=${PLAN}\nconfiguration_version_id=${CV}\nplan_state_version=sv-Old1\nstate_binding=relationship\nadditions=4\nchanges=0\ndestructions=1\nimports=0\nreview_creates=3\nreview_replaces=1\nreview_deletes=0\nwatch_pages_project=create\nwatch_pages_domain=create\nrun_link=https://x"
 PLAN_ENV=(RUN_ID="${RUN}" RUN_LINK=https://x CONFIGURATION_VERSION="${CV}" ARCHIVE_SHA256=deadbeef STATE_BEFORE=sv-Old1 FAKE_REVIEW='#### Reemplazar (1)\n- `module.x`')
 step_case "plan revisado con cambios → salidas, resumen con identidad y efectos, aviso de revisión" pasa terraform_plan hcp_plan "${PLAN_ENV[@]}" FAKE_OUT="${PLAN_OUT}"
 check "terraform_plan/hcp_plan: el resumen muestra workspace, commit, run, plan, configuración provisional, estado de entrada y los efectos" \
@@ -1162,8 +1303,13 @@ check "terraform_plan/hcp_plan: aviso para revisar y aprobar, y advertencia de p
 step_case "plan sin cambios → resumen 'Sin cambios', sin aviso de revisión" pasa terraform_plan hcp_plan "${PLAN_ENV[@]}" FAKE_OUT="${PLAN_OUT/has_changes=true/has_changes=false}"
 check "terraform_plan/hcp_plan: sin cambios no pide revisar ni aprobar un Apply" \
   bash -c "grep -q 'Sin cambios:' '${SD}/summary' && ! grep -q '::notice' '${SD}/log'"
-step_case "el plan partió de otro estado que el capturado → falla" falla terraform_plan hcp_plan "${PLAN_ENV[@]}" FAKE_OUT="${PLAN_OUT/input_state_version=sv-Old1/input_state_version=sv-Otro}"
+step_case "el plan quedó ligado a otro estado que el capturado → falla" falla terraform_plan hcp_plan "${PLAN_ENV[@]}" FAKE_OUT="${PLAN_OUT/plan_state_version=sv-Old1/plan_state_version=sv-Otro}"
 check "terraform_plan/hcp_plan: con identidad inconsistente no publica salidas (production no puede usarlas)" bash -c "! grep -q has_changes '${SD}/out'"
+step_case "sin plan_state_version → falla" falla terraform_plan hcp_plan "${PLAN_ENV[@]}" FAKE_OUT="${PLAN_OUT/plan_state_version=sv-Old1/}"
+step_case "state_binding inválido → falla" falla terraform_plan hcp_plan "${PLAN_ENV[@]}" FAKE_OUT="${PLAN_OUT/state_binding=relationship/state_binding=fallback}"
+step_case "sin state_binding → falla" falla terraform_plan hcp_plan "${PLAN_ENV[@]}" FAKE_OUT="${PLAN_OUT/state_binding=relationship/}"
+step_case "ligado por captura y relectura (bracketed) → sigue, con la ligadura en el resumen" pasa terraform_plan hcp_plan "${PLAN_ENV[@]}" FAKE_OUT="${PLAN_OUT/state_binding=relationship/state_binding=bracketed}"
+check "terraform_plan/hcp_plan: el resumen muestra el state version del plan y cómo se ligó" grep -qF "state version del plan | \`sv-Old1\` (bracketed)" "${SD}/summary"
 step_case "el run usa otra configuración que la subida → falla" falla terraform_plan hcp_plan "${PLAN_ENV[@]}" FAKE_OUT="${PLAN_OUT/configuration_version_id=${CV}/configuration_version_id=cv-Otra}"
 step_case "has_changes inválido → falla" falla terraform_plan hcp_plan "${PLAN_ENV[@]}" FAKE_OUT="${PLAN_OUT/has_changes=true/has_changes=quizas}"
 step_case "hcp-state.sh plan falla → el paso falla" falla terraform_plan hcp_plan "${PLAN_ENV[@]}" FAKE_OUT="" FAKE_RC=1

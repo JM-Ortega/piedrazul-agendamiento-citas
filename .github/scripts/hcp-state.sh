@@ -47,7 +47,8 @@
 #     saved plan (save-plan=true, no plan-only, no destroy) con auto-apply=false explícito, y
 #     verifica en la respuesta que HCP lo registró así (workspace, configuración, mensaje).
 #     HCP nunca aplica solo un saved plan: solo se aplica confirmándolo (subcomando apply).
-#   - plan: espera a que el saved plan termine y lo clasifica:
+#   - plan: (EXPECTED_STATE: el state version capturado por `current` antes de crear el run,
+#     sv-… o none; obligatorio) espera a que el saved plan termine y lo clasifica:
 #       * planned_and_saved, confirmable, con cambios → has_changes=true (espera el Apply);
 #       * planned_and_finished sin cambios → has_changes=false (terminal: nada que aplicar
 #         ni que descartar);
@@ -61,14 +62,20 @@
 #     PLAN_WATCH (opcional): "<nombre>=<dirección> …"; por cada uno informa la acción
 #     OBSERVADA en el JSON del plan, watch_<nombre>=create|delete|replace|update|no-op|none,
 #     o unknown (JSON ilegible) o ambiguous (la dirección aparece más de una vez).
+#     Estado (ver bind_state): si HCP informa input-state-version, debe ser EXPECTED_STATE
+#     (otra cosa es una contradicción y falla); la relación es opcional (HCP la omitió en un
+#     saved plan real), y en todos los casos el estado actual, leído después del plan, debe
+#     seguir siendo EXPECTED_STATE. Salida: plan_state_version y state_binding
+#     (relationship|bracketed).
 #     FRESHNESS_CMD (opcional; p. ej. verify-main-tip.sh): si el commit dejó de ser la punta
 #     de main, el run propio se descarta (si espera el Apply) y falla.
 #   - apply: confirma el saved plan propio, una sola vez, después de revalidar en ese momento:
 #     workspace (apply), run propio (mensaje, save-plan, auto-apply=false, no destroy),
 #     planned_and_saved y confirmable con cambios, plan (EXPECTED_PLAN_ID), configuración
-#     (EXPECTED_CONFIGURATION_VERSION), state version de entrada del run y actual del
-#     workspace (EXPECTED_STATE, sv-… o none), antigüedad del run (PLAN_MAX_AGE_SECONDS, por
-#     defecto 3600), ningún otro run activo y frescura (FRESHNESS_CMD). Envía UN solo
+#     (EXPECTED_CONFIGURATION_VERSION), antigüedad del run (PLAN_MAX_AGE_SECONDS, por
+#     defecto 3600), ningún otro run activo, frescura (FRESHNESS_CMD) y, al final, estado
+#     (EXPECTED_STATE, sv-… o none: el de entrada del run si HCP lo informa y el actual del
+#     workspace, como en plan). Envía UN solo
 #     POST /runs/<id>/actions/apply y nunca lo repite:
 #       * 202 → apply_request=accepted cuando HCP muestra el run confirmado;
 #       * 409 → se relee: descartado (estado cambiado) falla; confirmado por otro es una
@@ -423,14 +430,54 @@ cmd_create_run() {
   echo "run_link=$(run_link "${run_id}")"
 }
 
-# input_state <run JSON>: sv-… o none (relación presente y nula); falla si HCP no la informa
+# input_state <run JSON>: lo que HCP informa como state version de entrada del run:
+#   sv-…        relación presente con data {id: sv-…, type: "state-versions"};
+#   none        relación presente con data: null (el run partió sin estado);
+#   unreported  relación ausente (clave inexistente en relationships), o presente como
+#               objeto sin clave data (HCP no la informa: observado en saved plans
+#               planned_and_saved). Nunca se lee como none.
+# Cualquier otra forma (relationships que no es objeto, relación null o que no es objeto,
+# data que no es objeto ni null, tipo distinto de state-versions o ausente, id malformado)
+# falla.
 input_state() {
-  jq -e '.relationships | has("input-state-version")' <<< "$1" > /dev/null ||
-    fail "el run $(jq -r .id <<< "$1") no informa su state version de entrada: no se puede ligar el plan al estado"
   local sv
-  sv=$(jq -r '.relationships["input-state-version"].data.id // "none"' <<< "$1")
-  [[ "${sv}" =~ ^sv-[A-Za-z0-9]+$ ]] || [ "${sv}" = none ] || fail "state version de entrada inválido: '${sv}'"
+  sv=$(jq -r '
+      if (.relationships | type) != "object" then "!"
+      elif (.relationships | has("input-state-version") | not) then "unreported"
+      else .relationships["input-state-version"] as $r
+      | if ($r | type) != "object" then "!"
+        elif ($r | has("data") | not) then "unreported"
+        elif $r.data == null then "none"
+        elif ($r.data | type) == "object" and $r.data.type == "state-versions" and ($r.data.id | type) == "string" then $r.data.id
+        else "!" end end' <<< "$1" 2> /dev/null) || sv="!"
+  [[ "${sv}" =~ ^sv-[A-Za-z0-9]+$ ]] || [ "${sv}" = none ] || [ "${sv}" = unreported ] ||
+    fail "el run $(jq -r .id <<< "$1") informa un state version de entrada malformado"
   echo "${sv}"
+}
+
+# bind_state <run JSON> <state esperado>: liga el saved plan al state version esperado
+# (el capturado antes de crear el run: sv-… o none) y escribe cómo:
+#   relationship  HCP informa el state version de entrada y es el esperado;
+#   bracketed     HCP no lo informa: el esperado se capturó antes de crear el run y sigue
+#                 siendo el actual ahora (después del plan). Un state version nuevo siempre
+#                 tiene un id nuevo (también un rollback), así que el actual no pudo cambiar y
+#                 volver; HCP además descarta un saved plan si el estado cambia.
+# En ambos casos el estado actual debe seguir siendo el esperado (none solo si current lo
+# confirma por dos lecturas). Una relación informada distinta del esperado es una
+# contradicción y falla: nunca se recurre al estado actual para taparla.
+bind_state() {
+  local run="$1" expected="$2" in_sv current id
+  id=$(jq -r .id <<< "${run}")
+  [[ "${expected}" =~ ^sv-[A-Za-z0-9]+$ ]] || [ "${expected}" = none ] ||
+    fail "state version esperado ausente o inválido: '${expected}'"
+  in_sv=$(input_state "${run}")
+  if [ "${in_sv}" != unreported ] && [ "${in_sv}" != "${expected}" ]; then
+    fail "HCP informa que el plan del run ${id} partió de ${in_sv}, no del estado capturado (${expected}): contradicción"
+  fi
+  current=$(current_state)
+  [ "${current}" = "${expected}" ] ||
+    fail "el estado del workspace cambió desde la captura previa al plan (${expected} → ${current}): el saved plan del run ${id} ya no corresponde"
+  if [ "${in_sv}" = unreported ]; then echo bracketed; else echo relationship; fi
 }
 
 # watch_actions <plan JSON|vacío>: watch_<nombre>=<acción observada> por cada entrada de
@@ -456,8 +503,9 @@ watch_actions() {
 }
 
 cmd_plan() {
-  local run_id="$1" run status plan_id body code has json review counts in_sv cv
+  local run_id="$1" run status plan_id body code has json review counts binding cv
   [[ "${run_id}" =~ ^run-[A-Za-z0-9]+$ ]] || fail "run_id inválido: '${run_id}'"
+  [[ "${EXPECTED_STATE:-}" =~ ^sv-[A-Za-z0-9]+$ ]] || [ "${EXPECTED_STATE:-}" = none ] || fail "EXPECTED_STATE inválido"
   require_identity
   status=""
   for i in $(seq 1 "${POLL_ATTEMPTS}"); do
@@ -498,7 +546,6 @@ cmd_plan() {
   [[ "${plan_id}" =~ ^plan-[A-Za-z0-9]+$ ]] || fail "el run ${run_id} no tiene un plan válido"
   cv=$(jq -r '.relationships["configuration-version"].data.id // ""' <<< "${run}")
   [[ "${cv}" =~ ^cv-[A-Za-z0-9]+$ ]] || fail "el run ${run_id} no informa su configuración"
-  in_sv=$(input_state "${run}")
   body=$(mktemp)
   code=$(hcp GET "/plans/${plan_id}" "${body}")
   [ "${code}" = 200 ] || fail "no se pudo leer el plan ${plan_id} (HTTP ${code})"
@@ -535,6 +582,11 @@ cmd_plan() {
     printf '_Plan sin cambios: el JSON del plan no se pudo leer; no hay cambios que revisar._\n' > "${review}"
   fi
 
+  # Estado: el plan terminó y el estado capturado antes de crear el run sigue siendo el
+  # actual (y coincide con el de entrada si HCP lo informa). Si no, falla: HCP descarta el
+  # saved plan por el cambio de estado y la limpieza del job también.
+  binding=$(bind_state "${run}" "${EXPECTED_STATE}")
+
   # Frescura: un commit viejo no sigue; el saved plan propio se descarta
   if ! fresh; then
     if [ "${has}" = true ]; then
@@ -548,7 +600,8 @@ cmd_plan() {
   echo "has_changes=${has}"
   echo "plan_id=${plan_id}"
   echo "configuration_version_id=${cv}"
-  echo "input_state_version=${in_sv}"
+  echo "plan_state_version=${EXPECTED_STATE}"
+  echo "state_binding=${binding}"
   echo "created_at=$(jq -r '.attributes["created-at"] // ""' <<< "${run}")"
   jq -r '.data.attributes | "additions=\(.["resource-additions"] // 0)\nchanges=\(.["resource-changes"] // 0)\ndestructions=\(.["resource-destructions"] // 0)\nimports=\(.["resource-imports"] // 0)"' "${body}"
   [ -z "${counts}" ] || echo "${counts}"
@@ -566,7 +619,7 @@ confirmed_after() {
 }
 
 cmd_apply() {
-  local run_id="$1" run status in_sv current created age busy body data code requested
+  local run_id="$1" run status created age busy body data code requested
   [[ "${run_id}" =~ ^run-[A-Za-z0-9]+$ ]] || fail "run_id inválido: '${run_id}'"
   [[ "${EXPECTED_PLAN_ID:-}" =~ ^plan-[A-Za-z0-9]+$ ]] || fail "EXPECTED_PLAN_ID inválido"
   [[ "${EXPECTED_CONFIGURATION_VERSION:-}" =~ ^cv-[A-Za-z0-9]+$ ]] || fail "EXPECTED_CONFIGURATION_VERSION inválido"
@@ -592,13 +645,6 @@ cmd_apply() {
     fail "el plan del run ${run_id} no es el revisado (${EXPECTED_PLAN_ID})"
   jq -e --arg c "${EXPECTED_CONFIGURATION_VERSION}" '.relationships["configuration-version"].data.id == $c' <<< "${run}" > /dev/null ||
     fail "la configuración del run ${run_id} no es la revisada (${EXPECTED_CONFIGURATION_VERSION})"
-  in_sv=$(input_state "${run}")
-  [ "${in_sv}" = "${EXPECTED_STATE}" ] ||
-    fail "el plan del run ${run_id} partió de ${in_sv}, no del estado revisado (${EXPECTED_STATE})"
-  current=$(current_state)
-  [ "${current}" = "${EXPECTED_STATE}" ] ||
-    fail "el estado del workspace cambió desde el plan (${EXPECTED_STATE} → ${current}): el saved plan ya no corresponde"
-
   created=$(jq -r '.attributes["created-at"] // ""' <<< "${run}")
   created=$(date -d "${created}" +%s 2> /dev/null) || fail "el run ${run_id} no informa una fecha de creación legible"
   age=$(($(date +%s) - created))
@@ -610,6 +656,11 @@ cmd_apply() {
   [ -z "${busy}" ] || fail "otro run ocupa el workspace ($(paste -sd' ' <<< "${busy}")): no se confirma detrás de él"
 
   fresh || fail "main avanzó: el saved plan del run ${run_id} no se confirma"
+
+  # Estado: el de entrada informado (si HCP lo informa) y el actual deben ser el revisado.
+  # Lo más tarde posible antes de la solicitud; después, HCP descarta el saved plan si el
+  # estado cambia (la última lectura del run lo ve descartado)
+  bind_state "${run}" "${EXPECTED_STATE}" > /dev/null
 
   # Última lectura antes de la solicitud: una confirmación ajena en la ventana se detecta
   run=$(run_json "${run_id}")
