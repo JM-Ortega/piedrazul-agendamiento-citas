@@ -52,7 +52,8 @@ configuraciones, encola, confirma y descarta los runs de la cadena), `CLOUDFLARE
 en la cuenta dedicada, distinto del de DNS), `CLOUDFLARE_DNS_API_TOKEN` (DNS de la zona
 nueva, para el desafío de Let's Encrypt), `ANSIBLE_SSH_KEY`, contraseñas de la base,
 secretos de Keycloak, `KC_PLATFORM_ADMIN_INITIAL_PASSWORD` (solo la instalación nueva, P2;
-ver [administrador-keycloak.md](administrador-keycloak.md)) y, si se habilita, el primer
+se valida antes del Apply si el plan crea o reemplaza el servidor: sin ella válida no se
+aplica nada; ver [administrador-keycloak.md](administrador-keycloak.md)) y, si se habilita, el primer
 administrador de negocio ([primer-admin-negocio.md](primer-admin-negocio.md)).
 
 **Correo.** SendGrid está deshabilitado en producción (`notifications_sendgrid_enabled: false`

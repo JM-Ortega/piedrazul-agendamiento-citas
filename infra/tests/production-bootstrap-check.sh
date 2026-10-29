@@ -398,14 +398,14 @@ plan_with() { # <JSON del plan>: JSON del plan y conteos coherentes
   hcp_seq "GET ${API}/plans/${PLAN}/json-output" "$1"
   hcp_seq "GET ${API}/plans/${PLAN}" "$(plan_json_for "$1")"
 }
-WATCH='pages_project=module.pages.cloudflare_pages_project.main pages_domain=module.pages.cloudflare_pages_domain.main'
+WATCH='pages_project=module.pages.cloudflare_pages_project.main pages_domain=module.pages.cloudflare_pages_domain.main server=module.server.hcloud_server.main'
 plan_cmd() { # [FRESHNESS_CMD] [EXPECTED_STATE]
   printf '%q ' bash -c "${HCP_DEF}; hcp_env PLAN_WATCH='${WATCH}' FRESHNESS_CMD='${1:-}' EXPECTED_STATE='${2-sv-Old1}' PLAN_REVIEW_FILE='${TMP}/review.md' '${HCP}' plan '${RUN}'"
 }
 PLAN_CMD="$(plan_cmd)"
 plan_setup "$(run_json planning)" "$(run_json planned)" "$(run_json planned_and_saved)"
 check "plan: saved plan con cambios → has_changes=true con identidad (plan, configuración, estado de entrada) y conteos" \
-  bash -c "out=\$(eval \"\$0\") && grep -qx has_changes=true <<< \"\$out\" && grep -qx plan_id=${PLAN} <<< \"\$out\" && grep -qx configuration_version_id=${CV} <<< \"\$out\" && grep -qx plan_state_version=sv-Old1 <<< \"\$out\" && grep -qx state_binding=relationship <<< \"\$out\" && grep -qx additions=4 <<< \"\$out\" && grep -qx review_creates=4 <<< \"\$out\" && grep -qx watch_pages_project=create <<< \"\$out\" && grep -qx watch_pages_domain=create <<< \"\$out\"" "${PLAN_CMD}"
+  bash -c "out=\$(eval \"\$0\") && grep -qx has_changes=true <<< \"\$out\" && grep -qx plan_id=${PLAN} <<< \"\$out\" && grep -qx configuration_version_id=${CV} <<< \"\$out\" && grep -qx plan_state_version=sv-Old1 <<< \"\$out\" && grep -qx state_binding=relationship <<< \"\$out\" && grep -qx additions=4 <<< \"\$out\" && grep -qx review_creates=4 <<< \"\$out\" && grep -qx watch_pages_project=create <<< \"\$out\" && grep -qx watch_pages_domain=create <<< \"\$out\" && grep -qx watch_server=create <<< \"\$out\"" "${PLAN_CMD}"
 check "plan: 'planned' de un saved plan no se confunde con la espera de confirmación (sigue esperando)" \
   test "$(grep -c "^GET ${API}/runs/${RUN}|" "${FAKE_HCP_LOG}")" = 3
 check "plan: la revisión lista los cambios materiales (sin no-op) con valores clasificados" \
@@ -489,6 +489,25 @@ check "plan: proyecto existente y dominio por crear → watch_pages_project=none
 plan_with "$(plan_output create | jq -c '.resource_changes += [{address: "module.pages.cloudflare_pages_project.main", type: "cloudflare_pages_project", change: {actions: ["delete"], before: {name: "x"}, after: null}}]')"
 check "plan: dirección vigilada repetida → ambiguous" \
   bash -c "eval \"\$0\" | grep -qx watch_pages_project=ambiguous" "${PLAN_CMD}"
+server_plan() { # <acciones del servidor como JSON | none | dup>: el plan base con esa acción sobre el servidor
+  case "$1" in
+    none) plan_output create | jq -c '.resource_changes |= map(select(.address != "module.server.hcloud_server.main"))' ;;
+    dup) plan_output create | jq -c '.resource_changes += [.resource_changes[0]]' ;;
+    *) plan_output create | jq -c --argjson a "$1" '.resource_changes |= map(if .address == "module.server.hcloud_server.main" then .change.actions = $a | (if $a != ["create"] then .change.before = .change.after else . end) else . end)' ;;
+  esac
+}
+# El estado previo (sv-Old1) existe: la creación se decide por la acción del plan, no por
+# la ausencia de state version (un state version puede no tener recursos)
+plan_setup "$(run_json planned_and_saved)"
+check "plan: estado previo existente (sin recursos) y el plan crea el servidor → watch_server=create" \
+  bash -c "out=\$(eval \"\$0\") && grep -qx plan_state_version=sv-Old1 <<< \"\$out\" && grep -qx watch_server=create <<< \"\$out\"" "${PLAN_CMD}"
+for c in 'replace|["delete","create"]' 'replace|["create","delete"]' 'no-op|["no-op"]' 'update|["update"]' 'none|none' 'ambiguous|dup'; do
+  want="${c%%|*}" acts="${c#*|}"
+  plan_setup "$(run_json planned_and_saved)"
+  plan_with "$(server_plan "${acts}")"
+  check "plan: servidor con acción ${acts} → watch_server=${want}" \
+    bash -c "eval \"\$0\" | grep -qx watch_server=${want}" "${PLAN_CMD}"
+done
 plan_setup "$(run_json planned_and_saved)"
 hcp_seq "GET ${API}/plans/${PLAN}/json-output" "$(status 403)"
 fails "plan con cambios: JSON del plan ilegible para el token → falla (sin revisión no hay Apply)" bash -c "${PLAN_CMD}"
@@ -964,8 +983,14 @@ check "production: la confirmación exige el plan, la configuración y el estado
   bash -c "${SDEF}; [ \"\$(step hcp_apply .env.EXPECTED_PLAN_ID)\" = '\${{ needs.terraform_plan.outputs.plan_id }}' ] && [ \"\$(step hcp_apply .env.EXPECTED_CONFIGURATION_VERSION)\" = '\${{ needs.terraform_plan.outputs.configuration_version_id }}' ] && [ \"\$(step hcp_apply .env.EXPECTED_STATE)\" = '\${{ needs.terraform_plan.outputs.plan_state_version }}' ] && [ \"\$(step hcp_apply .env.FRESHNESS_CMD)\" = .github/scripts/verify-main-tip.sh ] && [ \"\$(step hcp_apply .env.PLAN_MAX_AGE_SECONDS)\" -le 3600 ]"
 check "production: TF_APPLY_REQUIRED solo con Terraform requerido y has_changes exactamente true" \
   test "$(yq -r '.jobs.production.env.TF_APPLY_REQUIRED' "${WORKFLOW}")" = "\${{ needs.classify.outputs.terraform_required == 'true' && needs.terraform_plan.outputs.has_changes == 'true' }}"
-check "production: orden workspace → libre → estado → evidencia de Pages → frescura → confirmación → resultado del Apply → outputs" \
-  in_order "hcp_workspace hcp_idle hcp_before pages_plan fresh_apply hcp_apply hcp_state tf_outputs" "${PROD_STEPS}"
+check "production: orden workspace → libre → estado → evidencia de Pages → contraseña inicial de Keycloak → frescura → confirmación → resultado del Apply → outputs" \
+  in_order "hcp_workspace hcp_idle hcp_before pages_plan kc_admin_preflight fresh_apply hcp_apply hcp_state tf_outputs" "${PROD_STEPS}"
+check "production: la contraseña inicial de Keycloak se verifica solo si hay que aplicar, con la acción sobre el servidor del plan revisado" \
+  bash -c "${SDEF}; [ \"\$(step kc_admin_preflight .if)\" = \"env.TF_APPLY_REQUIRED == 'true'\" ] && [ \"\$(step kc_admin_preflight .env.WATCH_SERVER)\" = '\${{ needs.terraform_plan.outputs.watch_server }}' ] && [ \"\$(yq -r '.jobs.terraform_plan.outputs.watch_server' '${WORKFLOW}')\" = '\${{ steps.hcp_plan.outputs.watch_server }}' ] && [ \"\$(step kc_admin_preflight '.\"continue-on-error\" // false')\" = false ]"
+check "production: la verificación temprana usa las reglas del converge (keycloak_credentials.yml), sin copia" \
+  bash -c "${SDEF}; step kc_admin_preflight .run | grep -q 'ansible-playbook -i infra/ansible/inventories/prod infra/ansible/playbooks/keycloak-admin-preflight.yml' && [ \"\$(yq -r '.[0].tasks[0].\"ansible.builtin.include_role\".tasks_from' '${ROOT}/infra/ansible/playbooks/keycloak-admin-preflight.yml')\" = keycloak_credentials.yml ] && [ \"\$(yq -r '.[0].hosts + \"/\" + .[0].connection + \"/\" + (.[0].become | tostring)' '${ROOT}/infra/ansible/playbooks/keycloak-admin-preflight.yml')\" = localhost/local/false ] && ! step kc_admin_preflight .run | grep -q 'hcp-state.sh'"
+check "terraform_plan: la dirección vigilada del servidor es la del recurso real (módulo server, sin count ni for_each)" \
+  bash -c "${SDEF}; pstep hcp_plan .env.PLAN_WATCH | grep -q 'server=module.server.hcloud_server.main' && grep -q '^module \"server\" {' '${ROOT}/infra/terraform/live/prod/main.tf' && [ \"\$(grep -c '^resource \"hcloud_server\"' '${ROOT}'/infra/terraform/modules/hetzner/server/*.tf | awk -F: '{s+=\$2} END {print s}')\" = 1 ] && grep -q '^resource \"hcloud_server\" \"main\" {' '${ROOT}/infra/terraform/modules/hetzner/server/main.tf' && ! grep -Eq '^\s*(count|for_each)\s*=' '${ROOT}/infra/terraform/modules/hetzner/server/main.tf' && ! sed -n '/^module \"server\"/,/^}/p' '${ROOT}/infra/terraform/live/prod/main.tf' | grep -Eq '^\s*(count|for_each)\s*='"
 check "production: workspace en modo apply solo si se aplica" \
   bash -c "${SDEF}; step hcp_workspace .run | grep -qF \"workspace \\\${{ env.TF_APPLY_REQUIRED == 'true' && 'apply' || 'read' }}\""
 check "production: el resultado del Apply (run-state) se exige con Terraform (con o sin cambios), contra el estado del plan" \
@@ -1068,24 +1093,24 @@ AUTH='"policy":{"decision":"authorized"},"scan_evidence":{"scan_backend":"false"
 FULL_ENV='{"TERRAFORM_REQUIRED":"true","TF_APPLY_REQUIRED":"true","DEPLOY_REQUIRED":"true","RUN_HOST_CONFIG":"true","RUN_APP_DEPLOY":"true","FRONTEND_REQUIRED":"true"}'
 FRESH="{\"env\":${FULL_ENV},\"outputs\":{\"pages_probe\":{\"project_state\":\"absent\"},\"hcp_apply\":{\"apply_request\":\"accepted\"},${AUTH}}}"
 flow_case "instalación nueva (dispatch completo, Pages ausente, plan con cambios)" "${FRESH}" \
-  "credentials pages_target pages_artifact pages_tooling pages_probe hcp_workspace hcp_idle hcp_before pages_plan fresh_apply hcp_apply hcp_state tf_outputs pages_preflight access readiness host_init host_state select scan_evidence policy converge converge_identity deploy running_identity container_health public_health record pages_publish hcp_cleanup" \
+  "credentials pages_target pages_artifact pages_tooling pages_probe hcp_workspace hcp_idle hcp_before pages_plan kc_admin_preflight fresh_apply hcp_apply hcp_state tf_outputs pages_preflight access readiness host_init host_state select scan_evidence policy converge converge_identity deploy running_identity container_health public_health record pages_publish hcp_cleanup" \
   "fresh_deploy fresh_frontend break_glass authorization scan_backend scan_postgres"
 NOOP_DEPLOY="${FRESH/\"TF_APPLY_REQUIRED\":\"true\"/\"TF_APPLY_REQUIRED\":\"false\"}"
 NOOP_DEPLOY="${NOOP_DEPLOY/\"project_state\":\"absent\"/\"project_state\":\"present\"}"
 flow_case "Terraform sin cambios + deploy: sin Apply ni limpieza; estado del plan verificado y frescura antes del servidor" "${NOOP_DEPLOY}" \
   "hcp_workspace hcp_idle hcp_before hcp_state tf_outputs pages_preflight fresh_deploy converge deploy record pages_publish" \
-  "pages_plan fresh_apply hcp_apply hcp_cleanup"
+  "pages_plan kc_admin_preflight fresh_apply hcp_apply hcp_cleanup"
 FRONT='{"env":{"TERRAFORM_REQUIRED":"false","TF_APPLY_REQUIRED":"false","DEPLOY_REQUIRED":"false","RUN_HOST_CONFIG":"false","RUN_APP_DEPLOY":"false","FRONTEND_REQUIRED":"true"},"outputs":{"pages_probe":{"project_state":"present"}},"image_scan":"skipped"}'
 flow_case "solo frontend: sin Terraform ni SSH; sondeo y preflight estrictos antes de publicar" "${FRONT}" \
   "credentials pages_probe pages_preflight fresh_frontend pages_publish" \
-  "hcp_workspace hcp_idle hcp_before pages_plan fresh_apply hcp_apply hcp_state tf_outputs access readiness converge deploy record hcp_cleanup"
+  "hcp_workspace hcp_idle hcp_before pages_plan kc_admin_preflight fresh_apply hcp_apply hcp_state tf_outputs access readiness converge deploy record hcp_cleanup"
 BACK="{\"env\":{\"TERRAFORM_REQUIRED\":\"false\",\"TF_APPLY_REQUIRED\":\"false\",\"DEPLOY_REQUIRED\":\"true\",\"RUN_HOST_CONFIG\":\"false\",\"RUN_APP_DEPLOY\":\"true\",\"FRONTEND_REQUIRED\":\"false\"},\"outputs\":{${AUTH}}}"
 flow_case "solo backend: lee el estado sin plan ni Apply, sin Pages" "${BACK}" \
   "hcp_workspace hcp_idle hcp_before tf_outputs access select policy fresh_deploy deploy running_identity record" \
-  "host_init authorization pages_plan fresh_apply hcp_apply hcp_state converge pages_probe pages_preflight pages_publish hcp_cleanup"
+  "host_init authorization pages_plan kc_admin_preflight fresh_apply hcp_apply hcp_state converge pages_probe pages_preflight pages_publish hcp_cleanup"
 TFONLY='{"env":{"TERRAFORM_REQUIRED":"true","TF_APPLY_REQUIRED":"true","DEPLOY_REQUIRED":"false","RUN_HOST_CONFIG":"false","RUN_APP_DEPLOY":"false","FRONTEND_REQUIRED":"false"},"outputs":{"hcp_apply":{"apply_request":"accepted"}},"image_scan":"skipped"}'
-flow_case "solo Terraform con cambios: confirmación y resultado del Apply; sin servidor ni Pages" "${TFONLY}" \
-  "hcp_workspace fresh_apply hcp_apply hcp_state hcp_cleanup" \
+flow_case "solo Terraform con cambios: verificación de la acción sobre el servidor, confirmación y resultado del Apply; sin servidor ni Pages" "${TFONLY}" \
+  "hcp_workspace kc_admin_preflight fresh_apply hcp_apply hcp_state hcp_cleanup" \
   "pages_plan tf_outputs access converge deploy pages_probe pages_preflight pages_publish"
 flow_case "revalidación o solicitud de Apply falla (también confirmación ajena): ni estado, ni servidor, ni Pages; limpieza y resumen sí" \
   "${FRESH%\}},\"fail_at\":\"hcp_apply\"}" \
@@ -1098,6 +1123,10 @@ flow_case "frescura falla antes del Apply: no se confirma; el saved plan se desc
   "${FRESH%\}},\"fail_at\":\"fresh_apply\"}" "fresh_apply hcp_cleanup" "hcp_apply hcp_state converge"
 flow_case "el plan no crea lo que falta de Pages: no se confirma; el saved plan se descarta" \
   "${FRESH%\}},\"fail_at\":\"pages_plan\"}" "pages_plan hcp_cleanup" "fresh_apply hcp_apply hcp_state converge pages_publish"
+flow_case "la contraseña inicial de Keycloak falta o es inválida (servidor nuevo): no se confirma; el saved plan se descarta; nada se registra" \
+  "${FRESH%\}},\"fail_at\":\"kc_admin_preflight\"}" "pages_plan kc_admin_preflight hcp_cleanup" "fresh_apply hcp_apply hcp_state tf_outputs pages_preflight access converge deploy record pages_publish"
+flow_case "cancelación durante la verificación temprana: no se confirma; la limpieza corre igual" \
+  "${FRESH%\}},\"cancel_at\":\"kc_admin_preflight\"}" "kc_admin_preflight hcp_cleanup" "fresh_apply hcp_apply hcp_state converge record"
 flow_case "Pages no existe tras el Apply (preflight falla): el servidor no se toca y no se publica" \
   "${FRESH%\}},\"fail_at\":\"pages_preflight\"}" \
   "hcp_apply hcp_state tf_outputs pages_preflight hcp_cleanup" "access converge deploy record pages_publish"
@@ -1339,6 +1368,68 @@ check "production/hcp_apply: una confirmación ajena queda registrada como out_o
   grep -qx apply_request=out_of_band "${SD}/out"
 step_case "el estado de entrada del plan no es el capturado por terraform_plan → falla sin llamar a HCP" falla production hcp_apply HCP_RUN_ID="${RUN}" EXPECTED_STATE=sv-Old1 HCP_STATE_BEFORE_PLAN=sv-Otro FAKE_OUT=x
 check "production/hcp_apply: con identidad inconsistente no hay solicitud" test ! -s "${SD}/calls"
+
+# ── 12b. Contraseña inicial de Keycloak antes del Apply (kc_admin_preflight) ──
+# Corre el `run` real del paso en el repositorio, con el ansible-playbook real (reglas de
+# keycloak_credentials.yml) y valores sintéticos. Nunca toca HCP ni el servidor.
+KC_BODY="$(yq -r '.jobs.production.steps[] | select(.id == "kc_admin_preflight") | .run' "${WORKFLOW}")"
+KC_BACKEND="synthetic-kcb-$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+KC_AUTO="synthetic-kca-$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+KC_VALID="CANARY-pw-$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+EXAMPLE_PW="$(grep -E '^[A-Z_]*(SECRET|PASSWORD|KEY)=.' "${ROOT}/.env.example" | head -1 | cut -d= -f2-)"
+kc_run() { # <acción del servidor> <RUN_HOST_CONFIG> [contraseña: omitida si no se pasa]
+  local args=(PATH="${PATH}" HOME="${HOME}" ANSIBLE_CONFIG="${ROOT}/infra/ansible/ansible.cfg" ANSIBLE_LOCAL_TEMP="${TMP}/ansible-tmp"
+    WATCH_SERVER="$1" RUN_HOST_CONFIG="$2" KC_BACKEND_CLIENT_SECRET="${KC_BACKEND}" KC_AUTOMATION_CLIENT_SECRET="${KC_AUTO}")
+  [ "$#" -lt 3 ] || args+=(KC_PLATFORM_ADMIN_INITIAL_PASSWORD="$3")
+  (cd "${ROOT}" && env -i "${args[@]}" bash -c "${KC_BODY}") < /dev/null > "${TMP}/kc.log" 2>&1
+}
+kc_case() { # <descripción> <pasa|falla> <acción> <RUN_HOST_CONFIG> [contraseña] — y nunca el valor en el log
+  local d="$1" exp="$2" rc=0
+  shift 2
+  kc_run "$@" || rc=$?
+  if grep -qE 'CANARY|synthetic-' "${TMP}/kc.log" || { [ "$#" -ge 3 ] && [ -n "$3" ] && [[ "$3" != *$'\n'* ]] && grep -qF -- "$3" "${TMP}/kc.log"; }; then
+    ko "production/kc_admin_preflight: ${d} (el log contiene un valor secreto)"
+  elif { [ "${exp}" = pasa ] && [ "${rc}" -eq 0 ]; } || { [ "${exp}" = falla ] && [ "${rc}" -ne 0 ]; }; then
+    ok "production/kc_admin_preflight: ${d}"
+  else
+    ko "production/kc_admin_preflight: ${d} (rc=${rc}: $(grep -E '::error|msg:|ERROR' "${TMP}/kc.log" | tail -1))"
+  fi
+}
+if command -v ansible-playbook > /dev/null; then
+  kc_case "servidor creado y contraseña ausente → falla antes del Apply" falla create true
+  check "production/kc_admin_preflight: el fallo nombra la regla (vacía), dice que no se solicitó el Apply y no muestra el valor" \
+    bash -c "grep -q 'vacío' '${TMP}/kc.log' && grep -q '::error title=Keycloak::KC_PLATFORM_ADMIN_INITIAL_PASSWORD falta o no cumple' '${TMP}/kc.log' && grep -q 'el saved plan se descarta' '${TMP}/kc.log' && grep -q 'valor no mostrado' '${TMP}/kc.log'"
+  kc_case "servidor creado y contraseña válida → sigue a la confirmación" pasa create true "${KC_VALID}"
+  check "production/kc_admin_preflight: el paso no llama a HCP ni solicita el Apply" bash -c "! grep -qiE 'hcp-state|actions/apply' '${TMP}/kc.log'"
+  kc_case "servidor creado, contraseña corta → falla" falla create true "CANARY-short"
+  grep -q 'menos de 16 caracteres' "${TMP}/kc.log" && ok "production/kc_admin_preflight: la regla incumplida se nombra (longitud)" || ko "production/kc_admin_preflight: la regla incumplida se nombra (longitud)"
+  kc_case "servidor creado, contraseña con espacio final → falla" falla create true "${KC_VALID} "
+  kc_case "servidor creado, contraseña con salto de línea en medio → falla" falla create true "${KC_VALID}"$'\n'"x"
+  check "production/kc_admin_preflight: la regla de saltos de línea se nombra" grep -q 'con saltos de línea' "${TMP}/kc.log"
+  kc_case "servidor creado, contraseña con retorno de carro en medio → falla" falla create true "${KC_VALID}"$'\r'"x"
+  kc_case "servidor creado, contraseña que contiene el nombre de la cuenta → falla" falla create true "CANARY-piedrazul-platform-admin-1"
+  kc_case "servidor creado, contraseña igual a una credencial técnica → falla" falla create true "${KC_BACKEND}"
+  check "production/kc_admin_preflight: la regla de credencial técnica se nombra" grep -q 'coincide con una credencial técnica' "${TMP}/kc.log"
+  kc_case "servidor creado, contraseña igual a un valor de .env.example → falla" falla create true "${EXAMPLE_PW}"
+  check "production/kc_admin_preflight: la regla de .env.example se nombra" grep -q 'valor de referencia de .env.example' "${TMP}/kc.log"
+  kc_case "servidor reemplazado y contraseña ausente → falla (misma protección que la creación)" falla replace true
+  kc_case "servidor reemplazado y contraseña inválida → falla" falla replace true "CANARY-short"
+  kc_case "servidor reemplazado y contraseña válida → sigue" pasa replace true "${KC_VALID}"
+  kc_case "servidor sin cambios (no-op) y contraseña ausente → no se exige" pasa no-op true
+  check "production/kc_admin_preflight: sin creación no corre la validación (ni Ansible)" \
+    bash -c "grep -q 'no se exige KC_PLATFORM_ADMIN_INITIAL_PASSWORD' '${TMP}/kc.log' && ! grep -q 'PLAY' '${TMP}/kc.log'"
+  kc_case "servidor actualizado en sitio y contraseña ausente → no se exige" pasa update true
+  kc_case "servidor destruido (sin crear otro) y contraseña ausente → no se exige" pasa delete true
+  kc_case "cambio de infraestructura sin el servidor y sin configuración del servidor (solo Terraform) → no se exige" pasa no-op false
+  kc_case "servidor creado pero el run no configura el servidor (run_host_config=false) → falla aunque la contraseña sea válida" falla create false "${KC_VALID}"
+  check "production/kc_admin_preflight: el fallo por falta de configuración del servidor lo explica" grep -q 'run_host_config=false' "${TMP}/kc.log"
+  for a in none ambiguous unknown "" forget read "create,delete,update"; do
+    kc_case "acción no interpretable sobre el servidor ('${a}') → falla aunque la contraseña sea válida" falla "${a}" true "${KC_VALID}"
+  done
+  check "production/kc_admin_preflight: la acción no interpretable dice que el saved plan se descarta" grep -q 'el saved plan se descarta' "${TMP}/kc.log"
+else
+  ko "production/kc_admin_preflight: falta ansible-playbook para ejecutar el paso"
+fi
 
 # ── 13. Barrera de cloud-init (host-ready.sh) ───────────────────────────────
 READY="${ROOT}/.github/scripts/host-ready.sh"

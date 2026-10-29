@@ -88,15 +88,36 @@ gh secret set KC_PLATFORM_ADMIN_INITIAL_PASSWORD --env production-hetzner
 
 (`gh` pide el valor por la terminal; no pasarlo con `--body`, que lo deja en el historial).
 
-Recorrido: secreto del environment → paso `Correr converge` del job `production` (único paso
-que lo recibe) → Ansible en el runner → en tránsito al `docker exec` de kcadm dentro del
-contenedor `keycloak`. No se escribe en `.env`, Compose, el backend ni ningún archivo del
-host, y todas las tareas que lo tocan llevan `no_log`.
+Recorrido: secreto del environment → paso `Correr converge` del job `production` → Ansible
+en el runner → en tránsito al `docker exec` de kcadm dentro del contenedor `keycloak`. Lo
+recibe además, solo para validarlo, el paso `Verificar la contraseña inicial de Keycloak si
+el plan crea el servidor` (ver abajo). No se escribe en `.env`, Compose, el backend, salidas
+ni resúmenes del run ni ningún archivo del host, y todas las tareas que lo tocan llevan
+`no_log`.
 
-Solo la instalación nueva lo exige. Si falta o no cumple los requisitos, la convergencia
-falla **antes** del evento con `KEYCLOAK P2: … necesita KC_PLATFORM_ADMIN_INITIAL_PASSWORD
-válida` y la base de Keycloak queda vacía: corregir el secreto y repetir. En una convergencia
-normal (P1) no se usa ni se exige.
+Solo la instalación nueva lo exige, en dos puntos con las mismas reglas
+(`roles/app/tasks/keycloak_credentials.yml`):
+
+- **Antes del Apply**, si el saved plan revisado **crea o reemplaza el servidor**
+  (`module.server.hcloud_server.main`): ese servidor nace sin Keycloak y su primer converge
+  es P2. Si el secreto falta o no cumple los requisitos, el paso falla con
+  `KEYCLOAK P2 (servidor nuevo o reemplazado): … necesita KC_PLATFORM_ADMIN_INITIAL_PASSWORD
+  válida: <regla> (valor no mostrado)`, la solicitud de Apply de Terraform **no se hace**
+  y el saved plan se descarta: ese Apply no aprovisionó infraestructura. Los pasos
+  anteriores del run (builds, imágenes publicadas, artefacto del frontend) ya ocurrieron y
+  sus efectos se mantienen. Corregir el secreto y volver a correr el workflow (un plan
+  nuevo; el descartado no se reutiliza). La decisión es la acción del plan sobre el servidor,
+  no la ausencia de estado: un state version sin recursos también crea el servidor. Si el
+  plan crea o reemplaza el servidor pero el run no configura el servidor
+  (`run_host_config=false`), o la acción del plan sobre él no se puede interpretar (`none`,
+  `ambiguous`, `unknown`, …), el paso también falla sin Apply. Un plan que no crea ni
+  reemplaza el servidor no la exige.
+- **En el converge**, solo si Keycloak es P2 y antes del evento (defensa final; cubre también
+  un servidor existente con la base de Keycloak vacía, p. ej. tras un Apply correcto cuyo
+  converge falló): falla con `KEYCLOAK P2: … necesita KC_PLATFORM_ADMIN_INITIAL_PASSWORD
+  válida` y la base de Keycloak queda vacía: corregir el secreto y repetir.
+
+En una convergencia normal (P1) no se usa ni se exige.
 
 ## Instalación nueva: mensajes esperados
 

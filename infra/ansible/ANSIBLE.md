@@ -22,7 +22,8 @@ infra/ansible/
 │   ├── converge.yml                     # Configura el servidor + levanta la app
 │   ├── deploy.yml                       # Rollout de backend y postgres por identidad exacta
 │   ├── verify-release.yml               # Verifica identidad en ejecución o health (solo lectura)
-│   └── record-release.yml               # Registra el último despliegue exitoso
+│   ├── record-release.yml               # Registra el último despliegue exitoso
+│   └── keycloak-admin-preflight.yml     # Valida en el runner la contraseña inicial antes del Apply
 └── roles/
     ├── common/                          # Paquetes base y timezone
     ├── docker_host/                     # Instalación y configuración de Docker
@@ -343,7 +344,7 @@ Si el evento falla, `converge` falla con la tarea y el motivo. Si además la aut
 Una instalación nueva (P2) crea **una** cuenta humana permanente en `master`, `kc_platform_admin_username` (`piedrazul-platform-admin`), con el rol de realm `kc_platform_admin_role` (`admin`): la autoridad completa de la plataforma para administración manual excepcional. No es un principal del ciclo técnico: ni la automatización, ni CI, ni el backend autentican con ella.
 
 - **Creación, solo en el evento P2**: falla ante un usuario existente con ese nombre (no lo adopta); fija la política de contraseñas de `master` `kc_master_password_policy` (`length(16)`: mínimo de 16, sin categorías ni rotación, hash por defecto) si `master` no tiene ninguna y falla sin pisarla si tiene otra; la crea deshabilitada con `CONFIGURE_TOTP` y `UPDATE_PASSWORD`, fija la contraseña inicial como temporal y el rol, la lee de vuelta y recién entonces la habilita; comprueba que la contraseña llegó intacta y que sola no da acceso. Una creación interrumpida deja la cuenta deshabilitada.
-- **Contraseña inicial**: `KC_PLATFORM_ADMIN_INITIAL_PASSWORD`, secreto de un solo uso del environment. La convergencia la valida (presente, ≥ 16 caracteres, sin saltos de línea ni espacios en blanco en los extremos —caracteres especiales y espacios intermedios sí—, distinta de los valores actuales de `KC_BACKEND_CLIENT_SECRET` y `KC_AUTOMATION_CLIENT_SECRET` y de los valores de referencia `*SECRET`/`*PASSWORD`/`*KEY` de `.env.example`, sin el nombre de la cuenta) **solo si el estado es P2 y antes del evento**: si falla, la base de Keycloak queda vacía. Fuera de P2 no se exige ni se usa (si sigue presente, la convergencia avisa que se elimine). Viaja como las credenciales técnicas: runner → en tránsito al exec de kcadm, en JSON armado por Ansible; nunca en `.env`, Compose, argv ni la salida.
+- **Contraseña inicial**: `KC_PLATFORM_ADMIN_INITIAL_PASSWORD`, secreto de un solo uso del environment. La convergencia la valida (presente, ≥ 16 caracteres, sin saltos de línea ni espacios en blanco en los extremos —caracteres especiales y espacios intermedios sí—, distinta de los valores actuales de `KC_BACKEND_CLIENT_SECRET` y `KC_AUTOMATION_CLIENT_SECRET` y de los valores de referencia `*SECRET`/`*PASSWORD`/`*KEY` de `.env.example`, sin el nombre de la cuenta) **solo si el estado es P2 y antes del evento**: si falla, la base de Keycloak queda vacía. Las mismas reglas corren antes, en el runner (`playbooks/keycloak-admin-preflight.yml`), cuando el saved plan revisado crea o reemplaza el servidor: si fallan, el workflow no solicita el Apply. Fuera de P2 no se exige ni se usa (si sigue presente, la convergencia avisa que se elimine). Viaja como las credenciales técnicas: runner → en tránsito al exec de kcadm, en JSON armado por Ansible; nunca en `.env`, Compose, argv ni la salida.
 - **Después**: contraseña y OTP son del operador. Ningún P1, rotación ni recuperación P3 la modifica, repara o recrea, ni reaplica la política de `master` (que es de realm: vale para toda contraseña nueva de `master`, no para clientes técnicos ni para `piedrazul`).
 - **Estado** (aparte de P1/P2/P3, solo informativo): `files/keycloak-state.sql` lee, filtrando por el nombre sin seleccionarlo, si está habilitada, si es un usuario local, si tiene el rol, sus acciones requeridas y cuántas credenciales `password` y `otp` tiene, además de la política de contraseñas de `master`. Cada convergencia lo resume en `ADMINISTRACIÓN HUMANA DE KEYCLOAK (aparte del estado técnico): …` como `FALTA`, `INESPERADA`, `INCOMPLETA`, `CREADA, primer login pendiente`, `SIN OTP` o `CONFIGURADA`. Ninguno hace fallar la convergencia ni es requisito del backend.
 - **Segundo factor**: OTP obligatorio en el primer login; después, con los flujos por defecto de `master` (no modificados), Keycloak lo exige mientras la cuenta tenga uno enrolado. Retirarlo es decisión del operador; entonces la contraseña sola da acceso (estado `SIN OTP`, informativo, no se restituye).
@@ -714,7 +715,9 @@ GitHub Actions (workflow)
   │
   ├── workspace sin estado (none, confirmado por HCP)
   ├── saved plan (configuración provisional, auto-apply=false) → revisión en el resumen
-  │     → segunda aprobación → una sola confirmación del Apply → resultado del Apply
+  │     → segunda aprobación → plan crea el servidor: KC_PLATFORM_ADMIN_INITIAL_PASSWORD
+  │     válida (keycloak-admin-preflight.yml, en el runner; si no, sin Apply)
+  │     → una sola confirmación del Apply → resultado del Apply
   │     (crea servidor, firewall, proyecto de Pages de subida directa, DNS, asociación del dominio)
   ├── state version de ese run → IP del servidor
   ├── preflight estricto de Pages (si se publica el frontend)

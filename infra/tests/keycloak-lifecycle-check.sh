@@ -20,7 +20,8 @@
 #   4. Workflow: sin las credenciales retiradas ni el marker; recuperación explícita, solo
 #      por dispatch y con configuración del servidor, pasada a converge; mismo environment y
 #      concurrencia; cada secreto de la app que referencia tiene un consumidor en Ansible; la
-#      contraseña inicial del administrador humano solo llega a converge y no es obligatoria.
+#      contraseña inicial del administrador humano solo llega a converge y a su validación
+#      temprana antes del Apply (kc_admin_preflight), y no es obligatoria fuera de ellas.
 #   5. Ansible: el ciclo corre después de setup y antes de refresh_backend; setup no arranca
 #      Keycloak; ninguna decisión depende del marker; las tareas con secretos o contraseñas
 #      llevan no_log; el administrador humano solo se crea en el evento P2, con su contraseña
@@ -155,8 +156,10 @@ check "workflow: production sigue en environment production-hetzner con su concu
   test "$(yq -r '.jobs.production | .environment + "/" + .concurrency.group + "/" + (.concurrency."cancel-in-progress" | tostring)' "${WORKFLOW}")" = "production-hetzner/piedrazul-production-hetzner/false"
 check "workflow: converge recibe KC_BACKEND_CLIENT_SECRET y KC_AUTOMATION_CLIENT_SECRET" \
   test "$(yq -r '.jobs.production.steps[] | select(.id == "converge") | .env | keys | map(select(test("^KC_(BACKEND|AUTOMATION)_CLIENT_SECRET$"))) | sort | join(" ")' "${WORKFLOW}")" = "KC_AUTOMATION_CLIENT_SECRET KC_BACKEND_CLIENT_SECRET"
-check "workflow: KC_PLATFORM_ADMIN_INITIAL_PASSWORD solo llega al paso converge" \
-  test "$(yq -r '[.jobs[].steps[]? | select((.env // {}) | has("KC_PLATFORM_ADMIN_INITIAL_PASSWORD")) | .id] | join(" ")' "${WORKFLOW}")" = "converge"
+check "workflow: KC_PLATFORM_ADMIN_INITIAL_PASSWORD solo llega a converge y a su validación temprana antes del Apply (kc_admin_preflight)" \
+  test "$(yq -r '[.jobs[].steps[]? | select((.env // {}) | has("KC_PLATFORM_ADMIN_INITIAL_PASSWORD")) | .id] | join(" ")' "${WORKFLOW}")" = "kc_admin_preflight converge"
+check "workflow: la validación temprana solo corre si hay que aplicar y no escribe la contraseña en salidas ni en el resumen" \
+  bash -c "[ \"\$(yq -r '.jobs.production.steps[] | select(.id == \"kc_admin_preflight\") | .if' '${WORKFLOW}')\" = \"env.TF_APPLY_REQUIRED == 'true'\" ] && ! yq -r '.jobs.production.steps[] | select(.id == \"kc_admin_preflight\") | .run' '${WORKFLOW}' | grep -Eq 'GITHUB_OUTPUT|GITHUB_STEP_SUMMARY|GITHUB_ENV|KC_PLATFORM_ADMIN_INITIAL_PASSWORD}'"
 check "workflow: KC_PLATFORM_ADMIN_INITIAL_PASSWORD no es obligatoria fuera de P2 (no se exige al verificar credenciales)" \
   bash -c "! yq -r '.jobs.production.steps[] | select(.id == \"credentials\") | .run' '${WORKFLOW}' | grep -q KC_PLATFORM_ADMIN"
 check "workflow: el alcance de KC_PLATFORM_ADMIN_INITIAL_PASSWORD está declarado (production-hetzner)" \

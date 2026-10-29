@@ -1007,6 +1007,7 @@ jobs:
       counts: ${{ steps.hcp_plan.outputs.additions }}/${{ steps.hcp_plan.outputs.changes }}/${{ steps.hcp_plan.outputs.destructions }}/${{ steps.hcp_plan.outputs.imports }}
       watch_pages_project: ${{ steps.hcp_plan.outputs.watch_pages_project }}
       watch_pages_domain: ${{ steps.hcp_plan.outputs.watch_pages_domain }}
+      watch_server: ${{ steps.hcp_plan.outputs.watch_server }}
     env:
       TF_CLOUD_ORGANIZATION: Piedrazul
       TF_WORKSPACE: piedrazul-hetzner
@@ -1121,6 +1122,7 @@ jobs:
           PLAN_WATCH: >-
             pages_project=module.pages.cloudflare_pages_project.main
             pages_domain=module.pages.cloudflare_pages_domain.main
+            server=module.server.hcloud_server.main
         run: |
           set -euo pipefail
           export PLAN_REVIEW_FILE="${RUNNER_TEMP}/plan-review.md"
@@ -1208,7 +1210,8 @@ jobs:
   #
   #   [escaneo de identidades conocidas: image_scan + image_policy] → [sondeo de Pages] →
   #   workspace verificado → state version previo (o `none`) → [con cambios: evidencia del
-  #   plan sobre Pages → frescura → revalidación y confirmación del saved plan revisado
+  #   plan sobre Pages → contraseña inicial de Keycloak si el plan crea o reemplaza el
+  #   servidor → frescura → revalidación y confirmación del saved plan revisado
   #   (una sola solicitud)] → resultado del Apply y state version exacto (o, sin cambios,
   #   el estado sin cambios) → outputs → preflight estricto de Pages → SSH → cloud-init
   #   terminado (si converge) → último éxito del servidor →
@@ -1536,6 +1539,46 @@ jobs:
             fi
           done
           echo "Evidencia del plan sobre Pages suficiente (proyecto ${PAGES_PROJECT_STATE:-sin sondear})"
+
+      # Un servidor creado o reemplazado nace sin Keycloak: su primer converge es P2 y exige
+      # KC_PLATFORM_ADMIN_INITIAL_PASSWORD. Se valida aquí, con las reglas del converge
+      # (keycloak_credentials.yml), para no solicitar un Apply cuyo converge fallaría por
+      # ella. Decide la acción OBSERVADA sobre el servidor en el plan revisado, no el estado
+      # previo (un state version puede existir sin recursos). Sin cambio que cree el
+      # servidor no se exige: la contraseña es temporal y se retira tras el primer login;
+      # P2 en un servidor existente lo sigue exigiendo keycloak_lifecycle.yml. Una acción
+      # desconocida, ausente o repetida no se interpreta: falla. Si falla, no se confirma
+      # y el saved plan se descarta (hcp_cleanup).
+      - name: Verificar la contraseña inicial de Keycloak si el plan crea el servidor
+        id: kc_admin_preflight
+        if: env.TF_APPLY_REQUIRED == 'true'
+        env:
+          WATCH_SERVER: ${{ needs.terraform_plan.outputs.watch_server }}
+          KC_BACKEND_CLIENT_SECRET: ${{ secrets.KC_BACKEND_CLIENT_SECRET }}
+          KC_AUTOMATION_CLIENT_SECRET: ${{ secrets.KC_AUTOMATION_CLIENT_SECRET }}
+          KC_PLATFORM_ADMIN_INITIAL_PASSWORD: ${{ secrets.KC_PLATFORM_ADMIN_INITIAL_PASSWORD }}
+        run: |
+          set -euo pipefail
+          case "${WATCH_SERVER}" in
+            no-op | update | delete)
+              echo "El plan revisado no crea ni reemplaza el servidor (acción: ${WATCH_SERVER}): no se exige KC_PLATFORM_ADMIN_INITIAL_PASSWORD"
+              exit 0
+              ;;
+            create | replace) ;;
+            *)
+              echo "::error title=Keycloak::Acción del plan revisado sobre el servidor no interpretable (${WATCH_SERVER:-sin dato}; none = la dirección no está en el plan, ambiguous = repetida, unknown = JSON ilegible): no se puede decidir si el Apply crea un Keycloak nuevo; no se aplica: el saved plan se descarta"
+              exit 1
+              ;;
+          esac
+          if [ "${RUN_HOST_CONFIG}" != "true" ]; then
+            echo "::error title=Keycloak::El plan revisado crea o reemplaza el servidor (acción: ${WATCH_SERVER}) pero este run no configura el servidor (run_host_config=false): quedaría sin Keycloak ni aplicación. Una instalación nueva necesita run_terraform_apply, run_host_config y run_app_deploy (instalacion-nueva.md); no se aplica: el saved plan se descarta"
+            exit 1
+          fi
+          echo "El plan revisado crea o reemplaza el servidor (acción: ${WATCH_SERVER}): su primer converge es P2 y exige KC_PLATFORM_ADMIN_INITIAL_PASSWORD"
+          ansible-playbook -i infra/ansible/inventories/prod infra/ansible/playbooks/keycloak-admin-preflight.yml || {
+            echo "::error title=Keycloak::KC_PLATFORM_ADMIN_INITIAL_PASSWORD falta o no cumple las reglas para la instalación nueva (regla incumplida en el log de este paso; valor no mostrado). No se aplica: el saved plan se descarta. Ver administrador-keycloak.md"
+            exit 1
+          }
 
       - name: Verificar frescura antes del Apply
         id: fresh_apply
@@ -2151,6 +2194,7 @@ jobs:
           O_FRESH_APPLY: ${{ steps.fresh_apply.outcome }}
           O_HCP: ${{ steps.hcp_workspace.outcome }}/${{ steps.hcp_idle.outcome }}/${{ steps.hcp_before.outcome }}/${{ steps.hcp_state.outcome }}/${{ steps.tf_outputs.outcome }}
           O_PAGES_PLAN: ${{ steps.pages_plan.outcome }}
+          O_KC_ADMIN_PREFLIGHT: ${{ steps.kc_admin_preflight.outcome }}
           O_HCP_APPLY: ${{ steps.hcp_apply.outcome }}
           HCP_PLAN_LINK: ${{ needs.terraform_plan.outputs.run_link }}
           HCP_PLAN_ID: ${{ needs.terraform_plan.outputs.plan_id }}
@@ -2203,6 +2247,7 @@ jobs:
           first_failure "Autoridad de producción (credenciales)" "${O_CREDENTIALS}"
           first_failure "Preparación del frontend (destino, artefacto, wrangler, proyecto/token de Pages o autoridad única)" "${O_PAGES_PREP}"
           first_failure "Evidencia del plan sobre Pages (el plan revisado no crea lo que falta)" "${O_PAGES_PLAN}"
+          first_failure "Contraseña inicial de Keycloak para el servidor nuevo o reemplazado (sin Apply)" "${O_KC_ADMIN_PREFLIGHT}"
           first_failure "Frescura (main avanzó o ref no es main)" "${O_FRESH_APPLY}"
           first_failure "HCP Terraform (workspace, estado previo)" "$(cut -d/ -f1-3 <<< "${O_HCP}")"
           if [ "${HCP_APPLY_REQUEST}" = out_of_band ]; then
