@@ -88,17 +88,30 @@ echo base > "${G}/README"
 git -C "${G}" add -A && git -C "${G}" commit -qm init
 INIT=$(git -C "${G}" rev-parse HEAD)
 
-# merge_pr <rama> <archivo> <contenido>: commit en la rama y merge --no-ff a main.
-# Deja en FEAT_COMMIT el commit de la rama, en MERGE el de main y en BLOB el contenido.
-merge_pr() {
-  git -C "${G}" checkout -q -b "$1" main
-  mkdir -p "$(dirname "${G}/$2")"
-  printf '%s\n' "$3" > "${G}/$2"
-  git -C "${G}" add -A && git -C "${G}" commit -qm "$1"
+# merge_files <rama> <archivo> <contenido> [<archivo> <contenido>...]: un commit en la rama
+# (contenido @rm borra el archivo, @x lo vuelve ejecutable) y merge --no-ff a main.
+# Deja en FEAT_COMMIT el commit de la rama y en MERGE el de main.
+merge_files() {
+  local branch="$1"
+  shift
+  git -C "${G}" checkout -q -b "${branch}" main
+  while [ $# -gt 0 ]; do
+    case "$2" in
+      @rm) git -C "${G}" rm -q "$1" ;;
+      @x) chmod +x "${G}/$1" ;;
+      *) mkdir -p "$(dirname "${G}/$1")" && printf '%s\n' "$2" > "${G}/$1" ;;
+    esac
+    shift 2
+  done
+  git -C "${G}" add -A && git -C "${G}" commit -qm "${branch}"
   FEAT_COMMIT=$(git -C "${G}" rev-parse HEAD)
   git -C "${G}" checkout -q main
-  git -C "${G}" merge -q --no-ff "$1" -m "merge $1"
+  git -C "${G}" merge -q --no-ff "${branch}" -m "merge ${branch}"
   MERGE=$(git -C "${G}" rev-parse HEAD)
+}
+# merge_pr <rama> <archivo> <contenido>: merge_files de un solo archivo; deja además su BLOB
+merge_pr() {
+  merge_files "$@"
   BLOB=$(git -C "${G}" rev-parse "HEAD:$2")
 }
 # pr_fixtures <número> <merge> <autor> <archivo> <commit revisado> <blob en ese commit> <revisiones JSON>
@@ -108,9 +121,21 @@ pr_fixtures() {
   serve "GET repos/${REPO}/pulls/$1/reviews?per_page=100" "$7"
   serve "GET repos/${REPO}/contents/$4?ref=$5" "$(jq -cn --arg b "$6" '{sha: $b}')"
 }
-review() { # <id> <login> <user id> <estado> <commit> [tipo]
+review() { # <id> <login> <user id> <estado> <commit> [tipo] [submitted_at ("-" = ausente)]
   jq -cn --argjson id "$1" --arg l "$2" --argjson uid "$3" --arg s "$4" --arg c "$5" --arg t "${6:-User}" \
-    '{id: $id, user: {login: $l, id: $uid, type: $t}, state: $s, commit_id: $c, submitted_at: "2026-10-09T00:00:00Z"}'
+    --arg at "${7:-2026-10-09T00:00:00Z}" \
+    '{id: $id, user: {login: $l, id: $uid, type: $t}, state: $s, commit_id: $c}
+     + (if $at == "-" then {} else {submitted_at: $at} end)'
+}
+# sm_fixtures <número> <merge> <cabeza> <autor> <id> [filtro jq del PR] [filtro jq de la lista]:
+# PR fusionado a main por su propio autor (GET pulls/<n> trae merged_by; la lista del commit no)
+sm_fixtures() {
+  local pull
+  pull=$(jq -cn --argjson n "$1" --arg m "$2" --arg h "$3" --arg a "$4" --argjson id "$5" '{
+      number: $n, merged: true, merged_at: "2026-10-10T00:00:00Z", base: {ref: "main"}, head: {sha: $h},
+      merge_commit_sha: $m, user: {login: $a, id: $id, type: "User"}, merged_by: {login: $a, id: $id, type: "User"}}')
+  serve "GET repos/${REPO}/commits/$2/pulls" "$(jq -c "[del(.merged_by, .merged) | ${7:-.}]" <<< "${pull}")"
+  serve "GET repos/${REPO}/pulls/$1" "$(jq -c "${6:-.}" <<< "${pull}")"
 }
 
 BACKEND="ghcr.io/o/r/backend@sha256:$(d64 1)"
@@ -136,7 +161,8 @@ prov() { # <archivo> <approver declarado> [VAR=valor...]
 expect_prov_fail() { # <descripción> <archivo> <approver> [VAR=valor...]
   local out rc=0
   out=$(prov "$2" "$3" "${@:4}" 2> "${TMP}/prov.err") || rc=$?
-  if [ "${rc}" -ne 0 ] && [ -z "${out}" ]; then ok "aprobación rechazada: $1"; else ko "aprobación rechazada: $1 (rc=${rc}: ${out})"; fi
+  # El motivo queda en la línea para comprobar que falla en la frontera buscada
+  if [ "${rc}" -ne 0 ] && [ -z "${out}" ]; then ok "aprobación rechazada: $1 ⟶ $(tail -n1 "${TMP}/prov.err")"; else ko "aprobación rechazada: $1 (rc=${rc}: ${out})"; fi
 }
 
 F1=security/vulnerability-dispositions/VD-2026-001.json
@@ -146,10 +172,12 @@ pr_fixtures 7 "${F1_MERGE}" carol "${F1}" "${F1_FEAT}" "${F1_BLOB}" "[$(review 1
 
 if OUT=$(prov "${F1}" alice 2> /dev/null) &&
    jq -e --arg m "${F1_MERGE}" --arg b "${F1_BLOB}" --arg c "${F1_FEAT}" \
-     '.pr == 7 and .merge_commit == $m and .blob == $b and .reviewed_commit == $c and .approver_login == "alice" and .approver_id == 1001' <<< "${OUT}" > /dev/null; then
-  ok "aprobación verificada: PR fusionado a main, revisor autorizado (login e id), mismo blob aprobado"
+     '.method == "independent_review" and .pr == 7 and .merge_commit == $m and .blob == $b and .reviewed_commit == $c
+      and .approver_login == "alice" and .approver_id == 1001 and .approved_at == "2026-10-09T00:00:00Z"
+      and .merged_at == "2026-10-10T00:00:00Z" and .record_history == [$m]' <<< "${OUT}" > /dev/null; then
+  ok "aprobación verificada (independent_review): PR fusionado a main, revisor autorizado (login e id) antes del merge, mismo blob aprobado"
 else
-  ko "aprobación verificada: PR fusionado a main, revisor autorizado (login e id), mismo blob aprobado (${OUT:-sin salida})"
+  ko "aprobación verificada (independent_review): PR fusionado a main, revisor autorizado (login e id) antes del merge, mismo blob aprobado (${OUT:-sin salida})"
 fi
 expect_prov_fail "sin autoridad configurada (vars.VULNERABILITY_RISK_APPROVERS vacía)" "${F1}" alice RISK_APPROVERS=
 expect_prov_fail "autoridad mal formada" "${F1}" alice "RISK_APPROVERS=alice"
@@ -176,7 +204,48 @@ check "aprobación: un comentario posterior no anula el APPROVED" prov "${F1}" a
 pr_fixtures 7 "${F1_MERGE}" carol "${F1}" "${F1_FEAT}" "${F1_BLOB}" "[$(review 1 alice 1001 APPROVED "${F1_FEAT}" Bot)]"
 expect_prov_fail "revisor que no es humano (Bot)" "${F1}" alice
 pr_fixtures 7 "${F1_MERGE}" alice "${F1}" "${F1_FEAT}" "${F1_BLOB}" "[$(review 1 alice 1001 APPROVED "${F1_FEAT}")]"
-expect_prov_fail "el aprobador es el autor del PR" "${F1}" alice
+serve "GET repos/${REPO}/pulls/7" "$(jq -cn --arg m "${F1_MERGE}" --arg h "${F1_FEAT}" '{number: 7, merged: true,
+  merged_at: "2026-10-10T00:00:00Z", base: {ref: "main"}, head: {sha: $h}, merge_commit_sha: $m,
+  user: {login: "alice", id: 1001, type: "User"}, merged_by: {login: "carol", id: 3003, type: "User"}}')"
+expect_prov_fail "el aprobador es el autor y se aprobó a sí mismo, pero fusionó otra cuenta (ni revisión independiente ni self_merge)" "${F1}" alice
+unserve "GET repos/${REPO}/pulls/7"
+# Revisión independiente: la aprobación tiene que existir cuando se fusiona (D2)
+for CASE in "2026-10-11T00:00:00Z|aprobación enviada después del merge (aceptación retroactiva)" \
+            "-|aprobación sin fecha de envío" "2026-10-09|aprobación con fecha mal formada" \
+            "2026-13-40T00:00:00Z|aprobación con fecha imposible"; do
+  pr_fixtures 7 "${F1_MERGE}" carol "${F1}" "${F1_FEAT}" "${F1_BLOB}" "[$(review 1 alice 1001 APPROVED "${F1_FEAT}" User "${CASE%%|*}")]"
+  expect_prov_fail "${CASE#*|}" "${F1}" alice
+done
+pr_fixtures 7 "${F1_MERGE}" carol "${F1}" "${F1_FEAT}" "${F1_BLOB}" \
+  "[$(review 1 alice 1001 APPROVED "${F1_FEAT}"),$(review 2 alice 1001 APPROVED "${F1_FEAT}" User 2026-10-12T00:00:00Z)]"
+expect_prov_fail "aprobación previa al merge reemplazada por otra posterior (el último estado decide: falla cerrado)" "${F1}" alice
+pr_fixtures 7 "${F1_MERGE}" carol "${F1}" "${F1_FEAT}" "${F1_BLOB}" "[$(review 1 alice 1001 APPROVED "${F1_FEAT}" User 2026-10-10T00:00:00Z)]"
+check "aprobación: revisión enviada en el mismo instante del merge → válida" prov "${F1}" alice
+serve "GET repos/${REPO}/commits/${F1_MERGE}/pulls" \
+  "$(jq -cn --arg m "${F1_MERGE}" '[{number: 7, merged_at: "ayer", base: {ref: "main"}, merge_commit_sha: $m, user: {login: "carol"}}]')"
+expect_prov_fail "PR con fecha de merge inválida" "${F1}" alice
+# Precisión: el orden se decide con la fracción de segundo, no solo con los segundos
+subsecond() { # <merged_at> <submitted_at>
+  pr_fixtures 7 "${F1_MERGE}" carol "${F1}" "${F1_FEAT}" "${F1_BLOB}" "[$(review 1 alice 1001 APPROVED "${F1_FEAT}" User "$2")]"
+  serve "GET repos/${REPO}/commits/${F1_MERGE}/pulls" \
+    "$(jq -cn --arg m "${F1_MERGE}" --arg at "$1" '[{number: 7, merged_at: $at, base: {ref: "main"}, merge_commit_sha: $m, user: {login: "carol"}}]')"
+}
+subsecond 2026-10-10T00:00:00.500Z 2026-10-10T00:00:00.400Z
+check "aprobación: revisión anterior al merge dentro del mismo segundo (.400 < .500) → válida" prov "${F1}" alice
+subsecond 2026-10-10T00:00:00.500Z 2026-10-10T00:00:00Z
+check "aprobación: revisión sin fracción en el mismo segundo de un merge con fracción (.000 < .500) → válida" prov "${F1}" alice
+subsecond 2026-10-10T00:00:00.500Z 2026-10-10T00:00:00.600Z
+expect_prov_fail "revisión posterior al merge dentro del mismo segundo (.600 > .500)" "${F1}" alice
+subsecond 2026-10-10T00:00:00.5Z 2026-10-10T00:00:00.500000001Z
+expect_prov_fail "revisión posterior al merge por un nanosegundo (fracciones de distinta longitud)" "${F1}" alice
+subsecond 2026-10-10T00:00:00Z 2026-10-10T00:00:00.001Z
+expect_prov_fail "revisión con fracción posterior a un merge sin fracción en el mismo segundo" "${F1}" alice
+subsecond 2026-10-10T00:00:00.5Z 2026-10-10T00:00:00.1234567890Z
+expect_prov_fail "revisión con más de 9 decimales (formato no admitido)" "${F1}" alice
+pr_fixtures 7 "${F1_MERGE}" carol "${F1}" "${F1_FEAT}" "${F1_BLOB}" "[$(review 1 alice 1001 COMMENTED "${F1_FEAT}")]"
+expect_prov_fail "solo un comentario (COMMENTED) del aprobador, p. ej. con un marcador de aceptación en el texto" "${F1}" alice
+pr_fixtures 7 "${F1_MERGE}" carol "${F1}" "${F1_FEAT}" "${F1_BLOB}" "[$(review 1 alice 1001 COMMENTED "${F1_FEAT}" User 2026-10-12T00:00:00Z)]"
+expect_prov_fail "comentario-marcador del aprobador editado o agregado después del merge" "${F1}" alice
 pr_fixtures 7 "${F1_MERGE}" carol "${F1}" "${F1_FEAT}" "${F1_BLOB}" "[]"
 expect_prov_fail "PR sin revisiones" "${F1}" alice
 serve "GET repos/${REPO}/commits/${F1_MERGE}/pulls" \
@@ -198,6 +267,122 @@ check "aprobación: segundo registro aprobado" prov "${F2}" alice
 merge_pr pr9 "${F2}" "$(disposition VD-2026-002 backend CVE-2026-41293 org.apache.tomcat.embed:tomcat-embed-core "{\"image_refs\": [\"${BACKEND}\"]}" 2026-10-01T00:00:00Z 2026-12-29T00:00:00Z)"
 pr_fixtures 9 "${MERGE}" carol "${F2}" "${FEAT_COMMIT}" "${BLOB}" "[$(review 4 dave 2001 APPROVED "${FEAT_COMMIT}")]"
 expect_prov_fail "registro modificado por un PR posterior aprobado por alguien sin autoridad" "${F2}" alice
+EVAL=$(git -C "${G}" rev-parse HEAD)
+
+# ── 1b. Procedencia por self_merge (operación unipersonal) ──────────────────
+# El aprobador autorizado abre el PR solo de registros y lo fusiona él mismo: GitHub
+# (user, merged_by) y git (forma del merge, cambio introducido, blob) lo prueban. Las
+# revisiones y comentarios del PR no cuentan para nada en esta vía.
+SM=security/vulnerability-dispositions/VD-2026-010.json
+merge_pr sm20 "${SM}" "$(disposition VD-2026-010 backend CVE-2026-50010 libfoo "{\"image_refs\": [\"${BACKEND}\"]}")"
+SM_MERGE="${MERGE}" SM_HEAD="${FEAT_COMMIT}" SM_BLOB="${BLOB}"
+sm_fixtures 20 "${SM_MERGE}" "${SM_HEAD}" alice 1001
+# Un "marcador" de aceptación en un comentario editable no se consulta
+serve "GET repos/${REPO}/pulls/20/reviews?per_page=100" "[$(review 50 bob 1002 COMMENTED "${SM_HEAD}"),$(review 51 bob 1002 CHANGES_REQUESTED "${SM_HEAD}")]"
+: > "${FAKE_GH_LOG}"
+if OUT=$(prov "${SM}" alice 2> /dev/null) &&
+   jq -e --arg m "${SM_MERGE}" --arg b "${SM_BLOB}" --arg h "${SM_HEAD}" '
+     .method == "self_merge" and .pr == 20 and .merge_commit == $m and .blob == $b and .reviewed_commit == $h
+     and .approver_login == "alice" and .approver_id == 1001 and .review_id == null
+     and .approved_at == "2026-10-10T00:00:00Z" and .record_history == [$m]' <<< "${OUT}" > /dev/null; then
+  ok "self_merge verificado: autor = quien fusionó = aprobador autorizado (login e id), merge commit de dos padres, solo registros, mismo blob"
+else
+  ko "self_merge verificado (${OUT:-sin salida}; $(cat "${TMP}/prov.err" 2> /dev/null))"
+fi
+check "self_merge: no consulta revisiones ni comentarios (texto editable sin efecto)" bash -c "! grep -q 'reviews' '${FAKE_GH_LOG}'"
+check "self_merge: no requiere una segunda cuenta de GitHub (solo alice en RISK_APPROVERS)" prov "${SM}" alice RISK_APPROVERS=alice:1001
+
+sm_case() { # <descripción> <filtro del PR> [filtro de la lista] [approver declarado]
+  sm_fixtures 20 "${SM_MERGE}" "${SM_HEAD}" alice 1001 "$2" "${3:-.}"
+  expect_prov_fail "self_merge: $1" "${SM}" "${4:-alice}"
+}
+sm_case "autor autorizado por login pero con otro id (cuenta reciclada)" '.user.id = 9999 | .merged_by.id = 9999'
+sm_case "autor que no es humano (Bot)" '.user.type = "Bot" | .merged_by.type = "Bot"'
+sm_case "PR sin autor identificable" 'del(.user)'
+sm_case "autor sin id" 'del(.user.id) | del(.merged_by.id)'
+sm_case "lo fusionó otro aprobador autorizado" '.merged_by = {login: "bob", id: 1002, type: "User"}'
+sm_case "lo fusionó una cuenta con el mismo login y otro id" '.merged_by.id = 9999'
+sm_case "lo fusionó un Bot" '.merged_by = {login: "alice", id: 1001, type: "Bot"}'
+sm_case "sin merged_by" '.merged_by = null'
+sm_case "GitHub dice que no está fusionado" '.merged = false'
+sm_case "fecha de merge contradictoria entre el PR y la lista del commit" '.merged_at = "2026-10-11T00:00:00Z"'
+sm_case "PR hacia otra rama" '.base.ref = "develop"'
+sm_case "PR cuyo merge commit es otro" ".merge_commit_sha = \"$(printf 'b%.0s' {1..40})\""
+sm_case "cabeza del PR distinta del segundo padre del merge" ".head.sha = \"${INIT}\""
+sm_case "sin cabeza del PR" 'del(.head)'
+sm_case "autor distinto entre el PR y la lista del commit" '.' '.user.login = "bob"' bob
+unserve "GET repos/${REPO}/pulls/20"
+serve "GET repos/${REPO}/commits/${SM_MERGE}/pulls" "$(jq -cn --arg m "${SM_MERGE}" '[{number: 20, merged_at: "2026-10-10T00:00:00Z", base: {ref: "main"}, merge_commit_sha: $m, user: {login: "alice"}}]')"
+expect_prov_fail "self_merge: PR individual ilegible (sin merged_by no hay prueba)" "${SM}" alice
+sm_fixtures 20 "${SM_MERGE}" "${SM_HEAD}" bob 1002
+serve "GET repos/${REPO}/pulls/20/reviews?per_page=100" '[]'
+expect_prov_fail "self_merge: el registro nombra a alice, pero lo abrió y fusionó bob (otro aprobador)" "${SM}" alice
+sm_fixtures 20 "${SM_MERGE}" "${SM_HEAD}" carol 3003 '.merged_by = {login: "alice", id: 1001, type: "User"}'
+serve "GET repos/${REPO}/pulls/20/reviews?per_page=100" "[$(review 52 alice 1001 COMMENTED "${SM_HEAD}")]"
+expect_prov_fail "PR de otro autor fusionado por el aprobador, con su comentario-marcador: un merge ordinario no acepta riesgo" "${SM}" alice
+sm_fixtures 20 "${SM_MERGE}" "${SM_HEAD}" alice 1001
+
+# Forma del merge y cambio introducido en main
+sm_merge_case() { # <descripción> <rama> <archivo evaluado> <archivo> <contenido> [...]
+  local desc="$1" file="$3"
+  merge_files "${@:2:1}" "${@:4}"
+  sm_fixtures 21 "${MERGE}" "${FEAT_COMMIT}" alice 1001
+  expect_prov_fail "self_merge: ${desc}" "${file}" alice
+}
+smx() { disposition "VD-2026-0$1" backend "CVE-2026-500$1" libfoo "{\"image_refs\": [\"${BACKEND}\"]}"; }
+smx_path() { echo "security/vulnerability-dispositions/VD-2026-0$1.json"; }
+# Cada caso trae su propio registro nuevo: el merge del caso es el que integra el registro
+sm_merge_case "PR que además cambia código de producción" sm21a "$(smx_path 21)" "$(smx_path 21)" "$(smx 21)" backend/src/Main.java 'class Main {}'
+sm_merge_case "PR que además cambia un workflow" sm21b "$(smx_path 22)" "$(smx_path 22)" "$(smx 22)" .github/workflows/x.yml 'on: push'
+sm_merge_case "PR que además cambia documentación de security/" sm21c "$(smx_path 23)" "$(smx_path 23)" "$(smx 23)" security/vulnerability-dispositions/README.md 'x'
+sm_merge_case "PR que además cambia un script de la política" sm21d "$(smx_path 24)" "$(smx_path 24)" "$(smx 24)" .github/scripts/vuln-policy.sh 'exit 0'
+sm_merge_case "registro con nombre de otro tipo (VD en break-glass/)" sm21e security/break-glass/VD-2026-025.json security/break-glass/VD-2026-025.json "$(smx 25)"
+sm_merge_case "registro con nombre fuera de la convención" sm21f security/vulnerability-dispositions/vd-2026-026.json security/vulnerability-dispositions/vd-2026-026.json "$(smx 26)"
+SMX=security/vulnerability-dispositions/VD-2026-011.json
+SMX_DOC="$(disposition VD-2026-011 backend CVE-2026-50011 libfoo "{\"image_refs\": [\"${BACKEND}\"]}")"
+merge_files sm21g "${SMX}" "${SMX_DOC}"
+sm_fixtures 21 "${MERGE}" "${FEAT_COMMIT}" alice 1001
+check "self_merge: control positivo del mismo PR con solo el registro" prov "${SMX}" alice
+sm_merge_case "registro que deja de ser un archivo regular (ejecutable)" sm21h "${SMX}" "${SMX}" @x
+# Squash o rebase: un commit de un solo padre en main
+printf '%s\n' "${SMX_DOC}" | jq '.justification = "Squash: otro texto de justificación suficiente."' > "${G}/${SMX}"
+git -C "${G}" add -A && git -C "${G}" commit -qm "squash"
+SQ=$(git -C "${G}" rev-parse HEAD)
+sm_fixtures 22 "${SQ}" "${SQ}" alice 1001
+expect_prov_fail "self_merge: integrado con squash/rebase (un solo padre)" "${SMX}" alice
+# Merge "malicioso": el contenido cambia al resolver el merge, no viene de la cabeza del PR
+git -C "${G}" checkout -q -b sm23 main
+printf '%s\n' "${SMX_DOC}" > "${G}/${SMX}" && git -C "${G}" add -A && git -C "${G}" commit -qm sm23
+EVIL_HEAD=$(git -C "${G}" rev-parse HEAD)
+git -C "${G}" checkout -q main && git -C "${G}" merge -q --no-ff --no-commit sm23 > /dev/null 2>&1
+printf '%s\n' "${SMX_DOC}" | jq '.expires = "2026-12-29T00:00:00Z"' > "${G}/${SMX}"
+git -C "${G}" add -A && git -C "${G}" commit -qm "merge sm23"
+sm_fixtures 23 "$(git -C "${G}" rev-parse HEAD)" "${EVIL_HEAD}" alice 1001
+expect_prov_fail "self_merge: el blob evaluado no es el de la cabeza del PR (cambiado en el merge)" "${SMX}" alice
+
+# Varios registros en un PR: cada uno se verifica por separado contra el mismo merge
+SMV=security/vulnerability-dispositions/VD-2026-012.json SMB=security/break-glass/BG-2026-012.json
+merge_files sm24 "${SMV}" "$(disposition VD-2026-012 backend CVE-2026-50012 libfoo "{\"image_refs\": [\"${BACKEND}\"]}")" \
+  "${SMB}" '{"schema": "piedrazul.break-glass-authorization/v2", "id": "BG-2026-012"}' "${SMX}" @rm
+sm_fixtures 24 "${MERGE}" "${FEAT_COMMIT}" alice 1001
+check "self_merge: PR con varios registros (disposición + break-glass + retiro de otro) → la disposición se verifica" \
+  bash -c "$(declare -f prov); TMP='${TMP}' G='${G}' FAKE_GH_DIR='${FAKE_GH_DIR}' FAKE_GH_LOG='${FAKE_GH_LOG}' REPO='${REPO}' APPROVERS='${APPROVERS}' APPROVAL='${APPROVAL}'; prov '${SMV}' alice | jq -e '.method == \"self_merge\" and .pr == 24'"
+check "self_merge: PR con varios registros → el break-glass se verifica con el mismo merge" \
+  bash -c "$(declare -f prov); TMP='${TMP}' G='${G}' FAKE_GH_DIR='${FAKE_GH_DIR}' FAKE_GH_LOG='${FAKE_GH_LOG}' REPO='${REPO}' APPROVERS='${APPROVERS}' APPROVAL='${APPROVAL}'; prov '${SMB}' alice | jq -e '.method == \"self_merge\" and .pr == 24'"
+
+# Modificación posterior: otro PR edita el registro ya aceptado por self_merge
+merge_files sm25 "${SM}" "$(disposition VD-2026-010 backend CVE-2026-50010 libfoo "{\"image_refs\": [\"${BACKEND}\"]}" 2026-10-01T00:00:00Z 2026-12-29T00:00:00Z)"
+sm_fixtures 25 "${MERGE}" "${FEAT_COMMIT}" carol 3003
+serve "GET repos/${REPO}/pulls/25/reviews?per_page=100" '[]'
+expect_prov_fail "registro aceptado por self_merge y modificado después por otro autor sin aprobación (no hereda la aceptación)" "${SM}" alice
+sm_fixtures 25 "${MERGE}" "${FEAT_COMMIT}" alice 1001
+check "self_merge: la edición posterior del propio aprobador es una nueva aceptación deliberada, ligada a su merge" \
+  bash -c "$(declare -f prov); TMP='${TMP}' G='${G}' FAKE_GH_DIR='${FAKE_GH_DIR}' FAKE_GH_LOG='${FAKE_GH_LOG}' REPO='${REPO}' APPROVERS='${APPROVERS}' APPROVAL='${APPROVAL}'; prov '${SM}' alice | jq -e --arg m '${MERGE}' --arg old '${SM_MERGE}' '.merge_commit == \$m and .record_history == [\$m, \$old]'"
+# Fuera del árbol que evalúan las secciones siguientes
+git -C "${G}" rm -q "${SM}" "${SMV}" "${SMB}" "$(smx_path 21)" "$(smx_path 22)" "$(smx_path 23)" "$(smx_path 24)" \
+  security/break-glass/VD-2026-025.json security/vulnerability-dispositions/vd-2026-026.json \
+  security/vulnerability-dispositions/README.md backend/src/Main.java .github/workflows/x.yml .github/scripts/vuln-policy.sh
+git -C "${G}" commit -qm "retirar registros y archivos de 1b"
 EVAL=$(git -C "${G}" rev-parse HEAD)
 
 # ── 2. Política: matriz de decisión ─────────────────────────────────────────
@@ -239,7 +424,8 @@ input() { # <surface> <ref> <dir> [<surface> <ref> <dir> ...]
 cat > "${TMP}/approve-stub" << 'EOF'
 #!/usr/bin/env bash
 case " ${STUB_APPROVED:-} " in
-  *" $(basename "$1" .json):$2 "*) jq -cn --arg a "$2" '{approver_login: $a, pr: 7, reviewed_commit: "c", merge_commit: ("a" * 40)}' ;;
+  *" $(basename "$1" .json):$2 "*) jq -cn --arg a "$2" --arg method "${STUB_METHOD:-independent_review}" \
+    '{method: $method, approver_login: $a, pr: 7, reviewed_commit: "c", merge_commit: ("a" * 40), record_history: [("a" * 40)]}' ;;
   *) echo "Error: aprobación humana no verificada (simulada)" >&2; exit 1 ;;
 esac
 EOF
@@ -287,8 +473,10 @@ expect "CRITICAL sin disposición → BLOCK" blocked 1 \
 put() { disposition "$@" > "${DISP}/$1.json"; }
 put VD-2026-001 postgres CVE-2025-68121 stdlib "{\"image_refs\": [\"${POSTGRES}\"]}"
 expect "CRITICAL con disposición aprobada y vigente (digest exacto) → authorized" authorized 0 \
-  '.surfaces[0].scan.critical[0].disposition.id == "VD-2026-001" and .surfaces[0].scan.critical[0].disposition.approver == "alice"' \
+  '.surfaces[0].scan.critical[0].disposition.id == "VD-2026-001" and .surfaces[0].scan.critical[0].disposition.approver == "alice"
+   and .surfaces[0].scan.critical[0].disposition.method == "independent_review"' \
   "${PG_INPUT}" STUB_APPROVED=VD-2026-001:alice
+check "política: el resumen muestra la vía de la aceptación de riesgo" grep -q 'VD-2026-001 (alice, independent_review, PR #7' "${TMP}/policy.err"
 expect "disposición sin aprobación humana verificada → BLOCK" blocked 1 \
   '.surfaces[0].reason_code == "undisposed_critical" and (.surfaces[0].scan.critical[0].undisposed[0] | test("aprobación humana no verificada"))' \
   "${PG_INPUT}"
@@ -390,6 +578,19 @@ expect "de punta a punta: sin vars.VULNERABILITY_RISK_APPROVERS ninguna disposic
 pr_fixtures 7 "${F1_MERGE}" carol "${F1}" "${F1_FEAT}" "${F1_BLOB}" "[$(review 1 dave 2001 APPROVED "${F1_FEAT}")]"
 expect "de punta a punta: aprobada solo por alguien sin autoridad → BLOCK" blocked 1 \
   '.surfaces[0].reason_code == "undisposed_critical"' "${PG_INPUT}" APPROVAL_CHECK="${APPROVAL}" DISPOSITIONS_DIR=security/vulnerability-dispositions
+pr_fixtures 7 "${F1_MERGE}" carol "${F1}" "${F1_FEAT}" "${F1_BLOB}" "[$(review 1 alice 1001 APPROVED "${F1_FEAT}" User 2026-10-10T00:00:01Z)]"
+expect "de punta a punta: aprobación independiente enviada después del merge → BLOCK" blocked 1 \
+  '(.surfaces[0].scan.critical[0].undisposed[0] | test("después del merge"))' "${PG_INPUT}" APPROVAL_CHECK="${APPROVAL}" DISPOSITIONS_DIR=security/vulnerability-dispositions
+# Unipersonal: alice abre y fusiona ella misma el PR que solo trae VD-2026-001
+sm_fixtures 7 "${F1_MERGE}" "${F1_FEAT}" alice 1001
+expect "de punta a punta: disposición aceptada por self_merge del aprobador → authorized, vía visible" authorized 0 \
+  '.surfaces[0].scan.critical[0].disposition | .method == "self_merge" and .approver == "alice" and .pr == 7 and .approved_commit == "'"${F1_FEAT}"'"' \
+  "${PG_INPUT}" APPROVAL_CHECK="${APPROVAL}" DISPOSITIONS_DIR=security/vulnerability-dispositions RISK_APPROVERS=alice:1001
+check "de punta a punta: el resumen distingue self_merge" grep -q 'VD-2026-001 (alice, self_merge, PR #7' "${TMP}/policy.err"
+sm_fixtures 7 "${F1_MERGE}" "${F1_FEAT}" alice 1001 '.merged_by = {login: "carol", id: 3003, type: "User"}'
+expect "de punta a punta: PR propio del aprobador fusionado por otra cuenta → BLOCK" blocked 1 \
+  '.surfaces[0].reason_code == "undisposed_critical"' "${PG_INPUT}" APPROVAL_CHECK="${APPROVAL}" DISPOSITIONS_DIR=security/vulnerability-dispositions
+unserve "GET repos/${REPO}/pulls/7"
 pr_fixtures 7 "${F1_MERGE}" carol "${F1}" "${F1_FEAT}" "${F1_BLOB}" "[$(review 1 alice 1001 APPROVED "${F1_FEAT}")]"
 
 # El árbol real no trae disposiciones ni autorizaciones de break-glass efectivas
@@ -567,7 +768,8 @@ BG_ENV=(EVENT_NAME=workflow_dispatch GITHUB_REF=refs/heads/main ACTOR=carol TRIG
 OP_INPUT="$(input backend "${BACKEND}" "${S}/opfail")"
 bg_auth BG-2026-001
 expect "break-glass válido con evidencia histórica verificada → break_glass (no authorized)" break_glass 0 \
-  '.surfaces[0].verdict == "break_glass" and .surfaces[0].evaluation == "historical" and .surfaces[0].historical_evidence.artifact_digest == "'"${GOOD_DIGEST}"'" and .surfaces[0].scan.age_hours == 340 and .break_glass.approver == "bob" and .break_glass.operation.image_tag == "565928f763"' \
+  '.surfaces[0].verdict == "break_glass" and .surfaces[0].evaluation == "historical" and .surfaces[0].historical_evidence.artifact_digest == "'"${GOOD_DIGEST}"'" and .surfaces[0].scan.age_hours == 340 and .break_glass.approver == "bob" and .break_glass.operation.image_tag == "565928f763"
+   and .break_glass.authorization_method == "independent_review" and .break_glass.consumption_anchors == [.break_glass.authorization_commit]' \
   "${OP_INPUT}" "${BG_ENV[@]}"
 check "break-glass: el resumen dice que no hubo escaneo fresco" grep -q 'NO tuvieron un escaneo fresco' "${TMP}/policy.err"
 expect "break-glass pedido por un push → BLOCK" blocked 1 '(.global_errors[0] | test("workflow_dispatch"))' "${OP_INPUT}" "${BG_ENV[@]}" EVENT_NAME=push
@@ -575,7 +777,13 @@ expect "break-glass desde otra rama → BLOCK" blocked 1 '(.global_errors | leng
 expect "break-glass sin justificación de la operación → BLOCK" blocked 1 '(.global_errors[0] | test("justificación"))' "${OP_INPUT}" "${BG_ENV[@]}" "BREAK_GLASS_JUSTIFICATION=   "
 expect "break-glass sin autorización versionada → BLOCK" blocked 1 '(.global_errors[0] | test("no existe"))' "${OP_INPUT}" "${BG_ENV[@]}" BREAK_GLASS_ID=BG-2026-002
 expect "break-glass sin aprobación humana verificada → BLOCK" blocked 1 '(.global_errors[0] | test("aprobación humana no verificada"))' "${OP_INPUT}" "${BG_ENV[@]}" STUB_APPROVED=
-expect "break-glass aprobado por quien dispara el run → BLOCK" blocked 1 '(.global_errors[0] | test("otra persona"))' "${OP_INPUT}" "${BG_ENV[@]}" TRIGGERING_ACTOR=bob
+expect "break-glass aprobado (self_merge) por quien también dispara el run: operación unipersonal → break_glass" break_glass 0 \
+  '.break_glass.approver == "bob" and .break_glass.authorization_method == "self_merge"' "${OP_INPUT}" "${BG_ENV[@]}" ACTOR=bob TRIGGERING_ACTOR=bob STUB_METHOD=self_merge
+check "break-glass: el resumen muestra la vía de autorización" grep -q 'aprobado por bob (self_merge, PR #7)' "${TMP}/policy.err"
+expect "break-glass sin quien dispara el run → BLOCK" blocked 1 '(.global_errors[0] | test("no está identificado"))' "${OP_INPUT}" "${BG_ENV[@]}" TRIGGERING_ACTOR=
+expect "break-glass sin actor del run → BLOCK" blocked 1 '(.global_errors[0] | test("no está identificado"))' "${OP_INPUT}" "${BG_ENV[@]}" ACTOR=
+expect "break-glass con quien dispara mal formado → BLOCK" blocked 1 '(.global_errors[0] | test("no está identificado"))' "${OP_INPUT}" "${BG_ENV[@]}" 'TRIGGERING_ACTOR=bob;x'
+
 bg_auth BG-2026-001 '.expires = "2026-10-15T11:00:00Z"'
 expect "break-glass vencido → BLOCK" blocked 1 '(.global_errors[0] | test("fuera de vigencia"))' "${OP_INPUT}" "${BG_ENV[@]}"
 bg_auth BG-2026-001 '.expires = "2026-10-18T08:00:01Z"'
@@ -661,8 +869,8 @@ rec() { # [VAR=valor...]
 expect_rec_fail() { # <descripción> [VAR=valor...]
   local rc=0
   : > "${FAKE_GH_LOG}"
-  rec "${@:2}" > /dev/null 2>&1 || rc=$?
-  if [ "${rc}" -ne 0 ]; then ok "registro de break-glass falla cerrado: $1"; else ko "registro de break-glass falla cerrado: $1"; fi
+  rec "${@:2}" > /dev/null 2> "${TMP}/rec.err" || rc=$?
+  if [ "${rc}" -ne 0 ]; then ok "registro de break-glass falla cerrado: $1 ⟶ $(tail -n1 "${TMP}/rec.err")"; else ko "registro de break-glass falla cerrado: $1"; fi
   cp "${FAKE_GH_LOG}" "${TMP}/last-rec.log"
   record_fixtures
 }
@@ -678,7 +886,7 @@ if OUT=$(rec 2> /dev/null) && grep -qx 'issue_number=12' <<< "${OUT}" && grep -q
        and .labels == ["security-break-glass"]
        and (.body | test("SIN escaneo fresco") and test($ref) and test("histórica: run 4242") and test("incidente 42")
             and test("erin") and test("carol") and test("PR #7") and test("una sola operación") and test("565928f763")
-            and test($ctx))' "${FAKE_GH_DIR}/last-input.json" > /dev/null; then
+            and test("`independent_review`") and test($ctx))' "${FAKE_GH_DIR}/last-input.json" > /dev/null; then
   ok "registro de break-glass: consumo inmutable + issue con actor, run, digests, evidencia, CVE, justificación y ausencia de escaneo fresco"
 else
   ko "registro de break-glass: consumo inmutable + issue (${OUT:-sin salida})"
@@ -692,6 +900,44 @@ jq '.decision = "authorized"' "${TMP}/bg-result.json" > "${TMP}/authorized-resul
 expect_rec_fail "la política no decidió break_glass" POLICY_RESULT="${TMP}/authorized-result.json"
 jq 'del(.break_glass.authorization_commit)' "${TMP}/bg-result.json" > "${TMP}/no-anchor-result.json"
 expect_rec_fail "autorización sin merge commit verificado (sin ancla de consumo)" POLICY_RESULT="${TMP}/no-anchor-result.json"
+bg_result_case() { # <descripción> <filtro jq sobre el resultado>
+  jq "$2" "${TMP}/bg-result.json" > "${TMP}/case-result.json"
+  expect_rec_fail "$1" POLICY_RESULT="${TMP}/case-result.json"
+  if ! grep -q -e "^POST repos/${REPO}/statuses" -e "^POST repos/${REPO}/issues" "${TMP}/last-rec.log"; then
+    ok "registro de break-glass: $1 → no consume ni crea issue"
+  else
+    ko "registro de break-glass: $1 → no consume ni crea issue"
+  fi
+}
+bg_result_case "sin historia del registro (consumption_anchors)" 'del(.break_glass.consumption_anchors)'
+bg_result_case "historia del registro vacía" '.break_glass.consumption_anchors = []'
+bg_result_case "historia que no empieza por el merge verificado" ".break_glass.consumption_anchors = [\"$(printf 'b%.0s' {1..40})\", .break_glass.authorization_commit]"
+bg_result_case "historia con un commit mal formado" '.break_glass.consumption_anchors += ["HEAD"]'
+bg_result_case "historia con commits repetidos" '.break_glass.consumption_anchors += [.break_glass.authorization_commit]'
+bg_result_case "sin vía de autorización" 'del(.break_glass.authorization_method)'
+bg_result_case "vía de autorización desconocida" '.break_glass.authorization_method = "comment_marker"'
+# Re-fusionar el mismo id (editado, o borrado y recreado) deja otro merge commit, pero el
+# consumo hecho sobre un merge anterior del mismo registro sigue contando
+OLD_AC=$(printf 'c%.0s' {1..40})
+OLD_KEY="GET repos/${REPO}/commits/${OLD_AC}/statuses?per_page=100"
+jq --arg old "${OLD_AC}" '.break_glass.consumption_anchors += [$old]' "${TMP}/bg-result.json" > "${TMP}/remerged-result.json"
+serve "${OLD_KEY}" "[$(status_json 390 "${CTX}" "https://github.com/${REPO}/actions/runs/4100/attempts/1")]"
+expect_rec_fail "id ya consumido sobre un merge anterior del registro (re-fusionado después: replay)" POLICY_RESULT="${TMP}/remerged-result.json"
+check "registro de break-glass: ante un consumo en un merge anterior no registra otro ni crea issue" \
+  bash -c "! grep -q -e '^POST repos/${REPO}/statuses' -e '^POST repos/${REPO}/issues' '${TMP}/last-rec.log'"
+unserve "${OLD_KEY}"
+expect_rec_fail "historia del registro con un commit cuyo registro de consumo es ilegible" POLICY_RESULT="${TMP}/remerged-result.json"
+serve "${OLD_KEY}" '{"message": "Not Found"}'
+expect_rec_fail "historia del registro con una lista de statuses inválida en un merge anterior" POLICY_RESULT="${TMP}/remerged-result.json"
+serve "${OLD_KEY}" "[$(status_json 391 security/break-glass-consumption/BG-2026-002 https://example.invalid/z)]"
+: > "${FAKE_GH_LOG}"
+if OUT=$(rec POLICY_RESULT="${TMP}/remerged-result.json" 2> /dev/null) && grep -qx 'consumption_status=501' <<< "${OUT}" &&
+   grep -q "^${OLD_KEY}$" "${FAKE_GH_LOG}" && ! grep -q "^POST repos/${REPO}/statuses/${OLD_AC}" "${FAKE_GH_LOG}"; then
+  ok "registro de break-glass: sin consumos del id en ninguna versión del registro → consume sobre el merge vigente"
+else
+  ko "registro de break-glass: sin consumos del id en ninguna versión del registro (${OUT:-sin salida})"
+fi
+record_fixtures
 serve "${APPROVALS_KEY}" '[]';                         expect_rec_fail "sin aprobación del environment en este run"
 serve "${APPROVALS_KEY}" '[{"state": "rejected", "user": {"login": "erin", "type": "User"}, "environments": [{"name": "production-hetzner"}]}]'
 expect_rec_fail "aprobación del environment rechazada"
@@ -773,6 +1019,107 @@ if OUT=$(rec 2> /dev/null) && grep -qx 'issue_number=12' <<< "${OUT}"; then
 else
   ko "registro de break-glass: el consumo de otra autorización no bloquea esta (${OUT:-sin salida})"
 fi
+record_fixtures
+
+# ── 6b. Break-glass unipersonal de punta a punta (procedencia real + registro) ──
+# alice es la única aprobadora: redacta BG-2026-030, abre y fusiona ella misma el PR solo de
+# registros, dispara el run y aprueba el environment. Nadie más interviene.
+bg_auth BG-2026-030 '.approver = "alice"'
+BG30=security/break-glass/BG-2026-030.json
+merge_files bg30 "${BG30}" "$(cat "${TMP}/bg/BG-2026-030.json")"
+M30="${MERGE}"
+sm_fixtures 30 "${M30}" "${FEAT_COMMIT}" alice 1001
+EVAL=$(git -C "${G}" rev-parse HEAD)
+hist_fixtures
+SOLO_ENV=("${BG_ENV[@]}" BREAK_GLASS_ID=BG-2026-030 ACTOR=alice TRIGGERING_ACTOR=alice RISK_APPROVERS=alice:1001
+  APPROVAL_CHECK="${APPROVAL}" BREAK_GLASS_DIR=security/break-glass DISPOSITIONS_DIR=security/vulnerability-dispositions)
+expect "unipersonal: break-glass self_merge de quien dispara el run, procedencia real → break_glass" break_glass 0 \
+  '.break_glass | .id == "BG-2026-030" and .approver == "alice" and .authorization_method == "self_merge" and .pr == 30
+     and .authorization_commit == "'"${M30}"'" and .consumption_anchors == ["'"${M30}"'"]' "${OP_INPUT}" "${SOLO_ENV[@]}"
+cp "${TMP}/result.json" "${TMP}/solo-result.json"
+expect "unipersonal: sin vars.VULNERABILITY_RISK_APPROVERS el mismo break-glass no es efectivo → BLOCK" blocked 1 \
+  '(.global_errors[0] | test("aprobación humana no verificada"))' "${OP_INPUT}" "${SOLO_ENV[@]}" RISK_APPROVERS=
+sm_fixtures 30 "${M30}" "${FEAT_COMMIT}" alice 1001 '.merged_by = {login: "bob", id: 1002, type: "User"}'
+expect "unipersonal: el PR del break-glass lo fusionó otra cuenta → BLOCK" blocked 1 \
+  '(.global_errors[0] | test("aprobación humana no verificada"))' "${OP_INPUT}" "${SOLO_ENV[@]}"
+sm_fixtures 30 "${M30}" "${FEAT_COMMIT}" alice 1001
+expect "unipersonal: break-glass con Terraform Apply sigue rechazado → BLOCK" blocked 1 \
+  '(.global_errors[0] | test("Terraform Apply"))' "${OP_INPUT}" "${SOLO_ENV[@]}" OP_RUN_TERRAFORM_APPLY=true
+expect "unipersonal: break-glass desde un push sigue rechazado → BLOCK" blocked 1 \
+  '(.global_errors[0] | test("workflow_dispatch"))' "${OP_INPUT}" "${SOLO_ENV[@]}" EVENT_NAME=push
+
+solo_fixtures() { # <anclas...>: aprobación del environment por alice, sin consumos, consumo sobre $1
+  local a
+  serve "GET repos/${REPO}/actions/runs/4300/approvals" '[{"state": "approved", "user": {"login": "alice", "type": "User"}, "environments": [{"name": "production-hetzner"}]}]'
+  for a in "$@"; do serve "GET repos/${REPO}/commits/${a}/statuses?per_page=100" '[]'; done
+  serve_then "GET repos/${REPO}/commits/$1/statuses?per_page=100" "[$(status_json 601 security/break-glass-consumption/BG-2026-030 "${RUN_URL_4300}")]"
+  serve "POST repos/${REPO}/statuses/$1" "$(status_json 601 security/break-glass-consumption/BG-2026-030 "${RUN_URL_4300}")"
+  serve "POST repos/${REPO}/issues" '{"number": 30, "html_url": "https://example.invalid/issues/30", "labels": [{"name": "security-break-glass"}]}'
+}
+solo_rec() { rec POLICY_RESULT="$1" GITHUB_SHA="${EVAL}" GITHUB_ACTOR=alice GITHUB_TRIGGERING_ACTOR=alice; }
+solo_fixtures "${M30}"
+: > "${FAKE_GH_LOG}"
+if OUT=$(solo_rec "${TMP}/solo-result.json" 2> /dev/null) && grep -qx 'consumption_status=601' <<< "${OUT}" &&
+   jq -e '.body | test("`self_merge`") and test("alice") and test("PR #30")' "${FAKE_GH_DIR}/last-input.json" > /dev/null; then
+  ok "unipersonal: aprobación del environment por la misma persona, consumo único e issue con la vía self_merge"
+else
+  ko "unipersonal: consumo e issue (${OUT:-sin salida})"
+fi
+CONSUMED_30=$(status_json 601 security/break-glass-consumption/BG-2026-030 "${RUN_URL_4300}")
+solo_expect_fail() { # <descripción> <resultado de la política>: falla sin consumir ni crear issue
+  : > "${FAKE_GH_LOG}"
+  if ! solo_rec "$2" > /dev/null 2> "${TMP}/rec.err" && ! grep -q '^POST' "${FAKE_GH_LOG}"; then ok "$1 ⟶ $(tail -n1 "${TMP}/rec.err")"; else ko "$1"; fi
+}
+serve "GET repos/${REPO}/commits/${M30}/statuses?per_page=100" "[${CONSUMED_30}]"
+solo_expect_fail "unipersonal: un re-run u otra operación con el mismo id ya consumido → no consume ni crea issue" "${TMP}/solo-result.json"
+solo_fixtures "${M30}"
+serve "GET repos/${REPO}/actions/runs/4300/approvals" '[]'
+solo_expect_fail "unipersonal: sin aprobación del environment → no consume ni crea issue" "${TMP}/solo-result.json"
+unserve "POST repos/${REPO}/issues"
+solo_fixtures "${M30}"
+unserve "POST repos/${REPO}/issues"
+: > "${FAKE_GH_LOG}"
+if ! solo_rec "${TMP}/solo-result.json" > /dev/null 2>&1 && grep -q "^POST repos/${REPO}/statuses/${M30}" "${FAKE_GH_LOG}"; then
+  ok "unipersonal: sin issue de auditoría falla cerrado (el consumo ya quedó: no hay reintento)"
+else
+  ko "unipersonal: sin issue de auditoría falla cerrado"
+fi
+
+# Replay: alice edita BG-2026-030 (extiende la vigencia) y lo vuelve a fusionar ella misma
+merge_files bg31 "${BG30}" "$(jq -c '.expires = "2026-10-17T08:00:00Z"' "${TMP}/bg/BG-2026-030.json")"
+M31="${MERGE}"
+sm_fixtures 31 "${M31}" "${FEAT_COMMIT}" alice 1001
+EVAL=$(git -C "${G}" rev-parse HEAD)
+expect "replay: el mismo id re-fusionado pasa la procedencia, con la historia completa del registro" break_glass 0 \
+  '.break_glass.authorization_commit == "'"${M31}"'" and .break_glass.consumption_anchors == ["'"${M31}"'", "'"${M30}"'"]' \
+  "${OP_INPUT}" "${SOLO_ENV[@]}"
+cp "${TMP}/result.json" "${TMP}/replay-result.json"
+solo_fixtures "${M31}" "${M30}"
+serve "GET repos/${REPO}/commits/${M30}/statuses?per_page=100" "[${CONSUMED_30}]"
+solo_expect_fail "replay: id consumido y re-fusionado (nuevo merge commit) → no consume otra vez ni crea issue" "${TMP}/replay-result.json"
+# Replay: borrar el registro y recrearlo con el mismo id
+merge_files bg32 "${BG30}" @rm
+M32="${MERGE}"
+merge_files bg33 "${BG30}" "$(cat "${TMP}/bg/BG-2026-030.json")"
+M33="${MERGE}"
+sm_fixtures 33 "${M33}" "${FEAT_COMMIT}" alice 1001
+EVAL=$(git -C "${G}" rev-parse HEAD)
+expect "replay: el id borrado y recreado lleva toda su historia (recreación, borrado y merges anteriores)" break_glass 0 \
+  '.break_glass.consumption_anchors == ["'"${M33}"'", "'"${M32}"'", "'"${M31}"'", "'"${M30}"'"]' "${OP_INPUT}" "${SOLO_ENV[@]}"
+cp "${TMP}/result.json" "${TMP}/recreated-result.json"
+solo_fixtures "${M33}" "${M32}" "${M31}" "${M30}"
+serve "GET repos/${REPO}/commits/${M30}/statuses?per_page=100" "[${CONSUMED_30}]"
+solo_expect_fail "replay: id consumido, borrado y recreado → no consume otra vez ni crea issue" "${TMP}/recreated-result.json"
+solo_fixtures "${M33}" "${M32}" "${M31}" "${M30}"
+: > "${FAKE_GH_LOG}"
+if OUT=$(solo_rec "${TMP}/recreated-result.json" 2> /dev/null) && grep -qx 'consumption_status=601' <<< "${OUT}" &&
+   [ "$(grep -c "^GET repos/${REPO}/commits/.*/statuses" "${FAKE_GH_LOG}")" -eq 8 ]; then
+  ok "replay: sin consumo en ninguna versión del registro (4 commits, leídos antes y después) → consume una sola vez"
+else
+  ko "replay: sin consumo en ninguna versión del registro (${OUT:-sin salida})"
+fi
+git -C "${G}" rm -q "${BG30}" && git -C "${G}" commit -qm "retirar BG-2026-030"
+EVAL=$(git -C "${G}" rev-parse HEAD)
 record_fixtures
 
 # ── 7. Entrada de la política (scan-evidence.sh) ────────────────────────────

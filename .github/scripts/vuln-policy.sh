@@ -21,14 +21,16 @@
 #
 # Break-glass (solo workflow_dispatch desde main): una imagen cuyo escaneo fresco tuvo un
 # fallo operativo puede autorizarse con evidencia histórica, solo si
-# security/break-glass/<id>.json está aprobado (misma verificación de procedencia), vigente
-# (máximo 72 h), su aprobador no es quien dispara el run, describe exactamente la operación
-# de este run (sin Terraform Apply: ninguna mutación puede ir antes de esta decisión y del
-# registro de auditoría), lista esa referencia exacta con su evidencia, y
+# security/break-glass/<id>.json está aprobado (misma verificación de procedencia, por
+# revisión independiente o por self_merge: el aprobador puede ser quien dispara el run),
+# vigente (máximo 72 h), describe exactamente la operación de este run (sin Terraform
+# Apply: ninguna mutación puede ir antes de esta decisión y del registro de auditoría),
+# lista esa referencia exacta con su evidencia, y
 # historical-scan-evidence.sh verifica procedencia e integridad de esa evidencia. Sus
 # CRITICAL conocidos siguen necesitando disposición. El resultado es break_glass, nunca
 # authorized: no hubo escaneo fresco. Una autorización sirve para UNA operación
-# (break-glass-record.sh lo exige al registrarla).
+# (break-glass-record.sh lo exige al registrarla, sobre todos los commits de main que
+# tocaron el registro: re-fusionar el mismo id no la renueva).
 #
 # Uso: vuln-policy.sh
 # Entorno:
@@ -38,7 +40,8 @@
 #   BREAK_GLASS_ID     autorización de break-glass pedida (vacío = ninguna)
 #   BREAK_GLASS_JUSTIFICATION  justificación de esta operación
 #   BREAK_GLASS_DIR    por defecto security/break-glass
-#   EVENT_NAME, GITHUB_REF, ACTOR, TRIGGERING_ACTOR
+#   EVENT_NAME, GITHUB_REF, ACTOR, TRIGGERING_ACTOR  (quien dispara: debe existir y ser un
+#                      login válido; puede ser el aprobador)
 #   OP_RUN_TERRAFORM_APPLY, OP_RUN_HOST_CONFIG, OP_RUN_APP_DEPLOY, OP_RUN_BUILD,
 #   OP_RUN_BUILD_POSTGRES, OP_IMAGE_TAG, OP_KEYCLOAK_RECOVERY  intención de este run
 #                      (solo se usan con break-glass)
@@ -74,6 +77,7 @@ MAX_BREAK_GLASS_HOURS=72       # vigencia máxima de una autorización de break-
 CLOCK_SKEW_SECONDS=300
 SURFACES_RE='^(backend|postgres|keycloak|traefik)$'
 REF_RE='^[a-z0-9][a-z0-9./:_-]*@sha256:[0-9a-f]{64}$'
+LOGIN_RE='^[A-Za-z0-9](-?[A-Za-z0-9]){0,38}$'
 ISO_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,9})?Z$'
 
 usage_error() {
@@ -228,8 +232,8 @@ dispose() {
         why=$(jq -c --arg m "$(jq -r '.id' <<< "${c}"): aprobación humana no verificada (${PROVENANCE[${file}|${approver}]#fail:})" '. + [$m]' <<< "${why}")
       else
         disp=$(jq -c --argjson p "${PROVENANCE[${file}|${approver}]#ok:}" \
-          '{id, approver: $p.approver_login, pr: $p.pr, approved_commit: $p.reviewed_commit, expires,
-            scope: "digest de imagen"}' <<< "${c}")
+          '{id, approver: $p.approver_login, method: $p.method, pr: $p.pr, approved_commit: $p.reviewed_commit,
+            expires, scope: "digest de imagen"}' <<< "${c}")
         break
       fi
     done < <(jq -c '.[]' <<< "${cands}")
@@ -316,15 +320,17 @@ if [ -n "${BREAK_GLASS_ID}" ]; then
       BG_ERROR="${BG_FILE}: fuera de vigencia ($(jq -r '"\(.effective) → \(.expires)"' "${BG_FILE}"))"
     elif ! jq -e --argjson op "${RUN_OPERATION}" '.operation == ($op | del(.run_terraform_apply))' "${BG_FILE}" > /dev/null; then
       BG_ERROR="${BG_FILE} autoriza otra operación ($(jq -c '.operation' "${BG_FILE}")) que la de este run ($(jq -c 'del(.run_terraform_apply)' <<< "${RUN_OPERATION}"))"
-    elif [ -z "${TRIGGERING_ACTOR}" ] || [ "${BG_APPROVER,,}" = "${TRIGGERING_ACTOR,,}" ] ||
-         [ "${BG_APPROVER,,}" = "${ACTOR,,}" ]; then
-      BG_ERROR="la autorización de break-glass debe venir de otra persona que quien dispara el run (${TRIGGERING_ACTOR:-desconocido})"
+    elif ! [[ "${TRIGGERING_ACTOR}" =~ ${LOGIN_RE} ]] || ! [[ "${ACTOR}" =~ ${LOGIN_RE} ]]; then
+      BG_ERROR="quien dispara el run no está identificado ('${TRIGGERING_ACTOR}', '${ACTOR}'): el registro de auditoría lo exige"
     elif ! provenance "${BG_FILE}" "${BG_APPROVER}"; then
       BG_ERROR="${BG_FILE}: aprobación humana no verificada (${PROVENANCE[${BG_FILE}|${BG_APPROVER}]#fail:})"
     else
+      # consumption_anchors: todos los commits de main que tocaron el registro; un consumo
+      # en cualquiera de ellos agota el id aunque se haya editado o re-fusionado después
       BG=$(jq -c --argjson p "${PROVENANCE[${BG_FILE}|${BG_APPROVER}]#ok:}" --arg j "${JUSTIFICATION}" \
-        '{id, approver: $p.approver_login, pr: $p.pr, approved_commit: $p.reviewed_commit,
-          authorization_commit: $p.merge_commit, effective, expires,
+        '{id, approver: $p.approver_login, authorization_method: $p.method, pr: $p.pr,
+          approved_commit: $p.reviewed_commit, authorization_commit: $p.merge_commit,
+          consumption_anchors: $p.record_history, effective, expires,
           operation, authorization_justification: .justification, operation_justification: $j, images}' "${BG_FILE}")
     fi
   fi
@@ -447,14 +453,14 @@ summary() {
     "",
     (if (.global_errors | length) > 0 then (.global_errors[] | "- **BLOQUEO:** \(.)"), "" else empty end),
     (if .break_glass != null then
-      "> **BREAK-GLASS \(.break_glass.id)** aprobado por \(.break_glass.approver) (PR #\(.break_glass.pr)), vigente hasta \(.break_glass.expires). Las imágenes marcadas `break_glass` NO tuvieron un escaneo fresco: se autorizan con evidencia histórica, sin la garantía escaneado = autorizado = desplegado de este run.", "" else empty end),
+      "> **BREAK-GLASS \(.break_glass.id)** aprobado por \(.break_glass.approver) (\(.break_glass.authorization_method), PR #\(.break_glass.pr)), vigente hasta \(.break_glass.expires). Las imágenes marcadas `break_glass` NO tuvieron un escaneo fresco: se autorizan con evidencia histórica, sin la garantía escaneado = autorizado = desplegado de este run.", "" else empty end),
     "| imagen | veredicto | evaluación | CRITICAL | HIGH (informativo) |",
     "|---|---|---|---|---|",
     (.surfaces[] | "| \(.surface) `\(.image_ref)` | **\(.verdict)**\(if .reason_code then " (\(.reason_code))" else "" end) | \(scanline) | \(if .scan == null then "—" else (.scan.critical | length | tostring) end) | \(if .scan == null then "—" else "\(.scan.high_findings) (\(.scan.high | length) CVE)" end) |"),
     "",
     (.surfaces[] | select((.reasons | length) > 0) | "- \(.surface): \(.reasons | join("; "))"),
     (.surfaces[] | select(.scan != null) | .surface as $s | .scan.critical[] |
-      if .disposition then "- \($s): \(.id) en \(.pkg) \(.version) — disposición \(.disposition.id) (\(.disposition.approver), PR #\(.disposition.pr), vence \(.disposition.expires))"
+      if .disposition then "- \($s): \(.id) en \(.pkg) \(.version) — disposición \(.disposition.id) (\(.disposition.approver), \(.disposition.method), PR #\(.disposition.pr), vence \(.disposition.expires))"
       else "- \($s): **\(.id) en \(.pkg) \(.version) sin disposición** — \(.undisposed // ["no evaluada: la imagen ya está bloqueada"] | join("; "))" end),
     (.surfaces[] | select(.scan != null and (.scan.high | length) > 0) | "- \(.surface) HIGH: \(.scan.high | join(", "))"),
     (.surfaces[] | select(.scan != null) | "- \(.surface) cobertura: SO \(.scan.os // "no detectado (paquetes del sistema sin evaluar)")\(if .scan.eosl then " (fuera de soporte)" else "" end); clases \(.scan.classes | join(", ")). Cero hallazgos no prueba ausencia de vulnerabilidades."),

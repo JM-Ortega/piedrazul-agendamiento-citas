@@ -13,7 +13,11 @@
 #
 # Registro de consumo: un commit status con contexto
 # security/break-glass-consumption/<id> sobre el merge commit de main que integró la
-# autorización (el que verificó approval-provenance.sh). GitHub no permite editar ni borrar
+# autorización (el que verificó approval-provenance.sh). El consumo previo se busca en TODOS
+# los commits de main que alguna vez tocaron security/break-glass/<id>.json
+# (consumption_anchors, de la historia completa del commit evaluado): editar, borrar y
+# recrear o re-fusionar el registro con el mismo id deja otro merge commit, pero no borra el
+# consumo de los anteriores; el id queda agotado y hace falta otro. GitHub no permite editar ni borrar
 # commit statuses y la API los lista todos, así que un consumo no puede desaparecer
 # cambiando metadatos. El issue security-break-glass es el registro operativo de auditoría,
 # pero NO se usa para decidir el consumo: su título y etiquetas son editables y puede
@@ -40,10 +44,15 @@ LABEL=security-break-glass
 
 jq -e '.decision == "break_glass" and .break_glass != null and (.break_glass.id | test("^BG-[0-9]{4}-[0-9]{3}$"))
        and (.break_glass.operation | type == "object")
-       and (.break_glass.authorization_commit | type == "string" and test("^[0-9a-f]{40}$"))' "${POLICY_RESULT}" > /dev/null 2>&1 ||
+       and (.break_glass.authorization_commit | type == "string" and test("^[0-9a-f]{40}$"))
+       and (.break_glass.authorization_method == "self_merge" or .break_glass.authorization_method == "independent_review")
+       and (.break_glass.consumption_anchors | type == "array" and length >= 1 and length == (unique | length)
+            and all(.[]; type == "string" and test("^[0-9a-f]{40}$")))
+       and .break_glass.consumption_anchors[0] == .break_glass.authorization_commit' "${POLICY_RESULT}" > /dev/null 2>&1 ||
   fail "la política no autorizó un break-glass verificado"
 ID=$(jq -r '.break_glass.id' "${POLICY_RESULT}")
 AUTH_COMMIT=$(jq -r '.break_glass.authorization_commit' "${POLICY_RESULT}")
+mapfile -t ANCHORS < <(jq -r '.break_glass.consumption_anchors[]' "${POLICY_RESULT}")
 CONTEXT="security/break-glass-consumption/${ID}"
 RUN_URL="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}"
 
@@ -56,23 +65,28 @@ APPROVER=$(jq -r --arg env "${ENVIRONMENT_NAME}" '
   | last | .user.login // ""' <<< "${APPROVALS}")
 [ -n "${APPROVER}" ] || fail "este run no tiene una aprobación humana del environment ${ENVIRONMENT_NAME}"
 
-# Consumos registrados (todos los statuses del contexto, de cualquier autor)
+# Consumos registrados (todos los statuses del contexto, de cualquier autor, en cada ancla)
 # Solo una enumeración completa y válida prueba "cero consumos": la salida de cada página
 # debe ser un arreglo JSON (el vacío `[]` es válido) de statuses con id y contexto. Salida
-# vacía, JSON malformado, otra estructura o una página fallida → no hay prueba, bloquea.
+# vacía, JSON malformado, otra estructura o una página fallida, en cualquier ancla → no hay
+# prueba, bloquea.
 consumptions() {
-  local raw
-  raw=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${AUTH_COMMIT}/statuses?per_page=100") || return 1
-  [ -n "${raw//[[:space:]]/}" ] || return 1
-  jq -s -c -e --arg c "${CONTEXT}" '
-    if length >= 1 and all(.[]; type == "array"
-         and all(.[]; type == "object" and (.id | type == "number") and (.context | type == "string")))
-    then [.[][] | select(.context == $c)]
-    else error("lista de statuses inválida") end' <<< "${raw}" 2> /dev/null
+  local raw anchor found all='[]'
+  for anchor in "${ANCHORS[@]}"; do
+    raw=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/commits/${anchor}/statuses?per_page=100") || return 1
+    [ -n "${raw//[[:space:]]/}" ] || return 1
+    found=$(jq -s -c -e --arg c "${CONTEXT}" --arg a "${anchor}" '
+      if length >= 1 and all(.[]; type == "array"
+           and all(.[]; type == "object" and (.id | type == "number") and (.context | type == "string")))
+      then [.[][] | select(.context == $c) | . + {anchor: $a}]
+      else error("lista de statuses inválida") end' <<< "${raw}" 2> /dev/null) || return 1
+    all=$(jq -c --argjson f "${found}" '. + $f' <<< "${all}")
+  done
+  echo "${all}"
 }
 PRIOR=$(consumptions) || fail "no se pudo leer el registro de consumo de ${ID}: no se puede probar que no se usó"
 [ "$(jq 'length' <<< "${PRIOR}")" -eq 0 ] ||
-  fail "${ID} ya se consumió ($(jq -r '[.[] | "\(.creator.login // "?") \(.created_at // "?") \(.target_url // "")"] | join("; ")' <<< "${PRIOR}")): una autorización cubre una sola operación; hace falta una nueva"
+  fail "${ID} ya se consumió ($(jq -r '[.[] | "\(.creator.login // "?") \(.created_at // "?") \(.target_url // "") sobre \(.anchor[0:10])"] | join("; ")' <<< "${PRIOR}")): una autorización cubre una sola operación y su id no se reutiliza; hace falta una nueva con otro id"
 
 # Consumir: desde aquí la autorización queda usada aunque algo falle después
 CREATED=$(jq -n --arg c "${CONTEXT}" --arg u "${RUN_URL}" \
@@ -85,7 +99,7 @@ STATUS_ID=$(jq -r --arg c "${CONTEXT}" --arg u "${RUN_URL}" \
 [ -n "${STATUS_ID}" ] || fail "el registro de consumo de ${ID} no quedó como se pidió"
 # Exactamente un consumo, el de este run: otro simultáneo hace ambiguo el uso
 AFTER=$(consumptions) || fail "no se pudo releer el registro de consumo de ${ID}"
-jq -e --argjson id "${STATUS_ID}" 'length == 1 and .[0].id == $id' <<< "${AFTER}" > /dev/null ||
+jq -e --argjson id "${STATUS_ID}" --arg a "${AUTH_COMMIT}" 'length == 1 and .[0].id == $id and .[0].anchor == $a' <<< "${AFTER}" > /dev/null ||
   fail "el registro de consumo de ${ID} es ambiguo ($(jq 'length' <<< "${AFTER}") consumos): producción no muta"
 
 TITLE="[break-glass][${ID}] run ${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}"
@@ -105,8 +119,9 @@ BODY=$(jq -r --arg run "${RUN_URL}" --arg sha "${GITHUB_SHA}" --arg actor "${GIT
   "| actor / quien disparó | \($actor) / \($trig) |",
   "| aprobación del environment `\($env)` | \($envapp) |",
   "| autorización | `\(.break_glass.id)` — \(.break_glass.approver), PR #\(.break_glass.pr) (commit aprobado `\(.break_glass.approved_commit)`), vigente \(.break_glass.effective) → \(.break_glass.expires), una sola operación |",
+  "| vía de autorización | `\(.break_glass.authorization_method)`\(if .break_glass.authorization_method == "self_merge" then " (el aprobador abrió y fusionó un PR solo de registros)" else " (revisión APPROVED de otro aprobador antes del merge)" end) |",
   "| operación autorizada | `\(.break_glass.operation | tojson)` (sin Terraform Apply) |",
-  "| consumo (inmutable) | commit status `\($ctx)` sobre `\(.break_glass.authorization_commit)` |",
+  "| consumo (inmutable) | commit status `\($ctx)` sobre `\(.break_glass.authorization_commit)`; sin consumo previo en \(.break_glass.consumption_anchors | length) commit(s) de main que tocaron el registro |",
   "| justificación de la operación | \(.break_glass.operation_justification | gsub("[\r\n|]"; " ")) |",
   "| justificación de la autorización | \(.break_glass.authorization_justification | gsub("[\r\n|]"; " ")) |",
   "",
