@@ -28,6 +28,8 @@
 #      con las nuevas.
 #   5. Falla cerrado: credencial de migración incorrecta → exit != 0; lock tomado → la
 #      migración no corre.
+#   6. Arranque sin root (infra/postgres/Dockerfile): imagen USER postgres y sin gosu; el
+#      servidor corre como uid 70 al inicializar y tras reiniciar sobre el PGDATA existente.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -117,6 +119,7 @@ new_passwords() { for r in postgres app migration kc; do PW[$r]="$(synthetic "$r
 
 # ── Operaciones (mismas que app/tasks/db_converge.yml y migrate.yml) ─────────
 converge_db() { compose up --detach --wait --wait-timeout 120 postgres; }
+restart_db() { compose restart postgres && converge_db; }
 reconcile() { flock --exclusive --timeout 30 "${LOCK}" docker exec --user postgres postgres /docker-entrypoint-initdb.d/01-init-databases.sh; }
 migrate() { # <log>
   flock --exclusive --timeout "${LOCK_TIMEOUT:-30}" "${LOCK}" \
@@ -135,6 +138,8 @@ client() { # <rol> <contraseña> <sql>
 login() { client "$1" "$2" 'select 1'; }
 as_app() { client piedrazul_app "${PW[app]}" "$1"; }
 history_count() { sql 'select count(*) from piedrazul.flyway_schema_history'; }
+# uid real del proceso principal del contenedor (postmaster)
+server_uid() { docker exec postgres awk '/^Uid:/ { print $2 }' /proc/1/status; }
 
 # Escrituras sin efecto (WHERE false) sobre una tabla: igual exigen el privilegio, así que
 # prueban la autoridad del rol sin depender del contenido. Columna: la primera que admite
@@ -179,6 +184,10 @@ new_passwords
 write_env
 
 must "PGDATA vacío: postgres inicializa y queda healthy" converge_db
+check "imagen de postgres declarada USER postgres" \
+  test "$(docker image inspect --format '{{.Config.User}}' "${POSTGRES_IMAGE}")" = postgres
+refute "imagen de postgres sin gosu" docker exec postgres test -e /usr/local/bin/gosu
+check "PGDATA vacío: el servidor corre como postgres (uid 70)" test "$(server_uid)" = 70
 must "reconciliación sobre la base recién inicializada" reconcile
 SYSID="$(sql 'select system_identifier from pg_control_system()')"
 
@@ -219,6 +228,8 @@ write_env
 must "postgres se recrea con las credenciales nuevas declaradas (PGDATA conservado)" converge_db
 check "mismo cluster tras recrear el contenedor (system_identifier)" test "$(sql 'select system_identifier from pg_control_system()')" = "${SYSID}"
 check "datos conservados (historial de Flyway intacto)" test "$(history_count)" = "${APPLIED}"
+check "PGDATA existente: el servidor recreado corre como postgres (uid 70)" test "$(server_uid)" = 70
+must "PGDATA existente: postgres reinicia sin root y queda healthy" restart_db
 refute "antes de reconciliar, la credencial nueva de app_role todavía no autentica" login piedrazul_app "${PW[app]}"
 must "reconciliación sin conocer las contraseñas anteriores" reconcile
 declare -A ROLE=([postgres]=postgres [app]=piedrazul_app [migration]=piedrazul_migration [kc]=keycloak_user)

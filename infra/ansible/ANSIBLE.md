@@ -388,6 +388,8 @@ Cuatro autoridades separadas sobre la base `piedrazul_db`. Los nombres están en
 1. `postgres` se (re)crea si cambió su imagen o su entorno y se espera a que esté healthy. `PGDATA` se conserva.
 2. Se vuelve a correr `01-init-databases.sh` dentro del contenedor (`docker exec -u postgres`), el mismo script que inicializa un `PGDATA` vacío. Es idempotente: crea lo que falte, fija las contraseñas declaradas de los cuatro roles, los schemas, sus dueños, los permisos y los default privileges. Se conecta por el socket local, así que no necesita las contraseñas anteriores; las anteriores dejan de autenticar.
 
+**Arranque sin root**: la imagen (`infra/postgres/Dockerfile`) parte de la oficial sin modificar su entrypoint, quita `gosu` (su Go stdlib embebido era el origen de los CRITICAL/HIGH del escaneo de la base) y declara `USER postgres` (uid/gid 70). El entrypoint oficial corriendo como `postgres` no necesita `gosu`, pero tampoco corrige dueños: supone que `PGDATA` ya pertenece a 70:70. El volumen nombrado `pgdata` lo cumple solo (uno vacío hereda el dueño del directorio de la imagen; uno inicializado por una imagen anterior que arrancaba como root ya quedó como 70:70), así que inicializar, reiniciar, recrear y reconciliar no requieren ningún paso adicional. Lo que llegue a `PGDATA` desde fuera del contenedor (copia de archivos, volumen de otro host) debe conservar ese dueño (`tar --numeric-owner` lo hace); si no, postgres no arranca y no toca los datos, y se corrige con `chown -R 70:70` sobre el volumen antes de arrancar. No hay aún un procedimiento de backup/restore del repositorio; un restore lógico (`pg_dump`/`pg_restore`) no depende de esto.
+
 **Historial de Flyway**: `flyway_schema_history` lo crea `migration_role` y solo él lo modifica. Los default privileges que dan DML a `app_role` sobre las tablas nuevas de `piedrazul` también lo alcanzarían, así que se retira en dos puntos idempotentes: al final de cada migración (callback de Flyway `ProtectSchemaHistoryCallback`, solo en `SchemaMigrationApplication`) y en cada reconciliación si la tabla ya existe (`REVOKE ALL … FROM app_role` en `01-init-databases.sh`). Las default privileges no se aplican a tablas existentes, así que una reconciliación posterior no lo deshace; un deploy sin migración (rollback, reuso) también pasa por la reconciliación.
 
 Solo después arrancan o se recrean los consumidores: Keycloak (`setup.yml`), `migrate` y `backend` (`deploy.yml`), y en un converge sin deploy el backend que ya corre (`refresh_backend.yml`, al final de `converge.yml`, después de la sincronización de Keycloak). `refresh_backend.yml` solo actúa si el contenedor `backend` corre exactamente `backend_image_ref`; nunca introduce una imagen nueva.
@@ -408,7 +410,7 @@ Solo después arrancan o se recrean los consumidores: Keycloak (`setup.yml`), `m
 
 ```bash
 infra/tests/db-contract-check.sh    # env.j2 → Compose → orden de Ansible y del workflow
-infra/tests/db-migration-check.sh   # PostgreSQL desechable: desde cero, repetición, autoridades, rotación, fallos
+infra/tests/db-migration-check.sh   # PostgreSQL desechable: desde cero, repetición, autoridades, rotación, fallos, arranque sin root
 ```
 
 `db-migration-check.sh` construye las imágenes de `backend/` e `infra/postgres/` (o usa `BACKEND_IMAGE` / `POSTGRES_IMAGE`) y no depende del contenido ni del número de migraciones. Usa los nombres fijos de producción (`postgres`, `piedrazul_net`) en su propio proyecto y no corre si ya existen fuera de él.
@@ -703,7 +705,7 @@ La misma referencia `repo@sha256:<linux/amd64>` es la que se escanea, la que rec
 - `image_policy` y `production` descargan la evidencia previa con `current-scan-evidence.sh` (no con `actions/download-artifact`, que ante un digest distinto solo advierte): artifacts de este run, sin nombres repetidos, con el digest que registró GitHub; cualquier diferencia falla el paso. Después la validan y muestran el resultado de cada imagen que aplica.
 - Los escaneos de keycloak y traefik son exactamente lo que converge despliega y pasan por la misma política.
 
-Los `FROM` de `backend/Dockerfile` e `infra/postgres/Dockerfile` están fijados por digest del índice OCI (`imagen:tag@sha256:…`), así buildx toma el hijo correcto para `linux/amd64` y `linux/arm64`. Para actualizar una base se resuelve el nuevo índice (`docker buildx imagetools inspect <imagen>:<tag>`) y se reemplaza el digest.
+Los `FROM` de `backend/Dockerfile` e `infra/postgres/Dockerfile` están fijados por digest del índice OCI (`imagen:tag@sha256:…`), así buildx toma el hijo correcto para `linux/amd64` y `linux/arm64`. Para actualizar una base se resuelve el nuevo índice (`docker buildx imagetools inspect <imagen>:<tag>`) y se reemplaza el digest. En postgres no hay otro paso: `db-migration-check.sh` comprueba que la imagen resultante sigue arrancando sin root y sin `gosu`. Si la oficial deja de traer `gosu`, el `rm -f` no hace nada y la adaptación se puede retirar (quitar esa línea y `USER postgres`) sin tocar volúmenes.
 
 
 ---
