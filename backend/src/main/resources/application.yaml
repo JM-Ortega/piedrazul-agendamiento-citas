@@ -105,6 +105,10 @@ audit:
 
 notifications:
   console:
+    # La consola es diagnóstico, no entrega. Con true, el contenido sensible (códigos de
+    # verificación) se escribe en el log solo si no hay ningún proveedor real habilitado; con
+    # un proveedor real nunca llega a la consola. Solo en entornos con datos exclusivamente
+    # sintéticos. Ese envío queda FAILED (CONSOLE_DIAGNOSTIC_ONLY), nunca como entregado.
     show-sensitive-content: ${NOTIFICATIONS_CONSOLE_SHOW_SENSITIVE:false}
   email:
     sendgrid:
@@ -140,9 +144,14 @@ management:
 
 logging:
   level:
+    # DEBUG en root también activa org.apache.http.wire (cliente HTTP de SendGrid), que escribe
+    # el cuerpo de cada correo, incluido el código de verificación. Mantener en INFO o superior
+    # donde haya códigos reales.
     root: ${LOG_LEVEL_ROOT:INFO}
     org.springframework.security: ${LOG_LEVEL_SECURITY:INFO}
     org.hibernate.SQL: ${LOG_LEVEL_SQL:WARN}
+    # TRACE escribe los valores de cada sentencia, incluidas las variables de las notificaciones
+    # (el código de verificación). Mantener en WARN donde haya códigos reales.
     org.hibernate.orm.jdbc.bind: ${LOG_LEVEL_SQL_BIND:WARN}
     org.springframework.modulith: ${LOG_LEVEL_MODULITH:WARN}
 

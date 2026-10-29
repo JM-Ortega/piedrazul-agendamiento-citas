@@ -23,7 +23,14 @@ public class NotificationDispatcherService {
     private final TemplateRenderer templateRenderer;
     private final RetryPolicy retryPolicy;
     private final ChannelFallbackPolicy fallbackPolicy;
+    private final boolean consoleSensitiveDiagnosticEnabled;
 
+    /**
+     * @param consoleSensitiveDiagnosticEnabled opt-in explícito
+     *        ({@code notifications.console.show-sensitive-content}) para mostrar contenido
+     *        sensible en la consola de diagnóstico. Solo tiene efecto si no hay ningún proveedor
+     *        real registrado.
+     */
     public NotificationDispatcherService(
             NotificationRepository notificationRepository,
             NotificationScheduleRepository scheduleRepository,
@@ -31,7 +38,8 @@ public class NotificationDispatcherService {
             ProviderRegistry providerRegistry,
             TemplateRenderer templateRenderer,
             RetryPolicy retryPolicy,
-            ChannelFallbackPolicy fallbackPolicy
+            ChannelFallbackPolicy fallbackPolicy,
+            boolean consoleSensitiveDiagnosticEnabled
     ) {
         this.notificationRepository = notificationRepository;
         this.scheduleRepository = scheduleRepository;
@@ -40,6 +48,7 @@ public class NotificationDispatcherService {
         this.templateRenderer = templateRenderer;
         this.retryPolicy = retryPolicy;
         this.fallbackPolicy = fallbackPolicy;
+        this.consoleSensitiveDiagnosticEnabled = consoleSensitiveDiagnosticEnabled;
     }
 
     public void dispatch(
@@ -68,6 +77,13 @@ public class NotificationDispatcherService {
         for (NotificationChannel channel : resolveChannels(notification)) {
             if (!providerRegistry.hasProvider(channel)) {
                 NotificationLogger.skipped(baseContext, channel, "Sin provider registrado");
+                continue;
+            }
+
+            Optional<String> consoleBlockReason = sensitiveConsoleBlockReason(notification, channel);
+
+            if (consoleBlockReason.isPresent()) {
+                NotificationLogger.skipped(baseContext, channel, consoleBlockReason.get());
                 continue;
             }
 
@@ -334,6 +350,32 @@ public class NotificationDispatcherService {
         );
 
         return DispatchDecision.STOP;
+    }
+
+    /**
+     * La consola es diagnóstico, no entrega. El contenido sensible (OTP) solo puede llegar a ella
+     * sin proveedor real registrado y con el opt-in explícito; con un proveedor real habilitado
+     * nunca, aunque el opt-in esté activo o el proveedor real haya fallado. Se evalúa en cada
+     * despacho, no al encolar.
+     */
+    private Optional<String> sensitiveConsoleBlockReason(
+            Notification notification,
+            NotificationChannel channel
+    ) {
+        if (channel != NotificationChannel.CONSOLE
+                || !notification.getType().containsSensitiveContent()) {
+            return Optional.empty();
+        }
+
+        if (providerRegistry.hasDeliveryProvider()) {
+            return Optional.of("Contenido sensible: la consola no se usa con un proveedor real habilitado");
+        }
+
+        if (!consoleSensitiveDiagnosticEnabled) {
+            return Optional.of("Contenido sensible: diagnóstico por consola no habilitado");
+        }
+
+        return Optional.empty();
     }
 
     private List<NotificationChannel> resolveChannels(Notification notification) {

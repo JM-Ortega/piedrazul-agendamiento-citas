@@ -4,6 +4,7 @@ import co.edu.unicauca.piedrazul.backend.notifications.application.exception.Not
 import co.edu.unicauca.piedrazul.backend.notifications.domain.message.ChannelMessage;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.message.ConsoleLogMessage;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.AttemptStatus;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.model.FailureType;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.NotificationChannel;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.RecipientSnapshot;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationProvider;
@@ -17,6 +18,8 @@ public class ConsoleNotificationProvider implements NotificationProvider {
 
     private static final Logger log = LoggerFactory.getLogger(ConsoleNotificationProvider.class);
     private static final String PROVIDER_NAME = "console";
+    private static final String SENSITIVE_PLACEHOLDER = "[contenido sensible oculto]";
+    public static final String DIAGNOSTIC_ONLY_ERROR_CODE = "CONSOLE_DIAGNOSTIC_ONLY";
 
     private final boolean showSensitiveContent;
 
@@ -46,14 +49,14 @@ public class ConsoleNotificationProvider implements NotificationProvider {
             );
         }
 
-        String renderedMessage = consoleMessage.sensitive() && !showSensitiveContent
-                ? "[contenido sensible oculto]"
-                : consoleMessage.message();
+        if (consoleMessage.sensitive()) {
+            return logSensitiveDiagnostic(consoleMessage, recipient);
+        }
 
         log.info(
                 "[CONSOLE_NOTIFICATION] recipient={} message={}",
                 maskRecipient(recipient),
-                renderedMessage
+                consoleMessage.message()
         );
 
         return new NotificationSendResult(
@@ -64,6 +67,37 @@ public class ConsoleNotificationProvider implements NotificationProvider {
                 null,
                 null,
                 null
+        );
+    }
+
+    /**
+     * El contenido sensible solo se muestra con el opt-in explícito (entornos con datos
+     * exclusivamente sintéticos); si no, se oculta. En ambos casos la salida es diagnóstico y no
+     * entrega: el resultado es un fallo permanente, sin reintento, y no queda registrado como
+     * entregado.
+     */
+    private NotificationSendResult logSensitiveDiagnostic(
+            ConsoleLogMessage consoleMessage,
+            RecipientSnapshot recipient
+    ) {
+        String renderedMessage = showSensitiveContent
+                ? consoleMessage.message()
+                : SENSITIVE_PLACEHOLDER;
+
+        log.warn(
+                "[CONSOLE_DIAGNOSTIC] recipient={} message={} (diagnóstico, no entregado al destinatario)",
+                maskRecipient(recipient),
+                renderedMessage
+        );
+
+        return new NotificationSendResult(
+                PROVIDER_NAME,
+                NotificationChannel.CONSOLE,
+                null,
+                AttemptStatus.FAILED,
+                FailureType.PERMANENT,
+                DIAGNOSTIC_ONLY_ERROR_CODE,
+                "Salida de diagnóstico en consola; no constituye entrega al destinatario"
         );
     }
 

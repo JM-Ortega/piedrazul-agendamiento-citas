@@ -34,7 +34,7 @@ public class TemplateRenderer {
             case WHATSAPP -> renderWhatsApp(template, variables);
             case SMS -> renderSms(template, variables);
             case EMAIL -> renderEmail(template, variables);
-            case CONSOLE -> renderConsole(template, variables);
+            case CONSOLE -> renderConsole(notification, template, variables);
         };
     }
 
@@ -78,12 +78,13 @@ public class TemplateRenderer {
     }
 
     private ConsoleLogMessage renderConsole(
+            Notification notification,
             TemplateDefinition template,
             Map<String, String> variables
     ) {
         return new ConsoleLogMessage(
                 interpolate(template.bodyText(), variables),
-                false
+                notification.getType().containsSensitiveContent()
         );
     }
 

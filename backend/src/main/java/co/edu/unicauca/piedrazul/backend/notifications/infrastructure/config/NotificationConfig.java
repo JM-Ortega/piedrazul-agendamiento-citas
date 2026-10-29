@@ -101,7 +101,8 @@ public class NotificationConfig {
             ProviderRegistry providerRegistry,
             TemplateRenderer templateRenderer,
             RetryPolicy retryPolicy,
-            ChannelFallbackPolicy fallbackPolicy
+            ChannelFallbackPolicy fallbackPolicy,
+            @Value("${notifications.console.show-sensitive-content:false}") boolean showSensitiveContent
     ) {
         return new NotificationDispatcherService(
                 notificationRepository,
@@ -110,7 +111,8 @@ public class NotificationConfig {
                 providerRegistry,
                 templateRenderer,
                 retryPolicy,
-                fallbackPolicy
+                fallbackPolicy,
+                showSensitiveContent
         );
     }
 

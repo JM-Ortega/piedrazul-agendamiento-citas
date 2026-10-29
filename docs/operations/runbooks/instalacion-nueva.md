@@ -59,11 +59,20 @@ administrador de negocio ([primer-admin-negocio.md](primer-admin-negocio.md)).
 **Correo.** SendGrid está deshabilitado en producción (`notifications_sendgrid_enabled: false`
 en `group_vars`): la cadena no exige ni entrega `PIEDRAZUL_BACKEND_MAIL_SEND`, el `.env`
 queda con `SENDGRID_API_KEY` vacía y el backend arranca sin ella. No hay envío externo de
-correo: las notificaciones (incluidos los códigos de verificación) caen al proveedor de
-consola, que solo registra en el log del backend y oculta el contenido sensible. Los flujos que
-dependen de recibir un correo quedan fuera de esta instalación y de su verificación. Si se
-habilita SendGrid sin entregar la clave al converge, la configuración del servidor falla antes
-de escribir `.env`. `NOTIFICATION_ENCRYPTION_KEY` no es un requisito: ningún componente la usa.
+correo. Las notificaciones de citas caen al proveedor de consola, que solo las registra en el
+log del backend. Los códigos de verificación no se escriben en el log (el `.env` no lleva
+`NOTIFICATIONS_CONSOLE_SHOW_SENSITIVE`, que vale `false` por defecto) y su notificación queda
+`FAILED`: el código se emite pero no llega al paciente, así que la vinculación de cuentas por
+código no es operable en esta instalación. La consola es diagnóstico, no entrega: aun con
+`NOTIFICATIONS_CONSOLE_SHOW_SENSITIVE=true` (solo para datos sintéticos, nunca aquí) el envío
+queda `FAILED` (`CONSOLE_DIAGNOSTIC_ONLY`), y con un proveedor real habilitado el código no
+llega a la consola. `LOG_LEVEL_SQL_BIND` debe seguir en `WARN` (`log_level_sql_bind`): en
+`TRACE` el log recibe los valores enlazados, incluido el código. Por lo mismo, `LOG_LEVEL_ROOT`
+no debe bajar a `DEBUG` (`log_level_root`): con SendGrid habilitado, el log de red de su
+cliente HTTP (`org.apache.http.wire`) escribe el cuerpo de cada correo. Los flujos que dependen de
+recibir un correo quedan fuera de esta instalación y de su verificación. Si se habilita
+SendGrid sin entregar la clave al converge, la configuración del servidor falla antes de
+escribir `.env`. `NOTIFICATION_ENCRYPTION_KEY` no es un requisito: ningún componente la usa.
 
 ## Cómo se inicia
 
