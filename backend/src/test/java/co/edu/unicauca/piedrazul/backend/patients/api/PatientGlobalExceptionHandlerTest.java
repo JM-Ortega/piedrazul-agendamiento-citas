@@ -1,8 +1,16 @@
 package co.edu.unicauca.piedrazul.backend.patients.api;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import co.edu.unicauca.piedrazul.backend.shared.BusinessException;
+import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationDeliveryUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -12,6 +20,84 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PatientGlobalExceptionHandlerTest {
 
     private final PatientGlobalExceptionHandler handler = new PatientGlobalExceptionHandler();
+
+    private final Logger handlerLogger = (Logger) LoggerFactory.getLogger(PatientGlobalExceptionHandler.class);
+    private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
+
+    @BeforeEach
+    void attachAppender() {
+        appender.start();
+        handlerLogger.addAppender(appender);
+    }
+
+    @AfterEach
+    void detachAppender() {
+        handlerLogger.detachAppender(appender);
+    }
+
+    @Test
+    void knownOtpDeliveryUnavailabilityKeepsItsContractWithoutStackTrace() {
+        ProblemDetail result = handler.handleRuntime(
+                new VerificationDeliveryUnavailableException(), buildRequest("/api/patients/link-user-account/request-code"));
+
+        assertThat(result.getStatus()).isEqualTo(503);
+        assertThat(result.getTitle()).isEqualTo("Servicio no disponible");
+        assertThat(result.getDetail()).isEqualTo(
+                "El servicio de envío de códigos no está disponible temporalmente. Inténtalo más tarde.");
+        assertThat(result.getProperties()).containsEntry("errorCode", "VERIFICATION_DELIVERY_UNAVAILABLE");
+        assertThat(result.getProperties()).containsEntry("module", "verification");
+        assertThat(appender.list).noneMatch(event -> event.getLevel().isGreaterOrEqual(Level.WARN));
+        assertThat(appender.list).allMatch(event -> event.getThrowableProxy() == null);
+    }
+
+    @Test
+    void anUnrelated503IsStillAnErrorWithItsStackTrace() {
+        ProblemDetail result = handler.handleRuntime(
+                new TestBusinessException("Dependencia sintética caída", "SYNTHETIC_DEPENDENCY_DOWN", HttpStatus.SERVICE_UNAVAILABLE),
+                buildRequest("/api/patients"));
+
+        assertThat(result.getStatus()).isEqualTo(503);
+        assertThat(result.getProperties()).containsEntry("errorCode", "SYNTHETIC_DEPENDENCY_DOWN");
+        assertThat(appender.list).hasSize(1);
+        assertThat(appender.list.getFirst().getLevel()).isEqualTo(Level.ERROR);
+        assertThat(appender.list.getFirst().getThrowableProxy()).isNotNull();
+    }
+
+    @Test
+    void the503SuppressionDependsOnTheErrorCodeNotOnTheModule() {
+        // Mismo módulo y estado que el caso conocido, otro errorCode: no se silencia.
+        handler.handleRuntime(
+                new TestBusinessException("Otro fallo", "VERIFICATION_SOMETHING_ELSE", HttpStatus.SERVICE_UNAVAILABLE),
+                buildRequest("/api/patients"));
+
+        assertThat(appender.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+            assertThat(event.getThrowableProxy()).isNotNull();
+        });
+    }
+
+    @Test
+    void anUnexpected500IsStillAnErrorWithItsStackTrace() {
+        handler.handleRuntime(new RuntimeException("boom"), buildRequest("/api/patients"));
+
+        assertThat(appender.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+            assertThat(event.getThrowableProxy()).isNotNull();
+        });
+    }
+
+    @Test
+    void anIdentityProvider502IsStillAnErrorWithItsStackTrace() {
+        ProblemDetail result = handler.handleRuntime(
+                new co.edu.unicauca.piedrazul.backend.user.exception.IdentityProviderException("synthetic"),
+                buildRequest("/api/patients"));
+
+        assertThat(result.getStatus()).isEqualTo(502);
+        assertThat(appender.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+            assertThat(event.getThrowableProxy()).isNotNull();
+        });
+    }
 
     @Test
     void handleIllegalArgumentShouldReturnBadRequestProblemDetail() {
@@ -108,6 +194,33 @@ class PatientGlobalExceptionHandlerTest {
         @Override
         public String getModule() {
             return "patients";
+        }
+    }
+
+    private static class TestBusinessException extends RuntimeException implements BusinessException {
+
+        private final String errorCode;
+        private final HttpStatus status;
+
+        TestBusinessException(String message, String errorCode, HttpStatus status) {
+            super(message);
+            this.errorCode = errorCode;
+            this.status = status;
+        }
+
+        @Override
+        public String getErrorCode() {
+            return errorCode;
+        }
+
+        @Override
+        public HttpStatus getStatus() {
+            return status;
+        }
+
+        @Override
+        public String getModule() {
+            return "verification";
         }
     }
 }

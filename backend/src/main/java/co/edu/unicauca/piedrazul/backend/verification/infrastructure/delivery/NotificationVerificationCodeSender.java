@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.verification.infrastructure.delivery;
 
 import co.edu.unicauca.piedrazul.backend.notifications.NotificationModuleApi;
+import co.edu.unicauca.piedrazul.backend.notifications.api.OtpDeliveryMode;
 import co.edu.unicauca.piedrazul.backend.notifications.api.SendNotificationCommand;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.verification.application.VerificationCodeSender;
@@ -21,6 +22,17 @@ public class NotificationVerificationCodeSender implements VerificationCodeSende
         this.notificationModuleApi = notificationModuleApi;
     }
 
+    @Override
+    public boolean isDeliveryAvailable() {
+        // Lista cerrada: un modo ausente o desconocido cuenta como no disponible.
+        OtpDeliveryMode mode = notificationModuleApi.otpDeliveryMode();
+        return mode == OtpDeliveryMode.EMAIL || mode == OtpDeliveryMode.DIAGNOSTIC_CONSOLE;
+    }
+
+    @Override
+    public boolean isRecipientUsable(String phone, String email) {
+        return notificationModuleApi.isUsableOtpRecipient(phone, email);
+    }
 
     @Override
     public void sendCode(String subject, String displayName, String phone, String email, String code, int expirationMinutes, UUID recipientId, UUID verificationCodeId) {

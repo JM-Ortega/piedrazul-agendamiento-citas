@@ -7,6 +7,23 @@ import java.util.UUID;
 
 public interface VerificationModuleApi {
 
+    /**
+     * Comprueba, sin consultar al sujeto ni modificar nada, que hay un canal apto para hacer
+     * llegar códigos. Permite rechazar una solicitud antes de buscar a la persona, de modo que
+     * el resultado no dependa de si existe.
+     *
+     * @throws co.edu.unicauca.piedrazul.backend.verification.exception.VerificationDeliveryUnavailableException si no hay canal apto
+     */
+    void requireCodeDeliveryAvailable();
+
+    /**
+     * Genera, guarda y encola un código nuevo, e invalida el activo anterior. Antes de cualquier
+     * cambio comprueba el canal y los contactos: si fallan, no se toca el estado existente.
+     *
+     * @throws co.edu.unicauca.piedrazul.backend.verification.exception.VerificationDeliveryUnavailableException si no hay canal apto
+     * @throws co.edu.unicauca.piedrazul.backend.verification.exception.VerificationContactUnusableException si los contactos no sirven para ese canal
+     * @throws co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeRequestLimitException si se superó el límite de solicitudes
+     */
     void requestCode(
             String subject,
             VerificationPurpose purpose,

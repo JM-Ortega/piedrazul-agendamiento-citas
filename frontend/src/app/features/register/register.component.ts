@@ -69,6 +69,25 @@ type PatientStatus =
   | 'already-linked'
   | 'inconsistent';
 
+/**
+ * Respuesta a una solicitud de código aceptada (HTTP 200). Encolar el envío no
+ * garantiza que llegue, así que no se afirma que se haya enviado.
+ */
+const CODE_REQUEST_ACCEPTED_MESSAGE =
+  'Hemos recibido tu solicitud. Si no recibes el código, podrás solicitar uno nuevo cuando termine el tiempo de espera o comunicarte con la clínica.';
+
+/**
+ * Textos acordados para los rechazos de la solicitud de código. Se fijan aquí
+ * para que el paciente vea siempre el mismo mensaje genérico, sin datos de
+ * contacto ni el motivo técnico.
+ */
+const CODE_REQUEST_ERROR_MESSAGES: Record<string, string> = {
+  VERIFICATION_DELIVERY_UNAVAILABLE:
+    'El servicio de envío de códigos no está disponible temporalmente. Inténtalo más tarde.',
+  VERIFICATION_CONTACT_UNUSABLE:
+    'No es posible completar la solicitud con los datos de contacto registrados. Comunícate con la clínica para verificar o actualizar tu información.',
+};
+
 @Component({
   selector: 'app-registro',
   standalone: true,
@@ -396,9 +415,7 @@ export class RegisterComponent implements OnInit {
         .subscribe({
           next: () => {
             this.isLoading.set(false);
-            this.successMessage.set(
-              'Se generó un código de verificación. Por ahora revísalo en la consola del backend.'
-            );
+            this.successMessage.set(CODE_REQUEST_ACCEPTED_MESSAGE);
             this.step.set(3);
           },
           error: (err: AppError) => this.handleError(err),
@@ -481,7 +498,9 @@ export class RegisterComponent implements OnInit {
       this.verificationCode.set('');
     }
 
-    this.errorMessage.set(err.message);
+    this.errorMessage.set(
+      CODE_REQUEST_ERROR_MESSAGES[err.errorCode] ?? err.message
+    );
   }
 
   private validateStep2(): boolean {

@@ -43,6 +43,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * El límite de solicitudes de código sobre PostgreSQL real: las ventanas se cuentan con la
@@ -88,6 +89,9 @@ class VerificationRequestLimitIT extends PostgresIntegrationSupport {
     @BeforeEach
     void setUp() {
         subject = "doc-" + UUID.randomUUID();
+        // Canal y contacto disponibles: aquí solo se prueban los límites.
+        when(verificationCodeSender.isDeliveryAvailable()).thenReturn(true);
+        when(verificationCodeSender.isRecipientUsable(any(), any())).thenReturn(true);
     }
 
     private void requestCode() {

@@ -134,6 +134,22 @@ class NotificationDispatcherServiceConsoleSafetyTest {
     }
 
     @Test
+    void otpFailureOfAProviderQualifiedForCodesDoesNotFallBackToConsoleEither() {
+        // Que un proveedor sea apto para códigos (W0b) no cambia la regla de W0a.
+        ConsoleNotificationProvider console = spy(new ConsoleNotificationProvider(true));
+        StubEmailProvider email = new StubEmailProvider(
+                () -> emailResult(AttemptStatus.FAILED, FailureType.PERMANENT), true);
+        Notification notification = otp();
+        NotificationSchedule schedule = schedule(notification);
+
+        dispatcher(true, email, console).dispatch(notification, schedule, otpVariables(), NOW);
+
+        verify(console, never()).send(any(), any());
+        assertFailedWithoutRetry(notification, schedule);
+        assertCodeNotLogged();
+    }
+
+    @Test
     void otpWithRealProviderRetriesExhaustedDoesNotFallBackToConsole() {
         ConsoleNotificationProvider console = spy(new ConsoleNotificationProvider(true));
         StubEmailProvider email = new StubEmailProvider(() -> {
@@ -262,10 +278,21 @@ class NotificationDispatcherServiceConsoleSafetyTest {
 
     private static final class StubEmailProvider implements NotificationProvider {
         private final Supplier<NotificationSendResult> behavior;
+        private final boolean qualifiesForOtp;
         private int calls;
 
         private StubEmailProvider(Supplier<NotificationSendResult> behavior) {
+            this(behavior, false);
+        }
+
+        private StubEmailProvider(Supplier<NotificationSendResult> behavior, boolean qualifiesForOtp) {
             this.behavior = behavior;
+            this.qualifiesForOtp = qualifiesForOtp;
+        }
+
+        @Override
+        public boolean qualifiesForOtpDelivery() {
+            return qualifiesForOtp;
         }
 
         @Override

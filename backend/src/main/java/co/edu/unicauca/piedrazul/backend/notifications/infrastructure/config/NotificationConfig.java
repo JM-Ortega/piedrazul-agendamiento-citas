@@ -14,6 +14,7 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.template.Notificat
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.provider.console.ConsoleNotificationProvider;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.provider.email.sendgrid.SendGridProperties;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.template.InMemoryNotificationTemplateProvider;
+import jakarta.validation.Validator;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -133,6 +134,21 @@ public class NotificationConfig {
         );
     }
 
+    @Bean
+    public OtpDeliveryCapability otpDeliveryCapability(
+            ProviderRegistry providerRegistry,
+            ChannelFallbackPolicy fallbackPolicy,
+            @Value("${notifications.console.show-sensitive-content:false}") boolean showSensitiveContent,
+            Validator validator
+    ) {
+        return new OtpDeliveryCapability(
+                providerRegistry,
+                fallbackPolicy,
+                showSensitiveContent,
+                validator
+        );
+    }
+
     @Bean("notificationClock")
     public Clock notificationClock(
             @Value("${app.timezone:America/Bogota}") String timezone
@@ -143,10 +159,12 @@ public class NotificationConfig {
     @Bean
     public NotificationModuleApi notificationModuleApi(
             NotificationOrchestrator orchestrator,
+            OtpDeliveryCapability otpDeliveryCapability,
             @Qualifier("notificationClock") Clock clock
     ) {
         return new NotificationModuleApiImpl(
                 orchestrator,
+                otpDeliveryCapability,
                 clock
         );
     }

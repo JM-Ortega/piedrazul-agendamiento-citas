@@ -1,9 +1,12 @@
 package co.edu.unicauca.piedrazul.backend.verification.infrastructure.delivery;
 
 import co.edu.unicauca.piedrazul.backend.notifications.NotificationModuleApi;
+import co.edu.unicauca.piedrazul.backend.notifications.api.OtpDeliveryMode;
 import co.edu.unicauca.piedrazul.backend.notifications.api.SendNotificationCommand;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -14,6 +17,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationVerificationCodeSenderTest {
@@ -39,5 +43,29 @@ class NotificationVerificationCodeSenderTest {
 
         assertThat(commandCaptor.getValue().recipient().recipientId()).isEqualTo(recipientId);
         assertThat(commandCaptor.getValue().aggregate().id()).isEqualTo(verificationCodeId);
+    }
+
+    @ParameterizedTest
+    @EnumSource(OtpDeliveryMode.class)
+    void deliveryIsAvailableOnlyWhenNotificationsReportsAChannel(OtpDeliveryMode mode) {
+        when(notificationModuleApi.otpDeliveryMode()).thenReturn(mode);
+
+        assertThat(sender.isDeliveryAvailable()).isEqualTo(mode != OtpDeliveryMode.UNAVAILABLE);
+    }
+
+    @Test
+    void deliveryIsUnavailableWhenNotificationsReportsNoMode() {
+        when(notificationModuleApi.otpDeliveryMode()).thenReturn(null);
+
+        assertThat(sender.isDeliveryAvailable()).isFalse();
+    }
+
+    @Test
+    void recipientUsabilityIsDecidedByNotificationsWithTheExactValues() {
+        when(notificationModuleApi.isUsableOtpRecipient("3001234567", "ana@example.invalid")).thenReturn(false);
+        when(notificationModuleApi.isUsableOtpRecipient(null, "ana@example.com")).thenReturn(true);
+
+        assertThat(sender.isRecipientUsable("3001234567", "ana@example.invalid")).isFalse();
+        assertThat(sender.isRecipientUsable(null, "ana@example.com")).isTrue();
     }
 }

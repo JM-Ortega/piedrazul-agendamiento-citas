@@ -50,6 +50,7 @@ public abstract class BaseExceptionHandler {
             case CONFLICT -> "Conflicto";
             case TOO_MANY_REQUESTS -> "Demasiadas solicitudes";
             case INTERNAL_SERVER_ERROR -> "Error interno del servidor";
+            case SERVICE_UNAVAILABLE -> "Servicio no disponible";
             default -> status.getReasonPhrase();
         };
     }

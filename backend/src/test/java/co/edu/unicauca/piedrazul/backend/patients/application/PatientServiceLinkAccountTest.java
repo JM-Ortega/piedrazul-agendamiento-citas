@@ -17,6 +17,7 @@ import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.verification.VerificationModuleApi;
 import co.edu.unicauca.piedrazul.backend.verification.api.VerificationPurpose;
 import co.edu.unicauca.piedrazul.backend.verification.api.VerifiedCode;
+import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationDeliveryUnavailableException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -34,14 +35,18 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -239,9 +244,12 @@ class PatientServiceLinkAccountTest {
     void stateE_shouldRejectOnRequestCode() {
         givenState(userId, true, true);
 
-        assertThrows(PatientAlreadyLinkedUserException.class,
+        PatientAlreadyLinkedUserException ex = assertThrows(PatientAlreadyLinkedUserException.class,
                 () -> service.requestLinkUserAccountCode(DOC));
 
+        // El detalle llega a un endpoint público: sin identificadores internos.
+        assertFalse(ex.getMessage().contains(personId.toString()));
+        assertFalse(ex.getMessage().contains(userId.toString()));
         verify(verificationModuleApi, never())
                 .requestCode(anyString(), any(), anyString(), anyString(), anyString(), any());
     }
@@ -280,5 +288,47 @@ class PatientServiceLinkAccountTest {
         verify(verificationModuleApi).requestCode(
                 DOC, VerificationPurpose.LINK_PATIENT_ACCOUNT, "Ana Ruiz",
                 "3001234567", "ana@example.com", personId);
+    }
+
+    // ---- disponibilidad del envío antes de buscar a la persona ----
+
+    @Test
+    void requestCode_shouldCheckDeliveryBeforeLookingUpThePerson() {
+        givenState(userId, true, false);
+
+        service.requestLinkUserAccountCode(DOC);
+
+        InOrder order = inOrder(verificationModuleApi, personExternalService);
+        order.verify(verificationModuleApi).requireCodeDeliveryAvailable();
+        order.verify(personExternalService).findByIdentification(DOC);
+        order.verify(verificationModuleApi).requestCode(
+                anyString(), any(), anyString(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void requestCode_shouldRejectKnownAndUnknownDocumentsAlikeWhenDeliveryIsUnavailable() {
+        doThrow(new VerificationDeliveryUnavailableException())
+                .when(verificationModuleApi).requireCodeDeliveryAvailable();
+
+        VerificationDeliveryUnavailableException known = assertThrows(
+                VerificationDeliveryUnavailableException.class,
+                () -> service.requestLinkUserAccountCode(DOC));
+        VerificationDeliveryUnavailableException unknown = assertThrows(
+                VerificationDeliveryUnavailableException.class,
+                () -> service.requestLinkUserAccountCode("9999999999"));
+
+        assertEquals(known.getMessage(), unknown.getMessage());
+        assertEquals(known.getErrorCode(), unknown.getErrorCode());
+        // El resultado no depende de la persona: ni se consulta.
+        verifyNoInteractions(personExternalService, patientRepository, userModuleApi);
+        verify(verificationModuleApi, never())
+                .requestCode(anyString(), any(), anyString(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void requestCode_shouldValidateTheDocumentBeforeCheckingDelivery() {
+        assertThrows(InvalidPatientDataException.class, () -> service.requestLinkUserAccountCode(" "));
+
+        verify(verificationModuleApi, never()).requireCodeDeliveryAvailable();
     }
 }

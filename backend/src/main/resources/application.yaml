@@ -109,6 +109,8 @@ notifications:
     # verificación) se escribe en el log solo si no hay ningún proveedor real habilitado; con
     # un proveedor real nunca llega a la consola. Solo en entornos con datos exclusivamente
     # sintéticos. Ese envío queda FAILED (CONSOLE_DIAGNOSTIC_ONLY), nunca como entregado.
+    # Sin un canal apto para códigos (SendGrid no lo es; falta SES) y sin este diagnóstico, no
+    # se emiten códigos: la solicitud responde 503 (VERIFICATION_DELIVERY_UNAVAILABLE).
     show-sensitive-content: ${NOTIFICATIONS_CONSOLE_SHOW_SENSITIVE:false}
   email:
     sendgrid:
