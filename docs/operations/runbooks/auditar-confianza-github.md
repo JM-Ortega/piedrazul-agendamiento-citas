@@ -69,8 +69,28 @@ Opciones:
 - Secretos de Actions con alcance de repositorio: el objetivo es **cero**, conocidos o no. La
   salida separa los de producción de los sin clasificar.
 - Política de Actions: `sha_pinning_required` y permisos por defecto del `GITHUB_TOKEN`.
-- Ruleset `Protect main`: activo sobre `main`, reglas de borrado, force-push y PR, y que el
-  contexto heredado en rojo `Build and Verify` no sea requerido.
+- Ruleset `Protect main`: activo sobre `main`, reglas de borrado, force-push y PR,
+  resolución obligatoria de hilos de revisión, cero actores de bypass y número de
+  aprobaciones igual al del contrato (ver abajo).
+- Checks de estado requeridos: mientras el ruleset no tenga ninguno, salen como `PENDING`
+  (activación pendiente, no un control activo). Cuando se activen, se lista cuáles son y se
+  verifica que el contexto heredado en rojo `Build and Verify` no esté entre ellos.
+
+### Modelo de un solo mantenedor
+
+Hay un único mantenedor técnico, y GitHub no permite aprobar un PR propio. Por eso el
+contrato es:
+
+- El PR a `main` es **obligatorio**, con **cero aprobaciones requeridas**. Es una decisión
+  de operación, no una protección faltante. Exigir una o más aprobaciones es `FAIL`: se
+  desvía del modelo y bloquearía al único mantenedor. Para cambiar esto, primero se cambia
+  `REQUIRED_APPROVALS` en el script.
+- El acceso a producción no depende de la aprobación del PR. Lo protegen los revisores
+  requeridos de `production-hetzner` y `terraform-plan` (se permite la autorrevisión) y la
+  restricción de `production-hetzner` a `main`.
+- En el traspaso institucional cambian el revisor (`--reviewers`, que por defecto es
+  `User:JM-Ortega`) y el dueño del repositorio. Si hay más de un revisor, también se revisa
+  `REQUIRED_APPROVALS`.
 
 **Árbol de workflows (`--ref`):**
 - Acciones externas fijadas por SHA completo (las locales `./…` no cuentan).
@@ -116,9 +136,11 @@ fuente, como referencia inerte (`INFO`). Que dejen de funcionar no es un fallo.
 | `PASS` | verificado positivamente |
 | `FAIL` | el control falta o contradice el contrato |
 | `UNKNOWN` | no se pudo determinar (permisos, error de API, dato no resoluble) |
+| `PENDING` | control decidido pero todavía sin activar; **no** es un `PASS` y no afecta el código de salida |
 | `INFO` | informativo; no afecta el código de salida |
 
-Código de salida: `0` todo `PASS`, `1` algún `FAIL`, `2` algún `UNKNOWN` sin `FAIL`.
+Código de salida: `0` sin `FAIL` ni `UNKNOWN` (puede haber `PENDING`), `1` algún `FAIL`,
+`2` algún `UNKNOWN` sin `FAIL`. El resumen final muestra cuántos `PENDING` hay.
 
 Un `UNKNOWN` **no** es un `PASS`: significa que el control no se pudo comprobar, no que esté
 bien. Cuando un dato del que dependen otros no se puede leer, esos controles también quedan
@@ -139,6 +161,9 @@ incompleto (`HTTP incompleto`) y sus controles quedan `UNKNOWN`.
 | `workflows@…` en `UNKNOWN` por ref no disponible | ref no presente localmente | `git fetch origin` |
 | `parseo YAML` en `UNKNOWN` | workflow con YAML inválido en ese árbol | corregir el workflow |
 | `falta jq`/`yq` | herramienta no instalada | instalarla (yq debe ser la de mikefarah) |
+
+El comportamiento del ruleset y de los environments se prueba sin red con fixtures
+sintéticos: `infra/tests/github-trust-audit-check.sh`.
 
 Un `FAIL` en un control de confianza (revisores adicionales, secreto en un environment no
 autorizado, ruta de repositorio inesperada) se escala al revisor privilegiado del repositorio

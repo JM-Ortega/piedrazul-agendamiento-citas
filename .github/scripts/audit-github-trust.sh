@@ -20,9 +20,10 @@
 # el contrato; no es UNKNOWN, que queda para lo que no se pudo leer o resolver.
 #
 # Resultado por control: PASS (verificado), FAIL (el control falta o contradice el
-# contrato), UNKNOWN (no se pudo determinar: permisos, API o dato no resoluble) o INFO
-# (solo informa). Un UNKNOWN nunca se reporta como PASS ni como FAIL.
-# Salida: 0 todo PASS, 1 algún FAIL, 2 sin FAIL pero algún UNKNOWN.
+# contrato), UNKNOWN (no se pudo determinar: permisos, API o dato no resoluble), PENDING
+# (control decidido pero aún no activado; no es PASS) o INFO (solo informa). Un UNKNOWN
+# nunca se reporta como PASS ni como FAIL.
+# Salida: 0 sin FAIL ni UNKNOWN (puede haber PENDING), 1 algún FAIL, 2 sin FAIL pero algún UNKNOWN.
 set -uo pipefail
 
 REPO=""
@@ -82,11 +83,19 @@ PLAN_WORKFLOW=".github/workflows/terraform-hetzner-plan.yml"
 HISTORICAL_GLOB=".github/workflows/terraform-oci-*.yml"
 # Contexto heredado en rojo: no puede ser condición requerida mientras siga así.
 FORBIDDEN_REQUIRED_CONTEXTS=("Build and Verify")
+# Modelo de un solo mantenedor: el PR a main es obligatorio pero sin aprobaciones humanas
+# (GitHub no permite aprobar el PR propio). El acceso a producción lo autoriza el revisor
+# del environment. Volver a exigir aprobaciones es una desviación de este contrato y se
+# cambia aquí cuando haya más de un revisor, no en el ruleset solo.
+REQUIRED_APPROVALS=0
 
-PASS=0 FAIL=0 UNKNOWN=0
+PASS=0 FAIL=0 UNKNOWN=0 PENDING=0
 report() { # report ESTADO control [detalle]
   printf '%-7s %-58s %s\n' "$1" "$2" "${3:-}"
-  case "$1" in PASS) PASS=$((PASS+1)) ;; FAIL) FAIL=$((FAIL+1)) ;; UNKNOWN) UNKNOWN=$((UNKNOWN+1)) ;; esac
+  case "$1" in
+    PASS) PASS=$((PASS+1)) ;; FAIL) FAIL=$((FAIL+1)) ;; UNKNOWN) UNKNOWN=$((UNKNOWN+1)) ;;
+    PENDING) PENDING=$((PENDING+1)) ;;
+  esac
 }
 detail() { local l; for l in "$@"; do printf '          - %s\n' "$l"; done; }
 # api RUTA → cuerpo JSON en $API_BODY y estado HTTP en $API_STATUS (200, 404, 403, err).
@@ -287,14 +296,47 @@ else
       jq -e --arg t "$r" 'any(.rules[]; .type==$t)' <<<"$RS" >/dev/null &&
         report PASS "Protect main: regla $r" || report FAIL "Protect main: regla $r" "ausente"
     done
-    n="$(jq -r '[.rules[]|select(.type=="pull_request")|.parameters.required_approving_review_count][0] // 0' <<<"$RS")"
-    [ "$n" -ge 1 ] && report PASS "Protect main: aprobaciones requeridas" "$n" ||
-      report FAIL "Protect main: aprobaciones requeridas" "$n"
-    ctx="$(jq -r '[.rules[]|select(.type=="required_status_checks")|.parameters.required_status_checks[].context]|join(",")' <<<"$RS")"
-    bad=(); for c in "${FORBIDDEN_REQUIRED_CONTEXTS[@]}"; do [[ ",$ctx," == *",$c,"* ]] && bad+=("$c"); done
-    [ ${#bad[@]} -eq 0 ] && report PASS "Protect main: sin contexto heredado en rojo" "requeridos: '${ctx:-ninguno}'" ||
-      report FAIL "Protect main: sin contexto heredado en rojo" "requerido: $(csv "${bad[@]}")"
-    report INFO "Protect main: bypass" "$(jq -c '[.bypass_actors[]?|"\(.actor_type):\(.bypass_mode)"]' <<<"$RS")"
+    # Parámetros del PR: solo si la regla existe (su ausencia ya es FAIL arriba).
+    PR="$(jq -c '[.rules[]|select(.type=="pull_request")|.parameters // {}][0] // empty' <<<"$RS")"
+    if [ -n "$PR" ]; then
+      # Solo un entero JSON no negativo cuenta; texto ("0"), null o ausencia son UNKNOWN.
+      n="$(jq -r '.required_approving_review_count
+        | if type=="number" and . >= 0 and . == floor then floor|tostring else "inválido: \(tojson)" end' <<<"$PR")"
+      if [ "$n" = "$REQUIRED_APPROVALS" ]; then
+        report PASS "Protect main: aprobaciones requeridas" "$n (modelo de un mantenedor)"
+      elif [[ "$n" =~ ^[0-9]+$ ]]; then
+        report FAIL "Protect main: aprobaciones requeridas" "esperado $REQUIRED_APPROVALS, actual $n (desvía del modelo de un mantenedor)"
+      else
+        report UNKNOWN "Protect main: aprobaciones requeridas" "$n"
+      fi
+      v="$(jq -r '.required_review_thread_resolution // false' <<<"$PR")"
+      [ "$v" = true ] && report PASS "Protect main: resolución de hilos de revisión" ||
+        report FAIL "Protect main: resolución de hilos de revisión" "$v"
+      report INFO "Protect main: parámetros de PR" "$(jq -c '{allowed_merge_methods, dismiss_stale_reviews_on_push,
+        require_last_push_approval, require_extra_approval_for_unattributed_changes, require_code_owner_review}' <<<"$PR")"
+    fi
+    # Checks requeridos: aún no se han elegido. Su ausencia es PENDING, nunca PASS; los
+    # nombres los decide su activación, no este script.
+    if ! jq -e 'any(.rules[]; .type=="required_status_checks")' <<<"$RS" >/dev/null; then
+      report PENDING "Protect main: checks de estado requeridos" "ninguno configurado; activación pendiente"
+    else
+      ctx="$(jq -r '[.rules[]|select(.type=="required_status_checks")|.parameters.required_status_checks[]?.context]|join(",")' <<<"$RS")"
+      report INFO "Protect main: checks de estado requeridos" "'${ctx:-ninguno}'"
+      bad=(); for c in "${FORBIDDEN_REQUIRED_CONTEXTS[@]}"; do [[ ",$ctx," == *",$c,"* ]] && bad+=("$c"); done
+      [ ${#bad[@]} -eq 0 ] && report PASS "Protect main: sin contexto heredado en rojo" ||
+        report FAIL "Protect main: sin contexto heredado en rojo" "requerido: $(csv "${bad[@]}")"
+    fi
+    # Nadie puede saltarse el ruleset. Solo un arreglo vacío lo demuestra; sin el campo
+    # (lectura sin admin) o con otro tipo no se puede afirmar.
+    bt="$(jq -r 'if has("bypass_actors") then .bypass_actors|type else "ausente" end' <<<"$RS" 2>/dev/null)"
+    if [ "$bt" != array ]; then
+      report UNKNOWN "Protect main: sin actores de bypass" "bypass_actors: ${bt:-ilegible}"
+    elif [ "$(jq '.bypass_actors | length' <<<"$RS")" -eq 0 ]; then
+      report PASS "Protect main: sin actores de bypass"
+    else
+      report FAIL "Protect main: sin actores de bypass" \
+        "$(jq -c '[.bypass_actors[]|"\(.actor_type? // "?"):\(.actor_id? // "-"):\(.bypass_mode? // "?")"]' <<<"$RS")"
+    fi
   fi
 fi
 
@@ -469,7 +511,7 @@ else
 fi
 
 echo
-echo "PASS=$PASS FAIL=$FAIL UNKNOWN=$UNKNOWN"
+echo "PASS=$PASS FAIL=$FAIL UNKNOWN=$UNKNOWN PENDING=$PENDING"
 [ "$FAIL" -gt 0 ] && exit 1
 [ "$UNKNOWN" -gt 0 ] && exit 2
 exit 0
