@@ -229,8 +229,26 @@ check "workflow: el registro del último éxito no corre tras un fallo" \
 # es el .env del host, que deploy.yml valida antes de mutar nada.
 HOST_CONFIG_SECRETS="POSTGRES_PASSWORD APP_DB_PASSWORD MIGRATION_DB_PASSWORD KC_DB_PASSWORD CLOUDFLARE_DNS_API_TOKEN KC_BACKEND_CLIENT_SECRET KC_AUTOMATION_CLIENT_SECRET"
 HOST_CONFIG_RE="$(tr ' ' '|' <<< "${HOST_CONFIG_SECRETS}")"
-check "workflow: solo el converge recibe credenciales de la base, de Keycloak y de Cloudflare DNS" \
-  test "$(yq -r "[.jobs.production.steps[] | select(.id != \"credentials\") | select((.env // {}) | to_entries | map(select(.value | test(\"secrets\\\\.(${HOST_CONFIG_RE})\"))) | length > 0) | .id] | join(\" \")" "${WORKFLOW}")" = "converge"
+# Lista exacta de consumidores (job/paso, en orden del workflow) de un secreto, por env o
+# with de cualquier paso de cualquier job. production/credentials solo verifica que existan y
+# queda fuera. env y with se leen por separado: una clave repetida en ambos no oculta nada.
+secret_consumers() { # <nombre del secreto>
+  yq -r "[.jobs | to_entries[] | .key as \$job | .value.steps[]? | select(\$job != \"production\" or .id != \"credentials\")
+    | select(((.env // {}) | to_entries) + ((.with // {}) | to_entries) | map(select(.value | tostring | test(\"secrets\\\\.$1\\\\b\"))) | length > 0)
+    | \$job + \"/\" + (.id // .name)] | join(\" \")" "${WORKFLOW}"
+}
+for key in POSTGRES_PASSWORD APP_DB_PASSWORD MIGRATION_DB_PASSWORD KC_DB_PASSWORD CLOUDFLARE_DNS_API_TOKEN; do
+  check "workflow: solo el converge recibe ${key}" test "$(secret_consumers "${key}")" = "production/converge"
+done
+# kc_admin_preflight valida la contraseña inicial del administrador humano antes del Apply con
+# las reglas del converge (keycloak_credentials.yml), que exigen ambos secretos de cliente y
+# rechazan una contraseña igual a cualquiera de ellos
+for key in KC_BACKEND_CLIENT_SECRET KC_AUTOMATION_CLIENT_SECRET; do
+  check "workflow: solo kc_admin_preflight y el converge reciben ${key}" \
+    test "$(secret_consumers "${key}")" = "production/kc_admin_preflight production/converge"
+done
+check "workflow: ningún job recibe credenciales de la base, de Keycloak ni de Cloudflare DNS en su env" \
+  test -z "$(yq -r ".jobs[] | (.env // {}) | to_entries[] | select(.value | tostring | test(\"secrets\\\\.(${HOST_CONFIG_RE})\\\\b\")) | .key" "${WORKFLOW}")"
 check "workflow: el converge solo corre con configuración del servidor" \
   grep -qF "env.RUN_HOST_CONFIG == 'true'" <(yq -r '.jobs.production.steps[] | select(.id == "converge") | .if' "${WORKFLOW}")
 
