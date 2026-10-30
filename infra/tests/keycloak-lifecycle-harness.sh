@@ -13,7 +13,9 @@
 #     (HARNESS_KC_FROM_REF, referencia fijada <tag>@sha256:<índice>), primer login del
 #     administrador humano en ella, actualización por convergencia normal a la versión que
 #     declara infra/compose/keycloak.yml (migración real de la base), intento de volver
-#     atrás, y después todos los escenarios P1/P3/REC/INT/ADMIN-H sobre la base migrada
+#     atrás, y después todos los escenarios P1/P3/REC/INT/ADMIN-H sobre la base migrada.
+#     Si HARNESS_KC_FROM_REF es la misma versión con otro digest: sin migración, la vuelta a
+#     ese digest es compatible (converge la admite) y se restaura la identidad declarada
 # Keycloak corre siempre por su identidad exacta: la referencia fijada se resuelve (como en
 # el workflow) a su manifiesto linux/amd64 y converge la recibe como keycloak_image_ref.
 # Requiere: docker (compose v2, buildx), jq, yq, ansible-playbook con community.docker 5.x
@@ -33,7 +35,8 @@
 #           antes de tocar Keycloak, también con recuperación; restaurada → P1
 #   UPG     (solo upgrade) migración hacia adelante con el administrador humano, OTP,
 #           acciones requeridas, clientes, roles y secretos preservados; volver atrás falla
-#           cerrado sin tocar Keycloak
+#           cerrado sin tocar Keycloak (misma versión, otro digest: sin migración y la
+#           vuelta es compatible; rechazar ese digest es de la política de vulnerabilidades)
 #   P2      base nueva → evento → P1; ninguna credencial del repositorio válida en ningún
 #           momento (sondeo continuo durante el evento); sin autoridad temporal al final
 #   P1      dos convergencias más: sin evento, idempotentes, sin recrear el realm
@@ -445,8 +448,14 @@ use_keycloak "${KC_TO_DECLARED}"
 TO_VERSION="$(docker pull -q --platform linux/amd64 "${KC_REF}" >/dev/null; kc_image_version "${KC_REF}")"
 converge upgrade false; RC=$?
 check "UPG: la convergencia normal termina bien (rc=${RC})" test "${RC}" -eq 0
+if [ "${FROM_VERSION}" != "${TO_VERSION}" ]; then
 check "UPG: informa la migración hacia adelante ${FROM_VERSION} → ${TO_VERSION} antes de arrancar" \
   bash -c "log_has upgrade 'base migrada por ${FROM_VERSION}, arrancar ${TO_VERSION} la migra hacia adelante (sin vuelta atrás)'"
+else
+# Reemplazo de digest con la misma versión (p. ej. reconstrucción corregida del mismo release)
+check "UPG: misma versión ${TO_VERSION}, otro digest: informa que no hay migración" \
+  log_has upgrade "base migrada por ${FROM_VERSION}, misma versión que la imagen: sin migración (imagen ${KC_REF}"
+fi
 check "UPG: P1 sin evento ni autoridad temporal (la actualización no es un evento de identidad)" \
   bash -c "log_has upgrade 'KEYCLOAK: estado P1' && ! log_has upgrade 'Crear la autoridad temporal' && test \$(temp_count) = 0"
 check "UPG: Keycloak recreado con la identidad exacta nueva" \
@@ -483,6 +492,28 @@ check "UPG: la convergencia siguiente no recrea ni migra (misma versión) (rc=${
   bash -c "test ${RC} -eq 0 && log_has upgrade-again 'misma versión que la imagen: sin migración' && log_has upgrade-again 'KEYCLOAK: estado P1'"
 KC_TO_REF="${KC_REF}"
 
+if [ "${FROM_VERSION}" = "${TO_VERSION}" ]; then
+# Misma versión: la base no se migró, así que volver al digest anterior es compatible para el
+# ciclo de vida y converge lo admite. Rechazar ese digest (p. ej. por un CRITICAL) es de la
+# política de vulnerabilidades del workflow, no de converge; este harness no la ejecuta.
+section "UPG — volver a ${KC_FROM_DECLARED} (misma versión ${TO_VERSION}): compatible con la base"
+CONTAINER_UPGRADED="$(kc_container)"
+use_keycloak "${KC_FROM_DECLARED}"
+converge downgrade-same-version false; RC=$?
+check "vuelta al digest anterior (misma versión): converge lo admite (rc=${RC})" test "${RC}" -eq 0
+check "vuelta al digest anterior: sin migración, base en ${TO_VERSION} sin registros nuevos" \
+  bash -c "log_has downgrade-same-version 'misma versión que la imagen: sin migración (imagen ${KC_FROM_REF}' && test \"\$(kc_db_version)\" = '${TO_VERSION}' && test \"\$(sql \"select count(*) from keycloak.migration_model where version='${TO_VERSION}'\")\" = 1"
+check "vuelta al digest anterior: Keycloak recreado con esa identidad exacta" \
+  bash -c "c=\"\$(kc_container)\"; test \"\${c%%|*}\" != '${CONTAINER_UPGRADED%%|*}' && test \"\${c##*|}\" = '${KC_FROM_REF}'"
+check "vuelta al digest anterior: P1 sin evento ni autoridad temporal" \
+  bash -c "log_has downgrade-same-version 'KEYCLOAK: estado P1' && ! log_has downgrade-same-version 'Crear la autoridad temporal' && test \$(temp_count) = 0"
+use_keycloak "${KC_TO_DECLARED}"
+converge upgrade-restore false; RC=$?
+check "vuelta atrás: restaurada la identidad nueva para lo que sigue (rc=${RC})" \
+  bash -c "test ${RC} -eq 0 && test '${KC_REF}' = '${KC_TO_REF}' && c=\"\$(kc_container)\" && test \"\${c##*|}\" = '${KC_TO_REF}'"
+check "restauración: mismo realm, identidades, clientes técnicos y administrador humano" \
+  test "$(realm_id)|$(users_in_realm)|$(technical_row)|$(platform_row)" = "${REALM_ID}|${USERS_SNAP}|${TECH_SNAP}|${PLATFORM_SNAP}"
+else
 section "UPG — volver atrás a ${KC_FROM_DECLARED} sobre la base migrada: falla cerrado"
 CONTAINER_UPGRADED="$(kc_container)"
 use_keycloak "${KC_FROM_DECLARED}"
@@ -499,6 +530,7 @@ for mode in false true; do
 done
 use_keycloak "${KC_TO_DECLARED}"
 check "vuelta atrás: restaurada la identidad nueva para lo que sigue" test "${KC_REF}" = "${KC_TO_REF}"
+fi
 PLATFORM_STATUS_P1='CONFIGURADA'
 fi
 
