@@ -32,6 +32,8 @@ public interface AppointmentRepository {
 
     boolean existsByDoctorAndState(UUID idDoctor, AppointmentState state);
 
+    boolean existsByIdAndState(UUID appointmentId, AppointmentState state);
+
     Appointment findById(UUID appointmentId);
   
     List<Appointment> findAllByDate(LocalDate date);

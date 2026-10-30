@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.notifications.application;
 
+import co.edu.unicauca.piedrazul.backend.appointment.eligibility.AppointmentEligibility;
 import co.edu.unicauca.piedrazul.backend.notifications.application.template.TemplateRenderer;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.message.ChannelMessage;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.*;
@@ -46,6 +47,27 @@ final class DispatchTestSupport {
             TemplateRenderer renderer,
             NotificationProvider... providers
     ) {
+        return dispatcher(store, clock, optIn, renderer, appointmentId -> true, providers);
+    }
+
+    static NotificationDispatcherService dispatcher(
+            InMemoryDispatchStore store,
+            Clock clock,
+            AppointmentEligibility eligibility,
+            NotificationProvider... providers
+    ) {
+        return dispatcher(store, clock, false, new TemplateRenderer(new InMemoryNotificationTemplateProvider()),
+                eligibility, providers);
+    }
+
+    private static NotificationDispatcherService dispatcher(
+            InMemoryDispatchStore store,
+            Clock clock,
+            boolean optIn,
+            TemplateRenderer renderer,
+            AppointmentEligibility eligibility,
+            NotificationProvider... providers
+    ) {
         return new NotificationDispatcherService(
                 store,
                 new ProviderRegistry(List.of(providers)),
@@ -53,6 +75,7 @@ final class DispatchTestSupport {
                 new RetryPolicy(),
                 new ChannelFallbackPolicy(),
                 new RecipientEmailPolicy(VALIDATOR),
+                eligibility,
                 optIn,
                 clock
         );
@@ -80,7 +103,16 @@ final class DispatchTestSupport {
     }
 
     static Notification appointment(String email) {
-        return notification(NotificationType.APPOINTMENT_SCHEDULED, AggregateType.APPOINTMENT, email,
+        return appointment(NotificationType.APPOINTMENT_REMINDER_2_DAYS, email);
+    }
+
+    /** Confirmación histórica, como la que pudo quedar en cola antes de retirar el tipo. */
+    static Notification legacyConfirmation() {
+        return appointment(NotificationType.APPOINTMENT_SCHEDULED, "sintetico@example.test");
+    }
+
+    private static Notification appointment(NotificationType type, String email) {
+        return notification(type, AggregateType.APPOINTMENT, email,
                 Map.of("patientName", "Paciente Sintético", "doctorName", "Dra. Sintética",
                         "date", "2026-01-10", "time", "08:00"));
     }

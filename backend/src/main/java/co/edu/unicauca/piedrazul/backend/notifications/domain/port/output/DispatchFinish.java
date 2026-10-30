@@ -21,12 +21,15 @@ public enum DispatchFinish {
     /** El contenido caducó antes de entregarse al proveedor. */
     EXPIRED,
 
+    /** La notificación dejó de ser elegible antes de entregarse a un proveedor. */
+    CANCELLED,
+
     /** Reintento programado: el schedule vuelve a PENDING; la notificación sigue en curso. */
     RETRY;
 
     /** Ya no queda reintento ni canal que necesite las variables secretas. */
     public boolean endsDispatch() {
-        return this == ACCEPTED || this == FAILED || this == EXPIRED;
+        return this == ACCEPTED || this == FAILED || this == EXPIRED || this == CANCELLED;
     }
 
     public void applyTo(
@@ -49,6 +52,10 @@ public enum DispatchFinish {
             case EXPIRED -> {
                 notification.markExpired(now);
                 schedule.markExpired(now);
+            }
+            case CANCELLED -> {
+                notification.markCancelled(now);
+                schedule.cancel(now);
             }
             case RETRY -> schedule.scheduleRetry(
                     Objects.requireNonNull(retryAt, "La fecha del reintento es obligatoria"),

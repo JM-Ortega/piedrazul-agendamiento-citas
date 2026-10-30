@@ -40,6 +40,11 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     }
 
     @Override
+    public boolean existsByIdAndState(UUID appointmentId, AppointmentState state) {
+        return jpaRepository.existsByIdAppointmentAndAppointmentState(appointmentId, state);
+    }
+
+    @Override
     public long countByDateAndState(LocalDate date,  AppointmentState state) {
         return jpaRepository.countByDateAndAppointmentState(date, state);
     }

@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.notifications.application;
 
+import co.edu.unicauca.piedrazul.backend.appointment.eligibility.AppointmentEligibility;
 import co.edu.unicauca.piedrazul.backend.notifications.application.exception.NotificationDispatchException;
 import co.edu.unicauca.piedrazul.backend.notifications.application.template.TemplateRenderer;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.message.ChannelMessage;
@@ -27,10 +28,12 @@ import java.util.regex.Pattern;
  * Despacha un schedule ya reclamado. Ciclo de vida por canal:
  *
  * <ol>
- *   <li>elegibilidad actual de notificación y schedule (leída fresca, bajo bloqueo);</li>
+ *   <li>elegibilidad actual de notificación y schedule (leída fresca, bajo bloqueo) y, si el
+ *       tipo lo exige, de la cita;</li>
  *   <li>proveedor, restricciones de consola (W0a), destinatario y contenido;</li>
  *   <li>intento en curso (PROCESSING) confirmado antes de invocar al proveedor;</li>
- *   <li>vigencia comprobada con un reloj fresco justo antes de la entrega;</li>
+ *   <li>vigencia comprobada con un reloj fresco y, si el tipo lo exige, estado confirmado de la
+ *       cita leído de nuevo justo antes de la entrega, sin bloqueos sobre el proveedor;</li>
  *   <li>proveedor invocado fuera de toda transacción;</li>
  *   <li>intento, notificación y schedule escritos juntos, con el código eliminado si el despacho
  *       termina.</li>
@@ -39,7 +42,10 @@ import java.util.regex.Pattern;
  * Cada escritura pasa por {@link NotificationDispatchStore}, que comprueba la propiedad del
  * trabajo; si se perdió, el despachador se detiene sin invocar más proveedores. Un fallo detectado
  * antes del proveedor nunca se registra como aceptación desconocida, y una aceptación (confirmada
- * o posible) nunca se reintenta ni cambia de canal.
+ * o posible) nunca se reintenta ni cambia de canal. El estado de la cita decide solo sobre la
+ * próxima entrega: una aceptación posible se resuelve antes de mirarlo y una cancelación confirmada
+ * después de la última lectura no impide esa entrega ni altera su resultado. El despachador es el
+ * único que escribe el resultado de una notificación.
  */
 public class NotificationDispatcherService {
 
@@ -47,6 +53,8 @@ public class NotificationDispatcherService {
     static final String CONTENT_EXPIRED = "CONTENT_EXPIRED";
     static final String DISPATCH_INTERRUPTED = InterruptedDispatchPolicy.DISPATCH_INTERRUPTED;
     static final String DIAGNOSTIC_REDACTED = "PROVIDER_DIAGNOSTIC_REDACTED";
+    static final String APPOINTMENT_NOT_SCHEDULED = "APPOINTMENT_NOT_SCHEDULED";
+    static final String TYPE_RETIRED = "NOTIFICATION_TYPE_RETIRED";
 
     // Un código de diagnóstico seguro: corto, sin espacios ni caracteres de control.
     private static final Pattern SAFE_CODE =
@@ -60,6 +68,7 @@ public class NotificationDispatcherService {
     private final RetryPolicy retryPolicy;
     private final ChannelFallbackPolicy fallbackPolicy;
     private final RecipientEmailPolicy emailPolicy;
+    private final AppointmentEligibility appointmentEligibility;
     private final boolean consoleSensitiveDiagnosticEnabled;
     private final Clock clock;
 
@@ -76,6 +85,7 @@ public class NotificationDispatcherService {
             RetryPolicy retryPolicy,
             ChannelFallbackPolicy fallbackPolicy,
             RecipientEmailPolicy emailPolicy,
+            AppointmentEligibility appointmentEligibility,
             boolean consoleSensitiveDiagnosticEnabled,
             Clock clock
     ) {
@@ -85,6 +95,8 @@ public class NotificationDispatcherService {
         this.retryPolicy = retryPolicy;
         this.fallbackPolicy = fallbackPolicy;
         this.emailPolicy = emailPolicy;
+        this.appointmentEligibility = Objects.requireNonNull(
+                appointmentEligibility, "La elegibilidad de citas es obligatoria");
         this.consoleSensitiveDiagnosticEnabled = consoleSensitiveDiagnosticEnabled;
         this.clock = Objects.requireNonNull(clock, "El reloj es obligatorio");
     }
@@ -144,6 +156,16 @@ public class NotificationDispatcherService {
             return;
         }
 
+        if (notification.getType().isRetired()) {
+            cancel(run, null, TYPE_RETIRED);
+            return;
+        }
+
+        if (!appointmentStillScheduled(run)) {
+            cancel(run, null, APPOINTMENT_NOT_SCHEDULED);
+            return;
+        }
+
         if (notification.isExpiredAt(clock.instant())) {
             expire(run, null);
             return;
@@ -159,6 +181,12 @@ public class NotificationDispatcherService {
             if (skipReason.isPresent()) {
                 NotificationLogger.skipped(run.context(), channel, skipReason.get());
                 continue;
+            }
+
+            // Tras un canal fallido la cita pudo cancelarse: no se abre un intento innecesario.
+            if (!triedChannels.isEmpty() && !appointmentStillScheduled(run)) {
+                cancel(run, null, APPOINTMENT_NOT_SCHEDULED);
+                return;
             }
 
             triedChannels.add(channel);
@@ -240,6 +268,14 @@ public class NotificationDispatcherService {
             attempt.markFailed(FailureType.PERMANENT, CONTENT_EXPIRED,
                     "El contenido caducó antes de entregarse al proveedor", handoff);
             expire(run, attempt);
+            return Step.DONE;
+        }
+
+        // Lectura propia de esta entrega, posterior al commit del intento. Si falla, el proveedor
+        // no se invoca y el error sale hacia abandon con providerInvoked en falso.
+        if (!appointmentStillScheduled(run)) {
+            attempt.cancel(clock.instant());
+            cancel(run, attempt, APPOINTMENT_NOT_SCHEDULED);
             return Step.DONE;
         }
 
@@ -359,6 +395,38 @@ public class NotificationDispatcherService {
         }
     }
 
+    /** Cierra sin invocar proveedores; los intentos anteriores conservan su resultado. */
+    private void cancel(Run run, NotificationAttempt inFlightAttempt, String reason) {
+        run.stage = "cancel";
+        run.abandonFinish = DispatchFinish.CANCELLED;
+        Instant now = clock.instant();
+
+        DispatchWrite write = inFlightAttempt == null
+                ? DispatchWrite.finishOnly(run.scheduleId(), run.expectedAttemptCount, DispatchFinish.CANCELLED, now)
+                : DispatchWrite.resolve(run.scheduleId(), run.expectedAttemptCount, inFlightAttempt,
+                        DispatchFinish.CANCELLED, null, now);
+
+        if (write(run, write)) {
+            NotificationLogger.statusUpdated(run.context(), "CANCELLED reason=" + reason);
+        }
+    }
+
+    /**
+     * Estado confirmado de la cita, leído de nuevo en cada llamada. El resultado no se guarda: cada
+     * entrega necesita su propia lectura. Un error de lectura se propaga y nunca cuenta como
+     * elegible.
+     */
+    private boolean appointmentStillScheduled(Run run) {
+        Notification notification = run.notification;
+
+        if (!notification.getType().requiresScheduledAppointment()) {
+            return true;
+        }
+
+        run.stage = "eligibility";
+        return appointmentEligibility.isScheduled(notification.getAggregate().id());
+    }
+
     /**
      * Trabajo retomado con un intento que pudo llegar al proveedor: nunca se reenvía. Un intento
      * aceptado cierra como aceptado; uno en curso pasa a aceptación desconocida; en ambos casos se
@@ -400,9 +468,11 @@ public class NotificationDispatcherService {
 
     /**
      * Error inesperado a mitad del despacho. Si el proveedor no llegó a invocarse, se cierra como
-     * FAILED (con el intento en curso, si lo hay, marcado como fallido). Si pudo invocarse, el
-     * intento queda en PROCESSING: la aceptación es posible y solo la recuperación lo resuelve. Si
-     * esta escritura también falla, el trabajo queda reclamado para la recuperación.
+     * FAILED (con el intento en curso, si lo hay, marcado como fallido), o como CANCELLED si ese
+     * cierre es lo que falló al escribirse. Si pudo invocarse, el intento queda en PROCESSING: la
+     * aceptación es posible y solo la recuperación lo resuelve. Si esta escritura también falla, el
+     * trabajo queda reclamado para la recuperación, que no distingue este caso y cierra un intento
+     * en curso como aceptación desconocida aunque el proveedor no llegara a invocarse.
      */
     private void abandon(Run run) {
         if (run.inFlight != null && run.providerInvoked) {
@@ -413,18 +483,18 @@ public class NotificationDispatcherService {
             Instant now = clock.instant();
 
             if (run.inFlight != null) {
-                // Si ya se le había asignado un fallo local (p. ej. caducidad) se conserva.
+                // Si ya se le había asignado un cierre local (p. ej. caducidad) se conserva.
                 if (run.inFlight.getStatus() == AttemptStatus.PROCESSING) {
                     run.inFlight.markFailed(FailureType.PERMANENT, DISPATCH_INTERRUPTED,
                             "Despacho interrumpido antes de invocar al proveedor", now);
                 }
 
                 write(run, DispatchWrite.resolve(run.scheduleId(), run.expectedAttemptCount, run.inFlight,
-                        DispatchFinish.FAILED, null, now));
+                        run.abandonFinish, null, now));
                 return;
             }
 
-            write(run, DispatchWrite.finishOnly(run.scheduleId(), run.expectedAttemptCount, DispatchFinish.FAILED, now));
+            write(run, DispatchWrite.finishOnly(run.scheduleId(), run.expectedAttemptCount, run.abandonFinish, now));
         } catch (RuntimeException exception) {
             NotificationLogger.dispatchInterrupted(run.context(), "abandon", exception);
         }
@@ -764,6 +834,7 @@ public class NotificationDispatcherService {
         private int expectedAttemptCount;
         private NotificationAttempt inFlight;
         private boolean providerInvoked;
+        private DispatchFinish abandonFinish = DispatchFinish.FAILED;
         private String stage = "start";
 
         private Run(Begin begin, int claimedAttemptCount) {

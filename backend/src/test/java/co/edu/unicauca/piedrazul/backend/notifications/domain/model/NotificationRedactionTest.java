@@ -28,7 +28,7 @@ class NotificationRedactionTest {
 
     @Test
     void nonSensitiveTypesAreUntouched() {
-        Notification appointment = notification(NotificationType.APPOINTMENT_SCHEDULED, Map.of("code", "no-secreto"));
+        Notification appointment = notification(NotificationType.APPOINTMENT_REMINDER_2_DAYS, Map.of("code", "no-secreto"));
 
         assertThat(appointment.redactSensitiveVariables()).isFalse();
         assertThat(appointment.getVariables()).containsKey("code");
@@ -42,7 +42,7 @@ class NotificationRedactionTest {
         assertThat(otp.isExpiredAt(expiresAt.minusNanos(1))).isFalse();
         assertThat(otp.isExpiredAt(expiresAt)).isTrue();
         assertThat(notification(NotificationType.OTP_CODE, Map.of()).isExpiredAt(NOW)).isTrue();
-        assertThat(notification(NotificationType.APPOINTMENT_SCHEDULED, Map.of()).isExpiredAt(NOW)).isFalse();
+        assertThat(notification(NotificationType.APPOINTMENT_REMINDER_2_DAYS, Map.of()).isExpiredAt(NOW)).isFalse();
     }
 
     private static Notification notification(NotificationType type, Map<String, String> variables) {

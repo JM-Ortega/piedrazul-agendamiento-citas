@@ -33,7 +33,7 @@ class TemplateRendererTest {
     @Test
     void appointmentConsoleMessageIsNotClassifiedAsSensitive() {
         ChannelMessage message = renderer.render(
-                notification(NotificationType.APPOINTMENT_SCHEDULED),
+                notification(NotificationType.APPOINTMENT_REMINDER_2_DAYS),
                 NotificationChannel.CONSOLE,
                 Map.of("patientName", "Paciente Sintético")
         );

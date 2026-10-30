@@ -59,10 +59,12 @@ modifican notificación ni schedule.
 
 Por canal: proveedor registrado y restricciones de consola → destinatario (correo vacío, mal formado
 o de dominio `.invalid`, con la misma regla que la admisión de códigos) y contenido (plantilla,
-marcadores sin resolver) → intento `PROCESSING` confirmado → vigencia del código con reloj fresco →
-proveedor, fuera de toda transacción → intento, notificación y schedule escritos juntos. Un fallo
-local se registra como intento `FAILED`/`PERMANENT` sin pasar por `PROCESSING` y nunca llega al
-proveedor ni a su circuit breaker.
+marcadores sin resolver) → intento `PROCESSING` confirmado → vigencia del código con reloj fresco y,
+en los recordatorios, estado confirmado de la cita → proveedor, fuera de toda transacción → intento,
+notificación y schedule escritos juntos. Un fallo local nunca llega al proveedor ni a su circuit
+breaker. Puede ocurrir antes de abrir un intento en curso (un destinatario o contenido inválido queda
+como intento `FAILED`/`PERMANENT` que no pasó por `PROCESSING`) o después de confirmarlo, en las
+comprobaciones finales de vigencia y de la cita.
 
 | Resultado del proveedor | Significado | Intento | Notificación / schedule | Reintento / otro canal |
 |---|---|---|---|---|
@@ -100,11 +102,55 @@ fuera de esta frontera; SendGrid no es apto para códigos y, con él registrado,
 **Códigos de verificación.** Verification pasa el vencimiento real del código (`expiresAt`, 5 min);
 el despachador no entrega nada al proveedor a partir de ese instante (sin margen adicional) y cierra
 como `EXPIRED`. Un código sin vencimiento legible cuenta como vencido. Cuando el despacho termina
-(`ACCEPTED`, `FAILED` o `EXPIRED`), la misma transacción elimina `code` de `variables_json` y conserva
+(`ACCEPTED`, `FAILED`, `EXPIRED` o `CANCELLED`), la misma transacción elimina `code` de `variables_json` y conserva
 las variables no secretas; mientras quede un reintento, el código se conserva. Limitación aceptada
 (D15-A1): si el proceso cae entre el intento en curso y su resolución, el código queda en claro
 hasta que la recuperación resuelva ese trabajo. Las filas anteriores no se limpian (entorno
 desechable).
+
+**Avisos de cita.** Una cita nueva genera un único recordatorio (`APPOINTMENT_REMINDER_2_DAYS`): dos
+días calendario antes a las 16:00 de `America/Bogota`. No hay confirmación inmediata. Si al procesar
+la cita ese instante ya no es estrictamente futuro, no se programa recordatorio ni se compensa con
+otro. Esa regla solo se aplica al programar: un recordatorio ya pendiente no tiene hora límite de
+entrega, y tras una caída o un retraso del procesamiento puede despacharse después de su hora si la
+cita sigue elegible. `AppointmentScheduledEvent` se conserva para el recordatorio y la auditoría. Una
+cita no se reprograma sobre sí misma: se cancela y se crea otra, con su propio recordatorio.
+
+La cancelación de la cita no escribe en notificaciones: el despachador es el único que decide el
+resultado, y consulta el estado confirmado a través de `appointment::eligibility`
+(`AppointmentEligibility.isScheduled`), una lectura fuera de toda transacción que no espera a
+cancelaciones en curso. El recordatorio solo se entrega mientras la cita exista y siga `AGENDADA`.
+Primero se resuelve cualquier intento que pudo llegar al proveedor; después se lee la cita antes de
+empezar, antes de abrir otro canal y una vez más tras confirmar cada intento `PROCESSING`, justo antes
+del proveedor. Cada entrega (también un reintento, otro canal o un trabajo reencolado) exige su propia
+lectura. Un recordatorio cuya cita se canceló sigue `PENDING` hasta su hora y entonces se cierra.
+
+La garantía es esta y no más: una cancelación confirmada antes de la última lectura impide esa entrega;
+una confirmada después puede coexistir con ella. Ningún bloqueo sobre cita o notificación se mantiene
+durante la llamada al proveedor.
+
+| Momento de la cancelación | Proveedor | Intento | Notificación / schedule |
+|---|---|---|---|
+| Antes de empezar, o tras reintento o reencolado | no | sin intento nuevo; los anteriores no cambian | `CANCELLED` / `CANCELLED` |
+| Entre canales | no | sin intento nuevo; el rechazo anterior se conserva | `CANCELLED` / `CANCELLED` |
+| Tras confirmar el intento en curso, antes de entregar | no | `CANCELLED` | `CANCELLED` / `CANCELLED` |
+| Con la entrega ya iniciada | sí | el resultado real del proveedor | según ese resultado |
+| Con un intento aceptado, desconocido o en curso previo | no | sin cambio, o `UNKNOWN` si seguía en curso | `ACCEPTED`/`SENT` o `FAILED`/`FAILED`, nunca `CANCELLED` |
+
+`CANCELLED` significa que no habrá más entregas, no que nunca se invocó un proveedor: puede tener
+intentos anteriores con no aceptación probada. Si la lectura de la cita falla, el proveedor no se
+invoca y notificación y schedule cierran como `FAILED`. Al empezar o entre canales no se crea ningún
+intento nuevo; en la lectura final el intento `PROCESSING` ya está confirmado y queda
+`FAILED`/`PERMANENT` (`DISPATCH_INTERRUPTED`), nunca como aceptación. El log emite
+`NOTIFICATION_DISPATCH_INTERRUPTED` con `stage=eligibility`. Riesgo aceptado: si en ese punto final
+tampoco se puede escribir el cierre (`FAILED`, o `CANCELLED` si la cita ya no era elegible), el intento
+sigue en `PROCESSING` para la recuperación, que no puede distinguir este caso y lo cierra como
+`UNKNOWN` aunque el proveedor no se invocara. Sobrestima la incertidumbre, pero no reenvía.
+
+**Confirmaciones históricas.** El tipo `APPOINTMENT_SCHEDULED` ya no se genera; su valor de catálogo y
+sus plantillas se conservan para leer las filas existentes. Una confirmación que siga en cola se
+cierra como `CANCELLED` sin invocar proveedores, y una con aceptación posible se resuelve como
+cualquier trabajo interrumpido, sin reescribir su historial.
 
 **Consola.** Es diagnóstico, nunca entrega: todo mensaje impreso deja el intento `FAILED`
 (`CONSOLE_DIAGNOSTIC_ONLY`, `PROVIDER_ERROR`) y, si es el último canal, la notificación `FAILED`.
@@ -137,8 +183,8 @@ pudo llegar al proveedor, aunque se interrumpiera justo antes.
 | Schedule ya terminado, sin intentos en curso | sin cambio | sin cambio | sin cambio | ninguno |
 
 Reencolar no crea intentos ni consume reintentos: al reclamarse de nuevo, el despachador revalida
-canales, presupuesto y vigencia, y es él quien cierra como `FAILED` un trabajo sin canales
-disponibles. Los reencolados se cuentan en `dispatchRecoveries` dentro de `variables_json`, igual que
+canales, presupuesto, vigencia y elegibilidad de la cita, y es él quien cierra un trabajo sin canales
+disponibles (`FAILED`) o cuya cita ya no es elegible (`CANCELLED`). Los reencolados se cuentan en `dispatchRecoveries` dentro de `variables_json`, igual que
 `expiresAt` es un dato del despacho y no del texto; no hay ventana de entrega tardía nueva. Un intento
 en curso nunca se reenvía: es el riesgo aceptado D8-A, un mensaje puede perderse pero no se duplica
 por una recuperación. El umbral debe superar lo que puede tardar una llamada real al proveedor, porque

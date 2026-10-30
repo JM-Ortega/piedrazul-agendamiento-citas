@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.notifications.infrastructure.config;
 
+import co.edu.unicauca.piedrazul.backend.appointment.eligibility.AppointmentEligibility;
 import co.edu.unicauca.piedrazul.backend.notifications.NotificationModuleApi;
 import co.edu.unicauca.piedrazul.backend.notifications.application.*;
 import co.edu.unicauca.piedrazul.backend.notifications.application.template.TemplateRenderer;
@@ -102,6 +103,7 @@ public class NotificationConfig {
             RetryPolicy retryPolicy,
             ChannelFallbackPolicy fallbackPolicy,
             Validator validator,
+            AppointmentEligibility appointmentEligibility,
             @Value("${notifications.console.show-sensitive-content:false}") boolean showSensitiveContent,
             @Qualifier("notificationClock") Clock clock
     ) {
@@ -112,6 +114,7 @@ public class NotificationConfig {
                 retryPolicy,
                 fallbackPolicy,
                 new RecipientEmailPolicy(validator),
+                appointmentEligibility,
                 showSensitiveContent,
                 clock
         );
@@ -120,14 +123,12 @@ public class NotificationConfig {
     @Bean
     public NotificationOrchestrator notificationOrchestrator(
             NotificationRepository notificationRepository,
-            NotificationScheduleRepository scheduleRepository,
             NotificationFactory notificationFactory,
             NotificationSchedulerService schedulerService,
             ChannelFallbackPolicy fallbackPolicy
     ) {
         return new NotificationOrchestrator(
                 notificationRepository,
-                scheduleRepository,
                 notificationFactory,
                 schedulerService,
                 fallbackPolicy

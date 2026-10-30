@@ -354,6 +354,7 @@ class NotificationSchedulerLoadIT extends PostgresIntegrationSupport {
                 new RetryPolicy(),
                 new ChannelFallbackPolicy(),
                 new RecipientEmailPolicy(Validation.buildDefaultValidatorFactory().getValidator()),
+                appointmentId -> true,
                 false,
                 Clock.systemUTC()
         );

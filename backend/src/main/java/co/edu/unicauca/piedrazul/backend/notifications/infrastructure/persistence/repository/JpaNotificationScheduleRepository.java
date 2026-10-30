@@ -1,6 +1,5 @@
 package co.edu.unicauca.piedrazul.backend.notifications.infrastructure.persistence.repository;
 
-import co.edu.unicauca.piedrazul.backend.notifications.domain.model.ScheduleStatus;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.persistence.entity.NotificationScheduleEntity;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -28,11 +27,6 @@ public interface JpaNotificationScheduleRepository
     List<NotificationScheduleEntity> findDuePendingWithLock(
             @Param("now") Instant now,
             @Param("limit") int limit
-    );
-
-    List<NotificationScheduleEntity> findAllByNotificationIdAndStatusIn(
-            UUID notificationId,
-            List<ScheduleStatus> statuses
     );
 
     /**

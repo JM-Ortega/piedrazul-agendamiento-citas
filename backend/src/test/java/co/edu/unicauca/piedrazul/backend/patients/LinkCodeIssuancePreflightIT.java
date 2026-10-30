@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.patients;
 
+import co.edu.unicauca.piedrazul.backend.appointment.eligibility.AppointmentEligibility;
 import co.edu.unicauca.piedrazul.backend.notifications.api.OtpDeliveryMode;
 import co.edu.unicauca.piedrazul.backend.notifications.application.OtpDeliveryCapability;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.config.NotificationConfig;
@@ -104,6 +105,12 @@ class LinkCodeIssuancePreflightIT extends PostgresIntegrationSupport {
         @Bean
         LocalValidatorFactoryBean validator() {
             return new LocalValidatorFactoryBean();
+        }
+
+        // NotificationConfig la exige; los códigos de verificación nunca la consultan.
+        @Bean
+        AppointmentEligibility appointmentEligibility() {
+            return appointmentId -> false;
         }
     }
 

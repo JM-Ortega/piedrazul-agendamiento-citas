@@ -257,7 +257,7 @@ class NotificationDispatcherServiceTest {
             StubProvider sms = new StubProvider(NotificationChannel.SMS, false)
                     .then(() -> outcome(DeliveryOutcome.RETRYABLE))
                     .then(() -> outcome(DeliveryOutcome.ACCEPTED));
-            Notification notification = notification(NotificationType.APPOINTMENT_SCHEDULED, AggregateType.APPOINTMENT,
+            Notification notification = notification(NotificationType.APPOINTMENT_REMINDER_2_DAYS, AggregateType.APPOINTMENT,
                     "sintetico@example.test", Map.of("patientName", "P", "doctorName", "D", "date", "d", "time", "t"));
             // Orden propio: EMAIL antes que SMS
             notification = Notification.reconstruct(notification.getId(), notification.getType(),
@@ -638,7 +638,7 @@ class NotificationDispatcherServiceTest {
                     new ProviderRegistry(List.of(email)), new TemplateRenderer(new InMemoryNotificationTemplateProvider()),
                     new co.edu.unicauca.piedrazul.backend.notifications.domain.policy.RetryPolicy(),
                     new co.edu.unicauca.piedrazul.backend.notifications.domain.policy.ChannelFallbackPolicy(),
-                    new RecipientEmailPolicy(VALIDATOR), false, clock);
+                    new RecipientEmailPolicy(VALIDATOR), appointmentId -> true, false, clock);
 
             assertThatCode(() -> dispatcher.dispatch(new ClaimedSchedule(UUID.randomUUID(), 0)))
                     .doesNotThrowAnyException();

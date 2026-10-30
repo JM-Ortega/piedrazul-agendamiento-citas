@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.notifications.infrastructure.config;
 
+import co.edu.unicauca.piedrazul.backend.appointment.eligibility.AppointmentEligibility;
 import co.edu.unicauca.piedrazul.backend.notifications.api.OtpDeliveryMode;
 import co.edu.unicauca.piedrazul.backend.notifications.application.NotificationDispatcherService;
 import co.edu.unicauca.piedrazul.backend.notifications.application.OtpDeliveryCapability;
@@ -48,6 +49,11 @@ class NotificationConfigConsoleTest {
         @Bean
         NotificationDispatchStore notificationDispatchStore() {
             return mock(NotificationDispatchStore.class);
+        }
+
+        @Bean
+        AppointmentEligibility appointmentEligibility() {
+            return mock(AppointmentEligibility.class);
         }
 
         @Bean

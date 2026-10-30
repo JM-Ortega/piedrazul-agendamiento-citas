@@ -882,6 +882,7 @@ class NotificationDispatchRecoveryIT extends PostgresIntegrationSupport {
                 new RetryPolicy(),
                 new ChannelFallbackPolicy(),
                 new RecipientEmailPolicy(Validation.buildDefaultValidatorFactory().getValidator()),
+                appointmentId -> true,
                 false,
                 clock
         );
