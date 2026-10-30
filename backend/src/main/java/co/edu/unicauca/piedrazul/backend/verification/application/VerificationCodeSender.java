@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.verification.application;
 
+import java.time.Instant;
 import java.util.UUID;
 
 public interface VerificationCodeSender {
@@ -16,6 +17,11 @@ public interface VerificationCodeSender {
      */
     boolean isRecipientUsable(String phone, String email);
 
-    /** Encola el envío; no confirma que el proveedor lo acepte ni que llegue al destinatario. */
-    void sendCode(String subject, String displayName, String phone, String email, String code, int expirationMinutes, UUID recipientId, UUID verificationCodeId);
+    /**
+     * Encola el envío; no confirma que el proveedor lo acepte ni que llegue al destinatario.
+     *
+     * @param expiresAt vencimiento real del código: a partir de ese instante no se entrega a
+     *                  ningún proveedor
+     */
+    void sendCode(String subject, String displayName, String phone, String email, String code, int expirationMinutes, Instant expiresAt, UUID recipientId, UUID verificationCodeId);
 }

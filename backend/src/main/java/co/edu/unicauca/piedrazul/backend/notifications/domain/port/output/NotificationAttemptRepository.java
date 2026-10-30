@@ -20,9 +20,11 @@ public interface NotificationAttemptRepository {
             co.edu.unicauca.piedrazul.backend.notifications.domain.model.NotificationChannel channel
     );
 
+    int countByNotificationId(UUID notificationId);
+
     /**
-     * Retorna attempts en estado ACCEPTED, SENT o UNKNOWN
-     * cuyo acceptedAt o sentAt sea anterior al threshold dado.
+     * Intentos en curso (PROCESSING) sin actualizar desde antes de {@code threshold}: el proveedor
+     * pudo haber sido invocado y el resultado no llegó a registrarse.
      */
     List<NotificationAttempt> findStaleAttempts(
             Instant threshold,

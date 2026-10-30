@@ -18,10 +18,10 @@ import java.util.UUID;
 public class NotificationAttemptRepositoryAdapter
         implements NotificationAttemptRepository {
 
+    // Solo intentos en curso: un intento aceptado o de aceptación desconocida ya está resuelto
+    // por el despacho y no debe reclasificarse como fallido por antigüedad.
     private static final List<AttemptStatus> STALE_STATUSES = List.of(
-            AttemptStatus.SENT,
-            AttemptStatus.ACCEPTED,
-            AttemptStatus.UNKNOWN
+            AttemptStatus.PROCESSING
     );
 
     private final JpaNotificationAttemptRepository repository;
@@ -67,6 +67,11 @@ public class NotificationAttemptRepositoryAdapter
                 notificationId,
                 channel
         );
+    }
+
+    @Override
+    public int countByNotificationId(UUID notificationId) {
+        return repository.countByNotificationId(notificationId);
     }
 
     @Override

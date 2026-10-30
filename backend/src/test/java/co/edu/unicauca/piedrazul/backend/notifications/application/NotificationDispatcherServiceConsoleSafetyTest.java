@@ -3,45 +3,37 @@ package co.edu.unicauca.piedrazul.backend.notifications.application;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import co.edu.unicauca.piedrazul.backend.notifications.application.DispatchTestSupport.MutableClock;
+import co.edu.unicauca.piedrazul.backend.notifications.application.DispatchTestSupport.StubProvider;
 import co.edu.unicauca.piedrazul.backend.notifications.application.exception.NotificationDispatchException;
-import co.edu.unicauca.piedrazul.backend.notifications.application.template.TemplateRenderer;
-import co.edu.unicauca.piedrazul.backend.notifications.domain.message.ChannelMessage;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.*;
-import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.ChannelFallbackPolicy;
-import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.RetryPolicy;
-import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.*;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.ClaimedSchedule;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationProvider;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.provider.console.ConsoleNotificationProvider;
-import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.template.InMemoryNotificationTemplateProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
 
-import java.time.Instant;
-import java.util.*;
-import java.util.function.Supplier;
+import java.time.Duration;
+import java.util.List;
 
+import static co.edu.unicauca.piedrazul.backend.notifications.application.DispatchTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
  * La consola es diagnóstico, no entrega: el OTP solo llega a ella sin proveedor real y con el
- * opt-in explícito, y aun así no queda registrado como entregado. Datos exclusivamente sintéticos.
+ * opt-in explícito, y aun así no queda registrado como entregado. Tampoco el resto de mensajes
+ * impresos en consola cuenta como entregado. Datos exclusivamente sintéticos.
  */
 class NotificationDispatcherServiceConsoleSafetyTest {
 
-    private static final String SYNTHETIC_CODE = "000111";
-    private static final Instant NOW = Instant.parse("2026-01-01T12:00:00Z");
-
-    private final NotificationRepository notificationRepository = mock(NotificationRepository.class);
-    private final NotificationScheduleRepository scheduleRepository = mock(NotificationScheduleRepository.class);
-    private final NotificationAttemptRepository attemptRepository = mock(NotificationAttemptRepository.class);
-    private final TemplateRenderer templateRenderer = new TemplateRenderer(new InMemoryNotificationTemplateProvider());
+    private final InMemoryDispatchStore store = new InMemoryDispatchStore();
+    private final MutableClock clock = new MutableClock(NOW);
 
     private final Logger rootLogger = (Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
     private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
@@ -63,13 +55,12 @@ class NotificationDispatcherServiceConsoleSafetyTest {
     void otpWithoutRealProviderAndWithoutOptInNeverInvokesConsole() {
         ConsoleNotificationProvider console = spy(new ConsoleNotificationProvider(false));
         Notification notification = otp();
-        NotificationSchedule schedule = schedule(notification);
 
-        dispatcher(false, console).dispatch(notification, schedule, otpVariables(), NOW);
+        dispatch(notification, false, console);
 
         verify(console, never()).send(any(), any());
-        verify(attemptRepository, never()).save(any());
-        assertFailedWithoutRetry(notification, schedule);
+        assertThat(store.attempts()).isEmpty();
+        assertFailedWithoutRetry(notification);
         assertCodeNotLogged();
     }
 
@@ -77,14 +68,13 @@ class NotificationDispatcherServiceConsoleSafetyTest {
     void otpWithoutRealProviderAndWithOptInIsDiagnosticOnly() {
         ConsoleNotificationProvider console = spy(new ConsoleNotificationProvider(true));
         Notification notification = otp();
-        NotificationSchedule schedule = schedule(notification);
 
-        dispatcher(true, console).dispatch(notification, schedule, otpVariables(), NOW);
+        dispatch(notification, true, console);
 
         verify(console, times(1)).send(any(), any());
         assertThat(logs()).anyMatch(line -> line.contains("[CONSOLE_DIAGNOSTIC]") && line.contains(SYNTHETIC_CODE));
 
-        NotificationAttempt attempt = singleSavedAttempt();
+        NotificationAttempt attempt = singleAttempt();
         assertThat(attempt.getChannel()).isEqualTo(NotificationChannel.CONSOLE);
         assertThat(attempt.getStatus()).isEqualTo(AttemptStatus.FAILED);
         assertThat(attempt.getFailureType()).isEqualTo(FailureType.PERMANENT);
@@ -92,7 +82,7 @@ class NotificationDispatcherServiceConsoleSafetyTest {
         assertThat(attempt.getDeliveredAt()).isNull();
         assertThat(attempt.getAcceptedAt()).isNull();
 
-        assertFailedWithoutRetry(notification, schedule);
+        assertFailedWithoutRetry(notification);
         // Solo la línea de diagnóstico lleva el código: los eventos del dispatcher no
         assertThat(logs().stream().filter(line -> line.contains(SYNTHETIC_CODE)))
                 .allMatch(line -> line.startsWith("[CONSOLE_DIAGNOSTIC]"));
@@ -104,16 +94,15 @@ class NotificationDispatcherServiceConsoleSafetyTest {
     @ValueSource(booleans = {false, true})
     void otpAcceptedByRealProviderNeverReachesConsole(boolean optIn) {
         ConsoleNotificationProvider console = spy(new ConsoleNotificationProvider(optIn));
-        StubEmailProvider email = new StubEmailProvider(() -> emailResult(AttemptStatus.ACCEPTED, null));
+        StubProvider email = StubProvider.email(() -> result(AttemptStatus.ACCEPTED, null));
         Notification notification = otp();
-        NotificationSchedule schedule = schedule(notification);
 
-        dispatcher(optIn, email, console).dispatch(notification, schedule, otpVariables(), NOW);
+        ClaimedSchedule claim = dispatch(notification, optIn, email, console);
 
-        assertThat(email.calls).isEqualTo(1);
+        assertThat(email.calls()).isEqualTo(1);
         verify(console, never()).send(any(), any());
-        assertThat(notification.getStatus()).isEqualTo(NotificationStatus.ACCEPTED);
-        assertThat(schedule.getStatus()).isEqualTo(ScheduleStatus.SENT);
+        assertThat(store.notification(notification.getId()).getStatus()).isEqualTo(NotificationStatus.ACCEPTED);
+        assertThat(store.schedule(claim.scheduleId()).getStatus()).isEqualTo(ScheduleStatus.SENT);
         assertCodeNotLogged();
     }
 
@@ -121,15 +110,14 @@ class NotificationDispatcherServiceConsoleSafetyTest {
     @ValueSource(booleans = {false, true})
     void otpPermanentFailureOfRealProviderDoesNotFallBackToConsole(boolean optIn) {
         ConsoleNotificationProvider console = spy(new ConsoleNotificationProvider(optIn));
-        StubEmailProvider email = new StubEmailProvider(() -> emailResult(AttemptStatus.FAILED, FailureType.PERMANENT));
+        StubProvider email = StubProvider.email(() -> result(AttemptStatus.FAILED, FailureType.PERMANENT));
         Notification notification = otp();
-        NotificationSchedule schedule = schedule(notification);
 
-        dispatcher(optIn, email, console).dispatch(notification, schedule, otpVariables(), NOW);
+        dispatch(notification, optIn, email, console);
 
         verify(console, never()).send(any(), any());
-        assertThat(singleSavedAttempt().getChannel()).isEqualTo(NotificationChannel.EMAIL);
-        assertFailedWithoutRetry(notification, schedule);
+        assertThat(singleAttempt().getChannel()).isEqualTo(NotificationChannel.EMAIL);
+        assertFailedWithoutRetry(notification);
         assertCodeNotLogged();
     }
 
@@ -137,178 +125,104 @@ class NotificationDispatcherServiceConsoleSafetyTest {
     void otpFailureOfAProviderQualifiedForCodesDoesNotFallBackToConsoleEither() {
         // Que un proveedor sea apto para códigos (W0b) no cambia la regla de W0a.
         ConsoleNotificationProvider console = spy(new ConsoleNotificationProvider(true));
-        StubEmailProvider email = new StubEmailProvider(
-                () -> emailResult(AttemptStatus.FAILED, FailureType.PERMANENT), true);
+        StubProvider email = StubProvider.qualifiedEmail(() -> result(AttemptStatus.FAILED, FailureType.PERMANENT));
         Notification notification = otp();
-        NotificationSchedule schedule = schedule(notification);
 
-        dispatcher(true, email, console).dispatch(notification, schedule, otpVariables(), NOW);
+        dispatch(notification, true, email, console);
 
         verify(console, never()).send(any(), any());
-        assertFailedWithoutRetry(notification, schedule);
+        assertFailedWithoutRetry(notification);
         assertCodeNotLogged();
     }
 
     @Test
     void otpWithRealProviderRetriesExhaustedDoesNotFallBackToConsole() {
+        // Fallo transitorio probado (no de aceptación desconocida) en el último intento permitido.
         ConsoleNotificationProvider console = spy(new ConsoleNotificationProvider(true));
-        StubEmailProvider email = new StubEmailProvider(() -> {
-            throw new NotificationDispatchException("SYNTHETIC_TIMEOUT", "fallo sintético");
+        StubProvider email = StubProvider.email(() -> {
+            throw new NotificationDispatchException(NotificationDispatchException.CIRCUIT_OPEN, "circuito sintético");
         });
-        // Dos intentos de EMAIL ya hechos: la política no programa otro reintento
-        when(attemptRepository.countByNotificationIdAndChannel(any(), eq(NotificationChannel.EMAIL))).thenReturn(2);
-        Notification notification = otp();
-        NotificationSchedule schedule = schedule(notification);
+        Notification notification = otp("sintetico@example.test", NOW.plus(Duration.ofHours(1)));
+        ClaimedSchedule claim = store.seedAndClaim(notification, NOW);
+        NotificationDispatcherService dispatcher = dispatcher(store, clock, true, email, console);
 
-        dispatcher(true, email, console).dispatch(notification, schedule, otpVariables(), NOW);
+        // Tres intentos de EMAIL: los dos primeros programan reintento; el tercero agota la política.
+        for (int run = 0; run < 3; run++) {
+            dispatcher.dispatch(claim);
+            NotificationSchedule schedule = store.schedule(claim.scheduleId());
 
+            if (schedule.getStatus() == ScheduleStatus.PENDING) {
+                clock.set(schedule.getNextRetryAt());
+                claim = store.reclaim(claim.scheduleId(), clock.instant());
+            }
+        }
+
+        assertThat(email.calls()).isEqualTo(3);
         verify(console, never()).send(any(), any());
-        assertFailedWithoutRetry(notification, schedule);
+        assertFailedWithoutRetry(notification);
         assertCodeNotLogged();
     }
 
-    // ── Notificaciones no sensibles: comportamiento existente ───────────
+    // ── Notificaciones no sensibles ─────────────────────────────────────
 
     @ParameterizedTest(name = "opt-in={0}")
     @ValueSource(booleans = {false, true})
-    void appointmentWithoutRealProviderKeepsConsoleDelivered(boolean optIn) {
+    void appointmentWithoutRealProviderIsPrintedButNotDelivered(boolean optIn) {
         ConsoleNotificationProvider console = spy(new ConsoleNotificationProvider(optIn));
         Notification notification = appointment();
-        NotificationSchedule schedule = schedule(notification);
 
-        dispatcher(optIn, console).dispatch(notification, schedule, Map.of("patientName", "Paciente Sintético"), NOW);
+        dispatch(notification, optIn, console);
 
         verify(console, times(1)).send(any(), any());
-        assertThat(notification.getStatus()).isEqualTo(NotificationStatus.DELIVERED);
-        assertThat(schedule.getStatus()).isEqualTo(ScheduleStatus.SENT);
         assertThat(logs()).anyMatch(line -> line.contains("[CONSOLE_NOTIFICATION]") && line.contains("Paciente Sintético"));
+
+        NotificationAttempt attempt = singleAttempt();
+        assertThat(attempt.getStatus()).isEqualTo(AttemptStatus.FAILED);
+        assertThat(attempt.getErrorCode()).isEqualTo(ConsoleNotificationProvider.DIAGNOSTIC_ONLY_ERROR_CODE);
+        assertThat(attempt.getDeliveredAt()).isNull();
+        assertFailedWithoutRetry(notification);
     }
 
     @Test
     void appointmentStillFallsBackToConsoleAfterRealProviderFailure() {
         ConsoleNotificationProvider console = spy(new ConsoleNotificationProvider(false));
-        StubEmailProvider email = new StubEmailProvider(() -> emailResult(AttemptStatus.FAILED, FailureType.PERMANENT));
+        StubProvider email = StubProvider.email(() -> result(AttemptStatus.FAILED, FailureType.PERMANENT));
         Notification notification = appointment();
-        NotificationSchedule schedule = schedule(notification);
 
-        dispatcher(false, email, console).dispatch(notification, schedule, Map.of("patientName", "Paciente Sintético"), NOW);
+        dispatch(notification, false, email, console);
 
         verify(console, times(1)).send(any(), any());
-        assertThat(notification.getStatus()).isEqualTo(NotificationStatus.DELIVERED);
-        assertThat(schedule.getStatus()).isEqualTo(ScheduleStatus.SENT);
+        assertThat(store.notification(notification.getId()).getStatus())
+                .isEqualTo(NotificationStatus.FAILED)
+                .isNotEqualTo(NotificationStatus.DELIVERED);
     }
 
     // ── Soporte ─────────────────────────────────────────────────────────
 
-    private NotificationDispatcherService dispatcher(boolean optIn, NotificationProvider... providers) {
-        return new NotificationDispatcherService(
-                notificationRepository,
-                scheduleRepository,
-                attemptRepository,
-                new ProviderRegistry(List.of(providers)),
-                templateRenderer,
-                new RetryPolicy(),
-                new ChannelFallbackPolicy(),
-                optIn
-        );
+    private ClaimedSchedule dispatch(Notification notification, boolean optIn, NotificationProvider... providers) {
+        ClaimedSchedule claim = store.seedAndClaim(notification, NOW);
+        dispatcher(store, clock, optIn, providers).dispatch(claim);
+        return claim;
     }
 
-    private void assertFailedWithoutRetry(Notification notification, NotificationSchedule schedule) {
-        assertThat(notification.getStatus()).isEqualTo(NotificationStatus.FAILED);
+    private void assertFailedWithoutRetry(Notification notification) {
+        assertThat(store.notification(notification.getId()).getStatus()).isEqualTo(NotificationStatus.FAILED);
+        NotificationSchedule schedule = store.schedule(
+                store.appliedWrites.get(store.appliedWrites.size() - 1).scheduleId());
         assertThat(schedule.getStatus()).isEqualTo(ScheduleStatus.FAILED);
-        assertThat(schedule.getNextRetryAt()).isNull();
     }
 
     private void assertCodeNotLogged() {
         assertThat(logs()).isNotEmpty().noneMatch(line -> line.contains(SYNTHETIC_CODE));
     }
 
-    private NotificationAttempt singleSavedAttempt() {
-        ArgumentCaptor<NotificationAttempt> captor = ArgumentCaptor.forClass(NotificationAttempt.class);
-        verify(attemptRepository, atLeastOnce()).save(captor.capture());
-        List<NotificationAttempt> distinct = captor.getAllValues().stream().distinct().toList();
-        assertThat(distinct).hasSize(1);
-        return distinct.get(0);
+    private NotificationAttempt singleAttempt() {
+        List<NotificationAttempt> attempts = store.attempts();
+        assertThat(attempts).hasSize(1);
+        return attempts.get(0);
     }
 
     private List<String> logs() {
         return appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
-    }
-
-    private static Map<String, String> otpVariables() {
-        return Map.of("code", SYNTHETIC_CODE, "expirationMinutes", "5", "destination", "+570000000000");
-    }
-
-    private static Notification otp() {
-        return notification(NotificationType.OTP_CODE, AggregateType.VERIFICATION);
-    }
-
-    private static Notification appointment() {
-        return notification(NotificationType.APPOINTMENT_SCHEDULED, AggregateType.APPOINTMENT);
-    }
-
-    private static Notification notification(NotificationType type, AggregateType aggregateType) {
-        return Notification.create(
-                type,
-                new AggregateReference(aggregateType, UUID.randomUUID()),
-                new RecipientSnapshot(UUID.randomUUID(), "Sintético", "+570000000000", "sintetico@example.test",
-                        Locale.forLanguageTag("es-CO"), null),
-                // Como el orquestador: el orden por defecto queda fijado al encolar
-                new ChannelPreference(new ChannelFallbackPolicy().resolveChannels(type)),
-                Map.of(),
-                NOW
-        );
-    }
-
-    private static NotificationSchedule schedule(Notification notification) {
-        return NotificationSchedule.create(notification.getId(), NOW, NOW);
-    }
-
-    private static NotificationSendResult emailResult(AttemptStatus status, FailureType failureType) {
-        return new NotificationSendResult(
-                "stub-email",
-                NotificationChannel.EMAIL,
-                status == AttemptStatus.FAILED ? null : "stub-" + UUID.randomUUID(),
-                status,
-                failureType,
-                failureType == null ? null : "SYNTHETIC_REJECTED",
-                failureType == null ? null : "rechazo sintético"
-        );
-    }
-
-    private static final class StubEmailProvider implements NotificationProvider {
-        private final Supplier<NotificationSendResult> behavior;
-        private final boolean qualifiesForOtp;
-        private int calls;
-
-        private StubEmailProvider(Supplier<NotificationSendResult> behavior) {
-            this(behavior, false);
-        }
-
-        private StubEmailProvider(Supplier<NotificationSendResult> behavior, boolean qualifiesForOtp) {
-            this.behavior = behavior;
-            this.qualifiesForOtp = qualifiesForOtp;
-        }
-
-        @Override
-        public boolean qualifiesForOtpDelivery() {
-            return qualifiesForOtp;
-        }
-
-        @Override
-        public NotificationChannel channel() {
-            return NotificationChannel.EMAIL;
-        }
-
-        @Override
-        public String providerName() {
-            return "stub-email";
-        }
-
-        @Override
-        public NotificationSendResult send(ChannelMessage message, RecipientSnapshot recipient) {
-            calls++;
-            return behavior.get();
-        }
     }
 }

@@ -47,6 +47,77 @@ Piedra Azul es una clínica cuyo proceso de agendamiento de citas se ha basado h
 4. Si nadie la captura, un manejador global de respaldo la registra y responde con `500 Internal Server Error` genérico.
 5. El cliente siempre recibe un error con estructura consistente, sin importar su origen.
 
+### Despacho de notificaciones
+
+> **Estado intermedio (W1a), no desplegable.** Falta la recuperación periódica del trabajo
+> interrumpido (W1b): hasta entonces un schedule o intento que quede en `PROCESSING` tras una caída
+> no se resuelve solo, y su código en claro sigue en `variables_json` (riesgo aceptado D15-A1).
+
+`DueNotificationJob` reclama los schedules vencidos (`FOR UPDATE SKIP LOCKED`, `PENDING` →
+`PROCESSING`) y anota cuántos intentos tenía cada notificación. `NotificationDispatcherService` los
+despacha uno a uno; un error en uno no abandona el resto del lote. Toda escritura del despacho pasa
+por `NotificationDispatchStore`, que en una sola transacción bloquea la fila del schedule y exige que
+siga en `PROCESSING` y que el número de intentos sea el esperado (cerca de propiedad); el estado se
+lee fresco dentro de la transacción. Si la cerca falla, no se invoca ningún proveedor más ni se
+modifican notificación ni schedule.
+
+Por canal: proveedor registrado y restricciones de consola → destinatario (correo vacío, mal formado
+o de dominio `.invalid`, con la misma regla que la admisión de códigos) y contenido (plantilla,
+marcadores sin resolver) → intento `PROCESSING` confirmado → vigencia del código con reloj fresco →
+proveedor, fuera de toda transacción → intento, notificación y schedule escritos juntos. Un fallo
+local se registra como intento `FAILED`/`PERMANENT` sin pasar por `PROCESSING` y nunca llega al
+proveedor ni a su circuit breaker.
+
+| Resultado del proveedor | Significado | Intento | Notificación / schedule | Reintento / otro canal |
+|---|---|---|---|---|
+| `ACCEPTED` | El proveedor lo aceptó; **no** prueba que llegara al buzón | `ACCEPTED` | `ACCEPTED` / `SENT` | No / no |
+| `UNKNOWN` | No se puede descartar que lo aceptara (excepción, tiempo agotado, respuesta ambigua) | `UNKNOWN`, `ACCEPTANCE_UNKNOWN` | `FAILED` / `FAILED` | No / no |
+| `RETRYABLE` | No aceptación transitoria probada; incluye circuit breaker abierto (no se invocó) | `FAILED`, `TEMPORARY` o `CIRCUIT_OPEN` | sigue / `PENDING` con `nextRetryAt` | Sí, dentro de la política; agotada, otro canal |
+| `REJECTED` | Rechazo permanente de destinatario o contenido | `FAILED`, `PERMANENT` | `FAILED` si no queda canal | No / siguiente canal elegible |
+| `PROVIDER_ERROR` | No aceptación probada que requiere intervención (configuración, consola) | `FAILED`, `PERMANENT` | `FAILED` si no queda canal | No / siguiente canal elegible |
+
+Política de reintentos: correo 60 s y 300 s (3 intentos), SMS y WhatsApp 60 s (2), consola ninguno.
+Un canal rechazado o con los reintentos agotados no se vuelve a intentar en ejecuciones posteriores.
+Antes de cada reintento se revalida la elegibilidad; no se programa uno que llegaría con el código
+vencido. `DELIVERED` solo podría venir de una confirmación posterior del proveedor (no implementada):
+un envío síncrono nunca queda como entregado.
+
+**Aceptación desconocida.** Notificación `FAILED` significa "terminó sin aceptación confirmada"; el
+intento `UNKNOWN` con `error_code = ACCEPTANCE_UNKNOWN` (el código original del proveedor queda en
+`error_message`) distingue el caso, y el log emite `NOTIFICATION_ACCEPTANCE_UNKNOWN` (sin contenido
+ni mensajes de excepción) para revisión del operador: el destinatario pudo haber recibido el
+mensaje. Las excepciones de SendGrid no aportan evidencia de no aceptación y se tratan así, salvo el
+circuit breaker abierto. Para un proveedor que no declara su resultado, la no aceptación solo se
+deduce de `FAILED` con `TEMPORARY`/`CIRCUIT_OPEN` (reintentable) o `PERMANENT` (rechazo); un
+`FAILED` sin tipo o con tipo `UNKNOWN`, `BOUNCED`, `UNDELIVERED` o `CANCELLED` cuenta como
+aceptación desconocida. `PROVIDER_ERROR` nunca se deduce: solo lo declara el proveedor.
+
+**Diagnósticos del proveedor.** Lo que devuelve el proveedor no es confiable (puede repetir el
+mensaje enviado). Antes de guardarlo en el intento o escribirlo en el log: un código de error que no
+tenga forma de código o contenga un valor secreto de la notificación pasa a
+`PROVIDER_DIAGNOSTIC_REDACTED`; con contenido sensible, el texto del proveedor se sustituye por una
+descripción controlada (clasificación y código seguro), y sin él se conserva salvo que contenga un
+secreto; un id de mensaje con un secreto se descarta. La clasificación, el reintento y el cambio de
+canal no dependen de ese texto. Los logs propios de SendGrid (cuerpo de respuestas de error) quedan
+fuera de esta frontera; SendGrid no es apto para códigos y, con él registrado, no se emiten (W0b).
+
+**Códigos de verificación.** Verification pasa el vencimiento real del código (`expiresAt`, 5 min);
+el despachador no entrega nada al proveedor a partir de ese instante (sin margen adicional) y cierra
+como `EXPIRED`. Un código sin vencimiento legible cuenta como vencido. Cuando el despacho termina
+(`ACCEPTED`, `FAILED` o `EXPIRED`), la misma transacción elimina `code` de `variables_json` y conserva
+las variables no secretas; mientras quede un reintento, el código se conserva. Limitación aceptada
+(D15-A1): si el proceso cae entre el intento en curso y su resolución, el código queda en claro
+hasta que W1b resuelva ese trabajo. Las filas anteriores no se limpian (entorno desechable).
+
+**Consola.** Es diagnóstico, nunca entrega: todo mensaje impreso deja el intento `FAILED`
+(`CONSOLE_DIAGNOSTIC_ONLY`, `PROVIDER_ERROR`) y, si es el último canal, la notificación `FAILED`.
+
+**Trabajo interrumpido.** Si un despacho retoma una notificación con un intento que pudo llegar al
+proveedor, no la reenvía: un intento en curso pasa a `UNKNOWN` y uno aceptado cierra como
+`ACCEPTED`. Un error antes de invocar al proveedor cierra como `FAILED`; uno después deja el intento
+en `PROCESSING`. `StaleNotificationAttemptJob` solo informa intentos en curso antiguos
+(`NOTIFICATION_STALE`); ya no reclasifica intentos aceptados ni desconocidos.
+
 ## Persistencia
 
 - Modelo relacional normalizado para las entidades de negocio.
@@ -135,6 +206,7 @@ No hay atomicidad ni vuelta atrás automática entre Cloudflare y Hetzner: un ca
 - El backend permanece como una única aplicación desplegable, por lo que no es posible escalar módulos de forma independiente como en una arquitectura de microservicios (ADR-003).
 - PostgreSQL presenta un escalado horizontal más complejo que enfoques NoSQL puros (ADR-002).
 - Dependencia de Docker Desktop o Docker Engine en los equipos de desarrollo, con posibles conflictos de puertos locales (ADR-005).
+- El despacho de notificaciones no recupera aún el trabajo interrumpido (W1b pendiente); ver [Despacho de notificaciones](#despacho-de-notificaciones).
 
 ## Decisiones relacionadas
 

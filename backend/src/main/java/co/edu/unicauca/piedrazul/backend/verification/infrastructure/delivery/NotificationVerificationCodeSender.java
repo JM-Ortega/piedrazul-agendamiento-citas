@@ -7,6 +7,7 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.verification.application.VerificationCodeSender;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -35,7 +36,7 @@ public class NotificationVerificationCodeSender implements VerificationCodeSende
     }
 
     @Override
-    public void sendCode(String subject, String displayName, String phone, String email, String code, int expirationMinutes, UUID recipientId, UUID verificationCodeId) {
+    public void sendCode(String subject, String displayName, String phone, String email, String code, int expirationMinutes, Instant expiresAt, UUID recipientId, UUID verificationCodeId) {
         RecipientSnapshot recipient = new RecipientSnapshot(
                 recipientId,
                 displayName,
@@ -46,8 +47,10 @@ public class NotificationVerificationCodeSender implements VerificationCodeSende
         );
 
         Map<String, String> variables = Map.of(
-                "code", code,
+                NotificationVariables.CODE, code,
                 "expirationMinutes", String.valueOf(expirationMinutes),
+                // El despacho no entrega el código al proveedor a partir de este instante.
+                NotificationVariables.EXPIRES_AT, expiresAt.toString(),
                 "destination", phone != null ? phone : email
         );
 

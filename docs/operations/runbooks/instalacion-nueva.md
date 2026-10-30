@@ -60,7 +60,7 @@ administrador de negocio ([primer-admin-negocio.md](primer-admin-negocio.md)).
 en `group_vars`): la cadena no exige ni entrega `PIEDRAZUL_BACKEND_MAIL_SEND`, el `.env`
 queda con `SENDGRID_API_KEY` vacía y el backend arranca sin ella. No hay envío externo de
 correo. Las notificaciones de citas caen al proveedor de consola, que solo las registra en el
-log del backend. Los códigos de verificación, en cambio, no se emiten: sin un canal apto para
+log del backend y las deja `FAILED` (`CONSOLE_DIAGNOSTIC_ONLY`): nadie las recibe. Los códigos de verificación, en cambio, no se emiten: sin un canal apto para
 ellos, `POST /api/patients/link-user-account/request-code` responde `503`
 (`VERIFICATION_DELIVERY_UNAVAILABLE`) antes de buscar el documento, sin generar código, sin
 invalidar el activo, sin consumir el cupo de solicitudes y sin encolar nada; el arranque lo
@@ -76,7 +76,10 @@ entregado; con un proveedor real habilitado el código nunca llega a la consola.
 correo apto, una persona sin correo utilizable (vacío, mal formado o de dominio `.invalid`)
 recibe `409` (`VERIFICATION_CONTACT_UNUSABLE`) sin cambios en su código activo; el teléfono no
 cuenta mientras no haya SMS ni WhatsApp. Un `200` significa solicitud aceptada y envío
-encolado, no entrega. `LOG_LEVEL_SQL_BIND` debe seguir en `WARN` (`log_level_sql_bind`): en
+encolado, no entrega; un envío `ACCEPTED` tampoco prueba la entrega, y un intento `UNKNOWN`
+(`ACCEPTANCE_UNKNOWN`, evento `NOTIFICATION_ACCEPTANCE_UNKNOWN`) significa que el destinatario pudo
+recibirlo y no se reintenta (ver [despacho de notificaciones](../../architecture/overview.md#despacho-de-notificaciones),
+que aún no es desplegable: falta la recuperación del trabajo interrumpido, W1b). `LOG_LEVEL_SQL_BIND` debe seguir en `WARN` (`log_level_sql_bind`): en
 `TRACE` el log recibe los valores enlazados, incluido el código. Por lo mismo, `LOG_LEVEL_ROOT`
 no debe bajar a `DEBUG` (`log_level_root`): con SendGrid habilitado, el log de red de su
 cliente HTTP (`org.apache.http.wire`) escribe el cuerpo de cada correo. Los flujos que dependen de

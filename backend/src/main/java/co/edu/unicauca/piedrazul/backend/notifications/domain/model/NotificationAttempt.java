@@ -216,6 +216,57 @@ public class NotificationAttempt {
         this.updatedAt = now;
     }
 
+    /**
+     * Fallo detectado antes de invocar al proveedor (destinatario, contenido, vigencia): el
+     * intento nunca pasa por PROCESSING y se registra ya fallido.
+     */
+    public void rejectBeforeSend(
+            String errorCode,
+            String errorMessage,
+            Instant now
+    ) {
+        Objects.requireNonNull(now, "La fecha actual es obligatoria");
+        requireStatus(AttemptStatus.PENDING);
+
+        this.status = AttemptStatus.FAILED;
+        this.failureType = FailureType.PERMANENT;
+        this.errorCode = errorCode;
+        this.errorMessage = truncateErrorMessage(errorMessage);
+        this.failedAt = now;
+        this.updatedAt = now;
+    }
+
+    /**
+     * El proveedor pudo haber aceptado el mensaje: no es un fallo probado ({@code failedAt} queda
+     * vacío) y no admite reintento ni cambio de canal.
+     */
+    public void markAcceptanceUnknown(
+            String errorCode,
+            String errorMessage,
+            Instant now
+    ) {
+        Objects.requireNonNull(now, "La fecha actual es obligatoria");
+        requireStatus(AttemptStatus.PROCESSING);
+
+        this.status = AttemptStatus.UNKNOWN;
+        this.failureType = FailureType.UNKNOWN;
+        this.errorCode = errorCode;
+        this.errorMessage = truncateErrorMessage(errorMessage);
+        this.updatedAt = now;
+    }
+
+    /** El proveedor ya fue invocado (o pudo serlo) y no consta que no aceptara el mensaje. */
+    public boolean mayHaveBeenAccepted() {
+        return status == AttemptStatus.PROCESSING
+                || status == AttemptStatus.ACCEPTED
+                || status == AttemptStatus.SENT
+                || status == AttemptStatus.DELIVERED
+                || status == AttemptStatus.READ
+                || status == AttemptStatus.BOUNCED
+                || status == AttemptStatus.UNDELIVERED
+                || status == AttemptStatus.UNKNOWN;
+    }
+
     public void markBounced(String errorCode, String errorMessage, Instant now) {
         Objects.requireNonNull(now, "La fecha actual es obligatorio");
         requireStatus(AttemptStatus.SENT, AttemptStatus.ACCEPTED, AttemptStatus.UNKNOWN);

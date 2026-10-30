@@ -6,7 +6,7 @@ import co.edu.unicauca.piedrazul.backend.notifications.application.template.Temp
 import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.ChannelFallbackPolicy;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.ReminderScheduleCalculator;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.RetryPolicy;
-import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationAttemptRepository;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationDispatchStore;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationProvider;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationRepository;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationScheduleRepository;
@@ -96,24 +96,24 @@ public class NotificationConfig {
 
     @Bean
     public NotificationDispatcherService notificationDispatcherService(
-            NotificationRepository notificationRepository,
-            NotificationScheduleRepository scheduleRepository,
-            NotificationAttemptRepository attemptRepository,
+            NotificationDispatchStore dispatchStore,
             ProviderRegistry providerRegistry,
             TemplateRenderer templateRenderer,
             RetryPolicy retryPolicy,
             ChannelFallbackPolicy fallbackPolicy,
-            @Value("${notifications.console.show-sensitive-content:false}") boolean showSensitiveContent
+            Validator validator,
+            @Value("${notifications.console.show-sensitive-content:false}") boolean showSensitiveContent,
+            @Qualifier("notificationClock") Clock clock
     ) {
         return new NotificationDispatcherService(
-                notificationRepository,
-                scheduleRepository,
-                attemptRepository,
+                dispatchStore,
                 providerRegistry,
                 templateRenderer,
                 retryPolicy,
                 fallbackPolicy,
-                showSensitiveContent
+                new RecipientEmailPolicy(validator),
+                showSensitiveContent,
+                clock
         );
     }
 

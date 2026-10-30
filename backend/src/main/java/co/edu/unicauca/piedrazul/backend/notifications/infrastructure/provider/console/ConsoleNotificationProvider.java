@@ -7,12 +7,11 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.model.AttemptStatu
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.FailureType;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.NotificationChannel;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.RecipientSnapshot;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.DeliveryOutcome;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationProvider;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationSendResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.UUID;
 
 public class ConsoleNotificationProvider implements NotificationProvider {
 
@@ -54,27 +53,17 @@ public class ConsoleNotificationProvider implements NotificationProvider {
         }
 
         log.info(
-                "[CONSOLE_NOTIFICATION] recipient={} message={}",
+                "[CONSOLE_NOTIFICATION] recipient={} message={} (diagnóstico, no entregado al destinatario)",
                 maskRecipient(recipient),
                 consoleMessage.message()
         );
 
-        return new NotificationSendResult(
-                PROVIDER_NAME,
-                NotificationChannel.CONSOLE,
-                "console-" + UUID.randomUUID(),
-                AttemptStatus.DELIVERED,
-                null,
-                null,
-                null
-        );
+        return diagnosticOnlyResult();
     }
 
     /**
      * El contenido sensible solo se muestra con el opt-in explícito (entornos con datos
-     * exclusivamente sintéticos); si no, se oculta. En ambos casos la salida es diagnóstico y no
-     * entrega: el resultado es un fallo permanente, sin reintento, y no queda registrado como
-     * entregado.
+     * exclusivamente sintéticos); si no, se oculta. La salida es diagnóstico y no entrega.
      */
     private NotificationSendResult logSensitiveDiagnostic(
             ConsoleLogMessage consoleMessage,
@@ -90,6 +79,14 @@ public class ConsoleNotificationProvider implements NotificationProvider {
                 renderedMessage
         );
 
+        return diagnosticOnlyResult();
+    }
+
+    /**
+     * Ningún mensaje impreso en consola llega al destinatario: el resultado es error de proveedor
+     * (no aceptado, sin reintento) y nunca entregado ni aceptado.
+     */
+    private static NotificationSendResult diagnosticOnlyResult() {
         return new NotificationSendResult(
                 PROVIDER_NAME,
                 NotificationChannel.CONSOLE,
@@ -97,7 +94,8 @@ public class ConsoleNotificationProvider implements NotificationProvider {
                 AttemptStatus.FAILED,
                 FailureType.PERMANENT,
                 DIAGNOSTIC_ONLY_ERROR_CODE,
-                "Salida de diagnóstico en consola; no constituye entrega al destinatario"
+                "Salida de diagnóstico en consola; no constituye entrega al destinatario",
+                DeliveryOutcome.PROVIDER_ERROR
         );
     }
 

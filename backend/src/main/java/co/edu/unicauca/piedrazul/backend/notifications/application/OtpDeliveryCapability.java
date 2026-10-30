@@ -5,13 +5,10 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.model.Notification
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.NotificationType;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.ChannelFallbackPolicy;
 import jakarta.validation.Validator;
-import jakarta.validation.constraints.Email;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
 
 /**
  * Decide si se puede emitir un código de verificación y para qué destinatarios, antes de
@@ -32,7 +29,7 @@ public class OtpDeliveryCapability {
     private static final Logger log = LoggerFactory.getLogger(OtpDeliveryCapability.class);
 
     private final OtpDeliveryMode mode;
-    private final Validator validator;
+    private final RecipientEmailPolicy emailPolicy;
 
     public OtpDeliveryCapability(
             ProviderRegistry providerRegistry,
@@ -40,7 +37,7 @@ public class OtpDeliveryCapability {
             boolean consoleSensitiveDiagnosticEnabled,
             Validator validator
     ) {
-        this.validator = Objects.requireNonNull(validator, "El validador es obligatorio");
+        this.emailPolicy = new RecipientEmailPolicy(validator);
         this.mode = resolveMode(providerRegistry, fallbackPolicy, consoleSensitiveDiagnosticEnabled);
         logMode();
     }
@@ -58,31 +55,8 @@ public class OtpDeliveryCapability {
             case UNAVAILABLE -> false;
             // La consola no entrega nada al destinatario; basta con que exista algún contacto.
             case DIAGNOSTIC_CONSOLE -> !isBlank(phone) || !isBlank(email);
-            case EMAIL -> isUsableEmail(email);
+            case EMAIL -> emailPolicy.isUsable(email);
         };
-    }
-
-    private boolean isUsableEmail(String email) {
-        if (isBlank(email)) {
-            return false;
-        }
-
-        if (!validator.validateValue(EmailValue.class, "value", email).isEmpty()) {
-            return false;
-        }
-
-        return !hasReservedInvalidDomain(email);
-    }
-
-    /** {@code .invalid} (RFC 2606) nunca entrega; se usa en datos sintéticos. */
-    private static boolean hasReservedInvalidDomain(String email) {
-        String domain = email.substring(email.lastIndexOf('@') + 1).toLowerCase(Locale.ROOT);
-
-        if (domain.endsWith(".")) {
-            domain = domain.substring(0, domain.length() - 1);
-        }
-
-        return domain.equals("invalid") || domain.endsWith(".invalid");
     }
 
     private static OtpDeliveryMode resolveMode(
@@ -126,11 +100,5 @@ public class OtpDeliveryCapability {
 
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
-    }
-
-    /** Portador de la restricción {@link Email} de Jakarta, para validar un valor suelto. */
-    private static final class EmailValue {
-        @Email
-        private String value;
     }
 }

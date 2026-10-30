@@ -108,7 +108,8 @@ notifications:
     # La consola es diagnóstico, no entrega. Con true, el contenido sensible (códigos de
     # verificación) se escribe en el log solo si no hay ningún proveedor real habilitado; con
     # un proveedor real nunca llega a la consola. Solo en entornos con datos exclusivamente
-    # sintéticos. Ese envío queda FAILED (CONSOLE_DIAGNOSTIC_ONLY), nunca como entregado.
+    # sintéticos. Todo envío por consola (sensible o no) queda FAILED (CONSOLE_DIAGNOSTIC_ONLY),
+    # nunca como entregado.
     # Sin un canal apto para códigos (SendGrid no lo es; falta SES) y sin este diagnóstico, no
     # se emiten códigos: la solicitud responde 503 (VERIFICATION_DELIVERY_UNAVAILABLE).
     show-sensitive-content: ${NOTIFICATIONS_CONSOLE_SHOW_SENSITIVE:false}
@@ -124,6 +125,9 @@ notifications:
   due-job:
     fixed-delay: ${NOTIFICATIONS_DUE_JOB_FIXED_DELAY:30000}
 
+  # Solo informa intentos en curso (PROCESSING) más antiguos que el umbral por defecto; no cambia
+  # estado. La recuperación del trabajo interrumpido es W1b (pendiente). Los umbrales por canal
+  # aún no se usan.
   stale-attempt:
     enabled: ${NOTIFICATIONS_STALE_ATTEMPT_ENABLED:true}
     fixed-delay: ${NOTIFICATIONS_STALE_ATTEMPT_FIXED_DELAY:300000}

@@ -7,6 +7,7 @@ import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.mappers.No
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.mappers.NotificationMapper;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.mappers.NotificationScheduleMapper;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.persistence.adapter.NotificationAttemptRepositoryAdapter;
+import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.persistence.adapter.NotificationDispatchStoreAdapter;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.persistence.adapter.NotificationRepositoryAdapter;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.persistence.adapter.NotificationScheduleRepositoryAdapter;
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientLinkFinalizer;
@@ -81,6 +82,7 @@ import static org.mockito.Mockito.doReturn;
         NotificationRepositoryAdapter.class,
         NotificationScheduleRepositoryAdapter.class,
         NotificationAttemptRepositoryAdapter.class,
+        NotificationDispatchStoreAdapter.class,
         NotificationMapper.class,
         NotificationScheduleMapper.class,
         NotificationAttemptMapper.class,

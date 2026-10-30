@@ -163,7 +163,7 @@ class PatientRequestCodeContractTest {
 
     private void verifyNoCodeIssued() {
         verifyNoInteractions(verificationCodeStore);
-        verify(sender, never()).sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any());
+        verify(sender, never()).sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any(), any());
     }
 
     // ── 503 ───────────────────────────────────────────────────────────────
@@ -252,7 +252,7 @@ class PatientRequestCodeContractTest {
         assertThat(result.getResponse().getStatus()).isEqualTo(200);
         assertThat(result.getResponse().getContentAsString()).isEmpty();
         verify(sender).sendCode(eq(KNOWN_DOC), anyString(), eq(PHONE), eq("ana.ruiz@example.com"),
-                anyString(), eq(5), eq(personId), any());
+                anyString(), eq(5), any(), eq(personId), any());
     }
 
     // ── 429 sin cambios ───────────────────────────────────────────────────
@@ -267,7 +267,7 @@ class PatientRequestCodeContractTest {
 
         assertThat(result.getResponse().getStatus()).isEqualTo(429);
         assertThat(body(result).get("errorCode").asText()).isEqualTo("VERIFICATION_CODE_REQUEST_LIMIT");
-        verify(sender, never()).sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any());
+        verify(sender, never()).sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any(), any());
     }
 
     // ── 409 ya vinculado: sin UUID interno ────────────────────────────────

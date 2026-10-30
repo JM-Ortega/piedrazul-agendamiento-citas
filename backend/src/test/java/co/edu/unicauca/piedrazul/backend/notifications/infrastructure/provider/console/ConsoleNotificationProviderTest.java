@@ -7,6 +7,7 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.message.ConsoleLog
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.AttemptStatus;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.FailureType;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.RecipientSnapshot;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.DeliveryOutcome;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationSendResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,12 +61,13 @@ class ConsoleNotificationProviderTest {
     }
 
     @Test
-    void nonSensitiveMessageKeepsExistingDeliveredBehavior() {
+    void nonSensitiveMessageIsPrintedButNeverReportedAsDelivered() {
         NotificationSendResult result = new ConsoleNotificationProvider(false)
                 .send(new ConsoleLogMessage("Cita agendada", false), recipient);
 
         assertThat(logs()).anyMatch(line -> line.contains("[CONSOLE_NOTIFICATION]") && line.contains("Cita agendada"));
-        assertThat(result.status()).isEqualTo(AttemptStatus.DELIVERED);
+        assertDiagnosticOnly(result);
+        assertThat(result.status()).isNotEqualTo(AttemptStatus.DELIVERED);
     }
 
     private void assertDiagnosticOnly(NotificationSendResult result) {
@@ -73,6 +75,7 @@ class ConsoleNotificationProviderTest {
         assertThat(result.failureType()).isEqualTo(FailureType.PERMANENT);
         assertThat(result.errorCode()).isEqualTo(ConsoleNotificationProvider.DIAGNOSTIC_ONLY_ERROR_CODE);
         assertThat(result.providerMessageId()).isNull();
+        assertThat(result.outcome()).isEqualTo(DeliveryOutcome.PROVIDER_ERROR);
     }
 
     private List<String> logs() {

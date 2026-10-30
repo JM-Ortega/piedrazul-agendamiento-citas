@@ -112,7 +112,7 @@ class VerificationRequestLimitIT extends PostgresIntegrationSupport {
 
     private void verifyCodesSent(int expected) {
         verify(verificationCodeSender, times(expected))
-                .sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any());
+                .sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any(), any());
     }
 
     private long codesInDatabase() {

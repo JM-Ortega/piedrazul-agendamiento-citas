@@ -185,7 +185,12 @@ class VerificationServiceTest {
         requestCode();
 
         verify(verificationCodeStore).save(any(VerificationCode.class));
-        verify(sender).sendCode(eq(SUBJECT), anyString(), eq(PHONE), eq(EMAIL), anyString(), anyInt(), eq(RECIPIENT), any());
+        // El vencimiento que recibe Notifications es el real del código (5 minutos), no uno derivado.
+        verify(sender).sendCode(eq(SUBJECT), anyString(), eq(PHONE), eq(EMAIL), anyString(), anyInt(),
+                argThat(expiresAt -> expiresAt != null
+                        && !expiresAt.isBefore(Instant.now().plus(Duration.ofMinutes(4)))
+                        && !expiresAt.isAfter(Instant.now().plus(Duration.ofMinutes(5)))),
+                eq(RECIPIENT), any());
     }
 
     @Test
@@ -233,7 +238,7 @@ class VerificationServiceTest {
         // Ni bloqueo, ni conteo de cupo, ni invalidación, ni código, ni envío.
         verifyNoInteractions(verificationCodeStore, passwordEncoder);
         verify(sender, never()).isRecipientUsable(any(), any());
-        verify(sender, never()).sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any());
+        verify(sender, never()).sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any(), any());
     }
 
     @Test
@@ -244,7 +249,7 @@ class VerificationServiceTest {
         assertThrows(VerificationContactUnusableException.class, this::requestCode);
 
         verifyNoInteractions(verificationCodeStore, passwordEncoder);
-        verify(sender, never()).sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any());
+        verify(sender, never()).sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any(), any());
     }
 
     @Test
@@ -271,6 +276,6 @@ class VerificationServiceTest {
 
     private void verifyNothingIssuedNorSent() {
         verify(verificationCodeStore, never()).save(any());
-        verify(sender, never()).sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any());
+        verify(sender, never()).sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any(), any());
     }
 }

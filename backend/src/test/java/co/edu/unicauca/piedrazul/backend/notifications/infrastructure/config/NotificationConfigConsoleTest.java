@@ -5,6 +5,7 @@ import co.edu.unicauca.piedrazul.backend.notifications.application.NotificationD
 import co.edu.unicauca.piedrazul.backend.notifications.application.OtpDeliveryCapability;
 import co.edu.unicauca.piedrazul.backend.notifications.application.ProviderRegistry;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationAttemptRepository;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationDispatchStore;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationRepository;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationScheduleRepository;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.provider.console.ConsoleNotificationProvider;
@@ -42,6 +43,11 @@ class NotificationConfigConsoleTest {
         @Bean
         NotificationAttemptRepository notificationAttemptRepository() {
             return mock(NotificationAttemptRepository.class);
+        }
+
+        @Bean
+        NotificationDispatchStore notificationDispatchStore() {
+            return mock(NotificationDispatchStore.class);
         }
 
         @Bean

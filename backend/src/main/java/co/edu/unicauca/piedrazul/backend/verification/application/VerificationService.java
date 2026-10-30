@@ -99,7 +99,8 @@ public class VerificationService implements VerificationModuleApi {
         );
 
         verificationCodeStore.save(verificationCode);
-        sender.sendCode(subject, displayName, phone, email, rawCode, EXPIRATION_MINUTES, recipientId, verificationCode.getId());
+        sender.sendCode(subject, displayName, phone, email, rawCode, EXPIRATION_MINUTES,
+                verificationCode.getExpiresAt(), recipientId, verificationCode.getId());
     }
 
     @Override
