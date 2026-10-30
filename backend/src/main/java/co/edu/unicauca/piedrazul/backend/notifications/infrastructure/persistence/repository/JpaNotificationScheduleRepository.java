@@ -35,6 +35,31 @@ public interface JpaNotificationScheduleRepository
             List<ScheduleStatus> statuses
     );
 
+    /**
+     * Con intentos en curso, manda el más reciente; sin ellos, el reclamo. Sin bloqueo: la decisión
+     * real se toma después, bajo el bloqueo de cada schedule.
+     */
+    @Query(value = """
+            SELECT s.id
+            FROM notification_schedule s
+            LEFT JOIN LATERAL (
+                SELECT MAX(a.updated_at) AS latest
+                FROM notification_attempts a
+                WHERE a.notification_id = s.notification_id
+                  AND a.status = 'PROCESSING'
+            ) in_flight ON TRUE
+            WHERE COALESCE(
+                in_flight.latest < :staleBefore,
+                s.status = 'PROCESSING' AND s.processing_started_at < :staleBefore
+            )
+            ORDER BY COALESCE(in_flight.latest, s.processing_started_at) ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<UUID> findInterruptedIds(
+            @Param("staleBefore") Instant staleBefore,
+            @Param("limit") int limit
+    );
+
     /** Bloquea la fila del schedule: serializa el despacho y la recuperación del mismo trabajo. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM NotificationScheduleEntity s WHERE s.id = :id")

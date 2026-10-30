@@ -79,7 +79,7 @@ cuenta mientras no haya SMS ni WhatsApp. Un `200` significa solicitud aceptada y
 encolado, no entrega; un envío `ACCEPTED` tampoco prueba la entrega, y un intento `UNKNOWN`
 (`ACCEPTANCE_UNKNOWN`, evento `NOTIFICATION_ACCEPTANCE_UNKNOWN`) significa que el destinatario pudo
 recibirlo y no se reintenta (ver [despacho de notificaciones](../../architecture/overview.md#despacho-de-notificaciones),
-que aún no es desplegable: falta la recuperación del trabajo interrumpido, W1b). `LOG_LEVEL_SQL_BIND` debe seguir en `WARN` (`log_level_sql_bind`): en
+que también explica la recuperación del trabajo interrumpido). `LOG_LEVEL_SQL_BIND` debe seguir en `WARN` (`log_level_sql_bind`): en
 `TRACE` el log recibe los valores enlazados, incluido el código. Por lo mismo, `LOG_LEVEL_ROOT`
 no debe bajar a `DEBUG` (`log_level_root`): con SendGrid habilitado, el log de red de su
 cliente HTTP (`org.apache.http.wire`) escribe el cuerpo de cada correo. Los flujos que dependen de

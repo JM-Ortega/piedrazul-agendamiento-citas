@@ -9,6 +9,7 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.message.SmsTextMes
 import co.edu.unicauca.piedrazul.backend.notifications.domain.message.WhatsAppTemplateMessage;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.ChannelFallbackPolicy;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.InterruptedDispatchPolicy;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.RetryPolicy;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.*;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationDispatchStore.Begin;
@@ -42,9 +43,9 @@ import java.util.regex.Pattern;
  */
 public class NotificationDispatcherService {
 
-    static final String ACCEPTANCE_UNKNOWN = "ACCEPTANCE_UNKNOWN";
+    static final String ACCEPTANCE_UNKNOWN = InterruptedDispatchPolicy.ACCEPTANCE_UNKNOWN;
     static final String CONTENT_EXPIRED = "CONTENT_EXPIRED";
-    static final String DISPATCH_INTERRUPTED = "DISPATCH_INTERRUPTED";
+    static final String DISPATCH_INTERRUPTED = InterruptedDispatchPolicy.DISPATCH_INTERRUPTED;
     static final String DIAGNOSTIC_REDACTED = "PROVIDER_DIAGNOSTIC_REDACTED";
 
     // Un código de diagnóstico seguro: corto, sin espacios ni caracteres de control.
@@ -91,7 +92,7 @@ public class NotificationDispatcherService {
     /**
      * Despacha un schedule reclamado. No propaga errores: un fallo de un schedule no debe
      * abandonar el resto del lote. Lo que no pueda resolverse aquí (p. ej. la base no responde)
-     * queda en PROCESSING para la recuperación periódica (W1b, aún no implementada).
+     * queda en PROCESSING para la recuperación periódica ({@link InterruptedDispatchPolicy}).
      */
     public void dispatch(ClaimedSchedule claim) {
         Objects.requireNonNull(claim, "El schedule reclamado es obligatorio");
@@ -267,6 +268,10 @@ public class NotificationDispatcherService {
                 if (write(run, DispatchWrite.resolve(run.scheduleId(), run.expectedAttemptCount, attempt,
                         DispatchFinish.ACCEPTED, null, now))) {
                     NotificationLogger.dispatched(run.context(attempt), outcome.providerMessageId());
+                } else {
+                    // Otro actor cerró el trabajo (p. ej. la recuperación, como aceptación
+                    // desconocida); el estado no cambia, pero el hecho no se pierde.
+                    NotificationLogger.lateAcceptance(run.context(attempt), outcome.providerMessageId());
                 }
 
                 return Step.DONE;
@@ -357,8 +362,8 @@ public class NotificationDispatcherService {
     /**
      * Trabajo retomado con un intento que pudo llegar al proveedor: nunca se reenvía. Un intento
      * aceptado cierra como aceptado; uno en curso pasa a aceptación desconocida; en ambos casos se
-     * elimina el código. Es la resolución conservadora que la recuperación periódica (W1b)
-     * reutilizará al reencolar trabajo interrumpido.
+     * elimina el código. Es la misma decisión de {@link InterruptedDispatchPolicy}, por si un
+     * trabajo así llegara a reclamarse: la recuperación no reencola nada con un intento en curso.
      */
     private void resolveInterrupted(Run run) {
         run.stage = "interrupted";
@@ -380,8 +385,7 @@ public class NotificationDispatcherService {
 
         if (inFlight.isPresent()) {
             NotificationAttempt attempt = inFlight.get();
-            attempt.markAcceptanceUnknown(ACCEPTANCE_UNKNOWN,
-                    "Intento en curso interrumpido; el proveedor pudo haberlo aceptado", now);
+            attempt.markAcceptanceUnknown(ACCEPTANCE_UNKNOWN, InterruptedDispatchPolicy.INTERRUPTED_MESSAGE, now);
 
             if (write(run, DispatchWrite.resolve(run.scheduleId(), run.expectedAttemptCount, attempt,
                     DispatchFinish.FAILED, null, now))) {
@@ -397,8 +401,8 @@ public class NotificationDispatcherService {
     /**
      * Error inesperado a mitad del despacho. Si el proveedor no llegó a invocarse, se cierra como
      * FAILED (con el intento en curso, si lo hay, marcado como fallido). Si pudo invocarse, el
-     * intento queda en PROCESSING: la aceptación es posible y solo la recuperación (W1b) lo
-     * resuelve. Si esta escritura también falla, el trabajo queda reclamado para W1b.
+     * intento queda en PROCESSING: la aceptación es posible y solo la recuperación lo resuelve. Si
+     * esta escritura también falla, el trabajo queda reclamado para la recuperación.
      */
     private void abandon(Run run) {
         if (run.inFlight != null && run.providerInvoked) {

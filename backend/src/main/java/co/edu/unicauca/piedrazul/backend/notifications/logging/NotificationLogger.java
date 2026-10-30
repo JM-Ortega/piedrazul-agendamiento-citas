@@ -31,6 +31,7 @@ public final class NotificationLogger {
     private static final String EXPIRED = "NOTIFICATION_EXPIRED";
     private static final String OWNERSHIP_LOST = "NOTIFICATION_OWNERSHIP_LOST";
     private static final String INTERRUPTED = "NOTIFICATION_DISPATCH_INTERRUPTED";
+    private static final String LATE_ACCEPTANCE = "NOTIFICATION_LATE_ACCEPTANCE";
 
     private NotificationLogger() {
     }
@@ -209,6 +210,22 @@ public final class NotificationLogger {
                 OWNERSHIP_LOST,
                 base(ctx),
                 stage
+        );
+    }
+
+    /**
+     * El proveedor aceptó el mensaje después de que otro actor cerrara el trabajo. No cambia el
+     * estado: es la evidencia para el operador de que un intento UNKNOWN sí fue aceptado.
+     */
+    public static void lateAcceptance(
+            NotificationLogContext ctx,
+            String providerMessageId
+    ) {
+        log.error(
+                "{} {} providerMessageId={}",
+                LATE_ACCEPTANCE,
+                base(ctx),
+                providerMessageId
         );
     }
 

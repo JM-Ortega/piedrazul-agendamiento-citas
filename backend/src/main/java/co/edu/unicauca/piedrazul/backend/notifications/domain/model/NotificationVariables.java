@@ -12,6 +12,12 @@ public final class NotificationVariables {
      */
     public static final String EXPIRES_AT = "expiresAt";
 
+    /**
+     * Veces que la recuperación reencoló este trabajo sin que se hubiera enviado nada. No es
+     * secreto; no forma parte de ninguna plantilla.
+     */
+    public static final String DISPATCH_RECOVERIES = "dispatchRecoveries";
+
     private NotificationVariables() {
     }
 }

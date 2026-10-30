@@ -44,7 +44,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Garantías del despacho que dependen de transacciones y bloqueos reales de PostgreSQL: escritura
  * terminal atómica, limpieza del código en {@code variables_json}, cerca de propiedad y que el job
  * de intentos antiguos no reclasifica una aceptación. El esquema lo crean las migraciones reales.
- * La prueba multihilo completa de reclamo y recuperación corresponde a W1b.
+ * El reclamo y la recuperación concurrentes se prueban en {@link NotificationDispatchRecoveryIT}.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -242,12 +242,12 @@ class NotificationDispatchPersistenceIT extends PostgresIntegrationSupport {
         jdbc.update("UPDATE piedrazul.notification_attempts SET updated_at = now() - interval '3 hours' WHERE notification_id = ?",
                 notification.getId());
 
-        new StaleNotificationAttemptJob(attemptRepository, Clock.systemUTC(), true, Duration.ofHours(2))
+        new StaleNotificationAttemptJob(store, Clock.systemUTC(), true, Duration.ofHours(2))
                 .processStaleAttempts();
 
         assertRow(notification, "ACCEPTED", "SENT", "ACCEPTED");
-        assertThat(attemptRepository.findStaleAttempts(Instant.now().minus(Duration.ofHours(2)), 500))
-                .noneMatch(stale -> stale.getNotificationId().equals(notification.getId()));
+        assertThat(store.findInterrupted(Instant.now().minus(Duration.ofHours(2)), 500))
+                .doesNotContain(claim.scheduleId());
     }
 
     // ── Soporte ─────────────────────────────────────────────────────────

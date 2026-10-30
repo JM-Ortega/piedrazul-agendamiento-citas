@@ -213,6 +213,19 @@ public class Notification {
         return true;
     }
 
+    public int dispatchRecoveries() {
+        return Integer.parseInt(variables.getOrDefault(NotificationVariables.DISPATCH_RECOVERIES, "0"));
+    }
+
+    public void recordDispatchRecovery(Instant now) {
+        Objects.requireNonNull(now, "La fecha actual es obligatoria");
+
+        Map<String, String> updated = new HashMap<>(variables);
+        updated.put(NotificationVariables.DISPATCH_RECOVERIES, String.valueOf(dispatchRecoveries() + 1));
+        this.variables = Map.copyOf(updated);
+        this.updatedAt = now;
+    }
+
     /**
      * Instante de caducidad del contenido. Vacío si el tipo no caduca; si el tipo caduca y el
      * valor falta o es ilegible, se devuelve {@link Instant#MIN} para que cuente como vencido.

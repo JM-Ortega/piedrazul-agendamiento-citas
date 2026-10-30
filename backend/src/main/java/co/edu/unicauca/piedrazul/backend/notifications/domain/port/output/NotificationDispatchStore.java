@@ -3,6 +3,7 @@ package co.edu.unicauca.piedrazul.backend.notifications.domain.port.output;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.Notification;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.NotificationAttempt;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.NotificationSchedule;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.InterruptedDispatchPolicy;
 
 import java.time.Instant;
 import java.util.List;
@@ -37,9 +38,31 @@ public interface NotificationDispatchStore {
      */
     WriteResult write(DispatchWrite write);
 
+    /**
+     * Schedules que parecen interrumpidos, los más antiguos primero: con un intento en curso sin
+     * actualizar desde antes de {@code staleBefore} o, sin intentos en curso, aún reclamados desde
+     * antes de ese instante. Es solo una lectura: {@link #recover} vuelve a decidir bajo bloqueo.
+     */
+    List<UUID> findInterrupted(Instant staleBefore, int limit);
+
+    /**
+     * Resuelve un trabajo interrumpido según {@link InterruptedDispatchPolicy}, sobre estado leído
+     * bajo el bloqueo del schedule, de modo que no puede cruzarse con una escritura del despacho.
+     * Es idempotente: repetirla sobre un trabajo ya resuelto no cambia nada.
+     */
+    Recovery recover(UUID scheduleId, Instant staleBefore, Instant now);
+
     enum WriteResult {
         APPLIED,
         OWNERSHIP_LOST
+    }
+
+    /** Lo que hizo la recuperación; {@code notification} es nula si no había schedule. */
+    record Recovery(
+            InterruptedDispatchPolicy.Resolution resolution,
+            Notification notification,
+            List<NotificationAttempt> closedAttempts
+    ) {
     }
 
     record Begin(

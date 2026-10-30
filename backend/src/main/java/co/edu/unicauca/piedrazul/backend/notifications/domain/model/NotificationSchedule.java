@@ -136,6 +136,16 @@ public class NotificationSchedule {
         this.updatedAt = now;
     }
 
+    /** Cierra el trabajo reclamado de una notificación que ya terminó por otra vía. */
+    public void settleWith(NotificationStatus notificationStatus, Instant now) {
+        switch (notificationStatus) {
+            case ACCEPTED, DELIVERED -> markSent(now);
+            case CANCELLED -> cancel(now);
+            case EXPIRED -> markExpired(now);
+            default -> markFailed(now);
+        }
+    }
+
     private void requireStatus(ScheduleStatus... allowedStatuses) {
         for (ScheduleStatus allowedStatus : allowedStatuses) {
             if (this.status == allowedStatus) {

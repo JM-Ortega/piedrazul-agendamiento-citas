@@ -6,6 +6,7 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.model.Notification
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.NotificationSchedule;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.NotificationStatus;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.ScheduleStatus;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.InterruptedDispatchPolicy;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.DispatchWrite;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationDispatchStore;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.mappers.NotificationAttemptMapper;
@@ -95,13 +96,7 @@ public class NotificationDispatchStoreAdapter implements NotificationDispatchSto
             }
         }
 
-        List<NotificationAttempt> attempts = attemptRepository
-                .findAllByNotificationIdOrderByCreatedAtAscAttemptNumberAsc(notification.getId())
-                .stream()
-                .map(attemptMapper::toDomain)
-                .toList();
-
-        return new Begin(Begin.Status.READY, notification, schedule, attempts);
+        return new Begin(Begin.Status.READY, notification, schedule, loadAttempts(notification.getId()));
     }
 
     @Override
@@ -151,6 +146,47 @@ public class NotificationDispatchStoreAdapter implements NotificationDispatchSto
         return WriteResult.APPLIED;
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<UUID> findInterrupted(Instant staleBefore, int limit) {
+        return scheduleRepository.findInterruptedIds(staleBefore, limit);
+    }
+
+    @Override
+    @Transactional
+    public Recovery recover(UUID scheduleId, Instant staleBefore, Instant now) {
+        Optional<NotificationScheduleEntity> locked = scheduleRepository.findByIdForUpdate(scheduleId);
+
+        if (locked.isEmpty()) {
+            return new Recovery(InterruptedDispatchPolicy.Resolution.NONE, null, List.of());
+        }
+
+        NotificationSchedule schedule = scheduleMapper.toDomain(locked.get());
+        Notification notification = notificationRepository
+                .findByIdForUpdate(schedule.getNotificationId())
+                .map(notificationMapper::toDomain)
+                .orElseThrow(() -> new IllegalStateException("Schedule sin notificación: " + scheduleId));
+
+        InterruptedDispatchPolicy.Decision decision = InterruptedDispatchPolicy.resolve(
+                schedule, notification, loadAttempts(notification.getId()), staleBefore, now);
+
+        if (decision.resolution() != InterruptedDispatchPolicy.Resolution.NONE) {
+            decision.closedAttempts().forEach(attempt -> attemptRepository.save(attemptMapper.toEntity(attempt)));
+            saveNotification(notification);
+            saveSchedule(schedule);
+        }
+
+        return new Recovery(decision.resolution(), notification, decision.closedAttempts());
+    }
+
+    private List<NotificationAttempt> loadAttempts(UUID notificationId) {
+        return attemptRepository
+                .findAllByNotificationIdOrderByCreatedAtAscAttemptNumberAsc(notificationId)
+                .stream()
+                .map(attemptMapper::toDomain)
+                .toList();
+    }
+
     /** Schedule bloqueado si sigue reclamado y nadie más ha añadido intentos. */
     private Optional<NotificationSchedule> lockOwnedSchedule(UUID scheduleId, int expectedAttemptCount) {
         Optional<NotificationScheduleEntity> entity = scheduleRepository.findByIdForUpdate(scheduleId);
@@ -185,13 +221,7 @@ public class NotificationDispatchStoreAdapter implements NotificationDispatchSto
             NotificationSchedule schedule,
             Instant now
     ) {
-        switch (notification.getStatus()) {
-            case ACCEPTED, DELIVERED -> schedule.markSent(now);
-            case CANCELLED -> schedule.cancel(now);
-            case EXPIRED -> schedule.markExpired(now);
-            default -> schedule.markFailed(now);
-        }
-
+        schedule.settleWith(notification.getStatus(), now);
         saveSchedule(schedule);
 
         if (notification.redactSensitiveVariables()) {

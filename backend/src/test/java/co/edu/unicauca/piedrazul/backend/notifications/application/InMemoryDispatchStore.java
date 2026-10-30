@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.notifications.application;
 
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.*;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.InterruptedDispatchPolicy;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.ClaimedSchedule;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.DispatchWrite;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationDispatchStore;
@@ -101,24 +102,13 @@ final class InMemoryDispatchStore implements NotificationDispatchStore {
             case PROCESSING -> {
             }
             default -> {
-                switch (notification.getStatus()) {
-                    case ACCEPTED, DELIVERED -> schedule.markSent(now);
-                    case CANCELLED -> schedule.cancel(now);
-                    case EXPIRED -> schedule.markExpired(now);
-                    default -> schedule.markFailed(now);
-                }
-
+                schedule.settleWith(notification.getStatus(), now);
                 notification.redactSensitiveVariables();
                 return Begin.of(Begin.Status.NOT_DISPATCHABLE);
             }
         }
 
-        List<NotificationAttempt> current = attempts.values().stream()
-                .filter(attempt -> attempt.getNotificationId().equals(notification.getId()))
-                .map(InMemoryDispatchStore::copy)
-                .toList();
-
-        return new Begin(Begin.Status.READY, copy(notification), copy(schedule), current);
+        return new Begin(Begin.Status.READY, copy(notification), copy(schedule), attemptsOf(notification.getId()));
     }
 
     @Override
@@ -169,6 +159,41 @@ final class InMemoryDispatchStore implements NotificationDispatchStore {
         schedules.put(nextSchedule.getId(), nextSchedule);
         appliedWrites.add(write);
         return WriteResult.APPLIED;
+    }
+
+    @Override
+    public List<UUID> findInterrupted(Instant staleBefore, int limit) {
+        return schedules.values().stream()
+                .filter(schedule -> schedule.getStatus() == ScheduleStatus.PROCESSING
+                        || attemptsOf(schedule.getNotificationId()).stream()
+                        .anyMatch(attempt -> attempt.getStatus() == AttemptStatus.PROCESSING))
+                .map(NotificationSchedule::getId)
+                .limit(limit)
+                .toList();
+    }
+
+    @Override
+    public Recovery recover(UUID scheduleId, Instant staleBefore, Instant now) {
+        NotificationSchedule schedule = copy(schedules.get(scheduleId));
+        Notification notification = copy(notifications.get(schedule.getNotificationId()));
+
+        InterruptedDispatchPolicy.Decision decision = InterruptedDispatchPolicy.resolve(
+                schedule, notification, attemptsOf(notification.getId()), staleBefore, now);
+
+        if (decision.resolution() != InterruptedDispatchPolicy.Resolution.NONE) {
+            decision.closedAttempts().forEach(attempt -> attempts.put(attempt.getId(), copy(attempt)));
+            notifications.put(notification.getId(), notification);
+            schedules.put(schedule.getId(), schedule);
+        }
+
+        return new Recovery(decision.resolution(), notification, decision.closedAttempts());
+    }
+
+    private List<NotificationAttempt> attemptsOf(UUID notificationId) {
+        return attempts.values().stream()
+                .filter(attempt -> attempt.getNotificationId().equals(notificationId))
+                .map(InMemoryDispatchStore::copy)
+                .toList();
     }
 
     private NotificationSchedule ownedSchedule(UUID scheduleId, int expectedAttemptCount) {

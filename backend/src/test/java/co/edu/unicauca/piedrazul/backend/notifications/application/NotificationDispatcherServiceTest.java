@@ -514,6 +514,24 @@ class NotificationDispatcherServiceTest {
         }
 
         @Test
+        void acceptanceAfterRecoveryClosedTheWorkIsLoggedAndChangesNothing() {
+            Notification notification = appointment();
+            ClaimedSchedule claim = store.seedAndClaim(notification, NOW);
+            StubProvider email = StubProvider.email(() -> outcome(DeliveryOutcome.ACCEPTED));
+            // Mientras el proveedor responde, la recuperación cierra el trabajo.
+            email.onSend = () -> store.recover(claim.scheduleId(), NOW.plusSeconds(1), NOW.plusSeconds(1));
+
+            dispatcher(store, clock, false, email).dispatch(claim);
+
+            assertThat(email.calls()).isEqualTo(1);
+            assertNotification(notification, NotificationStatus.FAILED);
+            assertSchedule(claim, ScheduleStatus.FAILED);
+            assertThat(store.attempts()).singleElement()
+                    .extracting(NotificationAttempt::getStatus).isEqualTo(AttemptStatus.UNKNOWN);
+            assertThat(logs()).anyMatch(line -> line.contains("NOTIFICATION_LATE_ACCEPTANCE"));
+        }
+
+        @Test
         void failedAttemptInsertPreventsProviderCallAndClosesWork() {
             StubProvider email = StubProvider.email(() -> outcome(DeliveryOutcome.ACCEPTED));
             Notification notification = appointment();
@@ -603,6 +621,16 @@ class NotificationDispatcherServiceTest {
                 @Override
                 public WriteResult write(DispatchWrite write) {
                     throw new AssertionError("no debe escribir");
+                }
+
+                @Override
+                public List<UUID> findInterrupted(Instant staleBefore, int limit) {
+                    throw new AssertionError("el despacho no recupera");
+                }
+
+                @Override
+                public Recovery recover(UUID scheduleId, Instant staleBefore, Instant now) {
+                    throw new AssertionError("el despacho no recupera");
                 }
             };
             StubProvider email = StubProvider.email(() -> outcome(DeliveryOutcome.ACCEPTED));

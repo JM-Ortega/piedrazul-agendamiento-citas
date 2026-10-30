@@ -49,10 +49,6 @@ Piedra Azul es una clínica cuyo proceso de agendamiento de citas se ha basado h
 
 ### Despacho de notificaciones
 
-> **Estado intermedio (W1a), no desplegable.** Falta la recuperación periódica del trabajo
-> interrumpido (W1b): hasta entonces un schedule o intento que quede en `PROCESSING` tras una caída
-> no se resuelve solo, y su código en claro sigue en `variables_json` (riesgo aceptado D15-A1).
-
 `DueNotificationJob` reclama los schedules vencidos (`FOR UPDATE SKIP LOCKED`, `PENDING` →
 `PROCESSING`) y anota cuántos intentos tenía cada notificación. `NotificationDispatcherService` los
 despacha uno a uno; un error en uno no abandona el resto del lote. Toda escritura del despacho pasa
@@ -107,16 +103,58 @@ como `EXPIRED`. Un código sin vencimiento legible cuenta como vencido. Cuando e
 (`ACCEPTED`, `FAILED` o `EXPIRED`), la misma transacción elimina `code` de `variables_json` y conserva
 las variables no secretas; mientras quede un reintento, el código se conserva. Limitación aceptada
 (D15-A1): si el proceso cae entre el intento en curso y su resolución, el código queda en claro
-hasta que W1b resuelva ese trabajo. Las filas anteriores no se limpian (entorno desechable).
+hasta que la recuperación resuelva ese trabajo. Las filas anteriores no se limpian (entorno
+desechable).
 
 **Consola.** Es diagnóstico, nunca entrega: todo mensaje impreso deja el intento `FAILED`
 (`CONSOLE_DIAGNOSTIC_ONLY`, `PROVIDER_ERROR`) y, si es el último canal, la notificación `FAILED`.
 
-**Trabajo interrumpido.** Si un despacho retoma una notificación con un intento que pudo llegar al
-proveedor, no la reenvía: un intento en curso pasa a `UNKNOWN` y uno aceptado cierra como
-`ACCEPTED`. Un error antes de invocar al proveedor cierra como `FAILED`; uno después deja el intento
-en `PROCESSING`. `StaleNotificationAttemptJob` solo informa intentos en curso antiguos
-(`NOTIFICATION_STALE`); ya no reclasifica intentos aceptados ni desconocidos.
+**Trabajo interrumpido.** Un error antes de invocar al proveedor cierra como `FAILED`; uno después,
+o una caída del proceso, deja el trabajo en `PROCESSING`. `StaleNotificationAttemptJob` lo recupera:
+cada 5 min (`NOTIFICATIONS_STALE_ATTEMPT_FIXED_DELAY`) toma hasta 50 schedules, los más antiguos
+primero, con un intento en curso sin actualizar desde hace 15 min
+(`NOTIFICATIONS_STALE_DEFAULT_THRESHOLD`) o, sin intentos en curso, reclamados desde hace ese tiempo.
+Cada uno se resuelve en su propia transacción, bajo el bloqueo del schedule y sobre el historial
+completo de intentos, en la misma frontera que las escrituras del despacho; un schedule que no se
+puede resolver no detiene a los demás y se reintenta en la siguiente pasada. Reclamos tardíos o en
+paralelo son seguros porque el intento se inserta bajo ese bloqueo con la cerca de intentos: de dos
+trabajadores con la misma cerca solo uno llega a invocar al proveedor.
+
+Ninguna invocación ocurre sin un intento `PROCESSING` confirmado antes. Por eso la decisión se basa
+en los intentos y nunca en comparar marcas de tiempo del reclamo: un intento en curso sin resultado
+pudo llegar al proveedor, aunque se interrumpiera justo antes.
+
+| Estado encontrado | Intento | Notificación / schedule | Código | Evento (`NOTIFICATION_STALE reason=`) |
+|---|---|---|---|---|
+| Intento en curso reciente, o reclamo reciente sin intentos en curso | sin cambio | sin cambio | se conserva | ninguno |
+| Algún intento aceptado | aceptado intacto; uno en curso pasa a `UNKNOWN` | `ACCEPTED` / `SENT` | se elimina | `ACCEPTED` |
+| Intento en curso antiguo, o un `UNKNOWN` en el historial | `UNKNOWN`, `ACCEPTANCE_UNKNOWN` | `FAILED` / `FAILED` | se elimina | `ACCEPTANCE_UNKNOWN`, más `NOTIFICATION_ACCEPTANCE_UNKNOWN` (`DISPATCH_INTERRUPTED`) |
+| Sin aceptación posible y contenido vencido | sin cambio | `EXPIRED` / `EXPIRED` | se elimina | `EXPIRED` |
+| Sin aceptación posible, vigente | sin cambio | sigue / `PENDING` sin demora | se conserva | `REQUEUED` |
+| Lo anterior, tras 3 reencolados | sin cambio | `FAILED` / `FAILED` | se elimina | `REQUEUES_EXHAUSTED`, más `NOTIFICATION_FAILED` |
+| Notificación ya terminada, schedule reclamado | en curso pasa a `UNKNOWN` | notificación intacta / schedule alineado | se elimina | `SETTLED` |
+| Schedule ya terminado con un intento en curso antiguo | `UNKNOWN` | sin cambio | se elimina si la notificación terminó | `ATTEMPT_CLOSED` |
+| Schedule ya terminado, sin intentos en curso | sin cambio | sin cambio | sin cambio | ninguno |
+
+Reencolar no crea intentos ni consume reintentos: al reclamarse de nuevo, el despachador revalida
+canales, presupuesto y vigencia, y es él quien cierra como `FAILED` un trabajo sin canales
+disponibles. Los reencolados se cuentan en `dispatchRecoveries` dentro de `variables_json`, igual que
+`expiresAt` es un dato del despacho y no del texto; no hay ventana de entrega tardía nueva. Un intento
+en curso nunca se reenvía: es el riesgo aceptado D8-A, un mensaje puede perderse pero no se duplica
+por una recuperación. El umbral debe superar lo que puede tardar una llamada real al proveedor, porque
+un intento cerrado por antigüedad queda `UNKNOWN`: si después el proveedor responde, el estado no
+cambia y el log emite `NOTIFICATION_LATE_ACCEPTANCE` con el id de mensaje, la evidencia para el
+operador de que ese `UNKNOWN` sí se aceptó. `UNKNOWN` sigue siendo cierto: no se pudo descartar.
+
+**Planificación compartida.** Todos los `@Scheduled` de la aplicación comparten un hilo (no se
+configura `spring.task.scheduling.pool.size`) y el lote de 50 se envía en serie. Medido con 50
+notificaciones sobre PostgreSQL real y proveedor sintético (`NotificationSchedulerLoadIT`): entre 18 y
+29 ms de sobrecarga propia por envío; recuperación y demás jobs esperan al lote completo (unos 3,5 s con
+50 ms por envío, unos 11,5 s con envíos de 100 ms y tres llamadas de 2 s); y un código que llega con el
+lote en marcha espera lo mismo. Dos hilos eliminan la espera de los demás jobs (unos 55 ms), pero no la
+del código (unos 11,5 s), que depende del envío en serie. A 0,3 s por envío serían unos 16 s (estimación). El lote queda acotado
+solo si cada llamada al proveedor tiene un tiempo máximo: una llamada sin él detiene todo `@Scheduled`,
+incluida la recuperación, mientras dure.
 
 ## Persistencia
 
@@ -206,7 +244,7 @@ No hay atomicidad ni vuelta atrás automática entre Cloudflare y Hetzner: un ca
 - El backend permanece como una única aplicación desplegable, por lo que no es posible escalar módulos de forma independiente como en una arquitectura de microservicios (ADR-003).
 - PostgreSQL presenta un escalado horizontal más complejo que enfoques NoSQL puros (ADR-002).
 - Dependencia de Docker Desktop o Docker Engine en los equipos de desarrollo, con posibles conflictos de puertos locales (ADR-005).
-- El despacho de notificaciones no recupera aún el trabajo interrumpido (W1b pendiente); ver [Despacho de notificaciones](#despacho-de-notificaciones).
+- El despacho de notificaciones envía en serie y comparte hilo con el resto de `@Scheduled`: una llamada al proveedor sin tiempo máximo los detiene a todos; ver [Despacho de notificaciones](#despacho-de-notificaciones).
 
 ## Decisiones relacionadas
 
