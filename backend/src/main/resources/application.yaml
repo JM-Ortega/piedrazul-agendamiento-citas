@@ -105,27 +105,50 @@ audit:
 
 notifications:
   console:
+    # La consola es diagnóstico, no entrega. Con true, el contenido sensible (códigos de
+    # verificación y datos de citas) se escribe en el log solo si no hay ningún proveedor real
+    # habilitado; con un proveedor real nunca se muestra. Solo en entornos con datos
+    # exclusivamente sintéticos. Todo envío por consola (sensible o no) queda FAILED
+    # (CONSOLE_DIAGNOSTIC_ONLY), nunca como entregado.
+    # Sin un canal apto para códigos (SES deshabilitado) y sin este diagnóstico, no se emiten
+    # códigos: la solicitud responde 503 (VERIFICATION_DELIVERY_UNAVAILABLE).
     show-sensitive-content: ${NOTIFICATIONS_CONSOLE_SHOW_SENSITIVE:false}
   email:
-    sendgrid:
-      enabled: ${NOTIFICATIONS_SENDGRID_ENABLED:false}
-      api-key: ${SENDGRID_API_KEY:}
-      from-email: ${NOTIFICATIONS_EMAIL_FROM:no-reply@piedrazul.org}
+    # Correo por el SMTP de Amazon SES. Deshabilitado no usa ninguna de estas propiedades, ni
+    # credenciales; habilitado, una configuración incompleta impide el arranque.
+    ses:
+      enabled: ${NOTIFICATIONS_SES_ENABLED:false}
+      host: ${SES_SMTP_HOST:}
+      port: ${SES_SMTP_PORT:587}
+      username: ${SES_SMTP_USERNAME:}
+      password: ${SES_SMTP_PASSWORD:}
+      from-email: ${NOTIFICATIONS_EMAIL_FROM:}
       from-name: ${NOTIFICATIONS_EMAIL_FROM_NAME:Piedrazul}
-      sandbox-mode: ${SENDGRID_SANDBOX_MODE:true}
+      # Por operación de socket; connect, lectura y escritura pueden repetirse en cada etapa, así
+      # que su suma no acota el envío: eso lo hace total-deadline.
+      connect-timeout: ${SES_SMTP_CONNECT_TIMEOUT:5s}
+      read-timeout: ${SES_SMTP_READ_TIMEOUT:15s}
+      write-timeout: ${SES_SMTP_WRITE_TIMEOUT:15s}
+      total-deadline: ${SES_SMTP_TOTAL_DEADLINE:60s}
+      circuit-breaker:
+        minimum-calls: ${SES_BREAKER_MINIMUM_CALLS:5}
+        window-size: ${SES_BREAKER_WINDOW_SIZE:10}
+        failure-rate: ${SES_BREAKER_FAILURE_RATE:50}
+        open-wait: ${SES_BREAKER_OPEN_WAIT:30s}
+        half-open-calls: ${SES_BREAKER_HALF_OPEN_CALLS:3}
 
 
   due-job:
     fixed-delay: ${NOTIFICATIONS_DUE_JOB_FIXED_DELAY:30000}
 
+  # Recuperación del trabajo interrumpido. Un intento en curso, o un reclamo sin intentos en curso,
+  # cuenta como interrumpido tras el umbral; debe superar lo que puede tardar una llamada real al
+  # proveedor, porque un intento cerrado por antigüedad queda como aceptación desconocida.
   stale-attempt:
     enabled: ${NOTIFICATIONS_STALE_ATTEMPT_ENABLED:true}
     fixed-delay: ${NOTIFICATIONS_STALE_ATTEMPT_FIXED_DELAY:300000}
     thresholds:
-      email: ${NOTIFICATIONS_STALE_EMAIL_THRESHOLD:6h}
-      sms: ${NOTIFICATIONS_STALE_SMS_THRESHOLD:30m}
-      whatsapp: ${NOTIFICATIONS_STALE_WHATSAPP_THRESHOLD:30m}
-      default: ${NOTIFICATIONS_STALE_DEFAULT_THRESHOLD:2h}
+      default: ${NOTIFICATIONS_STALE_DEFAULT_THRESHOLD:15m}
 
 
 management:
@@ -141,17 +164,13 @@ management:
 logging:
   level:
     root: ${LOG_LEVEL_ROOT:INFO}
+    # En FINE o inferior, Jakarta Mail y Angus escriben respuestas del servidor y direcciones. El
+    # transporte de SES fija además el nivel de sus propios loggers (SmtpTransaction).
+    jakarta.mail: WARN
+    org.eclipse.angus.mail: WARN
     org.springframework.security: ${LOG_LEVEL_SECURITY:INFO}
     org.hibernate.SQL: ${LOG_LEVEL_SQL:WARN}
+    # TRACE escribe los valores de cada sentencia, incluidas las variables de las notificaciones
+    # (el código de verificación). Mantener en WARN donde haya códigos reales.
     org.hibernate.orm.jdbc.bind: ${LOG_LEVEL_SQL_BIND:WARN}
     org.springframework.modulith: ${LOG_LEVEL_MODULITH:WARN}
-
-resilience4j:
-  circuitbreaker:
-    instances:
-      sendgrid:
-        sliding-window-size: ${RESILIENCE4J_SENDGRID_WINDOW_SIZE:10}
-        failure-rate-threshold: ${RESILIENCE4J_SENDGRID_FAILURE_RATE:50}
-        wait-duration-in-open-state: ${RESILIENCE4J_SENDGRID_WAIT_DURATION:30s}
-        permitted-number-of-calls-in-half-open-state: ${RESILIENCE4J_SENDGRID_HALF_OPEN_CALLS:3}
-        register-health-indicator: true

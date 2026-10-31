@@ -27,6 +27,11 @@ public final class NotificationLogger {
     private static final String STALE = "NOTIFICATION_STALE";
     private static final String CHANNEL_SKIPPED = "NOTIFICATION_CHANNEL_SKIPPED";
     private static final String FAILED = "NOTIFICATION_FAILED";
+    private static final String ACCEPTANCE_UNKNOWN = "NOTIFICATION_ACCEPTANCE_UNKNOWN";
+    private static final String EXPIRED = "NOTIFICATION_EXPIRED";
+    private static final String OWNERSHIP_LOST = "NOTIFICATION_OWNERSHIP_LOST";
+    private static final String INTERRUPTED = "NOTIFICATION_DISPATCH_INTERRUPTED";
+    private static final String LATE_ACCEPTANCE = "NOTIFICATION_LATE_ACCEPTANCE";
 
     private NotificationLogger() {
     }
@@ -164,6 +169,81 @@ public final class NotificationLogger {
                 STALE,
                 base(ctx),
                 reason
+        );
+    }
+
+    /**
+     * El proveedor pudo haber aceptado el mensaje: no se reintenta ni se cambia de canal. Requiere
+     * revisión del operador; no incluye contenido ni mensajes de excepción.
+     */
+    public static void acceptanceUnknown(
+            NotificationLogContext ctx,
+            String providerErrorCode
+    ) {
+        log.error(
+                "{} {} providerErrorCode={}",
+                ACCEPTANCE_UNKNOWN,
+                base(ctx),
+                providerErrorCode
+        );
+    }
+
+    public static void expired(
+            NotificationLogContext ctx,
+            Instant expiresAt
+    ) {
+        log.warn(
+                "{} {} expiresAt={}",
+                EXPIRED,
+                base(ctx),
+                expiresAt
+        );
+    }
+
+    /** Otro trabajador avanzó el schedule: esta escritura no se aplicó. */
+    public static void ownershipLost(
+            NotificationLogContext ctx,
+            String stage
+    ) {
+        log.warn(
+                "{} {} stage={}",
+                OWNERSHIP_LOST,
+                base(ctx),
+                stage
+        );
+    }
+
+    /**
+     * El proveedor aceptó el mensaje después de que otro actor cerrara el trabajo. No cambia el
+     * estado: es la evidencia para el operador de que un intento UNKNOWN sí fue aceptado.
+     */
+    public static void lateAcceptance(
+            NotificationLogContext ctx,
+            String providerMessageId
+    ) {
+        log.error(
+                "{} {} providerMessageId={}",
+                LATE_ACCEPTANCE,
+                base(ctx),
+                providerMessageId
+        );
+    }
+
+    /**
+     * Error inesperado durante el despacho de un schedule. Solo se registra el tipo de la
+     * excepción: sus mensajes pueden arrastrar valores de la fila (incluido el código).
+     */
+    public static void dispatchInterrupted(
+            NotificationLogContext ctx,
+            String stage,
+            Throwable error
+    ) {
+        log.error(
+                "{} {} stage={} errorType={}",
+                INTERRUPTED,
+                base(ctx),
+                stage,
+                error.getClass().getName()
         );
     }
 

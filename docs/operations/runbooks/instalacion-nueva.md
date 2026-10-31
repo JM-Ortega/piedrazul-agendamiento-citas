@@ -78,11 +78,33 @@ administrador de negocio ([primer-admin-negocio.md](primer-admin-negocio.md)).
 **Correo.** SendGrid está deshabilitado en producción (`notifications_sendgrid_enabled: false`
 en `group_vars`): la cadena no exige ni entrega `PIEDRAZUL_BACKEND_MAIL_SEND`, el `.env`
 queda con `SENDGRID_API_KEY` vacía y el backend arranca sin ella. No hay envío externo de
-correo: las notificaciones (incluidos los códigos de verificación) caen al proveedor de
-consola, que solo registra en el log del backend y oculta el contenido sensible. Los flujos que
-dependen de recibir un correo quedan fuera de esta instalación y de su verificación. Si se
-habilita SendGrid sin entregar la clave al converge, la configuración del servidor falla antes
-de escribir `.env`. `NOTIFICATION_ENCRYPTION_KEY` no es un requisito: ningún componente la usa.
+correo. Las notificaciones de citas caen al proveedor de consola, que solo las registra en el
+log del backend y las deja `FAILED` (`CONSOLE_DIAGNOSTIC_ONLY`): nadie las recibe. Los códigos de verificación, en cambio, no se emiten: sin un canal apto para
+ellos, `POST /api/patients/link-user-account/request-code` responde `503`
+(`VERIFICATION_DELIVERY_UNAVAILABLE`) antes de buscar el documento, sin generar código, sin
+invalidar el activo, sin consumir el cupo de solicitudes y sin encolar nada; el arranque lo
+avisa una sola vez en el log (`[OTP_DELIVERY] Sin canal apto…`); los rechazos no repiten ese
+aviso ni dejan traza (solo una línea `DEBUG`). La vinculación de cuentas por código no es operable en esta instalación
+hasta que exista un proveedor de correo apto para códigos (SES, pendiente); SendGrid, aunque se
+habilite, no cuenta como canal para códigos. La consola es diagnóstico, no entrega:
+`NOTIFICATIONS_CONSOLE_SHOW_SENSITIVE=true` (el `.env` no la lleva; vale `false` por defecto)
+solo habilita el diagnóstico por consola si no hay ningún proveedor real, y solo para datos
+exclusivamente sintéticos, nunca aquí. En ese modo se aceptan las solicitudes (incluso con
+contactos ficticios), pero el envío queda `FAILED` (`CONSOLE_DIAGNOSTIC_ONLY`) y no cuenta como
+entregado; con un proveedor real habilitado el código nunca llega a la consola. Con un canal de
+correo apto, una persona sin correo utilizable (vacío, mal formado o de dominio `.invalid`)
+recibe `409` (`VERIFICATION_CONTACT_UNUSABLE`) sin cambios en su código activo; el teléfono no
+cuenta mientras no haya SMS ni WhatsApp. Un `200` significa solicitud aceptada y envío
+encolado, no entrega; un envío `ACCEPTED` tampoco prueba la entrega, y un intento `UNKNOWN`
+(`ACCEPTANCE_UNKNOWN`, evento `NOTIFICATION_ACCEPTANCE_UNKNOWN`) significa que el destinatario pudo
+recibirlo y no se reintenta (ver [despacho de notificaciones](../../architecture/overview.md#despacho-de-notificaciones),
+que también explica la recuperación del trabajo interrumpido). `LOG_LEVEL_SQL_BIND` debe seguir en `WARN` (`log_level_sql_bind`): en
+`TRACE` el log recibe los valores enlazados, incluido el código. Por lo mismo, `LOG_LEVEL_ROOT`
+no debe bajar a `DEBUG` (`log_level_root`): con SendGrid habilitado, el log de red de su
+cliente HTTP (`org.apache.http.wire`) escribe el cuerpo de cada correo. Los flujos que dependen de
+recibir un correo quedan fuera de esta instalación y de su verificación. Si se habilita
+SendGrid sin entregar la clave al converge, la configuración del servidor falla antes de
+escribir `.env`. `NOTIFICATION_ENCRYPTION_KEY` no es un requisito: ningún componente la usa.
 
 ## Cómo se inicia
 

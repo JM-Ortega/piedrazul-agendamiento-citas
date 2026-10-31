@@ -237,16 +237,24 @@ public class PatientService implements PatientModuleApi {
      * Solicita el código de verificación necesario para completar la habilitación
      * de acceso asociada al documento.
      *
+     * <p>La disponibilidad del envío se comprueba antes de buscar a la persona,
+     * para que ese rechazo no dependa de si el documento existe.
+     *
+     * @throws co.edu.unicauca.piedrazul.backend.verification.exception.VerificationDeliveryUnavailableException
+     * si no hay un canal apto para hacer llegar el código
      * @throws PatientNotFoundException si no existe una persona con ese documento
      * @throws PatientAlreadyLinkedUserException si el acceso ya está habilitado
      * @throws InvalidPatientDataException si el documento está en un estado
      * inconsistente
+     * @throws co.edu.unicauca.piedrazul.backend.verification.exception.VerificationContactUnusableException
+     * si los contactos registrados no sirven para el canal disponible
      */
     // Evita mantener una transacción de base de datos durante las consultas al
     // proveedor de identidad.
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void requestLinkUserAccountCode(String identification) {
         validateIdentification(identification);
+        verificationModuleApi.requireCodeDeliveryAvailable();
 
         PersonSummary person = findPersonOrThrow(identification);
         classifyLinkState(person);
@@ -539,7 +547,7 @@ public class PatientService implements PatientModuleApi {
 
         if (patientExists) {
             if (hasPatientRole(person)) {
-                throw new PatientAlreadyLinkedUserException(person.id());
+                throw new PatientAlreadyLinkedUserException();
             }
             return LinkState.GRANT_ACCESS;
         }

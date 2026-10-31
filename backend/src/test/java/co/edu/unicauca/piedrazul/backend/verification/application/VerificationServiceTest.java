@@ -9,6 +9,8 @@ import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCode
 import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeExpiredException;
 import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeNotFoundException;
 import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeRequestLimitException;
+import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationContactUnusableException;
+import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationDeliveryUnavailableException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -20,6 +22,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,6 +34,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -166,19 +170,32 @@ class VerificationServiceTest {
         service().requestCode(SUBJECT, PURPOSE, "Ana Ruiz", PHONE, EMAIL, RECIPIENT);
     }
 
+    /** Canal disponible y contactos utilizables: las pruebas de límites parten de aquí. */
+    private void stubDeliveryReady() {
+        lenient().when(sender.isDeliveryAvailable()).thenReturn(true);
+        lenient().when(sender.isRecipientUsable(PHONE, EMAIL)).thenReturn(true);
+    }
+
     @Test
     void shouldIssueAndSendACodeWhenUnderTheLimits() {
+        stubDeliveryReady();
         stubIssued(0, 4);
         when(passwordEncoder.encode(anyString())).thenReturn("hash");
 
         requestCode();
 
         verify(verificationCodeStore).save(any(VerificationCode.class));
-        verify(sender).sendCode(eq(SUBJECT), anyString(), eq(PHONE), eq(EMAIL), anyString(), anyInt(), eq(RECIPIENT), any());
+        // El vencimiento que recibe Notifications es el real del código (5 minutos), no uno derivado.
+        verify(sender).sendCode(eq(SUBJECT), anyString(), eq(PHONE), eq(EMAIL), anyString(), anyInt(),
+                argThat(expiresAt -> expiresAt != null
+                        && !expiresAt.isBefore(Instant.now().plus(Duration.ofMinutes(4)))
+                        && !expiresAt.isAfter(Instant.now().plus(Duration.ofMinutes(5)))),
+                eq(RECIPIENT), any());
     }
 
     @Test
     void shouldRejectANewCodeRequestedWithinAMinuteOfThePreviousOne() {
+        stubDeliveryReady();
         stubIssued(1, 1);
 
         assertThrows(VerificationCodeRequestLimitException.class, this::requestCode);
@@ -188,6 +205,7 @@ class VerificationServiceTest {
 
     @Test
     void shouldRejectTheSixthCodeRequestedWithinAnHour() {
+        stubDeliveryReady();
         stubIssued(0, 5);
 
         assertThrows(VerificationCodeRequestLimitException.class, this::requestCode);
@@ -197,6 +215,7 @@ class VerificationServiceTest {
 
     @Test
     void shouldKeepTheActiveCodeUsableWhenARequestIsRejected() {
+        stubDeliveryReady();
         stubIssued(1, 1);
         VerificationCode active = new VerificationCode(SUBJECT, PURPOSE, "hash",
                 Instant.now().plus(Duration.ofMinutes(5)), 5);
@@ -208,8 +227,55 @@ class VerificationServiceTest {
         assertTrue(active.isUsable(Instant.now()), "una solicitud rechazada no debe invalidar el código vigente");
     }
 
+    // ---- comprobación previa del canal y del destinatario ----
+
+    @Test
+    void shouldRejectWithoutTouchingStateWhenDeliveryIsUnavailable() {
+        when(sender.isDeliveryAvailable()).thenReturn(false);
+
+        assertThrows(VerificationDeliveryUnavailableException.class, this::requestCode);
+
+        // Ni bloqueo, ni conteo de cupo, ni invalidación, ni código, ni envío.
+        verifyNoInteractions(verificationCodeStore, passwordEncoder);
+        verify(sender, never()).isRecipientUsable(any(), any());
+        verify(sender, never()).sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any(), any());
+    }
+
+    @Test
+    void shouldRejectWithoutTouchingStateWhenTheRecipientIsUnusable() {
+        when(sender.isDeliveryAvailable()).thenReturn(true);
+        when(sender.isRecipientUsable(PHONE, EMAIL)).thenReturn(false);
+
+        assertThrows(VerificationContactUnusableException.class, this::requestCode);
+
+        verifyNoInteractions(verificationCodeStore, passwordEncoder);
+        verify(sender, never()).sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any(), any());
+    }
+
+    @Test
+    void shouldCheckTheRecipientWithTheExactValuesThatWouldBeSent() {
+        String rawEmail = " Ana@Correo.com ";
+        when(sender.isDeliveryAvailable()).thenReturn(true);
+        when(sender.isRecipientUsable(null, rawEmail)).thenReturn(false);
+
+        assertThrows(VerificationContactUnusableException.class,
+                () -> service().requestCode(SUBJECT, PURPOSE, "Ana Ruiz", null, rawEmail, RECIPIENT));
+
+        verify(sender).isRecipientUsable(null, rawEmail);
+    }
+
+    @Test
+    void shouldReportDeliveryAvailabilityWithoutTouchingState() {
+        when(sender.isDeliveryAvailable()).thenReturn(false, true);
+
+        assertThrows(VerificationDeliveryUnavailableException.class, () -> service().requireCodeDeliveryAvailable());
+        assertDoesNotThrow(() -> service().requireCodeDeliveryAvailable());
+
+        verifyNoInteractions(verificationCodeStore, passwordEncoder);
+    }
+
     private void verifyNothingIssuedNorSent() {
         verify(verificationCodeStore, never()).save(any());
-        verify(sender, never()).sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any());
+        verify(sender, never()).sendCode(any(), any(), any(), any(), any(), anyInt(), any(), any(), any());
     }
 }

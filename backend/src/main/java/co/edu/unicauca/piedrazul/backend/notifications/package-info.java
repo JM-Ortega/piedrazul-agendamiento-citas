@@ -1,7 +1,7 @@
 @ApplicationModule(allowedDependencies = {
         "appointment::events",
-        "shared",
-        "config::validation"
+        "appointment::eligibility",
+        "shared"
 })
 package co.edu.unicauca.piedrazul.backend.notifications;
 

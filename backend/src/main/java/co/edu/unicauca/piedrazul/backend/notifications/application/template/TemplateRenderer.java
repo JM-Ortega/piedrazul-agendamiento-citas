@@ -7,6 +7,7 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.model.Notification
 import co.edu.unicauca.piedrazul.backend.notifications.domain.template.NotificationTemplateProvider;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.template.TemplateDefinition;
 
+import java.util.HashMap;
 import java.util.Map;
 
 public class TemplateRenderer {
@@ -34,7 +35,7 @@ public class TemplateRenderer {
             case WHATSAPP -> renderWhatsApp(template, variables);
             case SMS -> renderSms(template, variables);
             case EMAIL -> renderEmail(template, variables);
-            case CONSOLE -> renderConsole(template, variables);
+            case CONSOLE -> renderConsole(notification, template, variables);
         };
     }
 
@@ -72,19 +73,40 @@ public class TemplateRenderer {
     ) {
         return new EmailMessage(
                 interpolate(template.subject(), variables),
-                interpolate(template.bodyHtml(), variables),
+                interpolate(template.bodyHtml(), escapeHtml(variables)),
                 interpolate(template.bodyText(), variables)
         );
     }
 
     private ConsoleLogMessage renderConsole(
+            Notification notification,
             TemplateDefinition template,
             Map<String, String> variables
     ) {
         return new ConsoleLogMessage(
                 interpolate(template.bodyText(), variables),
-                false
+                notification.getType().containsSensitiveContent()
+                        || notification.getType().containsIdentifiableContent()
         );
+    }
+
+    /** Los valores interpolados en HTML son datos: nunca aportan marcado. Conserva los acentos. */
+    private static Map<String, String> escapeHtml(Map<String, String> variables) {
+        Map<String, String> escaped = new HashMap<>();
+
+        variables.forEach((name, value) -> escaped.put(name, escapeHtml(value)));
+
+        return escaped;
+    }
+
+    private static String escapeHtml(String value) {
+        return value == null
+                ? null
+                : value.replace("&", "&amp;")
+                        .replace("<", "&lt;")
+                        .replace(">", "&gt;")
+                        .replace("\"", "&quot;")
+                        .replace("'", "&#39;");
     }
 
     private String interpolate(

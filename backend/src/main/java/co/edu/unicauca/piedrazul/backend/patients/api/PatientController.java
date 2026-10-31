@@ -112,13 +112,16 @@ public class PatientController {
 
     @PostMapping("/link-user-account/request-code")
     @Operation(summary = "Solicitar el código para habilitar el acceso",
-            description = "Endpoint público. Envía al paciente un código de verificación para habilitar o vincular su cuenta de acceso a un documento ya registrado. El código se usa en la confirmación.")
+            description = "Endpoint público. Genera un código de verificación para habilitar o vincular la cuenta de acceso de un documento ya registrado y encola su envío; el código se usa en la confirmación. "
+                    + "Antes de buscar el documento comprueba que haya un canal apto para hacer llegar el código: mientras no haya proveedor de correo (SES) responde 503, salvo en el diagnóstico por consola autorizado para datos exclusivamente sintéticos, que no constituye entrega. "
+                    + "Si la solicitud se rechaza, no se genera código, no se invalida el activo, no se consume cupo y no se encola nada.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Código enviado correctamente"),
+            @ApiResponse(responseCode = "200", description = "Solicitud aceptada y envío encolado (sin cuerpo). No confirma que el proveedor lo acepte ni que llegue al destinatario"),
             @ApiResponse(responseCode = "400", description = "Documento inválido o en un estado inconsistente"),
             @ApiResponse(responseCode = "404", description = "No existe una persona con ese documento"),
-            @ApiResponse(responseCode = "409", description = "El acceso de ese paciente ya está habilitado"),
-            @ApiResponse(responseCode = "429", description = "Se bloquearon temporalmente las solicitudes de código para ese documento")
+            @ApiResponse(responseCode = "409", description = "PATIENT_ALREADY_LINKED_USER: el acceso de ese paciente ya está habilitado. VERIFICATION_CONTACT_UNUSABLE: los datos de contacto registrados no permiten hacer llegar el código"),
+            @ApiResponse(responseCode = "429", description = "Se bloquearon temporalmente las solicitudes de código para ese documento"),
+            @ApiResponse(responseCode = "503", description = "VERIFICATION_DELIVERY_UNAVAILABLE: el servicio de envío de códigos no está disponible; se responde igual exista o no el documento")
     })
     public void requestLinkUserAccountCode(@Valid @RequestBody RequestLinkUserAccountCodeRequest request) {
         patientService.requestLinkUserAccountCode(request.getIdentification());

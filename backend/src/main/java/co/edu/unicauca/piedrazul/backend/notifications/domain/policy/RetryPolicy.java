@@ -7,6 +7,11 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Solo se reintenta ante no aceptación probada y transitoria: {@link FailureType#TEMPORARY} o
+ * {@link FailureType#CIRCUIT_OPEN} (el circuit breaker rechaza sin invocar al proveedor). Un fallo
+ * permanente o de aceptación desconocida ({@link FailureType#UNKNOWN}) no se reintenta nunca.
+ */
 public class RetryPolicy {
 
     /**
@@ -18,7 +23,7 @@ public class RetryPolicy {
             FailureType failureType,
             int retriesAlreadyMade
     ) {
-        if (failureType == FailureType.PERMANENT || failureType == FailureType.CIRCUIT_OPEN) {
+        if (failureType != FailureType.TEMPORARY && failureType != FailureType.CIRCUIT_OPEN) {
             return Optional.empty();
         }
 
@@ -29,6 +34,11 @@ public class RetryPolicy {
         }
 
         return Optional.of(delays.get(retriesAlreadyMade));
+    }
+
+    /** Número máximo de intentos de un canal: el inicial más los reintentos permitidos. */
+    public int maxAttempts(NotificationChannel channel) {
+        return 1 + delaysFor(channel).size();
     }
 
     private List<Duration> delaysFor(NotificationChannel channel) {

@@ -3,7 +3,6 @@ package co.edu.unicauca.piedrazul.backend.notifications.application.eventhandler
 import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentScheduledEvent;
 import co.edu.unicauca.piedrazul.backend.notifications.NotificationModuleApi;
 import co.edu.unicauca.piedrazul.backend.notifications.api.ScheduleNotificationCommand;
-import co.edu.unicauca.piedrazul.backend.notifications.api.SendNotificationCommand;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.AggregateReference;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.AggregateType;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.ChannelPreference;
@@ -57,17 +56,7 @@ public class AppointmentNotificationEventHandler {
 
         Instant now = Instant.now(clock);
 
-        // 1. Confirmación inmediata
-        notificationModuleApi.sendNow(
-                new SendNotificationCommand(
-                        NotificationType.APPOINTMENT_SCHEDULED,
-                        aggregate,
-                        recipient,
-                        variables
-                )
-        );
-
-        // 2. Recordatorio 2 días antes a las 4pm
+        // Recordatorio 2 días antes a las 4pm
         Instant reminderAt = reminderCalculator
                 .calculateTwoDaysBeforeAtFourPm(event.appointmentDate());
 

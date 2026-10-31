@@ -10,6 +10,8 @@ import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCode
 import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeExpiredException;
 import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeNotFoundException;
 import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeRequestLimitException;
+import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationContactUnusableException;
+import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationDeliveryUnavailableException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -54,11 +56,24 @@ public class VerificationService implements VerificationModuleApi {
     }
 
     @Override
+    public void requireCodeDeliveryAvailable() {
+        if (!sender.isDeliveryAvailable()) {
+            throw new VerificationDeliveryUnavailableException();
+        }
+    }
+
+    @Override
     @Transactional
     public void requestCode(String subject, VerificationPurpose purpose, String displayName, String phone, String email, UUID recipientId) {
         validateSubject(subject);
-        validateAtLeastOneContact(phone, email);
         Objects.requireNonNull(recipientId, "recipientId cannot be null");
+
+        // Antes del bloqueo y de cualquier escritura: sin canal o sin contacto utilizable no se
+        // emite un código que no puede llegar, ni se invalida el activo ni se consume cupo.
+        requireCodeDeliveryAvailable();
+        if (!sender.isRecipientUsable(phone, email)) {
+            throw new VerificationContactUnusableException();
+        }
 
         // El bloqueo sobre el código activo serializa las solicitudes simultáneas del mismo sujeto,
         // para que ninguna se salte el conteo de los límites.
@@ -84,7 +99,8 @@ public class VerificationService implements VerificationModuleApi {
         );
 
         verificationCodeStore.save(verificationCode);
-        sender.sendCode(subject, displayName, phone, email, rawCode, EXPIRATION_MINUTES, recipientId, verificationCode.getId());
+        sender.sendCode(subject, displayName, phone, email, rawCode, EXPIRATION_MINUTES,
+                verificationCode.getExpiresAt(), recipientId, verificationCode.getId());
     }
 
     @Override
@@ -142,14 +158,6 @@ public class VerificationService implements VerificationModuleApi {
     private void validateSubject(String subject) {
         if (subject == null || subject.isBlank()) {
             throw new IllegalArgumentException("Subject cannot be blank");
-        }
-    }
-
-    private void validateAtLeastOneContact(String phone, String email) {
-        boolean hasPhone = phone != null && !phone.isBlank();
-        boolean hasEmail = email != null && !email.isBlank();
-        if (!hasPhone && !hasEmail) {
-            throw new IllegalArgumentException("At least one contact (phone or email) is required");
         }
     }
 

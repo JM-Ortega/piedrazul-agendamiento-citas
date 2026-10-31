@@ -1,7 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.notifications.infrastructure.persistence.adapter;
 
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.NotificationSchedule;
-import co.edu.unicauca.piedrazul.backend.notifications.domain.model.ScheduleStatus;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationScheduleRepository;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.mappers.NotificationScheduleMapper;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.persistence.repository.JpaNotificationScheduleRepository;
@@ -14,11 +13,6 @@ import java.util.UUID;
 
 @Repository
 public class NotificationScheduleRepositoryAdapter implements NotificationScheduleRepository {
-
-    private static final List<ScheduleStatus> PENDING_STATUSES = List.of(
-            ScheduleStatus.PENDING,
-            ScheduleStatus.PROCESSING
-    );
 
     private final JpaNotificationScheduleRepository repository;
     private final NotificationScheduleMapper mapper;
@@ -51,17 +45,6 @@ public class NotificationScheduleRepositoryAdapter implements NotificationSchedu
             int limit
     ) {
         return repository.findDuePendingWithLock(now, limit)
-                .stream()
-                .map(mapper::toDomain)
-                .toList();
-    }
-
-    @Override
-    public List<NotificationSchedule> findPendingByNotificationId(UUID notificationId) {
-        return repository.findAllByNotificationIdAndStatusIn(
-                        notificationId,
-                        PENDING_STATUSES
-                )
                 .stream()
                 .map(mapper::toDomain)
                 .toList();
