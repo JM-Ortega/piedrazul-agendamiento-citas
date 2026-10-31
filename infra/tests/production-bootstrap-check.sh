@@ -1207,6 +1207,9 @@ flow_case "identidad rechazada: la clave SSH no se escribe, nada lee ni muta el 
 flow_case "handshake rechazado tras verificar: sin lecturas del host ni mutaciones" "${RUN_I%\}},\"fail_at\":\"readiness\"}" "host_trust access readiness" "host_init sshd_check host_state select converge deploy record pages_publish"
 flow_case "sshd efectivo inseguro: los secretos del converge no se entregan" "${RUN_I%\}},\"fail_at\":\"sshd_check\"}" "host_init sshd_check" "host_state select policy converge deploy record pages_publish"
 flow_case "converge falla en Run I: no se registra ni se publica (el reintento no requiere otra autenticación fuera de banda)" "${RUN_I%\}},\"fail_at\":\"converge\"}" "host_trust converge" "deploy record pages_publish"
+flow_case "correo SES: Run P valida la configuración antes del Apply" "${RUN_P}" "credentials ses_preflight hcp_apply" "host_trust converge deploy"
+flow_case "correo SES: configuración inválida en Run P: nada se aplica" "${RUN_P%\}},\"fail_at\":\"ses_preflight\"}" "credentials ses_preflight" "hcp_workspace kc_admin_preflight fresh_apply hcp_apply"
+flow_case "correo SES: configuración inválida en Run I: ni SSH ni mutaciones" "${RUN_I%\}},\"fail_at\":\"ses_preflight\"}" "credentials ses_preflight" "hcp_workspace host_trust access readiness converge deploy record pages_publish"
 ORD="{\"classify\":{\"stage\":\"ordinary\",\"terraform_required\":\"false\",\"deploy_required\":\"true\",\"run_host_config\":\"false\",\"run_app_deploy\":\"true\",\"frontend_required\":\"false\"},\"outputs\":{${AUTH}}}"
 flow_case "deploy ordinario contra un host de confianza: un solo run, con identidad verificada y sin Terraform" "${ORD}" \
   "pin_preflight tf_outputs host_trust access readiness host_state select policy fresh_deploy deploy record" "hcp_apply hcp_state host_init sshd_check converge pages_publish"

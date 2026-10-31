@@ -159,7 +159,7 @@ converge.yml
 ├── role: common        → apt update, paquetes base, timezone
 ├── role: docker_host   → instala Docker CE + Compose plugin, daemon.json
 ├── role: hardening     → fail2ban, sysctl, deshabilita servicios innecesarios
-├── app/setup.yml       → copia archivos, genera .env y rutas de Traefik, postgres + reconciliación, Traefik
+├── app/setup.yml       → valida SES, copia archivos, genera .env y rutas de Traefik, postgres + reconciliación, Traefik
 ├── app/keycloak_lifecycle.yml → ciclo técnico de Keycloak (P1/P2/P3, ver abajo)
 └── app/refresh_backend.yml → recrea el backend en ejecución si cambió su configuración (sin imagen nueva)
 ```
@@ -228,14 +228,16 @@ Corre en cada `converge`. Pasos:
 
 1. Crea `/opt/piedrazul/`
 2. `keycloak_credentials.yml`: toma `KC_BACKEND_CLIENT_SECRET` y `KC_AUTOMATION_CLIENT_SECRET` del entorno del runner y falla, nombrando solo la regla, si alguno está vacío, si son iguales (el de automatización no debe persistirse en el host) o si coinciden con un valor del repositorio (`.env.example`, realm). Sin lista de caracteres prohibidos ni requisito de formato nuevo: el valor (con el `trim` de extremos que ya se aplicaba) llega a Keycloak en JSON armado por Ansible y al backend por `.env` con escape
-3. Valida `frontend_public_domain` (nombre DNS en minúsculas; si no, falla sin copiar Compose ni escribir `.env`) y copia `infra/compose/` → `/opt/piedrazul/`
-4. Copia `infra/keycloak/` → `/opt/piedrazul/keycloak/` (realm JSON + theme JAR) e `infra/traefik/` → `/opt/piedrazul/traefik/` (opciones TLS de AOP y CA de Cloudflare); `traefik_routes.yml` genera `traefik/dynamic/routes.yml` (ver [Traefik](#traefik))
-5. Toma del entorno del runner las contraseñas de la base (`POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `MIGRATION_DB_PASSWORD`, `KC_DB_PASSWORD`) y falla, nombrando solo las claves, si alguna está vacía o contiene comilla simple o salto de línea
-6. Genera `.env` desde `env.j2`
-7. Valida y descarga por digest las imágenes propias (`release_images.yml`), Keycloak (`keycloak_image.yml`) y Traefik (`traefik_image.yml`) → `image.env`
+3. `ses_inputs.yml`: toma la decisión de correo SES y, solo habilitado, valida endpoint, credenciales y remitente; `ses_image_gate.yml` exige que la imagen seleccionada traiga el proveedor SES. Cualquier fallo ocurre antes de copiar Compose o escribir `.env`. Ver [Correo SES](#correo-ses)
+4. Valida `frontend_public_domain` (nombre DNS en minúsculas; si no, falla sin copiar Compose ni escribir `.env`) y copia `infra/compose/` → `/opt/piedrazul/`
+5. Copia `infra/keycloak/` → `/opt/piedrazul/keycloak/` (realm JSON + theme JAR) e `infra/traefik/` → `/opt/piedrazul/traefik/` (opciones TLS de AOP y CA de Cloudflare); `traefik_routes.yml` genera `traefik/dynamic/routes.yml` (ver [Traefik](#traefik))
+6. Toma del entorno del runner las contraseñas de la base (`POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `MIGRATION_DB_PASSWORD`, `KC_DB_PASSWORD`) y falla, nombrando solo las claves, si alguna está vacía o contiene comilla simple o salto de línea
+7. Genera `.env` desde `env.j2` (`root:root 0600`: Ansible y Compose lo leen con `become`; a mano, con `sudo`)
+8. Valida y descarga por digest las imágenes propias (`release_images.yml`), Keycloak (`keycloak_image.yml`) y Traefik (`traefik_image.yml`) → `image.env`
    - `keycloak_backend_delivery.yml`: comprueba con `docker compose config` que el backend recibiría `KC_BACKEND_CLIENT_SECRET` exactamente igual al declarado (en `.env` va entre comillas dobles con `\ " $` escapados); si no, falla sin mostrar el valor
-8. `db_converge.yml`: postgres con el `.env` vigente + reconciliación de autoridades
-9. Levanta Traefik (`docker_compose_v2 state: present`, imagen ya descargada por digest). No arranca Keycloak (lo hace `keycloak_lifecycle.yml`), el backend ni migra
+   - `ses_delivery.yml`: comprueba igual la configuración de SES: exacta habilitado, vacía deshabilitado
+9. `db_converge.yml`: postgres con el `.env` vigente + reconciliación de autoridades
+10. Levanta Traefik (`docker_compose_v2 state: present`, imagen ya descargada por digest). No arranca Keycloak (lo hace `keycloak_lifecycle.yml`), el backend ni migra
 
 #### Traefik
 
@@ -271,7 +273,7 @@ El servidor guarda dos estados distintos:
 
 Identidad en ejecución (`verify_running_images.yml`): el contenedor existe y corre, su `Config.Image` es la referencia exacta esperada (un contenedor creado desde un tag no cuenta, aunque el contenido coincida) y la imagen local que ejecuta está registrada por el daemon bajo ese digest (`RepoDigests`). El health (`verify_health.yml`) se verifica por separado: un backend `healthy` no prueba que corra el contenido esperado. Ambas tareas leen los contenedores sin mostrarlos (`no_log`) y verifican sobre un resumen sin el entorno: la salida nunca incluye las variables de entorno de los contenedores (contraseñas de la base, secretos de clientes). Sirven para `postgres`, `backend` y `keycloak`; una identidad esperada vacía o por tag falla.
 
-Si cualquier paso falla o el run se cancela antes del registro, `last-success.env` no cambia: el siguiente reuso vuelve al último éxito, aunque `image.env` o el contenedor tengan el candidato fallido. No hay rollback automático del contenedor; para eso existe el rollback explícito del backend. Un primer deploy fallido en un servidor nuevo no deja estado reusable.
+Si cualquier paso falla o el run se cancela antes del registro, `last-success.env` no cambia: el siguiente reuso vuelve al último éxito, aunque `image.env` o el contenedor tengan el candidato fallido. No hay rollback automático del contenedor; para eso existe el rollback explícito del backend, que no debe apuntar a una imagen anterior al proveedor SES: es una regla operativa, sin control técnico con SES deshabilitado ([correo-ses.md](../../docs/operations/runbooks/correo-ses.md#límite-de-rollback)). Un primer deploy fallido en un servidor nuevo no deja estado reusable.
 
 `last-success.env` es la única fuente de reuso y la lee el workflow, nunca Ansible (ver [Cadena de producción](#cadena-de-producción-workflow)). Keycloak no forma parte de `last-success.env`: su identidad sale del commit, no del reuso (ver abajo). El formato anterior (`backend-deployed.env`, solo tag) no se migra: un servidor sin `last-success.env` necesita un deploy con build de backend y de postgres (o rollback de backend más build de postgres); un reuso falla cerrado.
 
@@ -431,10 +433,7 @@ El archivo `.env` se genera en cada converge desde este template. Las variables 
 | `host_vars/vps.yml` | `kc_hostname`, `api_public_domain`, `acme_email` |
 | Variables de entorno del runner (secretos de GitHub) | `POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `MIGRATION_DB_PASSWORD`, `KC_DB_PASSWORD`, `KC_BACKEND_CLIENT_SECRET` (vía `app_kc_backend_secret`), `CLOUDFLARE_DNS_API_TOKEN` |
 
-SendGrid está deshabilitado (`notifications_sendgrid_enabled: false`): `.env` lleva
-`NOTIFICATIONS_SENDGRID_ENABLED=false` y `SENDGRID_API_KEY` vacía, y el converge no recibe
-`PIEDRAZUL_BACKEND_MAIL_SEND`. Con el proveedor habilitado, `env.j2` escribe esa variable del
-runner como `SENDGRID_API_KEY` y `setup.yml` falla antes de generar `.env` si está vacía.
+El correo por SES llega al `.env` solo con `NOTIFICATIONS_SES_ENABLED=true` en el GitHub Environment; si no, `.env` lleva `false` y endpoint y credenciales vacíos (ver [Correo SES](#correo-ses)).
 
 `.env` no lleva credenciales de administración de Keycloak ni `KC_AUTOMATION_CLIENT_SECRET`: el secreto de automatización y el de la autoridad temporal de un evento no se persisten en el host; Ansible solo los entrega en tránsito al exec administrativo de Keycloak (ver [Ciclo técnico de Keycloak](#ciclo-técnico-de-keycloak-keycloak_lifecycleyml)).
 
@@ -459,6 +458,8 @@ ANSIBLE_SSH_KEY              # Clave privada SSH para que Ansible se conecte al 
 IDENTITY_SEED_ADMIN_PASSWORD # Un solo uso: contraseña temporal del primer ADMIN de negocio. Solo
                              # se lee con la variable IDENTITY_SEED_ENABLED=true; se elimina tras
                              # el primer login (docs/operations/runbooks/primer-admin-negocio.md)
+SES_SMTP_USERNAME            # Solo con la variable NOTIFICATIONS_SES_ENABLED=true. Los recibe el
+SES_SMTP_PASSWORD            # converge, nunca el deploy (docs/operations/runbooks/correo-ses.md)
 ```
 
 Qué exige la verificación de credenciales depende del modo del run: con configuración del
@@ -468,7 +469,23 @@ deploy sin configuración del servidor no las recibe ni las exige (solo `TF_API_
 `ANSIBLE_SSH_KEY`): usa el `.env` que dejó el converge, y `deploy.yml` falla antes de mutar si
 falta o le falta una clave de la base o `KC_BACKEND_CLIENT_SECRET` ("corre converge primero").
 
-Bootstrap del primer `ADMIN` de negocio (variables `IDENTITY_SEED_*` del environment): con
+### Correo SES
+
+`NOTIFICATIONS_SES_ENABLED` y `SES_SMTP_HOST` son variables exclusivas del environment `production-hetzner`; los dos secretos se leen solo habilitado. Deshabilitado (variable ausente o `false`) no se exige ni se lee nada. Operación completa en [correo-ses.md](../../docs/operations/runbooks/correo-ses.md).
+
+| Momento | Tarea | Qué hace |
+|---------|-------|----------|
+| Antes del Apply, también en Run P | `ses-config.sh preflight` | decisión estricta, sin copias fuera del environment, endpoint y remitente; credenciales si el run incluye converge |
+| Converge, antes de `.env` | `ses_inputs.yml`, `ses_image_gate.yml` | repite la validación con lo que recibe y exige la clase del proveedor en el JAR de la imagen exacta |
+| Converge, después de `.env` | `ses_delivery.yml` | Compose entregaría exactamente lo validado |
+| Deploy, antes de mutar | `ses_host_gate.yml`, `ses_image_gate.yml` | decisión y endpoint del `.env` iguales a los del environment y credenciales presentes; la imagen del deploy trae el proveedor si está habilitado |
+| Final de `refresh_backend.yml` y `deploy.yml` | `ses_runtime.yml` | el contenedor tiene exactamente lo que Compose entregaría, credenciales incluidas |
+
+`ses_smtp_host_pattern` (`group_vars`) y `HOST_RE` (`ses-config.sh`) deben ser la misma expresión; `infra/tests/notifications-contract-check.sh` lo exige. La puerta de imagen lista `app.jar` con el `unzip` de la propia imagen, en un contenedor sin red, sin escritura y sin capacidades; no recibe entorno ni credenciales. Un deploy no recibe secretos: no comprueba que las credenciales del host coincidan con las de GitHub, ni las renueva.
+
+### Bootstrap del primer `ADMIN` de negocio
+
+Variables `IDENTITY_SEED_*` del environment: con
 `IDENTITY_SEED_ENABLED=true`, `identity_seed_inputs.yml` valida las entradas antes de escribir
 `.env`, `identity_seed_delivery.yml` comprueba que Compose las entregaría intactas e
 `identity_seed_runtime.yml` (al final de `refresh_backend.yml` y de `deploy.yml`) exige que el

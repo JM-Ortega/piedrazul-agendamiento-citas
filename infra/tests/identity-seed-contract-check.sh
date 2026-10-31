@@ -349,7 +349,7 @@ container() {
   (cd "${APP}/compose" && "${TMP}/remote-bin/docker" compose --project-name piedrazul-contract --file prod.yml \
     --env-file "${src}" --env-file ../image.env config --format json) \
     | jq --arg state "${state}" --arg image "${image}" '
-      .services.backend.environment | with_entries(select(.key | startswith("IDENTITY_SEED_")))
+      .services.backend.environment | with_entries(select(.key | test("^(IDENTITY_SEED_|NOTIFICATIONS_|SES_SMTP_)")))
       | map_values(gsub("\\$\\$"; "$"))
       | if $state == "anterior-habilitado" then .IDENTITY_SEED_ADMIN_PASSWORD = "Retenida-Temporal-2026" else . end
       | if $state == "conserva" then .IDENTITY_SEED_ADMIN_PASSWORD = "Retenida-Temporal-2026" else . end

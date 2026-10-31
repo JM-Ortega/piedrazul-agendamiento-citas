@@ -135,7 +135,8 @@ jobs:
   #       push diferido quedan cubiertos por el siguiente.
   # workflow_dispatch: la intención es explícita (inputs) y no avanza el rango.
   # Este job no tiene environment: solo ve variables de repositorio y organización, y por
-  # eso puede comprobar que el pin no tiene una copia fuera del environment.
+  # eso puede comprobar que el pin y las variables de SES no tienen una copia fuera del
+  # environment.
   classify:
     name: Intención de producción
     runs-on: ubuntu-latest
@@ -146,6 +147,7 @@ jobs:
     outputs:
       stage: ${{ steps.intent.outputs.stage }}
       pin_outside_environment: ${{ steps.intent.outputs.pin_outside_environment }}
+      ses_vars_outside_environment: ${{ steps.intent.outputs.ses_vars_outside_environment }}
       # enabled|deferred|invalid, leído sin environment: el mismo valor que ve un push
       push_mode: ${{ steps.intent.outputs.push_mode }}
       intent: ${{ steps.intent.outputs.intent }}
@@ -174,6 +176,10 @@ jobs:
           PUSH_DEPLOY_SETTING: ${{ vars.PRODUCTION_PUSH_DEPLOY }}
           # Solo si existe; el valor nunca sale de environment
           PIN_OUTSIDE_ENVIRONMENT: ${{ vars.PRODUCTION_SSH_HOST_PIN != '' }}
+          # También con valor false o vacío: toJSON(vars) mira el nombre, no el valor, y no pide
+          # permisos (el GITHUB_TOKEN no tiene alcance de variables). La cobertura de un valor
+          # vacío en un run real está sin verificar; audit-github-trust.sh lo ve por la API.
+          SES_VARS_OUTSIDE_ENVIRONMENT: ${{ vars.NOTIFICATIONS_SES_ENABLED != '' || vars.SES_SMTP_HOST != '' || contains(toJSON(vars), '"NOTIFICATIONS_SES_ENABLED"') || contains(toJSON(vars), '"SES_SMTP_HOST"') }}
           IN_STAGE: ${{ inputs.stage }}
           IN_TERRAFORM: ${{ inputs.run_terraform_apply }}
           IN_HOST_CONFIG: ${{ inputs.run_host_config }}
@@ -340,6 +346,7 @@ jobs:
           fi
 
           echo "pin_outside_environment=${PIN_OUTSIDE_ENVIRONMENT:-}" >> "${OUT}"
+          echo "ses_vars_outside_environment=${SES_VARS_OUTSIDE_ENVIRONMENT:-}" >> "${OUT}"
           echo "push_mode=${PUSH_MODE}" >> "${OUT}"
           cat "${OUT}" >> "$GITHUB_OUTPUT"
           cat "${OUT}"
@@ -1441,6 +1448,8 @@ jobs:
       RUN_HOST_CONFIG: ${{ needs.classify.outputs.stage != 'provision' && needs.classify.outputs.run_host_config == 'true' }}
       RUN_APP_DEPLOY: ${{ needs.classify.outputs.stage != 'provision' && needs.classify.outputs.run_app_deploy == 'true' }}
       KEYCLOAK_RECOVERY: ${{ needs.classify.outputs.keycloak_recovery }}
+      # La intención del run, también en Run P: lo que la instalación necesitará
+      SES_PREFLIGHT_REQUIRED: ${{ needs.classify.outputs.deploy_required }}
       # Preparar y verificar Pages (también en Run P) / publicar (nunca en Run P)
       FRONTEND_REQUIRED: ${{ needs.classify.outputs.frontend_required }}
       FRONTEND_PUBLISH: ${{ needs.classify.outputs.stage != 'provision' && needs.classify.outputs.frontend_required == 'true' }}
@@ -1535,6 +1544,26 @@ jobs:
             exit 1
           fi
           echo "Credenciales requeridas presentes"
+
+      # Sin red y antes del Apply y de cualquier conexión al servidor, también en Run P:
+      # deshabilitado (ausente o false) no exige ni lee nada de SES. Habilitado valida las
+      # entradas; los secretos solo llegan a este paso si el run incluye converge, porque un
+      # deploy no los recibe (docs/operations/runbooks/correo-ses.md).
+      - name: Verificar la configuración del correo SES
+        id: ses_preflight
+        if: env.SES_PREFLIGHT_REQUIRED == 'true'
+        env:
+          # La intención, no lo que hace este run: Run P valida lo que la instalación necesitará
+          RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
+          SES_VARS_OUTSIDE_ENVIRONMENT: ${{ needs.classify.outputs.ses_vars_outside_environment }}
+          NOTIFICATIONS_SES_ENABLED: ${{ vars.NOTIFICATIONS_SES_ENABLED }}
+          SES_SMTP_HOST: ${{ vars.SES_SMTP_HOST }}
+          SES_SMTP_USERNAME: ${{ vars.NOTIFICATIONS_SES_ENABLED == 'true' && needs.classify.outputs.run_host_config == 'true' && secrets.SES_SMTP_USERNAME || '' }}
+          SES_SMTP_PASSWORD: ${{ vars.NOTIFICATIONS_SES_ENABLED == 'true' && needs.classify.outputs.run_host_config == 'true' && secrets.SES_SMTP_PASSWORD || '' }}
+        run: |
+          set -euo pipefail
+          .github/scripts/ses-config.sh preflight | tee "${RUNNER_TEMP}/ses-preflight.env"
+          grep '^ses_' "${RUNNER_TEMP}/ses-preflight.env" >> "$GITHUB_OUTPUT"
 
       # Sin red y antes de cualquier mutación: un run que va a tocar el servidor no aplica nada
       # si ni siquiera tiene un pin utilizable. Run P no lo lee: su servidor aún no tiene pin.
@@ -2131,8 +2160,13 @@ jobs:
           IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
           IDENTITY_SEED_ADMIN_PHONE: ${{ vars.IDENTITY_SEED_ADMIN_PHONE }}
           IDENTITY_SEED_ADMIN_PASSWORD: ${{ vars.IDENTITY_SEED_ENABLED == 'true' && secrets.IDENTITY_SEED_ADMIN_PASSWORD || '' }}
-          # SendGrid está deshabilitado (group_vars: notifications_sendgrid_enabled): el converge
-          # no recibe PIEDRAZUL_BACKEND_MAIL_SEND y setup.yml falla si se habilita sin ella.
+          # Correo SES: único paso que entrega endpoint y credenciales al host, y solo
+          # habilitado. Deshabilitado el converge deja esas entradas vacías en .env y el backend
+          # se recrea sin ellas, aunque los secretos sigan en el environment (correo-ses.md).
+          NOTIFICATIONS_SES_ENABLED: ${{ vars.NOTIFICATIONS_SES_ENABLED }}
+          SES_SMTP_HOST: ${{ vars.NOTIFICATIONS_SES_ENABLED == 'true' && vars.SES_SMTP_HOST || '' }}
+          SES_SMTP_USERNAME: ${{ vars.NOTIFICATIONS_SES_ENABLED == 'true' && secrets.SES_SMTP_USERNAME || '' }}
+          SES_SMTP_PASSWORD: ${{ vars.NOTIFICATIONS_SES_ENABLED == 'true' && secrets.SES_SMTP_PASSWORD || '' }}
         run: |
           set -euo pipefail
           ansible-playbook \
@@ -2147,6 +2181,8 @@ jobs:
             -e "keycloak_recovery=${KEYCLOAK_RECOVERY}" \
             -e "app_deploy_follows=${RUN_APP_DEPLOY}" \
             -e "app_identity_seed_intended=${IDENTITY_SEED_ENABLED:-false}" \
+            -e "app_ses_intended=${NOTIFICATIONS_SES_ENABLED:-false}" \
+            -e "app_ses_intended_host=${SES_SMTP_HOST}" \
             infra/ansible/playbooks/converge.yml
 
       - name: Verificar postgres, keycloak y traefik tras converge (identidad en ejecución)
@@ -2189,6 +2225,11 @@ jobs:
           # si ese .env no corresponde a esta decisión (habilitación o retiro pendientes de la
           # configuración del servidor) o si el backend resultante no la tiene en vigor
           IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
+          # Solo lo no secreto de SES: deploy.yml lo compara con el .env del host antes de mutar
+          # y falla si el environment cambió sin converge. No puede comparar credenciales ni
+          # las renueva: una rotación exige la configuración del servidor.
+          NOTIFICATIONS_SES_ENABLED: ${{ vars.NOTIFICATIONS_SES_ENABLED }}
+          SES_SMTP_HOST: ${{ vars.NOTIFICATIONS_SES_ENABLED == 'true' && vars.SES_SMTP_HOST || '' }}
         run: |
           set -euo pipefail
           ansible-playbook \
@@ -2198,6 +2239,8 @@ jobs:
             -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
             -e "app_migrate=${APP_MIGRATE}" \
             -e "app_identity_seed_intended=${IDENTITY_SEED_ENABLED:-false}" \
+            -e "app_ses_intended=${NOTIFICATIONS_SES_ENABLED:-false}" \
+            -e "app_ses_intended_host=${SES_SMTP_HOST}" \
             infra/ansible/playbooks/deploy.yml
 
       # ── Verificación posterior ──
@@ -2360,6 +2403,9 @@ jobs:
           PREVIOUS_POSTGRES: ${{ steps.select.outputs.previous_postgres_image_ref }}
           STATE_STATUS: ${{ steps.select.outputs.state_status }}
           O_CREDENTIALS: ${{ steps.credentials.outcome }}
+          O_SES: ${{ steps.ses_preflight.outcome }}
+          SES_ENABLED: ${{ steps.ses_preflight.outputs.ses_enabled }}
+          SES_CREDENTIALS: ${{ steps.ses_preflight.outputs.ses_credentials }}
           O_FRESH_APPLY: ${{ steps.fresh_apply.outcome }}
           O_HCP: ${{ steps.hcp_workspace.outcome }}/${{ steps.hcp_idle.outcome }}/${{ steps.hcp_before.outcome }}/${{ steps.hcp_state.outcome }}/${{ steps.tf_outputs.outcome }}
           O_PAGES_PLAN: ${{ steps.pages_plan.outcome }}
@@ -2562,6 +2608,14 @@ jobs:
               fi
             fi
             echo "| credenciales / frescura | ${O_CREDENTIALS} / ${O_FRESH_APPLY:-—} ${O_FRESH_DEPLOY:-} |"
+            # Configuración, no entrega: ningún paso de esta cadena envía un correo
+            case "${O_SES:-skipped}/${SES_ENABLED:-}/${SES_CREDENTIALS:-}" in
+              skipped/*) ;;
+              success/false/*) echo "| correo SES | deshabilitado: sin proveedor real; los códigos responden 503 |" ;;
+              success/true/converge) echo "| correo SES | habilitado, entradas válidas; las credenciales llegan al host solo si el converge termina bien (fila deploy). Entrega de correo **no verificada** |" ;;
+              success/true/host) echo "| correo SES | habilitado: deploy sin secretos, **credenciales no renovadas ni comparadas** con GitHub. Entrega de correo **no verificada** |" ;;
+              *) echo "| correo SES | **configuración no válida** (${O_SES}): el run no toca el servidor |" ;;
+            esac
             echo "| HCP (workspace/idle/previo/estado/outputs) | ${O_HCP} — confirmación ${O_HCP_APPLY:-—} |"
             echo "| identidad del host (pin/verificación/sshd) | ${O_HOST_TRUST} |"
             echo "| acceso (ssh/espera/cloud-init/último éxito) | ${O_ACCESS} (cloud-init: ${CLOUD_INIT:-no comprobado}) |"

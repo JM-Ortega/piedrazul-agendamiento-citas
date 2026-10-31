@@ -126,10 +126,20 @@ kc_metrics_enabled: true
 kc_db_username: keycloak_user
 kc_db_schema: keycloak
 
-# Notificaciones. SendGrid desactivado: el backend arranca sin su clave y no hay envío
-# externo de correo. Activarlo exige PIEDRAZUL_BACKEND_MAIL_SEND en el entorno del converge
-# (setup.yml falla antes de escribir .env si falta; el backend tampoco arranca sin ella).
-notifications_sendgrid_enabled: false
-notifications_sendgrid_sandbox_mode: false
+# Notificaciones. La decisión de usar SES y sus credenciales vienen del GitHub Environment,
+# no de aquí (roles/app/tasks/ses_inputs.yml); el remitente se aplica solo con SES habilitado.
 notifications_email_from: no-reply@mail.piedrazul.org
 notifications_email_from_name: Piedrazul Salud
+# Endpoint SMTP público de SES: estándar o FIPS, en amazonaws.com o api.aws. Misma expresión que
+# .github/scripts/ses-config.sh; la región y la conectividad no se comprueban aquí.
+ses_smtp_host_pattern: '^email-smtp(-fips)?\.[a-z]{2}(-[a-z]+)+-[0-9]+\.(amazonaws\.com|api\.aws)\Z'
+# Lo que Compose debe entregar al backend, y solo a él (ses_delivery.yml, ses_runtime.yml)
+ses_backend_env_keys:
+  - NOTIFICATIONS_SES_ENABLED
+  - SES_SMTP_HOST
+  - SES_SMTP_USERNAME
+  - SES_SMTP_PASSWORD
+  - NOTIFICATIONS_EMAIL_FROM
+  - NOTIFICATIONS_EMAIL_FROM_NAME
+# Clase que demuestra que una imagen del backend trae el proveedor SES (ses_image_gate.yml)
+ses_image_provider_class: BOOT-INF/classes/co/edu/unicauca/piedrazul/backend/notifications/infrastructure/provider/email/ses/SesEmailProvider.class

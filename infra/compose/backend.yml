@@ -61,9 +61,14 @@ services:
       IDENTITY_SEED_ADMIN_PHONE: ${IDENTITY_SEED_ADMIN_PHONE:-}
       IDENTITY_SEED_ADMIN_PASSWORD: ${IDENTITY_SEED_ADMIN_PASSWORD:-}
 
-      NOTIFICATIONS_SENDGRID_ENABLED: ${NOTIFICATIONS_SENDGRID_ENABLED}
-      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
-      SENDGRID_SANDBOX_MODE: ${SENDGRID_SANDBOX_MODE}
+      # Correo por SES: solo habilitado las entradas tienen valor; deshabilitado llegan vacías
+      # (env.j2) y el backend no las usa. Puerto, plazos y circuit breaker: sus valores por
+      # defecto (application.yaml). Sin NOTIFICATIONS_CONSOLE_SHOW_SENSITIVE: producción no
+      # activa el diagnóstico por consola.
+      NOTIFICATIONS_SES_ENABLED: ${NOTIFICATIONS_SES_ENABLED:-false}
+      SES_SMTP_HOST: ${SES_SMTP_HOST:-}
+      SES_SMTP_USERNAME: ${SES_SMTP_USERNAME:-}
+      SES_SMTP_PASSWORD: ${SES_SMTP_PASSWORD:-}
       NOTIFICATIONS_EMAIL_FROM: ${NOTIFICATIONS_EMAIL_FROM}
       NOTIFICATIONS_EMAIL_FROM_NAME: ${NOTIFICATIONS_EMAIL_FROM_NAME}
 

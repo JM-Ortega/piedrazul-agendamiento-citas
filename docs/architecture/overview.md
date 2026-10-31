@@ -106,7 +106,8 @@ correo, no hay proveedor real y los códigos responden `503`. Habilitado exige `
 `SES_SMTP_USERNAME`, `SES_SMTP_PASSWORD` y `NOTIFICATIONS_EMAIL_FROM`; si falta alguno o un valor no
 es válido, no arranca (el error nombra la propiedad, nunca su valor). Al arrancar no contacta con el
 servidor, y no aporta indicador de salud: `/actuator/health` no depende de SES. Las credenciales y
-variables son solo del backend.
+variables son solo del backend. En producción las configura el GitHub Environment y nada más
+([correo-ses.md](../operations/runbooks/correo-ses.md)).
 
 La conexión exige STARTTLS (TLS 1.2 o superior) con la confianza de la JVM y validación del nombre
 del servidor; sin STARTTLS, con un certificado no válido o sin `AUTH` no se envían credenciales o no

@@ -20,11 +20,13 @@ contrato, así que no es `UNKNOWN`. `secrets.GITHUB_TOKEN` es un mecanismo de Gi
 secreto del repositorio, y no cuenta como nombre sin clasificar.
 
 Los nombres retirados de producción (`DB_PASSWORD`, `KC_ADMIN_PASSWORD`,
-`KC_BOOTSTRAP_ADMIN_PASSWORD`, `NOTIFICATION_ENCRYPTION_KEY`) no tienen alcance en la tabla:
-una copia o referencia restante sale como `sin alcance decidido` y se resuelve retirándola,
-no agregándola. `PIEDRAZUL_BACKEND_MAIL_SEND` conserva su alcance (`production-hetzner`)
-aunque SendGrid esté deshabilitado y ningún job lo consuma: guardado ahí aparece como secreto
-sin consumidor (`INFO`); una copia de repositorio sigue siendo `FAIL`.
+`KC_BOOTSTRAP_ADMIN_PASSWORD`, `NOTIFICATION_ENCRYPTION_KEY`, `PIEDRAZUL_BACKEND_MAIL_SEND`) no
+tienen alcance en la tabla: una copia o referencia restante sale como `sin alcance decidido` y se
+resuelve retirándola, no agregándola. Si `PIEDRAZUL_BACKEND_MAIL_SEND` sigue guardado en
+`production-hetzner`, la auditoría falla hasta eliminarlo: SendGrid ya no existe.
+
+`SES_SMTP_USERNAME` y `SES_SMTP_PASSWORD` tienen alcance `production-hetzner`, pero son
+condicionales: faltan sin problema mientras SES esté deshabilitado ([correo-ses.md](correo-ses.md)).
 
 ## Cuándo ejecutarla
 
@@ -68,6 +70,12 @@ Opciones:
   o un secreto sin clasificar.
 - Secretos de Actions con alcance de repositorio: el objetivo es **cero**, conocidos o no. La
   salida separa los de producción de los sin clasificar.
+- Correo SES: decisión de `production-hetzner` (`true`, `false` o ausente; otro valor es `FAIL`),
+  entradas exigidas solo si está habilitado, y `NOTIFICATIONS_SES_ENABLED` y `SES_SMTP_HOST` sin
+  copias en el repositorio, la organización ni otro environment. Las copias se buscan por nombre,
+  sin distinguir mayúsculas y sea cual sea su valor, incluso vacío: esta auditoría es la comprobación
+  autoritativa, porque `classify` no ve otros environments ni garantiza ver una copia vacía. Es
+  confianza y preparación en GitHub: no ve el `.env` del host, el backend ni la entrega de correo.
 - Política de Actions: `sha_pinning_required` y permisos por defecto del `GITHUB_TOKEN`.
 - Ruleset `Protect main`: activo sobre `main`, reglas de borrado, force-push y PR,
   resolución obligatoria de hilos de revisión, cero actores de bypass y número de
@@ -146,9 +154,12 @@ Un `UNKNOWN` **no** es un `PASS`: significa que el control no se pudo comprobar,
 bien. Cuando un dato del que dependen otros no se puede leer, esos controles también quedan
 `UNKNOWN`.
 
-Las listas de la API (secretos, environments, políticas de rama, rulesets) se leen completas,
-todas las páginas. Si la API informa un total distinto de lo leído, el dato se marca
-incompleto (`HTTP incompleto`) y sus controles quedan `UNKNOWN`.
+Las listas de la API (secretos, variables, environments, políticas de rama, rulesets) se leen
+completas, todas las páginas; las de variables, de a 30, el máximo de GitHub. Si la API informa un
+total distinto de lo leído o que cambia entre páginas, o si una respuesta `200` no trae la forma
+esperada, el dato se marca incompleto (`HTTP incompleto`) y sus controles quedan `UNKNOWN`: nunca se
+interpreta como una lista vacía o como una variable ausente. En las variables también se exigen
+`total_count`, `name` y `value`.
 
 ## Problemas frecuentes
 
@@ -158,6 +169,9 @@ incompleto (`HTTP incompleto`) y sus controles quedan `UNKNOWN`.
 | `HTTP err` aislado | error transitorio de red o API | volver a ejecutar |
 | `HTTP incompleto` | la lista paginada cambió durante la lectura o la API devolvió un total inconsistente | volver a ejecutar; si persiste, revisar en la interfaz de GitHub |
 | `sin alcance decidido: …` | secreto nuevo o huérfano sin clasificar | decidir su alcance (agregarlo a la tabla del script) o eliminar la referencia o el secreto |
+| `SES: variables solo en production-hetzner` en `FAIL` | copia de la variable fuera del environment | eliminarla, cualquiera que sea su valor |
+| `production-hetzner: decisión de correo SES` en `FAIL` | valor distinto de `true` o `false`, también vacío | corregirlo o eliminar la variable |
+| `production-hetzner: entradas de SES` en `FAIL` | SES habilitado sin endpoint válido o sin un secreto | definirlo, o deshabilitar SES |
 | `workflows@…` en `UNKNOWN` por ref no disponible | ref no presente localmente | `git fetch origin` |
 | `parseo YAML` en `UNKNOWN` | workflow con YAML inválido en ese árbol | corregir el workflow |
 | `falta jq`/`yq` | herramienta no instalada | instalarla (yq debe ser la de mikefarah) |

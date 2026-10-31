@@ -64,6 +64,18 @@
   vars:
     app_identity_seed_runtime_mode: "{{ 'deferred' if (app_deploy_follows | default(false) | bool) else 'enforce' }}"
 
+# Correo SES: mismo criterio que el bootstrap. Un converge solo termina bien si el backend que
+# corre ya tiene la configuración vigente (o la recibirá del deploy de este run).
+- name: Verificar la configuración de SES en el backend recreado
+  when: app_backend_refreshable | bool
+  ansible.builtin.include_tasks: ses_runtime.yml
+
+- name: Verificar la configuración de SES en el backend no recreado
+  when: not (app_backend_refreshable | bool)
+  ansible.builtin.include_tasks: ses_runtime.yml
+  vars:
+    app_ses_runtime_mode: "{{ 'deferred' if (app_deploy_follows | default(false) | bool) else 'enforce' }}"
+
 - name: Omitir el backend
   ansible.builtin.debug:
     msg: >-

@@ -57,6 +57,16 @@
   when: app_identity_seed_enabled | bool
   ansible.builtin.include_tasks: identity_seed_image_gate.yml
 
+# Igual para el correo: con SES habilitado, entradas válidas e imagen con el proveedor SES antes
+# de escribir .env (las credenciales no llegan al host para una imagen que no las usaría).
+# Deshabilitado no se lee ninguna entrada.
+- name: Tomar y validar la configuración del correo SES
+  ansible.builtin.include_tasks: ses_inputs.yml
+
+- name: Verificar que la imagen del backend trae el proveedor SES
+  when: app_ses_enabled | bool
+  ansible.builtin.include_tasks: ses_image_gate.yml
+
 # Antes de copiar Compose o escribir .env: compose/keycloak.yml exige FRONTEND_PUBLIC_URL y
 # env.j2 la produce desde frontend_public_domain. Un valor ausente o malformado falla aquí,
 # sin dejar en el servidor archivos Compose nuevos junto a un .env que no los cumple.
@@ -105,24 +115,15 @@
 - name: Generar las rutas de Traefik
   ansible.builtin.include_tasks: traefik_routes.yml
 
-# SendGrid habilitado sin clave: falla antes de escribir .env (el backend tampoco arrancaría)
-- name: Validar la clave de SendGrid si el proveedor está habilitado
-  ansible.builtin.assert:
-    that:
-      - lookup('env', 'PIEDRAZUL_BACKEND_MAIL_SEND') | trim | length > 0
-    fail_msg: "notifications_sendgrid_enabled=true requiere PIEDRAZUL_BACKEND_MAIL_SEND no vacío en el entorno del converge"
-    quiet: true
-  when: notifications_sendgrid_enabled | bool
-  no_log: true
-
-# .env
+# .env: tiene secretos, solo root lo lee. Lo consumen Ansible y Compose con become; las
+# inspecciones manuales en el host usan sudo.
 - name: Generar .env desde template
   ansible.builtin.template:
     src: env.j2
     dest: "{{ app_dir }}/.env"
-    owner: ansible
-    group: ansible
-    mode: "0640"
+    owner: root
+    group: root
+    mode: "0600"
   no_log: true
 
 # Identidades exactas de las imágenes propias para image.env
@@ -156,6 +157,9 @@
 
 - name: Verificar la entrega del bootstrap del primer administrador al backend
   ansible.builtin.include_tasks: identity_seed_delivery.yml
+
+- name: Verificar la entrega de la configuración de SES al backend
+  ansible.builtin.include_tasks: ses_delivery.yml
 
 # Base primero: ningún consumidor arranca con credenciales que postgres aún no acepta
 - name: Converger postgres y reconciliar autoridades de la base

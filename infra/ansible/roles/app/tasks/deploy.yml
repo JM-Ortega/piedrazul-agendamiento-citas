@@ -16,10 +16,12 @@
 # construido en este run; un rollback explícito (o el reuso del último éxito) no migra.
 #
 # Orden:
-#   .env válido → Keycloak ya convergido (sin mutar nada) → imágenes por digest → image.env
+#   .env válido y al día con la decisión de SES → Keycloak ya convergido (sin mutar nada) →
+#   imágenes por digest → imagen con el proveedor SES si está habilitado → image.env
 #   → postgres + reconciliación
 #   (db_converge.yml) → [migración con la misma identidad (migrate.yml)] → backend →
-#   bootstrap del primer administrador (identity_seed_runtime.yml)
+#   bootstrap del primer administrador (identity_seed_runtime.yml) → configuración de SES en
+#   el backend (ses_runtime.yml)
 
 # Validar que .env existe y tiene claves críticas
 - name: Verificar que .env existe
@@ -77,6 +79,11 @@
       - app_env_db_missing | length == 0
     fail_msg: "Faltan o están vacías en .env: {{ app_env_db_missing | join(', ') }} — corre converge primero"
     quiet: true
+
+# Deploy no recibe secretos ni escribe .env: la decisión y el endpoint del GitHub Environment
+# deben estar ya en el host. Las credenciales solo se comprueban presentes (ses_host_gate.yml).
+- name: Verificar que el .env del host corresponde a la configuración de SES
+  ansible.builtin.include_tasks: ses_host_gate.yml
 
 - name: Validar la decisión de migración
   ansible.builtin.assert:
@@ -191,6 +198,12 @@
   when: app_deploy_identity_seed_enabled | bool
   ansible.builtin.include_tasks: identity_seed_image_gate.yml
 
+# Mismo punto para el correo: con SES habilitado en .env, una imagen sin el proveedor (p. ej.
+# un rollback a una anterior) no se introduce. Deshabilitado no se inspecciona la imagen.
+- name: Verificar que la imagen del backend trae el proveedor SES
+  when: app_ses_env_enabled | bool
+  ansible.builtin.include_tasks: ses_image_gate.yml
+
 # image.env es la entrada de Compose: referencias exactas, nunca tags. Puede quedar con
 # un candidato fallido; el último éxito vive aparte (release_state_file) y solo lo
 # escribe record_release.yml.
@@ -265,3 +278,6 @@
 # bootstrap habilitado, su resultado debe ser CREATED o ALREADY_LINKED
 - name: Verificar el bootstrap del primer administrador en el backend
   ansible.builtin.include_tasks: identity_seed_runtime.yml
+
+- name: Verificar la configuración de SES en el backend
+  ansible.builtin.include_tasks: ses_runtime.yml

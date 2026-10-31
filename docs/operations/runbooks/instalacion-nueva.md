@@ -61,8 +61,9 @@ en la cuenta dedicada, distinto del de DNS), `CLOUDFLARE_DNS_API_TOKEN` (DNS de 
 nueva, para el desafío de Let's Encrypt), `ANSIBLE_SSH_KEY`, contraseñas de la base,
 secretos de Keycloak, `KC_PLATFORM_ADMIN_INITIAL_PASSWORD` (solo la instalación nueva, P2;
 se valida antes del Apply si el plan crea o reemplaza el servidor: sin ella válida no se
-aplica nada; ver [administrador-keycloak.md](administrador-keycloak.md)) y, si se habilita, el primer
-administrador de negocio ([primer-admin-negocio.md](primer-admin-negocio.md)).
+aplica nada; ver [administrador-keycloak.md](administrador-keycloak.md)) y, si se habilitan, el primer
+administrador de negocio ([primer-admin-negocio.md](primer-admin-negocio.md)) y el correo por SES
+([correo-ses.md](correo-ses.md)). La instalación no necesita ningún secreto de correo.
 
 **GitHub, variables:**
 
@@ -75,18 +76,19 @@ administrador de negocio ([primer-admin-negocio.md](primer-admin-negocio.md)).
   exige que esté retenida si el plan crea o reemplaza el servidor. No definirla en el environment:
   los push la leen sin environment y esa copia no cambiaría su decisión.
 
-**Correo.** SendGrid está deshabilitado en producción (`notifications_sendgrid_enabled: false`
-en `group_vars`): la cadena no exige ni entrega `PIEDRAZUL_BACKEND_MAIL_SEND`, el `.env`
-queda con `SENDGRID_API_KEY` vacía y el backend arranca sin ella. No hay envío externo de
-correo. Las notificaciones de citas caen al proveedor de consola, que solo las registra en el
-log del backend y las deja `FAILED` (`CONSOLE_DIAGNOSTIC_ONLY`): nadie las recibe. Los códigos de verificación, en cambio, no se emiten: sin un canal apto para
+**Correo.** SES está deshabilitado mientras `NOTIFICATIONS_SES_ENABLED` no sea `true` en el
+environment: Run P, Run I y los deploys no exigen ni entregan endpoint ni credenciales, el `.env`
+los deja vacíos y el backend arranca sin ellos. Activarlo es una operación posterior, con sus
+propios requisitos externos ([correo-ses.md](correo-ses.md)). Sin SES no hay envío externo de
+correo. Nadie recibe los recordatorios de cita: uno vigente termina en un intento de consola `FAILED`
+(`CONSOLE_DIAGNOSTIC_ONLY`) y, como aquí no se activa el diagnóstico, el log no muestra su
+contenido (`[contenido sensible oculto]`, destinatario enmascarado). Los códigos de verificación, en cambio, no se emiten: sin un canal apto para
 ellos, `POST /api/patients/link-user-account/request-code` responde `503`
 (`VERIFICATION_DELIVERY_UNAVAILABLE`) antes de buscar el documento, sin generar código, sin
 invalidar el activo, sin consumir el cupo de solicitudes y sin encolar nada; el arranque lo
 avisa una sola vez en el log (`[OTP_DELIVERY] Sin canal apto…`); los rechazos no repiten ese
 aviso ni dejan traza (solo una línea `DEBUG`). La vinculación de cuentas por código no es operable en esta instalación
-hasta que exista un proveedor de correo apto para códigos (SES, pendiente); SendGrid, aunque se
-habilite, no cuenta como canal para códigos. La consola es diagnóstico, no entrega:
+hasta que SES esté activo. La consola es diagnóstico, no entrega:
 `NOTIFICATIONS_CONSOLE_SHOW_SENSITIVE=true` (el `.env` no la lleva; vale `false` por defecto)
 solo habilita el diagnóstico por consola si no hay ningún proveedor real, y solo para datos
 exclusivamente sintéticos, nunca aquí. En ese modo se aceptan las solicitudes (incluso con
@@ -99,12 +101,9 @@ encolado, no entrega; un envío `ACCEPTED` tampoco prueba la entrega, y un inten
 (`ACCEPTANCE_UNKNOWN`, evento `NOTIFICATION_ACCEPTANCE_UNKNOWN`) significa que el destinatario pudo
 recibirlo y no se reintenta (ver [despacho de notificaciones](../../architecture/overview.md#despacho-de-notificaciones),
 que también explica la recuperación del trabajo interrumpido). `LOG_LEVEL_SQL_BIND` debe seguir en `WARN` (`log_level_sql_bind`): en
-`TRACE` el log recibe los valores enlazados, incluido el código. Por lo mismo, `LOG_LEVEL_ROOT`
-no debe bajar a `DEBUG` (`log_level_root`): con SendGrid habilitado, el log de red de su
-cliente HTTP (`org.apache.http.wire`) escribe el cuerpo de cada correo. Los flujos que dependen de
-recibir un correo quedan fuera de esta instalación y de su verificación. Si se habilita
-SendGrid sin entregar la clave al converge, la configuración del servidor falla antes de
-escribir `.env`. `NOTIFICATION_ENCRYPTION_KEY` no es un requisito: ningún componente la usa.
+`TRACE` el log recibe los valores enlazados, incluido el código. Los
+flujos que dependen de recibir un correo quedan fuera de esta instalación y de su verificación.
+`NOTIFICATION_ENCRYPTION_KEY` no es un requisito: ningún componente la usa.
 
 ## Cómo se inicia
 

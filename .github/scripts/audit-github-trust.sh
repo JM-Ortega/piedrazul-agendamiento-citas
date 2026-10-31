@@ -52,9 +52,8 @@ done
 # un secreto deba existir lo decide un consumidor real en el árbol analizado (--ref), no
 # esta tabla. Un secreto nuevo entra aquí cuando se decida su alcance, no antes. Un nombre
 # retirado (DB_PASSWORD, KC_ADMIN_PASSWORD, KC_BOOTSTRAP_ADMIN_PASSWORD,
-# NOTIFICATION_ENCRYPTION_KEY) sale de la tabla: cualquier copia o referencia restante queda
-# sin clasificar (FAIL) hasta retirarla. PIEDRAZUL_BACKEND_MAIL_SEND conserva su alcance:
-# SendGrid sigue implementado aunque producción lo tenga deshabilitado.
+# NOTIFICATION_ENCRYPTION_KEY, PIEDRAZUL_BACKEND_MAIL_SEND) sale de la tabla: cualquier copia o
+# referencia restante queda sin clasificar (FAIL) hasta retirarla.
 declare -A AUTH=(
   [TF_API_TOKEN]="production-hetzner terraform-plan"
   [ANSIBLE_SSH_KEY]="production-hetzner"
@@ -64,7 +63,8 @@ declare -A AUTH=(
   [KC_BACKEND_CLIENT_SECRET]="production-hetzner"
   [KC_PLATFORM_ADMIN_INITIAL_PASSWORD]="production-hetzner"
   [IDENTITY_SEED_ADMIN_PASSWORD]="production-hetzner"
-  [PIEDRAZUL_BACKEND_MAIL_SEND]="production-hetzner"
+  [SES_SMTP_USERNAME]="production-hetzner"
+  [SES_SMTP_PASSWORD]="production-hetzner"
   [POSTGRES_PASSWORD]="production-hetzner"
   [APP_DB_PASSWORD]="production-hetzner"
   [MIGRATION_DB_PASSWORD]="production-hetzner"
@@ -77,6 +77,11 @@ PROD_ENV="production-hetzner"
 PLAN_ENV="terraform-plan"
 SENSITIVE_ENVS=("$PROD_ENV" "$PLAN_ENV")
 PROD_REF="main"
+# Correo SES: los secretos solo se exigen si el environment lo habilita, y las variables viven
+# exclusivamente en él. Esto audita alcance y preparación de la configuración; no ve el .env del
+# host ni el backend, y nada aquí prueba que se entregue un correo.
+SES_SECRETS=(SES_SMTP_USERNAME SES_SMTP_PASSWORD)
+SES_VARS=(NOTIFICATIONS_SES_ENABLED SES_SMTP_HOST)
 PLAN_WORKFLOW=".github/workflows/terraform-hetzner-plan.yml"
 # OCI es histórico/inactivo: sus workflows no se mantienen operativos. Al retirar las
 # copias de repo dejan de resolver secretos y pasan a referencias inertes.
@@ -114,19 +119,25 @@ api() {
   done
   return 1
 }
-# api_list RUTA CLAVE → todas las páginas (--paginate) combinadas en $API_BODY con la forma
-# {CLAVE: [...]}; CLAVE "-" para endpoints que devuelven un arreglo. Si la API informa
-# total_count y no coincide con lo leído, API_STATUS=incompleto y devuelve error.
+# api_list RUTA CLAVE [POR_PÁGINA] → todas las páginas (--paginate) combinadas en $API_BODY con la
+# forma {CLAVE: [...]}; CLAVE "-" para endpoints que devuelven un arreglo. Si una página no trae el
+# arreglo, o la API informa un total_count que varía o no coincide con lo leído,
+# API_STATUS=incompleto y devuelve error: una respuesta 200 inesperada no es una lista vacía.
 api_list() {
-  local path="$1" key="$2" sep="?" raw try
+  local path="$1" key="$2" per_page="${3:-100}" sep="?" raw try
   [[ "$path" == *\?* ]] && sep="&"
   for try in 1 2; do
     API_BODY="" API_STATUS=err
-    if raw="$(gh api -X GET --paginate --slurp "$path${sep}per_page=100" 2>/dev/null)"; then
+    if raw="$(gh api -X GET --paginate --slurp "$path${sep}per_page=$per_page" 2>/dev/null)"; then
       if [ "$key" = "-" ]; then
         API_BODY="$(jq -c 'add // []' <<<"$raw")" || return 1
       else
-        API_BODY="$(jq -c --arg k "$key" '{($k): (map(.[$k] // []) | add // []), total_count: (.[0].total_count // null)}' <<<"$raw")" || return 1
+        if ! jq -e --arg k "$key" 'type == "array" and length > 0
+             and all(.[]; type == "object" and (.[$k] | type) == "array")
+             and (map(.total_count) | unique | length) == 1' <<<"$raw" >/dev/null 2>&1; then
+          API_BODY="" API_STATUS=incompleto; return 1
+        fi
+        API_BODY="$(jq -c --arg k "$key" '{($k): (map(.[$k]) | add), total_count: .[0].total_count}' <<<"$raw")" || return 1
         if ! jq -e --arg k "$key" '.total_count == null or .total_count == (.[$k] | length)' <<<"$API_BODY" >/dev/null; then
           API_STATUS=incompleto; return 1
         fi
@@ -140,6 +151,19 @@ api_list() {
   done
   return 1
 }
+# api_vars RUTA → lista de variables: un inventario exhaustivo o un error, nunca uno parcial del
+# que se deduzca una ausencia. GitHub limita estas listas a 30 por página. Exige lo que su esquema
+# declara requerido (total_count, name, value) y nombres únicos: no distinguen mayúsculas.
+api_vars() {
+  api_list "$1" variables 30 || return 1
+  jq -e '(.total_count | type) == "number"
+    and all(.variables[]; type == "object" and (.name | type) == "string" and (.name | length) > 0
+      and (.value | type) == "string")
+    and (.variables | map(.name | ascii_upcase) | unique | length) == (.variables | length)' \
+    <<<"$API_BODY" >/dev/null 2>&1 && return 0
+  API_BODY="" API_STATUS=incompleto
+  return 1
+}
 in_list() { local x="$1"; shift; local y; for y in "$@"; do [ "$x" = "$y" ] && return 0; done; return 1; }
 csv() { local IFS=,; echo "$*"; }
 is_historical() { [[ "$1" == $HISTORICAL_GLOB ]]; }
@@ -148,7 +172,9 @@ echo "Repositorio: $REPO   árbol analizado: $REF   revisores autorizados: $REVI
 echo
 
 # ---------------------------------------------------------------- acceso
-if api "repos/$REPO" && [ "$(jq -r '.permissions.admin // false' <<<"$API_BODY")" = true ]; then
+OWNER_TYPE=""
+if api "repos/$REPO" && OWNER_TYPE="$(jq -r '.owner.type // ""' <<<"$API_BODY")" &&
+   [ "$(jq -r '.permissions.admin // false' <<<"$API_BODY")" = true ]; then
   report PASS "acceso: admin del mantenedor"
 else
   report UNKNOWN "acceso: admin del mantenedor" "sin admin varios controles quedarán UNKNOWN"
@@ -262,6 +288,81 @@ else
     [ ${#other[@]} -eq 0 ] || detail "sin clasificar: $(csv "${other[@]}")"
   fi
 fi
+
+# ---------------------------------------------------------------- correo SES (condicional)
+# SES_DECISION: enabled, disabled, invalid o unknown. Gobierna qué significa que falten sus
+# secretos: deshabilitado es una ausencia aceptada, no una fuente faltante.
+SES_DECISION=unknown
+if [ -z "${ENV_EXISTS[$PROD_ENV]+x}" ]; then
+  report UNKNOWN "$PROD_ENV: decisión de correo SES" "environment no disponible"
+elif ! api_vars "repos/$REPO/environments/$PROD_ENV/variables"; then
+  report UNKNOWN "$PROD_ENV: decisión de correo SES" "variables ilegibles (HTTP $API_STATUS)"
+else
+  PROD_VARS="$API_BODY"
+  ses_var() { jq -r --arg n "$1" '.variables[] | select(.name | ascii_upcase == $n) | .value' <<<"$PROD_VARS"; }
+  ses_flag="$(ses_var NOTIFICATIONS_SES_ENABLED)"
+  # La ausencia solo se afirma sobre un inventario válido, y solo si jq la confirma
+  ses_flag_defined="$(jq -r 'any(.variables[]; .name | ascii_upcase == "NOTIFICATIONS_SES_ENABLED")' <<<"$PROD_VARS" 2>/dev/null)" || ses_flag_defined=""
+  if [ "$ses_flag_defined" = false ]; then
+    SES_DECISION=disabled; report PASS "$PROD_ENV: decisión de correo SES" "deshabilitado (variable ausente)"
+  elif [ "$ses_flag_defined" != true ]; then
+    report UNKNOWN "$PROD_ENV: decisión de correo SES" "respuesta no interpretable"
+  elif [ "$ses_flag" = false ]; then
+    SES_DECISION=disabled; report PASS "$PROD_ENV: decisión de correo SES" "deshabilitado"
+  elif [ "$ses_flag" = true ]; then
+    SES_DECISION=enabled; report PASS "$PROD_ENV: decisión de correo SES" "habilitado"
+  else
+    SES_DECISION=invalid; report FAIL "$PROD_ENV: decisión de correo SES" "debe ser exactamente true o false"
+  fi
+  case "$SES_DECISION" in
+    disabled)
+      report PASS "$PROD_ENV: entradas de SES" "no exigidas (deshabilitado)" ;;
+    enabled)
+      missing=()
+      if [ -z "$(ses_var SES_SMTP_HOST)" ]; then missing+=("variable SES_SMTP_HOST")
+      elif ! "$(dirname "$0")/ses-config.sh" check-host "$(ses_var SES_SMTP_HOST)"; then missing+=("SES_SMTP_HOST no es un endpoint SMTP de SES"); fi
+      if [ "${ENV_SECRETS_OK[$PROD_ENV]:-0}" != 1 ]; then
+        report UNKNOWN "$PROD_ENV: entradas de SES" "secretos ilegibles (HTTP ${ENV_SECRETS_STATUS[$PROD_ENV]:-err})"
+      else
+        for s in "${SES_SECRETS[@]}"; do in_list "$s" ${ENV_SECRETS[$PROD_ENV]} || missing+=("secreto $s"); done
+        [ ${#missing[@]} -eq 0 ] && report PASS "$PROD_ENV: entradas de SES" "presentes (no prueba que sean válidas)" ||
+          report FAIL "$PROD_ENV: entradas de SES" "habilitado con: $(csv "${missing[@]}")"
+      fi ;;
+  esac
+fi
+
+# Fuera del environment no hay copia válida, cualquiera que sea su valor (también false o vacío):
+# se compara el nombre. Un dueño que no es organización no tiene variables de organización.
+ses_outside=() ses_unread=()
+ses_scan() { # ses_scan ALCANCE: variables de SES en $API_BODY
+  local found
+  found="$(jq -r --args '.variables as $v | $ARGS.positional | map(select(. as $n | any($v[]; .name | ascii_upcase == $n))) | join(",")' "${SES_VARS[@]}" <<<"$API_BODY" 2>/dev/null)" ||
+    { ses_unread+=("$1 (respuesta no interpretable)"); return; }
+  [ -z "$found" ] || ses_outside+=("$1: $found")
+}
+if api_vars "repos/$REPO/actions/variables"; then ses_scan repositorio
+else ses_unread+=("repositorio (HTTP $API_STATUS)"); fi
+if [ "$OWNER_TYPE" != User ]; then
+  if api_vars "repos/$REPO/actions/organization-variables"; then ses_scan organización
+  else ses_unread+=("organización (HTTP $API_STATUS)"); fi
+fi
+if [ "$ENVS_OK" = 1 ]; then
+  for e in "${!ENV_EXISTS[@]}"; do
+    [ "$e" != "$PROD_ENV" ] || continue
+    if api_vars "repos/$REPO/environments/$e/variables"; then ses_scan "environment $e"
+    else ses_unread+=("environment $e (HTTP $API_STATUS)"); fi
+  done
+else
+  ses_unread+=("environments (HTTP ${ENVS_STATUS:-err})")
+fi
+if [ ${#ses_outside[@]} -gt 0 ]; then
+  report FAIL "SES: variables solo en $PROD_ENV" "${#ses_outside[@]} alcances con copias"; detail "${ses_outside[@]}"
+elif [ ${#ses_unread[@]} -gt 0 ]; then
+  report UNKNOWN "SES: variables solo en $PROD_ENV" "${#ses_unread[@]} alcances ilegibles"; detail "${ses_unread[@]}"
+else
+  report PASS "SES: variables solo en $PROD_ENV"
+fi
+report INFO "SES: alcance de esta auditoría" "confianza y entradas de GitHub; no el .env del host, el backend ni la entrega"
 
 # ---------------------------------------------------------------- Actions
 if ! api "repos/$REPO/actions/permissions"; then report UNKNOWN "actions: sha_pinning_required" "HTTP $API_STATUS"
@@ -413,6 +514,7 @@ else
   done
 
   ok=() repo_in_auth=() repo_outside=() hist_live=() env_unauth=() auth_nosrc=() inert=() unresolved=() missing_env=()
+  ses_absent=()
   plan_envs=""
   for c in "${CONSUMERS[@]}"; do
     IFS=$'\t' read -r where envs secs <<<"$c"
@@ -445,7 +547,11 @@ else
             elif [ $authorized = 1 ]; then repo_in_auth+=("$tag ← copia de repo")
             else repo_outside+=("$tag ← copia de repo"); fi ;;
           none)
-            if [ $authorized = 1 ]; then auth_nosrc+=("$tag")
+            if [ $authorized = 1 ] && in_list "$s" "${SES_SECRETS[@]}" && [ "$SES_DECISION" != enabled ]; then
+              # Solo la decisión de SES legible y deshabilitada acepta la ausencia
+              [ "$SES_DECISION" = disabled ] && ses_absent+=("$tag") ||
+                unresolved+=("$tag: decisión de SES no determinable")
+            elif [ $authorized = 1 ]; then auth_nosrc+=("$tag")
             else inert+=("$tag$(is_historical "$file" && echo ' (histórico OCI)')"); fi ;;
         esac
       done
@@ -460,6 +566,7 @@ else
     else report "$st" "$name" "$# — $why"; detail "$@"; fi
   }
   if [ ${#ok[@]} -gt 0 ]; then report INFO "consumidores: vía environment autorizado" "${#ok[@]}"; detail "${ok[@]}"; fi
+  if [ ${#ses_absent[@]} -gt 0 ]; then report INFO "consumidores: secretos de SES ausentes (deshabilitado)" "${#ses_absent[@]}"; detail "${ses_absent[@]}"; fi
   pr FAIL "consumidores: env autorizado pero resuelven copia de repo" \
     "falta la copia en el environment; la copia de repo es alcanzable fuera de él" "${repo_in_auth[@]}"
   pr FAIL "consumidores: copia de repo sin environment autorizado" \

@@ -257,7 +257,7 @@ Hasta aquí la línea `CREATED` o `ALREADY_LINKED_READY` no es prueba de nada de
    dar `0`):
 
    ```bash
-   grep -c '^IDENTITY_SEED_ADMIN_PASSWORD=.' /opt/piedrazul/.env
+   sudo grep -c '^IDENTITY_SEED_ADMIN_PASSWORD=.' /opt/piedrazul/.env
    ```
 
    ```bash
