@@ -6,9 +6,13 @@ import org.jmolecules.ddd.annotation.ValueObject;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 @ValueObject
 public class PatientInfo {
+
+    // El dominio se ancla en su primer punto (tras el primer carácter) para evitar backtracking cuadrático (ReDoS).
+    static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s][^@\\s.]*\\.[^@\\s]+$");
 
     private final DocumentType documentType;
     private final String documentNumber;
@@ -87,7 +91,7 @@ public class PatientInfo {
             throw new InvalidBirthDateException("La fecha de nacimiento no puede ser futura");
         }
 
-        if (email != null && !email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+        if (email != null && !EMAIL_PATTERN.matcher(email).matches()) {
             throw new InvalidEmailException("El correo no tiene un formato válido");
         }
 

@@ -9,9 +9,14 @@ import co.edu.unicauca.piedrazul.backend.appointment.exception.InvalidPatientInf
 import co.edu.unicauca.piedrazul.backend.appointment.exception.InvalidPersonNameException;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.InvalidPhoneException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.LocalDate;
+import java.util.concurrent.atomic.AtomicLong;
 
+import static co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo.EMAIL_PATTERN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -454,6 +459,97 @@ class PatientInfoTest {
         );
 
         assertThat(sinEmail.getEmail()).isNull();
+    }
+
+    @Test
+    void ofShouldNormalizeBlankEmailToNull() {
+        assertThat(buildAdultoConEmail("   ").getEmail()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "carlos@correo.com",
+            "carlos.gomez+citas@correo.com",
+            "carlos@a.co",
+            "carlos@mail.correo.edu.co",
+            // Formatos laxos que el contrato vigente admite
+            "carlos@.correo.com",
+            "carlos@correo..com",
+            "carlos@correo.."
+    })
+    void ofShouldAcceptEmail(String email) {
+        assertThat(buildAdultoConEmail(email).getEmail()).isEqualTo(email);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "@correo.com",
+            "carlos@",
+            "carlos@.com",
+            "carlos@correo.",
+            "carlos@@correo.com",
+            "carlos@correo.com@otro",
+            "car los@correo.com",
+            "carlos@cor reo.com"
+    })
+    void ofShouldThrowWhenEmailIsMalformed(String email) {
+        assertThatThrownBy(() -> buildAdultoConEmail(email))
+                .isInstanceOf(InvalidEmailException.class);
+    }
+
+    @Test
+    @Timeout(10)
+    void ofShouldRejectLongAdversarialEmail() {
+        String email = "a@" + ".".repeat(100_000) + "@";
+
+        assertThatThrownBy(() -> buildAdultoConEmail(email))
+                .isInstanceOf(InvalidEmailException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {".", "a."})
+    void emailPatternShouldReadAdversarialInputInLinearSteps(String fragment) {
+        String email = "a@" + fragment.repeat(20_000) + "@";
+        AtomicLong reads = new AtomicLong();
+
+        boolean matches = EMAIL_PATTERN.matcher(countingReads(email, reads)).matches();
+
+        // Mide lecturas, no tiempo: el patrón vulnerable supera aquí las 10^8 lecturas
+        assertThat(matches).isFalse();
+        assertThat(reads.get()).isLessThanOrEqualTo(4L * email.length());
+    }
+
+    private static CharSequence countingReads(String value, AtomicLong reads) {
+        return new CharSequence() {
+            @Override
+            public int length() {
+                return value.length();
+            }
+
+            @Override
+            public char charAt(int index) {
+                reads.incrementAndGet();
+                return value.charAt(index);
+            }
+
+            @Override
+            public CharSequence subSequence(int start, int end) {
+                return value.subSequence(start, end);
+            }
+
+            @Override
+            public String toString() {
+                return value;
+            }
+        };
+    }
+
+    private static PatientInfo buildAdultoConEmail(String email) {
+        return PatientInfo.of(
+                DocumentType.CEDULA,
+                "12345678", "Carlos", "Gomez", "3001234567",
+                Gender.MASCULINO, LocalDate.of(1990, 6, 15), email, null
+        );
     }
 
     // ─────────────────────────────────────────────
