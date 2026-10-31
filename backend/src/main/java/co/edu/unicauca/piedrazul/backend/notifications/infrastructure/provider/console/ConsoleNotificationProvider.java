@@ -112,10 +112,7 @@ public class ConsoleNotificationProvider implements NotificationProvider {
             return maskEmail(recipient.email());
         }
 
-        if (recipient.displayName() != null && !recipient.displayName().isBlank()) {
-            return recipient.displayName();
-        }
-
+        // El nombre visible identifica a la persona: no sustituye a un contacto enmascarado.
         return "unknown";
     }
 

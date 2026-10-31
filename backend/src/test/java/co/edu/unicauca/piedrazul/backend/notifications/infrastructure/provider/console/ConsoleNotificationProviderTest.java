@@ -70,6 +70,16 @@ class ConsoleNotificationProviderTest {
         assertThat(result.status()).isNotEqualTo(AttemptStatus.DELIVERED);
     }
 
+    @Test
+    void theDisplayNameIsNotShownInPlaceOfAMaskedContact() {
+        RecipientSnapshot withoutContact = new RecipientSnapshot(
+                UUID.randomUUID(), "Paciente Sintético", null, null, Locale.forLanguageTag("es-CO"), null);
+
+        new ConsoleNotificationProvider(false).send(new ConsoleLogMessage("Aviso", false), withoutContact);
+
+        assertThat(logs()).noneMatch(line -> line.contains("Paciente Sintético"));
+    }
+
     private void assertDiagnosticOnly(NotificationSendResult result) {
         assertThat(result.status()).isEqualTo(AttemptStatus.FAILED);
         assertThat(result.failureType()).isEqualTo(FailureType.PERMANENT);

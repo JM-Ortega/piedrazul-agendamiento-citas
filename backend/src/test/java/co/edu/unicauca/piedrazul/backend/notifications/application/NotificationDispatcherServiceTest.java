@@ -129,9 +129,9 @@ class NotificationDispatcherServiceTest {
         }
 
         @ParameterizedTest(name = "{0}")
-        @ValueSource(strings = {"SENDGRID_IO_ERROR", "SENDGRID_503", "SENDGRID_429", "INVALID_EMAIL_MESSAGE"})
+        @ValueSource(strings = {"PROVIDER_IO_ERROR", "PROVIDER_503", "PROVIDER_429", "INVALID_EMAIL_MESSAGE"})
         void dispatchExceptionWithoutEvidenceIsAcceptanceUnknown(String errorCode) {
-            // SendGrid no expone evidencia de no aceptación en sus excepciones: se trata con cautela.
+            // Una excepción sin evidencia de no aceptación se trata con cautela.
             StubProvider email = StubProvider.email(() -> {
                 throw new NotificationDispatchException(errorCode, "sintético");
             });
@@ -893,7 +893,7 @@ class NotificationDispatcherServiceTest {
         }
     }
 
-    /** Proveedor que, como SendGrid, mide su salud con un circuit breaker propio. */
+    /** Proveedor que mide su salud con un circuit breaker propio. */
     private static final class BreakerProvider implements NotificationProvider {
         private final CircuitBreaker breaker;
         int calls;

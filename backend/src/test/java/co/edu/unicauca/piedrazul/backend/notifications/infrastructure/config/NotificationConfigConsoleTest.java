@@ -10,8 +10,7 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.Notifi
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationRepository;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationScheduleRepository;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.provider.console.ConsoleNotificationProvider;
-import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.provider.email.sendgrid.SendGridConfig;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.provider.email.ses.SesSmtpConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -56,11 +55,6 @@ class NotificationConfigConsoleTest {
             return mock(AppointmentEligibility.class);
         }
 
-        @Bean
-        CircuitBreakerRegistry circuitBreakerRegistry() {
-            return CircuitBreakerRegistry.ofDefaults();
-        }
-
         // En la aplicación lo aporta la autoconfiguración de Bean Validation.
         @Bean
         LocalValidatorFactoryBean validator() {
@@ -69,7 +63,7 @@ class NotificationConfigConsoleTest {
     }
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withUserConfiguration(Repositories.class, NotificationConfig.class, SendGridConfig.class);
+            .withUserConfiguration(Repositories.class, NotificationConfig.class, SesSmtpConfig.class);
 
     @Test
     void diagnosticOptInIsOffByDefaultAndNoRealProviderIsRegistered() {
@@ -93,15 +87,18 @@ class NotificationConfigConsoleTest {
     }
 
     @Test
-    void realProviderIsDetectedWhenSendGridIsEnabled() {
+    void realProviderIsDetectedWhenSesIsEnabled() {
         runner.withPropertyValues(
                         "notifications.console.show-sensitive-content=true",
-                        "notifications.email.sendgrid.enabled=true",
-                        "notifications.email.sendgrid.api-key=synthetic-key")
+                        "notifications.email.ses.enabled=true",
+                        "notifications.email.ses.host=smtp.invalid",
+                        "notifications.email.ses.username=synthetic-user",
+                        "notifications.email.ses.password=synthetic-password",
+                        "notifications.email.ses.from-email=no-reply@piedrazul.example")
                 .run(context -> {
                     assertThat(context.getBean(ProviderRegistry.class).hasDeliveryProvider()).isTrue();
-                    // SendGrid no es canal para códigos y además impide el diagnóstico por consola.
-                    assertThat(otpMode(context)).isEqualTo(OtpDeliveryMode.UNAVAILABLE);
+                    // Con el correo real, el opt-in no vuelve la consola un canal para códigos.
+                    assertThat(otpMode(context)).isEqualTo(OtpDeliveryMode.EMAIL);
                 });
     }
 

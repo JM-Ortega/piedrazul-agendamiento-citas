@@ -32,6 +32,14 @@ public enum NotificationType {
         return this == OTP_CODE;
     }
 
+    /**
+     * Tipos cuyo contenido identifica a una persona y su atención médica. No son secretos, pero en
+     * consola solo pueden mostrarse con el diagnóstico sintético explícito.
+     */
+    public boolean containsIdentifiableContent() {
+        return this == APPOINTMENT_SCHEDULED || this == APPOINTMENT_REMINDER_2_DAYS;
+    }
+
     /** Variables secretas que no deben quedar guardadas una vez terminado el despacho. */
     public Set<String> sensitiveVariables() {
         return this == OTP_CODE ? Set.of(NotificationVariables.CODE) : Set.of();

@@ -163,18 +163,24 @@ class NotificationDispatcherServiceConsoleSafetyTest {
         assertCodeNotLogged();
     }
 
-    // ── Notificaciones no sensibles ─────────────────────────────────────
+    // ── Notificaciones con datos identificables ─────────────────────────
 
     @ParameterizedTest(name = "opt-in={0}")
     @ValueSource(booleans = {false, true})
-    void appointmentWithoutRealProviderIsPrintedButNotDelivered(boolean optIn) {
+    void appointmentWithoutRealProviderIsDiagnosticOnlyAndShownOnlyWithOptIn(boolean optIn) {
         ConsoleNotificationProvider console = spy(new ConsoleNotificationProvider(optIn));
         Notification notification = appointment();
 
         dispatch(notification, optIn, console);
 
         verify(console, times(1)).send(any(), any());
-        assertThat(logs()).anyMatch(line -> line.contains("[CONSOLE_NOTIFICATION]") && line.contains("Paciente Sintético"));
+
+        if (optIn) {
+            assertThat(logs()).anyMatch(line -> line.contains("[CONSOLE_DIAGNOSTIC]") && line.contains("Paciente Sintético"));
+        } else {
+            assertThat(logs()).anyMatch(line -> line.contains("[contenido sensible oculto]"));
+            assertThat(logs()).noneMatch(line -> line.contains("Paciente Sintético"));
+        }
 
         NotificationAttempt attempt = singleAttempt();
         assertThat(attempt.getStatus()).isEqualTo(AttemptStatus.FAILED);
@@ -183,15 +189,17 @@ class NotificationDispatcherServiceConsoleSafetyTest {
         assertFailedWithoutRetry(notification);
     }
 
-    @Test
-    void appointmentStillFallsBackToConsoleAfterRealProviderFailure() {
-        ConsoleNotificationProvider console = spy(new ConsoleNotificationProvider(false));
+    @ParameterizedTest(name = "opt-in={0}")
+    @ValueSource(booleans = {false, true})
+    void appointmentStillFallsBackToConsoleAfterRealProviderFailureWithoutItsContent(boolean optIn) {
+        ConsoleNotificationProvider console = spy(new ConsoleNotificationProvider(optIn));
         StubProvider email = StubProvider.email(() -> result(AttemptStatus.FAILED, FailureType.PERMANENT));
         Notification notification = appointment();
 
-        dispatch(notification, false, email, console);
+        dispatch(notification, optIn, email, console);
 
         verify(console, times(1)).send(any(), any());
+        assertThat(logs()).noneMatch(line -> line.contains("Paciente Sintético"));
         assertThat(store.notification(notification.getId()).getStatus())
                 .isEqualTo(NotificationStatus.FAILED)
                 .isNotEqualTo(NotificationStatus.DELIVERED);

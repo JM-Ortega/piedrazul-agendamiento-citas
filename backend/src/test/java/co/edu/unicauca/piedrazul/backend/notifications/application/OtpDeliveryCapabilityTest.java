@@ -12,10 +12,6 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.ChannelFall
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationProvider;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationSendResult;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.provider.console.ConsoleNotificationProvider;
-import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.provider.email.sendgrid.SendGridEmailProvider;
-import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.provider.email.sendgrid.SendGridProperties;
-import com.sendgrid.SendGrid;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
@@ -35,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Qué capacidad de envío de códigos resulta de cada combinación de proveedores, y qué
  * destinatarios se aceptan con cada una. Usa el registro, la política de canales, el proveedor de
- * consola, el proveedor heredado de SendGrid y el validador de Jakarta reales.
+ * consola y el validador de Jakarta reales.
  */
 class OtpDeliveryCapabilityTest {
 
@@ -77,15 +73,6 @@ class OtpDeliveryCapabilityTest {
         return new ConsoleNotificationProvider(true);
     }
 
-    /** El proveedor heredado tal como lo registra {@code SendGridConfig}; no se envía nada. */
-    private static SendGridEmailProvider sendGrid() {
-        return new SendGridEmailProvider(
-                new SendGrid("SG.synthetic-test-key"),
-                new SendGridProperties(true, "SG.synthetic-test-key", "no-reply@example.com", "Piedrazul", true),
-                CircuitBreakerRegistry.ofDefaults()
-        );
-    }
-
     private static OtpDeliveryCapability qualifyingEmail() {
         return capability(false, console(), new FakeProvider(NotificationChannel.EMAIL, true));
     }
@@ -111,16 +98,17 @@ class OtpDeliveryCapabilityTest {
     }
 
     @Test
-    void theLegacySendGridProviderDoesNotQualifyForCodes() {
-        assertThat(sendGrid().qualifiesForOtpDelivery()).isFalse();
-        assertThat(capability(false, console(), sendGrid()).mode()).isEqualTo(OtpDeliveryMode.UNAVAILABLE);
+    void aNonQualifyingEmailProviderDoesNotEnableCodes() {
+        assertThat(capability(false, console(), new FakeProvider(NotificationChannel.EMAIL, false)).mode())
+                .isEqualTo(OtpDeliveryMode.UNAVAILABLE);
     }
 
     @Test
     void aNonQualifyingRealProviderAlsoRulesOutTheConsoleDiagnostic() {
         // W0a: con un proveedor real registrado, el contenido sensible nunca va a la consola; W0b
         // no puede entonces declarar el diagnóstico disponible.
-        assertThat(capability(true, console(), sendGrid()).mode()).isEqualTo(OtpDeliveryMode.UNAVAILABLE);
+        assertThat(capability(true, console(), new FakeProvider(NotificationChannel.EMAIL, false)).mode())
+                .isEqualTo(OtpDeliveryMode.UNAVAILABLE);
     }
 
     @Test
@@ -149,6 +137,17 @@ class OtpDeliveryCapabilityTest {
     }
 
     // ── Destinatario en modo correo ──────────────────────────────────────
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ñandú@correo.example", "ana@faß.example", "ana@ｃorreo.example"})
+    void anAddressTheTransportCannotCarryIsNotUsable(String email) {
+        assertThat(qualifyingEmail().isUsableRecipient(PHONE, email)).isFalse();
+    }
+
+    @Test
+    void anInternationalizedDomainThatConvertsSafelyIsUsable() {
+        assertThat(qualifyingEmail().isUsableRecipient(null, "ana@clínica.example")).isTrue();
+    }
 
     @Test
     void aValidEmailIsUsable() {

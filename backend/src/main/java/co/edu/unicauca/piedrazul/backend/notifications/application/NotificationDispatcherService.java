@@ -55,6 +55,7 @@ public class NotificationDispatcherService {
     static final String DIAGNOSTIC_REDACTED = "PROVIDER_DIAGNOSTIC_REDACTED";
     static final String APPOINTMENT_NOT_SCHEDULED = "APPOINTMENT_NOT_SCHEDULED";
     static final String TYPE_RETIRED = "NOTIFICATION_TYPE_RETIRED";
+    private static final String CONSOLE_CONTENT_WITHHELD = "[contenido oculto: hay un proveedor real habilitado]";
 
     // Un código de diagnóstico seguro: corto, sin espacios ni caracteres de control.
     private static final Pattern SAFE_CODE =
@@ -617,9 +618,24 @@ public class NotificationDispatcherService {
                     "No se pudo construir el mensaje para el canal " + channel));
         }
 
-        return validateContent(message)
+        ChannelMessage safeMessage = withoutIdentifiableConsoleContent(notification, message);
+
+        return validateContent(safeMessage)
                 .map(rejection -> new Prepared(null, rejection))
-                .orElseGet(() -> new Prepared(message, null));
+                .orElseGet(() -> new Prepared(safeMessage, null));
+    }
+
+    /**
+     * Un aviso de cita conserva su intento de diagnóstico en la consola, pero con un proveedor real
+     * registrado su contenido no llega a ella, aunque el opt-in esté activo: el opt-in solo vale sin
+     * proveedor real.
+     */
+    private ChannelMessage withoutIdentifiableConsoleContent(Notification notification, ChannelMessage message) {
+        return message instanceof ConsoleLogMessage
+                && notification.getType().containsIdentifiableContent()
+                && providerRegistry.hasDeliveryProvider()
+                ? new ConsoleLogMessage(CONSOLE_CONTENT_WITHHELD, true)
+                : message;
     }
 
     private Optional<LocalRejection> validateRecipient(NotificationChannel channel, RecipientSnapshot recipient) {

@@ -57,8 +57,9 @@ siga en `PROCESSING` y que el número de intentos sea el esperado (cerca de prop
 lee fresco dentro de la transacción. Si la cerca falla, no se invoca ningún proveedor más ni se
 modifican notificación ni schedule.
 
-Por canal: proveedor registrado y restricciones de consola → destinatario (correo vacío, mal formado
-o de dominio `.invalid`, con la misma regla que la admisión de códigos) y contenido (plantilla,
+Por canal: proveedor registrado y restricciones de consola → destinatario (correo vacío, mal
+formado, de dominio `.invalid` o sin forma ASCII segura, con la misma regla que la admisión de
+códigos) y contenido (plantilla,
 marcadores sin resolver) → intento `PROCESSING` confirmado → vigencia del código con reloj fresco y,
 en los recordatorios, estado confirmado de la cita → proveedor, fuera de toda transacción → intento,
 notificación y schedule escritos juntos. Un fallo local nunca llega al proveedor ni a su circuit
@@ -84,7 +85,7 @@ un envío síncrono nunca queda como entregado.
 intento `UNKNOWN` con `error_code = ACCEPTANCE_UNKNOWN` (el código original del proveedor queda en
 `error_message`) distingue el caso, y el log emite `NOTIFICATION_ACCEPTANCE_UNKNOWN` (sin contenido
 ni mensajes de excepción) para revisión del operador: el destinatario pudo haber recibido el
-mensaje. Las excepciones de SendGrid no aportan evidencia de no aceptación y se tratan así, salvo el
+mensaje. Una excepción de un proveedor no aporta evidencia de no aceptación y se trata así, salvo el
 circuit breaker abierto. Para un proveedor que no declara su resultado, la no aceptación solo se
 deduce de `FAILED` con `TEMPORARY`/`CIRCUIT_OPEN` (reintentable) o `PERMANENT` (rechazo); un
 `FAILED` sin tipo o con tipo `UNKNOWN`, `BOUNCED`, `UNDELIVERED` o `CANCELLED` cuenta como
@@ -96,8 +97,70 @@ tenga forma de código o contenga un valor secreto de la notificación pasa a
 `PROVIDER_DIAGNOSTIC_REDACTED`; con contenido sensible, el texto del proveedor se sustituye por una
 descripción controlada (clasificación y código seguro), y sin él se conserva salvo que contenga un
 secreto; un id de mensaje con un secreto se descarta. La clasificación, el reintento y el cambio de
-canal no dependen de ese texto. Los logs propios de SendGrid (cuerpo de respuestas de error) quedan
-fuera de esta frontera; SendGrid no es apto para códigos y, con él registrado, no se emiten (W0b).
+canal no dependen de ese texto.
+
+**Correo (SMTP de Amazon SES).** Un único proveedor de correo (`SesEmailProvider`, nombre `ses`) habla
+SMTP con Jakarta Mail/Angus, con una conexión por envío. Está deshabilitado por defecto
+(`NOTIFICATIONS_SES_ENABLED=false`): así el backend arranca sin credenciales ni configuración de
+correo, no hay proveedor real y los códigos responden `503`. Habilitado exige `SES_SMTP_HOST`,
+`SES_SMTP_USERNAME`, `SES_SMTP_PASSWORD` y `NOTIFICATIONS_EMAIL_FROM`; si falta alguno o un valor no
+es válido, no arranca (el error nombra la propiedad, nunca su valor). Al arrancar no contacta con el
+servidor, y no aporta indicador de salud: `/actuator/health` no depende de SES. Las credenciales y
+variables son solo del backend.
+
+La conexión exige STARTTLS (TLS 1.2 o superior) con la confianza de la JVM y validación del nombre
+del servidor; sin STARTTLS, con un certificado no válido o sin `AUTH` no se envían credenciales o no
+se envía el mensaje. `ACCEPTED` significa que el servidor SMTP aceptó el mensaje, no que llegara al
+buzón: no se procesan rebotes ni quejas. El resultado se decide por la etapa del protocolo y la
+respuesta leída, no por las excepciones de Angus:
+
+| Situación | Resultado | Circuit breaker |
+|---|---|---|
+| `250` completo y bien formado a la secuencia final de datos, aunque después fallen `QUIT`, el cierre o venza el plazo | `ACCEPTED` | Éxito |
+| Conexión perdida, también durante TLS o `AUTH`, o plazo vencido antes de la transacción; `4xx` en la sesión | `RETRYABLE` | Fallo |
+| Certificado o nombre del servidor, negociación TLS rechazada, ausencia de STARTTLS o de `AUTH`, credenciales rechazadas, `5xx` en la sesión | `PROVIDER_ERROR` | Fallo |
+| `4xx` a `MAIL`, `DATA` o la secuencia final; `421` en cualquier etapa | `RETRYABLE` | Fallo |
+| `4xx` a `RCPT` (salvo `421`) | `RETRYABLE` | No cuenta |
+| `5xx` a `MAIL` o `DATA`; `554` a `RCPT`; `5xx` a la secuencia final salvo `552`; `530`, `534`, `535` o `538` en cualquier etapa | `PROVIDER_ERROR` | Fallo |
+| `5xx` a `RCPT` salvo `554`; `552` a la secuencia final; destinatario o mensaje rechazados localmente | `REJECTED` | No cuenta |
+| Cualquier otro final desde `MAIL`: tiempo agotado, conexión perdida, fin de flujo, plazo vencido, respuesta cortada, malformada o inesperada | `UNKNOWN` | Fallo |
+
+Un `UNKNOWN` no se reintenta ni cambia de canal, tampoco tras la recuperación. Es deliberadamente
+conservador: incluye fallos de transporte anteriores al cuerpo, en los que el mensaje no llegó a
+salir, a cambio de no deducir nada de un fallo de transporte; se pierde ese reintento. Una respuesta
+de la transacción cuenta solo si termina en CRLF: un `250` cortado por el fin de flujo no prueba la
+aceptación. Como Angus descarta ese dato, los últimos bytes descifrados se observan en el
+`SSLSocket` de STARTTLS, que por lo demás delega en el socket real.
+
+Un `554` de SES no identifica su causa: AWS lo documenta para falta de autorización
+(`Access denied`) e identidades sin verificar, también destinatarios en el sandbox. El clasificador
+no interpreta el texto del servidor, de modo que un `5xx` sin atribuir cuenta como `PROVIDER_ERROR`
+y es visible para el circuit breaker; el único rechazo propio del mensaje que AWS documenta en la
+secuencia final es `552`. Un rechazo específico del contenido con `554` queda, por tanto, como error
+del proveedor: tampoco se reintenta, pero cuenta contra su salud. El EHLO usa el nombre de host que
+resuelve Angus, no el dominio del remitente; lo que SES exija de ese nombre está sin verificar.
+
+Cada operación de socket está acotada (`SES_SMTP_CONNECT_TIMEOUT` 5 s, `SES_SMTP_READ_TIMEOUT` y
+`SES_SMTP_WRITE_TIMEOUT` 15 s), pero se repiten por etapa y un servidor que envía la respuesta byte a
+byte no agota ninguna. Lo acota `SES_SMTP_TOTAL_DEADLINE` (60 s): un hilo daemon propio del proveedor,
+independiente del planificador de Spring (cuyo único hilo es el que ejecuta el envío), cierra el
+socket TCP real y aborta la operación bloqueada, también dentro de TLS. Estos valores son ajustes
+iniciales sin calibrar contra SES. Si el plazo vence después de una respuesta decisiva ya leída,
+esa respuesta prevalece. El plazo no interrumpe una resolución de DNS en curso (si vence
+durante ella, la conexión no llega a abrirse) y un lote lleno de envíos lentos sigue siendo
+secuencial hasta que el circuito se abre: el plazo acota cada envío, no el lote.
+
+El circuit breaker es un `CircuitBreaker` de Resilience4j Core creado en la configuración del
+proveedor, con ventana de 10 llamadas, mínimo de 5, 50 % de fallos, 30 s abierto y 3 sondas
+(`SES_BREAKER_*`), sin regla de llamadas lentas por no estar calibrada. Abierto, no se abre ninguna
+conexión y el despachador lo trata como `RETRYABLE` (`CIRCUIT_OPEN`).
+
+SES no admite SMTPUTF8: la parte local debe ser ASCII. Un dominio internacionalizado se envía en su
+forma `xn--` si la conversión conserva el dominio escrito; si lo cambiaría (`ß`, `ς`, caracteres de
+compatibilidad o invisibles), el correo no es utilizable. La regla (`RecipientEmailPolicy`) es la
+misma en la admisión de códigos y en el despacho, y el valor guardado no cambia. Los valores
+interpolados en el HTML del correo se escapan, y el proveedor no escribe en el log; los niveles
+detallados de Jakarta Mail y Angus, que escriben protocolo y direcciones, quedan fijados en `WARN`.
 
 **Códigos de verificación.** Verification pasa el vencimiento real del código (`expiresAt`, 5 min);
 el despachador no entrega nada al proveedor a partir de ese instante (sin margen adicional) y cierra
@@ -154,6 +217,9 @@ cualquier trabajo interrumpido, sin reescribir su historial.
 
 **Consola.** Es diagnóstico, nunca entrega: todo mensaje impreso deja el intento `FAILED`
 (`CONSOLE_DIAGNOSTIC_ONLY`, `PROVIDER_ERROR`) y, si es el último canal, la notificación `FAILED`.
+Los códigos solo llegan a ella sin proveedor real y con `NOTIFICATIONS_CONSOLE_SHOW_SENSITIVE=true`
+(solo datos exclusivamente sintéticos). Los avisos de citas siempre conservan su intento de
+diagnóstico, pero con el contenido oculto; ese mismo opt-in lo muestra, solo sin proveedor real.
 
 **Trabajo interrumpido.** Un error antes de invocar al proveedor cierra como `FAILED`; uno después,
 o una caída del proceso, deja el trabajo en `PROCESSING`. `StaleNotificationAttemptJob` lo recupera:

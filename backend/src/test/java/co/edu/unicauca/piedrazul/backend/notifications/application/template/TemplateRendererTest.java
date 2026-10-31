@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.notifications.application.template;
 
 import co.edu.unicauca.piedrazul.backend.notifications.domain.message.ChannelMessage;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.message.ConsoleLogMessage;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.message.EmailMessage;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.template.InMemoryNotificationTemplateProvider;
 import org.junit.jupiter.api.Test;
@@ -31,14 +32,51 @@ class TemplateRendererTest {
     }
 
     @Test
-    void appointmentConsoleMessageIsNotClassifiedAsSensitive() {
+    void appointmentConsoleMessageIsClassifiedAsSensitive() {
         ChannelMessage message = renderer.render(
                 notification(NotificationType.APPOINTMENT_REMINDER_2_DAYS),
                 NotificationChannel.CONSOLE,
                 Map.of("patientName", "Paciente Sintético")
         );
 
-        assertThat(((ConsoleLogMessage) message).sensitive()).isFalse();
+        assertThat(((ConsoleLogMessage) message).sensitive()).isTrue();
+    }
+
+    @Test
+    void emailVariablesAreEscapedInHtmlOnlyAndKeepTheirAccents() {
+        String hostile = "José <script>alert('x')</script> & \"Peña\"";
+
+        EmailMessage message = (EmailMessage) renderer.render(
+                notification(NotificationType.APPOINTMENT_REMINDER_2_DAYS),
+                NotificationChannel.EMAIL,
+                Map.of("patientName", hostile, "doctorName", "Dra. Núñez", "date", "2026-01-10", "time", "08:00")
+        );
+
+        assertThat(message.htmlBody())
+                .contains("José &lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt; &amp; &quot;Peña&quot;")
+                .contains("Dra. Núñez")
+                .doesNotContain("<script>");
+        assertThat(message.textBody()).contains(hostile);
+        assertThat(message.subject()).isEqualTo("Recordatorio de cita médica");
+        assertThat(message.htmlBody()).contains("<strong>Médico:</strong>");
+    }
+
+    @Test
+    void anEscapedValueStaysOutOfOtherPlaceholders() {
+        EmailMessage message = (EmailMessage) renderer.render(
+                notification(NotificationType.OTP_CODE),
+                NotificationChannel.EMAIL,
+                Map.of("code", "000111", "expirationMinutes", "5")
+        );
+
+        assertThat(message.htmlBody()).contains("000111").doesNotContain("{{");
+    }
+
+    @Test
+    void appointmentTypesIdentifyAPersonAndOtpDoesNot() {
+        assertThat(NotificationType.APPOINTMENT_REMINDER_2_DAYS.containsIdentifiableContent()).isTrue();
+        assertThat(NotificationType.APPOINTMENT_SCHEDULED.containsIdentifiableContent()).isTrue();
+        assertThat(NotificationType.OTP_CODE.containsIdentifiableContent()).isFalse();
     }
 
     @Test
