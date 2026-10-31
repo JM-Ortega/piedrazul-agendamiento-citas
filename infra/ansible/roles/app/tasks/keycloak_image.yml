@@ -1,0 +1,77 @@
+---
+# Identidad exacta de Keycloak (tercero) para este converge. La incluye setup.yml antes de
+# escribir image.env; keycloak_lifecycle.yml vuelve a exigirla antes de arrancar Keycloak.
+#
+# El repositorio declara la referencia fijada en compose/keycloak.yml (keycloak_compose_file):
+#   quay.io/keycloak/keycloak:<versión>@sha256:<índice OCI>
+# El workflow (image_targets, sin credenciales de producción) la resuelve una sola vez a su
+# único manifiesto linux/amd64, escanea ese manifiesto y lo pasa:
+#   keycloak_image_ref          = quay.io/keycloak/keycloak@sha256:<manifiesto linux/amd64>
+#   keycloak_image_index_digest = sha256:<índice OCI>
+# Aquí no se resuelve ningún tag: la identidad recibida debe corresponder a la declaración
+# que este mismo converge copia al servidor; se descarga por digest y la versión de la
+# imagen descargada debe ser la del tag declarado. Sin identidad válida, falla antes de
+# tocar image.env.
+#
+# Salida: app_kc_image_version (versión de la imagen, de su etiqueta OCI)
+
+- name: Leer la referencia declarada de Keycloak
+  ansible.builtin.set_fact:
+    app_kc_declared_ref: >-
+      {{ ((lookup('ansible.builtin.file', keycloak_compose_file) | from_yaml).services.keycloak.image
+          | default('')) | string | trim }}
+
+- name: Validar la identidad exacta de Keycloak
+  ansible.builtin.assert:
+    that:
+      # Declaración fijada: <tag>@sha256:<índice>, nunca solo un tag
+      - app_kc_declared_ref is match('^' ~ (keycloak_image | regex_escape) ~ ':[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}@sha256:[0-9a-f]{64}\Z')
+      - (keycloak_image_ref | default('') | string) is match('^' ~ (keycloak_image | regex_escape) ~ '@sha256:[0-9a-f]{64}\Z')
+      - (keycloak_image_index_digest | default('') | string) is match('^sha256:[0-9a-f]{64}\Z')
+      # El índice resuelto es el declarado en este commit
+      - keycloak_image_index_digest == app_kc_declared_ref.split('@')[1]
+      # Se ejecuta el manifiesto de plataforma, no el índice (no son intercambiables)
+      - keycloak_image_ref.split('@')[1] != keycloak_image_index_digest
+    fail_msg: >-
+      IDENTIDAD DE KEYCLOAK inválida o distinta de la declarada. Declarada en
+      {{ keycloak_compose_file | basename }}: '{{ app_kc_declared_ref }}' (debe ser
+      {{ keycloak_image }}:<tag>@sha256:<índice>); recibida: keycloak_image_ref='{{ keycloak_image_ref | default('') }}',
+      keycloak_image_index_digest='{{ keycloak_image_index_digest | default('') }}' (deben ser el manifiesto
+      linux/amd64 exacto de ese índice y el índice). Las resuelve el workflow de producción; no se aceptan tags.
+    quiet: true
+
+# Por digest el contenido es inmutable: si ya está en el daemon es el mismo
+- name: Descargar Keycloak por digest
+  community.docker.docker_image_pull:
+    name: "{{ keycloak_image_ref }}"
+    platform: linux/amd64
+    pull: not_present
+
+- name: Leer la imagen de Keycloak descargada
+  community.docker.docker_image_info:
+    name: "{{ keycloak_image_ref }}"
+  register: app_kc_image_info
+
+- name: Verificar la imagen de Keycloak descargada
+  ansible.builtin.assert:
+    that:
+      - app_kc_image_info.images | length == 1
+      - keycloak_image_ref in (app_kc_image_info.images[0].RepoDigests | default([]))
+      - app_kc_image_info.images[0].Os == 'linux'
+      - app_kc_image_info.images[0].Architecture == 'amd64'
+      - _version | length > 0
+      - _version == app_kc_declared_ref.split('@')[0].split(':')[-1]
+    fail_msg: >-
+      IDENTIDAD DE KEYCLOAK: {{ keycloak_image_ref }} no es la imagen linux/amd64 de la versión
+      declarada ({{ app_kc_declared_ref }}): versión de la imagen '{{ _version }}',
+      plataforma {{ (app_kc_image_info.images | first | default({})).Os | default('?') }}/{{ (app_kc_image_info.images | first | default({})).Architecture | default('?') }}.
+      No se escribe image.env.
+    success_msg: "keycloak {{ _version }} = {{ keycloak_image_ref }} (índice {{ keycloak_image_index_digest }})"
+  vars:
+    _version: >-
+      {{ ((((app_kc_image_info.images | first | default({})).Config | default({}, true)).Labels
+          | default({}, true))['org.opencontainers.image.version'] | default('')) | string }}
+
+- name: Fijar la versión de Keycloak de este converge
+  ansible.builtin.set_fact:
+    app_kc_image_version: "{{ app_kc_image_info.images[0].Config.Labels['org.opencontainers.image.version'] }}"

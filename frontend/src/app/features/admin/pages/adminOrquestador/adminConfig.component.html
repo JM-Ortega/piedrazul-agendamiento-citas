@@ -1,0 +1,300 @@
+<div class="min-h-screen bg-blue-50 py-4 px-4 md:px-8">
+  <div class="max-w-[1600px] mx-auto space-y-4">
+    <!-- Header -->
+    <div
+      class="bg-linear-to-r from-[#163c63] to-[#215c98] text-white rounded-xl px-20 py-4 shadow-md"
+    >
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 class="text-xl font-bold flex items-center gap-2">
+            <svg lucideSettings [size]="22"></svg>
+            Panel de Configuracion de Horarios
+          </h1>
+          <p class="text-[#a7c9ec] text-sm mt-1">
+            Configure los parámetros del sistema de agendamiento
+          </p>
+        </div>
+
+        <app-button
+          variant="plain"
+          plainTextClass="text-white"
+          extraClass="!gap-2.5 !bg-white/10 hover:!bg-white/15 !border !border-white/25 !rounded-lg !px-3.5 !py-2 !text-sm !mx-0 !my-0 !shadow-none"
+          (buttonClick)="openAutonomousBookingModal()"
+        >
+          <svg lucideCalendarCheck [size]="16"></svg>
+          <span>Agendamiento autónomo</span>
+          <span
+            [class]="
+              'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ' +
+              (autonomousBookingEnabled()
+                ? 'bg-green-500/20 text-green-200'
+                : 'bg-red-500/20 text-red-200')
+            "
+          >
+            <svg
+              [lucideIcon]="autonomousBookingEnabled() ? Check : X"
+              [size]="12"
+            ></svg>
+            {{ autonomousBookingEnabled() ? 'Habilitado' : 'Deshabilitado' }}
+          </span>
+        </app-button>
+      </div>
+    </div>
+
+    <!-- Selector de vista + acciones -->
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <div
+        class="bg-white rounded-xl shadow-sm p-1.5 flex gap-1.5 w-fit border border-[#d9e9f8]"
+      >
+        <button
+          type="button"
+          [class]="viewTabClass('horarios')"
+          (click)="activeView.set('horarios')"
+        >
+          <svg lucideChartNoAxesColumn [size]="15"></svg>
+          Horarios
+        </button>
+        <button
+          type="button"
+          [class]="viewTabClass('estadisticas')"
+          (click)="activeView.set('estadisticas')"
+        >
+          <svg lucideBarChart2 [size]="15"></svg>
+          Estadísticas
+        </button>
+      </div>
+
+      @if (activeView() === 'estadisticas') {
+        <app-button
+          variant="primary"
+          size="sm"
+          [active]="false"
+          extraClass="!w-auto"
+          (buttonClick)="refreshStatistics()"
+        >
+          <span class="flex items-center gap-2">
+            <svg lucideRefreshCw [size]="16"></svg>
+            Refrescar
+          </span>
+        </app-button>
+      }
+    </div>
+
+    <!-- Vista: Horarios (contenido existente, sin cambios) -->
+    <div class="space-y-4" [class.hidden]="activeView() !== 'horarios'">
+      <!-- Error de carga -->
+      @if (errorCarga()) {
+        ...
+      }
+
+      <!-- Lista de doctores -->
+      <div
+        class="bg-white rounded-xl shadow-md p-4 md:p-5 border border-[#d9e9f8]"
+      >
+        <div class="mb-4 space-y-3">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <h2
+              class="text-[#163c63] text-lg font-semibold flex items-center gap-2"
+            >
+              <svg lucidePencil [size]="18"></svg>
+              Configuración de Médicos y Terapistas
+            </h2>
+            <app-pagination
+              [pagination]="pagination()"
+              (pageChange)="goToPage($event)"
+            />
+          </div>
+
+          <!-- Buscador (izquierda) + Ordenamiento (derecha) -->
+          <div class="flex items-end justify-between flex-wrap gap-3">
+            <div class="flex flex-col gap-1 w-full sm:w-64">
+              <span
+                class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+              >
+                Buscar
+              </span>
+              <app-search-input
+                size="sm"
+                placeholder="Buscar médico o documento..."
+                [loading]="searching()"
+                [showButton]="false"
+                (searchChange)="onSearch($event)"
+                (searchNow)="onSearch($event)"
+              />
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <span
+                class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide"
+              >
+                Ordenar por
+              </span>
+              <app-sort-control
+                [options]="sortOptions"
+                [field]="sortField()"
+                [direction]="sortDirection()"
+                (fieldChange)="onSortFieldChange($event)"
+                (directionChange)="onSortDirectionChange($event)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="relative">
+          @if (loading()) {
+            <div class="absolute inset-0 flex items-center justify-center z-10">
+              <div
+                class="w-6 h-6 border-2 border-[#215c98] border-t-transparent rounded-full animate-spin"
+              ></div>
+            </div>
+          }
+
+          <!-- Después -->
+          <div
+            class="grid grid-cols-1 lg:grid-cols-2 gap-y-3 gap-x-5 transition-opacity duration-300"
+            [class.opacity-40]="loading()"
+            [class.pointer-events-none]="loading()"
+          >
+            @for (doctor of doctors(); track doctor.id) {
+              <div
+                [id]="'doctor-card-' + doctor.id"
+                animate.enter="card-enter-animation"
+                class="border rounded-xl transition-all"
+                [class]="containerClass(doctor)"
+                [class.lg:col-span-2]="editingId() === doctor.id"
+              >
+                <app-doctor-card
+                  [doctor]="doctor"
+                  [isEditing]="editingId() === doctor.id"
+                  [isSaved]="savedId() === doctor.id"
+                  (edit)="startEdit($event)"
+                  (toggleModal)="openToggleModal($event)"
+                  [timeOffs]="timeOffsByDoctor()[doctor.id] ?? []"
+                  (timeOff)="openTimeOff($event)"
+                />
+
+                @if (editingId() === doctor.id) {
+                  <app-doctor-edit-form
+                    [doctor]="doctor"
+                    [isSaving]="savingDoctorId() === doctor.id"
+                    (saved)="onFormSaved($event)"
+                    (cancelled)="cancelEdit()"
+                  />
+                }
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Guía -->
+      <div class="bg-[#215c98] text-white rounded-xl p-4">
+        <h3 class="text-base font-semibold mb-3">Guía de Configuración</h3>
+        <div
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-[#d9e9f8] text-sm"
+        >
+          <div>
+            <p class="font-semibold text-white mb-0.5">Período Laboral</p>
+            <p>
+              Fecha de inicio y fin del contrato o período de trabajo del médico
+              en la clínica.
+            </p>
+          </div>
+          <div>
+            <p class="font-semibold text-white mb-0.5">Franja Horaria</p>
+            <p>
+              Define el inicio y fin de la jornada del médico cada día de
+              atención. Puede personalizarse por día.
+            </p>
+          </div>
+          <div>
+            <p class="font-semibold text-white mb-0.5">Intervalo</p>
+            <p>
+              Tiempo en minutos entre cada cita. Determina el número de citas
+              disponibles por día.
+            </p>
+          </div>
+          <div>
+            <p class="font-semibold text-white mb-0.5">Días</p>
+            <p>
+              Seleccione los días de la semana (lunes a viernes) en que el
+              médico presta sus servicios.
+            </p>
+          </div>
+          <div>
+            <p class="font-semibold text-white mb-0.5">
+              Habilitar / Deshabilitar
+            </p>
+            <p>
+              Permite activar o desactivar un médico para que aparezca o no en
+              el sistema de agendamiento.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vista: Estadísticas -->
+    @if (activeView() === 'estadisticas') {
+      <app-admin-statistics />
+    }
+  </div>
+
+  <app-toast [message]="toastMessage()" [type]="toastType()" />
+
+  <!-- Panel lateral: descansos del médico -->
+  @if (timeOffDoctor(); as timeOffDoctor) {
+    <app-doctor-time-off-drawer
+      [doctor]="timeOffDoctor"
+      (timeOffsChange)="onTimeOffsChange(timeOffDoctor.id, $event)"
+      (notify)="showToast('success', $event)"
+      (closed)="closeTimeOff()"
+    />
+  }
+  <!-- Modales -->
+  <app-admin-modals
+    [showConfirmModal]="showConfirmModal()"
+    [doctorToToggle]="doctorToToggle()"
+    (confirmToggle)="onConfirmToggle()"
+    (closeToggleModal)="onCloseToggleModal()"
+    [showErrorModal]="showErrorModal()"
+    [errorGuardado]="errorGuardado()"
+    (closeErrorModal)="onCloseErrorModal()"
+  />
+</div>
+<!-- Modal: Agendamiento autónomo -->
+<app-confirm-modal
+  [visible]="showAutonomousBookingModal()"
+  title="Confirmar Cambio"
+  [richMessage]="true"
+  maxWidth="max-w-md"
+  [fullWidthButtons]="true"
+  cancelLabel="Cancelar"
+  [confirmLabel]="
+    'Sí, ' + (autonomousBookingEnabled() ? 'Deshabilitar' : 'Habilitar')
+  "
+  [confirmVariant]="autonomousBookingEnabled() ? 'danger' : 'success'"
+  [iconBg]="autonomousBookingEnabled() ? 'bg-red-100' : 'bg-green-100'"
+  (dismissed)="onCloseAutonomousBookingModal()"
+  (confirmed)="onConfirmAutonomousBookingToggle()"
+>
+  <svg
+    lucideCalendarCheck
+    [size]="24"
+    icon
+    [class]="autonomousBookingEnabled() ? 'text-red-600' : 'text-green-600'"
+  ></svg>
+  <span message>
+    ¿Está seguro de que desea
+    <strong>{{
+      autonomousBookingEnabled() ? 'deshabilitar' : 'habilitar'
+    }}</strong>
+    el agendamiento autónomo?
+    @if (autonomousBookingEnabled()) {
+      Los pacientes no podrán agendar citas por sí mismos hasta que se vuelva a
+      habilitar.
+    } @else {
+      Los pacientes podrán volver a agendar citas por sí mismos.
+    }
+  </span>
+</app-confirm-modal>

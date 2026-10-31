@@ -1,110 +1,114 @@
-import { HttpClient } from '@angular/common/http';
-import { inject, Injectable, signal } from '@angular/core';
-import { Observable } from 'rxjs';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { inject, Injectable } from '@angular/core';
+import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Patient } from '../../shared/models/interfaces/patient.model';
-import { MedicalRecord } from '../../shared/models/dtos/medicalRecord.dto';
+import { withPagination } from '../../shared/helpers/httpPagination';
+import { PaginatedState } from '../../shared/helpers/paginatedState';
+import { AppointmentsPatient } from '../../shared/models/dtos/appointments.dto';
+import { PageResponse } from '../../shared/models/dtos/pageResponse.dto';
 
-export interface PatientPublicResponse {
-  documentType: string | null;
-  maskedDocument: string;
-  firstName: string | null;
-  lastName: string | null;
-  patientExists: boolean;
-  hasUserAccount: boolean;
-  hasSystemUser: boolean;
+interface LoadAppointmentsParams {
+  idPatient: string;
+  state?: string;
+  pageNumber?: number;
+  pageSize?: number;
+  sortDirection?: 'asc' | 'desc';
 }
 
+/**
+ * Servicio de citas del paciente.
+ */
 @Injectable({ providedIn: 'root' })
-export class PatientService {
+export class PatientAppointmentService {
   private http = inject(HttpClient);
   private apiUrl = environment.apiUrl;
 
-  medicalRecords = signal<MedicalRecord[]>([]);
-  error = signal<string | null>(null);
-  readonly documentTypes = signal<string[]>([]);
+  private readonly appointmentsState =
+    new PaginatedState<AppointmentsPatient>();
 
-  loadDocumentTypes(): void {
-    if (this.documentTypes().length > 0) return;
-    this.getAllDocumentTypes().subscribe({
-      next: (types) => this.documentTypes.set(types),
-      error: () => {},
-    });
+  readonly appointments = this.appointmentsState.content;
+  readonly pagination = this.appointmentsState.pagination;
+
+  /**
+   * Limpia las citas en memoria y datos de paginación al cerrar sesión
+   */
+  clearAllData(): void {
+    this.appointmentsState.clear();
   }
 
-  getMe(): Observable<Patient> {
-    return this.http.get<Patient>(`${this.apiUrl}/patients/me`);
-  }
-
-  loadMyMedicalRecords(patientId: string | null): void {
-    this.http.get<MedicalRecord[]>(`${this.apiUrl}/clinical-history/patient/${patientId}`)
-      .subscribe({
-        next: (records) => this.medicalRecords.set(records),
-        error: (err) => {
-          if (err.status === 0) {
-            this.error.set('No se pudo conectar con el servidor.');
-          } else {
-            this.error.set(err.error?.message ?? 'Error al cargar el historial.');
-          }
-        }
-      });
-  }
-
-  getByDocument(documentNumber: string): Observable<Patient> {
-    return this.http.get<Patient>(
-      `${this.apiUrl}/patients/document/${documentNumber}`,
+  /**
+   * Carga una página de citas del paciente indicado, opcionalmente
+   * filtradas por estado y ordenadas por fecha.
+   *
+   * @param params.idPatient id del paciente a consultar
+   * @param params.state estado de la cita a filtrar (ej. 'AGENDADA'); si se omite, trae todos los estados
+   * @param params.pageNumber número de página a solicitar, base 0 (por defecto 0)
+   * @param params.pageSize cantidad de citas por página (por defecto 5)
+   * @param params.sortDirection orden ascendente o descendente; si se omite, aplica el del backend
+   * @returns Observable con la respuesta paginada completa del backend
+   */
+  loadAppointments(
+    params: LoadAppointmentsParams
+  ): Observable<PageResponse<AppointmentsPatient>> {
+    return this.getAppointments(params).pipe(
+      tap((page) => this.appointmentsState.set(page))
     );
   }
 
-  // consulta el estado público del documento
-  getPublicByDocument(
-    documentNumber: string,
-  ): Observable<PatientPublicResponse> {
-    return this.http.get<PatientPublicResponse>(
-      `${this.apiUrl}/patients/document/${documentNumber}/public`,
+  /**
+   * Realiza la petición HTTP GET paginada de citas al backend.
+   *
+   * @param params filtros y parámetros de paginación
+   * @returns Observable con la respuesta cruda del backend (`PageResponse<AppointmentsPatient>`)
+   */
+  private getAppointments(
+    params: LoadAppointmentsParams
+  ): Observable<PageResponse<AppointmentsPatient>> {
+    let httpParams = new HttpParams().set('idPatient', params.idPatient);
+    if (params.state) httpParams = httpParams.set('state', params.state);
+    if (params.sortDirection)
+      httpParams = httpParams.set(
+        'sortDirection',
+        params.sortDirection.toUpperCase()
+      );
+    httpParams = withPagination(httpParams, params.pageNumber, params.pageSize);
+
+    return this.http.get<PageResponse<AppointmentsPatient>>(
+      `${this.apiUrl}/appointments`,
+      { params: httpParams }
     );
   }
 
-  // crea paciente nuevo con cuenta nueva
-  createWithUser(data: {
-    username: string;
-    password: string;
-    documentType: string;
-    documentNumber: string;
-    firstName: string;
-    lastName: string;
-    phone: string;
-    email?: string;
-    gender: string;
-    birthDate: string;
-    guardianPhone?: string;
-  }): Observable<Patient> {
-    return this.http.post<Patient>(`${this.apiUrl}/patients/with-user`, data);
-  }
-
-  // solicita OTP para vincular o completar registro
-  requestLinkUserAccountCode(data: {
-    documentNumber: string;
-  }): Observable<void> {
-    return this.http.post<void>(
-      `${this.apiUrl}/patients/link-user-account/request-code`,
-      data,
+  /**
+   * Verifica si el paciente indicado no tiene citas registradas (paciente nuevo).
+   *
+   * @param patientId id del paciente
+   */
+  hasAppointments(patientId: string): Observable<boolean> {
+    return this.http.get<boolean>(
+      `${this.apiUrl}/appointments/${patientId}/is-new-patient`
     );
   }
 
-  // confirma OTP y crea o vincula la cuenta según el caso
-  confirmLinkUserAccount(data: {
-    documentNumber: string;
-    code: string;
-    password?: string;
-  }): Observable<Patient> {
-    return this.http.post<Patient>(
-      `${this.apiUrl}/patients/link-user-account/confirm`,
-      data,
+  /**
+   * Cancela una cita por su id.
+   *
+   * @param appointmentId id de la cita a cancelar
+   */
+  cancelAppointment(appointmentId: string): Observable<void> {
+    return this.http.put<void>(
+      `${this.apiUrl}/appointments/${appointmentId}/cancel`,
+      {}
     );
   }
-
-  getAllDocumentTypes(): Observable<string[]> {
-    return this.http.get<string[]>(`${this.apiUrl}/patients/document-types`);
+  /**
+   * Consulta si el agendamiento autónomo de pacientes está habilitado.
+   *
+   * @returns Observable con el estado actual (true = habilitado).
+   */
+  getAutonomousSchedulingStatus(): Observable<boolean> {
+    return this.http.get<boolean>(
+      `${this.apiUrl}/appointments/config/autonomous-scheduling`
+    );
   }
 }

@@ -8,19 +8,11 @@ base_domain = "piedrazul.org"
 
 # -- Cloudflare
 
-# Cuenta principal de Cloudflare
-cloudflare_account_id = "3962a117c8b14a746eec13702d330b42"
+# Cuenta nueva de Cloudflare: Piedrazul
+cloudflare_account_id = "ab4f90b9b70538731273c3fdf9548f07"
 
-# Zona DNS del dominio base
-cloudflare_zone_id = "a6b67fc21dcdfb3c00c9020f6cd92891"
-
-# -- GitHub
-
-# Owner del repositorio
-github_owner = "JM-Ortega"
-
-# Nombre del repositorio
-github_repo = "piedrazul-agendamiento-citas"
+# Nueva zona DNS de piedrazul.org
+cloudflare_zone_id = "b663ee4c0c9adb151120634cb7b84e7b"
 
 # -- Hetzner
 

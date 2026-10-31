@@ -42,7 +42,7 @@ public class DeliveryEvent {
         this.rawStatus = Objects.requireNonNull(rawStatus, "El estado crudo es obligatorio");
         this.normalizedStatus = Objects.requireNonNull(normalizedStatus, "El estado normalizado es obligatorio");
         this.payloadJson = payloadJson;
-        this.eventTimestamp = eventTimestamp;
+        this.eventTimestamp = Objects.requireNonNull(eventTimestamp, "La fecha del evento es obligatoria");
         this.receivedAt = Objects.requireNonNull(receivedAt, "La fecha de recepción es obligatoria");
         this.processedAt = processedAt;
     }

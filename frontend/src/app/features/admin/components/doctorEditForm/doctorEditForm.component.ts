@@ -1,0 +1,371 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  OnInit,
+  output,
+  signal,
+} from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import {
+  LucideCalendar,
+  LucideCalendarRange,
+  LucideChevronDown,
+  LucideChevronUp,
+  LucideClock,
+  LucidePencil,
+  LucideSave,
+} from '@lucide/angular';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
+import { InputComponent } from '../../../../designSystem/atoms/input/input.component';
+import { SelectComponent } from '../../../../designSystem/atoms/select/select.component';
+import { DatepickerComponent } from '../../../../designSystem/molecules/datepicker/datepicker.component';
+import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
+import {
+  generateTimeOptions,
+  generateTimeSelectOptions,
+} from '../../../../shared/helpers/timeUtils';
+import { toIsoDateString } from '../../../../shared/helpers/transformDateLocal';
+import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
+import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
+import {
+  DoctorFormValidationService,
+  FormErrors,
+} from '../../service/doctorFormValidation.service';
+
+export interface DoctorSaveEvent {
+  form: Doctor;
+  originalDoctor: Doctor;
+  originalWorkdays: number[];
+  removedWorkdays: number[];
+}
+
+/**
+ * Formulario de edición de un doctor existente. Clona `doctor` al iniciar,
+ * mantiene su propio estado editable (`editForm`) y solo emite `saved` con
+ * el diff (incluyendo días removidos) cuando el usuario guarda.
+ */
+@Component({
+  selector: 'app-doctor-edit-form',
+  templateUrl: './doctorEditForm.component.html',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    FormsModule,
+    LucideCalendar,
+    LucideCalendarRange,
+    LucideChevronDown,
+    LucideChevronUp,
+    LucideClock,
+    LucidePencil,
+    LucideSave,
+    ButtonComponent,
+    DatepickerComponent,
+    SelectComponent,
+    InputComponent,
+  ],
+})
+export class DoctorEditFormComponent implements OnInit {
+  private validationService = inject(DoctorFormValidationService);
+
+  // ── Constantes ────────────────────────────────────────────────────────────
+  readonly DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  readonly DAY_FULL_LABELS = [
+    'Domingo',
+    'Lunes',
+    'Martes',
+    'Miércoles',
+    'Jueves',
+    'Viernes',
+    'Sábado',
+  ];
+
+  /** Días hábiles seleccionables (lunes a viernes). */
+  readonly weekDays = [1, 2, 3, 4, 5];
+
+  /** Opciones de hora de 06:00 a 13:00 en pasos de 5 minutos (valor en 24h). */
+  readonly timeOptions: string[] = generateTimeOptions();
+
+  /** timeOptions con label en formato 12h (ej: "13:00" se muestra como "1:00"). */
+  readonly timeSelectOptions = generateTimeSelectOptions();
+  // ── Inputs / Outputs ──────────────────────────────────────────────────────
+  doctor = input.required<Doctor>();
+  isSaving = input(false);
+  saved = output<DoctorSaveEvent>();
+  cancelled = output<void>();
+
+  // ── Internal state ────────────────────────────────────────────────────────
+  editForm = signal<Doctor | null>(null);
+  showDaySchedules = signal(false);
+  /** Días cuyo editor de horario personalizado está abierto (por click del usuario). */
+  customizingDays = signal<Set<number>>(new Set());
+  errors = signal<FormErrors>({
+    horarioGlobal: '',
+    fechas: '',
+    fechaInicio: '',
+    fechaFin: '',
+    intervalo: '',
+    dias: '',
+    bookingWindowWeeks: '',
+    horariosDia: {},
+  });
+
+  private originalDoctor = signal<Doctor | null>(null);
+  private originalWorkdays = signal<number[]>([]);
+
+  // ── Computed ──────────────────────────────────────────────────────────────
+
+  /** True si `editForm` difiere de `originalDoctor` en algún campo relevante. */
+  hasChanges = computed(() => {
+    const form = this.editForm();
+    const orig = this.originalDoctor();
+    if (!form || !orig) return false;
+    if (
+      form.appointmentInterval !== orig.appointmentInterval ||
+      form.laborStart !== orig.laborStart ||
+      form.laborEnd !== orig.laborEnd ||
+      form.startTime !== orig.startTime ||
+      form.endTime !== orig.endTime ||
+      form.bookingWindowWeeks !== orig.bookingWindowWeeks
+    )
+      return true;
+    const fDays = [...(form.workdays ?? [])].sort((a, b) => a - b);
+    const oDays = [...(orig.workdays ?? [])].sort((a, b) => a - b);
+    if (JSON.stringify(fDays) !== JSON.stringify(oDays)) return true;
+    for (const day of fDays) {
+      const fd = form.daySchedules?.[day];
+      const od = orig.daySchedules?.[day];
+      if (fd?.startTime !== od?.startTime || fd?.endTime !== od?.endTime)
+        return true;
+    }
+    return false;
+  });
+  /** Abre/cierra el desplegable de horarios por día y, si se abre, hace scroll hasta él. */
+  toggleDaySchedules(): void {
+    const willOpen = !this.showDaySchedules();
+    this.showDaySchedules.set(willOpen);
+    if (willOpen) {
+      scrollToElementById(`day-schedules-${this.doctor().id}`);
+    }
+  }
+  /** True si hay cambios, no hay errores pendientes y no se está guardando ya. */
+  canSave = computed(() => {
+    const errs = this.errors();
+    const form = this.editForm();
+    if (!form) return false;
+    return (
+      !this.isSaving() &&
+      this.hasChanges() &&
+      !errs.horarioGlobal &&
+      !errs.fechas &&
+      !errs.fechaInicio &&
+      !errs.fechaFin &&
+      !errs.intervalo &&
+      !errs.dias &&
+      !errs.bookingWindowWeeks &&
+      Object.keys(errs.horariosDia).length === 0 &&
+      this.validationService.horariosValidos(form)
+    );
+  });
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+  /** Clona el doctor recibido a estado editable y valida el estado inicial. */
+  ngOnInit(): void {
+    const doc = this.doctor();
+    const clone: Doctor = {
+      ...doc,
+      workdays: [...(doc.workdays ?? [])],
+      daySchedules: { ...(doc.daySchedules ?? {}) },
+    };
+    this.editForm.set(clone);
+    this.originalDoctor.set(clone);
+    this.originalWorkdays.set([...(doc.workdays ?? [])]);
+    this.errors.set(this.validationService.validateForm(clone));
+  }
+
+  // ── Campos del formulario ──────────────────────────────────────────────────────────
+
+  /** Actualiza un campo simple de `editForm` y revalida. */
+  updateField(field: keyof Doctor, value: Doctor[keyof Doctor]): void {
+    const form = this.editForm();
+    if (!form) return;
+
+    let daySchedules = form.daySchedules;
+
+    if (field === 'startTime' || field === 'endTime') {
+      daySchedules = { ...(form.daySchedules ?? {}) };
+      for (const day of form.workdays ?? []) {
+        if (this.customizingDays().has(day)) continue;
+
+        const ds = daySchedules[day];
+        if (!ds) continue;
+
+        const matchesOldDefault =
+          ds.startTime === form.startTime && ds.endTime === form.endTime;
+
+        if (matchesOldDefault) {
+          daySchedules[day] = {
+            startTime: field === 'startTime' ? (value as string) : ds.startTime,
+            endTime: field === 'endTime' ? (value as string) : ds.endTime,
+          };
+        }
+      }
+    }
+
+    const updated = { ...form, [field]: value, daySchedules };
+    this.editForm.set(updated);
+    this.errors.set(this.validationService.validateForm(updated));
+  }
+
+  /** Agrega o quita un día de `workdays`, limpiando su horario si se quita. */
+  toggleDay(day: number): void {
+    const form = this.editForm();
+    if (!form) return;
+    const days = (form.workdays ?? []).includes(day)
+      ? form.workdays.filter((d) => d !== day)
+      : [...(form.workdays ?? []), day].sort((a, b) => a - b);
+    const daySchedules = { ...(form.daySchedules ?? {}) };
+    if (!days.includes(day)) {
+      delete daySchedules[day];
+      const set = new Set(this.customizingDays());
+      set.delete(day);
+      this.customizingDays.set(set);
+    }
+    const updated = { ...form, workdays: days, daySchedules };
+    this.editForm.set(updated);
+    this.errors.set(this.validationService.validateForm(updated));
+  }
+
+  /** Actualiza un campo de horario (inicio/fin) para un día específico. */
+  updateDaySchedule(
+    day: number,
+    field: keyof DaySchedule,
+    value: string
+  ): void {
+    const form = this.editForm();
+    if (!form) return;
+    const daySchedules = { ...(form.daySchedules ?? {}) };
+    daySchedules[day] = {
+      startTime: daySchedules[day]?.startTime ?? form.startTime,
+      endTime: daySchedules[day]?.endTime ?? form.endTime,
+      [field]: value,
+    };
+    const updated = { ...form, daySchedules };
+    this.editForm.set(updated);
+    this.errors.set(this.validationService.validateForm(updated));
+  }
+
+  /** Elimina el horario personalizado de un día, volviendo al horario general. */
+  resetDaySchedule(day: number): void {
+    const form = this.editForm();
+    if (!form) return;
+    const daySchedules = { ...(form.daySchedules ?? {}) };
+    delete daySchedules[day];
+    const updated = { ...form, daySchedules };
+    this.editForm.set(updated);
+    this.errors.set(this.validationService.validateForm(updated));
+  }
+
+  /** True si el día tiene un horario propio que realmente difiere del general. */
+  hasDayOverride(day: number): boolean {
+    const form = this.editForm();
+    const ds = form?.daySchedules?.[day];
+    if (!ds || !form) return false;
+    return ds.startTime !== form.startTime || ds.endTime !== form.endTime;
+  }
+
+  /** True si el editor de horario personalizado de un día debe mostrarse (abierto o ya tiene override). */
+  isCustomizingDay(day: number): boolean {
+    return this.customizingDays().has(day) || this.hasDayOverride(day);
+  }
+
+  /** Abre el editor de horario personalizado para un día. */
+  startCustomizeDay(day: number): void {
+    const set = new Set(this.customizingDays());
+    set.add(day);
+    this.customizingDays.set(set);
+  }
+
+  /** Cierra el editor de un día y vuelve al horario por defecto. */
+  collapseCustomizeDay(day: number): void {
+    const set = new Set(this.customizingDays());
+    set.delete(day);
+    this.customizingDays.set(set);
+    this.resetDaySchedule(day);
+  }
+
+  /** Valor a mostrar para un día: su horario propio o el horario general. */
+  getDayScheduleValue(day: number, field: keyof DaySchedule): string {
+    const form = this.editForm();
+    if (!form) return '';
+    return (
+      form.daySchedules?.[day]?.[field] ??
+      (field === 'startTime' ? form.startTime : form.endTime)
+    );
+  }
+
+  /** Cantidad de días cuyo horario realmente difiere del general. */
+  getEditFormDayScheduleCount(): number {
+    const form = this.editForm();
+    if (!form) return 0;
+    return Object.keys(form.daySchedules ?? {}).filter((day) =>
+      this.hasDayOverride(Number(day))
+    ).length;
+  }
+  // ── Guardar ───────────────────────────────────────────────────────────────
+
+  /** Calcula los días removidos y emite el evento `saved` con el diff completo. */
+  onSave(): void {
+    if (!this.canSave()) return;
+    const form = this.editForm();
+    const orig = this.originalDoctor();
+    if (!form || !orig) return;
+
+    const removedWorkdays = this.originalWorkdays().filter(
+      (day) => !form.workdays.includes(day)
+    );
+
+    this.saved.emit({
+      form,
+      originalDoctor: orig,
+      originalWorkdays: this.originalWorkdays(),
+      removedWorkdays,
+    });
+  }
+
+  // ── Inputs de fecha (período laboral) ────────────────────────────────────
+  /** Limita el año escrito a mano en laborStart a 4 dígitos. */
+  onLaborStartInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value;
+    if (value) {
+      const parts = value.split('-');
+      if (parts[0].length > 4) {
+        parts[0] = parts[0].slice(0, 4);
+        input.value = parts.join('-');
+        this.updateField('laborStart', input.value);
+      }
+    }
+  }
+
+  /** Limita el año escrito a mano en laborEnd a 4 dígitos. */
+  onLaborEndInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value;
+    if (value) {
+      const parts = value.split('-');
+      if (parts[0].length > 4) {
+        parts[0] = parts[0].slice(0, 4);
+        input.value = parts.join('-');
+        this.updateField('laborEnd', input.value);
+      }
+    }
+  }
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  /** Convierte un Date del datepicker a 'yyyy-mm-dd', o '' si es null. */
+  toDateString(date: Date | null): string {
+    return date ? toIsoDateString(date) : '';
+  }
+}

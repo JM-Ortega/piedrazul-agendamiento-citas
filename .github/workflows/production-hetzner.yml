@@ -1,0 +1,2700 @@
+name: Producción — Hetzner
+run-name: >-
+  ${{ github.event_name == 'push' && (vars.PRODUCTION_PUSH_DEPLOY == '' || vars.PRODUCTION_PUSH_DEPLOY == 'deferred')
+  && format('Push diferido, sin deploy: {0}', github.sha)
+  || (github.event_name == 'push' && github.event.head_commit.message
+  || format('Producción {0}: {1}', inputs.stage, github.sha)) }}
+
+# Única cadena de producción: Terraform Apply, deploy de la aplicación en Hetzner y
+# publicación del frontend en Cloudflare Pages.
+#
+# Etapas (ADR-007). Un servidor nuevo o reemplazado se instala en dos runs explícitos, con
+# una autenticación fuera de banda entre ambos; lo demás es un run ordinario:
+#   stage=provision (Run P)  comprobaciones previas de la instalación completa, plan revisado
+#                            y Apply; termina antes de cualquier conexión SSH. Si creó o
+#                            reemplazó el servidor: PROVISIONED / TRUST PENDING / NOT INSTALLED.
+#   [operador]               autentica la clave del host por la consola de Hetzner y registra
+#                            PRODUCTION_SSH_HOST_PIN en el environment. Ningún workflow lo hace.
+#   stage=install (Run I)    plan nuevo que debe salir sin cambios, nunca Apply; concilia
+#                            instancia, dirección, pin y clave ofrecida antes de tocar el
+#                            servidor, y sigue como cualquier deploy.
+#   stage=ordinary / push    un servidor existente y de confianza, un solo run. Si el plan
+#                            revisado crea, reemplaza o destruye el servidor, falla antes de
+#                            aplicar. Crear o reemplazar exige Run P con los push retenidos
+#                            (vars.PRODUCTION_PUSH_DEPLOY sin definir o en deferred).
+# production-stage.sh decide qué combina cada etapa; host-trust.sh, la identidad SSH.
+# Un push se difiere (sin efectos y sin avanzar el rango) salvo con
+# vars.PRODUCTION_PUSH_DEPLOY=enabled, que se habilita después de instalar.
+#
+#   classify ─┬─ resolve_rollback ─┐
+#             ├─ app_build ────────┼─ select_images ─ image_targets ─ image_scan ─ image_policy ─┐
+#             ├─ postgres_build ───┘                                                            │
+#             └─ frontend_build ───────────────────────────────────────────────────────────────┤
+#                 terraform_plan (gate production-hetzner; solo con Terraform) ◄─────────────────┤
+#                   └─ production (gate production-hetzner) ◄────────────────────────────────────┘
+#                        └─ conclude ─ range_processed
+#
+# Solo `terraform_plan` y `production` usan el environment production-hetzner y credenciales
+# de producción (terraform_plan: solo HCP Terraform; production: HCP Terraform, SSH,
+# secretos de la app, token de Pages). Clasificación, builds, selección y escaneo de
+# identidades conocidas corren antes de los gates y solo con GITHUB_TOKEN.
+#
+# Con Terraform hay dos aprobaciones del mismo environment, con propósitos distintos: la de
+# terraform_plan autoriza usar las credenciales de producción para planificar este commit;
+# la de production llega DESPUÉS de que el plan definitivo está revisado en el resumen de
+# este mismo run y autoriza aplicar ese plan exacto y seguir con el deploy. Sin Terraform
+# (solo deploy o solo frontend) hay una sola, la de production.
+#
+# Frontend: frontend_build construye y valida el sitio una sola vez y lo sube como
+# artifact; production descarga ESE artifact (id y sha256 como outputs de job, digest de
+# GitHub verificado) y lo publica con `wrangler pages deploy`, sin volver a construir, al
+# final de la cadena: después del Apply, del deploy y de sus verificaciones de health.
+#
+# Escaneo y política antes de mutar: ninguna mutación que pueda aplicar una imagen empieza
+# sin que la política de vulnerabilidades (vuln-policy.sh) autorice el escaneo fresco de
+# esa identidad exacta (escaneado = autorizado = desplegado). Identidades conocidas antes
+# del gate → image_scan + image_policy (evaluación preliminar: un bloqueo evita el gate y
+# el Apply). Reuso de backend/postgres → se lee tras el gate y se escanea dentro de
+# production. Dentro de production, la evaluación autoritativa de TODAS las imágenes que
+# el run aplica va justo antes de converge/deploy.
+# CRITICAL sin disposición aprobada por un humano autorizado → BLOCK; HIGH → solo se
+# informa; "operational_failure" (registry/DB/Trivy; nunca "0 hallazgos") → BLOCK;
+# evidencia incompleta, vencida o no verificable → BLOCK. Break-glass (solo dispatch,
+# autorización aprobada y evidencia histórica verificada) queda registrado en un issue
+# security-break-glass antes de mutar y nunca se informa como escaneo fresco.
+
+on:
+  # Todo push a main corre la clasificación (sin filtro de rutas): si un commit ajeno a
+  # producción avanza main y deja obsoleto a un run anterior, su run clasifica el rango
+  # acumulado desde el último rango procesado y recoge los cambios pendientes. Un rango sin
+  # cambios de producción termina como no-op limpio. Con vars.PRODUCTION_PUSH_DEPLOY sin
+  # definir o en deferred, el push queda registrado como diferido y no hace nada más.
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "Etapa: ordinary (operación normal), provision (Run P: crear o reemplazar el servidor, sin SSH) o install (Run I: instalar con el pin registrado, sin Apply). instalacion-nueva.md"
+        type: choice
+        options: [ordinary, provision, install]
+        default: ordinary
+      run_terraform_apply:
+        description: "Aplicar Terraform (HCP) antes del deploy"
+        type: boolean
+        default: false
+      run_host_config:
+        description: "Correr configuración del servidor"
+        type: boolean
+        default: false
+      run_build:
+        description: "Construir nueva imagen del backend"
+        type: boolean
+        default: true
+      run_build_postgres:
+        description: "Construir nueva imagen de postgres"
+        type: boolean
+        default: false
+      run_app_deploy:
+        description: "Desplegar aplicación"
+        type: boolean
+        default: true
+      run_frontend_publish:
+        description: "Construir el frontend de este commit y publicarlo en Cloudflare Pages (producción)"
+        type: boolean
+        default: false
+      image_tag:
+        description: "Tag específico del backend para rollback (vacío = construir nueva o reusar)"
+        type: string
+        default: ""
+      keycloak_recovery:
+        description: "Recuperación P3 de Keycloak autorizada: autoridad temporal con kc.sh bootstrap-admin, detiene Keycloak durante el evento (requiere configuración del servidor; docs/operations/runbooks/recuperar-keycloak.md)"
+        type: boolean
+        default: false
+      break_glass_authorization:
+        description: "Break-glass de escaneo (BG-AAAA-NNN): solo ante un fallo operativo del escáner; requiere security/break-glass/<id>.json aprobado (docs/operations/runbooks/politica-vulnerabilidades-imagenes.md)"
+        type: string
+        default: ""
+      break_glass_justification:
+        description: "Justificación de ESTA operación de break-glass (obligatoria con break_glass_authorization)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: jm-ortega/piedrazul-agendamiento-citas/backend
+  POSTGRES_IMAGE_NAME: jm-ortega/piedrazul-agendamiento-citas/postgres
+  WORKFLOW_PATH: .github/workflows/production-hetzner.yml
+
+jobs:
+  # ── Intención de producción ────────────────────────────────────────────────
+  # push: clasifica el rango desde el último run push que lo procesó hasta este commit (no
+  #       solo el último commit), así un push descartado por la cola, un run fallido o un
+  #       push diferido quedan cubiertos por el siguiente.
+  # workflow_dispatch: la intención es explícita (inputs) y no avanza el rango.
+  # Este job no tiene environment: solo ve variables de repositorio y organización, y por
+  # eso puede comprobar que el pin no tiene una copia fuera del environment.
+  classify:
+    name: Intención de producción
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      stage: ${{ steps.intent.outputs.stage }}
+      pin_outside_environment: ${{ steps.intent.outputs.pin_outside_environment }}
+      # enabled|deferred|invalid, leído sin environment: el mismo valor que ve un push
+      push_mode: ${{ steps.intent.outputs.push_mode }}
+      intent: ${{ steps.intent.outputs.intent }}
+      terraform_required: ${{ steps.intent.outputs.terraform_required }}
+      deploy_required: ${{ steps.intent.outputs.deploy_required }}
+      run_build: ${{ steps.intent.outputs.run_build }}
+      run_build_postgres: ${{ steps.intent.outputs.run_build_postgres }}
+      run_host_config: ${{ steps.intent.outputs.run_host_config }}
+      run_app_deploy: ${{ steps.intent.outputs.run_app_deploy }}
+      frontend_required: ${{ steps.intent.outputs.frontend_required }}
+      image_tag: ${{ steps.intent.outputs.image_tag }}
+      keycloak_recovery: ${{ steps.intent.outputs.keycloak_recovery }}
+      break_glass_authorization: ${{ steps.intent.outputs.break_glass_authorization }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Clasificar intención
+        id: intent
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_DEPLOY_SETTING: ${{ vars.PRODUCTION_PUSH_DEPLOY }}
+          # Solo si existe; el valor nunca sale de environment
+          PIN_OUTSIDE_ENVIRONMENT: ${{ vars.PRODUCTION_SSH_HOST_PIN != '' }}
+          IN_STAGE: ${{ inputs.stage }}
+          IN_TERRAFORM: ${{ inputs.run_terraform_apply }}
+          IN_HOST_CONFIG: ${{ inputs.run_host_config }}
+          IN_BUILD: ${{ inputs.run_build }}
+          IN_BUILD_POSTGRES: ${{ inputs.run_build_postgres }}
+          IN_APP_DEPLOY: ${{ inputs.run_app_deploy }}
+          IN_FRONTEND: ${{ inputs.run_frontend_publish }}
+          IN_IMAGE_TAG: ${{ inputs.image_tag }}
+          IN_KEYCLOAK_RECOVERY: ${{ inputs.keycloak_recovery }}
+          IN_BREAK_GLASS: ${{ inputs.break_glass_authorization }}
+          IN_BREAK_GLASS_JUSTIFICATION: ${{ inputs.break_glass_justification }}
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "::error title=Intención de producción::Solo main puede iniciar producción (ref: ${GITHUB_REF})"
+            exit 1
+          fi
+
+          OUT="${RUNNER_TEMP}/intent.env"
+
+          # En un push, un valor inválido falla. En un dispatch no bloquea por sí mismo: la
+          # retención la decide stage_gate, y solo si el plan crea o reemplaza el servidor
+          if [ "${EVENT_NAME}" = "push" ]; then
+            PUSH_MODE=$(.github/scripts/production-stage.sh push-mode "${PUSH_DEPLOY_SETTING:-}")
+          else
+            PUSH_MODE=$(.github/scripts/production-stage.sh push-mode "${PUSH_DEPLOY_SETTING:-}" 2> /dev/null) || PUSH_MODE=invalid
+          fi
+
+          if [ "${EVENT_NAME}" = "push" ] && [ "${PUSH_MODE}" = "deferred" ]; then
+            # Sin lecturas de rango: un diferido no depende de la API y no procesa nada. Todos
+            # los flags en false dejan sin correr lo privilegiado y a range_processed sin señal.
+            {
+              echo "stage=deferred"
+              echo "range_mode=deferred"
+              echo "range_base="
+              echo "terraform_required=false"
+              echo "deploy_required=false"
+              echo "run_build=false"
+              echo "run_build_postgres=false"
+              echo "run_host_config=false"
+              echo "run_app_deploy=false"
+              echo "frontend_required=false"
+              echo "intent=deferred"
+              echo "image_tag="
+              echo "keycloak_recovery=false"
+              echo "break_glass_authorization="
+            } > "${OUT}"
+          elif [ "${EVENT_NAME}" = "push" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/$(basename "${WORKFLOW_PATH}")/runs?branch=main&event=push&status=success&per_page=50" \
+              > "${RUNNER_TEMP}/runs.json"
+            BASE=$(.github/scripts/production-range-base.sh "${WORKFLOW_PATH}" "${GITHUB_SHA}" "${GITHUB_RUN_ID}" \
+              < "${RUNNER_TEMP}/runs.json")
+            .github/scripts/classify-production.sh "${BASE}" "${GITHUB_SHA}" > "${OUT}"
+            {
+              echo "stage=ordinary"
+              echo "image_tag="
+              echo "keycloak_recovery=false"
+              echo "break_glass_authorization="
+            } >> "${OUT}"
+          else
+            STAGE="${IN_STAGE:-ordinary}"
+            .github/scripts/production-stage.sh validate
+            if [ "${IN_TERRAFORM}" = "false" ] && [ "${IN_HOST_CONFIG}" = "false" ] && \
+               [ "${IN_BUILD}" = "false" ] && [ "${IN_BUILD_POSTGRES}" = "false" ] && \
+               [ "${IN_APP_DEPLOY}" = "false" ] && [ "${IN_FRONTEND}" = "false" ]; then
+              echo "::error title=Intención de producción::Todos los flags están en false; no hay nada que hacer"
+              exit 1
+            fi
+            if [ -n "${IN_IMAGE_TAG}" ]; then
+              if [ "${IN_BUILD}" = "true" ]; then
+                echo "::error title=Intención de producción::No se puede especificar image_tag cuando run_build=true"
+                exit 1
+              fi
+              if [ "${IN_APP_DEPLOY}" != "true" ]; then
+                echo "::error title=Intención de producción::image_tag solo tiene efecto con run_app_deploy=true"
+                exit 1
+              fi
+              if ! [[ "${IN_IMAGE_TAG}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || \
+                 [[ "${IN_IMAGE_TAG,,}" =~ ^(none|null|undefined|latest)$ ]]; then
+                echo "::error title=Intención de producción::image_tag '${IN_IMAGE_TAG}' no es un tag OCI explícito válido"
+                exit 1
+              fi
+            fi
+            if [ "${IN_KEYCLOAK_RECOVERY}" = "true" ] && [ "${IN_HOST_CONFIG}" != "true" ]; then
+              echo "::error title=Intención de producción::keycloak_recovery requiere run_host_config=true"
+              exit 1
+            fi
+            # Break-glass: solo aquí (dispatch); la autorización la verifica vuln-policy.sh
+            if [ -n "${IN_BREAK_GLASS}" ]; then
+              if ! [[ "${IN_BREAK_GLASS}" =~ ^BG-[0-9]{4}-[0-9]{3}$ ]]; then
+                echo "::error title=Intención de producción::break_glass_authorization '${IN_BREAK_GLASS}' no es un identificador BG-AAAA-NNN"
+                exit 1
+              fi
+              JUSTIFICATION_TRIMMED="${IN_BREAK_GLASS_JUSTIFICATION//[[:space:]]/}"
+              if [ "${#JUSTIFICATION_TRIMMED}" -lt 20 ]; then
+                echo "::error title=Intención de producción::break_glass_authorization requiere break_glass_justification (mínimo 20 caracteres)"
+                exit 1
+              fi
+              if [ "${IN_HOST_CONFIG}" != "true" ] && [ "${IN_APP_DEPLOY}" != "true" ]; then
+                echo "::error title=Intención de producción::break_glass_authorization solo tiene efecto con configuración del servidor o deploy de aplicación"
+                exit 1
+              fi
+              # La autorización liga una operación sobre imágenes; publicar el frontend es
+              # otra operación y va en otro dispatch
+              if [ "${IN_FRONTEND}" != "false" ]; then
+                echo "::error title=Intención de producción::break_glass_authorization no admite run_frontend_publish: publique el frontend en otro dispatch"
+                exit 1
+              fi
+              # El Apply es la primera mutación de production y va antes de la decisión
+              # autoritativa y del registro de auditoría: no se combina con break-glass
+              if [ "${IN_TERRAFORM}" != "false" ]; then
+                echo "::error title=Intención de producción::break_glass_authorization no admite run_terraform_apply: el Apply mutaría antes de autorizar y registrar la excepción"
+                exit 1
+              fi
+            elif [ -n "${IN_BREAK_GLASS_JUSTIFICATION}" ]; then
+              echo "::error title=Intención de producción::break_glass_justification sin break_glass_authorization"
+              exit 1
+            fi
+
+            DEPLOY=false
+            if [ "${IN_HOST_CONFIG}" = "true" ] || [ "${IN_APP_DEPLOY}" = "true" ]; then
+              DEPLOY=true
+            fi
+            case "${IN_TERRAFORM}/${DEPLOY}" in
+              true/true) INTENT=apply_then_deploy ;;
+              true/false) INTENT=apply_only ;;
+              false/true) INTENT=deploy_only ;;
+              *) INTENT=noop ;;
+            esac
+            if [ "${IN_FRONTEND}" = "true" ]; then
+              case "${INTENT}" in
+                noop) INTENT=frontend_only ;;
+                apply_only) INTENT=apply_then_frontend ;;
+                deploy_only) INTENT=deploy_then_frontend ;;
+                apply_then_deploy) INTENT=apply_then_deploy_then_frontend ;;
+              esac
+            fi
+            # Run I no aplica, pero siempre planifica: el plan debe salir sin cambios
+            TERRAFORM_REQUIRED="${IN_TERRAFORM}"
+            if [ "${STAGE}" != "ordinary" ]; then
+              INTENT="${STAGE}"
+              TERRAFORM_REQUIRED=true
+            fi
+            if [ "${STAGE}" = "provision" ] && [ "${PUSH_MODE}" != "deferred" ]; then
+              echo "::warning title=Etapa de producción::Run P sin push retenidos (modo: ${PUSH_MODE}): si el plan crea o reemplaza el servidor se rechazará antes de la segunda aprobación; una recuperación que no lo hace sigue. Definir vars.PRODUCTION_PUSH_DEPLOY=deferred (instalacion-nueva.md)"
+            fi
+            {
+              echo "stage=${STAGE}"
+              echo "range_mode=manual"
+              echo "range_base="
+              echo "terraform_required=${TERRAFORM_REQUIRED}"
+              echo "deploy_required=${DEPLOY}"
+              echo "run_build=${IN_BUILD}"
+              echo "run_build_postgres=${IN_BUILD_POSTGRES}"
+              echo "run_host_config=${IN_HOST_CONFIG}"
+              echo "run_app_deploy=${IN_APP_DEPLOY}"
+              echo "frontend_required=${IN_FRONTEND}"
+              echo "intent=${INTENT}"
+              echo "image_tag=${IN_IMAGE_TAG}"
+              echo "keycloak_recovery=${IN_KEYCLOAK_RECOVERY}"
+              echo "break_glass_authorization=${IN_BREAK_GLASS}"
+            } > "${OUT}"
+          fi
+
+          echo "pin_outside_environment=${PIN_OUTSIDE_ENVIRONMENT:-}" >> "${OUT}"
+          echo "push_mode=${PUSH_MODE}" >> "${OUT}"
+          cat "${OUT}" >> "$GITHUB_OUTPUT"
+          cat "${OUT}"
+
+          get() { sed -n "s/^$1=//p" "${OUT}"; }
+          if [ "$(get stage)" = "deferred" ]; then
+            echo "::notice title=Push diferido::Sin deploy: ${GITHUB_SHA} queda pendiente y el rango no avanza"
+          fi
+          {
+            echo "## Intención de producción: \`$(get intent)\`"
+            echo
+            echo "| campo | valor |"
+            echo "|---|---|"
+            echo "| evento | ${EVENT_NAME} |"
+            echo "| etapa | \`$(get stage)\` |"
+            echo "| commit | \`${GITHUB_SHA}\` |"
+            case "$(get range_mode)" in
+              incremental) echo "| rango | \`$(get range_base)..${GITHUB_SHA}\` (desde el último rango procesado) |" ;;
+              full) echo "| rango | árbol completo (sin un rango procesado previo confiable) |" ;;
+              deferred) echo "| rango | **diferido**: este push no procesa nada y no avanza el rango |" ;;
+              manual) echo "| rango | — (dispatch manual: intención explícita, no avanza el rango) |" ;;
+            esac
+            if [ "$(get stage)" = "provision" ]; then
+              echo "| alcance de Run P | comprobaciones previas de toda la instalación; aplica y termina antes del servidor (sin SSH, configuración, deploy ni publicación) |"
+            elif [ "$(get stage)" = "install" ]; then
+              echo "| alcance de Run I | plan nuevo sin cambios y sin Apply; identidad del host verificada antes de configurar y desplegar |"
+            fi
+            echo "| terraform_required | $(get terraform_required) |"
+            echo "| deploy_required | $(get deploy_required) |"
+            echo "| build backend / postgres | $(get run_build) / $(get run_build_postgres) |"
+            echo "| configuración del servidor | $(get run_host_config) |"
+            echo "| deploy de aplicación | $(get run_app_deploy) |"
+            echo "| publicación del frontend (Pages) | $(get frontend_required) |"
+            if [ -n "$(get image_tag)" ]; then
+              echo "| rollback backend | \`$(get image_tag)\` |"
+            fi
+            if [ "$(get keycloak_recovery)" = "true" ]; then
+              echo "| recuperación de Keycloak (P3) | **autorizada**: autoridad temporal con bootstrap-admin, Keycloak detenido durante el evento |"
+            fi
+            if [ -n "$(get break_glass_authorization)" ]; then
+              echo "| break-glass de escaneo | **pedido**: \`$(get break_glass_authorization)\` (lo verifica la política; solo cubre fallos operativos del escáner) |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Identidades de imagen (sin privilegios de producción) ─────────────────
+  # Única lectura del tag de rollback: verifica que exista en GHCR y fija su índice OCI
+  # y su manifiesto linux/amd64. Después solo se usan esos digests.
+  resolve_rollback:
+    name: Resolver rollback del backend
+    runs-on: ubuntu-latest
+    needs: classify
+    if: |
+      needs.classify.outputs.run_app_deploy == 'true' &&
+      needs.classify.outputs.run_build != 'true' &&
+      needs.classify.outputs.image_tag != ''
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      image_index_digest: ${{ steps.rollback.outputs.image_index_digest }}
+      image_amd64_digest: ${{ steps.rollback.outputs.image_amd64_digest }}
+      image_ref: ${{ steps.rollback.outputs.image_ref }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Login a GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verificar image_tag en GHCR y resolver su identidad inmutable
+        id: rollback
+        env:
+          ROLLBACK_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.classify.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          if ! IDENTITY=$(.github/scripts/resolve-amd64-image.sh "${ROLLBACK_IMAGE}"); then
+            echo "::error title=Identidad de imagen::${ROLLBACK_IMAGE} no existe, no es accesible en GHCR o no tiene una identidad linux/amd64 única"
+            exit 1
+          fi
+
+          echo "${IDENTITY}" >> "$GITHUB_OUTPUT"
+          echo "Imagen ${ROLLBACK_IMAGE} verificada"
+          echo "${IDENTITY}"
+
+  app_build:
+    name: Build imagen backend
+    runs-on: ubuntu-latest
+    needs: classify
+    if: needs.classify.outputs.run_build == 'true'
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.tag.outputs.value }}
+      image_index_digest: ${{ steps.identity.outputs.image_index_digest }}
+      image_amd64_digest: ${{ steps.identity.outputs.image_amd64_digest }}
+      image_ref: ${{ steps.identity.outputs.image_ref }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Generar IMAGE_TAG
+        id: tag
+        run: |
+          set -euo pipefail
+          echo "value=${GITHUB_SHA::10}" >> "$GITHUB_OUTPUT"
+
+      - name: Configurar QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Login a GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build y push imagen multi-arch
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: backend/
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # El índice se lee por el digest que devolvió este mismo push; el tag no se vuelve a resolver
+      - name: Resolver identidad inmutable linux/amd64
+        id: identity
+        env:
+          BUILT_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          IDENTITY=$(.github/scripts/resolve-amd64-image.sh "${BUILT_IMAGE}")
+          echo "${IDENTITY}" >> "$GITHUB_OUTPUT"
+          echo "${IDENTITY}"
+
+  postgres_build:
+    name: Build imagen postgres
+    runs-on: ubuntu-latest
+    needs: classify
+    if: needs.classify.outputs.run_build_postgres == 'true'
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.tag.outputs.value }}
+      image_index_digest: ${{ steps.identity.outputs.image_index_digest }}
+      image_amd64_digest: ${{ steps.identity.outputs.image_amd64_digest }}
+      image_ref: ${{ steps.identity.outputs.image_ref }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Generar POSTGRES_IMAGE_TAG
+        id: tag
+        run: |
+          set -euo pipefail
+          echo "value=${GITHUB_SHA::10}" >> "$GITHUB_OUTPUT"
+
+      - name: Configurar QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Login a GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build y push imagen multi-arch
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: infra/postgres/
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE_NAME }}:${{ steps.tag.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # El índice se lee por el digest que devolvió este mismo push; el tag no se vuelve a resolver
+      - name: Resolver identidad inmutable linux/amd64
+        id: identity
+        env:
+          BUILT_IMAGE: ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          IDENTITY=$(.github/scripts/resolve-amd64-image.sh "${BUILT_IMAGE}")
+          echo "${IDENTITY}" >> "$GITHUB_OUTPUT"
+          echo "${IDENTITY}"
+
+  # ── Frontend (sin privilegios de producción) ──────────────────────────────
+  # Único build del frontend de producción de este commit: mismo comando y misma versión
+  # de Node que CI Frontend y que el build Git de Pages (frontend/.node-version, npm ci,
+  # `npm run build`), sin caché. Valida el sitio y lo sube como artifact; id, nombre y
+  # sha256 viajan como outputs de job, y production publica exactamente ese contenido.
+  # El nombre lleva el intento: un re-run completo produce otro artifact y production
+  # sigue el id de su propio frontend_build, nunca "el más reciente".
+  frontend_build:
+    name: Build frontend
+    runs-on: ubuntu-latest
+    needs: classify
+    if: needs.classify.outputs.frontend_required == 'true'
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_name: ${{ steps.package.outputs.artifact_name }}
+      dist_sha256: ${{ steps.package.outputs.dist_sha256 }}
+      entry_asset: ${{ steps.package.outputs.entry_asset }}
+      file_count: ${{ steps.package.outputs.file_count }}
+      frontend_tree: ${{ steps.package.outputs.frontend_tree }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Configurar Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: frontend/.node-version
+          package-manager-cache: false
+
+      - name: Instalar dependencias
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Build de producción
+        working-directory: frontend
+        run: npm run build
+
+      - name: Validar y empaquetar el sitio
+        id: package
+        run: |
+          set -euo pipefail
+          NAME="frontend-dist-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          .github/scripts/frontend-artifact.sh package frontend/dist/frontend/browser \
+            "${RUNNER_TEMP}/frontend-artifact" > "${RUNNER_TEMP}/frontend.env"
+          echo "artifact_name=${NAME}" >> "${RUNNER_TEMP}/frontend.env"
+          cat "${RUNNER_TEMP}/frontend.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/frontend.env"
+          get() { sed -n "s/^$1=//p" "${RUNNER_TEMP}/frontend.env"; }
+          {
+            echo "## Artefacto del frontend"
+            echo
+            echo "| campo | valor |"
+            echo "|---|---|"
+            echo "| commit | \`${GITHUB_SHA}\` (árbol frontend/ \`$(get frontend_tree)\`) |"
+            echo "| artifact | \`${NAME}\` |"
+            echo "| sha256 del sitio (tar) | \`$(get dist_sha256)\` |"
+            echo "| archivos / entrada | $(get file_count) / \`$(get entry_asset)\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Subir artefacto
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: |
+            ${{ runner.temp }}/frontend-artifact/frontend-dist.tar
+            ${{ runner.temp }}/frontend-artifact/frontend-manifest.json
+          if-no-files-found: error
+          retention-days: 30
+
+  # Fuente de la identidad de backend y postgres que recibe el job de producción.
+  # Precedencia backend: rollback explícito > imagen construida en este run > reuso.
+  # Postgres: imagen construida en este run > reuso. Sin deploy de aplicación, ambas
+  # son reuso (una imagen construida pero no desplegada no es candidata).
+  # Build y rollback arrastran la identidad inmutable ya resuelta. Reuso queda vacío
+  # aquí: la identidad exacta del último éxito solo se lee en el servidor, después del
+  # gate de producción (select-release.sh).
+  select_images:
+    name: Seleccionar imágenes propias
+    runs-on: ubuntu-latest
+    needs: [classify, resolve_rollback, app_build, postgres_build]
+    if: |
+      !cancelled() &&
+      needs.classify.result == 'success' &&
+      (needs.resolve_rollback.result == 'success' || needs.resolve_rollback.result == 'skipped') &&
+      (needs.app_build.result == 'success' || needs.app_build.result == 'skipped') &&
+      (needs.postgres_build.result == 'success' || needs.postgres_build.result == 'skipped')
+    timeout-minutes: 5
+    outputs:
+      backend_source: ${{ steps.select.outputs.backend_source }}
+      backend_tag: ${{ steps.select.outputs.backend_tag }}
+      backend_index_digest: ${{ steps.select.outputs.backend_index_digest }}
+      backend_image_ref: ${{ steps.select.outputs.backend_image_ref }}
+      postgres_source: ${{ steps.select.outputs.postgres_source }}
+      postgres_tag: ${{ steps.select.outputs.postgres_tag }}
+      postgres_index_digest: ${{ steps.select.outputs.postgres_index_digest }}
+      postgres_image_ref: ${{ steps.select.outputs.postgres_image_ref }}
+    steps:
+      - name: Seleccionar identidades
+        id: select
+        env:
+          RUN_APP_DEPLOY: ${{ needs.classify.outputs.run_app_deploy }}
+          RUN_BUILD: ${{ needs.classify.outputs.run_build }}
+          RUN_BUILD_POSTGRES: ${{ needs.classify.outputs.run_build_postgres }}
+          ROLLBACK_IMAGE_TAG: ${{ needs.classify.outputs.image_tag }}
+          ROLLBACK_INDEX_DIGEST: ${{ needs.resolve_rollback.outputs.image_index_digest }}
+          ROLLBACK_AMD64_DIGEST: ${{ needs.resolve_rollback.outputs.image_amd64_digest }}
+          ROLLBACK_IMAGE_REF: ${{ needs.resolve_rollback.outputs.image_ref }}
+          BUILT_IMAGE_TAG: ${{ needs.app_build.outputs.image_tag }}
+          BUILT_INDEX_DIGEST: ${{ needs.app_build.outputs.image_index_digest }}
+          BUILT_AMD64_DIGEST: ${{ needs.app_build.outputs.image_amd64_digest }}
+          BUILT_IMAGE_REF: ${{ needs.app_build.outputs.image_ref }}
+          PG_BUILT_IMAGE_TAG: ${{ needs.postgres_build.outputs.image_tag }}
+          PG_BUILT_INDEX_DIGEST: ${{ needs.postgres_build.outputs.image_index_digest }}
+          PG_BUILT_AMD64_DIGEST: ${{ needs.postgres_build.outputs.image_amd64_digest }}
+          PG_BUILT_IMAGE_REF: ${{ needs.postgres_build.outputs.image_ref }}
+          BACKEND_REPOSITORY: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          POSTGRES_REPOSITORY: ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE_NAME }}
+        run: |
+          set -euo pipefail
+
+          # Build y rollback ya resolvieron su identidad inmutable una sola vez; aquí solo se arrastra
+          emit() { # <salida> <fuente> <repo> <tag> <índice> <amd64> <ref>
+            local out="$1" source="$2" repo="$3" tag="$4" index="$5" amd64="$6" ref="$7"
+            if [ "${source}" != "reuse" ]; then
+              if ! [[ "${index}" =~ ^sha256:[0-9a-f]{64}$ ]] || \
+                 ! [[ "${amd64}" =~ ^sha256:[0-9a-f]{64}$ ]] || \
+                 [ "${ref}" != "${repo}@${amd64}" ]; then
+                echo "::error title=Identidad de imagen::${out} (${source}) no tiene una identidad inmutable linux/amd64 válida"
+                exit 1
+              fi
+              if ! [[ "${tag}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || \
+                 [[ "${tag,,}" =~ ^(none|null|undefined|latest)$ ]]; then
+                echo "::error title=Identidad de imagen::tag '${tag}' de ${out} (${source}) no es un tag OCI explícito válido"
+                exit 1
+              fi
+            else
+              tag="" index="" ref=""
+            fi
+            {
+              echo "${out}_source=${source}"
+              echo "${out}_tag=${tag}"
+              echo "${out}_index_digest=${index}"
+              echo "${out}_image_ref=${ref}"
+            } >> "$GITHUB_OUTPUT"
+            echo "${out} (${source}): ${tag:-<último éxito del servidor, tras el gate>} ${ref}"
+          }
+
+          if [ "${RUN_APP_DEPLOY}" != "true" ]; then
+            emit backend reuse "${BACKEND_REPOSITORY}" "" "" "" ""
+          elif [ -n "${ROLLBACK_IMAGE_TAG}" ]; then
+            emit backend rollback "${BACKEND_REPOSITORY}" "${ROLLBACK_IMAGE_TAG}" \
+              "${ROLLBACK_INDEX_DIGEST}" "${ROLLBACK_AMD64_DIGEST}" "${ROLLBACK_IMAGE_REF}"
+          elif [ "${RUN_BUILD}" = "true" ]; then
+            emit backend build "${BACKEND_REPOSITORY}" "${BUILT_IMAGE_TAG}" \
+              "${BUILT_INDEX_DIGEST}" "${BUILT_AMD64_DIGEST}" "${BUILT_IMAGE_REF}"
+          else
+            emit backend reuse "${BACKEND_REPOSITORY}" "" "" "" ""
+          fi
+
+          if [ "${RUN_APP_DEPLOY}" = "true" ] && [ "${RUN_BUILD_POSTGRES}" = "true" ]; then
+            emit postgres build "${POSTGRES_REPOSITORY}" "${PG_BUILT_IMAGE_TAG}" \
+              "${PG_BUILT_INDEX_DIGEST}" "${PG_BUILT_AMD64_DIGEST}" "${PG_BUILT_IMAGE_REF}"
+          else
+            emit postgres reuse "${POSTGRES_REPOSITORY}" "" "" "" ""
+          fi
+
+  # ── Escaneo de imágenes conocidas antes del gate ─────────────────────────────
+  # Intenta escanear con Trivy el manifiesto linux/amd64 exacto de cada imagen que este
+  # run construye o aplica en el servidor y cuya identidad se conoce antes del gate.
+  # image_policy evalúa esa evidencia antes del gate; production vuelve a evaluarla, con la
+  # del reuso (que solo se conoce y escanea dentro de production), antes de mutar.
+  # La acción trivy-scan registra un fallo operativo (registry, DB o Trivy) como
+  # operational_failure (anotación de error, resumen y summary.json) y termina bien: es
+  # evidencia, distinta de cero hallazgos, y la política la bloquea.
+  # Un job de escaneo que FALLA es otra cosa (error fuera del intento modelado: checkout,
+  # evidencia, artifact): no hay evidencia verificable y production no empieza.
+  image_targets:
+    name: Identidades a escanear
+    runs-on: ubuntu-latest
+    needs: [classify, app_build, postgres_build, select_images]
+    if: |
+      !cancelled() &&
+      needs.select_images.result == 'success'
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      targets: ${{ steps.targets.outputs.targets }}
+      # Keycloak (solo si converge corre): referencia fijada declarada, índice y manifiesto
+      # linux/amd64 que se escanea y que converge despliega
+      keycloak_label: ${{ steps.targets.outputs.keycloak_label }}
+      keycloak_index_digest: ${{ steps.targets.outputs.keycloak_index_digest }}
+      keycloak_image_ref: ${{ steps.targets.outputs.keycloak_image_ref }}
+      # Traefik (solo si converge corre): mismo contrato que Keycloak
+      traefik_label: ${{ steps.targets.outputs.traefik_label }}
+      traefik_index_digest: ${{ steps.targets.outputs.traefik_index_digest }}
+      traefik_image_ref: ${{ steps.targets.outputs.traefik_image_ref }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Reunir identidades inmutables
+        id: targets
+        env:
+          RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
+          RUN_APP_DEPLOY: ${{ needs.classify.outputs.run_app_deploy }}
+          BACKEND_SOURCE: ${{ needs.select_images.outputs.backend_source }}
+          BACKEND_TAG: ${{ needs.select_images.outputs.backend_tag }}
+          BACKEND_INDEX_DIGEST: ${{ needs.select_images.outputs.backend_index_digest }}
+          BACKEND_IMAGE_REF: ${{ needs.select_images.outputs.backend_image_ref }}
+          BUILT_BACKEND_TAG: ${{ needs.app_build.outputs.image_tag }}
+          BUILT_BACKEND_INDEX_DIGEST: ${{ needs.app_build.outputs.image_index_digest }}
+          BUILT_BACKEND_IMAGE_REF: ${{ needs.app_build.outputs.image_ref }}
+          POSTGRES_SOURCE: ${{ needs.select_images.outputs.postgres_source }}
+          POSTGRES_TAG: ${{ needs.select_images.outputs.postgres_tag }}
+          POSTGRES_INDEX_DIGEST: ${{ needs.select_images.outputs.postgres_index_digest }}
+          POSTGRES_IMAGE_REF: ${{ needs.select_images.outputs.postgres_image_ref }}
+          BUILT_POSTGRES_TAG: ${{ needs.postgres_build.outputs.image_tag }}
+          BUILT_POSTGRES_INDEX_DIGEST: ${{ needs.postgres_build.outputs.image_index_digest }}
+          BUILT_POSTGRES_IMAGE_REF: ${{ needs.postgres_build.outputs.image_ref }}
+        run: |
+          set -euo pipefail
+
+          TARGETS='[]'
+          PENDING='[]'
+          NOT_APPLIED='[]'
+
+          # applied: este run la aplica en el servidor (la política la exige); una imagen
+          # construida y no desplegada se escanea pero no se autoriza
+          add_target() { # <surface> <source> <label> <índice> <ref> <applied>
+            TARGETS=$(jq -c --arg surface "$1" --arg source "$2" --arg label "$3" \
+              --arg index "$4" --arg ref "$5" --argjson applied "$6" \
+              '. + [{surface: $surface, source: $source, label: $label, image_index_digest: $index, image_ref: $ref, applied: $applied}]' \
+              <<< "${TARGETS}")
+          }
+          add_pending() {
+            PENDING=$(jq -c --arg surface "$1" --arg reason "$2" \
+              '. + [{surface: $surface, reason: $reason}]' <<< "${PENDING}")
+          }
+          add_not_applied() {
+            NOT_APPLIED=$(jq -c --arg surface "$1" '. + [$surface]' <<< "${NOT_APPLIED}")
+          }
+
+          # Qué aplica este run en el servidor:
+          #   converge (setup.yml) → postgres, keycloak, traefik
+          #   deploy.yml           → postgres y backend (conserva la identidad de keycloak
+          #                          que dejó el último converge; no la cambia)
+          APPLIES_STACK=false
+          if [ "${RUN_HOST_CONFIG}" = "true" ] || [ "${RUN_APP_DEPLOY}" = "true" ]; then
+            APPLIES_STACK=true
+          fi
+
+          # Imágenes propias: identidad seleccionada (build o rollback) o, si se construyó
+          # sin desplegarla, la imagen construida. El reuso se escanea en production antes de mutar.
+          own_surface() { # <surface> <source> <tag> <index> <ref> <built_tag> <built_index> <built_ref>
+            if [ "$2" != "reuse" ]; then
+              add_target "$1" "$2" "$3" "$4" "$5" true
+            elif [ -n "$8" ]; then
+              add_target "$1" "build (no desplegada en este run)" "$6" "$7" "$8" false
+            fi
+            if [ "$2" = "reuse" ] && [ "${APPLIES_STACK}" = "true" ]; then
+              add_pending "$1" "reuso: la identidad exacta del último éxito se lee en el servidor tras el gate y se escanea en production antes de mutar"
+            elif [ "${APPLIES_STACK}" != "true" ] && [ -z "$8" ]; then
+              add_not_applied "$1"
+            fi
+          }
+          own_surface backend "${BACKEND_SOURCE}" "${BACKEND_TAG}" "${BACKEND_INDEX_DIGEST}" "${BACKEND_IMAGE_REF}" \
+            "${BUILT_BACKEND_TAG}" "${BUILT_BACKEND_INDEX_DIGEST}" "${BUILT_BACKEND_IMAGE_REF}"
+          own_surface postgres "${POSTGRES_SOURCE}" "${POSTGRES_TAG}" "${POSTGRES_INDEX_DIGEST}" "${POSTGRES_IMAGE_REF}" \
+            "${BUILT_POSTGRES_TAG}" "${BUILT_POSTGRES_INDEX_DIGEST}" "${BUILT_POSTGRES_IMAGE_REF}"
+
+          # Keycloak: referencia fijada <tag>@sha256:<índice OCI> declarada en Compose. Solo
+          # converge la aplica. Se resuelve una vez, por digest, a su manifiesto linux/amd64:
+          # ese mismo manifiesto se escanea y converge lo despliega (escaneado = desplegado).
+          # Sin referencia fijada o sin identidad resoluble no hay qué desplegar: el job falla
+          # y producción no empieza (no es un fallo operativo del escáner).
+          KEYCLOAK_LABEL="" KEYCLOAK_INDEX_DIGEST="" KEYCLOAK_IMAGE_REF=""
+          if [ "${RUN_HOST_CONFIG}" = "true" ]; then
+            KEYCLOAK_LABEL=$(yq -r '.services.keycloak.image' infra/compose/keycloak.yml)
+            if ! [[ "${KEYCLOAK_LABEL}" =~ ^quay\.io/keycloak/keycloak:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}@sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error title=Identidad de Keycloak::infra/compose/keycloak.yml debe fijar quay.io/keycloak/keycloak:<tag>@sha256:<índice OCI> (tiene '${KEYCLOAK_LABEL}')"
+              exit 1
+            fi
+            if ! IDENTITY=$(.github/scripts/resolve-amd64-image.sh "${KEYCLOAK_LABEL}"); then
+              echo "::error title=Identidad de Keycloak::No se pudo resolver ${KEYCLOAK_LABEL} a un manifiesto linux/amd64 único; converge no despliega Keycloak sin identidad exacta"
+              exit 1
+            fi
+            KEYCLOAK_INDEX_DIGEST=$(sed -n 's/^image_index_digest=//p' <<< "${IDENTITY}")
+            KEYCLOAK_IMAGE_REF=$(sed -n 's/^image_ref=//p' <<< "${IDENTITY}")
+            [ "${KEYCLOAK_INDEX_DIGEST}" = "${KEYCLOAK_LABEL#*@}" ] || {
+              echo "::error title=Identidad de Keycloak::el índice resuelto (${KEYCLOAK_INDEX_DIGEST}) no es el declarado"
+              exit 1
+            }
+            add_target keycloak "compose (fijada)" "${KEYCLOAK_LABEL}" "${KEYCLOAK_INDEX_DIGEST}" "${KEYCLOAK_IMAGE_REF}" true
+          else
+            add_not_applied keycloak
+          fi
+          {
+            echo "keycloak_label=${KEYCLOAK_LABEL}"
+            echo "keycloak_index_digest=${KEYCLOAK_INDEX_DIGEST}"
+            echo "keycloak_image_ref=${KEYCLOAK_IMAGE_REF}"
+          } >> "$GITHUB_OUTPUT"
+
+          # Traefik: mismo contrato que Keycloak. Referencia fijada traefik:<tag>@sha256:<índice>
+          # en Compose, resuelta una vez a su manifiesto linux/amd64: ese manifiesto se escanea y
+          # converge lo despliega. Sin identidad exacta el job falla y producción no empieza.
+          TRAEFIK_LABEL="" TRAEFIK_INDEX_DIGEST="" TRAEFIK_IMAGE_REF=""
+          if [ "${RUN_HOST_CONFIG}" = "true" ]; then
+            TRAEFIK_LABEL=$(yq -r '.services.traefik.image' infra/compose/traefik.yml)
+            if ! [[ "${TRAEFIK_LABEL}" =~ ^traefik:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}@sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error title=Identidad de Traefik::infra/compose/traefik.yml debe fijar traefik:<tag>@sha256:<índice OCI> (tiene '${TRAEFIK_LABEL}')"
+              exit 1
+            fi
+            if ! IDENTITY=$(.github/scripts/resolve-amd64-image.sh "${TRAEFIK_LABEL}"); then
+              echo "::error title=Identidad de Traefik::No se pudo resolver ${TRAEFIK_LABEL} a un manifiesto linux/amd64 único; converge no despliega Traefik sin identidad exacta"
+              exit 1
+            fi
+            TRAEFIK_INDEX_DIGEST=$(sed -n 's/^image_index_digest=//p' <<< "${IDENTITY}")
+            TRAEFIK_IMAGE_REF=$(sed -n 's/^image_ref=//p' <<< "${IDENTITY}")
+            [ "${TRAEFIK_INDEX_DIGEST}" = "${TRAEFIK_LABEL#*@}" ] || {
+              echo "::error title=Identidad de Traefik::el índice resuelto (${TRAEFIK_INDEX_DIGEST}) no es el declarado"
+              exit 1
+            }
+            add_target traefik "compose (fijada)" "${TRAEFIK_LABEL}" "${TRAEFIK_INDEX_DIGEST}" "${TRAEFIK_IMAGE_REF}" true
+          else
+            add_not_applied traefik
+          fi
+          {
+            echo "traefik_label=${TRAEFIK_LABEL}"
+            echo "traefik_index_digest=${TRAEFIK_INDEX_DIGEST}"
+            echo "traefik_image_ref=${TRAEFIK_IMAGE_REF}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "targets=${TARGETS}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Identidades de imagen a escanear"
+            echo
+            if [ "$(jq 'length' <<< "${TARGETS}")" -gt 0 ]; then
+              echo "| imagen | origen | referencia | índice OCI | escaneada (linux/amd64) |"
+              echo "|---|---|---|---|---|"
+              jq -r '.[] | "| \(.surface) | \(.source) | `\(.label)` | `\(.image_index_digest)` | `\(.image_ref)` |"' <<< "${TARGETS}"
+            else
+              echo "Ninguna imagen con identidad conocida antes del gate."
+            fi
+            if [ "$(jq 'length' <<< "${PENDING}")" -gt 0 ]; then
+              echo
+              echo "**Aplicadas por este run, identidad conocida solo tras el gate:**"
+              echo
+              jq -r '.[] | "- \(.surface): \(.reason)"' <<< "${PENDING}"
+            fi
+            if [ "$(jq 'length' <<< "${NOT_APPLIED}")" -gt 0 ]; then
+              echo
+              echo "No aplicadas por este run: $(jq -r 'join(", ")' <<< "${NOT_APPLIED}")."
+            fi
+            echo
+            echo "> La política de vulnerabilidades evalúa estos escaneos antes del gate y otra vez,"
+            echo "> con los del reuso, justo antes de mutar. Backend, postgres, keycloak y traefik se"
+            echo "> despliegan por la misma identidad exacta escaneada y autorizada."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Reportar fallo operativo
+        if: failure()
+        run: |
+          echo "::error title=Identidades a escanear::El job no pudo reunir las identidades a escanear (error del workflow, no del escáner); producción no empieza sin saber qué se intentó escanear."
+          {
+            echo "## Identidades a escanear: ERROR"
+            echo
+            echo "No se pudo determinar qué escanear; producción no empieza."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  image_scan:
+    name: Escanear ${{ matrix.surface }}
+    runs-on: ubuntu-latest
+    needs: image_targets
+    if: |
+      !cancelled() &&
+      needs.image_targets.outputs.targets != '' &&
+      needs.image_targets.outputs.targets != '[]'
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.image_targets.outputs.targets) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Escanear
+        uses: ./.github/actions/trivy-scan
+        with:
+          surface: ${{ matrix.surface }}
+          source: ${{ matrix.source }}
+          label: ${{ matrix.label }}
+          image_index_digest: ${{ matrix.image_index_digest }}
+          image_ref: ${{ matrix.image_ref }}
+          phase: selected
+
+  # ── Política de vulnerabilidades antes del gate (preliminar) ────────────────
+  # Evalúa los escaneos de las identidades conocidas antes del gate que este run aplica.
+  # Un bloqueo aquí evita pedir la aprobación del environment y no llega al Apply. Solo
+  # GITHUB_TOKEN de lectura: verifica en GitHub la procedencia de disposiciones y de un
+  # break-glass (PR y revisiones, artifacts históricos). La decisión que habilita la
+  # mutación es la autoritativa dentro de production (vence o cambia con el tiempo).
+  image_policy:
+    name: Política de vulnerabilidades (preliminar)
+    runs-on: ubuntu-latest
+    needs: [classify, image_targets, image_scan]
+    if: |
+      !cancelled() &&
+      needs.classify.outputs.deploy_required == 'true' &&
+      needs.image_targets.result == 'success' &&
+      (needs.image_scan.result == 'success' ||
+        (needs.image_scan.result == 'skipped' && needs.image_targets.outputs.targets == '[]'))
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      decision: ${{ steps.policy.outputs.decision }}
+      # Huella de vars.VULNERABILITY_RISK_APPROVERS vista sin environment: production la exige igual
+      approvers_fingerprint: ${{ steps.policy.outputs.approvers_fingerprint }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Historia completa: la procedencia de una disposición se busca en main
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Origen (este run) y digest registrado por GitHub verificados; un fallo bloquea
+      - name: Descargar y verificar evidencia de escaneos
+        if: needs.image_targets.outputs.targets != '[]'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/current-scan-evidence.sh "${RUNNER_TEMP}/scan-evidence"
+
+      - name: Evaluar política
+        id: policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGETS: ${{ needs.image_targets.outputs.targets }}
+          EVIDENCE_DIR: ${{ runner.temp }}/scan-evidence
+          POLICY_PHASE: preliminar
+          RESULT_FILE: ${{ runner.temp }}/policy-result.json
+          RISK_APPROVERS: ${{ vars.VULNERABILITY_RISK_APPROVERS }}
+          BREAK_GLASS_ID: ${{ needs.classify.outputs.break_glass_authorization }}
+          BREAK_GLASS_JUSTIFICATION: ${{ inputs.break_glass_justification }}
+          EVENT_NAME: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          OP_RUN_TERRAFORM_APPLY: ${{ needs.classify.outputs.terraform_required }}
+          OP_RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
+          OP_RUN_APP_DEPLOY: ${{ needs.classify.outputs.run_app_deploy }}
+          OP_RUN_BUILD: ${{ needs.classify.outputs.run_build }}
+          OP_RUN_BUILD_POSTGRES: ${{ needs.classify.outputs.run_build_postgres }}
+          OP_IMAGE_TAG: ${{ needs.classify.outputs.image_tag }}
+          OP_KEYCLOAK_RECOVERY: ${{ needs.classify.outputs.keycloak_recovery }}
+        run: |
+          set -euo pipefail
+          # Solo lo que este run aplica; cada una con el directorio de su artifact
+          POLICY_INPUT=$(jq -c --arg d "${EVIDENCE_DIR}" --arg run "${GITHUB_RUN_ID}" \
+            '[.[] | select(.applied == true)
+              | {surface, image_ref, dir: "\($d)/image-scan-selected-\(.surface)-\($run)"}]' <<< "${TARGETS}")
+          export POLICY_INPUT
+          set +e
+          .github/scripts/vuln-policy.sh > "${RUNNER_TEMP}/policy.env"
+          RC=$?
+          set -e
+          cat "${RUNNER_TEMP}/policy.env" >> "$GITHUB_OUTPUT"
+          if [ "${RC}" -ne 0 ]; then
+            echo "::error title=Política de vulnerabilidades: BLOQUEO::$(jq -r '[.global_errors[]?, (.surfaces[]? | select(.verdict == "blocked") | "\(.surface): \(.reason_code)")] | join("; ")' "${RESULT_FILE}" 2>/dev/null || echo "entrada inválida")"
+            exit "${RC}"
+          fi
+
+  # ── Plan de Terraform (primera aprobación) ─────────────────────────────────
+  # Solo cuando el run aplica Terraform. Mismo environment que production: su aprobación
+  # autoriza usar las credenciales de HCP para planificar este commit, nada más. Mismas
+  # condiciones previas que production (imágenes y frontend), así un run ya bloqueado no
+  # pide aprobación.
+  #
+  #   workspace verificado (sin auto-apply, con permiso de encolar y confirmar) → libre →
+  #   state version previo (o `none`) → frescura → configuración PROVISIONAL subida →
+  #   saved plan (save-plan, auto-apply=false) → plan terminado, ligado al estado previo y a
+  #   esa configuración → revisión saneada en el resumen → frescura
+  #
+  # Un saved plan nunca se aplica solo y no ocupa la cola del workspace: HCP lo descarta si
+  # el estado cambia antes de confirmarlo. La configuración provisional no pasa a ser la
+  # actual del workspace salvo que su run se aplique. Sin cambios, el run termina en
+  # planned_and_finished (nada que aplicar ni que descartar). Si este job falla o se
+  # cancela después de crear el run, hcp_cleanup lo descarta o cancela; un run confirmado
+  # fuera de GitHub no se toca y el job falla (production no corre).
+  #
+  # Etapa: si el plan no corresponde a la etapa (stage_gate), el job falla antes de pedir la
+  # segunda aprobación y el saved plan se descarta. Run I exige un plan sin cambios; un push o
+  # dispatch ordinario no puede crear, reemplazar ni destruir el servidor; Run P solo crea o
+  # reemplaza con los push retenidos.
+  #
+  # Salidas: identidad exacta del plan (run, plan, configuración, state version de entrada,
+  # mensaje del run) y has_changes (true|false; cualquier otro valor deja production sin
+  # correr y conclude en fallo).
+  terraform_plan:
+    name: Plan de Terraform
+    runs-on: ubuntu-latest
+    needs: [classify, select_images, image_targets, image_scan, image_policy, frontend_build]
+    if: |
+      !cancelled() &&
+      needs.classify.result == 'success' &&
+      needs.select_images.result == 'success' &&
+      needs.classify.outputs.terraform_required == 'true' &&
+      (needs.classify.outputs.frontend_required != 'true' || needs.frontend_build.result == 'success') &&
+      (needs.classify.outputs.deploy_required != 'true' ||
+        (needs.image_targets.result == 'success' &&
+          needs.image_policy.result == 'success' &&
+          (needs.image_scan.result == 'success' ||
+            (needs.image_scan.result == 'skipped' && needs.image_targets.outputs.targets == '[]'))))
+    timeout-minutes: 45
+    environment: production-hetzner
+    concurrency:
+      group: piedrazul-production-hetzner
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+    outputs:
+      run_id: ${{ steps.hcp_run.outputs.run_id }}
+      run_link: ${{ steps.hcp_run.outputs.run_link }}
+      run_message: ${{ steps.hcp_run.outputs.run_message }}
+      configuration_version_id: ${{ steps.hcp_plan.outputs.configuration_version_id }}
+      plan_id: ${{ steps.hcp_plan.outputs.plan_id }}
+      state_before: ${{ steps.hcp_before.outputs.state_version_id }}
+      plan_state_version: ${{ steps.hcp_plan.outputs.plan_state_version }}
+      has_changes: ${{ steps.hcp_plan.outputs.has_changes }}
+      counts: ${{ steps.hcp_plan.outputs.additions }}/${{ steps.hcp_plan.outputs.changes }}/${{ steps.hcp_plan.outputs.destructions }}/${{ steps.hcp_plan.outputs.imports }}
+      watch_pages_project: ${{ steps.hcp_plan.outputs.watch_pages_project }}
+      watch_pages_domain: ${{ steps.hcp_plan.outputs.watch_pages_domain }}
+      watch_server: ${{ steps.hcp_plan.outputs.watch_server }}
+    env:
+      TF_CLOUD_ORGANIZATION: Piedrazul
+      TF_WORKSPACE: piedrazul-hetzner
+      HCP_WORKSPACE_ID: ${{ vars.TF_WORKSPACE_HETZNER_ID }}
+      # Identifica el run de HCP de ESTE intento: production y la limpieza solo tocan ese run
+      HCP_RUN_MESSAGE: "Producción ${{ github.sha }} — run ${{ github.run_id }}/${{ github.run_attempt }}"
+      PRODUCTION_STAGE: ${{ needs.classify.outputs.stage }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Verificar credenciales de HCP Terraform
+        id: credentials
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          MISSING=()
+          [ -n "${TF_API_TOKEN:-}" ] || MISSING+=("TF_API_TOKEN")
+          [[ "${HCP_WORKSPACE_ID}" =~ ^ws-[A-Za-z0-9]+$ ]] || MISSING+=("vars.TF_WORKSPACE_HETZNER_ID")
+          if [ "${#MISSING[@]}" -gt 0 ]; then
+            echo "::error title=Plan de Terraform::Faltan credenciales o variables: ${MISSING[*]}"
+            exit 1
+          fi
+          echo "Credenciales de HCP presentes"
+
+      # Workspace verificado (identidad, permisos, ejecución remota, sin auto-apply) antes de
+      # leer su estado. Un workspace sin estado es `none` solo si HCP lo confirma por dos
+      # lecturas; un error nunca se lee como instalación limpia.
+      - name: Verificar workspace de HCP Terraform
+        id: hcp_workspace
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          .github/scripts/hcp-state.sh workspace apply > "${RUNNER_TEMP}/hcp-workspace.env"
+          cat "${RUNNER_TEMP}/hcp-workspace.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/hcp-workspace.env"
+
+      - name: Esperar a que HCP Terraform esté libre
+        id: hcp_idle
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: .github/scripts/hcp-state.sh wait-idle
+
+      - name: Capturar state version previo
+        id: hcp_before
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          SV=$(.github/scripts/hcp-state.sh current)
+          echo "state_version_id=${SV}" >> "$GITHUB_OUTPUT"
+          if [ "${SV}" = none ]; then
+            echo "El workspace no tiene state version (instalación nueva, confirmado por HCP)"
+          else
+            echo "State version previo: ${SV}"
+          fi
+
+      - name: Verificar frescura antes del plan
+        id: fresh_plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/verify-main-tip.sh
+
+      # Configuración PROVISIONAL (sin auto-queue-runs): no pasa a ser la actual del workspace
+      # salvo que su run se aplique. Sin provisional confirmado por HCP, falla: nunca se sube
+      # una configuración no provisional
+      - name: Subir configuración provisional a HCP Terraform
+        id: hcp_upload
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          .github/scripts/hcp-state.sh upload infra/terraform > "${RUNNER_TEMP}/hcp-upload.env"
+          cat "${RUNNER_TEMP}/hcp-upload.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/hcp-upload.env"
+
+      # Saved plan con auto-apply=false explícito; HCP_RUN_MESSAGE lo identifica como propio
+      - name: Crear saved plan de Terraform
+        id: hcp_run
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          RUN_MESSAGE: ${{ env.HCP_RUN_MESSAGE }}
+          CONFIGURATION_VERSION: ${{ steps.hcp_upload.outputs.configuration_version_id }}
+        run: |
+          set -euo pipefail
+          .github/scripts/hcp-state.sh create-run "${CONFIGURATION_VERSION}" > "${RUNNER_TEMP}/hcp-run.env"
+          echo "run_message=${RUN_MESSAGE}" >> "${RUNNER_TEMP}/hcp-run.env"
+          cat "${RUNNER_TEMP}/hcp-run.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/hcp-run.env"
+
+      # Plan terminado, ligado al estado previo (EXPECTED_STATE: el de entrada si HCP lo informa
+      # y el actual después del plan; ver hcp-state.sh plan) y a la configuración subida, con su revisión
+      # saneada en el resumen (el repositorio es público: solo rutas y valores clasificados,
+      # ver plan-review.sh). La frescura se vuelve a comprobar: un commit viejo no sigue y su
+      # saved plan se descarta.
+      - name: Revisar plan de Terraform
+        id: hcp_plan
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          RUN_MESSAGE: ${{ env.HCP_RUN_MESSAGE }}
+          GH_TOKEN: ${{ github.token }}
+          FRESHNESS_CMD: .github/scripts/verify-main-tip.sh
+          RUN_ID: ${{ steps.hcp_run.outputs.run_id }}
+          RUN_LINK: ${{ steps.hcp_run.outputs.run_link }}
+          CONFIGURATION_VERSION: ${{ steps.hcp_upload.outputs.configuration_version_id }}
+          ARCHIVE_SHA256: ${{ steps.hcp_upload.outputs.archive_sha256 }}
+          STATE_BEFORE: ${{ steps.hcp_before.outputs.state_version_id }}
+          EXPECTED_STATE: ${{ steps.hcp_before.outputs.state_version_id }}
+          PLAN_WATCH: >-
+            pages_project=module.pages.cloudflare_pages_project.main
+            pages_domain=module.pages.cloudflare_pages_domain.main
+            server=module.server.hcloud_server.main
+        run: |
+          set -euo pipefail
+          export PLAN_REVIEW_FILE="${RUNNER_TEMP}/plan-review.md"
+          .github/scripts/hcp-state.sh plan "${RUN_ID}" > "${RUNNER_TEMP}/hcp-plan.env"
+          get() { sed -n "s/^$1=//p" "${RUNNER_TEMP}/hcp-plan.env"; }
+          # El plan debe partir del estado capturado y de la configuración subida por este job
+          if [ "$(get plan_state_version)" != "${STATE_BEFORE}" ]; then
+            echo "::error title=Terraform::El plan del run ${RUN_ID} quedó ligado al estado $(get plan_state_version), no al capturado (${STATE_BEFORE}): no se revisa ni se aplica"
+            exit 1
+          fi
+          case "$(get state_binding)" in
+            relationship | bracketed) ;;
+            *) echo "::error title=Terraform::Ligadura del plan al estado inválida: state_binding='$(get state_binding)'"; exit 1 ;;
+          esac
+          if [ "$(get configuration_version_id)" != "${CONFIGURATION_VERSION}" ]; then
+            echo "::error title=Terraform::El run ${RUN_ID} usa la configuración $(get configuration_version_id), no la subida por este job (${CONFIGURATION_VERSION})"
+            exit 1
+          fi
+          case "$(get has_changes)" in
+            true | false) ;;
+            *) echo "::error title=Terraform::Resultado del plan inválido: has_changes='$(get has_changes)'"; exit 1 ;;
+          esac
+          cat "${RUNNER_TEMP}/hcp-plan.env" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Plan de Terraform"
+            echo
+            if [ "$(get has_changes)" = true ] && [ "${PRODUCTION_STAGE:-}" = provision ]; then
+              echo "**Con cambios (Run P).** Revisar los efectos de abajo; aprobar el environment \`production-hetzner\` del job *Producción* de este run aplica **exactamente** este saved plan y termina sin tocar el servidor. Si algo no corresponde, rechazar: el plan se descarta sin Apply."
+            elif [ "$(get has_changes)" = true ] && [ "${PRODUCTION_STAGE:-}" = install ]; then
+              echo "**Con cambios: Run I no aplica.** El run falla aquí y el saved plan se descarta."
+            elif [ "$(get has_changes)" = true ]; then
+              echo "**Con cambios.** Revisar los efectos de abajo; aprobar el environment \`production-hetzner\` del job *Producción* de este run aplica **exactamente** este saved plan (y sigue con el deploy). Si algo no corresponde, rechazar: el plan se descarta sin Apply."
+            else
+              echo "**Sin cambios:** nada que aplicar. *Producción* solo corre si este run también despliega o publica el frontend."
+            fi
+            echo
+            echo "| identidad | valor |"
+            echo "|---|---|"
+            echo "| workspace | \`${TF_CLOUD_ORGANIZATION}/${TF_WORKSPACE}\` (\`${HCP_WORKSPACE_ID}\`) |"
+            echo "| commit | \`${GITHUB_SHA}\` |"
+            echo "| run / plan | [\`${RUN_ID}\`](${RUN_LINK}) / \`$(get plan_id)\` ($(get run_status)) |"
+            echo "| configuración (provisional) | \`${CONFIGURATION_VERSION}\` — sha256 del archivo subido \`${ARCHIVE_SHA256}\` |"
+            echo "| state version del plan | \`$(get plan_state_version)\` ($(get state_binding)) |"
+            echo "| crear / cambiar / destruir / importar (HCP) | $(get additions) / $(get changes) / $(get destructions) / $(get imports) |"
+            echo "| intento | run ${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT} |"
+            echo
+            echo "### Efectos"
+            echo
+            cat "${PLAN_REVIEW_FILE}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$(get has_changes)" = true ]; then
+            echo "::notice title=Terraform::Plan listo para revisión: run ${RUN_ID}, plan $(get plan_id), commit ${GITHUB_SHA}. Revisar el resumen de este run y aprobar el job Producción para aplicarlo"
+            if [ "$(get review_deletes)" != 0 ] || [ "$(get review_replaces)" != 0 ]; then
+              echo "::warning title=Terraform::Plan destructivo: $(get review_deletes) destrucción(es) y $(get review_replaces) reemplazo(s). Revisar cada uno antes de aprobar"
+            fi
+          fi
+
+      # La etapa admite este plan con la acción observada sobre el servidor. Si no, la limpieza
+      # de abajo descarta el saved plan antes de la segunda aprobación.
+      - name: Verificar que la etapa admite el plan
+        id: stage_gate
+        env:
+          HAS_CHANGES: ${{ steps.hcp_plan.outputs.has_changes }}
+          WATCH_SERVER: ${{ steps.hcp_plan.outputs.watch_server }}
+          PUSH_MODE: ${{ needs.classify.outputs.push_mode }}
+        run: .github/scripts/production-stage.sh plan-gate "${PRODUCTION_STAGE}" "${HAS_CHANGES}" "${WATCH_SERVER}" "${PUSH_MODE}"
+
+      # Si este job falla o se cancela después de intentar crear el run, el run propio se
+      # descarta (o se cancela si sigue planificando); uno confirmado no se toca. Si la
+      # creación se cortó antes de registrar el id, se busca por el mensaje. Con éxito no
+      # corre: el saved plan queda para production.
+      - name: Liberar el run de Terraform de este intento
+        id: hcp_cleanup
+        if: |
+          always() && (failure() || cancelled()) &&
+          (steps.hcp_run.outcome == 'success' || steps.hcp_run.outcome == 'failure' || steps.hcp_run.outcome == 'cancelled')
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          RUN_MESSAGE: ${{ env.HCP_RUN_MESSAGE }}
+          RUN_ID: ${{ steps.hcp_run.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          .github/scripts/hcp-state.sh cleanup ${RUN_ID:+"${RUN_ID}"} > "${RUNNER_TEMP}/hcp-cleanup.env"
+          cat "${RUNNER_TEMP}/hcp-cleanup.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/hcp-cleanup.env"
+          {
+            echo
+            case "$(sed -n 's/^cleanup=//p' "${RUNNER_TEMP}/hcp-cleanup.env")" in
+              discarded) echo "**Run de este intento descartado** (no hubo Apply)." ;;
+              canceled) echo "**Run de este intento cancelado** durante el plan (no hubo Apply)." ;;
+              *apply_accepted*) echo "**El run de este intento ya había sido confirmado en HCP** (Apply aceptado fuera de GitHub; no se deshace). La cadena no sigue." ;;
+              *) echo "Run de este intento: sin acción de limpieza." ;;
+            esac
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Autoridad de producción ────────────────────────────────────────────────
+  # Única aprobación sin Terraform; con Terraform, la segunda, pedida cuando el plan
+  # definitivo ya está en el resumen de terraform_plan. Cubre toda la cadena:
+  #
+  #   [escaneo de identidades conocidas: image_scan + image_policy] → [sondeo de Pages] →
+  #   workspace verificado → state version previo (o `none`) → [con cambios: evidencia del
+  #   plan sobre Pages → contraseña inicial de Keycloak si el plan crea o reemplaza el
+  #   servidor → frescura → revalidación y confirmación del saved plan revisado
+  #   (una sola solicitud)] → resultado del Apply y state version exacto (o, sin cambios,
+  #   el estado sin cambios) → outputs → preflight estricto de Pages → [Run P termina aquí] →
+  #   identidad del host (pin ↔ estado ↔ clave ofrecida, antes de usar la clave SSH) → SSH
+  #   estricto → cloud-init
+  #   terminado (si converge) → sshd efectivo (si converge) → último éxito del servidor →
+  #   identidades exactas → evidencia de escaneo + escaneo del reuso → política de
+  #   vulnerabilidades (autoritativa) [→ registro de break-glass] → [frescura si no hubo Apply] →
+  #   converge (postgres + reconciliación de autoridades de la base → Keycloak/Traefik) /
+  #   deploy (postgres + reconciliación → migración del backend construido → backend) →
+  #   identidad en ejecución → health (contenedores + públicos) → registro del último éxito
+  #   → [frescura si nada mutó antes] → publicación del frontend en Pages → verificación
+  #
+  # Terraform: solo se confirma el saved plan de terraform_plan de este run (mensaje, run,
+  # plan, configuración y state version de entrada), y solo si en ese momento siguen
+  # vigentes: workspace sin auto-apply, el estado actual es el del plan, el plan tiene
+  # como mucho una hora, ningún otro run ocupa el workspace y main no avanzó. Una única
+  # solicitud de Apply; una respuesta incierta se reconcilia leyendo el run, nunca
+  # repitiéndola. Aceptar la solicitud no es aplicar: el resultado lo da hcp_state. Si el
+  # run aparece confirmado fuera de GitHub, se observa sin cancelarlo y la cadena falla
+  # antes del servidor y de Pages. Si production falla o se cancela antes de confirmar, el
+  # saved plan se descarta (hcp_cleanup); un Apply que HCP ya aceptó no se deshace y se
+  # informa como tal. Si production nunca corre (aprobación rechazada o vencida), el saved
+  # plan queda sin confirmar: no ocupa el workspace y HCP lo descarta si el estado cambia.
+  #
+  # Pages (subida directa, sin Git): el artefacto de frontend_build se descarga y verifica,
+  # wrangler se instala desde un lockfile fijado y el proyecto se sondea ANTES de la primera
+  # mutación: si existe se exige estricto (declarado, sin integración Git, dominio
+  # asociado); si no existe solo se admite cuando este run aplica Terraform y el plan lo
+  # crea. Después de Terraform y antes de mutar el servidor, el preflight estricto exige el
+  # proyecto real; así una credencial, un proyecto ajeno o una segunda autoridad no dejan un
+  # backend nuevo con el frontend sin publicar. La publicación va al final: Cloudflare y
+  # Hetzner no son atómicos entre sí, y un fallo de Pages deja el backend ya registrado en
+  # el servidor (last-success.env) pero el run en failure, así que el rango no avanza y el
+  # siguiente run (o el re-run) vuelve a publicar.
+  #
+  # Frescura: solo la punta actual de main inicia una mutación, verificado justo antes
+  # de la primera. Iniciada la cadena, termina aunque main avance. Un re-run de un commit
+  # que ya no es la punta falla en la frescura sin mutar nada.
+  # Etapas: DEPLOY_REQUIRED, RUN_HOST_CONFIG y RUN_APP_DEPLOY son lo que ESTE run hace, así
+  # que en Run P todo lo que toca el servidor queda sin correr desde un solo lugar. Credenciales
+  # y contraseña de Keycloak leen la intención de classify: Run P exige, antes del Apply, lo
+  # mismo que una instalación completa. Lo que vence (política, escaneo, frescura, Pages) se
+  # evalúa de nuevo en Run I; nada de Run P se hereda.
+  #
+  # La concurrencia serializa producción y, con queue: max, conserva los jobs pendientes
+  # en vez de reemplazarlos. El orden de la cola no define la corrección: la frescura
+  # deja mutar solo a la punta de main y el rango acumulado cubre lo pendiente.
+  production:
+    name: Producción
+    runs-on: ubuntu-latest
+    needs: [classify, select_images, image_targets, image_scan, image_policy, frontend_build, terraform_plan]
+    # Con frontend, espera a que frontend_build haya construido y validado el artefacto.
+    # Con deploy, espera a que el escaneo de las identidades conocidas antes del gate haya
+    # terminado en success (todos los intentos completados con evidencia; fallido o
+    # cancelado = cadena no verificable; sin objetivos, image_scan se salta y la lista debe
+    # estar vacía) y a que la política preliminar no haya bloqueado.
+    # Terraform: sin Terraform, terraform_plan debe estar saltado (nunca "sin plan" por un
+    # fallo); con Terraform, debe haber terminado en success con has_changes exactamente
+    # true (aplicar) o false (solo si además hay deploy o frontend). Cualquier otro
+    # resultado (failure, cancelled, salida vacía o inválida) deja production sin correr y
+    # conclude en fallo.
+    if: |
+      !cancelled() &&
+      needs.classify.result == 'success' &&
+      needs.select_images.result == 'success' &&
+      (needs.classify.outputs.frontend_required != 'true' || needs.frontend_build.result == 'success') &&
+      (needs.classify.outputs.deploy_required != 'true' ||
+        (needs.image_targets.result == 'success' &&
+          needs.image_policy.result == 'success' &&
+          (needs.image_scan.result == 'success' ||
+            (needs.image_scan.result == 'skipped' && needs.image_targets.outputs.targets == '[]')))) &&
+      ((needs.classify.outputs.terraform_required != 'true' &&
+          needs.terraform_plan.result == 'skipped' &&
+          (needs.classify.outputs.deploy_required == 'true' || needs.classify.outputs.frontend_required == 'true')) ||
+        (needs.classify.outputs.terraform_required == 'true' &&
+          needs.terraform_plan.result == 'success' &&
+          (needs.terraform_plan.outputs.has_changes == 'true' ||
+            (needs.terraform_plan.outputs.has_changes == 'false' &&
+              (needs.classify.outputs.deploy_required == 'true' || needs.classify.outputs.frontend_required == 'true'))))) &&
+      (needs.classify.outputs.stage != 'install' || needs.terraform_plan.outputs.has_changes == 'false')
+    # Incluye el Apply (hasta 15 min de seguimiento) y el deploy completo
+    timeout-minutes: 120
+    environment: production-hetzner
+    concurrency:
+      group: piedrazul-production-hetzner
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      # Política: procedencia de disposiciones (PR y revisiones) y de evidencia histórica
+      actions: read
+      pull-requests: read
+      # Solo break-glass: consumo de la autorización (commit status, no editable ni borrable)
+      # e issue de auditoría security-break-glass, ambos antes de mutar
+      statuses: write
+      issues: write
+    env:
+      ANSIBLE_CONFIG: infra/ansible/ansible.cfg
+      ANSIBLE_HOST_KEY_CHECKING: "True"
+      ANSIBLE_HOST: vps
+      PRODUCTION_STAGE: ${{ needs.classify.outputs.stage }}
+      TF_CLOUD_ORGANIZATION: Piedrazul
+      TF_WORKSPACE: piedrazul-hetzner
+      HCP_WORKSPACE_ID: ${{ vars.TF_WORKSPACE_HETZNER_ID }}
+      # Saved plan revisado en terraform_plan de este run: el Apply, el estado y la limpieza
+      # solo tocan ese run (mismo mensaje, aunque production se vuelva a correr sola)
+      HCP_RUN_ID: ${{ needs.terraform_plan.outputs.run_id }}
+      HCP_RUN_MESSAGE: ${{ needs.terraform_plan.outputs.run_message }}
+      HCP_STATE_BEFORE_PLAN: ${{ needs.terraform_plan.outputs.state_before }}
+      KC_REALM: piedrazul
+      # Este run pasa por Terraform (plan en terraform_plan) / aplica su saved plan
+      TERRAFORM_REQUIRED: ${{ needs.classify.outputs.terraform_required }}
+      TF_APPLY_REQUIRED: ${{ needs.classify.outputs.stage != 'install' && needs.classify.outputs.terraform_required == 'true' && needs.terraform_plan.outputs.has_changes == 'true' }}
+      # Lo que este run hace en el servidor; Run P no hace nada de esto
+      DEPLOY_REQUIRED: ${{ needs.classify.outputs.stage != 'provision' && needs.classify.outputs.deploy_required == 'true' }}
+      RUN_HOST_CONFIG: ${{ needs.classify.outputs.stage != 'provision' && needs.classify.outputs.run_host_config == 'true' }}
+      RUN_APP_DEPLOY: ${{ needs.classify.outputs.stage != 'provision' && needs.classify.outputs.run_app_deploy == 'true' }}
+      KEYCLOAK_RECOVERY: ${{ needs.classify.outputs.keycloak_recovery }}
+      # Preparar y verificar Pages (también en Run P) / publicar (nunca en Run P)
+      FRONTEND_REQUIRED: ${{ needs.classify.outputs.frontend_required }}
+      FRONTEND_PUBLISH: ${{ needs.classify.outputs.stage != 'provision' && needs.classify.outputs.frontend_required == 'true' }}
+      # Identidad exacta de Keycloak que image_targets resolvió y escaneó (vacía sin converge)
+      KEYCLOAK_LABEL: ${{ needs.image_targets.outputs.keycloak_label }}
+      KEYCLOAK_INDEX_DIGEST: ${{ needs.image_targets.outputs.keycloak_index_digest }}
+      KEYCLOAK_IMAGE_REF: ${{ needs.image_targets.outputs.keycloak_image_ref }}
+      # Identidad exacta de Traefik que image_targets resolvió y escaneó (vacía sin converge)
+      TRAEFIK_LABEL: ${{ needs.image_targets.outputs.traefik_label }}
+      TRAEFIK_INDEX_DIGEST: ${{ needs.image_targets.outputs.traefik_index_digest }}
+      TRAEFIK_IMAGE_REF: ${{ needs.image_targets.outputs.traefik_image_ref }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Historia completa: la procedencia de una disposición se busca en main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verificar credenciales de producción
+        id: credentials
+        env:
+          # La intención, no lo que hace este run: Run P exige lo que la instalación necesitará
+          DEPLOY_REQUIRED: ${{ needs.classify.outputs.deploy_required }}
+          RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          ANSIBLE_SSH_KEY: ${{ secrets.ANSIBLE_SSH_KEY }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+          MIGRATION_DB_PASSWORD: ${{ secrets.MIGRATION_DB_PASSWORD }}
+          KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
+          CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
+          KC_BACKEND_CLIENT_SECRET: ${{ secrets.KC_BACKEND_CLIENT_SECRET }}
+          KC_AUTOMATION_CLIENT_SECRET: ${{ secrets.KC_AUTOMATION_CLIENT_SECRET }}
+          # Token dedicado de Pages (Cloudflare Pages: Edit en la cuenta); nunca el de DNS
+          CLOUDFLARE_PAGES_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          # Bootstrap del primer administrador de negocio: el secreto solo se lee si está
+          # habilitado (docs/operations/runbooks/primer-admin-negocio.md)
+          IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
+          IDENTITY_SEED_ADMIN_USERNAME: ${{ vars.IDENTITY_SEED_ADMIN_USERNAME }}
+          IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE: ${{ vars.IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE }}
+          IDENTITY_SEED_ADMIN_FIRST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_FIRST_NAME }}
+          IDENTITY_SEED_ADMIN_LAST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_LAST_NAME }}
+          IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
+          IDENTITY_SEED_ADMIN_PHONE: ${{ vars.IDENTITY_SEED_ADMIN_PHONE }}
+          IDENTITY_SEED_ADMIN_PASSWORD: ${{ vars.IDENTITY_SEED_ENABLED == 'true' && secrets.IDENTITY_SEED_ADMIN_PASSWORD || '' }}
+        run: |
+          set -euo pipefail
+          MISSING=()
+          need() { for NAME in "$@"; do [ -n "${!NAME:-}" ] || MISSING+=("${NAME}"); done; }
+
+          # HCP solo hace falta si el run aplica o despliega; publicar solo el frontend no lo lee
+          if [ "${TERRAFORM_REQUIRED:-}" = "true" ] || [ "${DEPLOY_REQUIRED}" = "true" ]; then
+            need TF_API_TOKEN
+            [[ "${HCP_WORKSPACE_ID}" =~ ^ws-[A-Za-z0-9]+$ ]] || MISSING+=("vars.TF_WORKSPACE_HETZNER_ID")
+          fi
+          if [ "${FRONTEND_REQUIRED:-}" = "true" ]; then
+            need CLOUDFLARE_PAGES_API_TOKEN
+            if [ -n "${CLOUDFLARE_PAGES_API_TOKEN:-}" ] && [ "${CLOUDFLARE_PAGES_API_TOKEN}" = "${CLOUDFLARE_DNS_API_TOKEN:-}" ]; then
+              echo "::error title=Autoridad de producción::CLOUDFLARE_PAGES_API_TOKEN no puede ser el token de DNS: Pages usa un token propio de alcance mínimo"
+              exit 1
+            fi
+          fi
+          if [ "${DEPLOY_REQUIRED}" = "true" ]; then
+            need ANSIBLE_SSH_KEY
+          fi
+          # Solo el converge entrega credenciales de la base, de Keycloak y de Cloudflare (las
+          # escribe en .env o las usa en tránsito). Un deploy sin configuración del servidor no
+          # las recibe: usa el .env del host y deploy.yml falla antes de mutar si le faltan.
+          if [ "${RUN_HOST_CONFIG}" = "true" ]; then
+            need POSTGRES_PASSWORD APP_DB_PASSWORD MIGRATION_DB_PASSWORD KC_DB_PASSWORD \
+              CLOUDFLARE_DNS_API_TOKEN KC_BACKEND_CLIENT_SECRET KC_AUTOMATION_CLIENT_SECRET
+          fi
+          # Solo el converge escribe el .env que entrega el bootstrap al backend
+          SEED_ENABLED="${IDENTITY_SEED_ENABLED:-}"
+          case "${SEED_ENABLED,,}" in
+            "" | false) ;;
+            true)
+              if [ "${RUN_HOST_CONFIG}" = "true" ]; then
+                need IDENTITY_SEED_ADMIN_USERNAME IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE \
+                  IDENTITY_SEED_ADMIN_FIRST_NAME IDENTITY_SEED_ADMIN_LAST_NAME \
+                  IDENTITY_SEED_ADMIN_EMAIL IDENTITY_SEED_ADMIN_PHONE IDENTITY_SEED_ADMIN_PASSWORD
+              else
+                echo "::warning title=Bootstrap del primer administrador::IDENTITY_SEED_ENABLED=true sin configuración del servidor: el .env del host no cambia en este run"
+              fi
+              ;;
+            *) MISSING+=("vars.IDENTITY_SEED_ENABLED (true|false)") ;;
+          esac
+
+          if [ "${#MISSING[@]}" -gt 0 ]; then
+            echo "::error title=Autoridad de producción::Faltan credenciales o variables: ${MISSING[*]}"
+            exit 1
+          fi
+          echo "Credenciales requeridas presentes"
+
+      # Sin red y antes de cualquier mutación: un run que va a tocar el servidor no aplica nada
+      # si ni siquiera tiene un pin utilizable. Run P no lo lee: su servidor aún no tiene pin.
+      - name: Verificar la forma del pin del host (sin red)
+        id: pin_preflight
+        if: env.DEPLOY_REQUIRED == 'true'
+        env:
+          EXPECTED_HOST_PIN: ${{ vars.PRODUCTION_SSH_HOST_PIN }}
+          PIN_OUTSIDE_ENVIRONMENT: ${{ needs.classify.outputs.pin_outside_environment }}
+        run: .github/scripts/host-trust.sh check-pin
+
+      # ── Frontend: preparación antes de la primera mutación ──
+      # Lo que la publicación necesita y no depende de Terraform se obtiene y verifica aquí,
+      # sin mutar nada: destino declarado, artefacto validado de este run y wrangler fijado.
+      - name: Destino de Pages declarado
+        id: pages_target
+        if: env.FRONTEND_REQUIRED == 'true'
+        run: |
+          set -euo pipefail
+          .github/scripts/pages-release.sh target > "${RUNNER_TEMP}/pages-target.env"
+          cat "${RUNNER_TEMP}/pages-target.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/pages-target.env"
+
+      - name: Descargar y verificar el artefacto del frontend
+        id: pages_artifact
+        if: env.FRONTEND_REQUIRED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_ARTIFACT_ID: ${{ needs.frontend_build.outputs.artifact_id }}
+          EXPECTED_ARTIFACT_NAME: ${{ needs.frontend_build.outputs.artifact_name }}
+          EXPECTED_DIST_SHA256: ${{ needs.frontend_build.outputs.dist_sha256 }}
+        run: |
+          set -euo pipefail
+          rm -rf "${RUNNER_TEMP}/frontend"
+          .github/scripts/frontend-artifact.sh fetch "${RUNNER_TEMP}/frontend" > "${RUNNER_TEMP}/frontend.env"
+          cat "${RUNNER_TEMP}/frontend.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/frontend.env"
+
+      - name: Configurar Node para wrangler
+        id: pages_node
+        if: env.FRONTEND_REQUIRED == 'true'
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: frontend/.node-version
+          package-manager-cache: false
+
+      # Versión y dependencias fijadas por lockfile (integridad de npm); sin scripts de
+      # instalación: nada corre al instalar en el job que tiene credenciales
+      - name: Instalar wrangler fijado
+        id: pages_tooling
+        if: env.FRONTEND_REQUIRED == 'true'
+        working-directory: .github/pages-publish
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          WRANGLER_SEND_METRICS=false node_modules/.bin/wrangler --version
+
+      # Antes de cualquier mutación. Identidad y autoridad (nombre, rama, subdominio, subida
+      # directa) se exigen siempre: si fallan, no se aplica ni se toca el servidor. Un
+      # proyecto ausente o incompleto (sin el dominio asociado, p. ej. tras un Apply parcial)
+      # solo se admite si este run aplica Terraform, que es quien lo crea o completa; el plan
+      # debe mostrarlo y el preflight estricto lo exige después del Apply.
+      - name: Sondear proyecto de Pages (solo lectura)
+        id: pages_probe
+        if: env.FRONTEND_REQUIRED == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          PAGES_ACCOUNT_ID: ${{ steps.pages_target.outputs.account_id }}
+          PAGES_PROJECT: ${{ steps.pages_target.outputs.project_name }}
+          PAGES_BRANCH: ${{ steps.pages_target.outputs.production_branch }}
+          PAGES_DOMAIN: ${{ steps.pages_target.outputs.custom_domain }}
+          PAGES_ALLOW_PROVISIONING: ${{ env.TF_APPLY_REQUIRED == 'true' }}
+        run: |
+          set -euo pipefail
+          .github/scripts/pages-release.sh probe > "${RUNNER_TEMP}/pages-probe.env"
+          cat "${RUNNER_TEMP}/pages-probe.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/pages-probe.env"
+
+      # ── Terraform: confirmación del saved plan revisado ──
+      # El workspace se verifica (identidad, permisos, ejecución remota y, si este run
+      # aplica, sin auto-apply y con permiso de confirmar) antes de leer su estado. Un
+      # workspace sin estado es `none` solo si HCP lo confirma por dos lecturas; un error
+      # nunca se lee como instalación limpia.
+      - name: Verificar workspace de HCP Terraform
+        id: hcp_workspace
+        if: env.TERRAFORM_REQUIRED == 'true' || env.DEPLOY_REQUIRED == 'true'
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          .github/scripts/hcp-state.sh workspace ${{ env.TF_APPLY_REQUIRED == 'true' && 'apply' || 'read' }} > "${RUNNER_TEMP}/hcp-workspace.env"
+          cat "${RUNNER_TEMP}/hcp-workspace.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/hcp-workspace.env"
+
+      - name: Esperar a que HCP Terraform esté libre
+        id: hcp_idle
+        if: env.TERRAFORM_REQUIRED == 'true' || env.DEPLOY_REQUIRED == 'true'
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: .github/scripts/hcp-state.sh wait-idle
+
+      - name: Capturar state version previo
+        id: hcp_before
+        if: env.TERRAFORM_REQUIRED == 'true' || env.DEPLOY_REQUIRED == 'true'
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          SV=$(.github/scripts/hcp-state.sh current)
+          echo "state_version_id=${SV}" >> "$GITHUB_OUTPUT"
+          if [ "${SV}" = none ]; then
+            echo "El workspace no tiene state version (instalación nueva, confirmado por HCP)"
+          else
+            echo "State version previo: ${SV}"
+          fi
+
+      # Un proyecto de Pages ausente o incompleto solo se admitió porque este Apply debía
+      # crear lo que falta: hace falta la acción OBSERVADA en el plan revisado (unknown,
+      # ambiguous o cualquier otra no basta; nunca se infiere). Antes de confirmar nada.
+      - name: Verificar evidencia del plan sobre Pages
+        id: pages_plan
+        if: env.FRONTEND_REQUIRED == 'true' && env.TF_APPLY_REQUIRED == 'true'
+        env:
+          PAGES_PROJECT_STATE: ${{ steps.pages_probe.outputs.project_state }}
+          WATCH_PAGES_PROJECT: ${{ needs.terraform_plan.outputs.watch_pages_project }}
+          WATCH_PAGES_DOMAIN: ${{ needs.terraform_plan.outputs.watch_pages_domain }}
+        run: |
+          set -euo pipefail
+          case "${PAGES_PROJECT_STATE}" in
+            absent) need="pages_project pages_domain" ;;
+            incomplete) need="pages_domain" ;;
+            *) need="" ;;
+          esac
+          for w in ${need}; do
+            v="WATCH_${w^^}"
+            if [ "${!v}" != create ]; then
+              echo "::error title=Pages::El proyecto de Pages está ${PAGES_PROJECT_STATE} y el plan revisado no muestra la creación de ${w} (acción observada: ${!v:-sin dato}; unknown = el JSON del plan no se pudo leer o interpretar); no se aplica: el saved plan se descarta"
+              exit 1
+            fi
+          done
+          echo "Evidencia del plan sobre Pages suficiente (proyecto ${PAGES_PROJECT_STATE:-sin sondear})"
+
+      # Un servidor creado o reemplazado nace sin Keycloak: su primer converge es P2 y exige
+      # KC_PLATFORM_ADMIN_INITIAL_PASSWORD. Se valida aquí, con las reglas del converge
+      # (keycloak_credentials.yml), para no solicitar un Apply cuyo converge fallaría por
+      # ella. Decide la acción OBSERVADA sobre el servidor en el plan revisado, no el estado
+      # previo (un state version puede existir sin recursos). Sin cambio que cree el
+      # servidor no se exige: la contraseña es temporal y se retira tras el primer login;
+      # P2 en un servidor existente lo sigue exigiendo keycloak_lifecycle.yml. Una acción
+      # desconocida, ausente o repetida no se interpreta: falla. Si falla, no se confirma
+      # y el saved plan se descarta (hcp_cleanup). Este es el último paso antes de confirmar
+      # y repite stage_gate: la etapa, la destrucción y la retención de los push. La retención
+      # se evalúa dos veces porque la segunda aprobación puede tardar: con el valor de classify
+      # (el de un push) y con el leído al empezar este job, por si alguien la levantó. Este
+      # último puede estar ensombrecido por el environment, así que no reemplaza al primero.
+      - name: Verificar la contraseña inicial de Keycloak si el plan crea el servidor
+        id: kc_admin_preflight
+        if: env.TF_APPLY_REQUIRED == 'true'
+        env:
+          # La intención: en Run P, RUN_HOST_CONFIG de este job es false
+          RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
+          WATCH_SERVER: ${{ needs.terraform_plan.outputs.watch_server }}
+          PUSH_MODE: ${{ needs.classify.outputs.push_mode }}
+          PUSH_DEPLOY_NOW: ${{ vars.PRODUCTION_PUSH_DEPLOY }}
+          KC_BACKEND_CLIENT_SECRET: ${{ secrets.KC_BACKEND_CLIENT_SECRET }}
+          KC_AUTOMATION_CLIENT_SECRET: ${{ secrets.KC_AUTOMATION_CLIENT_SECRET }}
+          KC_PLATFORM_ADMIN_INITIAL_PASSWORD: ${{ secrets.KC_PLATFORM_ADMIN_INITIAL_PASSWORD }}
+        run: |
+          set -euo pipefail
+          case "${WATCH_SERVER}" in
+            no-op | update)
+              echo "El plan revisado no crea ni reemplaza el servidor (acción: ${WATCH_SERVER}): no se exige KC_PLATFORM_ADMIN_INITIAL_PASSWORD"
+              exit 0
+              ;;
+            create | replace | delete)
+              PUSH_MODE_NOW=$(.github/scripts/production-stage.sh push-mode "${PUSH_DEPLOY_NOW:-}" 2> /dev/null) || PUSH_MODE_NOW=invalid
+              .github/scripts/production-stage.sh plan-gate "${PRODUCTION_STAGE:-}" true "${WATCH_SERVER}" "${PUSH_MODE:-}"
+              .github/scripts/production-stage.sh plan-gate "${PRODUCTION_STAGE:-}" true "${WATCH_SERVER}" "${PUSH_MODE_NOW}"
+              ;;
+            *)
+              echo "::error title=Keycloak::Acción del plan revisado sobre el servidor no interpretable (${WATCH_SERVER:-sin dato}; none = la dirección no está en el plan, ambiguous = repetida, unknown = JSON ilegible): no se puede decidir si el Apply crea un Keycloak nuevo; no se aplica: el saved plan se descarta"
+              exit 1
+              ;;
+          esac
+          if [ "${RUN_HOST_CONFIG}" != "true" ]; then
+            echo "::error title=Keycloak::El plan revisado crea o reemplaza el servidor (acción: ${WATCH_SERVER}) pero la intención del run no incluye configurar el servidor (run_host_config=false); no se aplica: el saved plan se descarta"
+            exit 1
+          fi
+          echo "El plan revisado crea o reemplaza el servidor (acción: ${WATCH_SERVER}): su primer converge es P2 y exige KC_PLATFORM_ADMIN_INITIAL_PASSWORD"
+          ansible-playbook -i infra/ansible/inventories/prod infra/ansible/playbooks/keycloak-admin-preflight.yml || {
+            echo "::error title=Keycloak::KC_PLATFORM_ADMIN_INITIAL_PASSWORD falta o no cumple las reglas para la instalación nueva (regla incumplida en el log de este paso; valor no mostrado). No se aplica: el saved plan se descarta. Ver administrador-keycloak.md"
+            exit 1
+          }
+
+      - name: Verificar frescura antes del Apply
+        id: fresh_apply
+        if: env.TF_APPLY_REQUIRED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/verify-main-tip.sh
+
+      # Única confirmación del Apply: el saved plan que terraform_plan revisó en este run,
+      # después de la aprobación de este job y revalidado ahora (ver hcp-state.sh apply).
+      # Una sola solicitud; nunca se repite. Confirmado fuera de GitHub → se observa sin
+      # cancelarlo y la cadena se detiene aquí.
+      - name: Confirmar el saved plan revisado (Apply)
+        id: hcp_apply
+        if: env.TF_APPLY_REQUIRED == 'true'
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          RUN_MESSAGE: ${{ env.HCP_RUN_MESSAGE }}
+          FRESHNESS_CMD: .github/scripts/verify-main-tip.sh
+          EXPECTED_PLAN_ID: ${{ needs.terraform_plan.outputs.plan_id }}
+          EXPECTED_CONFIGURATION_VERSION: ${{ needs.terraform_plan.outputs.configuration_version_id }}
+          EXPECTED_STATE: ${{ needs.terraform_plan.outputs.plan_state_version }}
+          PLAN_MAX_AGE_SECONDS: "3600"
+          APPLY_COMMENT: "Aprobado en GitHub: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }} (commit ${{ github.sha }})"
+        run: |
+          set -euo pipefail
+          if [ "${PRODUCTION_STAGE:-}" = "install" ]; then
+            echo "::error title=Terraform::stage=install nunca aplica"
+            exit 1
+          fi
+          if [ "${EXPECTED_STATE}" != "${HCP_STATE_BEFORE_PLAN}" ]; then
+            echo "::error title=Terraform::El plan revisado está ligado a ${EXPECTED_STATE}, no al estado capturado por terraform_plan (${HCP_STATE_BEFORE_PLAN})"
+            exit 1
+          fi
+          rc=0
+          .github/scripts/hcp-state.sh apply "${HCP_RUN_ID}" > "${RUNNER_TEMP}/hcp-apply.env" || rc=$?
+          cat "${RUNNER_TEMP}/hcp-apply.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/hcp-apply.env"
+          exit "${rc}"
+
+      # Resultado real del Apply (no la aceptación de la solicitud): el Deploy solo consume el
+      # state version que produjo el saved plan de este run o, sin cambios
+      # (planned_and_finished), el estado del plan, que debe seguir siendo el actual.
+      # Ver hcp-state.sh run-state.
+      - name: Resolver state version del Apply
+        id: hcp_state
+        if: env.TERRAFORM_REQUIRED == 'true'
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          RUN_ID: ${{ env.HCP_RUN_ID }}
+          STATE_BEFORE: ${{ env.HCP_STATE_BEFORE_PLAN }}
+        run: |
+          set -euo pipefail
+          .github/scripts/hcp-state.sh run-state "${RUN_ID}" "${STATE_BEFORE}" > "${RUNNER_TEMP}/hcp-state.env"
+          cat "${RUNNER_TEMP}/hcp-state.env" >> "$GITHUB_OUTPUT"
+          echo "run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/hcp-state.env"
+
+      - name: Leer outputs del state version esperado
+        id: tf_outputs
+        if: env.DEPLOY_REQUIRED == 'true' || env.PRODUCTION_STAGE == 'provision'
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          APPLY_STATE: ${{ steps.hcp_state.outputs.state_version_id }}
+          STATE_BEFORE: ${{ steps.hcp_before.outputs.state_version_id }}
+        run: |
+          set -euo pipefail
+          # Con Apply: el state version de ese run. Sin Apply: el capturado antes, que
+          # outputs vuelve a exigir como actual.
+          if [ "${TERRAFORM_REQUIRED}" = "true" ]; then
+            EXPECTED_STATE="${APPLY_STATE}"
+          else
+            EXPECTED_STATE="${STATE_BEFORE}"
+          fi
+          if [ -z "${EXPECTED_STATE}" ]; then
+            echo "Error: no hay state version esperado"
+            exit 1
+          fi
+          if [ "${EXPECTED_STATE}" = none ]; then
+            echo "::error title=Terraform::El workspace no tiene estado: no hay servidor que desplegar. Una instalación nueva empieza con stage=provision"
+            exit 1
+          fi
+          .github/scripts/hcp-state.sh outputs "${EXPECTED_STATE}" > "${RUNNER_TEMP}/tf-outputs.env"
+          cat "${RUNNER_TEMP}/tf-outputs.env" >> "$GITHUB_OUTPUT"
+          echo "state_version_id=${EXPECTED_STATE}" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/tf-outputs.env"
+
+      # ── Pages: destino real, después de Terraform y antes de mutar el servidor ──
+      # Estricto: el proyecto existe (también el que acaba de crear el Apply), es el declarado,
+      # de subida directa, con el dominio asociado. Sus salidas (producción vigente, alias
+      # *.pages.dev) son las que la publicación vuelve a exigir. Si falla, ni el servidor ni
+      # Pages cambian (el Apply, si lo hubo, ya ocurrió y queda en el resumen).
+      - name: Verificar proyecto de Pages, token y autoridad única (solo lectura)
+        id: pages_preflight
+        if: env.FRONTEND_REQUIRED == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          PAGES_ACCOUNT_ID: ${{ steps.pages_target.outputs.account_id }}
+          PAGES_PROJECT: ${{ steps.pages_target.outputs.project_name }}
+          PAGES_BRANCH: ${{ steps.pages_target.outputs.production_branch }}
+          PAGES_DOMAIN: ${{ steps.pages_target.outputs.custom_domain }}
+        run: |
+          set -euo pipefail
+          .github/scripts/pages-release.sh preflight > "${RUNNER_TEMP}/pages-preflight.env"
+          cat "${RUNNER_TEMP}/pages-preflight.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/pages-preflight.env"
+
+      # ── Acceso al servidor ──
+      # Primer contacto con el host de este run, antes de escribir la clave SSH y de cualquier
+      # decisión que dependa del servidor. Concilia pin, instancia y dirección del state version
+      # exacto, y lee la clave ofrecida sin enviar credenciales. Solo si coincide existe la
+      # configuración SSH que usan todos los pasos siguientes (raw SSH y Ansible). El pin lo
+      # registra un operador; este paso nunca lo escribe. Ver host-trust.sh.
+      - name: Verificar la identidad SSH del host
+        id: host_trust
+        if: env.DEPLOY_REQUIRED == 'true'
+        timeout-minutes: 7
+        env:
+          EXPECTED_HOST_PIN: ${{ vars.PRODUCTION_SSH_HOST_PIN }}
+          PIN_OUTSIDE_ENVIRONMENT: ${{ needs.classify.outputs.pin_outside_environment }}
+          SERVER_ID: ${{ steps.tf_outputs.outputs.server_id }}
+          SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
+        run: |
+          set -euo pipefail
+          .github/scripts/host-trust.sh verify "${SERVER_ID}" "${SERVER_IP}" > "${RUNNER_TEMP}/host-trust.env"
+          cat "${RUNNER_TEMP}/host-trust.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/host-trust.env"
+
+      - name: Preparar acceso SSH e inventario
+        id: access
+        if: env.DEPLOY_REQUIRED == 'true'
+        env:
+          ANSIBLE_SSH_KEY: ${{ secrets.ANSIBLE_SSH_KEY }}
+          SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
+          SSH_CONFIG: ${{ steps.host_trust.outputs.ssh_config }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${ANSIBLE_SSH_KEY}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf 'all:\n  hosts:\n    %s:\n      ansible_host: %s\n      ansible_ssh_common_args: "-F %s"\n' \
+            "${ANSIBLE_HOST}" "${SERVER_IP}" "${SSH_CONFIG}" > "${RUNNER_TEMP}/hosts.runtime.yml"
+          cat "${RUNNER_TEMP}/hosts.runtime.yml"
+
+      - name: Esperar SSH en el servidor
+        id: readiness
+        if: env.DEPLOY_REQUIRED == 'true'
+        timeout-minutes: 6
+        env:
+          SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
+        run: .github/scripts/host-trust.sh wait-ssh "${SERVER_IP}"
+
+      # SSH responde antes de que cloud-init termine (usuarios, paquetes, configuración de
+      # SSH): converge espera aquí, con plazo, a que termine sin errores ni errores
+      # recuperables (falla cerrado si falló, quedó degradado, sigue corriendo, no se puede
+      # leer o vence el plazo). Solo antes de converge.
+      - name: Esperar la inicialización del servidor (cloud-init)
+        id: host_init
+        if: env.RUN_HOST_CONFIG == 'true'
+        timeout-minutes: 12
+        env:
+          SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
+          SSH_CONFIG_FILE: ${{ steps.host_trust.outputs.ssh_config }}
+          HOST_READY_TIMEOUT: "600"
+        run: |
+          set -euo pipefail
+          .github/scripts/host-ready.sh "${SERVER_IP}" > "${RUNNER_TEMP}/host-ready.env"
+          cat "${RUNNER_TEMP}/host-ready.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/host-ready.env"
+
+      # Después de cloud-init, que escribe la configuración de SSH, y antes de entregar los
+      # secretos del converge. Comprueba las restricciones remotas: no bloquea la consola de
+      # Hetzner, que sigue siendo la vía de recuperación excepcional.
+      - name: Verificar la configuración efectiva de sshd
+        id: sshd_check
+        if: env.RUN_HOST_CONFIG == 'true'
+        env:
+          SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
+        run: .github/scripts/host-trust.sh sshd-check "${SERVER_IP}"
+
+      - name: Instalar colecciones de Ansible
+        if: env.DEPLOY_REQUIRED == 'true'
+        run: |
+          set -euo pipefail
+          ansible-galaxy collection install \
+            -r infra/ansible/requirements.yml \
+            -p infra/ansible/collections
+
+      # Lectura privilegiada (solo lectura) del último éxito registrado en el servidor.
+      # Ausente es un estado válido (servidor nuevo); ilegible falla.
+      - name: Leer último éxito del servidor
+        id: host_state
+        if: env.DEPLOY_REQUIRED == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/release"
+          rm -f "${RUNNER_TEMP}/release/last-success.env"
+          ansible "${ANSIBLE_HOST}" \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -m ansible.builtin.fetch \
+            -a "src={{ release_state_file }} dest=${RUNNER_TEMP}/release/last-success.env flat=true fail_on_missing=false"
+          if [ -f "${RUNNER_TEMP}/release/last-success.env" ]; then
+            echo "Último éxito registrado en el servidor:"
+            grep -v '^#' "${RUNNER_TEMP}/release/last-success.env"
+          else
+            echo "El servidor no tiene último éxito registrado"
+          fi
+
+      - name: Seleccionar identidades exactas
+        id: select
+        if: env.DEPLOY_REQUIRED == 'true'
+        env:
+          BACKEND_REPOSITORY: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          POSTGRES_REPOSITORY: ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE_NAME }}
+          BACKEND_SOURCE: ${{ needs.select_images.outputs.backend_source }}
+          BACKEND_IMAGE_REF: ${{ needs.select_images.outputs.backend_image_ref }}
+          BACKEND_INDEX_DIGEST: ${{ needs.select_images.outputs.backend_index_digest }}
+          BACKEND_TAG: ${{ needs.select_images.outputs.backend_tag }}
+          POSTGRES_SOURCE: ${{ needs.select_images.outputs.postgres_source }}
+          POSTGRES_IMAGE_REF: ${{ needs.select_images.outputs.postgres_image_ref }}
+          POSTGRES_INDEX_DIGEST: ${{ needs.select_images.outputs.postgres_index_digest }}
+          POSTGRES_TAG: ${{ needs.select_images.outputs.postgres_tag }}
+        run: |
+          set -euo pipefail
+          STATE_FILE="${RUNNER_TEMP}/release/last-success.env" \
+            .github/scripts/select-release.sh > "${RUNNER_TEMP}/release/selected.env"
+          cat "${RUNNER_TEMP}/release/selected.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/release/selected.env"
+          if grep -q '^state_status=invalid$' "${RUNNER_TEMP}/release/selected.env"; then
+            echo "::warning title=Último éxito del servidor::Inválido ($(sed -n 's/^state_error=//p' "${RUNNER_TEMP}/release/selected.env")); no se usó. Un deploy exitoso lo reemplaza."
+          fi
+
+      # ── Escaneo y política antes de mutar ──
+      # Build/rollback y terceros: evidencia válida de image_scan sobre la misma referencia
+      # exacta. Reuso: se escanea aquí, con la identidad recién leída del servidor. El
+      # escáner (acción trivy-scan) no recibe secretos ni el socket de Docker. Después, la
+      # política decide sobre TODAS las imágenes que el run aplica.
+      # Solo datos (summary.json, trivy.json y trivy-version.json de cada intento), con origen
+      # (este run) y digest registrado por GitHub verificados: un artifact alterado, ajeno o
+      # repetido falla aquí. Si falta, scan-evidence.sh bloquea: un artifact ausente no prueba
+      # que Trivy haya intentado el escaneo.
+      - name: Descargar y verificar evidencia de escaneos previos
+        id: scan_download
+        if: env.DEPLOY_REQUIRED == 'true' && needs.image_scan.result != 'skipped'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/current-scan-evidence.sh "${RUNNER_TEMP}/scan-evidence"
+
+      - name: Verificar evidencia de escaneo
+        id: scan_evidence
+        if: env.DEPLOY_REQUIRED == 'true'
+        env:
+          TARGETS: ${{ needs.image_targets.outputs.targets }}
+          SCAN_RESULT: ${{ needs.image_scan.result }}
+          EVIDENCE_DIR: ${{ runner.temp }}/scan-evidence
+          BACKEND_SOURCE: ${{ steps.select.outputs.backend_source }}
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          POSTGRES_SOURCE: ${{ steps.select.outputs.postgres_source }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+          REUSE_SCAN_ROOT: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          .github/scripts/scan-evidence.sh > "${RUNNER_TEMP}/scan-evidence.env"
+          cat "${RUNNER_TEMP}/scan-evidence.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/scan-evidence.env"
+
+      - name: Escanear backend en reuso
+        id: scan_backend
+        if: env.DEPLOY_REQUIRED == 'true' && steps.scan_evidence.outputs.scan_backend == 'true'
+        uses: ./.github/actions/trivy-scan
+        with:
+          surface: backend
+          source: reuse (último éxito del servidor)
+          label: ${{ steps.select.outputs.backend_tag }}
+          image_index_digest: ${{ steps.select.outputs.backend_index_digest }}
+          image_ref: ${{ steps.select.outputs.backend_image_ref }}
+          phase: production
+
+      - name: Escanear postgres en reuso
+        id: scan_postgres
+        if: env.DEPLOY_REQUIRED == 'true' && steps.scan_evidence.outputs.scan_postgres == 'true'
+        uses: ./.github/actions/trivy-scan
+        with:
+          surface: postgres
+          source: reuse (último éxito del servidor)
+          label: ${{ steps.select.outputs.postgres_tag }}
+          image_index_digest: ${{ steps.select.outputs.postgres_index_digest }}
+          image_ref: ${{ steps.select.outputs.postgres_image_ref }}
+          phase: production
+
+      # Decisión autoritativa, justo antes de mutar: todas las imágenes que el run aplica
+      # (incluido el reuso recién escaneado), con vigencias y procedencia verificadas ahora.
+      # Bloqueo después de la aprobación del environment: visible en el resumen y en una
+      # anotación; el reuso solo se conoce aquí.
+      - name: Autorizar imágenes (política de vulnerabilidades)
+        id: policy
+        if: env.DEPLOY_REQUIRED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          POLICY_INPUT: ${{ steps.scan_evidence.outputs.policy_input }}
+          POLICY_PHASE: autoritativa
+          RESULT_FILE: ${{ runner.temp }}/policy-result.json
+          RISK_APPROVERS: ${{ vars.VULNERABILITY_RISK_APPROVERS }}
+          # Un environment que ensombrece la variable del repositorio no cambia la autoridad
+          EXPECTED_APPROVERS_FINGERPRINT: ${{ needs.image_policy.outputs.approvers_fingerprint }}
+          BREAK_GLASS_ID: ${{ needs.classify.outputs.break_glass_authorization }}
+          BREAK_GLASS_JUSTIFICATION: ${{ inputs.break_glass_justification }}
+          EVENT_NAME: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          OP_RUN_TERRAFORM_APPLY: ${{ needs.classify.outputs.terraform_required }}
+          OP_RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
+          OP_RUN_APP_DEPLOY: ${{ needs.classify.outputs.run_app_deploy }}
+          OP_RUN_BUILD: ${{ needs.classify.outputs.run_build }}
+          OP_RUN_BUILD_POSTGRES: ${{ needs.classify.outputs.run_build_postgres }}
+          OP_IMAGE_TAG: ${{ needs.classify.outputs.image_tag }}
+          OP_KEYCLOAK_RECOVERY: ${{ needs.classify.outputs.keycloak_recovery }}
+        run: |
+          set -euo pipefail
+          set +e
+          .github/scripts/vuln-policy.sh > "${RUNNER_TEMP}/policy.env"
+          RC=$?
+          set -e
+          cat "${RUNNER_TEMP}/policy.env" >> "$GITHUB_OUTPUT"
+          if [ "${RC}" -ne 0 ]; then
+            echo "::error title=Política de vulnerabilidades: BLOQUEO::$(jq -r '[.global_errors[]?, (.surfaces[]? | select(.verdict == "blocked") | "\(.surface): \(.reason_code)")] | join("; ")' "${RESULT_FILE}" 2>/dev/null || echo "entrada inválida")"
+            exit "${RC}"
+          fi
+
+      # Break-glass: aprobación humana del environment en este run, consumo único de la
+      # autorización (commit status inmutable) e issue security-break-glass, ANTES de mutar;
+      # si algo falla, no hay mutación
+      - name: Registrar break-glass
+        id: break_glass
+        if: env.DEPLOY_REQUIRED == 'true' && steps.policy.outputs.decision == 'break_glass'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          POLICY_RESULT: ${{ runner.temp }}/policy-result.json
+          ENVIRONMENT_NAME: production-hetzner
+        run: |
+          set -euo pipefail
+          .github/scripts/break-glass-record.sh > "${RUNNER_TEMP}/break-glass.env"
+          cat "${RUNNER_TEMP}/break-glass.env" >> "$GITHUB_OUTPUT"
+          echo "::warning title=BREAK-GLASS::Imágenes autorizadas sin escaneo fresco: $(sed -n 's/^issue_url=//p' "${RUNNER_TEMP}/break-glass.env")"
+
+      # Una decisión ausente o desconocida falla el job: nunca deja seguir sin mutar y
+      # registrar un éxito falso
+      - name: Exigir autorización de imágenes
+        id: authorization
+        if: |
+          env.DEPLOY_REQUIRED == 'true' &&
+          !(steps.policy.outputs.decision == 'authorized' ||
+            (steps.policy.outputs.decision == 'break_glass' && steps.break_glass.outcome == 'success'))
+        env:
+          DECISION: ${{ steps.policy.outputs.decision }}
+        run: |
+          echo "::error title=Política de vulnerabilidades::Sin autorización de imágenes (decisión '${DECISION}'); producción no muta"
+          exit 1
+
+      # ── Mutaciones del servidor ──
+      # Converge y deploy exigen además, explícitamente, la decisión de la política (y el
+      # registro del break-glass): un paso saltado por error nunca equivale a autorización.
+      - name: Verificar frescura antes de mutar el servidor
+        id: fresh_deploy
+        if: env.DEPLOY_REQUIRED == 'true' && env.TF_APPLY_REQUIRED != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/verify-main-tip.sh
+
+      - name: Correr converge
+        id: converge
+        if: |
+          env.RUN_HOST_CONFIG == 'true' &&
+          (steps.policy.outputs.decision == 'authorized' ||
+            (steps.policy.outputs.decision == 'break_glass' && steps.break_glass.outcome == 'success'))
+        env:
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+          MIGRATION_DB_PASSWORD: ${{ secrets.MIGRATION_DB_PASSWORD }}
+          KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
+          CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
+          KC_BACKEND_CLIENT_SECRET: ${{ secrets.KC_BACKEND_CLIENT_SECRET }}
+          KC_AUTOMATION_CLIENT_SECRET: ${{ secrets.KC_AUTOMATION_CLIENT_SECRET }}
+          # Un solo uso: contraseña inicial del administrador humano de Keycloak. Solo la
+          # exige y usa una instalación nueva (P2) dentro de Ansible; fuera de P2 puede faltar.
+          # Se elimina del environment tras el primer login (administrador-keycloak.md).
+          KC_PLATFORM_ADMIN_INITIAL_PASSWORD: ${{ secrets.KC_PLATFORM_ADMIN_INITIAL_PASSWORD }}
+          # Bootstrap del primer administrador de negocio (un solo uso). Solo habilitado se
+          # entrega la contraseña inicial; deshabilitado el converge deja vacías las entradas
+          # en .env y recrea el backend sin ellas. El secreto se elimina del environment tras
+          # el primer login (primer-admin-negocio.md).
+          IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
+          IDENTITY_SEED_ADMIN_USERNAME: ${{ vars.IDENTITY_SEED_ADMIN_USERNAME }}
+          IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE: ${{ vars.IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE }}
+          IDENTITY_SEED_ADMIN_FIRST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_FIRST_NAME }}
+          IDENTITY_SEED_ADMIN_LAST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_LAST_NAME }}
+          IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
+          IDENTITY_SEED_ADMIN_PHONE: ${{ vars.IDENTITY_SEED_ADMIN_PHONE }}
+          IDENTITY_SEED_ADMIN_PASSWORD: ${{ vars.IDENTITY_SEED_ENABLED == 'true' && secrets.IDENTITY_SEED_ADMIN_PASSWORD || '' }}
+          # SendGrid está deshabilitado (group_vars: notifications_sendgrid_enabled): el converge
+          # no recibe PIEDRAZUL_BACKEND_MAIL_SEND y setup.yml falla si se habilita sin ella.
+        run: |
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
+            -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            -e "keycloak_image_ref=${KEYCLOAK_IMAGE_REF}" \
+            -e "keycloak_image_index_digest=${KEYCLOAK_INDEX_DIGEST}" \
+            -e "traefik_image_ref=${TRAEFIK_IMAGE_REF}" \
+            -e "traefik_image_index_digest=${TRAEFIK_INDEX_DIGEST}" \
+            -e "keycloak_recovery=${KEYCLOAK_RECOVERY}" \
+            -e "app_deploy_follows=${RUN_APP_DEPLOY}" \
+            -e "app_identity_seed_intended=${IDENTITY_SEED_ENABLED:-false}" \
+            infra/ansible/playbooks/converge.yml
+
+      - name: Verificar postgres, keycloak y traefik tras converge (identidad en ejecución)
+        id: converge_identity
+        if: env.RUN_HOST_CONFIG == 'true'
+        env:
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+        run: |
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
+            -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            -e "keycloak_image_ref=${KEYCLOAK_IMAGE_REF}" \
+            -e "traefik_image_ref=${TRAEFIK_IMAGE_REF}" \
+            -e release_check=identity \
+            -e '{"app_release_services": ["postgres", "keycloak", "traefik"]}' \
+            infra/ansible/playbooks/verify-release.yml
+
+      # deploy.yml: postgres + reconciliación → migración (solo backend construido en este
+      # run, con su misma identidad exacta) → backend → bootstrap del primer administrador
+      # (resultado si está habilitado, retiro si no). Usa el .env que dejó converge; no
+      # recibe secretos (ni de la base, ni de Cloudflare, ni de correo). Un rollback explícito no migra: el backend valida
+      # el esquema al arrancar (JPA validate). Si la migración falla, el backend candidato
+      # no arranca y este paso falla antes de la verificación y del registro.
+      - name: Correr deploy
+        id: deploy
+        if: |
+          env.RUN_APP_DEPLOY == 'true' &&
+          (steps.policy.outputs.decision == 'authorized' ||
+            (steps.policy.outputs.decision == 'break_glass' && steps.break_glass.outcome == 'success'))
+        env:
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+          APP_MIGRATE: ${{ steps.select.outputs.backend_source == 'build' }}
+          # Solo la decisión del bootstrap, sin entradas ni secreto: deploy.yml no escribe .env;
+          # el bootstrap (y su retiro) lo aplica el .env que dejó el converge. deploy.yml falla
+          # si ese .env no corresponde a esta decisión (habilitación o retiro pendientes de la
+          # configuración del servidor) o si el backend resultante no la tiene en vigor
+          IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
+        run: |
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
+            -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            -e "app_migrate=${APP_MIGRATE}" \
+            -e "app_identity_seed_intended=${IDENTITY_SEED_ENABLED:-false}" \
+            infra/ansible/playbooks/deploy.yml
+
+      # ── Verificación posterior ──
+      - name: Verificar identidad en ejecución
+        id: running_identity
+        if: env.RUN_APP_DEPLOY == 'true'
+        env:
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+        run: |
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
+            -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            -e release_check=identity \
+            -e '{"app_release_services": ["postgres", "backend"]}' \
+            infra/ansible/playbooks/verify-release.yml
+
+      - name: Verificar health de contenedores
+        id: container_health
+        if: env.DEPLOY_REQUIRED == 'true'
+        env:
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+          SERVICES: ${{ format('["postgres"{0}{1}]', env.RUN_APP_DEPLOY == 'true' && ', "backend"' || '', env.RUN_HOST_CONFIG == 'true' && ', "keycloak"' || '') }}
+        run: |
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
+            -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            -e release_check=health \
+            -e "{\"app_release_services\": ${SERVICES}}" \
+            infra/ansible/playbooks/verify-release.yml
+
+      - name: Verificar health público
+        id: public_health
+        if: env.DEPLOY_REQUIRED == 'true'
+        timeout-minutes: 5
+        env:
+          API_FQDN: ${{ steps.tf_outputs.outputs.api_fqdn }}
+          AUTH_FQDN: ${{ steps.tf_outputs.outputs.auth_fqdn }}
+        run: |
+          set -euo pipefail
+          check() { # <nombre> <url>
+            echo "Verificando $2..."
+            for i in $(seq 1 12); do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$2" || echo "000")
+              if [ "${STATUS}" = "200" ]; then
+                echo "$1 healthy"
+                return 0
+              fi
+              echo "Intento $i/12 — status: ${STATUS} — esperando 10s..."
+              sleep 10
+            done
+            echo "Error: $1 no responde después de 2 minutos"
+            return 1
+          }
+          check backend "https://${API_FQDN}/actuator/health"
+          check keycloak "https://${AUTH_FQDN}/realms/${KC_REALM}/.well-known/openid-configuration"
+
+      # Único punto que avanza el último éxito: deploy + identidad en ejecución + health
+      # de contenedores + health público ya pasaron. Re-verifica la identidad justo antes
+      # de escribir.
+      - name: Registrar último éxito
+        id: record
+        if: env.RUN_APP_DEPLOY == 'true'
+        env:
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          BACKEND_INDEX_DIGEST: ${{ steps.select.outputs.backend_index_digest }}
+          BACKEND_TAG: ${{ steps.select.outputs.backend_tag }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+          POSTGRES_INDEX_DIGEST: ${{ steps.select.outputs.postgres_index_digest }}
+          POSTGRES_TAG: ${{ steps.select.outputs.postgres_tag }}
+        run: |
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -e "backend_image_ref=${BACKEND_IMAGE_REF}" \
+            -e "backend_image_index_digest=${BACKEND_INDEX_DIGEST}" \
+            -e "backend_image_tag=${BACKEND_TAG}" \
+            -e "postgres_image_ref=${POSTGRES_IMAGE_REF}" \
+            -e "postgres_image_index_digest=${POSTGRES_INDEX_DIGEST}" \
+            -e "postgres_image_tag=${POSTGRES_TAG}" \
+            -e "release_commit=${GITHUB_SHA}" \
+            -e "release_run=${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}" \
+            infra/ansible/playbooks/record-release.yml
+
+      # ── Publicación del frontend ──
+      # Última operación de la cadena: solo llega aquí si todo lo anterior que el run
+      # requería (Apply, converge/deploy, identidad, health y registro) terminó bien.
+      # Si nada mutó antes (solo frontend), la frescura se comprueba aquí; si ya hubo una
+      # mutación, la cadena iniciada termina aunque main haya avanzado.
+      - name: Verificar frescura antes de publicar el frontend
+        id: fresh_frontend
+        if: env.FRONTEND_PUBLISH == 'true' && env.TF_APPLY_REQUIRED != 'true' && env.DEPLOY_REQUIRED != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/verify-main-tip.sh
+
+      # Solo con el preflight estricto (posterior a Terraform) en success
+      - name: Publicar frontend en Cloudflare Pages
+        id: pages_publish
+        if: env.FRONTEND_PUBLISH == 'true' && steps.pages_preflight.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          PAGES_ACCOUNT_ID: ${{ steps.pages_target.outputs.account_id }}
+          PAGES_PROJECT: ${{ steps.pages_target.outputs.project_name }}
+          PAGES_BRANCH: ${{ steps.pages_target.outputs.production_branch }}
+          PAGES_DOMAIN: ${{ steps.pages_target.outputs.custom_domain }}
+          PREVIOUS_DEPLOYMENT_ID: ${{ steps.pages_preflight.outputs.previous_deployment_id }}
+          PRODUCTION_URL: ${{ steps.pages_preflight.outputs.production_url }}
+          SITE_DIR: ${{ steps.pages_artifact.outputs.site_dir }}
+          ENTRY_ASSET: ${{ steps.pages_artifact.outputs.entry_asset }}
+          WRANGLER_BIN: ${{ github.workspace }}/.github/pages-publish/node_modules/.bin/wrangler
+        run: |
+          set -euo pipefail
+          .github/scripts/pages-release.sh publish "${SITE_DIR}" > "${RUNNER_TEMP}/pages-publish.env"
+          cat "${RUNNER_TEMP}/pages-publish.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/pages-publish.env"
+
+      # Siempre que este run debía aplicar un saved plan: si production falló o se canceló
+      # antes de confirmarlo, se descarta (nunca queda un plan revisado confirmable en HCP);
+      # si HCP ya aceptó el Apply (por esta cadena o fuera de GitHub), no se toca (cancelar
+      # el job no lo deshace) y se informa. Solo actúa sobre el run con el mensaje de
+      # terraform_plan de este run. Si este paso no llega a correr (runner terminado de
+      # golpe), ver docs/operations/runbooks/instalacion-nueva.md (run huérfano).
+      - name: Liberar el saved plan de este run
+        id: hcp_cleanup
+        if: always() && env.TF_APPLY_REQUIRED == 'true'
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          RUN_MESSAGE: ${{ env.HCP_RUN_MESSAGE }}
+          RUN_ID: ${{ env.HCP_RUN_ID }}
+        run: |
+          set -euo pipefail
+          .github/scripts/hcp-state.sh cleanup "${RUN_ID}" > "${RUNNER_TEMP}/hcp-cleanup.env"
+          cat "${RUNNER_TEMP}/hcp-cleanup.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/hcp-cleanup.env"
+
+      - name: Resumen de producción
+        if: always()
+        env:
+          INTENT: ${{ needs.classify.outputs.intent }}
+          HCP_RUN_STATUS: ${{ steps.hcp_state.outputs.run_status }}
+          STATE_BEFORE: ${{ steps.hcp_before.outputs.state_version_id }}
+          STATE_USED: ${{ steps.tf_outputs.outputs.state_version_id || steps.hcp_state.outputs.state_version_id }}
+          STATE_SOURCE: ${{ steps.hcp_state.outputs.state_source || 'current' }}
+          BACKEND_SOURCE: ${{ steps.select.outputs.backend_source }}
+          BACKEND_IMAGE_REF: ${{ steps.select.outputs.backend_image_ref }}
+          POSTGRES_SOURCE: ${{ steps.select.outputs.postgres_source }}
+          POSTGRES_IMAGE_REF: ${{ steps.select.outputs.postgres_image_ref }}
+          RUN_APP_DEPLOY_SUMMARY: ${{ env.RUN_APP_DEPLOY }}
+          RUN_HOST_CONFIG_SUMMARY: ${{ env.RUN_HOST_CONFIG }}
+          PREVIOUS_BACKEND: ${{ steps.select.outputs.previous_backend_image_ref }}
+          PREVIOUS_POSTGRES: ${{ steps.select.outputs.previous_postgres_image_ref }}
+          STATE_STATUS: ${{ steps.select.outputs.state_status }}
+          O_CREDENTIALS: ${{ steps.credentials.outcome }}
+          O_FRESH_APPLY: ${{ steps.fresh_apply.outcome }}
+          O_HCP: ${{ steps.hcp_workspace.outcome }}/${{ steps.hcp_idle.outcome }}/${{ steps.hcp_before.outcome }}/${{ steps.hcp_state.outcome }}/${{ steps.tf_outputs.outcome }}
+          O_PAGES_PLAN: ${{ steps.pages_plan.outcome }}
+          O_KC_ADMIN_PREFLIGHT: ${{ steps.kc_admin_preflight.outcome }}
+          O_HCP_APPLY: ${{ steps.hcp_apply.outcome }}
+          HCP_PLAN_LINK: ${{ needs.terraform_plan.outputs.run_link }}
+          HCP_PLAN_ID: ${{ needs.terraform_plan.outputs.plan_id }}
+          HCP_PLAN_COUNTS: ${{ needs.terraform_plan.outputs.counts }}
+          HCP_APPLY_REQUEST: ${{ steps.hcp_apply.outputs.apply_request }}
+          HCP_CLEANUP: ${{ steps.hcp_cleanup.outputs.cleanup }}
+          O_HCP_CLEANUP: ${{ steps.hcp_cleanup.outcome }}
+          O_HOST_TRUST: ${{ steps.pin_preflight.outcome }}/${{ steps.host_trust.outcome }}/${{ steps.sshd_check.outcome }}
+          WATCH_SERVER: ${{ needs.terraform_plan.outputs.watch_server }}
+          SERVER_ID: ${{ steps.tf_outputs.outputs.server_id }}
+          SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
+          O_ACCESS: ${{ steps.access.outcome }}/${{ steps.readiness.outcome }}/${{ steps.host_init.outcome }}/${{ steps.host_state.outcome }}
+          CLOUD_INIT: ${{ steps.host_init.outputs.cloud_init_status }}
+          O_SELECT: ${{ steps.select.outcome }}
+          O_SCAN: ${{ steps.scan_download.outcome }}/${{ steps.scan_evidence.outcome }}/${{ steps.scan_backend.outcome }}/${{ steps.scan_postgres.outcome }}
+          O_POLICY: ${{ steps.policy.outcome }}/${{ steps.authorization.outcome }}
+          O_BREAK_GLASS: ${{ steps.break_glass.outcome }}
+          POLICY_DECISION: ${{ steps.policy.outputs.decision }}
+          BREAK_GLASS_ISSUE: ${{ steps.break_glass.outputs.issue_url }}
+          POLICY_RESULT: ${{ runner.temp }}/policy-result.json
+          SCAN_EVIDENCE: ${{ steps.scan_evidence.outputs.evidence }}
+          REUSE_BACKEND_SCAN: ${{ steps.scan_backend.outputs.outcome }}
+          REUSE_POSTGRES_SCAN: ${{ steps.scan_postgres.outputs.outcome }}
+          O_FRESH_DEPLOY: ${{ steps.fresh_deploy.outcome }}
+          O_DEPLOY: ${{ steps.converge.outcome }}/${{ steps.deploy.outcome }}
+          O_IDENTITY: ${{ steps.converge_identity.outcome }}/${{ steps.running_identity.outcome }}
+          O_HEALTH: ${{ steps.container_health.outcome }}/${{ steps.public_health.outcome }}
+          O_RECORD: ${{ steps.record.outcome }}
+          O_PAGES_PREP: ${{ steps.pages_target.outcome }}/${{ steps.pages_artifact.outcome }}/${{ steps.pages_node.outcome }}/${{ steps.pages_tooling.outcome }}/${{ steps.pages_probe.outcome }}
+          O_PAGES_PREFLIGHT: ${{ steps.pages_preflight.outcome }}
+          PAGES_PROBE_STATE: ${{ steps.pages_probe.outputs.project_state }}
+          O_FRESH_FRONTEND: ${{ steps.fresh_frontend.outcome }}
+          O_PAGES_PUBLISH: ${{ steps.pages_publish.outcome }}
+          PAGES_PROJECT: ${{ steps.pages_target.outputs.project_name }}
+          PAGES_BRANCH: ${{ steps.pages_target.outputs.production_branch }}
+          PAGES_ARTIFACT: ${{ needs.frontend_build.outputs.artifact_name }}
+          PAGES_DIST_SHA256: ${{ needs.frontend_build.outputs.dist_sha256 }}
+          PAGES_ENTRY_ASSET: ${{ needs.frontend_build.outputs.entry_asset }}
+          PAGES_SOURCE: ${{ steps.pages_preflight.outputs.pages_source }}
+          PAGES_DOMAIN_STATUS: ${{ steps.pages_publish.outputs.custom_domain_status || steps.pages_preflight.outputs.custom_domain_status }}
+          PAGES_PREVIOUS_ID: ${{ steps.pages_preflight.outputs.previous_deployment_id }}
+          PAGES_PREVIOUS_COMMIT: ${{ steps.pages_preflight.outputs.previous_deployment_commit }}
+          PAGES_DEPLOYMENT_ID: ${{ steps.pages_publish.outputs.deployment_id }}
+          PAGES_DEPLOYMENT_URL: ${{ steps.pages_publish.outputs.deployment_url }}
+        run: |
+          set -euo pipefail
+
+          # Primera etapa que falló → categoría visible para el operador
+          CATEGORY=""
+          first_failure() { # <categoría> <outcomes separados por />
+            [ -z "${CATEGORY}" ] && [[ "/$2/" == */failure/* ]] && CATEGORY="$1"
+            return 0
+          }
+          first_failure "Autoridad de producción (credenciales)" "${O_CREDENTIALS}"
+          first_failure "Preparación del frontend (destino, artefacto, wrangler, proyecto/token de Pages o autoridad única)" "${O_PAGES_PREP}"
+          first_failure "Evidencia del plan sobre Pages (el plan revisado no crea lo que falta)" "${O_PAGES_PLAN}"
+          first_failure "Etapa, retención de push o contraseña inicial de Keycloak para el servidor nuevo o reemplazado (sin Apply)" "${O_KC_ADMIN_PREFLIGHT}"
+          first_failure "Frescura (main avanzó o ref no es main)" "${O_FRESH_APPLY}"
+          first_failure "HCP Terraform (workspace, estado previo)" "$(cut -d/ -f1-3 <<< "${O_HCP}")"
+          if [ "${HCP_APPLY_REQUEST}" = out_of_band ]; then
+            first_failure "Apply confirmado fuera de GitHub (no autorizado por esta cadena; no se sigue mutando)" "${O_HCP_APPLY}"
+          fi
+          first_failure "Confirmación del saved plan (revalidación o solicitud de Apply)" "${O_HCP_APPLY}"
+          first_failure "Resultado del Apply y causalidad del estado" "$(cut -d/ -f4-5 <<< "${O_HCP}")"
+          first_failure "Proyecto de Pages tras Terraform (destino real, autoridad única)" "${O_PAGES_PREFLIGHT}"
+          first_failure "Identidad SSH del host o sshd efectivo (el pin no cambia; ver el diagnóstico del paso)" "${O_HOST_TRUST}"
+          first_failure "Acceso al servidor" "${O_ACCESS}"
+          first_failure "Identidad de imagen (selección)" "${O_SELECT}"
+          first_failure "Evidencia de escaneo incompleta o no verificable" "${O_SCAN}"
+          first_failure "Política de vulnerabilidades (bloqueo)" "${O_POLICY}"
+          first_failure "Registro de break-glass" "${O_BREAK_GLASS}"
+          first_failure "Frescura (main avanzó o ref no es main)" "${O_FRESH_DEPLOY}"
+          first_failure "Deploy" "${O_DEPLOY}"
+          first_failure "Identidad en ejecución" "${O_IDENTITY}"
+          first_failure "Health" "${O_HEALTH}"
+          first_failure "Registro del último éxito" "${O_RECORD}"
+          first_failure "Frescura (main avanzó o ref no es main)" "${O_FRESH_FRONTEND}"
+          first_failure "Publicación del frontend en Pages" "${O_PAGES_PUBLISH}"
+
+          if [ "${O_RECORD}" = "success" ]; then
+            RESULT="último éxito registrado: backend \`${BACKEND_IMAGE_REF}\`, postgres \`${POSTGRES_IMAGE_REF}\`"
+            if [ "${POLICY_DECISION}" = "break_glass" ]; then
+              RESULT="${RESULT} — **BREAK-GLASS: sin escaneo fresco de alguna imagen** (${BREAK_GLASS_ISSUE})"
+            fi
+            if [ -n "${CATEGORY}" ]; then
+              RESULT="${RESULT} — pero **FALLÓ: ${CATEGORY}** (release parcial: el servidor quedó en este backend)"
+              echo "::error title=Producción: ${CATEGORY}::El backend quedó desplegado y registrado en el servidor; la publicación del frontend no terminó. Ver el resumen del run."
+            fi
+          elif [ -n "${CATEGORY}" ]; then
+            RESULT="**FALLÓ: ${CATEGORY}** — el último éxito del servidor no cambió"
+            echo "::error title=Producción: ${CATEGORY}::El último éxito del servidor no cambió. Ver el resumen del run."
+          elif [ "${{ job.status }}" != "success" ]; then
+            RESULT="**incompleto (${{ job.status }})** — el último éxito del servidor no cambió"
+          elif [ "${PRODUCTION_STAGE}" = "provision" ] && [ "$(cut -d/ -f5 <<< "${O_HCP}")" = "success" ]; then
+            # El titular sale de lo aplicado y de la acción observada sobre el servidor en el plan
+            # revisado: un job en success no dice por sí solo que se creó algo
+            IDENTITY="instancia \`${SERVER_ID}\`, dirección \`${SERVER_IP}\` (state version \`${STATE_USED}\`)"
+            NOT_DONE="Este run no abrió SSH, no configuró ni desplegó nada y no publicó el frontend."
+            if [ "${TF_APPLY_REQUIRED}" != "true" ]; then
+              OUTCOME="INFRASTRUCTURE UNCHANGED / TRUST AND INSTALLATION NOT EVALUATED"
+              DETAIL="Plan sin cambios: este run no aplicó nada ni sabe si ese servidor tiene pin o está instalado. Si Run P quedó pendiente, seguir con el paso fuera de banda y \`stage=install\` (instalacion-nueva.md)."
+            else
+              case "${WATCH_SERVER}" in
+                create | replace)
+                  OUTCOME="PROVISIONED / TRUST PENDING / NOT INSTALLED"
+                  DETAIL="Siguiente paso: autenticar la clave del host por la consola de Hetzner, registrar \`PRODUCTION_SSH_HOST_PIN\` en el environment y correr \`stage=install\` (instalacion-nueva.md). Este estado no vence."
+                  ;;
+                *)
+                  OUTCOME="INFRASTRUCTURE UPDATED / TRUST AND INSTALLATION NOT EVALUATED"
+                  DETAIL="El Apply terminó sin crear ni reemplazar el servidor (acción: ${WATCH_SERVER:-sin dato}): este run no sabe si ese servidor tiene pin o está instalado. Si Run P quedó pendiente, seguir con el paso fuera de banda y \`stage=install\` (instalacion-nueva.md)."
+                  ;;
+              esac
+            fi
+            RESULT="**${OUTCOME}** — ${IDENTITY}. ${NOT_DONE} ${DETAIL}"
+            echo "::notice title=${OUTCOME}::Instancia ${SERVER_ID}, ${SERVER_IP}. Ver el resumen del run."
+          else
+            RESULT="sin deploy de aplicación — el último éxito del servidor no cambia"
+          fi
+
+          # Pages es independiente del último éxito del servidor: su propio resultado
+          PAGES_RESULT=""
+          if [ "${FRONTEND_REQUIRED}" = "true" ]; then
+            case "${O_PAGES_PUBLISH}" in
+              success) PAGES_RESULT="frontend publicado en Pages y verificado: deployment \`${PAGES_DEPLOYMENT_ID}\` (${PAGES_DEPLOYMENT_URL}) sirve \`${PAGES_ENTRY_ASSET}\` de \`${GITHUB_SHA}\`" ;;
+              failure) PAGES_RESULT="**frontend NO verificado como publicado**: wrangler o la verificación falló; Pages pudo haber recibido o no el deployment. Producción de Pages anterior: \`${PAGES_PREVIOUS_ID:-—}\` (commit \`${PAGES_PREVIOUS_COMMIT:-—}\`)" ;;
+              *) PAGES_RESULT="**frontend no publicado**: la cadena se detuvo antes de la publicación; producción de Pages no cambió (vigente: \`${PAGES_PREVIOUS_ID:-no leída}\`)" ;;
+            esac
+            if [ "${PRODUCTION_STAGE}" = "provision" ]; then
+              PAGES_RESULT="frontend no publicado: Run P nunca publica; la publicación corresponde a Run I"
+            fi
+          fi
+
+          {
+            echo "## Producción: \`${INTENT}\`"
+            echo
+            echo "${RESULT}"
+            echo
+            if [ -n "${PAGES_RESULT}" ]; then
+              echo "${PAGES_RESULT}"
+              echo
+            fi
+            if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+              echo "> El rango procesado (base del siguiente push) avanza solo si este run termina en success y el job *Rango procesado* corre."
+              echo "> Con cualquier fallo, el re-run o el siguiente push vuelve a cubrir todo lo pendiente (incluida la publicación del frontend)."
+              echo
+            fi
+            echo "| etapa | valor |"
+            echo "|---|---|"
+            echo "| etapa de la cadena | \`${PRODUCTION_STAGE}\` |"
+            [ -z "${SERVER_ID}" ] || echo "| servidor (estado de Terraform) | instancia \`${SERVER_ID}\`, dirección \`${SERVER_IP}\` |"
+            echo "| HCP state version previo | \`${STATE_BEFORE:-—}\` |"
+            if [ "${TERRAFORM_REQUIRED}" = "true" ]; then
+              echo "| saved plan revisado (crear/cambiar/destruir/importar) | ${HCP_PLAN_COUNTS:-—} — \`${HCP_RUN_ID:-—}\` / \`${HCP_PLAN_ID:-—}\` ${HCP_PLAN_LINK:-} |"
+              if [ "${TF_APPLY_REQUIRED}" = "true" ]; then
+                case "${HCP_APPLY_REQUEST}" in
+                  accepted) echo "| solicitud de Apply | aceptada por HCP tras la aprobación de este job (una sola solicitud) |" ;;
+                  accepted_after_ambiguous) echo "| solicitud de Apply | respuesta incierta; HCP muestra el run confirmado después de la solicitud (sin reintento) |" ;;
+                  out_of_band) echo "| solicitud de Apply | **no enviada: el run se confirmó fuera de GitHub**; observado sin cancelarlo, la cadena no siguió |" ;;
+                  *) echo "| solicitud de Apply | **no aceptada o no enviada** (${O_HCP_APPLY:-—}): sin Apply de esta cadena |" ;;
+                esac
+                echo "| resultado del Apply | ${HCP_RUN_STATUS:-**sin resultado verificado**} |"
+              else
+                echo "| Apply | no requerido: plan sin cambios (${HCP_RUN_STATUS:-sin verificar}) |"
+              fi
+              if [ -n "${HCP_CLEANUP}" ] || [ "${O_HCP_CLEANUP:-skipped}" != skipped ]; then
+                case "${HCP_CLEANUP}" in
+                  discarded) echo "| saved plan de este run | **descartado** (no hubo Apply) |" ;;
+                  canceled) echo "| saved plan de este run | **cancelado** durante el plan (no hubo Apply) |" ;;
+                  apply_accepted) echo "| saved plan de este run | confirmado: HCP aceptó el Apply (no se deshace al cancelar o fallar el job) |" ;;
+                  none) echo "| saved plan de este run | terminado, sin acción de limpieza |" ;;
+                  *) echo "| saved plan de este run | **limpieza no verificada (${O_HCP_CLEANUP})**: revisar el run en HCP |" ;;
+                esac
+              fi
+            fi
+            echo "| state version consumido | \`${STATE_USED:-—}\` (${STATE_SOURCE}) |"
+            if [ "${DEPLOY_REQUIRED}" = "true" ]; then
+              echo "| último éxito leído | ${STATE_STATUS:-—} |"
+              echo "| backend | ${BACKEND_SOURCE:-—} \`${BACKEND_IMAGE_REF:-—}\` (anterior \`${PREVIOUS_BACKEND:-—}\`) |"
+              echo "| postgres | ${POSTGRES_SOURCE:-—} \`${POSTGRES_IMAGE_REF:-—}\` (anterior \`${PREVIOUS_POSTGRES:-—}\`) |"
+              if [ "${RUN_HOST_CONFIG_SUMMARY}" = "true" ]; then
+                echo "| keycloak | \`${KEYCLOAK_LABEL:-—}\` → \`${KEYCLOAK_IMAGE_REF:-—}\` (converge; la base de Keycloak solo migra hacia adelante) |"
+              else
+                echo "| keycloak | sin cambios: este run no corre converge (deploy conserva la identidad del servidor) |"
+              fi
+              if [ "${RUN_HOST_CONFIG_SUMMARY}" = "true" ]; then
+                echo "| traefik | \`${TRAEFIK_LABEL:-—}\` → \`${TRAEFIK_IMAGE_REF:-—}\` (converge) |"
+              else
+                echo "| traefik | sin cambios: este run no corre converge |"
+              fi
+              if [ "${RUN_APP_DEPLOY_SUMMARY}" = "true" ]; then
+                if [ "${BACKEND_SOURCE}" = "build" ]; then
+                  echo "| migración de esquema | sí, con \`${BACKEND_IMAGE_REF}\` antes de arrancar el backend (dentro de deploy) |"
+                else
+                  echo "| migración de esquema | no (${BACKEND_SOURCE:-—}): el backend valida el esquema existente |"
+                fi
+              fi
+            fi
+            echo "| credenciales / frescura | ${O_CREDENTIALS} / ${O_FRESH_APPLY:-—} ${O_FRESH_DEPLOY:-} |"
+            echo "| HCP (workspace/idle/previo/estado/outputs) | ${O_HCP} — confirmación ${O_HCP_APPLY:-—} |"
+            echo "| identidad del host (pin/verificación/sshd) | ${O_HOST_TRUST} |"
+            echo "| acceso (ssh/espera/cloud-init/último éxito) | ${O_ACCESS} (cloud-init: ${CLOUD_INIT:-no comprobado}) |"
+            echo "| selección | ${O_SELECT} |"
+            echo "| escaneo antes de mutar (descarga/evidencia/backend reuso/postgres reuso) | ${O_SCAN} |"
+            if [ -n "${SCAN_EVIDENCE}" ] && [ "${SCAN_EVIDENCE}" != "[]" ]; then
+              jq -r '.[] | "| escaneo previo \(.surface) | \(.outcome)\(if .critical != null then " — CRITICAL \(.critical), HIGH \(.high)" else "" end) |"' <<< "${SCAN_EVIDENCE}"
+            fi
+            [ -z "${REUSE_BACKEND_SCAN}" ] || echo "| escaneo backend (reuso) | ${REUSE_BACKEND_SCAN} |"
+            [ -z "${REUSE_POSTGRES_SCAN}" ] || echo "| escaneo postgres (reuso) | ${REUSE_POSTGRES_SCAN} |"
+            if [ "${DEPLOY_REQUIRED}" = "true" ]; then
+              echo "| política de vulnerabilidades (evaluación/exigencia) | ${O_POLICY} — decisión **${POLICY_DECISION:-sin decisión}** |"
+              if [ -f "${POLICY_RESULT}" ]; then
+                jq -r '.surfaces[] | "| política \(.surface) | \(.verdict)\(if .reason_code then " (\(.reason_code))" else "" end)\(if .evaluation == "historical" then " — evidencia HISTÓRICA, sin escaneo fresco" else "" end) |"' "${POLICY_RESULT}"
+              fi
+              [ -z "${O_BREAK_GLASS}" ] || [ "${O_BREAK_GLASS}" = "skipped" ] ||
+                echo "| break-glass | ${O_BREAK_GLASS} ${BREAK_GLASS_ISSUE:-} |"
+            fi
+            echo "| deploy (converge/deploy) | ${O_DEPLOY} |"
+            echo "| identidad en ejecución (converge/deploy) | ${O_IDENTITY} |"
+            echo "| health (contenedores/público) | ${O_HEALTH} |"
+            echo "| registro del último éxito | ${O_RECORD} |"
+            if [ "${FRONTEND_REQUIRED}" = "true" ]; then
+              echo "| Pages: destino | proyecto \`${PAGES_PROJECT:-—}\`, rama \`${PAGES_BRANCH:-—}\` |"
+              echo "| Pages: artefacto | \`${PAGES_ARTIFACT:-—}\` \`${PAGES_DIST_SHA256:-—}\` (entrada \`${PAGES_ENTRY_ASSET:-—}\`) |"
+              echo "| Pages: preparación (destino/artefacto/node/wrangler/sondeo) | ${O_PAGES_PREP} (proyecto antes de Terraform: ${PAGES_PROBE_STATE:-—}) |"
+              echo "| Pages: proyecto tras Terraform (preflight estricto) | ${O_PAGES_PREFLIGHT:-—} — origen \`${PAGES_SOURCE:-no verificado}\` |"
+              echo "| Pages: dominio propio | \`${PAGES_DOMAIN_STATUS:-no leído}\` (informativo: la publicación se verifica por *.pages.dev; un dominio pendiente no prueba activación ni fallo) |"
+              if [ "${O_PAGES_PUBLISH}" = success ] && [ "${PAGES_DOMAIN_STATUS}" != active ]; then
+                echo "| Pages: instalación pública | **no verificada**: el sitio se publicó en *.pages.dev, pero el dominio propio no está activo (\`${PAGES_DOMAIN_STATUS:-no leído}\`); ni la activación ni el funcionamiento de punta a punta se verifican aquí |"
+              elif [ "${O_PAGES_PUBLISH}" = success ]; then
+                echo "| Pages: instalación pública | dominio propio activo según la API; el funcionamiento de punta a punta no se verifica aquí |"
+              fi
+              echo "| Pages: producción anterior | \`${PAGES_PREVIOUS_ID:-—}\` (commit \`${PAGES_PREVIOUS_COMMIT:-—}\`) |"
+              echo "| Pages: frescura / publicación | ${O_FRESH_FRONTEND:-—} / ${O_PAGES_PUBLISH:-—} |"
+              echo "| Pages: deployment publicado | \`${PAGES_DEPLOYMENT_ID:-—}\` ${PAGES_DEPLOYMENT_URL:-} |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Resultado ─────────────────────────────────────────────────────────────
+  # Solo puede ser success si cada job requerido corrió y terminó bien (incluida la
+  # publicación del frontend cuando el rango la requiere) y cada job no requerido quedó
+  # saltado. Un job saltado nunca cuenta como trabajo hecho: con Terraform, terraform_plan
+  # debe terminar en success con has_changes exactamente true o false. Un push diferido
+  # termina en success sin haber hecho nada: esa conclusión no es un deploy ni procesa el
+  # rango, y por eso la base del siguiente rango es range_processed, no la conclusión.
+  conclude:
+    name: Resultado de producción
+    runs-on: ubuntu-latest
+    needs: [classify, select_images, frontend_build, terraform_plan, production]
+    if: always()
+    timeout-minutes: 2
+    steps:
+      - name: Verificar resultado
+        env:
+          CLASSIFY: ${{ needs.classify.result }}
+          SELECT: ${{ needs.select_images.result }}
+          PRODUCTION: ${{ needs.production.result }}
+          TERRAFORM_PLAN: ${{ needs.terraform_plan.result }}
+          HAS_CHANGES: ${{ needs.terraform_plan.outputs.has_changes }}
+          TERRAFORM_REQUIRED: ${{ needs.classify.outputs.terraform_required }}
+          DEPLOY_REQUIRED: ${{ needs.classify.outputs.deploy_required }}
+          FRONTEND_REQUIRED: ${{ needs.classify.outputs.frontend_required }}
+          FRONTEND_BUILD: ${{ needs.frontend_build.result }}
+          PRODUCTION_STAGE: ${{ needs.classify.outputs.stage }}
+        run: |
+          set -euo pipefail
+          echo "classify=${CLASSIFY} select_images=${SELECT} frontend_build=${FRONTEND_BUILD} terraform_plan=${TERRAFORM_PLAN} (has_changes=${HAS_CHANGES:-—}) production=${PRODUCTION}"
+          [ "${CLASSIFY}" = "success" ] || { echo "Error: la intención no se pudo clasificar"; exit 1; }
+          [ "${SELECT}" = "success" ] || { echo "Error: la selección de imágenes no terminó (${SELECT})"; exit 1; }
+          if [ "${PRODUCTION_STAGE:-}" = "deferred" ]; then
+            for f in "${TERRAFORM_REQUIRED}" "${DEPLOY_REQUIRED}" "${FRONTEND_REQUIRED}"; do
+              [ "${f}" = "false" ] || { echo "Error: un push diferido no puede requerir trabajo"; exit 1; }
+            done
+            [ "${TERRAFORM_PLAN}" = "skipped" ] && [ "${PRODUCTION}" = "skipped" ] ||
+              { echo "Error: un push diferido corrió un job privilegiado (plan=${TERRAFORM_PLAN}, producción=${PRODUCTION})"; exit 1; }
+            echo "::notice title=Push diferido::Registrado sin deploy: este run no aplicó ni desplegó nada y el rango no avanza"
+            {
+              echo "## Push diferido: sin deploy"
+              echo
+              echo "Este run terminó bien porque registró la decisión de no procesar el push; **no es un deploy**. Ni Terraform ni el servidor ni Pages cambiaron, y el rango no avanza: el primer push procesado con \`vars.PRODUCTION_PUSH_DEPLOY=enabled\` lo cubre."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "${FRONTEND_REQUIRED}" = "true" ]; then
+            [ "${FRONTEND_BUILD}" = "success" ] || { echo "Error: el build del frontend requerido terminó en '${FRONTEND_BUILD}'"; exit 1; }
+          fi
+          PRODUCTION_REQUIRED=false
+          if [ "${TERRAFORM_REQUIRED}" = "true" ]; then
+            [ "${TERRAFORM_PLAN}" = "success" ] || { echo "Error: el plan de Terraform requerido terminó en '${TERRAFORM_PLAN}'"; exit 1; }
+            case "${HAS_CHANGES}" in
+              true)
+                [ "${PRODUCTION_STAGE:-}" != "install" ] || { echo "Error: stage=install exige un plan sin cambios"; exit 1; }
+                PRODUCTION_REQUIRED=true
+                ;;
+              false) ;;
+              *) echo "Error: el plan de Terraform no informó un resultado válido (has_changes='${HAS_CHANGES}')"; exit 1 ;;
+            esac
+          else
+            [ "${TERRAFORM_PLAN}" = "skipped" ] || { echo "Error: plan de Terraform no requerido terminó en '${TERRAFORM_PLAN}'"; exit 1; }
+          fi
+          if [ "${DEPLOY_REQUIRED}" = "true" ] || [ "${FRONTEND_REQUIRED}" = "true" ]; then
+            PRODUCTION_REQUIRED=true
+          fi
+          if [ "${PRODUCTION_REQUIRED}" = "true" ]; then
+            [ "${PRODUCTION}" = "success" ] || { echo "Error: producción requerida terminó en '${PRODUCTION}'"; exit 1; }
+          else
+            [ "${PRODUCTION}" = "skipped" ] || { echo "Error: producción no requerida terminó en '${PRODUCTION}'"; exit 1; }
+            if [ "${TERRAFORM_REQUIRED}" = "true" ]; then
+              echo "Plan de Terraform sin cambios y nada que desplegar: no-op limpio"
+            else
+              echo "Sin cambios de producción en el rango: no-op limpio"
+            fi
+          fi
+
+  # ── Rango procesado ───────────────────────────────────────────────────────
+  # Señal positiva que production-range-base.sh exige para avanzar la base: este push
+  # ordinario recorrió la cadena y conclude la verificó. Solo existe si corrió; un diferido,
+  # un dispatch o un fallo no la dejan. Sin secretos ni permisos. La condición es explícita
+  # porque el success() implícito de GitHub salta el job si cualquier dependencia transitiva
+  # se saltó, y en un push normal siempre hay jobs saltados.
+  range_processed:
+    name: Rango procesado
+    runs-on: ubuntu-latest
+    needs: [classify, conclude]
+    if: |
+      !cancelled() &&
+      github.event_name == 'push' &&
+      needs.classify.result == 'success' &&
+      needs.conclude.result == 'success' &&
+      needs.classify.outputs.stage == 'ordinary'
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Registrar rango procesado
+        run: echo "Rango procesado hasta ${GITHUB_SHA}"

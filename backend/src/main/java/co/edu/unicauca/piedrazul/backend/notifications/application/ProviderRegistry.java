@@ -35,6 +35,14 @@ public class ProviderRegistry {
         return providers.stream().anyMatch(p -> p.channel() == channel);
     }
 
+    /**
+     * Indica si hay al menos un proveedor que entrega al destinatario (cualquier canal distinto
+     * de CONSOLE, que es solo diagnóstico).
+     */
+    public boolean hasDeliveryProvider() {
+        return providers.stream().anyMatch(p -> p.channel() != NotificationChannel.CONSOLE);
+    }
+
     private void validateNoDuplicateChannels(
             List<NotificationProvider> providers
     ) {

@@ -1,37 +1,31 @@
 package co.edu.unicauca.piedrazul.backend.notifications.application;
 
-import co.edu.unicauca.piedrazul.backend.notifications.api.CancellationReason;
 import co.edu.unicauca.piedrazul.backend.notifications.api.ScheduleNotificationCommand;
 import co.edu.unicauca.piedrazul.backend.notifications.api.SendNotificationCommand;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.ChannelFallbackPolicy;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationRepository;
-import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationScheduleRepository;
 import co.edu.unicauca.piedrazul.backend.notifications.logging.NotificationLogContext;
 import co.edu.unicauca.piedrazul.backend.notifications.logging.NotificationLogger;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
 public class NotificationOrchestrator {
 
     private final NotificationRepository notificationRepository;
-    private final NotificationScheduleRepository scheduleRepository;
     private final NotificationFactory notificationFactory;
     private final NotificationSchedulerService schedulerService;
     private final ChannelFallbackPolicy fallbackPolicy;
 
     public NotificationOrchestrator(
             NotificationRepository notificationRepository,
-            NotificationScheduleRepository scheduleRepository,
             NotificationFactory notificationFactory,
             NotificationSchedulerService schedulerService,
             ChannelFallbackPolicy fallbackPolicy
     ) {
         this.notificationRepository = notificationRepository;
-        this.scheduleRepository = scheduleRepository;
         this.notificationFactory = notificationFactory;
         this.schedulerService = schedulerService;
         this.fallbackPolicy = fallbackPolicy;
@@ -61,41 +55,6 @@ public class NotificationOrchestrator {
                 .findActiveByAggregateAndType(command.aggregate(), command.type())
                 .map(Notification::getId)
                 .orElseGet(() -> createAndScheduleAt(command, now));
-    }
-
-    public void cancelPendingForAggregate(
-            AggregateReference aggregate,
-            CancellationReason reason,
-            Instant now
-    ) {
-        Objects.requireNonNull(aggregate, "El agregado es obligatorio");
-        Objects.requireNonNull(reason, "La razón de cancelación es obligatoria");
-        Objects.requireNonNull(now, "La fecha actual es obligatoria");
-
-        List<Notification> pendingNotifications =
-                notificationRepository.findPendingByAggregate(aggregate);
-
-        for (Notification notification : pendingNotifications) {
-            if (!notification.getStatus().isTerminal()) {
-                notification.markCancelled(now);
-                notificationRepository.save(notification);
-
-                NotificationLogger.statusUpdated(
-                        logContext(notification),
-                        "CANCELLED reason=" + reason
-                );
-            }
-
-            List<NotificationSchedule> schedules =
-                    scheduleRepository.findPendingByNotificationId(notification.getId());
-
-            for (NotificationSchedule schedule : schedules) {
-                if (!schedule.getStatus().isTerminal()) {
-                    schedule.cancel(now);
-                    scheduleRepository.save(schedule);
-                }
-            }
-        }
     }
 
     public boolean alreadySent(

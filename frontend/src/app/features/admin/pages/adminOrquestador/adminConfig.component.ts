@@ -1,0 +1,560 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+  viewChild,
+} from '@angular/core';
+import {
+  LucideCalendarCheck,
+  LucideChartNoAxesColumn,
+  LucideCheck,
+  LucideDynamicIcon,
+  LucidePencil,
+  LucideSettings,
+  LucideX,
+  LucideRefreshCw,
+} from '@lucide/angular';
+import { catchError, finalize, forkJoin, Observable, of } from 'rxjs';
+import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
+import { PaginationComponent } from '../../../../designSystem/molecules/pagination/pagination.component';
+import { SearchInputComponent } from '../../../../designSystem/molecules/searchInput/searchInput.component';
+import {
+  SortControlComponent,
+  SortDirection,
+  SortOption,
+} from '../../../../designSystem/molecules/sortControl/sortControl.component';
+import {
+  ToastComponent,
+  ToastType,
+} from '../../../../designSystem/molecules/toastMessage/toast.component';
+import { ConfirmModalComponent } from '../../../../designSystem/organisms/confirmModal/confirmModal.component';
+import { PaginationMeta } from '../../../../shared/helpers/paginatedState';
+import { scrollToElementById } from '../../../../shared/helpers/scrollToElement';
+import {
+  DAY_TO_WORKDAY,
+  workdayToNumber,
+} from '../../../../shared/helpers/workday.util';
+import { AppError } from '../../../../shared/models/interfaces/apiError.model';
+import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.model';
+import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
+import { AdminStatisticsComponent } from '../../components/adminStatistics/adminStatistics.component';
+import { DoctorCardComponent } from '../../components/doctorCard/doctorCard.component';
+import { DoctorTimeOffDrawerComponent } from '../../components/doctorTimeOffDrawer/doctorTimeOffDrawer.component';
+import {
+  DoctorEditFormComponent,
+  DoctorSaveEvent,
+} from '../../components/doctorEditForm/doctorEditForm.component';
+import { AdminModalsComponent } from '../../components/modals/modalHorarios/adminModals.component';
+import { dtoSchedule } from '../../models/dtos/schedule.dto';
+import { TimeOffDto } from '../../models/dtos/timeOff.dto';
+import { AdminService } from '../../service/admin.service';
+
+type AdminView = 'horarios' | 'estadisticas';
+
+@Component({
+  selector: 'app-admin-config',
+  templateUrl: './adminConfig.component.html',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    LucideSettings,
+    LucidePencil,
+    DoctorCardComponent,
+    DoctorEditFormComponent,
+    AdminModalsComponent,
+    ToastComponent,
+    PaginationComponent,
+    SortControlComponent,
+    SearchInputComponent,
+    LucideCalendarCheck,
+    ConfirmModalComponent,
+    LucideDynamicIcon,
+    ButtonComponent,
+    AdminStatisticsComponent,
+    LucideChartNoAxesColumn,
+    DoctorTimeOffDrawerComponent,
+    LucideRefreshCw,
+  ],
+})
+export class AdminConfigComponent implements OnInit {
+  private adminService = inject(AdminService);
+  // ── Búsqueda ─────────────────────────────────────────────────────────────
+  searchTerm = signal('');
+  searching = signal(false);
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  doctors = signal<Doctor[]>([]);
+  loading = signal(false);
+  errorCarga = signal('');
+  editingId = signal<string | null>(null);
+  savedId = signal<string | null>(null);
+  savingDoctorId = signal<string | null>(null);
+
+  showConfirmModal = signal(false);
+  doctorToToggle = signal<Doctor | null>(null);
+  showErrorModal = signal(false);
+  errorGuardado = signal('');
+  toastMessage = signal('');
+  toastType = signal<ToastType | null>(null);
+
+  // ── Descansos ─────────────────────────────────────────────────────────────
+  /** Descansos por id de doctor (para los chips de las tarjetas). */
+  timeOffsByDoctor = signal<Record<string, TimeOffDto[]>>({});
+  /** Doctor cuyo panel de descansos está abierto. */
+  timeOffDoctor = signal<Doctor | null>(null);
+
+  readonly Check = LucideCheck;
+  readonly X = LucideX;
+  // ── Vista activa ──────────────────────────────────────────────────────────
+  activeView = signal<AdminView>('horarios');
+  // ── Paginacion ──────────────────────────────────────────────────────────────
+  currentPage = signal(0);
+  totalPages = signal(0);
+  totalElements = signal(0);
+  readonly PAGE_SIZE = 4;
+
+  // ── Botón de refrescar de estadísticas ──────────────────────────────────────────────────────────
+  /** Referencia al hijo de estadísticas; solo existe mientras esa vista está activa. */
+  private statistics = viewChild(AdminStatisticsComponent);
+  refreshStatistics(): void {
+    this.statistics()?.refresh();
+  }
+
+  // ── Agendamiento autónomo ────────────────────────────────────────────────
+  /** Estado del agendamiento autónomo de pacientes. TODO: cargar del backend cuando exista el endpoint. */
+  autonomousBookingEnabled = signal(true);
+  showAutonomousBookingModal = signal(false);
+  // ── Ordenamiento ──────────────────────────────────────────────────────────
+  sortField = signal('appointmentInterval');
+  sortDirection = signal<SortDirection>('asc');
+
+  readonly sortOptions: SortOption[] = [
+    { value: 'name', label: 'Nombre' },
+    { value: 'status', label: 'Estado' },
+    { value: 'appointmentInterval', label: 'Intervalo' },
+  ];
+
+  // ── Computed ──────────────────────────────────────────────────────────────
+
+  pagination = computed<PaginationMeta | null>(() => {
+    const total = this.totalPages();
+    if (total <= 1) return null;
+    const current = this.currentPage();
+    return {
+      pageNumber: current,
+      pageSize: this.PAGE_SIZE,
+      totalElements: this.totalElements(),
+      totalPages: total,
+      first: current === 0,
+      last: current === total - 1,
+    };
+  });
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+  ngOnInit(): void {
+    this.loadDoctors();
+    this.loadAutonomousSchedulingStatus();
+  }
+
+  // ── Data loading ──────────────────────────────────────────────────────────
+  loadDoctors(page = 0): void {
+    this.loading.set(true);
+    this.searching.set(true);
+    this.errorCarga.set('');
+    const sort = `${this.sortField()},${this.sortDirection()}`;
+    const search = this.searchTerm() || undefined;
+    this.adminService
+      .getDoctors(page, this.PAGE_SIZE, sort, search)
+      .pipe(finalize(() => this.searching.set(false)))
+      .subscribe({
+        next: (response) => {
+          this.currentPage.set(response.pageNumber);
+          this.totalPages.set(response.totalPages);
+          this.totalElements.set(response.totalElements);
+
+          const doctors = response.content;
+          if (!doctors.length) {
+            this.doctors.set([]);
+            this.loading.set(false);
+            return;
+          }
+
+          this.loadTimeOffs(doctors);
+
+          forkJoin(
+            doctors.map((d) => this.adminService.getSchedulesByDoctor(d.id))
+          ).subscribe({
+            next: (allSchedules) => {
+              this.doctors.set(
+                doctors.map((d, i) => ({
+                  ...d,
+                  workdays: d.workdays ?? [],
+                  ...this.mapSchedulesToDoctor(allSchedules[i]),
+                }))
+              );
+              this.loading.set(false);
+            },
+            error: () => {
+              this.doctors.set(
+                doctors.map((d) => ({ ...d, workdays: d.workdays ?? [] }))
+              );
+              this.loading.set(false);
+            },
+          });
+        },
+        error: (err: AppError) => {
+          this.errorCarga.set(err.message);
+          this.loading.set(false);
+        },
+      });
+  }
+  private loadAutonomousSchedulingStatus(): void {
+    this.adminService.getAutonomousSchedulingStatus().subscribe({
+      next: (enabled) => this.autonomousBookingEnabled.set(enabled),
+      error: () => {
+        // Si falla la carga, se mantiene el valor por defecto (true)
+        // y el usuario puede intentar cambiarlo igualmente.
+      },
+    });
+  }
+  // ── Edit handlers ─────────────────────────────────────────────────────────
+  startEdit(doctor: Doctor): void {
+    this.editingId.set(doctor.id);
+    this.savedId.set(null);
+    scrollToElementById(`doctor-card-${doctor.id}`);
+  }
+
+  cancelEdit(): void {
+    this.editingId.set(null);
+  }
+  onSearch(term: string): void {
+    this.applySearch(term);
+  }
+
+  private applySearch(value: string): void {
+    const trimmed = value.trim();
+    if (trimmed === this.searchTerm()) return;
+    this.searchTerm.set(trimmed);
+    this.loadDoctors(0);
+  }
+  onFormSaved(event: DoctorSaveEvent): void {
+    const { form, originalDoctor, removedWorkdays } = event;
+    if (this.savingDoctorId() === form.id) return;
+    const calls: Observable<unknown>[] = [];
+
+    const infoChanged =
+      originalDoctor.appointmentInterval !== form.appointmentInterval ||
+      originalDoctor.laborStart !== form.laborStart ||
+      originalDoctor.laborEnd !== form.laborEnd ||
+      originalDoctor.bookingWindowWeeks !== form.bookingWindowWeeks;
+
+    if (infoChanged) {
+      calls.push(
+        this.adminService.updateDoctorInfo(
+          form.id,
+          form.laborStart,
+          form.laborEnd,
+          form.appointmentInterval,
+          form.bookingWindowWeeks
+        )
+      );
+    }
+
+    removedWorkdays.forEach((day) => {
+      const workday = DAY_TO_WORKDAY[day];
+      if (workday)
+        calls.push(this.adminService.deleteSchedule(form.id, workday));
+    });
+
+    (form.workdays ?? []).forEach((day) => {
+      const workday = DAY_TO_WORKDAY[day];
+      if (!workday) return;
+
+      const ds = form.daySchedules?.[day];
+      const startTime = this.toTimeBackend(
+        ds?.startTime ?? form.startTime ?? '05:00'
+      );
+      const endTime = this.toTimeBackend(
+        ds?.endTime ?? form.endTime ?? '12:00'
+      );
+
+      calls.push(
+        this.adminService.updateSchedule(form.id, workday, startTime, endTime)
+      );
+    });
+
+    if (!calls.length) {
+      this.cancelEdit();
+      return;
+    }
+
+    forkJoin(calls).subscribe({
+      next: () => {
+        this.reloadDoctor(form.id, form);
+        this.savedId.set(form.id);
+        this.editingId.set(null);
+        setTimeout(() => this.savedId.set(null), 3000);
+        this.showToast('success', 'Configuración guardada correctamente.');
+      },
+      error: (err: AppError) => {
+        this.errorGuardado.set(err.message);
+        this.showErrorModal.set(true);
+      },
+    });
+  }
+
+  // ── Toggle handlers ───────────────────────────────────────────────────────
+  openToggleModal(doctor: Doctor): void {
+    // Si se intenta HABILITAR un médico sin horario configurado,
+    if (!doctor.status && !this.hasScheduleConfigured(doctor)) {
+      this.errorGuardado.set(
+        'Debes añadir un horario laboral al médico antes de poder habilitarlo.'
+      );
+      this.showErrorModal.set(true);
+      return;
+    }
+
+    this.doctorToToggle.set(doctor);
+    this.showConfirmModal.set(true);
+  }
+  openAutonomousBookingModal(): void {
+    this.showAutonomousBookingModal.set(true);
+  }
+
+  onCloseAutonomousBookingModal(): void {
+    this.showAutonomousBookingModal.set(false);
+  }
+
+  onConfirmAutonomousBookingToggle(): void {
+    const next = !this.autonomousBookingEnabled();
+    this.adminService.setAutonomousSchedulingStatus(next).subscribe({
+      next: () => {
+        this.autonomousBookingEnabled.set(next);
+        this.onCloseAutonomousBookingModal();
+        this.showToast(
+          'success',
+          next
+            ? 'Agendamiento autónomo habilitado.'
+            : 'Agendamiento autónomo deshabilitado.'
+        );
+      },
+      error: (err: AppError) => {
+        this.onCloseAutonomousBookingModal();
+        this.errorGuardado.set(err.message);
+        this.showErrorModal.set(true);
+      },
+    });
+  }
+  /** True si el médico tiene todos los datos mínimos de horario para poder habilitarse. */
+  private hasScheduleConfigured(doctor: Doctor): boolean {
+    return !!(
+      doctor.startTime &&
+      doctor.endTime &&
+      doctor.workdays?.length &&
+      doctor.laborStart &&
+      doctor.laborEnd
+    );
+  }
+
+  onCloseToggleModal(): void {
+    this.showConfirmModal.set(false);
+    this.doctorToToggle.set(null);
+  }
+
+  onConfirmToggle(): void {
+    const doctor = this.doctorToToggle();
+    if (!doctor) return;
+    if (!doctor.status) {
+      this.adminService
+        .enableDoctor(doctor.id, doctor.laborStart, doctor.laborEnd)
+        .subscribe({
+          next: () => {
+            this.doctors.update((list) =>
+              list.map((d) => (d.id === doctor.id ? { ...d, status: true } : d))
+            );
+            this.onCloseToggleModal();
+          },
+          error: (err: AppError) => {
+            this.onCloseToggleModal();
+            this.errorGuardado.set(err.message);
+            this.showErrorModal.set(true);
+          },
+        });
+      return;
+    }
+
+    this.adminService.disableDoctor(doctor.id).subscribe({
+      next: () => {
+        this.doctors.update((list) =>
+          list.map((d) => (d.id === doctor.id ? { ...d, status: false } : d))
+        );
+        this.onCloseToggleModal();
+      },
+      error: (err: AppError) => {
+        this.onCloseToggleModal();
+        this.errorGuardado.set(
+          err.errorCode === 'DOCTOR_SCHEDULED_APPOINTMENTS'
+            ? err.message
+            : err.message
+        );
+        this.showErrorModal.set(true);
+      },
+    });
+  }
+
+  // ── Descansos ─────────────────────────────────────────────────────────────
+  openTimeOff(doctor: Doctor): void {
+    if (doctor.status === false) return;
+    this.timeOffDoctor.set(doctor);
+  }
+
+  closeTimeOff(): void {
+    this.timeOffDoctor.set(null);
+  }
+
+  onTimeOffsChange(doctorId: string, timeOffs: TimeOffDto[]): void {
+    this.timeOffsByDoctor.update((map) => ({ ...map, [doctorId]: timeOffs }));
+  }
+
+  /** Carga los descansos de los doctores de la página. Si uno falla, queda sin chip. */
+  private loadTimeOffs(doctors: Doctor[]): void {
+    forkJoin(
+      doctors.map((d) =>
+        this.adminService
+          .getTimeOffs(d.id)
+          .pipe(catchError(() => of([] as TimeOffDto[])))
+      )
+    ).subscribe((lists) => {
+      const map: Record<string, TimeOffDto[]> = {};
+      doctors.forEach((d, i) => (map[d.id] = lists[i]));
+      this.timeOffsByDoctor.set(map);
+    });
+  }
+
+  onCloseErrorModal(): void {
+    this.showErrorModal.set(false);
+    this.errorGuardado.set('');
+  }
+
+  // ── Helpers de template ───────────────────────────────────────────────────
+  containerClass(doctor: Doctor): string {
+    if (doctor.status === false) return 'border-gray-200 bg-gray-50';
+    if (this.editingId() === doctor.id) return 'border-blue-400 bg-blue-50';
+    return 'border-gray-100 bg-white hover:shadow-lg transition-shadow';
+  }
+
+  viewTabClass(view: AdminView): string {
+    return (
+      'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ' +
+      (this.activeView() === view
+        ? 'bg-[#215c98] text-white shadow-sm'
+        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700')
+    );
+  }
+
+  // ── Private ───────────────────────────────────────────────────────────────
+  private toTimeBackend(time: string | undefined): string {
+    if (!time) return '';
+    return time.length === 5 ? `${time}:00` : time;
+  }
+  showToast(type: ToastType, message: string, duration = 3000): void {
+    this.toastType.set(type);
+    this.toastMessage.set(message);
+    setTimeout(() => {
+      this.toastType.set(null);
+      this.toastMessage.set('');
+    }, duration);
+  }
+
+  private mapSchedulesToDoctor(schedules: dtoSchedule[]): Partial<Doctor> {
+    if (!schedules?.length) return {};
+    const daySchedules: Record<number, DaySchedule> = {};
+    const workdays: number[] = [];
+    schedules.forEach((s) => {
+      const day = workdayToNumber(s.workday);
+      if (day === null) return;
+      daySchedules[day] = {
+        startTime: s.startTime.substring(0, 5),
+        endTime: s.endTime.substring(0, 5),
+      };
+      workdays.push(day);
+    });
+    workdays.sort((a, b) => a - b);
+
+    const freq = new Map<
+      string,
+      { count: number; startTime: string; endTime: string }
+    >();
+    Object.values(daySchedules).forEach((ds) => {
+      const key = `${ds.startTime}-${ds.endTime}`;
+      if (freq.has(key)) {
+        freq.get(key)!.count++;
+      } else {
+        freq.set(key, {
+          count: 1,
+          startTime: ds.startTime,
+          endTime: ds.endTime,
+        });
+      }
+    });
+
+    let best = { count: 0, startTime: '', endTime: '' };
+    freq.forEach((val) => {
+      if (val.count > best.count) best = val;
+    });
+
+    return {
+      startTime: best.startTime,
+      endTime: best.endTime,
+      daySchedules,
+      workdays,
+    };
+  }
+
+  private reloadDoctor(doctorId: string, fallback: Doctor): void {
+    const sort = `${this.sortField()},${this.sortDirection()}`;
+    const search = this.searchTerm() || undefined;
+    forkJoin([
+      this.adminService.getDoctors(
+        this.currentPage(),
+        this.PAGE_SIZE,
+        sort,
+        search
+      ),
+      this.adminService.getSchedulesByDoctor(doctorId),
+    ]).subscribe({
+      next: ([doctorsPage, schedules]) => {
+        const freshDoctor =
+          doctorsPage.content.find((d) => d.id === doctorId) ?? fallback;
+        const mapped = this.mapSchedulesToDoctor(schedules);
+        this.doctors.update((list) =>
+          list.map((d) =>
+            d.id === doctorId ? { ...freshDoctor, ...mapped } : d
+          )
+        );
+      },
+      error: () => {
+        this.doctors.update((list) =>
+          list.map((d) => (d.id === doctorId ? fallback : d))
+        );
+      },
+    });
+  }
+  // ── Pagination ───────────────────────────────────────────────────────────────
+  goToPage(page: number): void {
+    if (page < 0 || page >= this.totalPages() || page === this.currentPage())
+      return;
+    this.loadDoctors(page);
+  }
+  onSortFieldChange(field: string): void {
+    this.sortField.set(field);
+    this.loadDoctors(0);
+  }
+
+  onSortDirectionChange(direction: SortDirection): void {
+    this.sortDirection.set(direction);
+    this.loadDoctors(0);
+  }
+}

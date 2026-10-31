@@ -18,16 +18,6 @@ variable "cloudflare_zone_id" {
   type        = string
 }
 
-variable "github_owner" {
-  description = "Propietario del repositorio en GitHub (usuario u organización)"
-  type        = string
-}
-
-variable "github_repo" {
-  description = "Nombre del repositorio en GitHub"
-  type        = string
-}
-
 variable "ansible_ssh_public_key" {
   description = "Llave pública SSH para Ansible — automatización CI/CD"
   type        = string

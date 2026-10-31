@@ -1,0 +1,213 @@
+---
+# Bootstrap del primer administrador en el backend que corre, al final de refresh_backend.yml
+# y de deploy.yml. Ver docs/operations/runbooks/primer-admin-negocio.md.
+#
+# "En vigor" no se deduce del .env: el contenedor en ejecución está en vigor solo si sus
+# IDENTITY_SEED_* son exactamente los que Compose entregaría hoy desde .env. Si no, el cambio
+# del .env está pendiente de recrear el backend.
+#
+# Modos (app_identity_seed_runtime_mode):
+#   enforce (por defecto) — falla si:
+#     - el GitHub Environment y el .env del host no coinciden (app_identity_seed_intended,
+#       si se pasa): un retiro o una habilitación esperan la configuración del servidor;
+#     - el contenedor no refleja el .env (pendiente de recreación), o con el bootstrap
+#       deshabilitado conserva IDENTITY_SEED_ENABLED=true o una contraseña inicial;
+#     - con el bootstrap habilitado: no hay backend, o su arranque actual no informó CREATED
+#       ni ALREADY_LINKED_READY (ALREADY_LINKED_NOT_READY incluido: no se repara).
+#   deferred — converge cuyo backend no se recreó y al que sigue un deploy en el mismo run:
+#     solo informa; el deploy exige.
+
+- name: Leer .env (bootstrap del primer administrador)
+  ansible.builtin.slurp:
+    src: "{{ app_dir }}/.env"
+  register: app_identity_seed_env_file
+  no_log: true
+
+- name: Leer lo que Compose entregaría al backend (bootstrap del primer administrador)
+  ansible.builtin.command:
+    argv: "{{ compose_cli + ['config', '--format', 'json'] }}"
+    chdir: "{{ app_dir }}/compose"
+  register: app_identity_seed_runtime_compose
+  changed_when: false
+  no_log: true
+
+- name: Leer el contenedor backend (bootstrap del primer administrador)
+  community.docker.docker_container_info:
+    name: backend
+  register: app_identity_seed_container
+  no_log: true
+
+# Solo booleanos, nombres de variable y la fecha de arranque salen de aquí: .env, Compose y
+# el entorno del contenedor tienen secretos. splitlines() y no split('\n'): en set_fact
+# Ansible escapa la barra y partiría por un "\n" literal (ansible-core 2.16).
+- name: Evaluar el bootstrap en .env, Compose y el contenedor
+  ansible.builtin.set_fact:
+    app_identity_seed_env_enabled: >-
+      {{ (app_identity_seed_env_file.content | b64decode).splitlines()
+         | select('match', '^IDENTITY_SEED_ENABLED=true$') | list | length > 0 }}
+    app_identity_seed_container_exists: "{{ app_identity_seed_container.exists }}"
+    app_identity_seed_container_retains: >-
+      {{ app_identity_seed_container.exists and
+         ((app_identity_seed_container.container.Config.Env | default([]))
+          | select('match', '^(IDENTITY_SEED_ENABLED=(?i:true)|IDENTITY_SEED_ADMIN_PASSWORD=.+)$')
+          | list | length > 0) }}
+    app_identity_seed_stale_keys: >-
+      {%- set expected = (app_identity_seed_runtime_compose.stdout | from_json).services.backend.environment -%}
+      {%- set actual = {} -%}
+      {%- if app_identity_seed_container.exists -%}
+        {%- for entry in app_identity_seed_container.container.Config.Env | default([]) -%}
+          {%- if entry.startswith('IDENTITY_SEED_') -%}
+            {%- set _ = actual.update({entry.split('=', 1)[0]: entry.split('=', 1)[1]}) -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endif -%}
+      {%- set stale = [] -%}
+      {%- for key in expected -%}
+        {%- if key.startswith('IDENTITY_SEED_')
+              and (expected[key] | default('') | string | replace('$$', '$')) != (actual[key] | default('')) -%}
+          {%- set _ = stale.append(key) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ stale if app_identity_seed_container.exists else [] }}
+    app_identity_seed_started_at: >-
+      {{ app_identity_seed_container.container.State.StartedAt
+         if app_identity_seed_container.exists else '' }}
+  no_log: true
+
+- name: Fijar el modo de verificación del bootstrap
+  ansible.builtin.set_fact:
+    app_identity_seed_enforce: "{{ (app_identity_seed_runtime_mode | default('enforce')) == 'enforce' }}"
+    app_identity_seed_in_effect: >-
+      {{ (app_identity_seed_container_exists | bool) and (app_identity_seed_stale_keys | length == 0) }}
+
+# ── El GitHub Environment frente al .env del host ──────────────────────────────
+- name: Verificar que el .env del host corresponde a la decisión del environment
+  when:
+    - app_identity_seed_enforce | bool
+    - app_identity_seed_intended is defined
+  ansible.builtin.assert:
+    that:
+      - ((app_identity_seed_intended | string | trim | lower) == 'true') == (app_identity_seed_env_enabled | bool)
+    fail_msg: >-
+      {{ 'IDENTITY_SEED_ENABLED ya no está habilitado en el environment, pero el .env del host
+      sigue con el bootstrap (y su contraseña): el retiro está pendiente. Correr la configuración
+      del servidor junto con el deploy.'
+      if app_identity_seed_env_enabled | bool else
+      'IDENTITY_SEED_ENABLED=true en el environment, pero el .env del host no tiene el bootstrap:
+      correr la configuración del servidor.' }}
+    quiet: true
+
+# ── Converge seguido de deploy: solo informar ─────────────────────────────────
+- name: Informar el bootstrap pendiente del deploy de este run
+  when: not (app_identity_seed_enforce | bool)
+  ansible.builtin.debug:
+    msg: >-
+      Bootstrap del primer administrador {{ 'habilitado' if app_identity_seed_env_enabled | bool else 'deshabilitado' }}
+      en .env; backend {{ 'sin cambios pendientes' if app_identity_seed_in_effect | bool
+      else 'pendiente de recreación (' ~ (app_identity_seed_stale_keys | join(', ') or 'no existe') ~ ')' }}.
+      Lo verifica el deploy de este run.
+
+# ── Deshabilitado: retiro en vigor ───────────────────────────────────────────
+- name: Verificar que el backend no conserva el bootstrap deshabilitado
+  when:
+    - app_identity_seed_enforce | bool
+    - not (app_identity_seed_env_enabled | bool)
+  ansible.builtin.assert:
+    that:
+      - not (app_identity_seed_container_retains | bool)
+      - app_identity_seed_stale_keys | length == 0
+    fail_msg: >-
+      El bootstrap está deshabilitado en .env pero el contenedor backend en ejecución no lo
+      refleja ({{ app_identity_seed_stale_keys | join(', ') }}; valores no mostrados){{
+      ': conserva la contraseña inicial' if app_identity_seed_container_retains | bool else '' }}.
+      El retiro está pendiente de recrear el backend: correr un deploy.
+    quiet: true
+
+# ── Habilitado: en vigor y con resultado listo ───────────────────────────────
+- name: Verificar que el bootstrap habilitado está en vigor en el backend
+  when:
+    - app_identity_seed_enforce | bool
+    - app_identity_seed_env_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - app_identity_seed_in_effect | bool
+    fail_msg: >-
+      {{ 'Bootstrap del primer administrador habilitado en .env, pero no hay contenedor backend
+      que lo aplique: correr un deploy.'
+      if not (app_identity_seed_container_exists | bool) else
+      'Bootstrap del primer administrador habilitado en .env, pero el backend en ejecución no
+      recibió esa configuración (' ~ (app_identity_seed_stale_keys | join(', ')) ~ '; valores no
+      mostrados): está pendiente de recrearlo y ningún resultado corresponde a ella. Correr un deploy.' }}
+    quiet: true
+
+# Sin datos personales por diseño: la línea solo trae códigos e ids internos
+- name: Esperar el resultado del bootstrap del primer administrador
+  when:
+    - app_identity_seed_enforce | bool
+    - app_identity_seed_env_enabled | bool
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail;
+      docker logs --since "{{ app_identity_seed_started_at }}" backend 2>&1
+      | grep -oE 'identity-bootstrap result=[A-Z_]+.*$' | tail -n 1
+    executable: /bin/bash
+  register: app_identity_seed_result
+  until: app_identity_seed_result.stdout is search('identity-bootstrap result=')
+  retries: "{{ app_identity_seed_result_retries | default(60) }}"
+  delay: "{{ app_identity_seed_result_delay | default(5) }}"
+  changed_when: false
+  failed_when: false
+
+# Con fail-closed el contenedor puede haberse reiniciado: el historial deja ver un intento
+# anterior (p. ej. FAILED_NEEDS_INSPECTION seguido de ALREADY_LINKED_NOT_READY)
+- name: Leer el historial de resultados del contenedor backend
+  when:
+    - app_identity_seed_enforce | bool
+    - app_identity_seed_env_enabled | bool
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail;
+      docker logs backend 2>&1
+      | grep -oE 'identity-bootstrap result=[A-Z_]+ attempt=[^ ]+ stage=[^ ]+( reasons=[^ ]+)?'
+      | awk '!seen[$0]++' | tail -n 5
+    executable: /bin/bash
+  register: app_identity_seed_history
+  changed_when: false
+  failed_when: false
+
+- name: Informar el resultado del bootstrap del primer administrador
+  when:
+    - app_identity_seed_enforce | bool
+    - app_identity_seed_env_enabled | bool
+  ansible.builtin.debug:
+    msg:
+      resultado: "{{ app_identity_seed_result.stdout | default('') or 'sin línea identity-bootstrap en el arranque actual del backend' }}"
+      historial: "{{ app_identity_seed_history.stdout_lines | default([]) }}"
+
+- name: Verificar que la identidad vinculada conserva su autoridad
+  when:
+    - app_identity_seed_enforce | bool
+    - app_identity_seed_env_enabled | bool
+    - app_identity_seed_result.stdout | default('') is search('result=ALREADY_LINKED_NOT_READY( |$)')
+  ansible.builtin.fail:
+    msg: >-
+      La cuenta y la Person configuradas ya están vinculadas, pero la cuenta no está lista
+      ({{ app_identity_seed_result.stdout | regex_search('reasons=[^ ]+') or 'sin reasons' }}). El
+      bootstrap no restituye roles ni reactiva cuentas. Si el cambio fue una decisión
+      administrativa: deshabilitar el bootstrap y reconverger. Si no: restituir a mano
+      (primer-admin-negocio.md, paso 6).
+
+- name: Verificar el resultado del bootstrap del primer administrador
+  when:
+    - app_identity_seed_enforce | bool
+    - app_identity_seed_env_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - app_identity_seed_result.stdout | default('') is search('identity-bootstrap result=(CREATED|ALREADY_LINKED_READY)( |$)')
+    fail_msg: >-
+      El bootstrap del primer administrador no terminó en CREATED ni ALREADY_LINKED_READY
+      ({{ app_identity_seed_result.stdout | default('') | regex_search('result=[A-Z_]+') or 'sin resultado' }}).
+      Con ese resultado el backend no arranca (fail-closed) y su política de reinicio lo
+      reintenta. No se reparó ni borró nada automáticamente: seguir primer-admin-negocio.md
+      según el resultado y los reasons.
+    quiet: true

@@ -1,0 +1,39 @@
+services:
+  # Migración de esquema de un solo uso. No arranca con `up` (perfil migrate): la corre
+  # Ansible con `docker compose --profile migrate run --rm --no-deps migrate` después de
+  # reconciliar las credenciales y antes de arrancar el backend.
+  #
+  # Misma identidad exacta que el backend (BACKEND_IMAGE de image.env), otro punto de
+  # entrada: SchemaMigrationApplication aplica las migraciones Flyway que trae la imagen y
+  # termina. Sin web, JPA, seeders ni schedulers. Es el único consumidor de MIGRATION_DB_*.
+  migrate:
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE no definido — image.env debe contener la identidad exacta del backend (repo@sha256)}
+    profiles: [migrate]
+    restart: "no"
+    entrypoint:
+      - java
+      - -XX:+UseContainerSupport
+      - -XX:MaxRAMPercentage=75.0
+      - -Dloader.main=co.edu.unicauca.piedrazul.migration.SchemaMigrationApplication
+      - -cp
+      - app.jar
+      - org.springframework.boot.loader.launch.PropertiesLauncher
+    environment:
+      DB_HOST: ${DB_HOST:?DB_HOST es requerido}
+      DB_PORT: ${DB_PORT:?DB_PORT es requerido}
+      DB_NAME: ${DB_NAME:?DB_NAME es requerido}
+      DB_SCHEMA: ${DB_SCHEMA:?DB_SCHEMA es requerido}
+
+      MIGRATION_DB_USERNAME: ${MIGRATION_DB_USERNAME:?MIGRATION_DB_USERNAME es requerido}
+      MIGRATION_DB_PASSWORD: ${MIGRATION_DB_PASSWORD:?MIGRATION_DB_PASSWORD es requerido}
+
+      # Solo el nombre: placeholder ${app_role} de las migraciones (GRANT/REVOKE)
+      APP_DB_USERNAME: ${APP_DB_USERNAME:?APP_DB_USERNAME es requerido}
+    # Sin healthcheck propio de la imagen: es un proceso que termina
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - piedrazul_net

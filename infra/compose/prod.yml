@@ -8,34 +8,38 @@ include:
   - ./db.yml
   - ./keycloak.yml
   - ./backend.yml
+  - ./migrate.yml
   - ./traefik.yml
 
 services:
+  # Imágenes propias: siempre por identidad exacta (repo@sha256), nunca por tag
+  postgres:
+    image: ${POSTGRES_IMAGE:?POSTGRES_IMAGE no definido — image.env debe contener la identidad exacta de postgres (repo@sha256)}
+
   keycloak:
-    command: ["start", "--import-realm"]
+    # Tercero fijado: manifiesto linux/amd64 exacto (repo@sha256) del índice que declara
+    # keycloak.yml, resuelto y escaneado por el workflow y escrito por converge (setup.yml).
+    # Nunca por tag.
+    image: ${KEYCLOAK_IMAGE:?KEYCLOAK_IMAGE no definido — image.env debe contener la identidad exacta de keycloak (repo@sha256); corre converge}
+    # Sin --import-realm: el realm solo se importa en un evento P2 (kc.sh import, ver
+    # ansible/roles/app/tasks/keycloak_bootstrap.yml). Un reinicio o una recuperación nunca
+    # recrean un realm que falta.
+    command: ["start"]
     environment:
       KC_HOSTNAME: ${KC_HOSTNAME}
       KC_HOSTNAME_STRICT: "true"
       KC_PROXY_HEADERS: xforwarded
+    # Traefik lo enruta por el file provider (routes.yml, generado por Ansible): sin labels
     expose:
       - "${KC_PORT}"
-    labels:
-      # Traefik — enrutamiento de Keycloak
-      - "traefik.enable=true"
-      - "traefik.http.routers.keycloak.rule=Host(`${KC_HOSTNAME}`)"
-      - "traefik.http.routers.keycloak.entrypoints=websecure"
-      - "traefik.http.routers.keycloak.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.keycloak.tls.options=cloudflare-aop@file"
-      - "traefik.http.services.keycloak.loadbalancer.server.port=${KC_PORT}"
 
   backend:
+    # Traefik lo enruta por el file provider (routes.yml, generado por Ansible): sin labels
     expose:
       - "${SERVER_PORT}"
-    labels:
-      # Traefik — enrutamiento del backend API
-      - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`${API_PUBLIC_DOMAIN}`)"
-      - "traefik.http.routers.backend.entrypoints=websecure"
-      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.backend.tls.options=cloudflare-aop@file"
-      - "traefik.http.services.backend.loadbalancer.server.port=${SERVER_PORT}"
+
+  traefik:
+    # Tercero fijado: manifiesto linux/amd64 exacto (repo@sha256) del índice que declara
+    # traefik.yml, resuelto y escaneado por el workflow y escrito por converge (setup.yml).
+    # Nunca por tag.
+    image: ${TRAEFIK_IMAGE:?TRAEFIK_IMAGE no definido — image.env debe contener la identidad exacta de traefik (repo@sha256); corre converge}

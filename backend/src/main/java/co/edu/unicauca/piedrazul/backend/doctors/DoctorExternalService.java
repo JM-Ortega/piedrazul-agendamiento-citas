@@ -1,33 +1,34 @@
 package co.edu.unicauca.piedrazul.backend.doctors;
 
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.WorkingSchedule;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 public interface DoctorExternalService {
-    boolean existDoctor(UUID idDoctor);
 
-    String doctorsName(UUID idDoctor);
-
-    List<LocalTime> getSlotsByDoctor(UUID idDoctor, LocalDate date);
+    Optional<UUID> findByUserId(UUID userId);
 
     int getIntervalMinutesByDoctor(UUID idDoctor);
 
-    String getDoctorName(UUID idDoctor);
-
-    List<DoctorResponse> getActiveDoctors ();
-
     List<UUID> getActiveDoctorIds();
-
-    List<UUID> getActiveGeneralDoctorIds();
 
     List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
 
-    List<Specialty> findSpecialtiesByIdentification(String identification);
+    // Retorna el nombre de todos los doctores
+    Map<UUID, String> getDoctorNamesByIds();
 
-    UUID findIdByIdentification(String identification);
+    Map<UUID, List<SpecialtyCode>> findSpecialtiesByPersonIds(Collection<UUID> personIds);
+
+    Map<UUID, Integer> bookingWindowWeeksByDoctorIds(List<UUID> doctorIds);
+
+    Map<UUID, Integer> intervalMinutesByDoctorIds(List<UUID> doctorIds);
+
+    // Retorna las fechas y slots y el intervalo en las que el doctor trabaja
+    WorkingSchedule workingSchedule(UUID idDoctor);
+
+    // Indica si la fecha cae dentro de un periodo de descanso del doctor
+    boolean isOnTimeOff(UUID idDoctor, LocalDate date);
 }

@@ -1,5 +1,10 @@
-# Crea directorios, copia compose files y assets, genera .env
-# y levanta solo la infraestructura base (sin backend).
+# Crea directorios, copia compose files y assets, genera .env, las rutas de Traefik
+# (traefik_routes.yml) e image.env (incluidas las identidades exactas de Keycloak y Traefik,
+# keycloak_image.yml y traefik_image.yml), converge postgres y
+# reconcilia las autoridades de la base, y después levanta Traefik. Keycloak lo arranca
+# keycloak_lifecycle.yml (después de setup, en converge.yml). No arranca un backend nuevo
+# ni migra (eso es deploy.yml); refresh_backend.yml, al final de converge, solo recrea el
+# backend que ya corre la identidad seleccionada.
 
 - name: Crear directorio de la aplicación
   ansible.builtin.file:
@@ -9,22 +14,63 @@
     group: ansible
     mode: "0750"
 
-# KC secrets desde el entorno
-- name: Tomar KC secrets desde el entorno
+- name: Tomar y validar las credenciales técnicas de Keycloak
+  ansible.builtin.include_tasks: keycloak_credentials.yml
+
+# Autoridades de la base desde el entorno (contraseñas; los nombres están en group_vars)
+- name: Tomar contraseñas de la base desde el entorno
   ansible.builtin.set_fact:
-    app_kc_backend_secret: "{{ lookup('env', 'KC_BACKEND_CLIENT_SECRET') | trim | string }}"
-    app_kc_automation_secret: "{{ lookup('env', 'KC_AUTOMATION_CLIENT_SECRET') | trim | string }}"
+    app_db_secrets:
+      POSTGRES_PASSWORD: "{{ lookup('env', 'POSTGRES_PASSWORD') | string }}"
+      APP_DB_PASSWORD: "{{ lookup('env', 'APP_DB_PASSWORD') | string }}"
+      MIGRATION_DB_PASSWORD: "{{ lookup('env', 'MIGRATION_DB_PASSWORD') | string }}"
+      KC_DB_PASSWORD: "{{ lookup('env', 'KC_DB_PASSWORD') | string }}"
   no_log: true
 
-- name: Verificar que los KC secrets están definidos
+# Solo nombres en el mensaje, nunca valores
+- name: Detectar contraseñas de la base ausentes o no representables en .env
+  ansible.builtin.set_fact:
+    app_db_secrets_invalid: >-
+      {{ app_db_secrets | dict2items
+         | selectattr('value', 'match', '^$|.*[\'\r\n]')
+         | map(attribute='key') | list }}
+  no_log: true
+
+- name: Verificar las contraseñas de la base
   ansible.builtin.assert:
     that:
-      - app_kc_backend_secret | length > 0
-      - app_kc_automation_secret | length > 0
+      - app_db_secrets_invalid | length == 0
     fail_msg: >-
-      KC_BACKEND_CLIENT_SECRET o KC_AUTOMATION_CLIENT_SECRET no están definidos.
-      Ambos deben existir como GitHub Secrets e inyectarse al workflow de Ansible.
-  no_log: true
+      Contraseñas de la base vacías o con comilla simple / salto de línea:
+      {{ app_db_secrets_invalid | join(', ') }}. Deben existir como secretos del
+      GitHub Environment production-hetzner e inyectarse al paso de converge.
+    quiet: true
+
+# Antes de escribir .env: con el bootstrap habilitado, sus entradas completas y válidas
+# (compara la contraseña con las credenciales técnicas y de la base tomadas arriba)
+- name: Tomar y validar las entradas del bootstrap del primer administrador
+  ansible.builtin.include_tasks: identity_seed_inputs.yml
+
+# También antes de escribir .env: una imagen del backend anterior al bootstrap create-only
+# no debe recibirlo (ni la contraseña llegar al host para ella)
+- name: Verificar que la imagen del backend admite el bootstrap del primer administrador
+  when: app_identity_seed_enabled | bool
+  ansible.builtin.include_tasks: identity_seed_image_gate.yml
+
+# Antes de copiar Compose o escribir .env: compose/keycloak.yml exige FRONTEND_PUBLIC_URL y
+# env.j2 la produce desde frontend_public_domain. Un valor ausente o malformado falla aquí,
+# sin dejar en el servidor archivos Compose nuevos junto a un .env que no los cumple.
+- name: Validar el dominio público del frontend
+  ansible.builtin.assert:
+    that:
+      - frontend_public_domain | default('') | string is match(_host_re)
+    fail_msg: >-
+      FRONTEND: frontend_public_domain='{{ frontend_public_domain | default('') }}' debe ser un
+      nombre DNS en minúsculas (el tema de login usa https://<dominio>). No se copió Compose
+      ni se escribió .env.
+    quiet: true
+  vars:
+    _host_re: '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\Z'
 
 # Compose files
 - name: Copiar archivos compose al servidor
@@ -55,6 +101,20 @@
     directory_mode: "0750"
     mode: "0640"
 
+# Rutas del file provider (backend y Keycloak), desde el inventario
+- name: Generar las rutas de Traefik
+  ansible.builtin.include_tasks: traefik_routes.yml
+
+# SendGrid habilitado sin clave: falla antes de escribir .env (el backend tampoco arrancaría)
+- name: Validar la clave de SendGrid si el proveedor está habilitado
+  ansible.builtin.assert:
+    that:
+      - lookup('env', 'PIEDRAZUL_BACKEND_MAIL_SEND') | trim | length > 0
+    fail_msg: "notifications_sendgrid_enabled=true requiere PIEDRAZUL_BACKEND_MAIL_SEND no vacío en el entorno del converge"
+    quiet: true
+  when: notifications_sendgrid_enabled | bool
+  no_log: true
+
 # .env
 - name: Generar .env desde template
   ansible.builtin.template:
@@ -65,74 +125,45 @@
     mode: "0640"
   no_log: true
 
-# Resolver tags para image.env
-- name: Verificar image.env actual
-  ansible.builtin.stat:
-    path: "{{ app_dir }}/image.env"
-  register: image_env_stat
+# Identidades exactas de las imágenes propias para image.env
+- name: Validar y descargar imágenes propias
+  ansible.builtin.include_tasks: release_images.yml
 
-- name: Leer image.env actual
-  ansible.builtin.slurp:
-    src: "{{ app_dir }}/image.env"
-  register: image_env_current
-  when: image_env_stat.stat.exists
+# Identidad exacta de Keycloak: la que declara este commit, resuelta y escaneada por el workflow
+- name: Validar y descargar Keycloak
+  ansible.builtin.include_tasks: keycloak_image.yml
 
-- name: Extraer IMAGE_TAG actual
-  ansible.builtin.set_fact:
-    current_image_tag: >-
-      {{
-        (
-          image_env_current.content
-          | b64decode
-          | regex_findall('(?m)^IMAGE_TAG=(.+)$')
-          | first
-          | default('')
-        )
-        if image_env_stat.stat.exists
-        else ''
-      }}
+# Identidad exacta de Traefik: la que declara este commit, resuelta y escaneada por el workflow
+- name: Validar y descargar Traefik
+  ansible.builtin.include_tasks: traefik_image.yml
 
-- name: Extraer POSTGRES_IMAGE_TAG actual
-  ansible.builtin.set_fact:
-    current_postgres_image_tag: >-
-      {{
-        (
-          image_env_current.content
-          | b64decode
-          | regex_findall('(?m)^POSTGRES_IMAGE_TAG=(.+)$')
-          | first
-          | default('')
-        )
-        if image_env_stat.stat.exists
-        else ''
-      }}
-
-- name: Resolver POSTGRES_IMAGE_TAG final
-  ansible.builtin.set_fact:
-    final_postgres_image_tag: >-
-      {{
-        postgres_image_tag
-        if (postgres_image_tag | default('') | length > 0)
-        else current_postgres_image_tag
-      }}
-
-- name: Validar que POSTGRES_IMAGE_TAG está disponible
-  ansible.builtin.fail:
-    msg: "No hay POSTGRES_IMAGE_TAG actual y postgres_image_tag vino vacío — corre con run_build_postgres=true"
-  when: final_postgres_image_tag | length == 0
-
-# Generar image.env con tags resueltos
-- name: Generar image.env con tags resueltos
+# image.env es la entrada de Compose: referencias exactas, nunca tags. KEYCLOAK_IMAGE y
+# TRAEFIK_IMAGE solo cambian aquí (converge); deploy.yml las conserva.
+- name: Generar image.env con identidades exactas
   ansible.builtin.copy:
     dest: "{{ app_dir }}/image.env"
     owner: ansible
     group: ansible
     mode: "0640"
     content: |
-      IMAGE_TAG={{ current_image_tag | default('none', true) }}
-      POSTGRES_IMAGE_TAG={{ final_postgres_image_tag }}
+      BACKEND_IMAGE={{ backend_image_ref }}
+      POSTGRES_IMAGE={{ postgres_image_ref }}
+      KEYCLOAK_IMAGE={{ keycloak_image_ref }}
+      TRAEFIK_IMAGE={{ traefik_image_ref }}
 
-# Levantar solo infraestructura base (sin backend)
+- name: Verificar la entrega de KC_BACKEND_CLIENT_SECRET al backend
+  ansible.builtin.include_tasks: keycloak_backend_delivery.yml
+
+- name: Verificar la entrega del bootstrap del primer administrador al backend
+  ansible.builtin.include_tasks: identity_seed_delivery.yml
+
+# Base primero: ningún consumidor arranca con credenciales que postgres aún no acepta
+- name: Converger postgres y reconciliar autoridades de la base
+  ansible.builtin.include_tasks: db_converge.yml
+
+# Infraestructura restante (sin backend ni Keycloak). Keycloak lo arranca
+# keycloak_lifecycle.yml: en una base nunca inicializada (P2) no debe arrancar antes de
+# crear la autoridad temporal del evento.
 - name: Levantar servicios de infraestructura
   community.docker.docker_compose_v2:
     project_src: "{{ app_dir }}/compose"
@@ -140,10 +171,10 @@
     files:
       - prod.yml
     services:
-      - postgres
-      - keycloak
       - traefik
     state: present
+    # La imagen ya se descargó por digest en traefik_image.yml
+    pull: missing
     env_files:
       - ../.env
       - ../image.env

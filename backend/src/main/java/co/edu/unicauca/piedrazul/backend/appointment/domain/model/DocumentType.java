@@ -4,5 +4,6 @@ public enum DocumentType {
     REGISTRO_NACIMIENTO,
     TARJETA_IDENTIDAD,
     CEDULA,
-    PASAPORTE
+    PASAPORTE,
+    CEDULA_EXTRANJERIA
 }

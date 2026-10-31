@@ -1,0 +1,27 @@
+---
+# KC_BACKEND_CLIENT_SECRET no tiene restricción de formato: se comprueba que Compose se lo
+# entrega intacto al backend (su único consumidor en el host), sin mostrar el valor.
+# `compose config` escribe cada $ como $$.
+- name: Leer la configuración efectiva de Compose
+  ansible.builtin.command:
+    argv: "{{ compose_cli + ['config', '--format', 'json'] }}"
+    chdir: "{{ app_dir }}/compose"
+  register: app_compose_effective
+  changed_when: false
+  no_log: true
+
+- name: Comparar el secreto que recibiría el backend
+  ansible.builtin.set_fact:
+    app_kc_backend_secret_delivered: >-
+      {{ ((app_compose_effective.stdout | from_json).services.backend.environment.KC_BACKEND_CLIENT_SECRET
+          | default('') | replace('$$', '$')) == app_kc_backend_secret }}
+  no_log: true
+
+- name: Verificar que el backend recibe KC_BACKEND_CLIENT_SECRET intacto
+  ansible.builtin.assert:
+    that:
+      - app_kc_backend_secret_delivered | bool
+    fail_msg: >-
+      KC_BACKEND_CLIENT_SECRET no llega intacto al backend a través de .env y Compose (valor
+      no mostrado). Revisar la versión de Docker Compose del host o la representación en env.j2.
+    quiet: true

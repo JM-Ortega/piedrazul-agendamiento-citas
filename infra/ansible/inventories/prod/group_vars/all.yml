@@ -4,11 +4,38 @@ app_dir: /opt/piedrazul
 compose_project_name: piedrazul
 compose_file: "{{ app_dir }}/compose/prod.yml"
 compose_src_dir: "{{ playbook_dir }}/../../compose"
+# Raíz del checkout que corre Ansible (fuente de realm y valores conocidos del repositorio)
+repo_root: "{{ playbook_dir }}/../../.."
+# CLI de Compose equivalente a docker_compose_v2 (para run/config). Se usa con
+# chdir={{ app_dir }}/compose.
+compose_cli:
+  - docker
+  - compose
+  - --project-name
+  - "{{ compose_project_name }}"
+  - --file
+  - prod.yml
+  - --env-file
+  - ../.env
+  - --env-file
+  - ../image.env
+# Último despliegue exitoso: identidades exactas de backend y postgres verificadas en
+# ejecución y healthy (única fuente de reuso; ver app/tasks/record_release.yml)
+release_state_file: "{{ app_dir }}/last-success.env"
 
 # Container registry
 ghcr_registry: ghcr.io
 ghcr_namespace: jm-ortega/piedrazul-agendamiento-citas
 backend_image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/backend"
+postgres_image: "{{ ghcr_registry }}/{{ ghcr_namespace }}/postgres"
+# Keycloak (tercero): repositorio y archivo Compose que declara su referencia fijada
+# <tag>@sha256:<índice OCI>. Ver app/tasks/keycloak_image.yml.
+keycloak_image: quay.io/keycloak/keycloak
+keycloak_compose_file: "{{ compose_src_dir }}/keycloak.yml"
+# Traefik (tercero): igual que Keycloak, referencia fijada en su archivo Compose. Ver
+# app/tasks/traefik_image.yml. Sus rutas las genera app/tasks/traefik_routes.yml.
+traefik_image: docker.io/library/traefik
+traefik_compose_file: "{{ compose_src_dir }}/traefik.yml"
 
 # Dominio base
 base_domain: piedrazul.org
@@ -19,15 +46,23 @@ server_port: 8080
 server_forward_headers_strategy: framework
 app_timezone: America/Bogota
 
-# Base de datos app
+# Base de datos: conexión y autoridades (nombres; las contraseñas llegan del entorno del
+# runner, ver app/tasks/setup.yml). El backend en ejecución corre siempre con Flyway
+# deshabilitado y JPA en validate (fijo en compose/backend.yml).
 db_host: postgres
 db_port: 5432
 db_name: piedrazul_db
-db_user: piedrazul
 db_schema: piedrazul
+postgres_user: postgres                     # superusuario administrativo (POSTGRES_*)
+app_db_username: piedrazul_app              # backend en ejecución (APP_DB_*)
+migration_db_username: piedrazul_migration  # servicio migrate (MIGRATION_DB_*)
+
+# Exclusividad del host para mutaciones de la base (reconciliación de roles y migración):
+# flock sobre este archivo, con espera acotada.
+db_lock_file: "{{ app_dir }}/db.lock"
+db_lock_timeout: 600
 
 # JPA / Hibernate
-jpa_ddl_auto: update
 jpa_show_sql: false
 jpa_format_sql: false
 
@@ -53,16 +88,48 @@ log_level_sql_bind: WARN
 kc_realm: piedrazul
 kc_port: 8180
 kc_backend_client_id: piedrazul-backend
+# Autoridad de reconciliación (service account en master, secreto solo en el runner).
+# Roles exactos: solo clientes del realm de la aplicación, nada en master.
 kc_automation_client_id: piedrazul-keycloak-automation
-kc_bootstrap_admin_user: kc-bootstrap
-kc_admin_user: kc-admin
+kc_automation_roles:
+  - "{{ kc_realm }}-realm:manage-clients"
+  - "{{ kc_realm }}-realm:view-clients"
+# Autoridad temporal de un evento (P2 o recuperación P3): kc.sh bootstrap-admin service con
+# este prefijo + sufijo aleatorio y secreto aleatorio generado en el runner. Se elimina al
+# terminar el evento. Ver app/tasks/keycloak_lifecycle.yml.
+kc_temp_admin_prefix: piedrazul-tmp-admin
+# Forma exacta del clientId que generan esos eventos (keycloak_bootstrap.yml). Solo una
+# autoridad temporal con esta forma (y los roles que da bootstrap-admin) se considera propia
+# y puede eliminarse; cualquier otra es ajena y bloquea hasta que un operador decida.
+kc_temp_admin_owned_regex: "^{{ kc_temp_admin_prefix }}-[0-9]{14}-[a-z0-9]{8}$"
+# Administrador humano permanente de master: lo crea solo el evento P2, con la contraseña
+# inicial de un solo uso KC_PLATFORM_ADMIN_INITIAL_PASSWORD y las acciones requeridas
+# UPDATE_PASSWORD y CONFIGURE_TOTP. Después pertenece al operador: ningún converge ni
+# recuperación lo modifica, repara ni recrea. Nombre de rol, no personal (no identifica a
+# quien lo custodia). Ver docs/operations/runbooks/administrador-keycloak.md.
+kc_platform_admin_username: piedrazul-platform-admin
+# Rol de realm de master que da la autoridad completa de la plataforma
+kc_platform_admin_role: admin
+# Política de contraseñas de master (alcance: todo el realm, no solo esta cuenta): mínimo de
+# 16 caracteres, sin categorías obligatorias ni rotación. Solo la fija el evento P2, sobre un
+# master recién creado sin política; nunca se reaplica. Sin hashAlgorithm: se mantiene el hash
+# por defecto de Keycloak.
+kc_master_password_policy: "length(16)"
+# Bootstrap del primer ADMIN de negocio: solo se entrega habilitado a una imagen del backend con
+# esta etiqueta (backend/Dockerfile). Ver app/tasks/identity_seed_image_gate.yml.
+identity_bootstrap_image_label: org.piedrazul.identity-bootstrap
+identity_bootstrap_image_contract: create-only-v1
+# Realm de la aplicación (fuente de la forma y los roles esperados del backend)
+kc_realm_file: "{{ repo_root }}/infra/keycloak/realm/piedrazul-realm.json"
 kc_health_enabled: true
 kc_metrics_enabled: true
 kc_db_username: keycloak_user
 kc_db_schema: keycloak
 
-# Notificaciones
-notifications_sendgrid_enabled: true
+# Notificaciones. SendGrid desactivado: el backend arranca sin su clave y no hay envío
+# externo de correo. Activarlo exige PIEDRAZUL_BACKEND_MAIL_SEND en el entorno del converge
+# (setup.yml falla antes de escribir .env si falta; el backend tampoco arranca sin ella).
+notifications_sendgrid_enabled: false
 notifications_sendgrid_sandbox_mode: false
 notifications_email_from: no-reply@mail.piedrazul.org
 notifications_email_from_name: Piedrazul Salud

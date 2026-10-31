@@ -1,85 +1,186 @@
 package co.edu.unicauca.piedrazul.backend.user.application;
 
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.patients.PatientModuleApi;
+import co.edu.unicauca.piedrazul.backend.patients.api.dto.internal.PatientAccountSummary;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.PersonSummary;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemDoctorResponse;
+import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemPatientResponse;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.output.SystemUserResponse;
 import co.edu.unicauca.piedrazul.backend.user.exception.DoctorRoleRequiredException;
+import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
+import co.edu.unicauca.piedrazul.backend.user.exception.PatientWithoutUserException;
+import co.edu.unicauca.piedrazul.backend.user.exception.PersonNotFoundException;
 import co.edu.unicauca.piedrazul.backend.user.exception.UserNotFoundException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
-import java.util.stream.Stream;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
     private final KeycloakUserService keycloakUserService;
     private final DoctorExternalService doctorExternalService;
+    private final PersonExternalServiceImp personExternalServiceImp;
+    private final PatientModuleApi patientModuleApi;
 
-    public UserService(KeycloakUserService keycloakUserService, DoctorExternalService doctorExternalService) {
+    public UserService(KeycloakUserService keycloakUserService, DoctorExternalService doctorExternalService
+    , PersonExternalServiceImp personExternalServiceImp, PatientModuleApi patientModuleApi) {
         this.keycloakUserService = keycloakUserService;
         this.doctorExternalService = doctorExternalService;
+        this.personExternalServiceImp = personExternalServiceImp;
+        this.patientModuleApi = patientModuleApi;
     }
 
-    public List<SystemUserResponse> getSystemUsers() {
-        List<UserSummary> doctors = keycloakUserService.findDoctors();
-        List<UserSummary> schedulers = keycloakUserService.findSchedulers();
+    public Page<SystemUserResponse> getSystemUsers(Pageable pageable) {
+        List<UserSummary> users =
+                new ArrayList<>(keycloakUserService.getSystemUsers());
 
-        List<UserSummary> keycloakUsers = Stream.concat(
-                doctors.stream(),
-                schedulers.stream()
-        ).distinct().toList();
+        int total = users.size();
 
-        List<SystemUserResponse> result = new ArrayList<>();
-
-        for (UserSummary user : keycloakUsers) {
-            List<String> roles = keycloakUserService.getUserRoles(user.id())
-                    .stream()
-                    .filter(role -> role.equals(Role.DOCTOR.name()) || role.equals(Role.SCHEDULER.name()))
-                    .toList();
-
-            result.add(new SystemUserResponse(
-                    user.id(),
-                    user.firstName(),
-                    user.lastName(),
-                    user.username(),
-                    roles
-            ));
+        if (users.isEmpty()) {
+            return new PageImpl<>(List.of(), pageable, 0);
         }
 
-        return result;
+        // 1. Aplicar Ordenamiento en Memoria
+        applySorting(users, pageable.getSort());
+
+
+        // Calcular límites de la página
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), total);
+
+        if (start >= total) {
+            return new PageImpl<>(List.of(), pageable, total);
+        }
+
+        // Paginar primero la lista base
+        List<UserSummary> pagedUsers = users.subList(start, end);
+
+        // Consultar roles SOLO para los usuarios de la página actual
+        Set<UUID> pagedUserIds = pagedUsers
+                                    .stream()
+                                    .map(UserSummary::id)
+                                    .collect(Collectors.toSet());
+
+        Map<UUID, List<String>> rolesByUserId = keycloakUserService.getUserRolesByIds(pagedUserIds);
+
+        List<SystemUserResponse> content = pagedUsers.stream()
+                .map(user -> new SystemUserResponse(
+                        user.id(),
+                        user.firstName(),
+                        user.lastName(),
+                        user.username(),
+                        rolesByUserId.getOrDefault(user.id(), List.of())
+                                .stream()
+                                .filter(role -> !EXCLUDED_ROLES.contains(role))
+                                .distinct()
+                                .toList()
+                ))
+                .toList();
+
+        return new PageImpl<>(content, pageable, total);
     }
 
-    public List<SystemDoctorResponse> getSystemDoctors() {
-        List<UserSummary> doctors = keycloakUserService.findDoctors();
+    private static final Set<String> EXCLUDED_ROLES = Set.of(
+            Role.PATIENT.name(),
+            "default-roles-piedrazul"
+    );
 
-        List<SystemDoctorResponse> result = new ArrayList<>();
+    public Page<SystemDoctorResponse> getSystemDoctors(Pageable pageable) {
+        List<UserSummary> doctors =
+                new ArrayList<>(keycloakUserService.findDoctors());
+        
+        int total = doctors.size();
 
-        for (UserSummary doctor : doctors) {
-            List<String> roles = keycloakUserService.getUserRoles(doctor.id())
+        if (doctors.isEmpty()) {
+            return new PageImpl<>(List.of(), pageable, 0);
+        }
+
+        // Aplicar Ordenamiento en Memoria
+        applySorting(doctors, pageable.getSort());
+
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), total);
+
+        if (start >= total) {
+            return new PageImpl<>(List.of(), pageable, total);
+        }
+
+        // Paginar la lista ya ordenada en memoria
+        List<UserSummary> pagedDoctors = doctors.subList(start, end);
+
+        // Obtener IDs solo del subconjunto paginado
+        Set<UUID> userIds = pagedDoctors.stream()
+                .map(UserSummary::id)
+                .collect(Collectors.toSet());
+
+        // Consultar dependencias solo para la página visible
+        Map<UUID, List<String>> rolesByUserId =
+                keycloakUserService.getUserRolesByIds(userIds);
+
+        Map<UUID, UUID> personIdsMap =
+                personExternalServiceImp.findPersonIdsByUserIds(userIds);
+
+        Map<UUID, List<SpecialtyCode>> specialties =
+                doctorExternalService.findSpecialtiesByPersonIds(personIdsMap.values());
+
+        List<SystemDoctorResponse> content = new ArrayList<>();
+
+        for (UserSummary doctor : pagedDoctors) {
+            UUID personId = personIdsMap.get(doctor.id());
+
+            List<String> doctorSpecialties = specialties
+                    .getOrDefault(personId, List.of())
                     .stream()
-                    .filter(role -> role.equals(Role.DOCTOR.name()) || role.equals(Role.SCHEDULER.name()))
+                    .map(Enum::name)
                     .toList();
 
-            List<String> specialties = doctorExternalService.findSpecialtiesByIdentification(doctor.username())
-                    .stream()
-                    .map(Objects::toString)
-                    .toList();
-
-            result.add(new SystemDoctorResponse(
-                    doctorExternalService.findIdByIdentification(doctor.username()),
+            content.add(new SystemDoctorResponse(
+                    personId,
                     doctor.firstName(),
                     doctor.lastName(),
                     doctor.username(),
-                    roles,
-                    specialties
+                    rolesByUserId.getOrDefault(doctor.id(), List.of())
+                            .stream()
+                            .filter(role -> !EXCLUDED_ROLES.contains(role))
+                            .distinct()
+                            .toList(),
+                    doctorSpecialties
             ));
         }
-        return result;
+
+        return new PageImpl<>(content, pageable, total);
+    }
+
+    /**
+     * Página de pacientes que tienen cuenta de usuario, ordenada por nombre, indicando si
+     * su cuenta está activada o desactivada. {@code search} filtra por nombre completo o
+     * número de documento; el orden no es configurable, lo fija la consulta.
+     */
+    public Page<SystemPatientResponse> getPatientsWithAccount(String search, Pageable pageable) {
+        Page<PatientAccountSummary> patients = patientModuleApi.searchPatientsWithAccount(search, pageable);
+
+        Set<UUID> userIds = patients.getContent().stream()
+                .map(PatientAccountSummary::userId)
+                .collect(Collectors.toSet());
+
+        Map<UUID, Boolean> enabledByUserId = keycloakUserService.getAccountsEnabledStatus(userIds);
+
+        return patients.map(patient -> new SystemPatientResponse(
+                patient.personId(),
+                patient.firstName(),
+                patient.lastName(),
+                patient.identification(),
+                Boolean.TRUE.equals(enabledByUserId.get(patient.userId()))
+        ));
     }
 
     public void giveDoctorScheduleRole(String username){
@@ -104,11 +205,81 @@ public class UserService {
         }
     }
 
-    private List<Role> normalizeRoles(List<Role> requestedRoles) {
-        return requestedRoles.stream().distinct().toList();
+    /**
+     * Activa el usuario de Keycloak del paciente. {@code patientId} es el id de la
+     * persona del paciente; el usuario se resuelve a partir de ella.
+     */
+    public void activatePatientUser(UUID patientId) {
+        keycloakUserService.activateUser(requirePatientUserId(patientId), patientId);
+    }
+
+    /** Desactiva el usuario de Keycloak del paciente. Ver {@link #activatePatientUser(UUID)}. */
+    public void deactivatePatientUser(UUID patientId) {
+        keycloakUserService.deactivateUser(requirePatientUserId(patientId), patientId);
+    }
+
+    private UUID requirePatientUserId(UUID patientId) {
+        if (patientId == null) {
+            throw new InvalidUserDataException("El id del paciente es requerido");
+        }
+
+        // Una persona que no es paciente (por ejemplo, solo doctor) no es un destino válido.
+        if (!patientModuleApi.existsById(patientId)) {
+            throw new PersonNotFoundException("No se encontró un paciente con id: " + patientId);
+        }
+
+        PersonSummary person = personExternalServiceImp.findById(patientId)
+                .orElseThrow(() -> new PersonNotFoundException("No se encontró un paciente con id: " + patientId));
+
+        if (person.userId() == null) {
+            throw new PatientWithoutUserException(patientId);
+        }
+
+        return person.userId();
     }
 
     private boolean hasRole(UUID userId, Role role) {
         return keycloakUserService.getUserRoles(userId).contains(role.name());
+    }
+
+    // Función auxiliar
+    private void applySorting(List<UserSummary> users, Sort sort) {
+        if (sort.isUnsorted()) {
+            return;
+        }
+
+        Comparator<UserSummary> comparator = null;
+
+        for (Sort.Order order : sort) {
+            Comparator<UserSummary> currentComparator = switch (order.getProperty().toLowerCase()) {
+                case "lastname" -> Comparator.comparing(UserSummary::lastName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
+                case "firstname" -> Comparator.comparing(UserSummary::firstName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
+                case "documentid" -> Comparator.comparing(
+                        user -> parseDocumentToLong(user.username()),
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                );
+                default -> Comparator.comparing(UserSummary::firstName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
+            };
+
+            if (order.isDescending()) {
+                currentComparator = currentComparator.reversed();
+            }
+
+            comparator = (comparator == null) ? currentComparator : comparator.thenComparing(currentComparator);
+        }
+
+        if (comparator != null) {
+            users.sort(comparator);
+        }
+    }
+
+    // Método auxiliar para evitar que la aplicación falle si un documento tiene letras o es nulo
+    private Long parseDocumentToLong(String documentId) {
+        if (documentId == null) return null;
+        try {
+            return Long.parseLong(documentId.replaceAll("\\D+", "")); // Extrae solo los dígitos
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
     }
 }

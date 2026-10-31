@@ -1,0 +1,323 @@
+<div class="min-h-screen bg-blue-50 py-5 px-4 md:px-8">
+  <div class="max-w-6xl mx-auto space-y-4">
+    <!-- Header -->
+    <div
+      class="bg-linear-to-r from-[#163c63] to-[#215c98] text-white rounded-xl px-6 py-4 shadow-md"
+    >
+      <app-button
+        variant="plain"
+        plainTextClass="text-white hover:text-[#a7c9ec]"
+        extraClass="!mb-2.5 !text-sm"
+        (buttonClick)="navigateBack()"
+      >
+        <svg lucideArrowLeft [size]="16"></svg>
+        Volver a Gestión de Usuarios
+      </app-button>
+      <div class="flex items-center gap-2.5">
+        <svg lucideUserPlus [size]="24"></svg>
+        <div>
+          <h1 class="text-xl font-bold">Crear Nuevo Usuario</h1>
+          <p class="text-[#a7c9ec] text-sm mt-1">
+            Registre un nuevo médico y/o agendador en el sistema
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Roles (fila completa arriba) -->
+    <div class="bg-white rounded-xl shadow-md p-5">
+      <app-create-user-roles
+        id="error-anchor-roles"
+        [selectedRoles]="selectedRoles"
+        [errorRoles]="errors.roles"
+        (roleToggled)="onRoleToggled($event)"
+      />
+    </div>
+
+    <!-- Información Básica: full-width si es solo Agendador, 2 columnas si hay rol Médico -->
+    <div
+      [class]="
+        hasDoctorRole
+          ? 'grid grid-cols-1 lg:grid-cols-2 gap-4 items-start'
+          : 'grid grid-cols-1 gap-4 items-start'
+      "
+    >
+      <!-- Columna izquierda: Información Básica -->
+      <div
+        id="basic-info-section"
+        class="bg-white rounded-xl shadow-md p-5 space-y-4"
+      >
+        <h3
+          class="text-gray-700 text-lg font-semibold border-b-2 border-[#d9e9f8] pb-2.5"
+        >
+          Información Básica
+        </h3>
+        <div
+          [class]="
+            hasDoctorRole
+              ? 'grid grid-cols-1 sm:grid-cols-2 gap-4'
+              : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'
+          "
+        >
+          <!-- Tipo de Documento -->
+          <div>
+            <label
+              for="identificationType"
+              class="block text-gray-700 text-base font-medium mb-2"
+            >
+              Tipo de Documento *
+            </label>
+            <app-select
+              id="identificationType"
+              [(ngModel)]="userForm.identificationType"
+              name="identificationType"
+              [options]="documentTypes | toSelectOptions"
+              [loading]="loadingDocumentTypes"
+              [hasSuffix]="true"
+              [errorMessage]="errors['identificationType']"
+              (selectBlur)="validateField('identificationType')"
+            >
+              <svg lucideCreditCard [size]="20" suffix></svg>
+            </app-select>
+            @if (loadErrorDocumentTypes) {
+              <p class="text-red-600 text-sm mt-1">
+                {{ loadErrorDocumentTypes }}
+              </p>
+            }
+          </div>
+          <!-- Documento -->
+          <div>
+            <label
+              for="documentId"
+              class="flex items-baseline justify-between text-gray-700 text-base font-medium mb-2"
+            >
+              <span>Documento de Identidad *</span>
+            </label>
+            <app-input
+              id="documentId"
+              type="text"
+              [(ngModel)]="userForm.documentId"
+              name="documentId"
+              [sanitize]="getDocumentIdSanitize()"
+              [maxLength]="getDocumentIdMaxLength()"
+              placeholder="1234567890"
+              autocomplete="off"
+              [errorMessage]="
+                hasError('documentId') ? errors.documentId : undefined
+              "
+              (inputBlur)="validateField('documentId')"
+            >
+              <svg lucideCreditCard [size]="20" suffix></svg>
+            </app-input>
+          </div>
+          <!-- Nombre -->
+          <div>
+            <label
+              for="firstName"
+              class="block text-gray-700 text-base font-medium mb-2"
+              >Nombre *</label
+            >
+            <app-input
+              id="firstName"
+              type="text"
+              [(ngModel)]="userForm.firstName"
+              name="firstName"
+              placeholder="Juan"
+              autocomplete="off"
+              [errorMessage]="
+                hasError('firstName') ? errors.firstName : undefined
+              "
+              (inputBlur)="validateField('firstName')"
+            >
+              <svg lucideUser [size]="20" suffix></svg>
+            </app-input>
+          </div>
+
+          <!-- Apellido -->
+          <div>
+            <label
+              for="lastName"
+              class="block text-gray-700 text-base font-medium mb-2"
+              >Apellido *</label
+            >
+            <app-input
+              id="lastName"
+              type="text"
+              [(ngModel)]="userForm.lastName"
+              name="lastName"
+              placeholder="Pérez"
+              autocomplete="off"
+              [errorMessage]="
+                hasError('lastName') ? errors.lastName : undefined
+              "
+              (inputBlur)="validateField('lastName')"
+            >
+              <svg lucideUser [size]="20" suffix></svg>
+            </app-input>
+          </div>
+
+          <!-- Contraseña -->
+          <div>
+            <label
+              for="password"
+              class="block text-gray-700 text-base font-medium mb-2"
+              >Contraseña *</label
+            >
+            <app-input
+              id="password"
+              [type]="showPassword ? 'text' : 'password'"
+              [(ngModel)]="userForm.password"
+              name="password"
+              placeholder="Mín. 6 caracteres"
+              autocomplete="new-password"
+              [errorMessage]="
+                hasError('password') ? errors.password : undefined
+              "
+              (inputBlur)="validateField('password')"
+            >
+              <button
+                type="button"
+                suffix
+                (click)="showPassword = !showPassword"
+                class="pointer-events-auto text-gray-400 hover:text-gray-600"
+              >
+                <svg
+                  [lucideIcon]="showPassword ? EyeOff : Eye"
+                  [size]="20"
+                ></svg>
+              </button>
+            </app-input>
+          </div>
+
+          <!-- Teléfono -->
+          <div>
+            <label
+              for="phone"
+              class="block text-gray-700 text-base font-medium mb-2"
+            >
+              Teléfono *
+              <span class="text-sm text-gray-500">(solo dígitos)</span>
+            </label>
+            <app-input
+              [id]="'phone'"
+              type="text"
+              [inputMode]="'numeric'"
+              [(ngModel)]="userForm.phone"
+              name="phone"
+              sanitize="numeric"
+              [maxLength]="10"
+              placeholder="3001234567"
+              autocomplete="off"
+              [errorMessage]="errors['phone']"
+              (inputBlur)="validateField('phone')"
+            >
+              <svg lucidePhone [size]="20" suffix class="text-gray-400"></svg>
+            </app-input>
+          </div>
+
+          <!-- Email (siempre visible) -->
+          <div
+            [class]="
+              hasDoctorRole ? 'sm:col-span-2' : 'sm:col-span-2 lg:col-span-3'
+            "
+          >
+            <label
+              for="email"
+              class="block text-gray-700 text-base font-medium mb-2"
+              >Correo Electrónico *</label
+            >
+            <app-input
+              id="email"
+              type="email"
+              [(ngModel)]="userForm.email"
+              name="email"
+              placeholder="usuario@piedrazul.dev"
+              autocomplete="off"
+              [validateEmailFormat]="false"
+              [errorMessage]="hasError('email') ? errors.email : undefined"
+              (inputBlur)="validateField('email')"
+            >
+              <svg lucideMail [size]="20" suffix></svg>
+            </app-input>
+          </div>
+        </div>
+      </div>
+
+      <!-- Columna derecha: Información del Médico (o placeholder) -->
+      @if (hasDoctorRole) {
+        <app-create-user-doctor-form
+          [data]="doctorFormData"
+          [specialtyOptions]="specialtyOptions"
+          [loadingSpecialties]="loadingSpecialties"
+          [loadError]="loadErrorSpecialties"
+          [timeSelectOptions]="timeSelectOptions"
+          [maxInterval]="maxInterval"
+          [daysOfWeek]="daysOfWeek"
+          [errors]="errors"
+          (dataChange)="onDoctorFormChange($event)"
+          (fieldBlurred)="validateField($any($event))"
+        />
+      }
+    </div>
+
+    <!-- Error global -->
+    @if (submitError) {
+      <div
+        id="submit-error-banner"
+        class="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-5 py-3.5 flex items-start gap-3"
+      >
+        <svg lucideCircleAlert [size]="20" class="shrink-0 mt-0.5"></svg>
+        <p class="text-base">{{ submitError }}</p>
+      </div>
+    }
+
+    <!-- Botones -->
+    <div class="bg-white rounded-xl shadow-md p-4">
+      <div class="flex gap-4">
+        <div class="flex-1">
+          <app-button
+            variant="secondary"
+            size="lg"
+            [disabled]="isSubmitting"
+            [fullWidth]="true"
+            (buttonClick)="navigateBack()"
+          >
+            Cancelar
+          </app-button>
+        </div>
+        <div class="flex-1">
+          <app-button
+            variant="primary"
+            size="lg"
+            [disabled]="isSubmitting"
+            [loading]="isSubmitting"
+            [fullWidth]="true"
+            (buttonClick)="openConfirmModal()"
+          >
+            @if (isSubmitting) {
+              <span
+                class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"
+              ></span>
+              Guardando...
+            } @else {
+              <svg lucideUserPlus [size]="22"></svg>
+              Crear Usuario
+            }
+          </app-button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de confirmación -->
+@if (showConfirmModal) {
+  <app-create-user-confirm-modal
+    [userForm]="userForm"
+    [hasDoctorRole]="hasDoctorRole"
+    [hasSchedulerRole]="hasSchedulerRole"
+    [dayLabels]="dayLabels"
+    (confirmed)="confirmAndCreate()"
+    (cancelled)="closeConfirmModal()"
+  />
+}

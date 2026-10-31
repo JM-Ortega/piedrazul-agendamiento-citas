@@ -14,4 +14,12 @@ public interface NotificationProvider {
             ChannelMessage message,
             RecipientSnapshot recipient
     );
+
+    /**
+     * Indica si el proveedor es un canal real apto para entregar códigos de verificación. Por
+     * defecto no lo es: un proveedor debe declararlo de forma explícita.
+     */
+    default boolean qualifiesForOtpDelivery() {
+        return false;
+    }
 }

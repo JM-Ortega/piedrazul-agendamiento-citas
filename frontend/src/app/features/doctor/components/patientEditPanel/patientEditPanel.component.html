@@ -1,0 +1,32 @@
+<app-patient-data-form
+  [ngModel]="formData()"
+  (ngModelChange)="onFormChange($event)"
+  [ngModelOptions]="{ standalone: true }"
+  [showDocumentNumber]="true"
+></app-patient-data-form>
+
+@if (saveError()) {
+  <div
+    class="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-xl mt-3 flex items-center gap-2"
+  >
+    <svg lucideTriangleAlert [size]="18" class="shrink-0"></svg>
+    <span>{{ saveError() }}</span>
+  </div>
+}
+
+<div class="flex justify-end gap-2 mt-4 mb-1">
+  <app-button variant="danger" [disabled]="isSaving()" (buttonClick)="cancel()">
+    Cancelar
+  </app-button>
+  <app-button variant="primary" [disabled]="isSaving()" (buttonClick)="save()">
+    @if (isSaving()) {
+      <span
+        class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
+      ></span>
+      Guardando...
+    } @else {
+      <svg lucideSave [size]="18" class="text-white"></svg>
+      Guardar cambios
+    }
+  </app-button>
+</div>

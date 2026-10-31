@@ -1,0 +1,12 @@
+<div class="h-screen bg-blue-50 px-8 py-2">
+  <div>
+    <div class="px-2">
+      <h1 class="text-[#215c98] text-xl font-bold">Nueva Cita</h1>
+      <p class="text-gray-500 text-2sm">Registre una cita para un paciente</p>
+    </div>
+    <app-appointment-booking
+      context="scheduler"
+      (goBack)="goToScheduler()"
+    ></app-appointment-booking>
+  </div>
+</div>

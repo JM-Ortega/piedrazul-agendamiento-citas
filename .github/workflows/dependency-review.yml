@@ -1,0 +1,242 @@
+name: Revisión de dependencias
+
+# Envía al Dependency Graph el árbol Maven resuelto del backend y, en cada PR, compara el
+# grafo de la base con el de la cabeza para reportar solo las vulnerabilidades que el PR
+# introduce. Las ya presentes en la base son la línea base de Dependabot Alerts.
+#
+# El análisis estático de GitHub sobre pom.xml no ve las transitivas ni las versiones que
+# gestiona el BOM de Spring Boot; sin el snapshot Maven no hay cobertura real del backend.
+# npm no lo necesita: package-lock.json y yarn.lock ya traen el árbol completo.
+#
+# Envío y revisión van en el mismo workflow, como recomienda GitHub: el snapshot de la
+# cabeza del PR se envía antes de la revisión (needs). El de la base lo envía el push a la
+# rama base (develop o main). La comparación cuenta como completa solo con evidencia
+# positiva de ambos envíos; si falta, la revisión solo advierte y no clasifica como nuevas
+# vulnerabilidades que ya estaban en la base.
+#
+# El snapshot de main alimenta Dependabot Alerts, que solo describe la rama por defecto.
+# Ver docs/operations/runbooks/senales-seguridad-github.md.
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Ningún job usa caché de Actions. El token de cada job queda sin lectura ni escritura de
+# caché (lo aplica GitHub en el token, no la herramienta que lo use).
+cache-mode: none
+
+concurrency:
+  # PR: cancela la revisión obsoleta. Push y manual: cada run tiene su grupo, ningún SHA de
+  # develop ni de main se queda sin snapshot (puede ser la base de un PR).
+  group: dependency-review-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  maven_snapshot:
+    name: Grafo Maven
+    # Push o manual sobre develop o main, o PR hacia develop o main desde una rama de este
+    # repositorio. Nunca en PRs de forks (su token es de solo lectura) ni en otras ramas o
+    # tags. La comprobación de la base repite el filtro de pull_request a propósito.
+    if: >-
+      (github.event_name != 'pull_request' &&
+       (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')) ||
+      (github.event_name == 'pull_request' &&
+       (github.base_ref == 'develop' || github.base_ref == 'main') &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # POST /repos/{repo}/dependency-graph/snapshots
+
+    steps:
+      # En PRs el snapshot queda ligado a pull_request.head.sha (no al merge commit), así
+      # que se resuelve ese mismo commit.
+      - name: Checkout código
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      # Maven corre con un token de escritura: el wrapper debe verificar la distribución que
+      # descarga. En PRs el workflow sale del merge commit pero se resuelve la cabeza, que
+      # puede ser una rama anterior al checksum; entonces no se envía nada.
+      - name: Exigir checksum del wrapper de Maven
+        run: |
+          if ! grep -Eq '^distributionSha256Sum=[0-9a-f]{64}$' backend/.mvn/wrapper/maven-wrapper.properties; then
+            echo "::error title=Grafo Maven::backend/.mvn/wrapper/maven-wrapper.properties no declara distributionSha256Sum; no se ejecuta Maven"
+            exit 1
+          fi
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # directory absoluto: la acción arma la ruta del wrapper como directory/mvnw y lo
+      # ejecuta con cwd=directory, contra el que vuelve a resolver una ruta relativa
+      # (backend/backend/mvnw).
+      - name: Enviar snapshot de dependencias
+        uses: advanced-security/maven-dependency-submission-action@a64327a7329c9939cf675e458452febe1894a70c # v6.0.1
+        with:
+          directory: ${{ github.workspace }}/backend
+
+  review:
+    name: Dependency Review
+    needs: maven_snapshot
+    # Corre aunque el snapshot de la cabeza se haya omitido o haya fallado: entonces la
+    # cobertura Maven queda incompleta y la revisión solo advierte.
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read # runs y jobs de Grafo Maven (cabeza y base)
+      checks: read # anotaciones del envío de cada job
+
+    steps:
+      # Completa = el envío de la cabeza (este run) y el de la base (push o manual sobre la
+      # rama base, para ese SHA) terminaron con el aviso de la acción "Snapshot successfully created" y sin
+      # anotaciones de fallo, y la API de comparación no informa snapshots faltantes.
+      # Espera con backoff mientras el envío de la base siga en curso. Un fallo de la API
+      # hace fallar el paso; nunca cuenta como completo ni como incompleto.
+      - name: Comprobar cobertura Maven
+        id: snapshots
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_REF: ${{ github.base_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_RESULT: ${{ needs.maven_snapshot.result }}
+          WAIT_SECONDS: "300"
+          ABSENT_GRACE_SECONDS: "60"
+        run: |
+          set -euo pipefail
+          shopt -s inherit_errexit
+          T="${RUNNER_TEMP}/deps"
+          mkdir -p "${T}"
+          R="repos/${GITHUB_REPOSITORY}"
+
+          fail() {
+            echo "::error title=Dependency Review::$1" >&2
+            exit 1
+          }
+          api() { # api ARCHIVO RUTA
+            gh api -X GET "$2" < /dev/null > "$1" 2> "${T}/err" || fail "falló GET $2"
+          }
+          # Deja en ${T}/warnings las advertencias de snapshot de la comparación
+          warnings() {
+            gh api -i -X GET "${R}/dependency-graph/compare/${BASE_SHA}...${HEAD_SHA}?per_page=1" \
+              < /dev/null > "${T}/compare" 2> "${T}/err" ||
+              fail "la API de comparación falló; ¿está activado el Dependency graph?"
+            # awk lee el archivo y no una tubería: salir al final de las cabeceras no deja a
+            # nadie escribiendo en una tubería cerrada (SIGPIPE con pipefail si el cuerpo es grande).
+            # Sin línea de estado HTTP o sin fin de cabeceras, la respuesta no es válida.
+            awk 'NR == 1 && !/^HTTP\// { exit 2 }
+                 { sub(/\r$/, "") }
+                 $0 == "" { headers = 1; exit }
+                 tolower($0) ~ /^x-github-dependency-graph-snapshot-warnings:/ { sub(/^[^:]*:[ \t]*/, ""); print }
+                 END { if (!headers) exit 2 }' "${T}/compare" | base64 -d > "${T}/warnings" ||
+              fail "respuesta de la API de comparación ilegible"
+          }
+          # 0 si algún job "Grafo Maven" de JOBS terminó bien con el envío aceptado
+          job_snapshot_ok() { # job_snapshot_ok JOBS
+            local run
+            for run in $(jq -r '.jobs[] | select(.name == "Grafo Maven" and .conclusion == "success")
+                                | .check_run_url | sub(".*/check-runs/"; "")' "$1"); do
+              api "${T}/ann" "${R}/check-runs/${run}/annotations?per_page=100"
+              if jq -e 'any(.[]; .annotation_level == "notice" and (.message | startswith("Snapshot successfully created at")))
+                        and (any(.[]; .annotation_level == "failure") | not)' "${T}/ann" > /dev/null; then
+                return 0
+              fi
+            done
+            return 1
+          }
+          # ok | pending | failed | absent para el envío del SHA base desde la rama base
+          base_state() {
+            local id status pending=false
+            api "${T}/runs" "${R}/actions/runs?head_sha=${BASE_SHA}&per_page=100"
+            # path puede venir calificado con la referencia (".github/workflows/x.yml@develop")
+            jq -r --arg b "${BASE_REF}" '.workflow_runs[]
+              | select((.path | sub("@.*$"; "")) == ".github/workflows/dependency-review.yml")
+              | select((.event == "push" or .event == "workflow_dispatch") and .head_branch == $b)
+              | "\(.id) \(.status)"' "${T}/runs" > "${T}/base-runs"
+            if [ ! -s "${T}/base-runs" ]; then echo absent; return; fi
+            while read -r id status; do
+              api "${T}/jobs" "${R}/actions/runs/${id}/jobs?filter=all&per_page=100"
+              if job_snapshot_ok "${T}/jobs"; then echo ok; return; fi
+              [ "${status}" = completed ] || pending=true
+            done < "${T}/base-runs"
+            if [ "${pending}" = true ]; then echo pending; else echo failed; fi
+          }
+
+          # Siempre una consulta: separa un fallo de la API de una cobertura incompleta
+          warnings
+
+          REASON=""
+          if [ "${BASE_REF}" != develop ] && [ "${BASE_REF}" != main ]; then
+            REASON="la base ${BASE_REF} no recibe snapshot Maven"
+          elif [ "${HEAD_REPO}" != "${GITHUB_REPOSITORY}" ]; then
+            REASON="PR de fork: la cabeza no envía snapshot Maven"
+          else
+            api "${T}/head-jobs" "${R}/actions/runs/${GITHUB_RUN_ID}/jobs?filter=all&per_page=100"
+            job_snapshot_ok "${T}/head-jobs" ||
+              REASON="envío Maven de la cabeza sin confirmar (job: ${HEAD_RESULT})"
+          fi
+
+          if [ -z "${REASON}" ]; then
+            START=$(date +%s)
+            DELAY=10
+            while :; do
+              STATE="$(base_state)"
+              if [ "${STATE}" = ok ]; then
+                warnings
+                [ -s "${T}/warnings" ] || break
+                STATE=warnings
+              fi
+              ELAPSED=$(( $(date +%s) - START ))
+              # absent: el push a la base puede no haber creado aún su run; margen corto
+              if [ "${STATE}" = failed ] || [ "${ELAPSED}" -ge "${WAIT_SECONDS}" ] ||
+                 { [ "${STATE}" = absent ] && [ "${ELAPSED}" -ge "${ABSENT_GRACE_SECONDS}" ]; }; then
+                case "${STATE}" in
+                  absent) REASON="no hay envío Maven de ${BASE_REF} para la base ${BASE_SHA::7}" ;;
+                  pending) REASON="el envío Maven de la base ${BASE_SHA::7} no terminó a tiempo" ;;
+                  failed) REASON="el envío Maven de la base ${BASE_SHA::7} no se confirmó" ;;
+                  warnings) REASON="la API sigue informando snapshots faltantes" ;;
+                esac
+                break
+              fi
+              echo "Cobertura Maven: ${STATE}; reintento en ${DELAY}s"
+              sleep "${DELAY}"
+              DELAY=$(( DELAY * 2 > 60 ? 60 : DELAY * 2 ))
+            done
+          fi
+
+          if [ -z "${REASON}" ]; then
+            echo "complete=true" >> "${GITHUB_OUTPUT}"
+            echo "Cobertura Maven: completa (base y cabeza con snapshot)" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "complete=false" >> "${GITHUB_OUTPUT}"
+            echo "Cobertura Maven: **incompleta**: ${REASON}. Los hallazgos solo se advierten." >> "${GITHUB_STEP_SUMMARY}"
+            echo "::warning title=Dependency Review::Cobertura Maven incompleta: ${REASON}. Los hallazgos solo se advierten."
+          fi
+
+      # Falla con vulnerabilidades nuevas high o critical en dependencias de runtime, solo
+      # si la cobertura Maven está completa. No es un check requerido.
+      - name: Revisar dependencias introducidas
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          fail-on-scopes: runtime
+          warn-only: ${{ steps.snapshots.outputs.complete != 'true' }}
+          # Licencias fuera de alcance de este control
+          license-check: false
+          show-openssf-scorecard: false
+          comment-summary-in-pr: never

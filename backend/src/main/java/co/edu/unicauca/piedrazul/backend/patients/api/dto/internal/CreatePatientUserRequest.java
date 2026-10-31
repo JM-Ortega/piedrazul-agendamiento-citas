@@ -1,8 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.patients.api.dto.internal;
 
 import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitize;
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientDocumentType;
-import co.edu.unicauca.piedrazul.backend.patients.api.PatientGender;
+import co.edu.unicauca.piedrazul.backend.patients.api.PatientSex;
 import jakarta.validation.constraints.*;
 
 import java.time.LocalDate;
@@ -10,16 +9,7 @@ import java.time.LocalDate;
 
 public record CreatePatientUserRequest(
         @NotNull
-        PatientDocumentType documentType,
-
-        // Número Colombiano
-        @Pattern(regexp = "^[0-9]{10}$")
-        @NotBlank
-        @Sanitize
-        String phone,
-
-        @NotNull
-        PatientGender gender,
+        PatientSex sex,
 
         @NotNull
         LocalDate birthDate,

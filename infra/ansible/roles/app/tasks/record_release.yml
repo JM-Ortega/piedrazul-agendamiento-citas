@@ -1,0 +1,56 @@
+---
+# Registra el último despliegue exitoso de las imágenes propias.
+#
+# Lo corre el workflow de producción como último paso, solo después de deploy.yml, de
+# verify-release.yml (identidad en ejecución y health de contenedores) y de los health
+# checks públicos. Vuelve a verificar identidad en ejecución y health de los contenedores
+# inmediatamente antes de escribir: se registra lo que corre, no lo que se intentó.
+#
+# release_state_file es la única fuente de reuso (la lee el workflow tras el gate de
+# producción). image.env, en cambio, es solo la entrada de Compose y puede contener un
+# candidato fallido. La escritura es atómica (copy escribe un temporal y lo renombra):
+# un fallo o una cancelación antes de este punto deja el último éxito anterior intacto.
+
+- name: Validar metadatos del despliegue
+  ansible.builtin.assert:
+    that:
+      - (backend_image_index_digest | default('') | string) is match('^sha256:[0-9a-f]{64}\Z')
+      - (postgres_image_index_digest | default('') | string) is match('^sha256:[0-9a-f]{64}\Z')
+      - (backend_image_tag | default('') | string) is match('^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\Z')
+      - (postgres_image_tag | default('') | string) is match('^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\Z')
+      - (backend_image_tag | string | lower) not in app_release_tag_placeholders
+      - (postgres_image_tag | string | lower) not in app_release_tag_placeholders
+      - (release_commit | default('') | string) is match('^[0-9a-f]{40}\Z')
+      - (release_run | default('') | string) is match('^[0-9]+/[0-9]+\Z')
+    fail_msg: Metadatos del despliegue inválidos; no se registra el último éxito.
+    quiet: true
+  vars:
+    # Mismas reglas que aplica select-release.sh al leer este archivo
+    app_release_tag_placeholders: [none, "null", undefined, latest]
+
+- name: Volver a verificar la identidad en ejecución
+  ansible.builtin.include_tasks: verify_running_images.yml
+  vars:
+    app_release_services: [postgres, backend]
+
+- name: Volver a verificar el health de los contenedores
+  ansible.builtin.include_tasks: verify_health.yml
+  vars:
+    app_release_services: [postgres, backend]
+
+- name: Registrar último despliegue exitoso
+  ansible.builtin.copy:
+    dest: "{{ release_state_file }}"
+    owner: ansible
+    group: ansible
+    mode: "0640"
+    content: |
+      # Generado por Ansible: último despliegue exitoso (identidad en ejecución + health verificados)
+      BACKEND_IMAGE_REF={{ backend_image_ref }}
+      BACKEND_INDEX_DIGEST={{ backend_image_index_digest }}
+      BACKEND_IMAGE_TAG={{ backend_image_tag }}
+      POSTGRES_IMAGE_REF={{ postgres_image_ref }}
+      POSTGRES_INDEX_DIGEST={{ postgres_image_index_digest }}
+      POSTGRES_IMAGE_TAG={{ postgres_image_tag }}
+      RELEASE_COMMIT={{ release_commit }}
+      RELEASE_RUN={{ release_run }}

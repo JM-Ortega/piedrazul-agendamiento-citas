@@ -1,0 +1,185 @@
+<!-- Header row -->
+<div
+  class="flex flex-col sm:flex-row sm:items-center justify-between p-3 gap-2"
+>
+  <div class="flex items-center gap-3">
+    <div
+      class="text-white rounded-full w-9 h-9 flex items-center justify-center text-sm font-bold shrink-0"
+      [class]="doctor().status === false ? 'bg-gray-400' : 'bg-[#215c98]'"
+    >
+      {{ doctor().name.split(' ').slice(-2)[0][0]
+      }}{{ doctor().name.split(' ').slice(-2)[1][0] }}
+    </div>
+    <div>
+      <p class="text-[#163c63] text-base font-semibold flex items-center gap-2">
+        {{ doctor().name }}
+        @if (doctor().status === false) {
+          <span
+            class="text-[11px] font-normal text-red-700 bg-red-100 px-1.5 py-0.5 rounded-full"
+          >
+            Inactivo
+          </span>
+        }
+      </p>
+      <p class="text-gray-600 text-sm">
+        {{ formattedSpecialties(doctor().specialty) }}
+      </p>
+    </div>
+  </div>
+
+  @if (isSaved()) {
+    <span class="flex items-center gap-1 text-green-600 text-sm">
+      <svg lucideCheckCircle [size]="16"></svg>
+      Guardado
+    </span>
+  }
+
+  @if (!isEditing()) {
+    <div class="flex items-center gap-2">
+      <span
+        [appTooltip]="
+          doctor().status === false
+            ? 'El médico debe estar activo para programar recesos'
+            : 'Ver y programar semanas de recesos'
+        "
+      >
+        <app-button
+          variant="secondary"
+          extraClass="!rounded-lg !px-3.5 !py-1.5 !text-sm !border-[#c2d8f0] !text-[#215c98] hover:!bg-blue-50"
+          [disabled]="doctor().status === false"
+          (buttonClick)="handleTimeOff()"
+        >
+          <svg lucideCoffee [size]="15"></svg>
+          Recesos
+        </app-button>
+      </span>
+      <app-button
+        variant="primary"
+        extraClass="!rounded-lg !px-3.5 !py-1.5 !text-sm"
+        [appTooltip]="'Editar configuración del médico'"
+        (buttonClick)="handleEdit()"
+      >
+        <svg lucidePencil [size]="15"></svg>
+        Editar
+      </app-button>
+    </div>
+  }
+</div>
+
+<!-- Summary — solo en modo lectura -->
+@if (!isEditing()) {
+  <div class="px-3 pb-3 pt-0 space-y-1.5">
+    <!-- Fila de badges + botón Habilitado alineado a la derecha -->
+    <div class="flex justify-between items-center gap-2 flex-wrap">
+      <div class="flex flex-wrap gap-2 text-xs text-gray-600">
+        @if (hasNoSchedule()) {
+          <span
+            class="bg-gray-100 text-gray-500 px-2 py-1 rounded-lg flex items-center gap-1"
+          >
+            <svg lucideClock [size]="12" class="text-gray-400"></svg>
+            Sin horario configurado
+          </span>
+        } @else {
+          @if (getDisplaySchedule().startTime && getDisplaySchedule().endTime) {
+            <span
+              class="bg-blue-50 px-2 py-1 rounded-lg flex items-center gap-1"
+            >
+              <svg lucideClock [size]="12" class="text-[#163c63]"></svg>
+              {{ getDisplaySchedule().startTime }} –
+              {{ getDisplaySchedule().endTime }}
+            </span>
+          }
+          @if (doctor().workdays.length) {
+            <span class="bg-blue-50 px-2 py-1 rounded-lg">
+              {{ getWorkDayLabels(doctor().workdays) }}
+            </span>
+          }
+        }
+        <span class="bg-blue-50 px-2 py-1 rounded-lg flex items-center gap-1">
+          <svg lucideClock [size]="12" class="text-[#163c63]"></svg>
+          Intervalo: {{ doctor().appointmentInterval }} min
+        </span>
+        @if (hasRealDayOverrides()) {
+          <span
+            class="bg-amber-50 text-amber-700 px-2 py-1 rounded-lg flex items-center gap-1"
+          >
+            <svg lucideClock [size]="12"></svg>
+            Horarios personalizados
+          </span>
+        }
+      </div>
+
+      <!-- Botón Habilitado/Deshabilitado alineado a la derecha -->
+      <app-button
+        variant="chip"
+        [active]="doctor().status !== false"
+        activeChipClasses="bg-green-100 text-green-700 hover:bg-green-200 border-transparent"
+        inactiveChipClasses="bg-red-100 text-red-700 hover:bg-red-200 border-transparent"
+        extraClass="!w-auto !py-1 !px-3 !text-xs !rounded-lg !flex !items-center !gap-1.5"
+        [appTooltip]="
+          doctor().status !== false ? 'Deshabilitar médico' : 'Habilitar médico'
+        "
+        (buttonClick)="handleToggle()"
+      >
+        @if (doctor().status !== false) {
+          <svg lucidePower [size]="14"></svg>
+          Habilitado
+        } @else {
+          <svg lucidePowerOff [size]="14"></svg>
+          Deshabilitado
+        }
+      </app-button>
+    </div>
+
+    <div class="flex flex-wrap gap-2 text-xs text-gray-600">
+      <span
+        class="bg-purple-50 text-purple-700 px-2 py-1 rounded-lg flex items-center gap-1"
+      >
+        <svg lucideCalendar [size]="12"></svg>
+        Período laboral: {{ doctor().laborStart }} – {{ doctor().laborEnd }}
+      </span>
+      @if (featuredTimeOff(); as timeOff) {
+        <span
+          animate.enter="animate-fade-in"
+          class="px-2 py-1 rounded-lg flex items-center gap-1.5 font-medium border"
+          [class]="
+            timeOff.status === 'EN_CURSO'
+              ? 'bg-orange-50 text-orange-800 border-orange-200'
+              : 'bg-sky-50 text-[#14548f] border-sky-200'
+          "
+        >
+          @if (timeOff.status === 'EN_CURSO') {
+            <span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+          } @else {
+            <svg lucideCoffee [size]="12"></svg>
+          }
+          {{ timeOffLabel(timeOff) }}
+          @if (extraScheduledTimeOffs() > 0) {
+            <span class="opacity-70">+{{ extraScheduledTimeOffs() }}</span>
+          }
+        </span>
+      }
+    </div>
+
+    @if (hasRealDayOverrides()) {
+      <div class="flex flex-wrap gap-1.5">
+        @for (day of doctor().workdays; track day) {
+          @if (day >= 1 && day <= 5) {
+            @let ds = $safeNavigationMigration(doctor().daySchedules?.[day]);
+            @if (
+              ds &&
+              (ds.startTime !== doctor().startTime ||
+                ds.endTime !== doctor().endTime)
+            ) {
+              <span
+                class="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-2 py-0.5 rounded-lg"
+              >
+                {{ DAY_LABELS[day] }}: {{ ds.startTime }} – {{ ds.endTime }}
+              </span>
+            }
+          }
+        }
+      </div>
+    }
+  </div>
+}

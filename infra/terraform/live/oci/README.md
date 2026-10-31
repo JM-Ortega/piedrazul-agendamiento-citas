@@ -1,5 +1,10 @@
 # live/oci — Entorno OCI de Piedrazul
 
+> **Estado: histórico / inactivo.** Este entorno OCI no es un destino de despliegue
+> operativo. El destino de despliegue activo es Hetzner (`infra/terraform/live/prod/`).
+> Este documento se conserva como referencia histórica y puede no reflejar el
+> estado actual del repositorio.
+
 Este es el root module de Terraform para el entorno de Oracle Cloud Infrastructure (OCI)
 de Piedrazul. Orquesta toda la infraestructura del proyecto componiendo los módulos
 disponibles en `infra/terraform/modules/`.
@@ -51,8 +56,7 @@ Internet
 
 **Security List sobre NSG** — Para una arquitectura de una sola instancia en una subnet
 pública, la Security List es suficiente y más simple. Aplica las mismas reglas que el
-`hcloud_firewall` de Hetzner. NSG queda como evolución futura si la red crece
-(múltiples instancias, subnets privadas, bastion host).
+`hcloud_firewall` de Hetzner.
 
 **`oci_core_default_security_list` sobre `oci_core_security_list`** — La VCN crea una
 security list por defecto automáticamente. Modificar esa lista evita la dependencia
@@ -65,8 +69,8 @@ el `default_security_list_id` y `security` lo modifica directamente.
 encontrar la imagen más reciente automáticamente sin hardcodear OCIDs que cambian
 por región y versión.
 
-**Dominios con sufijo `-oci`** — Para poder tener ambos entornos activos simultáneamente
-durante la fase de comparación, los dominios de OCI llevan el sufijo `-oci`. Hetzner
+**Dominios con sufijo `-oci`** — Para que ambos entornos pudieran coexistir durante la
+comparación entre proveedores, los dominios de OCI llevan el sufijo `-oci`. Hetzner
 mantiene los dominios principales sin sufijo por ser el entorno establecido.
 
 **IP efímera** — Igual que Hetzner, la IP pública de la instancia es efímera. Terraform
@@ -83,24 +87,13 @@ OCI requiere base64 en `metadata.user_data`, Hetzner acepta texto plano en `user
 con 4 OCPU y 24GB de forma permanente. No hay costo adicional mientras se usen solo
 recursos del tier gratuito.
 
-## Estado actual por fases
+## Configuración histórica por fases
 
-### Fase 1 — Activa
+### Fase 1 — Configuración histórica
 - SSH abierto a `0.0.0.0/0` — seguridad por llave ED25519
 - HTTP/HTTPS abiertos a `0.0.0.0/0`
 - `api` y `auth` con `proxied_backend = false` — sin Cloudflare proxy
 - ICMP habilitado para diagnóstico
-
-### Fase 2 — Pendiente (requiere Traefik + Let's Encrypt)
-- Cambiar `web_sources` en `module "security"` a `local.cloudflare_ips`
-- Cambiar `proxied_backend = false` a `true` en `module "dns"`
-- Agregar `data.tf` con `data "cloudflare_ip_ranges" "main" {}`
-- Descomentar `local.cloudflare_ips` en `locals.tf`
-
-### Fase 3 — Pendiente (requiere Tailscale)
-- Cambiar `enable_ssh = false` en `module "security"`
-- Configurar GitHub Actions con Tailscale GitHub Action oficial
-- Ansible conecta por IP/hostname de Tailscale en vez de SSH público
 
 ## Estructura de archivos
 

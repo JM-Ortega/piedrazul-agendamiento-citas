@@ -1,1 +1,0 @@
-export type BookingMode = 'specialty' | 'specialty-doctor' | null;

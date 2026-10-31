@@ -1,0 +1,424 @@
+---
+# Ciclo técnico de Keycloak. Lo incluye converge.yml después de setup.yml (base
+# reconciliada, .env vigente) y antes de refresh_backend.yml.
+#
+# La decisión sale del estado de Keycloak (su base y su API), nunca de archivos del host:
+#
+#   P1 conocido/reconciliado → reconcilia el secreto del backend con la automatización.
+#                              No crea autoridad temporal. Repetible.
+#   P2 nuevo (schema de Keycloak vacío, tal como lo deja P-1) → evento con autoridad
+#      temporal (ver keycloak_bootstrap.yml): importa el realm, establece la automatización,
+#      elimina la autoridad temporal → se reclasifica (debe ser P1) → reconciliación P1.
+#      En P2 el evento también crea el administrador humano permanente de master
+#      (kc_platform_admin_username), una sola vez y nunca después.
+#   P3 desconocido/divergente → falla cerrado y explica por qué.
+#      - Bloqueante (schema ausente o parcial, falta master, el realm de la aplicación o el
+#        cliente backend, autoridad temporal ajena): falla antes de arrancar Keycloak y
+#        ninguna automatización lo corrige, tampoco la recuperación → escalar.
+#      - Recuperable (credencial de automatización rechazada, forma o roles técnicos
+#        divergentes, autoridad temporal propia de un evento interrumpido): solo con
+#        keycloak_recovery=true (workflow_dispatch con aprobación del environment) corre el
+#        evento con autoridad temporal sobre el estado existente. Nunca importa ni recrea
+#        master, el realm de la aplicación ni piedrazul-backend; sí puede crear o corregir el
+#        cliente técnico piedrazul-keycloak-automation.
+#
+# Autoridades:
+#   - temporal (kc.sh bootstrap-admin service): solo dentro de un evento P2/recuperación;
+#     id y secreto aleatorios generados en el runner; el secreto no se persiste en el host,
+#     solo viaja en tránsito al contenedor de un solo uso de bootstrap-admin y al exec de
+#     kcadm (entorno y sesión en /dev/shm, borrada al terminar).
+#   - automatización (KC_AUTOMATION_CLIENT_SECRET): no se persiste en el host; en tránsito
+#     al exec de kcadm dentro del contenedor keycloak; roles manage-clients y
+#     view-clients del realm de la aplicación, nada en master.
+#   - backend (KC_BACKEND_CLIENT_SECRET): runtime; el único secreto técnico en el host.
+#   - administrador humano permanente: no es una autoridad del ciclo. Su contraseña inicial
+#     (KC_PLATFORM_ADMIN_INITIAL_PASSWORD) solo se exige y usa en P2, en tránsito al exec de
+#     kcadm; después contraseña y OTP son del operador. Ningún estado lo modifica, repara ni
+#     recrea; la clasificación solo informa su preparación, aparte de P1/P2/P3.
+#
+# Imagen: Keycloak solo arranca (servicio o contenedor de un solo uso del evento) con
+# keycloak_image_ref, la identidad exacta que escribió setup.yml en image.env
+# (keycloak_image.yml). Antes de arrancar se verifica que Compose la usa y que no vuelve
+# atrás sobre una base ya migrada por una versión posterior (la migración de la base de
+# Keycloak es solo hacia adelante). Al final, el contenedor corre exactamente esa identidad
+# y la base quedó migrada a su versión.
+#
+# Variables:
+#   keycloak_recovery  true solo para una recuperación P3 autorizada (por defecto false)
+#   keycloak_image_ref <quay.io/keycloak/keycloak>@sha256:<manifiesto linux/amd64> (obligatoria)
+
+- name: Validar la decisión de recuperación
+  ansible.builtin.assert:
+    that:
+      - (keycloak_recovery | default(false) | string | lower) in ['true', 'false']
+    fail_msg: "keycloak_recovery debe ser true o false"
+    quiet: true
+
+- name: Calcular la forma técnica esperada
+  ansible.builtin.set_fact:
+    app_kc_recovery: "{{ keycloak_recovery | default(false) | bool }}"
+    app_kc_expected:
+      automation_shape: "enabled:true,public:false,bearer:false,service_account:true,authenticator:client-secret,standard_flow:false,implicit_flow:false,direct_grants:false"
+      automation_roles: "{{ kc_automation_roles | sort }}"
+      backend_shape: >-
+        {{ 'enabled:%s,public:%s,bearer:%s,service_account:%s,authenticator:%s,standard_flow:%s,implicit_flow:%s,direct_grants:%s'
+           | format(_c.enabled | default(true) | string | lower, _c.publicClient | default(false) | string | lower,
+                    _c.bearerOnly | default(false) | string | lower, _c.serviceAccountsEnabled | default(false) | string | lower,
+                    _c.clientAuthenticatorType | default('client-secret'), _c.standardFlowEnabled | default(true) | string | lower,
+                    _c.implicitFlowEnabled | default(false) | string | lower, _c.directAccessGrantsEnabled | default(false) | string | lower) }}
+      backend_shape_json: >-
+        {{ {'enabled': _c.enabled | default(true), 'publicClient': _c.publicClient | default(false),
+            'bearerOnly': _c.bearerOnly | default(false), 'serviceAccountsEnabled': _c.serviceAccountsEnabled | default(false),
+            'clientAuthenticatorType': _c.clientAuthenticatorType | default('client-secret'),
+            'standardFlowEnabled': _c.standardFlowEnabled | default(true), 'implicitFlowEnabled': _c.implicitFlowEnabled | default(false),
+            'directAccessGrantsEnabled': _c.directAccessGrantsEnabled | default(false)} | to_json }}
+      backend_roles: >-
+        {%- set r = [] -%}
+        {%- for c, names in (_sa.clientRoles | default({})).items() -%}{%- for n in names -%}{%- set _ = r.append(c ~ ':' ~ n) -%}{%- endfor -%}{%- endfor -%}
+        {%- for n in _sa.realmRoles | default([]) -%}{%- if not n.startswith('default-roles-') -%}{%- set _ = r.append('realm:' ~ n) -%}{%- endif -%}{%- endfor -%}
+        {{ r | sort }}
+  vars:
+    _realm: "{{ lookup('ansible.builtin.file', kc_realm_file) | from_json }}"
+    _c: "{{ _realm.clients | selectattr('clientId', 'equalto', kc_backend_client_id) | first }}"
+    _sa: "{{ _realm.users | default([]) | selectattr('serviceAccountClientId', 'defined') | selectattr('serviceAccountClientId', 'equalto', kc_backend_client_id) | first }}"
+
+- name: Verificar que el realm del repositorio define al backend sin secreto
+  ansible.builtin.assert:
+    that:
+      - app_kc_expected.backend_shape is search('service_account:true')
+      - app_kc_expected.backend_roles | length > 0
+      - _c.secret is not defined
+    fail_msg: >-
+      {{ kc_realm_file | basename }}: {{ kc_backend_client_id }} debe ser confidencial con service
+      account y roles, y sin "secret" (un valor del repositorio nunca debe ser válido).
+    quiet: true
+  vars:
+    _c: "{{ (lookup('ansible.builtin.file', kc_realm_file) | from_json).clients | selectattr('clientId', 'equalto', kc_backend_client_id) | first }}"
+
+# ── Identidad de la imagen, antes de tocar Keycloak ─────────────────────────
+- name: Validar la identidad de Keycloak de este converge
+  ansible.builtin.assert:
+    that:
+      - (keycloak_image_ref | default('') | string) is match('^' ~ (keycloak_image | regex_escape) ~ '@sha256:[0-9a-f]{64}\Z')
+    fail_msg: >-
+      keycloak_image_ref debe ser {{ keycloak_image }}@sha256:<manifiesto linux/amd64>
+      (recibido: '{{ keycloak_image_ref | default('') }}'). No se arranca Keycloak.
+    quiet: true
+
+- name: Leer la imagen de Keycloak de este converge
+  community.docker.docker_image_info:
+    name: "{{ keycloak_image_ref }}"
+  register: app_kc_target_image
+
+# La configuración resuelta incluye valores de .env: solo se conserva la imagen de keycloak
+- name: Leer la configuración que Compose usaría para Keycloak
+  ansible.builtin.command:
+    argv: "{{ compose_cli + ['config', '--format', 'json', 'keycloak'] }}"
+    chdir: "{{ app_dir }}/compose"
+  register: app_kc_compose_config
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Leer la imagen que Compose usaría para Keycloak
+  ansible.builtin.set_fact:
+    app_kc_compose_image: >-
+      {{ ((app_kc_compose_config.stdout | from_json).services.keycloak.image | default(''))
+         if app_kc_compose_config.rc == 0 else '' }}
+
+- name: Verificar la identidad que arrancaría Keycloak
+  ansible.builtin.assert:
+    that:
+      - app_kc_target_image.images | length == 1
+      - keycloak_image_ref in (app_kc_target_image.images[0].RepoDigests | default([]))
+      - app_kc_target_version | length > 0
+      - app_kc_compose_image == keycloak_image_ref
+    fail_msg: >-
+      IDENTIDAD DE KEYCLOAK: Compose ({{ app_kc_compose_image or 'configuración no resoluble (rc=' ~ app_kc_compose_config.rc ~ ')' }})
+      no arrancaría exactamente {{ keycloak_image_ref }}, o esa imagen no está descargada o no
+      declara su versión. No se arranca ni clasifica nada.
+    quiet: true
+  vars:
+    app_kc_target_version: >-
+      {{ ((((app_kc_target_image.images | first | default({})).Config | default({}, true)).Labels
+          | default({}, true))['org.opencontainers.image.version'] | default('')) | string }}
+
+- name: Fijar la versión de Keycloak de destino
+  ansible.builtin.set_fact:
+    app_kc_target_version: "{{ app_kc_target_image.images[0].Config.Labels['org.opencontainers.image.version'] }}"
+
+# Historia del host, no autoridad: la decisión ya no depende de él
+- name: Retirar el marker histórico de inicialización
+  ansible.builtin.file:
+    path: "{{ app_dir }}/.keycloak_initialized"
+    state: absent
+
+# ── Clasificación ────────────────────────────────────────────────────────────
+- name: Clasificar por la base
+  ansible.builtin.include_tasks: keycloak_state.yml
+  vars:
+    app_kc_with_api: false
+
+# Schema vacío con Keycloak corriendo (p. ej. reiniciando sin conectar): no sirve
+# identidad, se detiene y se vuelve a leer. Si entre tanto escribió en la base, lo hizo fuera
+# de este ciclo → ya no es P2.
+- name: Detener Keycloak sobre un schema vacío
+  when: app_kc_observed.schema == 'empty'
+  block:
+    - name: Leer el contenedor keycloak
+      community.docker.docker_container_info:
+        name: keycloak
+      register: app_kc_container
+
+    - name: Detener Keycloak antes del evento P2
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}/compose"
+        project_name: "{{ compose_project_name }}"
+        files:
+          - prod.yml
+        services:
+          - keycloak
+        state: stopped
+        env_files:
+          - ../.env
+          - ../image.env
+      when:
+        - app_kc_container.exists
+        - app_kc_container.container.State.Running | default(false)
+
+    - name: Volver a clasificar por la base
+      ansible.builtin.include_tasks: keycloak_state.yml
+      vars:
+        app_kc_with_api: false
+      when:
+        - app_kc_container.exists
+        - app_kc_container.container.State.Running | default(false)
+
+# Una base inicializada siempre registra la versión de Keycloak que la migró (migration_model).
+# Sin una versión conocida (ausente, vacía, ambigua o con otra forma) no se puede decidir si
+# arrancar la migra hacia adelante o vuelve atrás: falla antes de tocar Keycloak, también con
+# recuperación. No se repara ni se adivina.
+- name: Fallar cerrado ante una versión de la base desconocida
+  ansible.builtin.fail:
+    msg: >-
+      KEYCLOAK: la base está inicializada pero su versión registrada (migration_model) es
+      desconocida ('{{ app_kc_observed.migration_version or 'sin registro' }}'). No se puede
+      decidir si {{ app_kc_target_version }} la migra hacia adelante o vuelve atrás: no se
+      arrancó, detuvo ni modificó nada. Escalar (docs/operations/runbooks/recuperar-keycloak.md).
+  when:
+    - app_kc_observed.schema == 'initialized'
+    - app_kc_observed.migration_version is not match('^[0-9]+\.[0-9]+\.[0-9]+\Z')
+
+# La base de Keycloak solo migra hacia adelante. Una imagen anterior a la versión que ya
+# migró la base no arranca (ni como servicio ni en un evento): no hay vuelta atrás soportada.
+- name: Fallar cerrado ante una imagen anterior a la base (vuelta atrás)
+  ansible.builtin.fail:
+    msg: >-
+      KEYCLOAK: la base ya fue migrada por Keycloak {{ app_kc_observed.migration_version }} y la
+      imagen de este converge es {{ app_kc_target_version }} ({{ keycloak_image_ref }}). Volver
+      atrás sobre una base migrada no está soportado: no se arrancó, detuvo ni modificó nada.
+      Desplegar una versión >= {{ app_kc_observed.migration_version }} o escalar
+      (docs/operations/runbooks/recuperar-keycloak.md).
+  when:
+    - app_kc_observed.schema == 'initialized'
+    - app_kc_observed.migration_version is version(app_kc_target_version, '>')
+
+- name: Informar la migración de la base de Keycloak
+  ansible.builtin.debug:
+    msg: >-
+      KEYCLOAK: {{ 'base nueva; la inicializa ' ~ app_kc_target_version
+                   if app_kc_observed.schema != 'initialized'
+                   else 'base migrada por ' ~ app_kc_observed.migration_version
+                        ~ (', arrancar ' ~ app_kc_target_version ~ ' la migra hacia adelante (sin vuelta atrás)'
+                           if app_kc_observed.migration_version is version(app_kc_target_version, '<')
+                           else ', misma versión que la imagen: sin migración') }}
+      (imagen {{ keycloak_image_ref }})
+
+# Antes de arrancar o tocar Keycloak: lo bloqueante falla aquí, con o sin recuperación
+- name: Fallar cerrado ante divergencias bloqueantes (P3, escalar)
+  ansible.builtin.fail:
+    msg: >-
+      KEYCLOAK P3 BLOQUEANTE: {{ app_kc_blocking | join('; ') }}. Puede implicar pérdida de
+      identidad o autoridad ajena: ninguna automatización lo corrige, tampoco
+      keycloak_recovery=true. No se arrancó, importó, adoptó ni borró nada. Escalar
+      (docs/operations/runbooks/recuperar-keycloak.md, casos no soportados).
+  when: app_kc_blocking | length > 0
+
+- name: Levantar Keycloak sobre la base ya inicializada
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/compose"
+    project_name: "{{ compose_project_name }}"
+    files:
+      - prod.yml
+    services:
+      - keycloak
+    dependencies: false
+    state: present
+    wait: true
+    wait_timeout: "{{ kc_start_timeout | default(600) }}"
+    env_files:
+      - ../.env
+      - ../image.env
+  when: app_kc_observed.schema == 'initialized'
+
+- name: Clasificar por la base y la API
+  ansible.builtin.include_tasks: keycloak_state.yml
+  vars:
+    app_kc_with_api: true
+  when: app_kc_observed.schema == 'initialized'
+
+- name: Informar la clasificación
+  ansible.builtin.debug:
+    msg:
+      - "KEYCLOAK: estado {{ app_kc_state }}"
+      - "{{ app_kc_reasons if app_kc_reasons else 'sin divergencias' }}"
+      - >-
+        Usuarios humanos con rol admin en master: {{ app_kc_observed.master_admin_users | default(0) }}
+        (incluye al administrador humano permanente; ninguno es dependencia de este ciclo)
+
+- name: Informar la administración humana de Keycloak
+  ansible.builtin.debug:
+    msg: "ADMINISTRACIÓN HUMANA DE KEYCLOAK (aparte del estado técnico): {{ app_kc_platform_admin.summary }}"
+  when: app_kc_state != 'P2'
+
+- name: Informar recuperación pedida sin necesidad
+  ansible.builtin.debug:
+    msg: >-
+      KEYCLOAK: se pidió recuperación pero el estado es {{ app_kc_state }}; no se crea autoridad
+      temporal por la recuperación{{ ' (el evento P2 sí la usa)' if app_kc_state == 'P2' else '' }}.
+  when:
+    - app_kc_recovery
+    - app_kc_state != 'P3'
+
+- name: Fallar cerrado ante divergencias bloqueantes detectadas con la API
+  ansible.builtin.fail:
+    msg: >-
+      KEYCLOAK P3 BLOQUEANTE: {{ app_kc_blocking | join('; ') }}. Ninguna automatización lo
+      corrige, tampoco keycloak_recovery=true. Escalar
+      (docs/operations/runbooks/recuperar-keycloak.md, casos no soportados).
+  when: app_kc_blocking | length > 0
+
+- name: Fallar cerrado ante estado desconocido o divergente (P3)
+  ansible.builtin.fail:
+    msg: >-
+      KEYCLOAK P3 (desconocido/divergente): {{ app_kc_reasons | join('; ') }}.
+      No se adopta, reinicia ni borra nada. Si el estado es el esperado tras un cambio
+      legítimo (p. ej. KC_AUTOMATION_CLIENT_SECRET rotado) o un evento interrumpido, correr la
+      recuperación autorizada: workflow_dispatch con run_host_config=true y
+      keycloak_recovery=true (docs/operations/runbooks/recuperar-keycloak.md).
+  when:
+    - app_kc_state == 'P3'
+    - not app_kc_recovery
+
+# La contraseña inicial solo se exige para crear el administrador humano en P2, antes de
+# cualquier paso del evento (Keycloak sigue detenido y la base vacía si falla)
+- name: Verificar la contraseña inicial del administrador humano (solo P2)
+  ansible.builtin.assert:
+    that:
+      - app_kc_platform_admin_password_invalid | length == 0
+    fail_msg: >-
+      KEYCLOAK P2: la instalación nueva crea el administrador humano permanente y necesita
+      KC_PLATFORM_ADMIN_INITIAL_PASSWORD válida: {{ app_kc_platform_admin_password_invalid | join('; ') }}
+      (valor no mostrado). No se inició el evento: la base de Keycloak sigue vacía. Ver
+      docs/operations/runbooks/administrador-keycloak.md.
+    quiet: true
+  when: app_kc_state == 'P2'
+
+- name: Avisar que la contraseña inicial ya no se usa
+  ansible.builtin.debug:
+    msg: >-
+      KEYCLOAK: KC_PLATFORM_ADMIN_INITIAL_PASSWORD está presente pero solo la usa una
+      instalación nueva (P2); este run ({{ app_kc_state }}) no la usa ni toca el administrador
+      humano. Eliminar el secreto del environment de GitHub una vez completado el primer login.
+  when:
+    - app_kc_state != 'P2'
+    - app_kc_platform_admin_password_present | bool
+
+# ── Evento con autoridad temporal: P2 o recuperación P3 autorizada ───────────
+# Fijado antes del evento: la reclasificación cambia app_kc_state y el `when` de un
+# bloque se evalúa en cada tarea
+- name: Decidir el evento con autoridad temporal
+  ansible.builtin.set_fact:
+    app_kc_event_required: "{{ app_kc_state == 'P2' or (app_kc_state == 'P3' and app_kc_recovery) }}"
+    # También fijado como hecho: app_kc_event se usa después de las reclasificaciones internas
+    # del evento, y una variable de include se volvería a evaluar con el app_kc_state nuevo
+    app_kc_event_kind: "{{ 'fresh' if app_kc_state == 'P2' else 'recovery' }}"
+
+- name: Evento con autoridad temporal
+  ansible.builtin.include_tasks: keycloak_bootstrap.yml
+  vars:
+    app_kc_event: "{{ app_kc_event_kind }}"
+  when: app_kc_event_required | bool
+
+- name: Reclasificar después del evento
+  when: app_kc_event_required | bool
+  block:
+    - name: Clasificar después del evento
+      ansible.builtin.include_tasks: keycloak_state.yml
+      vars:
+        app_kc_with_api: true
+
+    - name: Verificar que el evento dejó el estado en P1
+      ansible.builtin.assert:
+        that:
+          - app_kc_state == 'P1'
+        fail_msg: >-
+          KEYCLOAK: el evento terminó y la autoridad temporal se eliminó, pero el estado es
+          {{ app_kc_state }}: {{ app_kc_reasons | join('; ') }}. Requiere revisión
+          (docs/operations/runbooks/recuperar-keycloak.md).
+        success_msg: "KEYCLOAK: estado P1 después del evento"
+
+    - name: Informar la administración humana de Keycloak después del evento
+      ansible.builtin.debug:
+        msg: "ADMINISTRACIÓN HUMANA DE KEYCLOAK (aparte del estado técnico): {{ app_kc_platform_admin.summary }}"
+
+# ── P1: reconciliación de credenciales durables ──────────────────────────────
+- name: Reconciliar el secreto del backend
+  community.docker.docker_container_exec:
+    container: keycloak
+    argv: ["/bin/bash", "-c", "{{ lookup('ansible.builtin.file', 'keycloak-admin.sh') }}", "keycloak-admin", "reconcile"]
+    env:
+      KCL_SERVER: "http://localhost:{{ kc_port }}"
+      KCL_REALM: "{{ kc_realm }}"
+      KCL_AUTOMATION_CLIENT_ID: "{{ kc_automation_client_id }}"
+      KCL_BACKEND_CLIENT_ID: "{{ kc_backend_client_id }}"
+      KCL_AUTOMATION_SECRET: "{{ app_kc_automation_secret }}"
+      KCL_BACKEND_SECRET: "{{ app_kc_backend_secret }}"
+      KCL_BACKEND_SECRET_JSON_B64: "{{ {'secret': app_kc_backend_secret} | to_json | b64encode }}"
+  register: app_kc_reconcile
+  changed_when: "'backend.secret=updated' in app_kc_reconcile.stdout_lines"
+  failed_when: false
+  no_log: true
+
+- name: Verificar la reconciliación
+  ansible.builtin.assert:
+    that:
+      - app_kc_reconcile.rc == 0
+      - "'backend.admin_api=ok' in app_kc_reconcile.stdout_lines"
+    fail_msg: >-
+      KEYCLOAK: falló la reconciliación del backend
+      ({{ app_kc_reconcile.stdout_lines | default([]) | select('match', '^(error|auth[.][a-z]+)=') | join(', ') or 'sin salida' }}).
+      El secreto de Keycloak puede haber cambiado sin que el backend lo tenga: reintentar converge.
+    success_msg: >-
+      KEYCLOAK P1: secreto del backend
+      {{ 'actualizado' if 'backend.secret=updated' in app_kc_reconcile.stdout_lines else 'sin cambios' }};
+      el backend autentica con él
+
+# ── Identidad en ejecución y versión de la base ─────────────────────────────
+# app_kc_observed es la última lectura, siempre posterior al arranque (clasificación con la
+# API o reclasificación después del evento)
+- name: Verificar la identidad de Keycloak en ejecución
+  ansible.builtin.include_tasks: verify_running_images.yml
+  vars:
+    app_release_services: [keycloak]
+
+- name: Verificar que la base quedó en la versión de la imagen
+  ansible.builtin.assert:
+    that:
+      - app_kc_observed.migration_version == app_kc_target_version
+    fail_msg: >-
+      KEYCLOAK: corre {{ keycloak_image_ref }} ({{ app_kc_target_version }}) pero la base
+      registra {{ app_kc_observed.migration_version or 'ninguna versión' }}. No se informa como éxito.
+    success_msg: >-
+      KEYCLOAK {{ app_kc_target_version }} en ejecución ({{ keycloak_image_ref }}); base en
+      {{ app_kc_observed.migration_version }}

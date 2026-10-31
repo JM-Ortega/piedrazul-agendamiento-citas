@@ -1,12 +1,24 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Order;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.DoctorDailyCount;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyGroupCount;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyStateCount;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -27,21 +39,19 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
         return mapper.toDomain(jpaRepository.save(mapper.toEntity(appointment)));
     }
 
+    @Override
+    public boolean existsByIdAndState(UUID appointmentId, AppointmentState state) {
+        return jpaRepository.existsByIdAppointmentAndAppointmentState(appointmentId, state);
+    }
 
     @Override
-    public List<Appointment> findByDoctorId(UUID idDoctor) {
-        return jpaRepository.findByIdDoctor(idDoctor).stream().map(mapper::toDomain).toList();
+    public long countByDateAndState(LocalDate date,  AppointmentState state) {
+        return jpaRepository.countByDateAndAppointmentState(date, state);
     }
 
     @Override
     public List<Appointment> findByPatientId(UUID idPatient) {
         return jpaRepository.findByIdPatient(idPatient).stream().map(mapper::toDomain).toList();
-    }
-
-
-    @Override
-    public List<Appointment> findByDate(LocalDate date) {
-        return jpaRepository.findByDate(date).stream().map(mapper::toDomain).toList();
     }
 
     @Override
@@ -59,18 +69,17 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     }
 
     @Override
+    public List<Appointment> findByDoctorIdAndState(UUID idDoctor, String state){
+        return jpaRepository
+                .findByIdDoctorAndAppointmentState(idDoctor, AppointmentState.valueOf(state))
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public List<Appointment> findByPatientIdAndDate(UUID idPatient, LocalDate date) {
         return jpaRepository.findByIdPatientAndDate(idPatient, date).stream().map(mapper::toDomain).toList();
-    }
-
-    @Override
-    public List<Appointment> findByDoctorIdAndPatientId(UUID idDoctor, UUID idPatient) {
-        return jpaRepository.findByIdDoctorAndIdPatient(idDoctor, idPatient).stream().map(mapper::toDomain).toList();
-    }
-
-    @Override
-    public List<Appointment> findByDoctorIdAndPatientIdAndDate(UUID idDoctor, UUID idPatient, LocalDate date) {
-        return jpaRepository.findByIdDoctorAndIdPatientAndDate(idDoctor, idPatient, date).stream().map(mapper::toDomain).toList();
     }
 
     @Override
@@ -79,8 +88,9 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     }
 
     @Override
-    public List<Appointment> findAll(){
-        return jpaRepository.findAll().stream().map(mapper::toDomain).toList();
+    public boolean existsByDoctorAndState(UUID idDoctor, AppointmentState state) {
+        LocalDate localDate = LocalDate.now();
+        return jpaRepository.existsByIdDoctorAndAppointmentStateAndDate(idDoctor, state, localDate);
     }
 
     @Override
@@ -109,5 +119,119 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
                 .toList();
     }
 
+    @Override
+    public PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery) {
+        Specification<AppointmentEntity> spec = buildSpecification(idDoctor, idPatient, date, state);
 
+        Pageable pageable = PageRequest.of(pageQuery.page(), pageQuery.size(), buildDeterministicSort(pageQuery));
+
+        Page<AppointmentEntity> entityPage = jpaRepository.findAll(spec, pageable);
+        return toPagedResult(entityPage);
+    }
+
+    private Sort buildDeterministicSort(PageQuery pageQuery) {
+        Sort.Direction direction = pageQuery.ascending() ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Sort primary = Sort.by(direction, pageQuery.sortBy());
+
+        if ("date".equals(pageQuery.sortBy())) {
+            return primary.and(Sort.by(Sort.Direction.ASC, "startTime"));
+        }
+        return primary.and(Sort.by(Sort.Direction.ASC, "date")).and(Sort.by(Sort.Direction.ASC, "startTime"));
+    }
+
+    @Override
+    public PagedResult<Appointment> ListDoctorDailyAgenda(UUID idDoctor, LocalDate date, PageQuery pageQuery) {
+        Specification<AppointmentEntity> specification = buildSpecification(idDoctor, null, date, null)
+                .and(byStatePriority());
+
+        Pageable pageable = PageRequest.of(pageQuery.page(), pageQuery.size());
+
+        Page<AppointmentEntity> entityPage = jpaRepository.findAll(specification, pageable);
+        return toPagedResult(entityPage);
+    }
+
+    @Override
+    public List<Appointment> findByDoctorAndDateBetween(
+            UUID idDoctor,
+            LocalDate dateStart,
+            LocalDate dateEnd
+    ) {
+        return jpaRepository
+                .findByIdDoctorAndDateBetween(idDoctor, dateStart, dateEnd)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    private Specification<AppointmentEntity> buildSpecification(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state) {
+        List<Specification<AppointmentEntity>> specs = new ArrayList<>();
+
+        if (idDoctor != null) {
+            specs.add((root, query, cb) -> cb.equal(root.get("idDoctor"), idDoctor));
+        }
+        if (idPatient != null) {
+            specs.add((root, query, cb) -> cb.equal(root.get("idPatient"), idPatient));
+        }
+        if (date != null) {
+            specs.add((root, query, cb) -> cb.equal(root.get("date"), date));
+        }
+        if (state != null) {
+            specs.add((root, query, cb) -> cb.equal(root.get("appointmentState"), state));
+        }
+
+        return Specification.allOf(specs);
+    }
+
+    private Specification<AppointmentEntity> byStatePriority() {
+        return (root, query, cb) -> {
+            Expression<Integer> priority = cb.<Integer>selectCase()
+                    .when(cb.equal(root.get("appointmentState"), AppointmentState.AGENDADA), 1)
+                    .when(cb.equal(root.get("appointmentState"), AppointmentState.ATENDIDA), 2)
+                    .when(cb.equal(root.get("appointmentState"), AppointmentState.NO_ASISTIO), 3)
+                    .when(cb.equal(root.get("appointmentState"), AppointmentState.CANCELADA), 4)
+                    .otherwise(5);
+
+            query.orderBy(cb.asc(priority), cb.asc(root.get("startTime")));
+            return cb.conjunction();
+        };
+    }
+
+    private PagedResult<Appointment> toPagedResult(Page<AppointmentEntity> entityPage) {
+        return new PagedResult<>(
+                entityPage.getContent().stream().map(mapper::toDomain).toList(),
+                entityPage.getNumber(), entityPage.getSize(), entityPage.getTotalElements(), entityPage.getTotalPages()
+        );
+    }
+
+    @Override
+    public List<MonthlyGroupCount> countByMonthAndDoctor(int year, Collection<AppointmentState> states) {
+        return jpaRepository.countByMonthAndDoctor(startOf(year), startOf(year + 1), states).stream()
+                .map(v -> new MonthlyGroupCount(v.getMonthNumber() - 1, String.valueOf(v.getGroupKey()), v.getTotal()))
+                .toList();
+    }
+
+    @Override
+    public List<MonthlyGroupCount> countByMonthAndSpecialty(int year, Collection<AppointmentState> states) {
+        return jpaRepository.countByMonthAndSpecialty(startOf(year), startOf(year + 1), states).stream()
+                .map(v -> new MonthlyGroupCount(v.getMonthNumber() - 1, String.valueOf(v.getGroupKey()), v.getTotal()))
+                .toList();
+    }
+
+    @Override
+    public List<MonthlyStateCount> countByMonthAndState(int year) {
+        return jpaRepository.countByMonthAndState(startOf(year), startOf(year + 1)).stream()
+                .map(v -> new MonthlyStateCount(v.getMonthNumber() - 1, v.getState(), v.getTotal()))
+                .toList();
+    }
+
+    @Override
+    public List<DoctorDailyCount> countByDateGroupedByDoctorExcludingState(LocalDate date, AppointmentState excludedState) {
+        return jpaRepository.countByDateGroupedByDoctorExcludingState(date, excludedState).stream()
+                .map(v -> new DoctorDailyCount(v.getDoctorId(), v.getTotal()))
+                .toList();
+    }
+
+    private static LocalDate startOf(int year) {
+        return LocalDate.of(year, 1, 1);
+    }
 }

@@ -1,0 +1,98 @@
+<div class="relative">
+  <label for="entitySearchInput" class="block text-gray-700 mb-2 text-2sm">{{
+    label
+  }}</label>
+
+  <div class="flex gap-3">
+    <div class="relative flex-1">
+      <input
+        id="entitySearchInput"
+        type="text"
+        [attr.inputmode]="inputMode"
+        [ngModel]="searchQuery()"
+        (input)="handleInput($event)"
+        (keyup.enter)="onSearchExact()"
+        (blur)="closeSuggestions()"
+        (focus)="openSuggestionsIfAny()"
+        [placeholder]="placeholder"
+        autocomplete="off"
+        class="w-full border-2 border-blue-200 rounded-xl px-4 py-3 pr-10"
+      />
+
+      @if (searchLoading()) {
+        <div class="absolute right-3 top-1/2 -translate-y-1/2">
+          <svg
+            class="animate-spin h-5 w-5 text-[#215c98]"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            ></circle>
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v8z"
+            ></path>
+          </svg>
+        </div>
+      }
+    </div>
+
+    <app-button
+      variant="primary"
+      (buttonClick)="onSearchExact()"
+      [disabled]="searchLoading()"
+    >
+      <svg lucideSearch [size]="18"></svg> {{ searchButtonLabel }}
+    </app-button>
+  </div>
+
+  @if (showSuggestions() && searchSuggestions().length > 0) {
+    <ul
+      class="absolute z-20 w-full mt-1 bg-white border border-blue-200 rounded-xl shadow-lg max-h-56 overflow-y-auto"
+    >
+      @for (suggestion of searchSuggestions(); track $index) {
+        <li>
+          <button
+            type="button"
+            (mousedown)="selectSuggestion(suggestion)"
+            class="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors text-gray-700 border-b border-gray-100 last:border-0"
+          >
+            <ng-container
+              *ngTemplateOutlet="
+                suggestionItemTemplate ?? null;
+                context: { $implicit: suggestion }
+              "
+            ></ng-container>
+          </button>
+        </li>
+      }
+    </ul>
+  }
+
+  @if (searchQuery().length > 0 && searchQuery().length < minSuggestionChars) {
+    <p class="text-gray-400 text-xs mt-1">
+      Ingrese al menos {{ minSuggestionChars }} caracteres para ver sugerencias.
+    </p>
+  }
+
+  @if (inputWarning()) {
+    <p class="text-red-500 text-sm mt-1">{{ inputWarning() }}</p>
+  }
+
+  @if (searchError()) {
+    <p class="text-red-500 text-sm mt-1">{{ searchError() }}</p>
+  }
+
+  @if (globalErrorMessage()) {
+    <div class="mt-2 bg-red-100 text-red-700 p-3 rounded-lg text-sm">
+      {{ globalErrorMessage() }}
+    </div>
+  }
+</div>

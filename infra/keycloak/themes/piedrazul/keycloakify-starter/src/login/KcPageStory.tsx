@@ -3,12 +3,14 @@ import type { KcContext } from "./KcContext";
 import KcPage from "./KcPage";
 import { createGetKcContextMock } from "keycloakify/login/KcContext";
 import type { KcContextExtension, KcContextExtensionPerPage } from "./KcContext";
-import { themeNames, kcEnvDefaults } from "../kc.gen";
+import { themeNames } from "../kc.gen";
+import { PATIENT_APP_CLIENT_ID } from "./frontendUrl";
 
 const kcContextExtension: KcContextExtension = {
     themeName: themeNames[0],
     properties: {
-        ...kcEnvDefaults
+        // Valor de desarrollo; en Keycloak lo entrega la variable de entorno del contenedor
+        FRONTEND_PUBLIC_URL: "http://localhost:4200"
     }
 };
 const kcContextExtensionPerPage: KcContextExtensionPerPage = {};
@@ -16,7 +18,8 @@ const kcContextExtensionPerPage: KcContextExtensionPerPage = {};
 export const { getKcContextMock } = createGetKcContextMock({
     kcContextExtension,
     kcContextExtensionPerPage,
-    overrides: {},
+    // Las historias representan logins pedidos por el frontend Angular
+    overrides: { client: { clientId: PATIENT_APP_CLIENT_ID } },
     overridesPerPage: {}
 });
 

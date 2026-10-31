@@ -8,12 +8,22 @@ import {
 } from 'keycloak-angular';
 import Keycloak from 'keycloak-js';
 import { filter, map } from 'rxjs';
+import { DoctorService } from './doctor.service';
+import { PatientService } from './register.service';
+import { PatientAppointmentService } from './patient.service';
+import { SchedulerService } from './scheduler.service';
+import { AuditService } from '../../features/audit/service/audit.service';
 
 @Injectable({ providedIn: 'root' })
 export class AppService {
   private keycloak = inject(Keycloak);
   private keycloakEvent = inject(KEYCLOAK_EVENT_SIGNAL);
   private router = inject(Router);
+  private doctorService = inject(DoctorService);
+  private patientService = inject(PatientService);
+  private patientAppointmentService = inject(PatientAppointmentService);
+  private schedulerService = inject(SchedulerService);
+  private AuditService = inject(AuditService);
 
   private currentUrl = toSignal(
     this.router.events.pipe(
@@ -39,7 +49,7 @@ export class AppService {
     if (!this.keycloak.authenticated) return [];
     const roles = this.keycloak.realmAccess?.roles ?? [];
     return roles.filter((r) =>
-      ['ADMIN', 'SCHEDULER', 'DOCTOR', 'PATIENT'].includes(r)
+      ['ADMIN', 'SCHEDULER', 'DOCTOR', 'PATIENT', 'AUDITOR'].includes(r)
     );
   });
 
@@ -61,6 +71,8 @@ export class AppService {
     if (url.startsWith('/medico') && roles.includes('DOCTOR')) return 'DOCTOR';
     if (url.startsWith('/paciente') && roles.includes('PATIENT'))
       return 'PATIENT';
+    if (url.startsWith('/auditor') && roles.includes('AUDITOR'))
+      return 'AUDITOR';
     return roles[0];
   });
 
@@ -97,6 +109,7 @@ export class AppService {
       SCHEDULER: '/agendador',
       DOCTOR: '/medico',
       PATIENT: '/paciente',
+      AUDITOR: '/auditor/auditoria',
     };
     this.router.navigate([routeMap[role] ?? '/']);
   }
@@ -108,6 +121,7 @@ export class AppService {
     if (url.startsWith('/agendador')) return 'Agendador';
     if (url.startsWith('/paciente')) return 'Paciente';
     if (url.startsWith('/medico')) return 'Médico';
+    if (url.startsWith('/auditor')) return 'Auditor';
     return this.roleLabelFor(this.currentRole() ?? '');
   });
 
@@ -117,15 +131,29 @@ export class AppService {
       SCHEDULER: 'Agendador',
       DOCTOR: 'Médico',
       PATIENT: 'Paciente',
+      AUDITOR: 'Auditor',
     };
     return map[role] ?? '';
   }
 
-  private roleLabel(): string {
-    return this.roleLabelFor(this.currentRole() ?? '');
-  }
-
+  /**
+   * Realiza el cierre de sesión seguro del usuario.
+   *
+   * Limpia el estado en memoria de los servicios Singleton (Signals y cachés),
+   * elimina cualquier dato persistido en el almacenamiento local del navegador
+   * y redirige al flujo de cierre de sesión unificado con Keycloak.
+   */
   logout(): void {
+    // 1. Purga de datos sensibles y estado en memoria de los servicios Singleton
+    this.doctorService.clearAllData();
+    this.patientService.clearAllData();
+    this.patientAppointmentService.clearAllData();
+    this.schedulerService.clearAllData();
+    this.AuditService.clearAllData();
+    // 2. Limpieza de storages del navegador (tokens locales, flags de sesión, etc.)
+    localStorage.clear();
+    sessionStorage.clear();
+    // 3. Redirección y destrucción de la sesión en el servidor de identidad (Keycloak)
     this.keycloak.logout({ redirectUri: window.location.origin });
   }
   async refreshRoles(): Promise<void> {

@@ -21,15 +21,15 @@ module "server" {
 module "pages" {
   source = "../../modules/cloudflare/pages"
 
+  # Subida directa (Direct Upload): sin integración Git ni builds de Cloudflare; solo
+  # publica wrangler desde la cadena de producción
   account_id        = var.cloudflare_account_id
   project_name      = local.pages_name
-  github_owner      = var.github_owner
-  github_repo       = var.github_repo
   production_branch = "main"
-  build_command     = "npm run build"
-  output_dir        = "dist/frontend/browser"
-  root_dir          = "frontend"
   custom_domain     = local.frontend_domain
+
+  # El dominio se asocia después de que existe su registro DNS (dueño: module.dns)
+  custom_domain_dns_record_id = module.dns.frontend_record_id
 }
 
 module "dns" {
