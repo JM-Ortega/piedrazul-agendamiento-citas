@@ -110,8 +110,8 @@ fails "dispatch: break-glass con publicación del frontend se rechaza" \
   bash -c "$(declare -f dispatch); TMP='${TMP}' HEAD_FULL='${HEAD_FULL}' INTENT_RUN=\$1; dispatch false false false false true true BG-2026-001" _ "${INTENT_RUN}"
 check "dispatch: break-glass sin frontend sigue admitido (sin regresión)" \
   bash -c "$(declare -f dispatch); TMP='${TMP}' HEAD_FULL='${HEAD_FULL}' INTENT_RUN=\$1; dispatch false false false false true false BG-2026-001 | grep -qx intent=deploy_only" _ "${INTENT_RUN}"
-check "dispatch: no más de 10 inputs (límite de workflow_dispatch)" \
-  test "$(yq '.on.workflow_dispatch.inputs | length' "${WORKFLOW}")" -le 10
+check "dispatch: no más de 25 inputs (límite de workflow_dispatch)" \
+  test "$(yq '.on.workflow_dispatch.inputs | length' "${WORKFLOW}")" -le 25
 
 # ── 3. Artefacto del frontend (frontend-artifact.sh) ────────────────────────
 SITE_REPO="${TMP}/site-repo"
@@ -685,7 +685,7 @@ check "autoridad única: sondeo y preflight fallan (sin continue-on-error ni adv
 check "identidad: publish recibe del preflight la producción anterior y el alias de producción" \
   bash -c "yq -r '.jobs.production.steps[] | select(.id == \"pages_publish\") | .env.PREVIOUS_DEPLOYMENT_ID + \" \" + .env.PRODUCTION_URL' '${WORKFLOW}' | grep -qx '\${{ steps.pages_preflight.outputs.previous_deployment_id }} \${{ steps.pages_preflight.outputs.production_url }}'"
 check "publicación: solo si todo lo anterior pasó (sin always/failure) y con el preflight estricto en success" \
-  test "$(yq -r '.jobs.production.steps[] | select(.id == "pages_publish") | .if' "${WORKFLOW}")" = "env.FRONTEND_REQUIRED == 'true' && steps.pages_preflight.outcome == 'success'"
+  test "$(yq -r '.jobs.production.steps[] | select(.id == "pages_publish") | .if' "${WORKFLOW}")" = "env.FRONTEND_PUBLISH == 'true' && steps.pages_preflight.outcome == 'success'"
 check "artefacto: production lo descarga con frontend-artifact.sh (verificado), no con download-artifact" \
   bash -c "! grep -q 'actions/download-artifact' '${WORKFLOW}' && yq -r '.jobs.production.steps[] | select(.id == \"pages_artifact\") | .run' '${WORKFLOW}' | grep -q 'frontend-artifact.sh fetch' && yq -r '.jobs.production.steps[] | select(.id == \"pages_artifact\") | .env.EXPECTED_ARTIFACT_ID' '${WORKFLOW}' | grep -q 'needs.frontend_build.outputs.artifact_id'"
 check "wrangler: versión exacta fijada, lockfile con integridad, instalado sin scripts" \

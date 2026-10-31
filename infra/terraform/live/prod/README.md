@@ -117,7 +117,7 @@ variables, Terraform solo advierte que no están declaradas; conviene quitarlas.
 | Output          | Descripción                          |
 | --------------- | ------------------------------------ |
 | `server_ip`     | IP pública del servidor              |
-| `server_id`     | ID del servidor en Hetzner           |
+| `server_id`     | ID del servidor en Hetzner; con `server_ip`, liga el pin SSH a la instancia |
 | `ssh_user`      | Usuario SSH para Ansible — `ansible` |
 | `frontend_fqdn` | FQDN del frontend (`<base_domain>`)  |
 | `api_fqdn`      | `api.<base_domain>`                  |

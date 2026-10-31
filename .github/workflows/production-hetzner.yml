@@ -1,7 +1,30 @@
 name: Producción — Hetzner
+run-name: >-
+  ${{ github.event_name == 'push' && (vars.PRODUCTION_PUSH_DEPLOY == '' || vars.PRODUCTION_PUSH_DEPLOY == 'deferred')
+  && format('Push diferido, sin deploy: {0}', github.sha)
+  || (github.event_name == 'push' && github.event.head_commit.message
+  || format('Producción {0}: {1}', inputs.stage, github.sha)) }}
 
 # Única cadena de producción: Terraform Apply, deploy de la aplicación en Hetzner y
 # publicación del frontend en Cloudflare Pages.
+#
+# Etapas (ADR-007). Un servidor nuevo o reemplazado se instala en dos runs explícitos, con
+# una autenticación fuera de banda entre ambos; lo demás es un run ordinario:
+#   stage=provision (Run P)  comprobaciones previas de la instalación completa, plan revisado
+#                            y Apply; termina antes de cualquier conexión SSH. Si creó o
+#                            reemplazó el servidor: PROVISIONED / TRUST PENDING / NOT INSTALLED.
+#   [operador]               autentica la clave del host por la consola de Hetzner y registra
+#                            PRODUCTION_SSH_HOST_PIN en el environment. Ningún workflow lo hace.
+#   stage=install (Run I)    plan nuevo que debe salir sin cambios, nunca Apply; concilia
+#                            instancia, dirección, pin y clave ofrecida antes de tocar el
+#                            servidor, y sigue como cualquier deploy.
+#   stage=ordinary / push    un servidor existente y de confianza, un solo run. Si el plan
+#                            revisado crea, reemplaza o destruye el servidor, falla antes de
+#                            aplicar. Crear o reemplazar exige Run P con los push retenidos
+#                            (vars.PRODUCTION_PUSH_DEPLOY sin definir o en deferred).
+# production-stage.sh decide qué combina cada etapa; host-trust.sh, la identidad SSH.
+# Un push se difiere (sin efectos y sin avanzar el rango) salvo con
+# vars.PRODUCTION_PUSH_DEPLOY=enabled, que se habilita después de instalar.
 #
 #   classify ─┬─ resolve_rollback ─┐
 #             ├─ app_build ────────┼─ select_images ─ image_targets ─ image_scan ─ image_policy ─┐
@@ -9,7 +32,7 @@ name: Producción — Hetzner
 #             └─ frontend_build ───────────────────────────────────────────────────────────────┤
 #                 terraform_plan (gate production-hetzner; solo con Terraform) ◄─────────────────┤
 #                   └─ production (gate production-hetzner) ◄────────────────────────────────────┘
-#                        └─ conclude
+#                        └─ conclude ─ range_processed
 #
 # Solo `terraform_plan` y `production` usan el environment production-hetzner y credenciales
 # de producción (terraform_plan: solo HCP Terraform; production: HCP Terraform, SSH,
@@ -43,12 +66,18 @@ name: Producción — Hetzner
 on:
   # Todo push a main corre la clasificación (sin filtro de rutas): si un commit ajeno a
   # producción avanza main y deja obsoleto a un run anterior, su run clasifica el rango
-  # acumulado desde el último éxito y recoge los cambios pendientes. Un rango sin cambios
-  # de producción termina como no-op limpio.
+  # acumulado desde el último rango procesado y recoge los cambios pendientes. Un rango sin
+  # cambios de producción termina como no-op limpio. Con vars.PRODUCTION_PUSH_DEPLOY sin
+  # definir o en deferred, el push queda registrado como diferido y no hace nada más.
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
+      stage:
+        description: "Etapa: ordinary (operación normal), provision (Run P: crear o reemplazar el servidor, sin SSH) o install (Run I: instalar con el pin registrado, sin Apply). instalacion-nueva.md"
+        type: choice
+        options: [ordinary, provision, install]
+        default: ordinary
       run_terraform_apply:
         description: "Aplicar Terraform (HCP) antes del deploy"
         type: boolean
@@ -101,10 +130,12 @@ env:
 
 jobs:
   # ── Intención de producción ────────────────────────────────────────────────
-  # push: clasifica el rango desde el último run push exitoso de este workflow hasta
-  #       este commit (no solo el último commit), así un push descartado por la cola o
-  #       un run fallido quedan cubiertos por el siguiente.
+  # push: clasifica el rango desde el último run push que lo procesó hasta este commit (no
+  #       solo el último commit), así un push descartado por la cola, un run fallido o un
+  #       push diferido quedan cubiertos por el siguiente.
   # workflow_dispatch: la intención es explícita (inputs) y no avanza el rango.
+  # Este job no tiene environment: solo ve variables de repositorio y organización, y por
+  # eso puede comprobar que el pin no tiene una copia fuera del environment.
   classify:
     name: Intención de producción
     runs-on: ubuntu-latest
@@ -113,6 +144,10 @@ jobs:
       contents: read
       actions: read
     outputs:
+      stage: ${{ steps.intent.outputs.stage }}
+      pin_outside_environment: ${{ steps.intent.outputs.pin_outside_environment }}
+      # enabled|deferred|invalid, leído sin environment: el mismo valor que ve un push
+      push_mode: ${{ steps.intent.outputs.push_mode }}
       intent: ${{ steps.intent.outputs.intent }}
       terraform_required: ${{ steps.intent.outputs.terraform_required }}
       deploy_required: ${{ steps.intent.outputs.deploy_required }}
@@ -136,6 +171,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
+          PUSH_DEPLOY_SETTING: ${{ vars.PRODUCTION_PUSH_DEPLOY }}
+          # Solo si existe; el valor nunca sale de environment
+          PIN_OUTSIDE_ENVIRONMENT: ${{ vars.PRODUCTION_SSH_HOST_PIN != '' }}
+          IN_STAGE: ${{ inputs.stage }}
           IN_TERRAFORM: ${{ inputs.run_terraform_apply }}
           IN_HOST_CONFIG: ${{ inputs.run_host_config }}
           IN_BUILD: ${{ inputs.run_build }}
@@ -156,18 +195,48 @@ jobs:
 
           OUT="${RUNNER_TEMP}/intent.env"
 
+          # En un push, un valor inválido falla. En un dispatch no bloquea por sí mismo: la
+          # retención la decide stage_gate, y solo si el plan crea o reemplaza el servidor
           if [ "${EVENT_NAME}" = "push" ]; then
+            PUSH_MODE=$(.github/scripts/production-stage.sh push-mode "${PUSH_DEPLOY_SETTING:-}")
+          else
+            PUSH_MODE=$(.github/scripts/production-stage.sh push-mode "${PUSH_DEPLOY_SETTING:-}" 2> /dev/null) || PUSH_MODE=invalid
+          fi
+
+          if [ "${EVENT_NAME}" = "push" ] && [ "${PUSH_MODE}" = "deferred" ]; then
+            # Sin lecturas de rango: un diferido no depende de la API y no procesa nada. Todos
+            # los flags en false dejan sin correr lo privilegiado y a range_processed sin señal.
+            {
+              echo "stage=deferred"
+              echo "range_mode=deferred"
+              echo "range_base="
+              echo "terraform_required=false"
+              echo "deploy_required=false"
+              echo "run_build=false"
+              echo "run_build_postgres=false"
+              echo "run_host_config=false"
+              echo "run_app_deploy=false"
+              echo "frontend_required=false"
+              echo "intent=deferred"
+              echo "image_tag="
+              echo "keycloak_recovery=false"
+              echo "break_glass_authorization="
+            } > "${OUT}"
+          elif [ "${EVENT_NAME}" = "push" ]; then
             gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/$(basename "${WORKFLOW_PATH}")/runs?branch=main&event=push&status=success&per_page=50" \
               > "${RUNNER_TEMP}/runs.json"
             BASE=$(.github/scripts/production-range-base.sh "${WORKFLOW_PATH}" "${GITHUB_SHA}" "${GITHUB_RUN_ID}" \
               < "${RUNNER_TEMP}/runs.json")
             .github/scripts/classify-production.sh "${BASE}" "${GITHUB_SHA}" > "${OUT}"
             {
+              echo "stage=ordinary"
               echo "image_tag="
               echo "keycloak_recovery=false"
               echo "break_glass_authorization="
             } >> "${OUT}"
           else
+            STAGE="${IN_STAGE:-ordinary}"
+            .github/scripts/production-stage.sh validate
             if [ "${IN_TERRAFORM}" = "false" ] && [ "${IN_HOST_CONFIG}" = "false" ] && \
                [ "${IN_BUILD}" = "false" ] && [ "${IN_BUILD_POSTGRES}" = "false" ] && \
                [ "${IN_APP_DEPLOY}" = "false" ] && [ "${IN_FRONTEND}" = "false" ]; then
@@ -243,10 +312,20 @@ jobs:
                 apply_then_deploy) INTENT=apply_then_deploy_then_frontend ;;
               esac
             fi
+            # Run I no aplica, pero siempre planifica: el plan debe salir sin cambios
+            TERRAFORM_REQUIRED="${IN_TERRAFORM}"
+            if [ "${STAGE}" != "ordinary" ]; then
+              INTENT="${STAGE}"
+              TERRAFORM_REQUIRED=true
+            fi
+            if [ "${STAGE}" = "provision" ] && [ "${PUSH_MODE}" != "deferred" ]; then
+              echo "::warning title=Etapa de producción::Run P sin push retenidos (modo: ${PUSH_MODE}): si el plan crea o reemplaza el servidor se rechazará antes de la segunda aprobación; una recuperación que no lo hace sigue. Definir vars.PRODUCTION_PUSH_DEPLOY=deferred (instalacion-nueva.md)"
+            fi
             {
+              echo "stage=${STAGE}"
               echo "range_mode=manual"
               echo "range_base="
-              echo "terraform_required=${IN_TERRAFORM}"
+              echo "terraform_required=${TERRAFORM_REQUIRED}"
               echo "deploy_required=${DEPLOY}"
               echo "run_build=${IN_BUILD}"
               echo "run_build_postgres=${IN_BUILD_POSTGRES}"
@@ -260,22 +339,34 @@ jobs:
             } > "${OUT}"
           fi
 
+          echo "pin_outside_environment=${PIN_OUTSIDE_ENVIRONMENT:-}" >> "${OUT}"
+          echo "push_mode=${PUSH_MODE}" >> "${OUT}"
           cat "${OUT}" >> "$GITHUB_OUTPUT"
           cat "${OUT}"
 
           get() { sed -n "s/^$1=//p" "${OUT}"; }
+          if [ "$(get stage)" = "deferred" ]; then
+            echo "::notice title=Push diferido::Sin deploy: ${GITHUB_SHA} queda pendiente y el rango no avanza"
+          fi
           {
             echo "## Intención de producción: \`$(get intent)\`"
             echo
             echo "| campo | valor |"
             echo "|---|---|"
             echo "| evento | ${EVENT_NAME} |"
+            echo "| etapa | \`$(get stage)\` |"
             echo "| commit | \`${GITHUB_SHA}\` |"
             case "$(get range_mode)" in
-              incremental) echo "| rango | \`$(get range_base)..${GITHUB_SHA}\` (desde el último run push exitoso) |" ;;
-              full) echo "| rango | árbol completo (sin run push exitoso previo confiable) |" ;;
+              incremental) echo "| rango | \`$(get range_base)..${GITHUB_SHA}\` (desde el último rango procesado) |" ;;
+              full) echo "| rango | árbol completo (sin un rango procesado previo confiable) |" ;;
+              deferred) echo "| rango | **diferido**: este push no procesa nada y no avanza el rango |" ;;
               manual) echo "| rango | — (dispatch manual: intención explícita, no avanza el rango) |" ;;
             esac
+            if [ "$(get stage)" = "provision" ]; then
+              echo "| alcance de Run P | comprobaciones previas de toda la instalación; aplica y termina antes del servidor (sin SSH, configuración, deploy ni publicación) |"
+            elif [ "$(get stage)" = "install" ]; then
+              echo "| alcance de Run I | plan nuevo sin cambios y sin Apply; identidad del host verificada antes de configurar y desplegar |"
+            fi
             echo "| terraform_required | $(get terraform_required) |"
             echo "| deploy_required | $(get deploy_required) |"
             echo "| build backend / postgres | $(get run_build) / $(get run_build_postgres) |"
@@ -969,6 +1060,11 @@ jobs:
   # cancela después de crear el run, hcp_cleanup lo descarta o cancela; un run confirmado
   # fuera de GitHub no se toca y el job falla (production no corre).
   #
+  # Etapa: si el plan no corresponde a la etapa (stage_gate), el job falla antes de pedir la
+  # segunda aprobación y el saved plan se descarta. Run I exige un plan sin cambios; un push o
+  # dispatch ordinario no puede crear, reemplazar ni destruir el servidor; Run P solo crea o
+  # reemplaza con los push retenidos.
+  #
   # Salidas: identidad exacta del plan (run, plan, configuración, state version de entrada,
   # mensaje del run) y has_changes (true|false; cualquier otro valor deja production sin
   # correr y conclude en fallo).
@@ -1014,6 +1110,7 @@ jobs:
       HCP_WORKSPACE_ID: ${{ vars.TF_WORKSPACE_HETZNER_ID }}
       # Identifica el run de HCP de ESTE intento: production y la limpieza solo tocan ese run
       HCP_RUN_MESSAGE: "Producción ${{ github.sha }} — run ${{ github.run_id }}/${{ github.run_attempt }}"
+      PRODUCTION_STAGE: ${{ needs.classify.outputs.stage }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -1149,7 +1246,11 @@ jobs:
           {
             echo "## Plan de Terraform"
             echo
-            if [ "$(get has_changes)" = true ]; then
+            if [ "$(get has_changes)" = true ] && [ "${PRODUCTION_STAGE:-}" = provision ]; then
+              echo "**Con cambios (Run P).** Revisar los efectos de abajo; aprobar el environment \`production-hetzner\` del job *Producción* de este run aplica **exactamente** este saved plan y termina sin tocar el servidor. Si algo no corresponde, rechazar: el plan se descarta sin Apply."
+            elif [ "$(get has_changes)" = true ] && [ "${PRODUCTION_STAGE:-}" = install ]; then
+              echo "**Con cambios: Run I no aplica.** El run falla aquí y el saved plan se descarta."
+            elif [ "$(get has_changes)" = true ]; then
               echo "**Con cambios.** Revisar los efectos de abajo; aprobar el environment \`production-hetzner\` del job *Producción* de este run aplica **exactamente** este saved plan (y sigue con el deploy). Si algo no corresponde, rechazar: el plan se descarta sin Apply."
             else
               echo "**Sin cambios:** nada que aplicar. *Producción* solo corre si este run también despliega o publica el frontend."
@@ -1175,6 +1276,16 @@ jobs:
               echo "::warning title=Terraform::Plan destructivo: $(get review_deletes) destrucción(es) y $(get review_replaces) reemplazo(s). Revisar cada uno antes de aprobar"
             fi
           fi
+
+      # La etapa admite este plan con la acción observada sobre el servidor. Si no, la limpieza
+      # de abajo descarta el saved plan antes de la segunda aprobación.
+      - name: Verificar que la etapa admite el plan
+        id: stage_gate
+        env:
+          HAS_CHANGES: ${{ steps.hcp_plan.outputs.has_changes }}
+          WATCH_SERVER: ${{ steps.hcp_plan.outputs.watch_server }}
+          PUSH_MODE: ${{ needs.classify.outputs.push_mode }}
+        run: .github/scripts/production-stage.sh plan-gate "${PRODUCTION_STAGE}" "${HAS_CHANGES}" "${WATCH_SERVER}" "${PUSH_MODE}"
 
       # Si este job falla o se cancela después de intentar crear el run, el run propio se
       # descarta (o se cancela si sigue planificando); uno confirmado no se toca. Si la
@@ -1213,8 +1324,10 @@ jobs:
   #   plan sobre Pages → contraseña inicial de Keycloak si el plan crea o reemplaza el
   #   servidor → frescura → revalidación y confirmación del saved plan revisado
   #   (una sola solicitud)] → resultado del Apply y state version exacto (o, sin cambios,
-  #   el estado sin cambios) → outputs → preflight estricto de Pages → SSH → cloud-init
-  #   terminado (si converge) → último éxito del servidor →
+  #   el estado sin cambios) → outputs → preflight estricto de Pages → [Run P termina aquí] →
+  #   identidad del host (pin ↔ estado ↔ clave ofrecida, antes de usar la clave SSH) → SSH
+  #   estricto → cloud-init
+  #   terminado (si converge) → sshd efectivo (si converge) → último éxito del servidor →
   #   identidades exactas → evidencia de escaneo + escaneo del reuso → política de
   #   vulnerabilidades (autoritativa) [→ registro de break-glass] → [frescura si no hubo Apply] →
   #   converge (postgres + reconciliación de autoridades de la base → Keycloak/Traefik) /
@@ -1248,6 +1361,12 @@ jobs:
   # Frescura: solo la punta actual de main inicia una mutación, verificado justo antes
   # de la primera. Iniciada la cadena, termina aunque main avance. Un re-run de un commit
   # que ya no es la punta falla en la frescura sin mutar nada.
+  # Etapas: DEPLOY_REQUIRED, RUN_HOST_CONFIG y RUN_APP_DEPLOY son lo que ESTE run hace, así
+  # que en Run P todo lo que toca el servidor queda sin correr desde un solo lugar. Credenciales
+  # y contraseña de Keycloak leen la intención de classify: Run P exige, antes del Apply, lo
+  # mismo que una instalación completa. Lo que vence (política, escaneo, frescura, Pages) se
+  # evalúa de nuevo en Run I; nada de Run P se hereda.
+  #
   # La concurrencia serializa producción y, con queue: max, conserva los jobs pendientes
   # en vez de reemplazarlos. El orden de la cola no define la corrección: la frescura
   # deja mutar solo a la punta de main y el rango acumulado cubre lo pendiente.
@@ -1282,7 +1401,8 @@ jobs:
           needs.terraform_plan.result == 'success' &&
           (needs.terraform_plan.outputs.has_changes == 'true' ||
             (needs.terraform_plan.outputs.has_changes == 'false' &&
-              (needs.classify.outputs.deploy_required == 'true' || needs.classify.outputs.frontend_required == 'true')))))
+              (needs.classify.outputs.deploy_required == 'true' || needs.classify.outputs.frontend_required == 'true'))))) &&
+      (needs.classify.outputs.stage != 'install' || needs.terraform_plan.outputs.has_changes == 'false')
     # Incluye el Apply (hasta 15 min de seguimiento) y el deploy completo
     timeout-minutes: 120
     environment: production-hetzner
@@ -1301,8 +1421,9 @@ jobs:
       issues: write
     env:
       ANSIBLE_CONFIG: infra/ansible/ansible.cfg
-      ANSIBLE_HOST_KEY_CHECKING: "False"
+      ANSIBLE_HOST_KEY_CHECKING: "True"
       ANSIBLE_HOST: vps
+      PRODUCTION_STAGE: ${{ needs.classify.outputs.stage }}
       TF_CLOUD_ORGANIZATION: Piedrazul
       TF_WORKSPACE: piedrazul-hetzner
       HCP_WORKSPACE_ID: ${{ vars.TF_WORKSPACE_HETZNER_ID }}
@@ -1314,12 +1435,15 @@ jobs:
       KC_REALM: piedrazul
       # Este run pasa por Terraform (plan en terraform_plan) / aplica su saved plan
       TERRAFORM_REQUIRED: ${{ needs.classify.outputs.terraform_required }}
-      TF_APPLY_REQUIRED: ${{ needs.classify.outputs.terraform_required == 'true' && needs.terraform_plan.outputs.has_changes == 'true' }}
-      DEPLOY_REQUIRED: ${{ needs.classify.outputs.deploy_required }}
-      RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
-      RUN_APP_DEPLOY: ${{ needs.classify.outputs.run_app_deploy }}
+      TF_APPLY_REQUIRED: ${{ needs.classify.outputs.stage != 'install' && needs.classify.outputs.terraform_required == 'true' && needs.terraform_plan.outputs.has_changes == 'true' }}
+      # Lo que este run hace en el servidor; Run P no hace nada de esto
+      DEPLOY_REQUIRED: ${{ needs.classify.outputs.stage != 'provision' && needs.classify.outputs.deploy_required == 'true' }}
+      RUN_HOST_CONFIG: ${{ needs.classify.outputs.stage != 'provision' && needs.classify.outputs.run_host_config == 'true' }}
+      RUN_APP_DEPLOY: ${{ needs.classify.outputs.stage != 'provision' && needs.classify.outputs.run_app_deploy == 'true' }}
       KEYCLOAK_RECOVERY: ${{ needs.classify.outputs.keycloak_recovery }}
+      # Preparar y verificar Pages (también en Run P) / publicar (nunca en Run P)
       FRONTEND_REQUIRED: ${{ needs.classify.outputs.frontend_required }}
+      FRONTEND_PUBLISH: ${{ needs.classify.outputs.stage != 'provision' && needs.classify.outputs.frontend_required == 'true' }}
       # Identidad exacta de Keycloak que image_targets resolvió y escaneó (vacía sin converge)
       KEYCLOAK_LABEL: ${{ needs.image_targets.outputs.keycloak_label }}
       KEYCLOAK_INDEX_DIGEST: ${{ needs.image_targets.outputs.keycloak_index_digest }}
@@ -1339,6 +1463,9 @@ jobs:
       - name: Verificar credenciales de producción
         id: credentials
         env:
+          # La intención, no lo que hace este run: Run P exige lo que la instalación necesitará
+          DEPLOY_REQUIRED: ${{ needs.classify.outputs.deploy_required }}
+          RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
           TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
           ANSIBLE_SSH_KEY: ${{ secrets.ANSIBLE_SSH_KEY }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
@@ -1408,6 +1535,16 @@ jobs:
             exit 1
           fi
           echo "Credenciales requeridas presentes"
+
+      # Sin red y antes de cualquier mutación: un run que va a tocar el servidor no aplica nada
+      # si ni siquiera tiene un pin utilizable. Run P no lo lee: su servidor aún no tiene pin.
+      - name: Verificar la forma del pin del host (sin red)
+        id: pin_preflight
+        if: env.DEPLOY_REQUIRED == 'true'
+        env:
+          EXPECTED_HOST_PIN: ${{ vars.PRODUCTION_SSH_HOST_PIN }}
+          PIN_OUTSIDE_ENVIRONMENT: ${{ needs.classify.outputs.pin_outside_environment }}
+        run: .github/scripts/host-trust.sh check-pin
 
       # ── Frontend: preparación antes de la primera mutación ──
       # Lo que la publicación necesita y no depende de Terraform se obtiene y verifica aquí,
@@ -1548,30 +1685,42 @@ jobs:
       # servidor no se exige: la contraseña es temporal y se retira tras el primer login;
       # P2 en un servidor existente lo sigue exigiendo keycloak_lifecycle.yml. Una acción
       # desconocida, ausente o repetida no se interpreta: falla. Si falla, no se confirma
-      # y el saved plan se descarta (hcp_cleanup).
+      # y el saved plan se descarta (hcp_cleanup). Este es el último paso antes de confirmar
+      # y repite stage_gate: la etapa, la destrucción y la retención de los push. La retención
+      # se evalúa dos veces porque la segunda aprobación puede tardar: con el valor de classify
+      # (el de un push) y con el leído al empezar este job, por si alguien la levantó. Este
+      # último puede estar ensombrecido por el environment, así que no reemplaza al primero.
       - name: Verificar la contraseña inicial de Keycloak si el plan crea el servidor
         id: kc_admin_preflight
         if: env.TF_APPLY_REQUIRED == 'true'
         env:
+          # La intención: en Run P, RUN_HOST_CONFIG de este job es false
+          RUN_HOST_CONFIG: ${{ needs.classify.outputs.run_host_config }}
           WATCH_SERVER: ${{ needs.terraform_plan.outputs.watch_server }}
+          PUSH_MODE: ${{ needs.classify.outputs.push_mode }}
+          PUSH_DEPLOY_NOW: ${{ vars.PRODUCTION_PUSH_DEPLOY }}
           KC_BACKEND_CLIENT_SECRET: ${{ secrets.KC_BACKEND_CLIENT_SECRET }}
           KC_AUTOMATION_CLIENT_SECRET: ${{ secrets.KC_AUTOMATION_CLIENT_SECRET }}
           KC_PLATFORM_ADMIN_INITIAL_PASSWORD: ${{ secrets.KC_PLATFORM_ADMIN_INITIAL_PASSWORD }}
         run: |
           set -euo pipefail
           case "${WATCH_SERVER}" in
-            no-op | update | delete)
+            no-op | update)
               echo "El plan revisado no crea ni reemplaza el servidor (acción: ${WATCH_SERVER}): no se exige KC_PLATFORM_ADMIN_INITIAL_PASSWORD"
               exit 0
               ;;
-            create | replace) ;;
+            create | replace | delete)
+              PUSH_MODE_NOW=$(.github/scripts/production-stage.sh push-mode "${PUSH_DEPLOY_NOW:-}" 2> /dev/null) || PUSH_MODE_NOW=invalid
+              .github/scripts/production-stage.sh plan-gate "${PRODUCTION_STAGE:-}" true "${WATCH_SERVER}" "${PUSH_MODE:-}"
+              .github/scripts/production-stage.sh plan-gate "${PRODUCTION_STAGE:-}" true "${WATCH_SERVER}" "${PUSH_MODE_NOW}"
+              ;;
             *)
               echo "::error title=Keycloak::Acción del plan revisado sobre el servidor no interpretable (${WATCH_SERVER:-sin dato}; none = la dirección no está en el plan, ambiguous = repetida, unknown = JSON ilegible): no se puede decidir si el Apply crea un Keycloak nuevo; no se aplica: el saved plan se descarta"
               exit 1
               ;;
           esac
           if [ "${RUN_HOST_CONFIG}" != "true" ]; then
-            echo "::error title=Keycloak::El plan revisado crea o reemplaza el servidor (acción: ${WATCH_SERVER}) pero este run no configura el servidor (run_host_config=false): quedaría sin Keycloak ni aplicación. Una instalación nueva necesita run_terraform_apply, run_host_config y run_app_deploy (instalacion-nueva.md); no se aplica: el saved plan se descarta"
+            echo "::error title=Keycloak::El plan revisado crea o reemplaza el servidor (acción: ${WATCH_SERVER}) pero la intención del run no incluye configurar el servidor (run_host_config=false); no se aplica: el saved plan se descarta"
             exit 1
           fi
           echo "El plan revisado crea o reemplaza el servidor (acción: ${WATCH_SERVER}): su primer converge es P2 y exige KC_PLATFORM_ADMIN_INITIAL_PASSWORD"
@@ -1606,6 +1755,10 @@ jobs:
           APPLY_COMMENT: "Aprobado en GitHub: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }} (commit ${{ github.sha }})"
         run: |
           set -euo pipefail
+          if [ "${PRODUCTION_STAGE:-}" = "install" ]; then
+            echo "::error title=Terraform::stage=install nunca aplica"
+            exit 1
+          fi
           if [ "${EXPECTED_STATE}" != "${HCP_STATE_BEFORE_PLAN}" ]; then
             echo "::error title=Terraform::El plan revisado está ligado a ${EXPECTED_STATE}, no al estado capturado por terraform_plan (${HCP_STATE_BEFORE_PLAN})"
             exit 1
@@ -1636,7 +1789,7 @@ jobs:
 
       - name: Leer outputs del state version esperado
         id: tf_outputs
-        if: env.DEPLOY_REQUIRED == 'true'
+        if: env.DEPLOY_REQUIRED == 'true' || env.PRODUCTION_STAGE == 'provision'
         env:
           TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
           APPLY_STATE: ${{ steps.hcp_state.outputs.state_version_id }}
@@ -1655,7 +1808,7 @@ jobs:
             exit 1
           fi
           if [ "${EXPECTED_STATE}" = none ]; then
-            echo "::error title=Terraform::El workspace no tiene estado: no hay servidor que desplegar. Una instalación nueva necesita run_terraform_apply=true"
+            echo "::error title=Terraform::El workspace no tiene estado: no hay servidor que desplegar. Una instalación nueva empieza con stage=provision"
             exit 1
           fi
           .github/scripts/hcp-state.sh outputs "${EXPECTED_STATE}" > "${RUNNER_TEMP}/tf-outputs.env"
@@ -1684,19 +1837,40 @@ jobs:
           cat "${RUNNER_TEMP}/pages-preflight.env"
 
       # ── Acceso al servidor ──
+      # Primer contacto con el host de este run, antes de escribir la clave SSH y de cualquier
+      # decisión que dependa del servidor. Concilia pin, instancia y dirección del state version
+      # exacto, y lee la clave ofrecida sin enviar credenciales. Solo si coincide existe la
+      # configuración SSH que usan todos los pasos siguientes (raw SSH y Ansible). El pin lo
+      # registra un operador; este paso nunca lo escribe. Ver host-trust.sh.
+      - name: Verificar la identidad SSH del host
+        id: host_trust
+        if: env.DEPLOY_REQUIRED == 'true'
+        timeout-minutes: 7
+        env:
+          EXPECTED_HOST_PIN: ${{ vars.PRODUCTION_SSH_HOST_PIN }}
+          PIN_OUTSIDE_ENVIRONMENT: ${{ needs.classify.outputs.pin_outside_environment }}
+          SERVER_ID: ${{ steps.tf_outputs.outputs.server_id }}
+          SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
+        run: |
+          set -euo pipefail
+          .github/scripts/host-trust.sh verify "${SERVER_ID}" "${SERVER_IP}" > "${RUNNER_TEMP}/host-trust.env"
+          cat "${RUNNER_TEMP}/host-trust.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/host-trust.env"
+
       - name: Preparar acceso SSH e inventario
         id: access
         if: env.DEPLOY_REQUIRED == 'true'
         env:
           ANSIBLE_SSH_KEY: ${{ secrets.ANSIBLE_SSH_KEY }}
           SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
+          SSH_CONFIG: ${{ steps.host_trust.outputs.ssh_config }}
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
           printf '%s\n' "${ANSIBLE_SSH_KEY}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          printf 'all:\n  hosts:\n    %s:\n      ansible_host: %s\n' "${ANSIBLE_HOST}" "${SERVER_IP}" \
-            > "${RUNNER_TEMP}/hosts.runtime.yml"
+          printf 'all:\n  hosts:\n    %s:\n      ansible_host: %s\n      ansible_ssh_common_args: "-F %s"\n' \
+            "${ANSIBLE_HOST}" "${SERVER_IP}" "${SSH_CONFIG}" > "${RUNNER_TEMP}/hosts.runtime.yml"
           cat "${RUNNER_TEMP}/hosts.runtime.yml"
 
       - name: Esperar SSH en el servidor
@@ -1705,40 +1879,35 @@ jobs:
         timeout-minutes: 6
         env:
           SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
-        run: |
-          set -euo pipefail
-          for i in $(seq 1 30); do
-            if ssh -o StrictHostKeyChecking=no \
-                   -o ConnectTimeout=5 \
-                   -o BatchMode=yes \
-                   -i ~/.ssh/id_ed25519 \
-                   "ansible@${SERVER_IP}" true 2>/dev/null; then
-              echo "SSH disponible"
-              exit 0
-            fi
-            echo "Intento $i/30 — esperando 10s..."
-            sleep 10
-          done
-          echo "Error: SSH no disponible después de 5 minutos"
-          exit 1
+        run: .github/scripts/host-trust.sh wait-ssh "${SERVER_IP}"
 
       # SSH responde antes de que cloud-init termine (usuarios, paquetes, configuración de
       # SSH): converge espera aquí, con plazo, a que termine sin errores ni errores
       # recuperables (falla cerrado si falló, quedó degradado, sigue corriendo, no se puede
-      # leer o vence el plazo). Solo antes de converge. No verifica la clave del host
-      # (StrictHostKeyChecking=no, como el resto de la cadena).
+      # leer o vence el plazo). Solo antes de converge.
       - name: Esperar la inicialización del servidor (cloud-init)
         id: host_init
         if: env.RUN_HOST_CONFIG == 'true'
         timeout-minutes: 12
         env:
           SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
+          SSH_CONFIG_FILE: ${{ steps.host_trust.outputs.ssh_config }}
           HOST_READY_TIMEOUT: "600"
         run: |
           set -euo pipefail
           .github/scripts/host-ready.sh "${SERVER_IP}" > "${RUNNER_TEMP}/host-ready.env"
           cat "${RUNNER_TEMP}/host-ready.env" >> "$GITHUB_OUTPUT"
           cat "${RUNNER_TEMP}/host-ready.env"
+
+      # Después de cloud-init, que escribe la configuración de SSH, y antes de entregar los
+      # secretos del converge. Comprueba las restricciones remotas: no bloquea la consola de
+      # Hetzner, que sigue siendo la vía de recuperación excepcional.
+      - name: Verificar la configuración efectiva de sshd
+        id: sshd_check
+        if: env.RUN_HOST_CONFIG == 'true'
+        env:
+          SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
+        run: .github/scripts/host-trust.sh sshd-check "${SERVER_IP}"
 
       - name: Instalar colecciones de Ansible
         if: env.DEPLOY_REQUIRED == 'true'
@@ -2128,7 +2297,7 @@ jobs:
       # mutación, la cadena iniciada termina aunque main haya avanzado.
       - name: Verificar frescura antes de publicar el frontend
         id: fresh_frontend
-        if: env.FRONTEND_REQUIRED == 'true' && env.TF_APPLY_REQUIRED != 'true' && env.DEPLOY_REQUIRED != 'true'
+        if: env.FRONTEND_PUBLISH == 'true' && env.TF_APPLY_REQUIRED != 'true' && env.DEPLOY_REQUIRED != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: .github/scripts/verify-main-tip.sh
@@ -2136,7 +2305,7 @@ jobs:
       # Solo con el preflight estricto (posterior a Terraform) en success
       - name: Publicar frontend en Cloudflare Pages
         id: pages_publish
-        if: env.FRONTEND_REQUIRED == 'true' && steps.pages_preflight.outcome == 'success'
+        if: env.FRONTEND_PUBLISH == 'true' && steps.pages_preflight.outcome == 'success'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
           PAGES_ACCOUNT_ID: ${{ steps.pages_target.outputs.account_id }}
@@ -2202,6 +2371,10 @@ jobs:
           HCP_APPLY_REQUEST: ${{ steps.hcp_apply.outputs.apply_request }}
           HCP_CLEANUP: ${{ steps.hcp_cleanup.outputs.cleanup }}
           O_HCP_CLEANUP: ${{ steps.hcp_cleanup.outcome }}
+          O_HOST_TRUST: ${{ steps.pin_preflight.outcome }}/${{ steps.host_trust.outcome }}/${{ steps.sshd_check.outcome }}
+          WATCH_SERVER: ${{ needs.terraform_plan.outputs.watch_server }}
+          SERVER_ID: ${{ steps.tf_outputs.outputs.server_id }}
+          SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
           O_ACCESS: ${{ steps.access.outcome }}/${{ steps.readiness.outcome }}/${{ steps.host_init.outcome }}/${{ steps.host_state.outcome }}
           CLOUD_INIT: ${{ steps.host_init.outputs.cloud_init_status }}
           O_SELECT: ${{ steps.select.outcome }}
@@ -2247,7 +2420,7 @@ jobs:
           first_failure "Autoridad de producción (credenciales)" "${O_CREDENTIALS}"
           first_failure "Preparación del frontend (destino, artefacto, wrangler, proyecto/token de Pages o autoridad única)" "${O_PAGES_PREP}"
           first_failure "Evidencia del plan sobre Pages (el plan revisado no crea lo que falta)" "${O_PAGES_PLAN}"
-          first_failure "Contraseña inicial de Keycloak para el servidor nuevo o reemplazado (sin Apply)" "${O_KC_ADMIN_PREFLIGHT}"
+          first_failure "Etapa, retención de push o contraseña inicial de Keycloak para el servidor nuevo o reemplazado (sin Apply)" "${O_KC_ADMIN_PREFLIGHT}"
           first_failure "Frescura (main avanzó o ref no es main)" "${O_FRESH_APPLY}"
           first_failure "HCP Terraform (workspace, estado previo)" "$(cut -d/ -f1-3 <<< "${O_HCP}")"
           if [ "${HCP_APPLY_REQUEST}" = out_of_band ]; then
@@ -2256,6 +2429,7 @@ jobs:
           first_failure "Confirmación del saved plan (revalidación o solicitud de Apply)" "${O_HCP_APPLY}"
           first_failure "Resultado del Apply y causalidad del estado" "$(cut -d/ -f4-5 <<< "${O_HCP}")"
           first_failure "Proyecto de Pages tras Terraform (destino real, autoridad única)" "${O_PAGES_PREFLIGHT}"
+          first_failure "Identidad SSH del host o sshd efectivo (el pin no cambia; ver el diagnóstico del paso)" "${O_HOST_TRUST}"
           first_failure "Acceso al servidor" "${O_ACCESS}"
           first_failure "Identidad de imagen (selección)" "${O_SELECT}"
           first_failure "Evidencia de escaneo incompleta o no verificable" "${O_SCAN}"
@@ -2283,6 +2457,28 @@ jobs:
             echo "::error title=Producción: ${CATEGORY}::El último éxito del servidor no cambió. Ver el resumen del run."
           elif [ "${{ job.status }}" != "success" ]; then
             RESULT="**incompleto (${{ job.status }})** — el último éxito del servidor no cambió"
+          elif [ "${PRODUCTION_STAGE}" = "provision" ] && [ "$(cut -d/ -f5 <<< "${O_HCP}")" = "success" ]; then
+            # El titular sale de lo aplicado y de la acción observada sobre el servidor en el plan
+            # revisado: un job en success no dice por sí solo que se creó algo
+            IDENTITY="instancia \`${SERVER_ID}\`, dirección \`${SERVER_IP}\` (state version \`${STATE_USED}\`)"
+            NOT_DONE="Este run no abrió SSH, no configuró ni desplegó nada y no publicó el frontend."
+            if [ "${TF_APPLY_REQUIRED}" != "true" ]; then
+              OUTCOME="INFRASTRUCTURE UNCHANGED / TRUST AND INSTALLATION NOT EVALUATED"
+              DETAIL="Plan sin cambios: este run no aplicó nada ni sabe si ese servidor tiene pin o está instalado. Si Run P quedó pendiente, seguir con el paso fuera de banda y \`stage=install\` (instalacion-nueva.md)."
+            else
+              case "${WATCH_SERVER}" in
+                create | replace)
+                  OUTCOME="PROVISIONED / TRUST PENDING / NOT INSTALLED"
+                  DETAIL="Siguiente paso: autenticar la clave del host por la consola de Hetzner, registrar \`PRODUCTION_SSH_HOST_PIN\` en el environment y correr \`stage=install\` (instalacion-nueva.md). Este estado no vence."
+                  ;;
+                *)
+                  OUTCOME="INFRASTRUCTURE UPDATED / TRUST AND INSTALLATION NOT EVALUATED"
+                  DETAIL="El Apply terminó sin crear ni reemplazar el servidor (acción: ${WATCH_SERVER:-sin dato}): este run no sabe si ese servidor tiene pin o está instalado. Si Run P quedó pendiente, seguir con el paso fuera de banda y \`stage=install\` (instalacion-nueva.md)."
+                  ;;
+              esac
+            fi
+            RESULT="**${OUTCOME}** — ${IDENTITY}. ${NOT_DONE} ${DETAIL}"
+            echo "::notice title=${OUTCOME}::Instancia ${SERVER_ID}, ${SERVER_IP}. Ver el resumen del run."
           else
             RESULT="sin deploy de aplicación — el último éxito del servidor no cambia"
           fi
@@ -2295,6 +2491,9 @@ jobs:
               failure) PAGES_RESULT="**frontend NO verificado como publicado**: wrangler o la verificación falló; Pages pudo haber recibido o no el deployment. Producción de Pages anterior: \`${PAGES_PREVIOUS_ID:-—}\` (commit \`${PAGES_PREVIOUS_COMMIT:-—}\`)" ;;
               *) PAGES_RESULT="**frontend no publicado**: la cadena se detuvo antes de la publicación; producción de Pages no cambió (vigente: \`${PAGES_PREVIOUS_ID:-no leída}\`)" ;;
             esac
+            if [ "${PRODUCTION_STAGE}" = "provision" ]; then
+              PAGES_RESULT="frontend no publicado: Run P nunca publica; la publicación corresponde a Run I"
+            fi
           fi
 
           {
@@ -2307,12 +2506,14 @@ jobs:
               echo
             fi
             if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
-              echo "> El rango procesado (base del siguiente push) avanza solo si este run termina en success."
+              echo "> El rango procesado (base del siguiente push) avanza solo si este run termina en success y el job *Rango procesado* corre."
               echo "> Con cualquier fallo, el re-run o el siguiente push vuelve a cubrir todo lo pendiente (incluida la publicación del frontend)."
               echo
             fi
             echo "| etapa | valor |"
             echo "|---|---|"
+            echo "| etapa de la cadena | \`${PRODUCTION_STAGE}\` |"
+            [ -z "${SERVER_ID}" ] || echo "| servidor (estado de Terraform) | instancia \`${SERVER_ID}\`, dirección \`${SERVER_IP}\` |"
             echo "| HCP state version previo | \`${STATE_BEFORE:-—}\` |"
             if [ "${TERRAFORM_REQUIRED}" = "true" ]; then
               echo "| saved plan revisado (crear/cambiar/destruir/importar) | ${HCP_PLAN_COUNTS:-—} — \`${HCP_RUN_ID:-—}\` / \`${HCP_PLAN_ID:-—}\` ${HCP_PLAN_LINK:-} |"
@@ -2362,6 +2563,7 @@ jobs:
             fi
             echo "| credenciales / frescura | ${O_CREDENTIALS} / ${O_FRESH_APPLY:-—} ${O_FRESH_DEPLOY:-} |"
             echo "| HCP (workspace/idle/previo/estado/outputs) | ${O_HCP} — confirmación ${O_HCP_APPLY:-—} |"
+            echo "| identidad del host (pin/verificación/sshd) | ${O_HOST_TRUST} |"
             echo "| acceso (ssh/espera/cloud-init/último éxito) | ${O_ACCESS} (cloud-init: ${CLOUD_INIT:-no comprobado}) |"
             echo "| selección | ${O_SELECT} |"
             echo "| escaneo antes de mutar (descarga/evidencia/backend reuso/postgres reuso) | ${O_SCAN} |"
@@ -2400,11 +2602,12 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ── Resultado ─────────────────────────────────────────────────────────────
-  # La conclusión del run es la base del siguiente rango (production-range-base.sh):
-  # solo puede ser success si cada job requerido corrió y terminó bien (incluida la
+  # Solo puede ser success si cada job requerido corrió y terminó bien (incluida la
   # publicación del frontend cuando el rango la requiere) y cada job no requerido quedó
   # saltado. Un job saltado nunca cuenta como trabajo hecho: con Terraform, terraform_plan
-  # debe terminar en success con has_changes exactamente true o false.
+  # debe terminar en success con has_changes exactamente true o false. Un push diferido
+  # termina en success sin haber hecho nada: esa conclusión no es un deploy ni procesa el
+  # rango, y por eso la base del siguiente rango es range_processed, no la conclusión.
   conclude:
     name: Resultado de producción
     runs-on: ubuntu-latest
@@ -2423,11 +2626,26 @@ jobs:
           DEPLOY_REQUIRED: ${{ needs.classify.outputs.deploy_required }}
           FRONTEND_REQUIRED: ${{ needs.classify.outputs.frontend_required }}
           FRONTEND_BUILD: ${{ needs.frontend_build.result }}
+          PRODUCTION_STAGE: ${{ needs.classify.outputs.stage }}
         run: |
           set -euo pipefail
           echo "classify=${CLASSIFY} select_images=${SELECT} frontend_build=${FRONTEND_BUILD} terraform_plan=${TERRAFORM_PLAN} (has_changes=${HAS_CHANGES:-—}) production=${PRODUCTION}"
           [ "${CLASSIFY}" = "success" ] || { echo "Error: la intención no se pudo clasificar"; exit 1; }
           [ "${SELECT}" = "success" ] || { echo "Error: la selección de imágenes no terminó (${SELECT})"; exit 1; }
+          if [ "${PRODUCTION_STAGE:-}" = "deferred" ]; then
+            for f in "${TERRAFORM_REQUIRED}" "${DEPLOY_REQUIRED}" "${FRONTEND_REQUIRED}"; do
+              [ "${f}" = "false" ] || { echo "Error: un push diferido no puede requerir trabajo"; exit 1; }
+            done
+            [ "${TERRAFORM_PLAN}" = "skipped" ] && [ "${PRODUCTION}" = "skipped" ] ||
+              { echo "Error: un push diferido corrió un job privilegiado (plan=${TERRAFORM_PLAN}, producción=${PRODUCTION})"; exit 1; }
+            echo "::notice title=Push diferido::Registrado sin deploy: este run no aplicó ni desplegó nada y el rango no avanza"
+            {
+              echo "## Push diferido: sin deploy"
+              echo
+              echo "Este run terminó bien porque registró la decisión de no procesar el push; **no es un deploy**. Ni Terraform ni el servidor ni Pages cambiaron, y el rango no avanza: el primer push procesado con \`vars.PRODUCTION_PUSH_DEPLOY=enabled\` lo cubre."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           if [ "${FRONTEND_REQUIRED}" = "true" ]; then
             [ "${FRONTEND_BUILD}" = "success" ] || { echo "Error: el build del frontend requerido terminó en '${FRONTEND_BUILD}'"; exit 1; }
           fi
@@ -2435,7 +2653,10 @@ jobs:
           if [ "${TERRAFORM_REQUIRED}" = "true" ]; then
             [ "${TERRAFORM_PLAN}" = "success" ] || { echo "Error: el plan de Terraform requerido terminó en '${TERRAFORM_PLAN}'"; exit 1; }
             case "${HAS_CHANGES}" in
-              true) PRODUCTION_REQUIRED=true ;;
+              true)
+                [ "${PRODUCTION_STAGE:-}" != "install" ] || { echo "Error: stage=install exige un plan sin cambios"; exit 1; }
+                PRODUCTION_REQUIRED=true
+                ;;
               false) ;;
               *) echo "Error: el plan de Terraform no informó un resultado válido (has_changes='${HAS_CHANGES}')"; exit 1 ;;
             esac
@@ -2455,3 +2676,25 @@ jobs:
               echo "Sin cambios de producción en el rango: no-op limpio"
             fi
           fi
+
+  # ── Rango procesado ───────────────────────────────────────────────────────
+  # Señal positiva que production-range-base.sh exige para avanzar la base: este push
+  # ordinario recorrió la cadena y conclude la verificó. Solo existe si corrió; un diferido,
+  # un dispatch o un fallo no la dejan. Sin secretos ni permisos. La condición es explícita
+  # porque el success() implícito de GitHub salta el job si cualquier dependencia transitiva
+  # se saltó, y en un push normal siempre hay jobs saltados.
+  range_processed:
+    name: Rango procesado
+    runs-on: ubuntu-latest
+    needs: [classify, conclude]
+    if: |
+      !cancelled() &&
+      github.event_name == 'push' &&
+      needs.classify.result == 'success' &&
+      needs.conclude.result == 'success' &&
+      needs.classify.outputs.stage == 'ordinary'
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Registrar rango procesado
+        run: echo "Rango procesado hasta ${GITHUB_SHA}"

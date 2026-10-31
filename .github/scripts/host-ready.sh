@@ -2,8 +2,9 @@
 # Barrera de inicialización del servidor antes de la configuración (converge).
 #
 # Uso: host-ready.sh <server_ip>
-# Entorno: SSH_KEY_FILE (por defecto ~/.ssh/id_ed25519), HOST_READY_TIMEOUT (segundos, por
-#   defecto 600), SSH_USER (por defecto ansible); SSH_BIN existe para las pruebas.
+# Entorno: SSH_CONFIG_FILE (ssh_config verificado de este run, de host-trust.sh verify;
+#   obligatorio), HOST_READY_TIMEOUT (segundos, por defecto 600), SSH_USER (por defecto
+#   ansible); SSH_BIN existe para las pruebas.
 #
 # Que SSH responda no prueba que el servidor terminó de inicializarse: cloud-init crea el
 # usuario de automatización al principio del arranque y después instala paquetes (fail2ban)
@@ -22,10 +23,8 @@
 #   - plazo vencido → falla cerrado.
 # Cada caso deja un diagnóstico propio (resultado, estado y errores) en el log.
 # Solo lee: no cambia nada en el servidor.
-# Identidad del host: como el resto de la cadena (paso "Esperar SSH" y Ansible), la conexión
-# usa StrictHostKeyChecking=no: la clave del host NO se verifica. Esta barrera prueba el
-# estado de cloud-init de quien responde en server_ip (el output de Terraform), no la
-# identidad criptográfica del servidor; es una limitación previa, fuera de este alcance.
+# Identidad del host: la conexión usa el ssh_config de este run, con verificación estricta
+# contra la clave que coincidió con el pin. Sin esa configuración no conecta.
 # Salida (GITHUB_OUTPUT): cloud_init_status=done.
 set -euo pipefail
 
@@ -39,15 +38,15 @@ IP="$1"
 [[ "${IP}" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || fail "IP del servidor inválida: '${IP}'"
 TIMEOUT="${HOST_READY_TIMEOUT:-600}"
 [[ "${TIMEOUT}" =~ ^[1-9][0-9]*$ ]] || fail "HOST_READY_TIMEOUT inválido"
-KEY="${SSH_KEY_FILE:-${HOME}/.ssh/id_ed25519}"
+CONFIG="${SSH_CONFIG_FILE:-}"
+[ -n "${CONFIG}" ] && [ -s "${CONFIG}" ] || fail "SSH_CONFIG_FILE ausente: la identidad del host debe verificarse antes de conectar"
 SSH="${SSH_BIN:-ssh}"
 
 out=$(mktemp)
 rc=0
 # La espera y la lectura van en una sola sesión. El código de --wait no decide; el de la
 # lectura final (código de salida de ssh) sí cuenta: éxito exige JSON de éxito Y código 0
-timeout "${TIMEOUT}" "${SSH}" -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10 \
-  -i "${KEY}" "${SSH_USER:-ansible}@${IP}" \
+timeout "${TIMEOUT}" "${SSH}" -F "${CONFIG}" "${SSH_USER:-ansible}@${IP}" \
   'cloud-init status --wait > /dev/null 2>&1; cloud-init status --format json' > "${out}" 2> "${out}.err" || rc=$?
 
 if [ "${rc}" -eq 124 ]; then

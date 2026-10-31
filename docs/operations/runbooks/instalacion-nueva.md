@@ -1,14 +1,22 @@
 # Instalación nueva de producción (y actualizaciones posteriores)
 
 La misma cadena, `.github/workflows/production-hetzner.yml`, instala desde cero y actualiza
-una instalación existente. No hay un modo ni un workflow de bootstrap aparte: una instalación
-nueva es un run que aplica Terraform, configura el servidor, construye las imágenes y publica
-el frontend, sin depender de un VPS, un proyecto de Pages, un estado de Terraform ni un
-último éxito previos.
+una instalación existente. Un servidor nuevo o reemplazado se instala en **dos runs explícitos**
+(ADR-007), con una autenticación fuera de banda entre ambos; no depende de un VPS, un proyecto
+de Pages, un estado de Terraform ni un último éxito previos. Un servidor existente y de
+confianza sigue con un solo run, sin pasos manuales.
+
+| etapa | qué hace | qué nunca hace |
+|---|---|---|
+| **Run P** (`stage=provision`) | comprobaciones previas de la instalación completa, plan revisado, Apply | SSH, configuración, deploy, publicación del frontend, último éxito |
+| **Fuera de banda** (operador) | autentica la clave del host por la consola de Hetzner y registra el pin | ningún workflow lo hace |
+| **Run I** (`stage=install`) | plan nuevo sin cambios, identidad verificada, converge, deploy, health, frontend | Terraform Apply |
 
 > **Estado de verificación.** El contrato está implementado y probado sin red
-> (`infra/tests/production-bootstrap-check.sh`, `infra/tests/pages-release-check.sh`, con
-> respuestas simuladas de HCP, Cloudflare y cloud-init). La base desde un `PGDATA` vacío,
+> (`infra/tests/production-bootstrap-check.sh`, `infra/tests/pages-release-check.sh`,
+> `infra/tests/production-stage-check.sh`, con respuestas simuladas de HCP, Cloudflare, GitHub y
+> cloud-init). La verificación SSH estricta tiene pruebas con OpenSSH y Ansible reales contra un
+> `sshd` desechable en Docker (`infra/tests/ssh-host-trust-check.sh`). La base desde un `PGDATA` vacío,
 > Flyway desde cero y Keycloak P2 tienen pruebas de runtime aisladas en Docker
 > (`infra/tests/db-migration-check.sh`, `infra/tests/keycloak-lifecycle-harness.sh`; este
 > último con la colección `community.docker` fijada en `infra/ansible/requirements.yml`, vía
@@ -56,6 +64,17 @@ se valida antes del Apply si el plan crea o reemplaza el servidor: sin ella vál
 aplica nada; ver [administrador-keycloak.md](administrador-keycloak.md)) y, si se habilita, el primer
 administrador de negocio ([primer-admin-negocio.md](primer-admin-negocio.md)).
 
+**GitHub, variables:**
+
+- `PRODUCTION_SSH_HOST_PIN`, solo en el environment `production-hetzner`: la identidad autenticada
+  del host (no es un secreto). No se define antes de Run P: la registra un operador después
+  (ver *Paso fuera de banda*). Una copia en el repositorio o la organización hace fallar la
+  cadena: `vars` no distingue el origen y esa copia podría ocupar el lugar del pin protegido.
+- `PRODUCTION_PUSH_DEPLOY`, de repositorio: sin definir o `deferred` difiere los push; `enabled`
+  los procesa; otro valor hace fallar el push. Se habilita **después** de instalar, y Run P
+  exige que esté retenida si el plan crea o reemplaza el servidor. No definirla en el environment:
+  los push la leen sin environment y esa copia no cambiaría su decisión.
+
 **Correo.** SendGrid está deshabilitado en producción (`notifications_sendgrid_enabled: false`
 en `group_vars`): la cadena no exige ni entrega `PIEDRAZUL_BACKEND_MAIL_SEND`, el `.env`
 queda con `SENDGRID_API_KEY` vacía y el backend arranca sin ella. No hay envío externo de
@@ -67,17 +86,43 @@ de escribir `.env`. `NOTIFICATION_ENCRYPTION_KEY` no es un requisito: ningún co
 
 ## Cómo se inicia
 
-Cualquiera de los dos:
+**Antes de promover a `main`:** dejar `PRODUCTION_PUSH_DEPLOY` sin definir. El push de la
+promoción queda entonces registrado como **diferido**: termina en `success`, su título dice
+`Push diferido, sin deploy`, no toca nada y no avanza el rango. No hace falta provocar ningún
+fallo. Un push nunca instala ni crea un servidor.
 
-- **Primer push a `main` con esta cadena.** Sin un run push exitoso previo del workflow, el
-  rango se clasifica contra el árbol completo: Terraform, configuración del servidor, build
-  de backend y de postgres, deploy y frontend.
-- **Dispatch manual completo** desde `main`: `run_terraform_apply`, `run_host_config`,
-  `run_build`, `run_build_postgres`, `run_app_deploy` y `run_frontend_publish` en `true`
-  (sin `image_tag`, sin break-glass). No depende de ningún diff. Es también el camino de
-  recuperación si se pierde la infraestructura: un push normal solo cubre su rango.
+La promoción debe ser un merge completo de `develop`: `main` todavía contiene
+`deploy-hetzner.yml`, `_deploy-server.yml` y `terraform-hetzner-apply.yml`, que despliegan y
+aplican por push y que `develop` eliminó. Un cherry-pick o una promoción parcial los dejaría
+activos.
 
-## Qué hace el operador
+**Run P**, dispatch desde `main` con todos los flags de la instalación:
+
+```bash
+gh workflow run production-hetzner.yml --ref main -f stage=provision -f run_terraform_apply=true -f run_host_config=true -f run_build=true -f run_build_postgres=true -f run_app_deploy=true -f run_frontend_publish=true
+```
+
+**Run I**, después del paso fuera de banda. Run I rechaza `run_terraform_apply=true`, aunque
+siempre planifica:
+
+```bash
+gh workflow run production-hetzner.yml --ref main -f stage=install -f run_terraform_apply=false -f run_host_config=true -f run_build=true -f run_build_postgres=true -f run_app_deploy=true -f run_frontend_publish=true
+```
+
+Ambas etapas exigen la instalación completa y rechazan `image_tag`, `keycloak_recovery` y
+break-glass, que van en un dispatch `ordinary`. Un dispatch `ordinary` cuyo plan cree, reemplace o
+destruya el servidor falla antes de la segunda aprobación y el saved plan se descarta.
+
+**Retención de los push.** Si el plan de Run P crea o reemplaza el servidor, `PRODUCTION_PUSH_DEPLOY`
+debe estar sin definir o en `deferred`; si no, Run P falla antes de la segunda aprobación y el
+saved plan se descarta, sin Apply. La cadena solo lee la variable, no la cambia: el operador la
+corrige y vuelve a lanzar Run P. Se comprueba otra vez justo antes del Apply, por si se levantó
+mientras el run esperaba la aprobación.
+
+Una recuperación que no crea ni reemplaza el servidor (plan sin cambios, o solo los recursos que
+faltaron tras un Apply parcial) no necesita esa retención y sigue aunque los push estén habilitados.
+
+## Qué hace el operador en Run P
 
 Todo ocurre en el run de GitHub; el operador no necesita abrir HCP.
 
@@ -106,8 +151,8 @@ Todo ocurre en el run de GitHub; el operador no necesita abrir HCP.
    zona y AOP. Una destrucción, un reemplazo o un cambio sobre recursos ajenos a lo esperado
    (por ejemplo, referencias del estado histórico) es motivo para **rechazar** e investigar:
    el saved plan no se aplica. Si corresponde, **aprueba el environment** del job
-   *Producción*: esa segunda aprobación autoriza aplicar **ese** saved plan y seguir con el
-   deploy.
+   *Producción*: esa segunda aprobación autoriza aplicar **ese** saved plan. En Run P no autoriza
+   nada más: el run termina sin tocar el servidor.
 4. **Producción revalida y confirma.** Justo antes de confirmar comprueba: workspace sin
    auto-apply y con permiso de confirmar, el run es el de este run de GitHub (mensaje, plan,
    configuración), el plan tiene como mucho una hora, ningún otro run ocupa el workspace,
@@ -115,13 +160,111 @@ Todo ocurre en el run de GitHub; el operador no necesita abrir HCP.
    sigue siendo el del plan.
    Envía **una sola** solicitud de Apply (nunca la repite) y espera el resultado real del
    Apply antes de seguir.
-5. El resto es automático: state version exacto del Apply → outputs → preflight estricto de
-   Pages → espera de cloud-init → servidor (converge con Keycloak P2, deploy con migración) →
-   identidad y health → registro del último éxito → publicación del frontend.
+5. **Fin de Run P.** State version exacto del Apply → outputs → preflight estricto de Pages. El
+   resumen muestra la **instancia** y la **dirección** del estado exacto y uno de estos resultados:
+
+   | resultado | cuándo | qué significa |
+   |---|---|---|
+   | `PROVISIONED / TRUST PENDING / NOT INSTALLED` | el Apply creó o reemplazó el servidor | falta el paso fuera de banda y Run I; este estado no vence y nada lo destruye solo |
+   | `INFRASTRUCTURE UNCHANGED / TRUST AND INSTALLATION NOT EVALUATED` | el plan salió sin cambios (p. ej., el Apply ya se había completado) | no se aplicó nada |
+   | `INFRASTRUCTURE UPDATED / TRUST AND INSTALLATION NOT EVALUATED` | el Apply terminó sin crear ni reemplazar el servidor (p. ej., recuperación de un Apply parcial) | se aplicaron otros recursos |
+
+   Los dos últimos no evalúan la confianza ni la instalación: solo informan el estado. Si Run P
+   quedó pendiente, seguir con el paso fuera de banda y Run I. Un run fallido o cancelado no
+   muestra ninguno de estos resultados: nunca informa un aprovisionamiento exitoso.
 
 Sin Terraform (solo deploy o solo frontend) hay una sola aprobación, la de *Producción*.
 Un plan de Terraform sin cambios que además despliega pide las dos; la segunda autoriza el
 deploy.
+
+## Paso fuera de banda: autenticar el host
+
+Lo hace un operador autorizado, por un canal que no pasa por la conexión SSH. Nunca copiar la
+huella de un log de GitHub ni de `ssh-keyscan`: eso solo repite lo que dice quien responde.
+
+1. En la consola de Hetzner, abrir la instancia cuyo id coincide con el resumen de Run P, y
+   confirmar que su IP pública es la del resumen.
+2. Abrir su **consola** (no SSH). Un `root` con contraseña sirve aquí: SSH lo rechaza, y esa
+   contraseña es solo la vía de recuperación por consola. Usar la consola no obliga a bloquear
+   `root` después.
+3. Comprobar que la inicialización terminó y leer la huella. El servidor debe informar la misma
+   instancia:
+
+   ```bash
+   cloud-init status --long
+   ```
+
+   ```bash
+   curl -s http://169.254.169.254/hetzner/v1/metadata/instance-id
+   ```
+
+   ```bash
+   ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256
+   ```
+
+4. Registrar el pin en el environment `production-hetzner`, en una sola línea con espacios
+   simples, por la interfaz de GitHub o con:
+
+   ```bash
+   gh variable set PRODUCTION_SSH_HOST_PIN --env production-hetzner --body "<server_id> <server_ip> ssh-ed25519 SHA256:<huella>"
+   ```
+
+5. Comprobar `PRODUCTION_PUSH_DEPLOY` y lanzar Run I.
+
+## Qué hace Run I
+
+1. Valida la **forma del pin** sin red, antes de cualquier mutación.
+2. **Plan nuevo**, con su primera aprobación. Debe salir sin cambios: con cambios, el run falla
+   antes de la segunda aprobación y el saved plan se descarta. Si el cambio es esperado, va en
+   Run P. Un plan sin cambios no prueba nada sobre el sistema operativo del host, así que
+   Run I configura el servidor igual.
+3. Segunda aprobación: autoriza configurar y desplegar. Sin Apply.
+4. **Identidad**, antes de escribir la clave SSH y de leer nada del servidor: pin ↔ instancia y
+   dirección del state version exacto ↔ clave ofrecida (leída sin credenciales). Solo si coincide
+   se crea la configuración SSH de ese run; todos los pasos siguientes usan verificación estricta.
+5. SSH → cloud-init → **sshd efectivo** antes de los secretos del converge (sin `root` ni
+   contraseñas por SSH) → último éxito → imágenes, escaneo y política autoritativa, evaluados de
+   nuevo → frescura → converge con Keycloak P2 → deploy con migración → identidad y health →
+   registro del último éxito → publicación del frontend.
+
+Los datos que vencen no se heredan de Run P. Si algo falla después de la verificación, **se vuelve
+a lanzar Run I** sobre la misma instancia, sin otra autenticación fuera de banda: el pin sigue
+vigente.
+
+## Después de instalar: habilitar los push
+
+Cuando Run I termine bien, definir `PRODUCTION_PUSH_DEPLOY=enabled` en el repositorio. El primer
+push procesado cubre todo el rango pendiente: si no hay un rango procesado previo, clasifica el
+árbol completo (Terraform y deploy, con sus aprobaciones). Dispatches y pushes diferidos nunca
+avanzan el rango. Para detener de nuevo los push, volver a `deferred`.
+
+## Ciclo de vida de la identidad
+
+| situación | qué ocurre | cómo seguir |
+|---|---|---|
+| Servidor reemplazado (Run P), o creado de nuevo tras una destrucción | el pin es de otra instancia: `[pin obsoleto]`, sin contacto de red | autenticar y registrar otro pin; Run I |
+| Servidor borrado fuera de banda | un deploy sin Terraform falla al leer la clave (`[sin respuesta]`); con Terraform, el plan crea el servidor y falla fuera de Run P | Run P, autenticar, Run I |
+| Misma IP en una instancia nueva | `[pin obsoleto]`: una dirección o un nombre reutilizados no heredan confianza | autenticar y registrar otro pin |
+| Reinstalación de la misma instancia, o rotación de claves | `[identidad distinta]` en el primer intento | autenticar la nueva huella por la consola; registrar otro pin. Si no hubo una reinstalación conocida, tratarlo como incidente |
+| Pin borrado o corrupto | falla sin red, antes de mutar | volver a autenticarlo por la consola; nunca recuperarlo de un log |
+| Copia del pin en repositorio u organización | falla sin conectar | eliminar esa copia |
+| Servidor apagado o firewall | `[sin respuesta]`: conectividad, no identidad | corregir; el pin no cambia |
+| Converge o deploy interrumpido | misma instancia, mismo pin | relanzar Run I |
+| `sshd` efectivo inseguro | falla antes de entregar secretos | corregir desde `ops` o la consola; relanzar |
+
+Antes de un Run P que cree o reemplace el servidor de una instalación activa, volver a
+`PRODUCTION_PUSH_DEPLOY=deferred`: Run P lo exige. Mientras la variable siga retenida, los push
+quedan diferidos y el rango pendiente se cubre al habilitarlos después de Run I. Si alguien la
+habilita antes de terminar Run I, un push con el pin anterior falla contra el pin (sin efectos y
+sin avanzar el rango), pero un push con el pin nuevo ya registrado sí puede tocar el servidor sin
+instalar: por eso solo se habilita al final.
+
+**Retirar el servidor** no es una operación de esta cadena: un plan que lo destruye sin crear otro
+falla en todas las etapas antes de la segunda aprobación y el saved plan se descarta. Un retiro
+deliberado es una decisión operativa aparte, sin procedimiento en este repositorio.
+
+**Reemplazar un servidor con datos** queda fuera de este procedimiento: destruye sus volúmenes y
+requiere una recuperación verificada aparte (ver *Limitaciones conocidas*).
 
 **Confirmación fuera de GitHub.** Un Owner de HCP puede confirmar el run desde la UI de HCP;
 la cadena no lo puede impedir. Si lo detecta (en la revisión del plan o al ir a confirmar),
@@ -156,7 +299,13 @@ cualquier deploy: una instalación nueva no tiene excepciones.
 | Apply terminado con error | estado parcial según el error de HCP | revisar el error; corregir y re-run completo (el plan nuevo parte de ese estado) |
 | Apply parcial (p. ej. creó el proyecto de Pages y falló antes del CNAME o de la asociación del dominio) | proyecto con la identidad correcta pero incompleto | re-run completo con Terraform: el sondeo lo admite como `incomplete`, el plan debe mostrar la creación de la asociación, y el preflight estricto exige el proyecto completo antes de publicar. Un run sin Terraform (solo frontend o deploy) falla ante un proyecto incompleto |
 | cloud-init falló, quedó degradado (errores recuperables), sigue corriendo, no se pudo leer (salida ilegible, forma inesperada o ssh/comando remoto con código distinto de 0) o venció el plazo | servidor creado, sin configurar (el diagnóstico dice cuál de los casos) | revisar `cloud-init status --long` con el usuario `ops`; corregir y re-run (en un servidor nuevo, recrearlo es también válido) |
-| después del Apply (preflight de Pages, SSH, converge, deploy, health) | infraestructura creada; servidor sin último éxito o con el anterior; Pages sin cambios | corregir y re-run completo: el plan nuevo no tiene cambios y el resto converge de nuevo |
+| Run P: Apply interrumpido o ya completado | según lo que HCP haya aplicado | volver a lanzar Run P: aplica lo que falte o, sin cambios, informa la identidad |
+| el plan de Run I tiene cambios | sin Apply; el saved plan se descarta | revisar el plan; si corresponde, Run P y después Run I |
+| el plan de un run ordinario crea o reemplaza el servidor | sin Apply; el saved plan se descarta | Run P, fuera de banda, Run I |
+| el plan destruye el servidor sin crear otro (cualquier etapa) | sin Apply; el saved plan se descarta | revisar por qué el plan lo destruye; un retiro es una decisión aparte |
+| Run P crea o reemplaza sin los push retenidos, o se levantaron antes del Apply | sin Apply; el saved plan se descarta | `PRODUCTION_PUSH_DEPLOY=deferred` y volver a lanzar Run P |
+| identidad del host (pin ausente, corrupto u obsoleto, clave distinta) | nada leído ni mutado en el servidor; el pin no cambia | ver *Ciclo de vida de la identidad* |
+| después de la identidad (`sshd`, SSH, converge, deploy, health) | infraestructura creada; servidor sin último éxito o con el anterior; Pages sin cambios | corregir y relanzar Run I: el pin sigue vigente |
 | publicación de Pages | release parcial: servidor registrado, frontend anterior (o ninguno) | re-run; republicar el mismo contenido es inocuo |
 
 - **Re-run de solo los jobs fallidos**: si *Producción* falló antes de confirmar por una causa
@@ -191,13 +340,18 @@ cualquier deploy: una instalación nueva no tiene excepciones.
   commit nuevo planifica mientras un saved plan anterior espera la segunda aprobación, el
   anterior falla en la frescura al confirmar; si otro Apply cambia el estado, HCP descarta el
   saved plan y la revalidación lo detecta.
-- El rango de push solo avanza cuando el run termina en éxito; un primer push fallido deja
-  el siguiente push también en modo árbol completo. Un job saltado nunca cuenta como hecho:
-  con Terraform, *Plan de Terraform* debe terminar bien con un resultado válido.
+- El rango de push solo avanza si el run es un push ordinario, termina en éxito y deja el job
+  *Rango procesado*. `success` no basta: un push diferido también termina así. Un fallo, una
+  cancelación, un run histórico sin ese job o un dispatch no lo avanzan; un primer push fallido
+  deja el siguiente también en modo árbol completo. Si GitHub no responde al leer los jobs, el
+  run falla: la falta de datos nunca se lee como rango procesado. Un job saltado nunca cuenta
+  como hecho: con Terraform, *Plan de Terraform* debe terminar bien con un resultado válido.
 
 ## Qué significa "instalado"
 
-El resumen del run separa cuatro resultados que no deben confundirse:
+Un Run P exitoso **no** es una instalación: ninguno de sus resultados dice que el servidor esté
+configurado. Después de Run I, el resumen separa cuatro resultados que no
+deben confundirse:
 
 1. **Proyecto de Pages creado** (Terraform) y verificado por el preflight estricto.
 2. **Frontend publicado** y verificado por `*.pages.dev` (deployment de este intento,
@@ -219,6 +373,20 @@ desde la cadena) y vuelve a comprobar el estado en el siguiente run o en el dash
 
 ## Pendiente de verificación en vivo
 
+- Las etapas y el diferido no se han ejecutado en GitHub Actions: `run-name` con `vars`, el input
+  `stage` de tipo `choice` (11 inputs; el límite actual documentado es 25), el job *Rango
+  procesado* con dependencias saltadas, su nombre en `/actions/runs/<id>/jobs?filter=latest`, y que
+  `vars` en `classify` no vea las variables del environment.
+- Que el primer push procesado después de la instalación cubra el rango y deje la señal.
+- En Hetzner: el acceso real a la consola, el acceso de `root` por consola en un servidor sin clave
+  SSH asignada, `metadata/instance-id` y que la huella leída coincida con la que recibe el runner.
+- Que `ssh-keyscan` desde un runner de GitHub alcance el puerto 22 a través del firewall real, y
+  que sus conexiones no cuenten para `fail2ban`.
+- Que el output `server_id` de HCP sea numérico y coincida con el id de la consola.
+- Que `vars.PRODUCTION_PUSH_DEPLOY` en un job con environment se resuelva con el valor vigente al
+  empezar ese job, después de la aprobación (la segunda lectura de la retención depende de eso).
+- Que `sudo -n sshd -T -C …` funcione para `ansible` en la imagen `ubuntu-24.04` de Hetzner (probado
+  en un contenedor Ubuntu 24.04). Lee la configuración, no el proceso en ejecución.
 - Que la API de Pages represente un proyecto de subida directa sin `source` (o `null`) y
   responda `404` con el código `8000007` a un proyecto inexistente.
 - Que `cloudflare_pages_project` sin `source` (provider 5.18.0) cree un proyecto de subida
@@ -270,9 +438,9 @@ la infraestructura nueva esperada.
   aprobación. Antes de introducir datos clínicos reales hace falta una protección propia
   (nativa de Terraform/Hetzner) y una recuperación de datos verificada; no es parte de esta
   cadena.
-- **Identidad del servidor por SSH**: la espera de SSH, la barrera de cloud-init y Ansible
-  conectan con `StrictHostKeyChecking=no`: la clave del host no se verifica. Se confía en que
-  `server_ip` (output del state version exacto de este run) es el servidor creado por
-  Terraform. Es una limitación previa a este trabajo y queda fuera de su alcance.
+- **Identidad del servidor por SSH**: la confianza inicial depende del operador que lee la consola
+  y de quien puede escribir en el environment. La cadena verifica el pin, no a quien lo registró.
+- **Pin en `vars`**: GitHub no informa el origen de una variable. La cadena detecta una copia de
+  repositorio u organización desde `classify`; el resto depende de la protección del environment.
 - Convergencia completa de un servidor limpio (Keycloak P2, identidad inicial) e
   instalación de punta a punta.

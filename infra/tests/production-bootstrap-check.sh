@@ -934,6 +934,28 @@ state_setup "$(run_json applied)" sv-Other
 fails "run-state: otro run reemplazó el estado tras el Apply (concurrencia) → falla" bash -c "$(state_cmd none)"
 fails "run-state: state version previo malformado → falla" bash -c "$(state_cmd sv)"
 state_setup "$(run_json applied)" none
+tf_outputs_json() { # <server_id> [JSON del valor de server_ip]
+  jq -cn --argjson id "$1" --argjson ip "${2:-\"203.0.113.7\"}" '{data: [
+    {attributes: {name: "server_id", value: $id}}, {attributes: {name: "server_ip", value: $ip}},
+    {attributes: {name: "api_fqdn", value: "api.piedrazul.org"}}, {attributes: {name: "auth_fqdn", value: "auth.piedrazul.org"}}]}'
+}
+outputs_setup() { # <respuesta de outputs>
+  reset_hcp
+  hcp_seq "GET ${API}/workspaces/${WS}" "$(workspace_json)"
+  hcp_seq "GET ${API}/workspaces/${WS}/current-state-version" '{"data":{"id":"sv-Out1"}}'
+  hcp_seq "GET ${API}/state-versions/sv-Out1/outputs" "$1"
+}
+outputs_cmd="$(printf '%q ' bash -c "${HCP_DEF}; hcp_env '${HCP}' outputs sv-Out1")"
+outputs_setup "$(tf_outputs_json '"12345678"')"
+check "outputs: expone la instancia (server_id) junto con la dirección del state version exacto" \
+  bash -c "out=\$(eval \"\$0\") && grep -qx server_id=12345678 <<< \"\$out\" && grep -qx server_ip=203.0.113.7 <<< \"\$out\" && grep -qx api_fqdn=api.piedrazul.org <<< \"\$out\"" "${outputs_cmd}"
+outputs_setup "$(tf_outputs_json 12345678)"
+check "outputs: server_id numérico en el estado se lee igual" \
+  bash -c "out=\$(eval \"\$0\") && grep -qx server_id=12345678 <<< \"\$out\"" "${outputs_cmd}"
+outputs_setup "$(jq -c 'del(.data[0])' <<< "$(tf_outputs_json '"1"')")"
+fails "outputs: sin server_id → falla (no hay instancia que conciliar con el pin)" bash -c "${outputs_cmd}"
+outputs_setup "$(tf_outputs_json '"abc"')"
+fails "outputs: server_id malformado → falla" bash -c "${outputs_cmd}"
 fails "outputs: sin estado (none) no hay outputs que consumir → falla" bash -c "$(printf '%q ' bash -c "${HCP_DEF}; hcp_env '${HCP}' outputs none")"
 reset_hcp
 hcp_seq "GET ${RUNS_URL}" "$(runs_list "$(run_json planned true '.data.attributes["save-plan"] = false')")"
@@ -981,8 +1003,8 @@ check "production: usa el run, el mensaje y el estado de terraform_plan (no los 
   bash -c "${SDEF}; [ \"\$(yq -r '.jobs.production.env.HCP_RUN_MESSAGE' '${WORKFLOW}')\" = '\${{ needs.terraform_plan.outputs.run_message }}' ] && [ \"\$(yq -r '.jobs.production.env.HCP_RUN_ID' '${WORKFLOW}')\" = '\${{ needs.terraform_plan.outputs.run_id }}' ] && for s in hcp_apply hcp_cleanup; do [ \"\$(step \$s .env.RUN_MESSAGE)\" = '\${{ env.HCP_RUN_MESSAGE }}' ] || exit 1; done && [ \"\$(step hcp_state .env.RUN_ID)\" = '\${{ env.HCP_RUN_ID }}' ]"
 check "production: la confirmación exige el plan, la configuración y el estado revisados, frescura y antigüedad máxima" \
   bash -c "${SDEF}; [ \"\$(step hcp_apply .env.EXPECTED_PLAN_ID)\" = '\${{ needs.terraform_plan.outputs.plan_id }}' ] && [ \"\$(step hcp_apply .env.EXPECTED_CONFIGURATION_VERSION)\" = '\${{ needs.terraform_plan.outputs.configuration_version_id }}' ] && [ \"\$(step hcp_apply .env.EXPECTED_STATE)\" = '\${{ needs.terraform_plan.outputs.plan_state_version }}' ] && [ \"\$(step hcp_apply .env.FRESHNESS_CMD)\" = .github/scripts/verify-main-tip.sh ] && [ \"\$(step hcp_apply .env.PLAN_MAX_AGE_SECONDS)\" -le 3600 ]"
-check "production: TF_APPLY_REQUIRED solo con Terraform requerido y has_changes exactamente true" \
-  test "$(yq -r '.jobs.production.env.TF_APPLY_REQUIRED' "${WORKFLOW}")" = "\${{ needs.classify.outputs.terraform_required == 'true' && needs.terraform_plan.outputs.has_changes == 'true' }}"
+check "production: TF_APPLY_REQUIRED solo con Terraform requerido, has_changes exactamente true y nunca en stage=install" \
+  test "$(yq -r '.jobs.production.env.TF_APPLY_REQUIRED' "${WORKFLOW}")" = "\${{ needs.classify.outputs.stage != 'install' && needs.classify.outputs.terraform_required == 'true' && needs.terraform_plan.outputs.has_changes == 'true' }}"
 check "production: orden workspace → libre → estado → evidencia de Pages → contraseña inicial de Keycloak → frescura → confirmación → resultado del Apply → outputs" \
   in_order "hcp_workspace hcp_idle hcp_before pages_plan kc_admin_preflight fresh_apply hcp_apply hcp_state tf_outputs" "${PROD_STEPS}"
 check "production: la contraseña inicial de Keycloak se verifica solo si hay que aplicar, con la acción sobre el servidor del plan revisado" \
@@ -1009,8 +1031,8 @@ check "terraform_plan: ningún otro secreto de producción (solo TF_API_TOKEN)" 
   test "$(yq -r '.jobs.terraform_plan' "${WORKFLOW}" | grep -o 'secrets\.[A-Z_]*' | sort -u | paste -sd,)" = "secrets.TF_API_TOKEN"
 check "workflow: el plazo del job production cubre el Apply y el deploy" \
   test "$(yq -r '.jobs.production."timeout-minutes"' "${WORKFLOW}")" -ge 100
-check "workflow: el dispatch completo sigue disponible sin diff (6 flags) y sin preset nuevo" \
-  bash -c "[ \"\$(yq -r '.on.workflow_dispatch.inputs | keys | sort | join(\",\")' '${WORKFLOW}')\" = 'break_glass_authorization,break_glass_justification,image_tag,keycloak_recovery,run_app_deploy,run_build,run_build_postgres,run_frontend_publish,run_host_config,run_terraform_apply' ]"
+check "workflow: el dispatch completo sigue disponible sin diff (6 flags); stage es el único input nuevo" \
+  bash -c "[ \"\$(yq -r '.on.workflow_dispatch.inputs | keys | sort | join(\",\")' '${WORKFLOW}')\" = 'break_glass_authorization,break_glass_justification,image_tag,keycloak_recovery,run_app_deploy,run_build,run_build_postgres,run_frontend_publish,run_host_config,run_terraform_apply,stage' ]"
 PR_WORKFLOW="${ROOT}/.github/workflows/terraform-hetzner-plan.yml"
 check "PR: el plan de PR sigue siendo speculative, en su propio environment, sin saved plan, Apply ni production" \
   bash -c "[ \"\$(yq -r '.jobs[].steps[] | select(.with.speculative != null) | .with.speculative' '${PR_WORKFLOW}')\" = true ] && [ \"\$(yq -r '.jobs[].environment' '${PR_WORKFLOW}')\" = terraform-plan ] && ! grep -qE 'save-plan|actions/apply|apply-run|production-hetzner|hcp-state.sh' '${PR_WORKFLOW}'"
@@ -1024,12 +1046,24 @@ check "PR: el workflow de producción no lee planes de PR (solo push a main y di
 # son las del escenario.
 yq -o=json '.jobs.production.steps' "${WORKFLOW}" > "${TMP}/steps.json"
 yq -o=json '.jobs.terraform_plan.steps' "${WORKFLOW}" > "${TMP}/plan-steps.json"
+yq -o=json '.jobs.production.env' "${WORKFLOW}" > "${TMP}/production-env.json"
 cat > "${TMP}/flow.py" << 'EOF'
 import json, re, sys
 steps = json.load(open(sys.argv[1]))
 sc = json.loads(sys.argv[2])
 env = sc.get("env", {})
 outs = sc.get("outputs", {})
+# Con "classify", el entorno sale de las expresiones REALES de env de production
+if "classify" in sc:
+    job_outs = {"classify": sc["classify"], "terraform_plan": sc.get("terraform_plan", {})}
+    for k, v in json.load(open(sys.argv[3])).items():
+        m = re.fullmatch(r"\s*\$\{\{(.*)\}\}\s*", str(v))
+        if not m or "needs." not in v or "image_targets" in v:
+            continue
+        e = re.sub(r"\bneeds\.([a-z_]+)\.outputs\.([a-z_]+)", r"NO('\1','\2')", m.group(1))
+        r = eval(e.replace("&&", " and ").replace("||", " or "), {"NO": lambda n, o: job_outs[n].get(o, "")})
+        env[k] = ("true" if r else "false") if isinstance(r, bool) else r
+env.setdefault("FRONTEND_PUBLISH", env.get("FRONTEND_REQUIRED", ""))
 needs = {"image_scan": {"result": sc.get("image_scan", "success")}}
 fail_at = sc.get("fail_at")
 cancel_at = sc.get("cancel_at")
@@ -1073,7 +1107,7 @@ EOF
 # flow_case <descripción> <escenario JSON> <pasos que deben correr> <pasos que no deben correr> [pasos del job]
 flow_case() {
   local d="$1" sc="$2" ran missing="" extra=""
-  if ! ran=" $(python3 "${TMP}/flow.py" "${5:-${TMP}/steps.json}" "${sc}" 2> "${TMP}/flow.err") "; then ko "camino: ${d} ($(tail -1 "${TMP}/flow.err"))"; return; fi
+  if ! ran=" $(python3 "${TMP}/flow.py" "${5:-${TMP}/steps.json}" "${sc}" "${TMP}/production-env.json" 2> "${TMP}/flow.err") "; then ko "camino: ${d} ($(tail -1 "${TMP}/flow.err"))"; return; fi
   for s in $3; do [[ "${ran}" == *" $s "* ]] || missing="${missing} $s"; done
   for s in $4; do [[ "${ran}" != *" $s "* ]] || extra="${extra} $s"; done
   if [ -z "${missing}${extra}" ]; then ok "camino: ${d}"; else ko "camino: ${d} (faltan:${missing:- —}; sobran:${extra:- —})"; fi
@@ -1149,6 +1183,38 @@ flow_case "publicación falla tras el registro del servidor (release parcial vis
   "${FRESH%\}},\"fail_at\":\"pages_publish\"}" \
   "record pages_publish hcp_cleanup" ""
 
+# Etapas: el entorno del job sale de sus expresiones reales, no del escenario
+flow_case "terraform_plan: la etapa no admite el plan → el saved plan se descarta antes de la segunda aprobación" '{"fail_at":"stage_gate"}' \
+  "hcp_plan stage_gate hcp_cleanup" "" "${PS}"
+CLASS_ALL='"terraform_required":"true","deploy_required":"true","run_host_config":"true","run_app_deploy":"true","frontend_required":"true"'
+HOST_STEPS="pin_preflight host_trust access readiness host_init sshd_check host_state select scan_evidence policy fresh_deploy converge converge_identity deploy running_identity container_health public_health record"
+RUN_P="{\"classify\":{\"stage\":\"provision\",${CLASS_ALL}},\"terraform_plan\":{\"has_changes\":\"true\"},\"outputs\":{\"pages_probe\":{\"project_state\":\"absent\"},\"hcp_apply\":{\"apply_request\":\"accepted\"}}}"
+flow_case "Run P: comprobaciones previas, Apply y estado, y termina antes de cualquier SSH, deploy o publicación" "${RUN_P}" \
+  "credentials pages_target pages_artifact pages_tooling pages_probe hcp_workspace hcp_idle hcp_before pages_plan kc_admin_preflight fresh_apply hcp_apply hcp_state tf_outputs pages_preflight hcp_cleanup" \
+  "${HOST_STEPS} fresh_frontend pages_publish"
+RUN_P_DONE="${RUN_P/\"has_changes\":\"true\"/\"has_changes\":\"false\"}"
+RUN_P_DONE="${RUN_P_DONE/\"project_state\":\"absent\"/\"project_state\":\"present\"}"
+flow_case "Run P tras un Apply ya completado (plan sin cambios): sin Apply, informa la identidad del estado y termina sin fallar" "${RUN_P_DONE}" \
+  "hcp_state tf_outputs pages_preflight" "pages_plan kc_admin_preflight fresh_apply hcp_apply hcp_cleanup ${HOST_STEPS} pages_publish"
+RUN_I="{\"classify\":{\"stage\":\"install\",${CLASS_ALL}},\"terraform_plan\":{\"has_changes\":\"false\"},\"outputs\":{\"pages_probe\":{\"project_state\":\"present\"},${AUTH}}}"
+flow_case "Run I: sin Apply; identidad antes del primer SSH, sshd antes del converge, todas las mutaciones y publicación" "${RUN_I}" \
+  "pin_preflight hcp_state tf_outputs pages_preflight host_trust access readiness host_init sshd_check host_state select policy fresh_deploy converge deploy running_identity container_health public_health record pages_publish" \
+  "pages_plan kc_admin_preflight fresh_apply hcp_apply hcp_cleanup"
+RUN_I_CHANGED="${RUN_I/\"has_changes\":\"false\"/\"has_changes\":\"true\"}"
+flow_case "Run I aunque el plan informara cambios: ningún paso de Apply corre (TF_APPLY_REQUIRED falso)" "${RUN_I_CHANGED}" "tf_outputs" "pages_plan kc_admin_preflight fresh_apply hcp_apply hcp_cleanup"
+flow_case "pin ausente o mal formado: falla antes de Pages, de HCP y del servidor" "${RUN_I%\}},\"fail_at\":\"pin_preflight\"}" "pin_preflight" "hcp_workspace tf_outputs host_trust access readiness converge deploy record pages_publish"
+flow_case "identidad rechazada: la clave SSH no se escribe, nada lee ni muta el servidor y no se publica" "${RUN_I%\}},\"fail_at\":\"host_trust\"}" "tf_outputs host_trust" "access readiness host_init sshd_check host_state select policy converge deploy record pages_publish"
+flow_case "handshake rechazado tras verificar: sin lecturas del host ni mutaciones" "${RUN_I%\}},\"fail_at\":\"readiness\"}" "host_trust access readiness" "host_init sshd_check host_state select converge deploy record pages_publish"
+flow_case "sshd efectivo inseguro: los secretos del converge no se entregan" "${RUN_I%\}},\"fail_at\":\"sshd_check\"}" "host_init sshd_check" "host_state select policy converge deploy record pages_publish"
+flow_case "converge falla en Run I: no se registra ni se publica (el reintento no requiere otra autenticación fuera de banda)" "${RUN_I%\}},\"fail_at\":\"converge\"}" "host_trust converge" "deploy record pages_publish"
+ORD="{\"classify\":{\"stage\":\"ordinary\",\"terraform_required\":\"false\",\"deploy_required\":\"true\",\"run_host_config\":\"false\",\"run_app_deploy\":\"true\",\"frontend_required\":\"false\"},\"outputs\":{${AUTH}}}"
+flow_case "deploy ordinario contra un host de confianza: un solo run, con identidad verificada y sin Terraform" "${ORD}" \
+  "pin_preflight tf_outputs host_trust access readiness host_state select policy fresh_deploy deploy record" "hcp_apply hcp_state host_init sshd_check converge pages_publish"
+check "production: orden pin → Apply → outputs → identidad → clave SSH → espera → cloud-init → sshd → lectura del host → selección → política → converge" \
+  in_order "pin_preflight hcp_apply tf_outputs pages_preflight host_trust access readiness host_init sshd_check host_state select policy converge" "${PROD_STEPS}"
+check "terraform_plan: la etapa se decide después de la revisión y antes de la limpieza" \
+  in_order "hcp_plan stage_gate hcp_cleanup" "${PLAN_STEPS}"
+
 # ── 11. Dependencias entre jobs: saltado, fallido y cancelado nunca son éxito ──
 # Evalúa las condiciones `if` REALES de terraform_plan y production (con !cancelled(),
 # needs.<job>.result y needs.<job>.outputs) y ejecuta el script REAL de conclude, sobre la
@@ -1182,15 +1248,16 @@ def conclude(results, outputs, cls):
            "PRODUCTION": results["production"], "TERRAFORM_PLAN": results["terraform_plan"],
            "HAS_CHANGES": outputs.get("terraform_plan", {}).get("has_changes", ""),
            "TERRAFORM_REQUIRED": cls["terraform_required"], "DEPLOY_REQUIRED": cls["deploy_required"],
-           "FRONTEND_REQUIRED": cls["frontend_required"], "FRONTEND_BUILD": results["frontend_build"]}
+           "FRONTEND_REQUIRED": cls["frontend_required"], "FRONTEND_BUILD": results["frontend_build"],
+           "PRODUCTION_STAGE": cls["stage"]}
     return subprocess.run(["bash", "-c", J["conclude"]], env=env, capture_output=True).returncode == 0
 
 failures, cases, counts = [], 0, {"prod_runs": 0, "conclude_ok": 0}
 B = ["true", "false"]
-for tf, dep, fe, plan_res, hc, prod_res, cancelled, fb in itertools.product(
-        B, B, B, ["success", "failure", "cancelled", "forced_skip"], ["true", "false", "", "garbage"],
-        ["success", "failure", "cancelled"], [False, True], ["success", "failure"]):
-    cls = {"terraform_required": tf, "deploy_required": dep, "frontend_required": fe}
+for stage, tf, dep, fe, plan_res, hc, prod_res, cancelled, fb in itertools.product(
+        ["ordinary", "provision", "install"], B, B, B, ["success", "failure", "cancelled", "forced_skip"],
+        ["true", "false", "", "garbage"], ["success", "failure", "cancelled"], [False, True], ["success", "failure"]):
+    cls = {"stage": stage, "terraform_required": tf, "deploy_required": dep, "frontend_required": fe}
     results = {"classify": "success", "select_images": "success", "image_targets": "success",
                "image_scan": "success", "image_policy": "success",
                "frontend_build": fb if fe == "true" else "skipped"}
@@ -1221,12 +1288,16 @@ for tf, dep, fe, plan_res, hc, prod_res, cancelled, fb in itertools.product(
     else:
         expect_plan_run = False
         prod_allowed = dep == "true" or fe == "true"
+    # Run I solo sigue con un plan terminado sin cambios, nunca con uno que aplicar
+    if stage == "install":
+        prod_allowed = prod_allowed and outputs.get("terraform_plan", {}).get("has_changes") == "false"
     expect_prod_run = (not cancelled) and gates_ok and prod_allowed
     prod_required = (tf == "true" and outputs.get("terraform_plan", {}).get("has_changes") == "true") or dep == "true" or fe == "true"
     expect_ok = (gates_ok or fe != "true") and (fe != "true" or fb == "success") and \
         (plan_ok if tf == "true" else results["terraform_plan"] == "skipped") and \
-        (results["production"] == "success" if prod_required else results["production"] == "skipped")
-    label = f"tf={tf} deploy={dep} frontend={fe} frontend_build={fb} plan={results['terraform_plan']} has_changes={hc!r} production={results['production']} cancelled={cancelled}"
+        (results["production"] == "success" if prod_required else results["production"] == "skipped") and \
+        not (stage == "install" and tf == "true" and outputs.get("terraform_plan", {}).get("has_changes") == "true")
+    label = f"stage={stage} tf={tf} deploy={dep} frontend={fe} frontend_build={fb} plan={results['terraform_plan']} has_changes={hc!r} production={results['production']} cancelled={cancelled}"
     if plan_would_run != expect_plan_run:
         failures.append("terraform_plan " + ("corrió" if results["terraform_plan"] != "skipped" else "no corrió") + ": " + label)
     if prod != expect_prod_run:
@@ -1238,6 +1309,8 @@ for tf, dep, fe, plan_res, hc, prod_res, cancelled, fb in itertools.product(
         failures.append("production corrió con un plan no exitoso o inválido: " + label)
     if prod and tf != "true" and results["terraform_plan"] != "skipped":
         failures.append("production corrió sin Terraform con terraform_plan no saltado: " + label)
+    if prod and stage == "install" and outputs.get("terraform_plan", {}).get("has_changes") != "false":
+        failures.append("production corrió en Run I sin un plan terminado sin cambios: " + label)
     if ok and "failure" in (results["terraform_plan"], results["production"]) and (tf == "true" or prod_required):
         failures.append("conclude success con un job requerido fallido: " + label)
     if ok and "cancelled" in (results["terraform_plan"], results["production"]):
@@ -1379,7 +1452,8 @@ KC_VALID="CANARY-pw-$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 EXAMPLE_PW="$(grep -E '^[A-Z_]*(SECRET|PASSWORD|KEY)=.' "${ROOT}/.env.example" | head -1 | cut -d= -f2-)"
 kc_run() { # <acción del servidor> <RUN_HOST_CONFIG> [contraseña: omitida si no se pasa]
   local args=(PATH="${PATH}" HOME="${HOME}" ANSIBLE_CONFIG="${ROOT}/infra/ansible/ansible.cfg" ANSIBLE_LOCAL_TEMP="${TMP}/ansible-tmp"
-    WATCH_SERVER="$1" RUN_HOST_CONFIG="$2" KC_BACKEND_CLIENT_SECRET="${KC_BACKEND}" KC_AUTOMATION_CLIENT_SECRET="${KC_AUTO}")
+    PRODUCTION_STAGE="${KC_STAGE:-provision}" PUSH_MODE="${KC_PUSH-deferred}" PUSH_DEPLOY_NOW="${KC_PUSH_NOW-}" WATCH_SERVER="$1" RUN_HOST_CONFIG="$2"
+    KC_BACKEND_CLIENT_SECRET="${KC_BACKEND}" KC_AUTOMATION_CLIENT_SECRET="${KC_AUTO}")
   [ "$#" -lt 3 ] || args+=(KC_PLATFORM_ADMIN_INITIAL_PASSWORD="$3")
   (cd "${ROOT}" && env -i "${args[@]}" bash -c "${KC_BODY}") < /dev/null > "${TMP}/kc.log" 2>&1
 }
@@ -1419,10 +1493,23 @@ if command -v ansible-playbook > /dev/null; then
   check "production/kc_admin_preflight: sin creación no corre la validación (ni Ansible)" \
     bash -c "grep -q 'no se exige KC_PLATFORM_ADMIN_INITIAL_PASSWORD' '${TMP}/kc.log' && ! grep -q 'PLAY' '${TMP}/kc.log'"
   kc_case "servidor actualizado en sitio y contraseña ausente → no se exige" pasa update true
-  kc_case "servidor destruido (sin crear otro) y contraseña ausente → no se exige" pasa delete true
+  kc_case "servidor destruido sin crear otro → falla antes del Apply, sin contraseña que evaluar" falla delete true
+  check "production/kc_admin_preflight: la destrucción se nombra como retiro" grep -q 'retiro es una decisión operativa' "${TMP}/kc.log"
+  KC_STAGE=ordinary kc_case "servidor destruido en un run ordinario → falla antes del Apply" falla delete true "${KC_VALID}"
   kc_case "cambio de infraestructura sin el servidor y sin configuración del servidor (solo Terraform) → no se exige" pasa no-op false
   kc_case "servidor creado pero el run no configura el servidor (run_host_config=false) → falla aunque la contraseña sea válida" falla create false "${KC_VALID}"
   check "production/kc_admin_preflight: el fallo por falta de configuración del servidor lo explica" grep -q 'run_host_config=false' "${TMP}/kc.log"
+  KC_STAGE=ordinary kc_case "servidor creado fuera de Run P → falla aunque la contraseña sea válida (segunda barrera antes de confirmar)" falla create true "${KC_VALID}"
+  check "production/kc_admin_preflight: el fallo fuera de Run P nombra stage=provision" grep -q 'stage=provision' "${TMP}/kc.log"
+  KC_STAGE=ordinary kc_case "servidor reemplazado fuera de Run P → falla" falla replace true "${KC_VALID}"
+  KC_PUSH=enabled kc_case "Run P crea con los push habilitados en classify → falla aunque la contraseña sea válida" falla create true "${KC_VALID}"
+  check "production/kc_admin_preflight: el fallo nombra la variable de la retención" grep -q 'PRODUCTION_PUSH_DEPLOY=deferred' "${TMP}/kc.log"
+  KC_PUSH= kc_case "Run P reemplaza sin el modo de push de classify → falla cerrado" falla replace true "${KC_VALID}"
+  KC_PUSH_NOW=enabled kc_case "la retención se levantó durante la espera de la aprobación → falla antes del Apply" falla replace true "${KC_VALID}"
+  KC_PUSH_NOW=enable kc_case "un valor inválido leído antes del Apply no retiene → falla" falla create true "${KC_VALID}"
+  KC_PUSH_NOW=deferred kc_case "Run P con la retención explícita en ambas lecturas → sigue" pasa create true "${KC_VALID}"
+  KC_PUSH=enabled KC_PUSH_NOW=enabled kc_case "recuperación que no crea ni reemplaza con push habilitados → no hay bloqueo mutuo" pasa no-op true
+  KC_PUSH=enabled KC_PUSH_NOW=enabled KC_STAGE=ordinary kc_case "cambio ordinario sin tocar el servidor con push habilitados → sigue" pasa update true
   for a in none ambiguous unknown "" forget read "create,delete,update"; do
     kc_case "acción no interpretable sobre el servidor ('${a}') → falla aunque la contraseña sea válida" falla "${a}" true "${KC_VALID}"
   done
@@ -1443,10 +1530,11 @@ exit "${FAKE_SSH_RC:-0}"
 EOF
 chmod +x "${TMP}/bin/fake-ssh"
 export FAKE_SSH_LOG="${TMP}/ssh.log"
+echo "Host *" > "${TMP}/verified_ssh_config"
 ready() { # <JSON> [variables extra...]
   local json="$1"
   shift
-  env SSH_BIN="${TMP}/bin/fake-ssh" SSH_KEY_FILE=/dev/null FAKE_CI_JSON="${json}" "$@" "${READY}" 203.0.113.7
+  env SSH_BIN="${TMP}/bin/fake-ssh" SSH_CONFIG_FILE="${TMP}/verified_ssh_config" FAKE_CI_JSON="${json}" "$@" "${READY}" 203.0.113.7
 }
 ready_case() { # <descripción> <pasa|falla> <JSON> [esperado en la salida] [variables extra...]
   local d="$1" exp="$2" json="$3" want="${4:-}" rc=0
@@ -1461,8 +1549,8 @@ ready_case() { # <descripción> <pasa|falla> <JSON> [esperado en la salida] [var
 }
 : > "${FAKE_SSH_LOG}"
 ready_case "cloud-init done sin errores → listo" pasa '{"status":"done","extended_status":"done","errors":[],"recoverable_errors":{}}' cloud_init_status=done
-check "host-ready: espera (status --wait) y lee el estado final en JSON, como ansible, por SSH sin contraseña" \
-  bash -c "grep -q 'BatchMode=yes' '${FAKE_SSH_LOG}' && grep -q 'ansible@203.0.113.7' '${FAKE_SSH_LOG}' && grep -q 'cloud-init status --wait > /dev/null 2>&1; cloud-init status --format json' '${FAKE_SSH_LOG}'"
+check "host-ready: espera (status --wait) y lee el estado final en JSON, como ansible, con el ssh_config verificado de este run" \
+  bash -c "grep -qF -- '-F ${TMP}/verified_ssh_config' '${FAKE_SSH_LOG}' && ! grep -q 'StrictHostKeyChecking' '${FAKE_SSH_LOG}' && grep -q 'ansible@203.0.113.7' '${FAKE_SSH_LOG}' && grep -q 'cloud-init status --wait > /dev/null 2>&1; cloud-init status --format json' '${FAKE_SSH_LOG}'"
 ready_case "cloud-init antiguo sin extended_status, done → listo" pasa '{"status":"done","errors":[]}' cloud_init_status=done
 ready_case "degraded done (errores recuperables, sin errores) → falla cerrado" falla '{"status":"done","extended_status":"degraded done","errors":[],"recoverable_errors":{"DEPRECATED":["x"],"WARNING":["y"]}}'
 check "host-ready: degradado se diagnostica como tal, con la cantidad y el contenido de los avisos" \

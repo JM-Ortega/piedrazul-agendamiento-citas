@@ -103,7 +103,8 @@
 #         siendo <state_version_antes> (`none` si el workspace no tenía estado).
 #     Cualquier otro estado final, un run de otro workspace o una contradicción falla.
 #   - outputs: lee los outputs de ese state version exacto, y solo si sigue siendo el
-#     actual antes y después de leerlos.
+#     actual antes y después de leerlos. server_id y server_ip son la instancia y la
+#     dirección con las que host-trust.sh concilia el pin de identidad.
 #
 # Salida en formato GITHUB_OUTPUT. El token nunca va en la línea de comandos.
 #
@@ -840,7 +841,7 @@ cmd_run_state() {
 }
 
 cmd_outputs() {
-  local sv="$1" outputs server_ip api_fqdn auth_fqdn current
+  local sv="$1" outputs server_id server_ip api_fqdn auth_fqdn current
   [[ "${sv}" =~ ^sv-[A-Za-z0-9]+$ ]] || fail "state version inválido: '${sv}' (sin estado no hay outputs que consumir)"
   current="$(current_state)"
   [ "${current}" = "${sv}" ] || fail "${sv} ya no es el state version actual (${current}): estado reemplazado"
@@ -848,16 +849,18 @@ cmd_outputs() {
   # Los outputs de un state version recién creado pueden tardar en procesarse
   for i in $(seq 1 12); do
     outputs="$(api "/state-versions/${sv}/outputs")" || fail "no se pudieron leer los outputs de ${sv}"
+    server_id="$(jq -r '[.data[] | select(.attributes.name == "server_id") | .attributes.value] | if length == 1 then .[0] // "" else "" end' <<< "${outputs}")"
     server_ip="$(jq -r '[.data[] | select(.attributes.name == "server_ip") | .attributes.value] | if length == 1 then .[0] // "" else "" end' <<< "${outputs}")"
     api_fqdn="$(jq -r '[.data[] | select(.attributes.name == "api_fqdn") | .attributes.value] | if length == 1 then .[0] // "" else "" end' <<< "${outputs}")"
     auth_fqdn="$(jq -r '[.data[] | select(.attributes.name == "auth_fqdn") | .attributes.value] | if length == 1 then .[0] // "" else "" end' <<< "${outputs}")"
-    if [ -n "${server_ip}" ] && [ -n "${api_fqdn}" ] && [ -n "${auth_fqdn}" ]; then
+    if [ -n "${server_id}" ] && [ -n "${server_ip}" ] && [ -n "${api_fqdn}" ] && [ -n "${auth_fqdn}" ]; then
       break
     fi
     echo "Outputs de ${sv} incompletos — esperando ${OUTPUTS_INTERVAL}s ($i/12)" >&2
     sleep "${OUTPUTS_INTERVAL}"
   done
 
+  [[ "${server_id}" =~ ^[0-9]+$ ]] || fail "server_id ausente o inválido en ${sv}"
   [[ "${server_ip}" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || fail "server_ip ausente o inválido en ${sv}"
   [[ "${api_fqdn}" =~ ^[a-z0-9.-]+$ ]] || fail "api_fqdn ausente o inválido en ${sv}"
   [[ "${auth_fqdn}" =~ ^[a-z0-9.-]+$ ]] || fail "auth_fqdn ausente o inválido en ${sv}"
@@ -865,6 +868,7 @@ cmd_outputs() {
   current="$(current_state)"
   [ "${current}" = "${sv}" ] || fail "${sv} fue reemplazado (${current}) mientras se leían sus outputs"
 
+  echo "server_id=${server_id}"
   echo "server_ip=${server_ip}"
   echo "api_fqdn=${api_fqdn}"
   echo "auth_fqdn=${auth_fqdn}"

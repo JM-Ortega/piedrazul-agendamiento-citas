@@ -2,15 +2,15 @@
 # Clasifica la intención de producción de un rango de commits de main.
 #
 # Uso: classify-production.sh <base> <head>
-#   base: SHA del último run push exitoso del workflow de producción. Debe ser ancestro
-#         de head. Vacío = no hay un rango procesado confiable: se clasifica el árbol
-#         completo de head (todo lo que el run podría necesitar aplicar).
+#   base: SHA del último run push que procesó su rango (production-range-base.sh). Debe ser
+#         ancestro de head. Vacío = no hay un rango procesado confiable: se clasifica el
+#         árbol completo de head (todo lo que el run podría necesitar aplicar).
 #   head: SHA a desplegar.
 #
 # Ser más inclusivo que el cambio real es seguro (Apply sin cambios y redeploy son
 # idempotentes); omitir un cambio no lo es. Por eso el rango siempre parte del último
-# éxito, no del commit anterior: un push descartado por la cola de concurrencia o un run
-# fallido quedan incluidos en el siguiente.
+# rango procesado, no del commit anterior: un push descartado por la cola de concurrencia,
+# un run fallido o un push diferido quedan incluidos en el siguiente.
 #
 # Salida (formato GITHUB_OUTPUT):
 #   range_mode=incremental|full   range_base=<sha|vacío>

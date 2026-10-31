@@ -75,7 +75,7 @@ El repositorio define un modelo de despliegue de producción compuesto por:
 - **Terraform** (ejecutado mediante HCP Terraform) para aprovisionar la infraestructura: servidor y firewall en **Hetzner**, y DNS, ajustes de zona, protección de origen y proyecto de Pages (frontend) en **Cloudflare**.
 - **Ansible** para configurar el servidor y desplegar la aplicación.
 - **Docker Compose** en el servidor de producción, que ejecuta Traefik (proxy inverso), el backend, Keycloak y PostgreSQL.
-- **GitHub Actions** (`.github/workflows/production-hetzner.yml`) como cadena de producción detrás del environment `production-hetzner`: Apply, deploy del servidor y, con sus requisitos operativos cumplidos, publicación del frontend en **Cloudflare Pages** (ver [Publicación del frontend](#publicación-del-frontend-cloudflare-pages)).
+- **GitHub Actions** (`.github/workflows/production-hetzner.yml`) como cadena de producción detrás del environment `production-hetzner`: Apply, deploy del servidor y, con sus requisitos operativos cumplidos, publicación del frontend en **Cloudflare Pages** (ver [Publicación del frontend](#publicación-del-frontend-cloudflare-pages)). Un servidor nuevo o reemplazado se instala en dos runs (`stage=provision` y `stage=install`), con su identidad SSH autenticada fuera de banda y fijada en el environment; las operaciones ordinarias son un solo run con verificación estricta ([ADR-007](../decisions/ADR-007%20Instalación%20por%20etapas%20y%20confianza%20SSH%20fijada.md)).
 
 Este documento no describe el estado en vivo de esa infraestructura. Los detalles están en:
 
@@ -108,7 +108,7 @@ El proyecto de Pages `piedrazul` (declarado en `infra/terraform/live/prod`, cuen
 
 **Credencial.** `CLOUDFLARE_PAGES_API_TOKEN`, secreto del environment `production-hetzner` (no de repositorio; alcance declarado en `.github/scripts/audit-github-trust.sh`). Token de API dedicado con **Account → Cloudflare Pages → Edit** sobre la cuenta de Piedrazul y nada más; no se reutilizan el token de DNS ni el de Terraform. Lo reciben solo los pasos de credenciales, sondeo, preflight y publicación del job `production`; nunca Ansible ni el servidor. La verificación de credenciales rechaza que coincida con `CLOUDFLARE_DNS_API_TOKEN`. wrangler se instala desde `.github/pages-publish/package-lock.json` (versión exacta, `npm ci --ignore-scripts`).
 
-**Resultado y reintentos.** El resumen del job muestra el artefacto, la producción anterior y el deployment publicado. El rango procesado avanza solo si el run termina en `success`, incluida la publicación cuando hacía falta.
+**Resultado y reintentos.** El resumen del job muestra el artefacto, la producción anterior y el deployment publicado. El rango procesado avanza solo con el job `range_processed`, que corre si un push ordinario termina en `success`, incluida la publicación cuando hacía falta. Run P nunca publica.
 
 | caso | efecto | recuperación |
 |---|---|---|
