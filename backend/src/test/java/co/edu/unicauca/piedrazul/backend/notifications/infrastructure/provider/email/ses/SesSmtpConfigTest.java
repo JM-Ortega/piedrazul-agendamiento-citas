@@ -25,6 +25,7 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import java.net.ServerSocket;
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -260,11 +261,19 @@ class SesSmtpConfigTest {
     }
 
     @Test
-    void theContextClosesTheWatchdogThread() {
-        runner.withPropertyValues(COMPLETE).run(context -> assertThat(context).hasSingleBean(SesSmtpSender.class));
+    void theContextClosesTheWatchdogThread() throws Exception {
+        AtomicReference<SesSmtpSender> sender = new AtomicReference<>();
+        AtomicReference<Thread> watchdog = new AtomicReference<>();
 
-        assertThat(Thread.getAllStackTraces().keySet()).noneMatch(thread ->
-                thread.getName().startsWith("ses-smtp-deadline") && thread.isAlive());
+        runner.withPropertyValues(COMPLETE).run(context -> {
+            assertThat(context).hasSingleBean(SesSmtpSender.class);
+            sender.set(context.getBean(SesSmtpSender.class));
+            // Sin envíos el hilo aún no existe, y su ausencia no probaría que el contexto lo cierra.
+            watchdog.set(SesSmtpTestKit.watchdogThread(sender.get()));
+            assertThat(watchdog.get().isAlive()).isTrue();
+        });
+
+        SesSmtpTestKit.assertWatchdogStopped(sender.get(), watchdog.get());
     }
 
     // ── Sin caminos alternativos ────────────────────────────────────────

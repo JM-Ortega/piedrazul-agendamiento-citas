@@ -38,11 +38,20 @@ class SesSmtpBreakerTest {
 
     @AfterEach
     void close() throws Exception {
-        harness.close();
-        server.close();
+        try {
+            if (harness != null) {
+                harness.close();
+            }
+        } finally {
+            if (server != null) {
+                server.close();
+            }
+        }
     }
 
-    private void start(LocalSmtpServer configured) {
+    /** Sustituye al emisor y al servidor anteriores, que quedarían fuera del alcance del cierre. */
+    private void start(LocalSmtpServer configured) throws Exception {
+        close();
         server = configured;
         harness = SesSmtpTestKit.harness(server, READ, DEADLINE, breaker, SmtpTransaction::new);
     }
@@ -106,7 +115,6 @@ class SesSmtpBreakerTest {
         send();
         send();
         assertThat(breaker.getMetrics().getNumberOfBufferedCalls()).isZero();
-        server.close();
 
         start(new LocalSmtpServer().on(Step.RCPT, reply("421 closing")));
         send();
@@ -171,15 +179,12 @@ class SesSmtpBreakerTest {
 
     @Test
     void afterTheWaitHalfOpenProbesCloseTheCircuitOnRecovery() throws Exception {
-        LocalSmtpServer failing = new LocalSmtpServer().on(Step.GREETING, reply("421 unavailable"));
-        start(failing);
+        start(new LocalSmtpServer().on(Step.GREETING, reply("421 unavailable")));
         send();
         send();
         assertThat(breaker.getState()).isEqualTo(CircuitBreaker.State.OPEN);
-        failing.close();
 
         // El mismo breaker, ahora con un servidor sano.
-        harness.close();
         start(new LocalSmtpServer());
         Thread.sleep(SETTINGS.openWait().multipliedBy(2));
 

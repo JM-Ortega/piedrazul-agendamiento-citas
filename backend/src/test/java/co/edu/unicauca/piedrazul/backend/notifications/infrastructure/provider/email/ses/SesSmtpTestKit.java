@@ -9,11 +9,17 @@ import jakarta.mail.Session;
 import jakarta.mail.URLName;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Piezas comunes de las pruebas del proveedor SES. Credenciales y datos exclusivamente sintéticos. */
 public final class SesSmtpTestKit {
@@ -23,6 +29,7 @@ public final class SesSmtpTestKit {
     static final String FROM = "no-reply@piedrazul.example";
     static final String TO = "paciente@correo.example";
     static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory().getValidator();
+    private static final Duration WATCHDOG_BOUND = Duration.ofSeconds(5);
 
     private SesSmtpTestKit() {
     }
@@ -66,6 +73,28 @@ public final class SesSmtpTestKit {
         SesSmtpSender sender = new SesSmtpSender(properties, LocalSmtpServer.Tls.forHost("localhost").client(), transactions);
 
         return new Harness(sender, new SesEmailProvider(sender, properties, breaker, new RecipientEmailPolicy(VALIDATOR)));
+    }
+
+    static ScheduledThreadPoolExecutor watchdog(SesSmtpSender sender) {
+        return (ScheduledThreadPoolExecutor) ReflectionTestUtils.getField(sender, "watchdog");
+    }
+
+    /**
+     * Hilo vigilante de este emisor, identificado por sí mismo y no por su nombre, que comparte con
+     * los de cualquier otro emisor. El ejecutor lo crea al primer uso, así que esto también lo arranca.
+     */
+    static Thread watchdogThread(SesSmtpSender sender) throws Exception {
+        Callable<Thread> current = Thread::currentThread;
+
+        return watchdog(sender).submit(current).get(WATCHDOG_BOUND.toSeconds(), TimeUnit.SECONDS);
+    }
+
+    /** El hilo termina después del cierre, no durante: se espera a que acabe, con un límite. */
+    static void assertWatchdogStopped(SesSmtpSender sender, Thread thread) throws InterruptedException {
+        thread.join(WATCHDOG_BOUND);
+
+        assertThat(thread.isAlive()).as("hilo vigilante vivo tras el cierre").isFalse();
+        assertThat(watchdog(sender).isTerminated()).as("vigilante terminado").isTrue();
     }
 
     static EmailMessage email() {

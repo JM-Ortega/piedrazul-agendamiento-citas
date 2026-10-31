@@ -436,6 +436,8 @@ class SesSmtpDeadlineTest {
             harness.provider().send(email(), recipient(TO));
         }
 
+        Thread watchdog = SesSmtpTestKit.watchdogThread(harness.sender());
+
         assertThat(watchdogQueueSize(harness.sender())).isZero();
         assertThat(liveThreads()).as("hilos creados por envío")
                 .containsAnyElementsOf(before)
@@ -444,8 +446,7 @@ class SesSmtpDeadlineTest {
                         || name.startsWith("local-smtp"));
 
         harness.close();
-        waitUntilGone("ses-smtp-deadline");
-        assertThat(liveThreads()).noneMatch(name -> name.startsWith("ses-smtp-deadline"));
+        SesSmtpTestKit.assertWatchdogStopped(harness.sender(), watchdog);
     }
 
     @Test
@@ -577,9 +578,7 @@ class SesSmtpDeadlineTest {
     }
 
     private static int watchdogQueueSize(SesSmtpSender sender) {
-        var watchdog = (java.util.concurrent.ScheduledThreadPoolExecutor)
-                org.springframework.test.util.ReflectionTestUtils.getField(sender, "watchdog");
-        return watchdog.getQueue().size();
+        return SesSmtpTestKit.watchdog(sender).getQueue().size();
     }
 
     private static Set<String> liveThreads() {
@@ -587,14 +586,6 @@ class SesSmtpDeadlineTest {
                 .filter(Thread::isAlive)
                 .map(Thread::getName)
                 .collect(Collectors.toSet());
-    }
-
-    private static void waitUntilGone(String prefix) {
-        long end = System.nanoTime() + WITHIN_BOUND.toNanos();
-
-        while (System.nanoTime() < end && liveThreads().stream().anyMatch(name -> name.startsWith(prefix))) {
-            sleep(Duration.ofMillis(20));
-        }
     }
 
     private static void sleep(Duration duration) {
