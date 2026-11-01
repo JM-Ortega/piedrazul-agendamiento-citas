@@ -83,6 +83,7 @@ log_level_root: INFO
 log_level_security: INFO
 log_level_sql: WARN
 log_level_sql_bind: WARN
+log_level_modulith: WARN
 
 # Keycloak
 kc_realm: piedrazul

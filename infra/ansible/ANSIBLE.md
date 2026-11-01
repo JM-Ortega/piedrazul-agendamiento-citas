@@ -125,6 +125,11 @@ kc_temp_admin_owned_regex: "^{{ kc_temp_admin_prefix }}-[0-9]{14}-[a-z0-9]{8}$"
 kc_realm_file: "{{ repo_root }}/infra/keycloak/realm/piedrazul-realm.json"
 ```
 
+`log_level_root`, `log_level_security`, `log_level_sql`, `log_level_sql_bind` y
+`log_level_modulith` producen las variables `LOG_LEVEL_*` del `.env`. `LOG_LEVEL_MODULITH` vale
+`WARN` si falta o está vacía en un `.env` anterior (`compose/backend.yml`): no llega vacía a
+Spring, que dejaría ese logger heredando el nivel del root.
+
 ### `host_vars/vps.yml` (Hetzner)
 
 ```yaml

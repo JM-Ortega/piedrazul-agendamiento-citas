@@ -47,7 +47,9 @@ services:
       LOG_LEVEL_SECURITY: ${LOG_LEVEL_SECURITY}
       LOG_LEVEL_SQL: ${LOG_LEVEL_SQL}
       LOG_LEVEL_SQL_BIND: ${LOG_LEVEL_SQL_BIND}
-      LOG_LEVEL_MODULITH: ${LOG_LEVEL_MODULITH}
+      # Con :- también cubre el valor vacío: Spring solo aplica su valor por defecto a una
+      # variable ausente, y vacía dejaría el logger heredando el nivel del root
+      LOG_LEVEL_MODULITH: ${LOG_LEVEL_MODULITH:-WARN}
 
       # Bootstrap del primer administrador de negocio: solo con IDENTITY_SEED_ENABLED=true las
       # entradas tienen valor; deshabilitado llegan vacías (env.j2) y el backend no las usa.
