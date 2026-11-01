@@ -236,8 +236,9 @@ Reglas:
 
 La persona entra a la aplicación con el documento y la contraseña temporal. Keycloak muestra
 la página de cambio de contraseña (`UPDATE_PASSWORD`) antes de entregar la sesión; la nueva
-contraseña reemplaza la temporal. El realm `piedrazul` no tiene política de contraseñas: se
-recomienda una larga y única, guardada en un gestor.
+contraseña reemplaza la temporal y debe cumplir la política del realm `piedrazul`, de 6 a 100
+caracteres (`length(6) and maxLength(100)`); se recomienda una larga y única, guardada en un
+gestor.
 
 ### 8. Confirmar el acceso `ADMIN`
 

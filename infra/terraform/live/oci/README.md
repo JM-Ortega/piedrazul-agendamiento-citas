@@ -48,9 +48,9 @@ Internet
 | Costo | ~€14/mes | Always Free |
 | Red | Incluida en el servidor | VCN explícita (módulo network) |
 | Firewall | hcloud_firewall | oci_core_default_security_list |
-| Dominio frontend | piedrazul.narvaezlab.dev | piedrazul-oci.narvaezlab.dev |
-| Dominio API | api.piedrazul.narvaezlab.dev | api.piedrazul-oci.narvaezlab.dev |
-| Dominio Auth | auth.piedrazul.narvaezlab.dev | auth.piedrazul-oci.narvaezlab.dev |
+| Dominio frontend | piedrazul.org | piedrazul-oci.narvaezlab.dev |
+| Dominio API | api.piedrazul.org | api.piedrazul-oci.narvaezlab.dev |
+| Dominio Auth | auth.piedrazul.org | auth.piedrazul-oci.narvaezlab.dev |
 
 ## Decisiones de diseño importantes
 

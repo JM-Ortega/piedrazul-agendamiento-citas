@@ -557,7 +557,7 @@ environment:
 1. Agregar a `host_vars/vps.yml`:
 
 ```yaml
-traefik_domain: traefik.piedrazul.narvaezlab.dev
+traefik_domain: traefik.piedrazul.org
 ```
 
 2. Agregar a `host_vars/vps_oci.yml`:
