@@ -162,6 +162,9 @@ management:
       show-details: ${MANAGEMENT_HEALTH_DETAILS:when-authorized}
 
 logging:
+  pattern:
+    # El id de correlación de la petición HTTP (CorrelationIdFilter); "-" fuera de una petición.
+    correlation: "[%X{correlationId:--}] "
   level:
     root: ${LOG_LEVEL_ROOT:INFO}
     # En FINE o inferior, Jakarta Mail y Angus escriben respuestas del servidor y direcciones. El

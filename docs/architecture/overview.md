@@ -282,6 +282,18 @@ incluida la recuperación, mientras dure.
 - El backend no almacena ni gestiona contraseñas de los usuarios.
 - Las autorizaciones se aplican en el backend según los roles incluidos en el JWT emitido por Keycloak (ADR-001).
 
+### Correlación de peticiones HTTP
+
+`CorrelationIdFilter` está registrado con prioridad propia, después de `ForwardedHeaderFilter` y antes de Spring Security, así que también cubre sus 401 y 403:
+
+- Un `X-Correlation-Id` entrante solo se conserva si es un UUID canónico (36 caracteres, hexadecimal en minúsculas). Si falta o tiene cualquier otra forma se reemplaza por un UUID nuevo, sin rechazar la petición y sin escribir el valor recibido en ningún lado. El header no admite otros formatos.
+- El id elegido vuelve en el header `X-Correlation-Id` de la respuesta y queda en el MDC (`correlationId`) durante la petición, incluido el despacho a `/error`. El MDC se limpia al terminar, también si la petición falla.
+- Las líneas del log incluyen el id en `logging.pattern.correlation`; fuera de una petición HTTP (tareas programadas, listeners asíncronos) muestran `[-]`.
+- Los registros de auditoría que publican un evento de dominio guardan ese id en `correlation_id`. Los inicios de sesión usan claves propias (`keycloak-session:*`, `keycloak-event:*`) para no guardarse dos veces, y como el filtro solo admite UUID un cliente no puede ocupar esas claves. Fuera de los inicios de sesión el id no se usa para deduplicar ni es único: dos registros pueden compartirlo. Los registros de `@Auditable` no llevan id de correlación.
+- Una petición que `ForwardedHeaderFilter` rechaza por un header `X-Forwarded-*` inválido responde 400 sin este header, porque ese filtro corre primero.
+
+El header no se expone por CORS: un frontend en otro origen no puede leerlo.
+
 ## Despliegue
 
 ### Entorno local
