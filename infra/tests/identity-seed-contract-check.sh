@@ -26,7 +26,8 @@
 #      un backend que no arranca (fail-closed) informa el resultado; el environment y el .env
 #      del host deben coincidir.
 #   5. Workflow: la contraseña solo se lee con el bootstrap habilitado; la verificación de
-#      credenciales no la exige deshabilitado y sí habilitado; el deploy solo recibe la
+#      credenciales no la exige deshabilitado y sí habilitado; Run P no recibe ni exige las
+#      entradas, pero sí valida la decisión; Run I las exige; el deploy solo recibe la
 #      decisión (no entradas ni secreto); converge declara si sigue un deploy. Orden en Ansible: validar antes de .env, entrega después, verificación
 #      en ejecución en refresh y deploy.
 #   7. Imagen: con el bootstrap habilitado, setup.yml (antes de escribir .env) y deploy.yml
@@ -288,6 +289,7 @@ invalid_case "tipo desconocido" "no es un tipo de documento conocido" IDENTITY_S
 invalid_case "celular inválido" "no es un celular de 10 dígitos" IDENTITY_SEED_ADMIN_PHONE=300123
 invalid_case "correo inválido" "no es un correo" IDENTITY_SEED_ADMIN_EMAIL=no-es-correo
 invalid_case "contraseña corta" "con menos de 16 caracteres" "IDENTITY_SEED_ADMIN_PASSWORD=Corta-Clave-15!"
+invalid_case "contraseña sobre el máximo del realm" "con más de 100 caracteres" "IDENTITY_SEED_ADMIN_PASSWORD=$(printf 'Larga-%.0s' {1..17})"
 invalid_case "contraseña con espacio final" "en los extremos" "IDENTITY_SEED_ADMIN_PASSWORD=Temp-Bootstrap-Value-26 "
 invalid_case "contraseña con salto de línea" "caracteres de control" "IDENTITY_SEED_ADMIN_PASSWORD=Temp-Bootstrap"$'\n'"-Value-2026"
 invalid_case "contraseña con el documento" "contiene el documento" "IDENTITY_SEED_ADMIN_PASSWORD=Clave-1061234567-Inicial"
@@ -482,6 +484,27 @@ check "credenciales: habilitado completo pasa" credentials IDENTITY_SEED_ENABLED
   IDENTITY_SEED_ADMIN_USERNAME=1 IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE=CEDULA IDENTITY_SEED_ADMIN_FIRST_NAME=a \
   IDENTITY_SEED_ADMIN_LAST_NAME=b IDENTITY_SEED_ADMIN_EMAIL=c IDENTITY_SEED_ADMIN_PHONE=d IDENTITY_SEED_ADMIN_PASSWORD=e
 check "credenciales: decisión no booleana falla" fails credentials IDENTITY_SEED_ENABLED=yes
+
+# Por etapa: Run P declara la configuración del servidor, pero no llega a escribir el .env
+check "Run P: habilitado sin ninguna entrada no bloquea el aprovisionamiento" \
+  credentials PRODUCTION_STAGE=provision IDENTITY_SEED_ENABLED=true
+check "Run P: lo advierte sin nombrar valores" \
+  grep -q '^::warning title=Bootstrap del primer administrador::IDENTITY_SEED_ENABLED=true: Run P no recibe ni valida' "${TMP}/credentials.log"
+check "Run P: decisión no booleana falla igual" fails credentials PRODUCTION_STAGE=provision IDENTITY_SEED_ENABLED=yes
+check "Run I: habilitado sin PHONE ni IDENTIFICATION_TYPE falla" fails credentials PRODUCTION_STAGE=install IDENTITY_SEED_ENABLED=true \
+  IDENTITY_SEED_ADMIN_USERNAME=1 IDENTITY_SEED_ADMIN_FIRST_NAME=a IDENTITY_SEED_ADMIN_LAST_NAME=b \
+  IDENTITY_SEED_ADMIN_EMAIL=c IDENTITY_SEED_ADMIN_PASSWORD=e
+check "Run I: el fallo nombra las entradas que faltan (sin valores)" \
+  grep -q 'Faltan credenciales o variables: IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE IDENTITY_SEED_ADMIN_PHONE$' "${TMP}/credentials.log"
+check "Run I: deshabilitado no exige ninguna entrada" credentials PRODUCTION_STAGE=install IDENTITY_SEED_ENABLED=false
+check "Run I: habilitado completo pasa" credentials PRODUCTION_STAGE=install IDENTITY_SEED_ENABLED=true \
+  IDENTITY_SEED_ADMIN_USERNAME=1 IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE=CEDULA IDENTITY_SEED_ADMIN_FIRST_NAME=a \
+  IDENTITY_SEED_ADMIN_LAST_NAME=b IDENTITY_SEED_ADMIN_EMAIL=c IDENTITY_SEED_ADMIN_PHONE=d IDENTITY_SEED_ADMIN_PASSWORD=e
+for field in USERNAME IDENTIFICATION_TYPE FIRST_NAME LAST_NAME EMAIL PHONE PASSWORD; do
+  check "workflow: Run P no recibe IDENTITY_SEED_ADMIN_${field}" \
+    bash -c '[[ "$1" == *"needs.classify.outputs.stage != '"'"'provision'"'"' && "* ]]' _ \
+    "$(step_env 'Verificar credenciales de producción' "IDENTITY_SEED_ADMIN_${field}")"
+done
 
 task_index() { # <archivo> <fragmento de nombre> → posición de la primera tarea que lo contiene
   yq -r '.[].name' "$1" | grep -nF -- "$2" | head -1 | cut -d: -f1

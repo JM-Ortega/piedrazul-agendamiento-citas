@@ -466,7 +466,9 @@ SES_SMTP_PASSWORD            # converge, nunca el deploy (docs/operations/runboo
 
 Qué exige la verificación de credenciales depende del modo del run: con configuración del
 servidor (`run_host_config`) exige las contraseñas de la base, `CLOUDFLARE_DNS_API_TOKEN`,
-`KC_BACKEND_CLIENT_SECRET` y `KC_AUTOMATION_CLIENT_SECRET`, que solo recibe el converge. Un
+`KC_BACKEND_CLIENT_SECRET` y `KC_AUTOMATION_CLIENT_SECRET`, que solo recibe el converge. Con
+`IDENTITY_SEED_ENABLED=true` exige además las entradas del bootstrap, salvo en Run P, que no
+las recibe. Un
 deploy sin configuración del servidor no las recibe ni las exige (solo `TF_API_TOKEN` y
 `ANSIBLE_SSH_KEY`): usa el `.env` que dejó el converge, y `deploy.yml` falla antes de mutar si
 falta o le falta una clave de la base o `KC_BACKEND_CLIENT_SECRET` ("corre converge primero").
@@ -488,8 +490,9 @@ falta o le falta una clave de la base o `KC_BACKEND_CLIENT_SECRET` ("corre conve
 
 ### Bootstrap del primer `ADMIN` de negocio
 
-Variables `IDENTITY_SEED_*` del environment: con
-`IDENTITY_SEED_ENABLED=true`, `identity_seed_inputs.yml` valida las entradas antes de escribir
+Variables `IDENTITY_SEED_*` del environment. Run P solo valida la decisión; con
+`IDENTITY_SEED_ENABLED=true`, Run I y todo run con configuración del servidor exigen las entradas e
+`identity_seed_inputs.yml` valida las entradas antes de escribir
 `.env`, `identity_seed_delivery.yml` comprueba que Compose las entregaría intactas e
 `identity_seed_runtime.yml` (al final de `refresh_backend.yml` y de `deploy.yml`) exige que el
 backend en ejecución tenga en vigor la configuración del `.env` (sus `IDENTITY_SEED_*` son los

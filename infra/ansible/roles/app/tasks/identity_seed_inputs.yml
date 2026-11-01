@@ -35,7 +35,7 @@
       PASSWORD: "{{ lookup('env', 'IDENTITY_SEED_ADMIN_PASSWORD') | string }}"
   no_log: true
 
-# Contraseña temporal: mínimo de 16, sin espacios en los extremos ni caracteres de control
+# Contraseña temporal: de 16 a 100 caracteres (100 es el máximo que admite el realm), sin espacios en los extremos ni caracteres de control
 # (saltos de línea incluidos), sin el documento ni el correo, distinta de toda credencial
 # técnica y de todo valor de referencia del repositorio (.env.example). No es la política del
 # realm ni garantiza la fuerza de la contraseña definitiva (UPDATE_PASSWORD en el primer login).
@@ -61,6 +61,8 @@
               if _s.PHONE | length > 0 and _s.PHONE is not match(_phone) else [])
          + (['IDENTITY_SEED_ADMIN_PASSWORD con menos de 16 caracteres']
               if 0 < _pw | length < 16 else [])
+         + (['IDENTITY_SEED_ADMIN_PASSWORD con más de 100 caracteres']
+              if _pw | length > 100 else [])
          + (['IDENTITY_SEED_ADMIN_PASSWORD con espacios o saltos de línea en los extremos']
               if _pw | length > 0 and _pw != _pw | trim else [])
          + (['IDENTITY_SEED_ADMIN_PASSWORD con saltos de línea u otros caracteres de control']

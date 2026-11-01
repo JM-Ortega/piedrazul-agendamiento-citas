@@ -10,9 +10,11 @@ run-name: >-
 #
 # Etapas (ADR-007). Un servidor nuevo o reemplazado se instala en dos runs explícitos, con
 # una autenticación fuera de banda entre ambos; lo demás es un run ordinario:
-#   stage=provision (Run P)  comprobaciones previas de la instalación completa, plan revisado
-#                            y Apply; termina antes de cualquier conexión SSH. Si creó o
-#                            reemplazó el servidor: PROVISIONED / TRUST PENDING / NOT INSTALLED.
+#   stage=provision (Run P)  comprobaciones previas de la instalación completa (salvo las
+#                            entradas del primer administrador de negocio, que exige Run I),
+#                            plan revisado y Apply; termina antes de cualquier conexión SSH.
+#                            Si creó o reemplazó el servidor: PROVISIONED / TRUST PENDING /
+#                            NOT INSTALLED.
 #   [operador]               autentica la clave del host por la consola de Hetzner y registra
 #                            PRODUCTION_SSH_HOST_PIN en el environment. Ningún workflow lo hace.
 #   stage=install (Run I)    plan nuevo que debe salir sin cambios, nunca Apply; concilia
@@ -1486,16 +1488,17 @@ jobs:
           KC_AUTOMATION_CLIENT_SECRET: ${{ secrets.KC_AUTOMATION_CLIENT_SECRET }}
           # Token dedicado de Pages (Cloudflare Pages: Edit en la cuenta); nunca el de DNS
           CLOUDFLARE_PAGES_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
-          # Bootstrap del primer administrador de negocio: el secreto solo se lee si está
-          # habilitado (docs/operations/runbooks/primer-admin-negocio.md)
+          # Bootstrap del primer administrador de negocio: Run P solo ve la decisión, porque no
+          # usa las entradas; el secreto solo se lee si está habilitado
+          # (docs/operations/runbooks/primer-admin-negocio.md)
           IDENTITY_SEED_ENABLED: ${{ vars.IDENTITY_SEED_ENABLED }}
-          IDENTITY_SEED_ADMIN_USERNAME: ${{ vars.IDENTITY_SEED_ADMIN_USERNAME }}
-          IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE: ${{ vars.IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE }}
-          IDENTITY_SEED_ADMIN_FIRST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_FIRST_NAME }}
-          IDENTITY_SEED_ADMIN_LAST_NAME: ${{ vars.IDENTITY_SEED_ADMIN_LAST_NAME }}
-          IDENTITY_SEED_ADMIN_EMAIL: ${{ vars.IDENTITY_SEED_ADMIN_EMAIL }}
-          IDENTITY_SEED_ADMIN_PHONE: ${{ vars.IDENTITY_SEED_ADMIN_PHONE }}
-          IDENTITY_SEED_ADMIN_PASSWORD: ${{ vars.IDENTITY_SEED_ENABLED == 'true' && secrets.IDENTITY_SEED_ADMIN_PASSWORD || '' }}
+          IDENTITY_SEED_ADMIN_USERNAME: ${{ needs.classify.outputs.stage != 'provision' && vars.IDENTITY_SEED_ADMIN_USERNAME || '' }}
+          IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE: ${{ needs.classify.outputs.stage != 'provision' && vars.IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE || '' }}
+          IDENTITY_SEED_ADMIN_FIRST_NAME: ${{ needs.classify.outputs.stage != 'provision' && vars.IDENTITY_SEED_ADMIN_FIRST_NAME || '' }}
+          IDENTITY_SEED_ADMIN_LAST_NAME: ${{ needs.classify.outputs.stage != 'provision' && vars.IDENTITY_SEED_ADMIN_LAST_NAME || '' }}
+          IDENTITY_SEED_ADMIN_EMAIL: ${{ needs.classify.outputs.stage != 'provision' && vars.IDENTITY_SEED_ADMIN_EMAIL || '' }}
+          IDENTITY_SEED_ADMIN_PHONE: ${{ needs.classify.outputs.stage != 'provision' && vars.IDENTITY_SEED_ADMIN_PHONE || '' }}
+          IDENTITY_SEED_ADMIN_PASSWORD: ${{ needs.classify.outputs.stage != 'provision' && vars.IDENTITY_SEED_ENABLED == 'true' && secrets.IDENTITY_SEED_ADMIN_PASSWORD || '' }}
         run: |
           set -euo pipefail
           MISSING=()
@@ -1523,12 +1526,15 @@ jobs:
             need POSTGRES_PASSWORD APP_DB_PASSWORD MIGRATION_DB_PASSWORD KC_DB_PASSWORD \
               CLOUDFLARE_DNS_API_TOKEN KC_BACKEND_CLIENT_SECRET KC_AUTOMATION_CLIENT_SECRET
           fi
-          # Solo el converge escribe el .env que entrega el bootstrap al backend
+          # Solo el converge escribe el .env que entrega el bootstrap al backend. Run P nunca
+          # llega a él: valida la decisión y Run I exige las entradas antes de tocar el servidor.
           SEED_ENABLED="${IDENTITY_SEED_ENABLED:-}"
           case "${SEED_ENABLED,,}" in
             "" | false) ;;
             true)
-              if [ "${RUN_HOST_CONFIG}" = "true" ]; then
+              if [ "${PRODUCTION_STAGE:-}" = "provision" ]; then
+                echo "::warning title=Bootstrap del primer administrador::IDENTITY_SEED_ENABLED=true: Run P no recibe ni valida sus entradas; Run I las exige antes de tocar el servidor"
+              elif [ "${RUN_HOST_CONFIG}" = "true" ]; then
                 need IDENTITY_SEED_ADMIN_USERNAME IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE \
                   IDENTITY_SEED_ADMIN_FIRST_NAME IDENTITY_SEED_ADMIN_LAST_NAME \
                   IDENTITY_SEED_ADMIN_EMAIL IDENTITY_SEED_ADMIN_PHONE IDENTITY_SEED_ADMIN_PASSWORD

@@ -71,14 +71,19 @@ Variables y secreto del GitHub Environment `production-hetzner`:
 Reglas de la contraseña temporal (las aplican el converge antes de escribir el `.env` y otra
 vez el backend):
 
-- al menos 16 caracteres; espacios internos y cualquier símbolo permitidos;
+- de 16 a 100 caracteres; espacios internos y cualquier símbolo permitidos;
 - sin espacios en los extremos, saltos de línea ni otros caracteres de control;
 - sin el documento ni el correo (ni su parte local);
 - distinta de toda credencial técnica (`KC_*_SECRET`, contraseñas de la base,
   `KC_PLATFORM_ADMIN_INITIAL_PASSWORD`) y de todo valor de `.env.example`.
 
 Son reglas de esta entrada temporal, no la política de contraseñas del realm: no dicen nada de
-la contraseña definitiva que la persona elige en el primer login.
+la contraseña definitiva que la persona elige en el primer login. El máximo es el del realm: una
+contraseña más larga se rechaza antes de cualquier operación de identidad.
+
+Run P no recibe ni exige estas entradas, aunque `IDENTITY_SEED_ENABLED` sea `true`: solo valida
+la decisión y lo advierte. Con `true`, Run I y cualquier run con configuración del servidor las
+exigen antes de tocar el servidor.
 
 ## Procedimiento
 
@@ -108,9 +113,9 @@ seleccionada, la misma que verificó.
 
 Procedimiento escalonado recomendado:
 
-1. Con `IDENTITY_SEED_ENABLED` en `false` (o sin definir), desplegar normalmente una imagen
-   construida desde esta versión, y confirmar que es la que corre (paso *Verificar identidad
-   en ejecución* del workflow).
+1. Con `IDENTITY_SEED_ENABLED` en `false` (o sin definir), desplegar normalmente (en una
+   instalación nueva, con Run I) una imagen construida desde esta versión, y confirmar que es
+   la que corre (paso *Verificar identidad en ejecución* del workflow).
 2. Recién entonces seguir con el paso siguiente. Un run que habilite el bootstrap y construya la
    imagen a la vez también es seguro (el converge no recrea la imagen anterior y el deploy
    arranca la nueva), pero el escalonado separa los dos cambios.

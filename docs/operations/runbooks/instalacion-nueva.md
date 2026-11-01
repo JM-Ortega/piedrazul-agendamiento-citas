@@ -63,7 +63,10 @@ secretos de Keycloak, `KC_PLATFORM_ADMIN_INITIAL_PASSWORD` (solo la instalación
 se valida antes del Apply si el plan crea o reemplaza el servidor: sin ella válida no se
 aplica nada; ver [administrador-keycloak.md](administrador-keycloak.md)) y, si se habilitan, el primer
 administrador de negocio ([primer-admin-negocio.md](primer-admin-negocio.md)) y el correo por SES
-([correo-ses.md](correo-ses.md)). La instalación no necesita ningún secreto de correo.
+([correo-ses.md](correo-ses.md)). La instalación no necesita ningún secreto de correo. Las
+entradas del primer administrador de negocio son la excepción a las comprobaciones de Run P: no
+las recibe ni las exige, y con `IDENTITY_SEED_ENABLED=true` Run I falla si faltan, antes de tocar
+el servidor. Una instalación con el bootstrap en `false` o sin definir no las necesita.
 
 **GitHub, variables:**
 
