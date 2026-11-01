@@ -1,9 +1,9 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import Keycloak from 'keycloak-js';
-import { catchError, tap, throwError } from 'rxjs';
+import { catchError, from, switchMap, tap, throwError } from 'rxjs';
 import { AppHealthService } from '../services/app-health.service';
-import { normalizeHttpError } from './normalizeHttpError';
+import { normalizeHttpError, parseBlobErrorBody } from './normalizeHttpError';
 import { SessionInactivityService } from '../services/sessionInactivity.service';
 
 /**
@@ -27,21 +27,27 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(req).pipe(
     tap(() => appHealth.reportReachable()),
-    catchError((error: HttpErrorResponse) => {
-      const appError = normalizeHttpError(error);
+    catchError((rawError: HttpErrorResponse) =>
+      // Las descargas (`responseType: 'blob'`) traen el error como Blob: se
+      // decodifica antes de normalizar para no perder el `errorCode`/`detail`.
+      from(parseBlobErrorBody(rawError)).pipe(
+        switchMap((error) => {
+          const appError = normalizeHttpError(error);
 
-      if (appError.errorCode === 'UNAUTHORIZED' && !inactivity.expired()) {
-        keycloak.login({ redirectUri: window.location.href });
-      }
+          if (appError.errorCode === 'UNAUTHORIZED' && !inactivity.expired()) {
+            keycloak.login({ redirectUri: window.location.href });
+          }
 
-      if (
-        appError.errorCode === 'NETWORK_ERROR' ||
-        appError.errorCode === 'OFFLINE'
-      ) {
-        appHealth.reportUnreachable();
-      }
+          if (
+            appError.errorCode === 'NETWORK_ERROR' ||
+            appError.errorCode === 'OFFLINE'
+          ) {
+            appHealth.reportUnreachable();
+          }
 
-      return throwError(() => appError);
-    })
+          return throwError(() => appError);
+        })
+      )
+    )
   );
 };
