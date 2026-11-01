@@ -6,6 +6,32 @@ import {
 import { GLOBAL_ERROR_MESSAGES } from '../../shared/helpers/errorMessages';
 
 /**
+ * Con `responseType: 'blob'` Angular entrega el cuerpo de un error HTTP como
+ * `Blob`, por lo que el Problem Details del backend no se puede leer de forma
+ * directa. Lo decodifica como JSON y devuelve un `HttpErrorResponse` con el
+ * cuerpo ya parseado; si no es un `Blob` o no es JSON válido, devuelve el
+ * error original sin cambios.
+ */
+export async function parseBlobErrorBody(
+  error: HttpErrorResponse
+): Promise<HttpErrorResponse> {
+  if (!(error.error instanceof Blob)) return error;
+
+  try {
+    const body: unknown = JSON.parse(await error.error.text());
+    return new HttpErrorResponse({
+      error: body,
+      headers: error.headers,
+      status: error.status,
+      statusText: error.statusText,
+      url: error.url ?? undefined,
+    });
+  } catch {
+    return error;
+  }
+}
+
+/**
  * Traduce cualquier `HttpErrorResponse` a un `AppError` consistente,
  * sin importar su origen: cuerpo Problem Details del backend, caída total
  * de red, ausencia de conexión a internet, o error HTTP genérico sin cuerpo.
