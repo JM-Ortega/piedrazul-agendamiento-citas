@@ -78,9 +78,10 @@ administrador de negocio ([primer-admin-negocio.md](primer-admin-negocio.md)) y 
 
 **Correo.** SES está deshabilitado mientras `NOTIFICATIONS_SES_ENABLED` no sea `true` en el
 environment: Run P, Run I y los deploys no exigen ni entregan endpoint ni credenciales, el `.env`
-los deja vacíos y el backend arranca sin ellos. Activarlo es una operación posterior, con sus
-propios requisitos externos ([correo-ses.md](correo-ses.md)). Sin SES no hay envío externo de
-correo. Nadie recibe los recordatorios de cita: uno vigente termina en un intento de consola `FAILED`
+los deja vacíos y el backend arranca sin ellos. Keycloak queda sin SMTP y sin recuperación de
+contraseña, y el primer administrador de negocio define la suya sin correo. Activarlo es una
+operación posterior, que también enciende esa recuperación, con sus propios requisitos externos
+([correo-ses.md](correo-ses.md)). Sin SES no hay envío externo de correo. Nadie recibe los recordatorios de cita: uno vigente termina en un intento de consola `FAILED`
 (`CONSOLE_DIAGNOSTIC_ONLY`) y, como aquí no se activa el diagnóstico, el log no muestra su
 contenido (`[contenido sensible oculto]`, destinatario enmascarado). Los códigos de verificación, en cambio, no se emiten: sin un canal apto para
 ellos, `POST /api/patients/link-user-account/request-code` responde `503`

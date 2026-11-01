@@ -42,7 +42,10 @@ Nunca:
 - borra algo que no pueda probar propio y seguro (ver
   [Fallos parciales](#fallos-parciales-y-compensación));
 - cambia la política de contraseñas del realm `piedrazul`;
-- registra contraseñas, documentos, correos ni nombres.
+- registra contraseñas, documentos, correos ni nombres;
+- depende del correo: la contraseña se define en el primer login, con SES o sin él. Con SES
+  habilitado, además, esta cuenta puede usar la recuperación nativa
+  ([correo-ses.md](correo-ses.md#riesgo-de-la-dirección-de-correo)).
 
 Deshabilitado (por defecto) no hace ninguna operación de Keycloak ni de `Person` y no necesita
 la contraseña.

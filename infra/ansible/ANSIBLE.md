@@ -119,7 +119,7 @@ kc_realm: piedrazul
 kc_port: 8180
 kc_backend_client_id: piedrazul-backend
 kc_automation_client_id: piedrazul-keycloak-automation
-kc_automation_roles: [piedrazul-realm:manage-clients, piedrazul-realm:view-clients]
+kc_automation_roles: [piedrazul-realm:manage-clients, piedrazul-realm:manage-realm, piedrazul-realm:view-clients]
 kc_temp_admin_prefix: piedrazul-tmp-admin
 kc_temp_admin_owned_regex: "^{{ kc_temp_admin_prefix }}-[0-9]{14}-[a-z0-9]{8}$"
 kc_realm_file: "{{ repo_root }}/infra/keycloak/realm/piedrazul-realm.json"
@@ -319,6 +319,8 @@ Keycloak de producción arranca con `start`, **sin `--import-realm`**: un reinic
 
 **Reconciliación P1** (`keycloak-admin.sh reconcile`, con la automatización): sin leer el secreto vigente, prueba si el backend ya autentica con `KC_BACKEND_CLIENT_SECRET`; si Keycloak lo rechaza, lo fija. Después verifica el consumidor real: el backend autentica con ese secreto y lee su realm por la API de administración. Repetible: sin cambios no escribe nada.
 
+**Correo nativo** (`keycloak_smtp.yml`, al final del ciclo, ya en P1): con la automatización y una escritura parcial del realm (`keycloak-admin.sh smtp`), aplica el SMTP de SES y la recuperación de contraseña según `NOTIFICATIONS_SES_ENABLED`, o los retira; relee el realm por la base y falla si no quedó lo deseado. No cambia la clasificación P1/P2/P3 ni corre en P3. Ver [Correo SES](#correo-ses).
+
 **Evento con autoridad temporal** (`keycloak_bootstrap.yml`, P2 o recuperación P3 autorizada):
 
 1. Detiene Keycloak: `kc.sh bootstrap-admin` exige todos los nodos detenidos (no se depende de que Keycloak lo verifique por sí mismo).
@@ -338,7 +340,7 @@ Si el evento falla, `converge` falla con la tarea y el motivo. Si además la aut
 | Principal | Consumidor | Dónde vive el secreto | Ciclo de vida |
 |-----------|------------|-----------------------|---------------|
 | `piedrazul-backend` (service account del realm `piedrazul`) | backend en ejecución (Keycloak Admin Client) | GitHub `KC_BACKEND_CLIENT_SECRET` → runner → `.env` del host → solo el servicio `backend` | durable; rotación: cambiar el secreto y correr converge (P1 lo fija y verifica, `refresh_backend.yml` recrea el backend) |
-| `piedrazul-keycloak-automation` (service account en `master`, roles `manage-clients` y `view-clients` de `piedrazul-realm`) | `keycloak_lifecycle.yml` | GitHub `KC_AUTOMATION_CLIENT_SECRET` → runner → en tránsito al exec de kcadm dentro del contenedor `keycloak` (entorno del exec y sesión en `/dev/shm`, borrada al terminar); nunca persistido en `.env` ni en Compose | durable; no puede modificarse a sí misma: tras rotar el secreto en GitHub, converge da P3 (credencial rechazada) y la recuperación autorizada fija el nuevo |
+| `piedrazul-keycloak-automation` (service account en `master`, roles `manage-clients`, `manage-realm` y `view-clients` de `piedrazul-realm`) | `keycloak_lifecycle.yml` | GitHub `KC_AUTOMATION_CLIENT_SECRET` → runner → en tránsito al exec de kcadm dentro del contenedor `keycloak` (entorno del exec y sesión en `/dev/shm`, borrada al terminar); nunca persistido en `.env` ni en Compose | durable; no puede modificarse a sí misma: tras rotar el secreto en GitHub, converge da P3 (credencial rechazada) y la recuperación autorizada fija el nuevo |
 | `piedrazul-tmp-admin-*` (admin temporal de `master`) | un evento P2 o de recuperación | generado en el runner; en tránsito al contenedor de un solo uso de bootstrap-admin y al exec de kcadm; nunca persistido | creado y eliminado dentro del evento |
 
 ##### Administrador humano permanente
@@ -479,9 +481,10 @@ falta o le falta una clave de la base o `KC_BACKEND_CLIENT_SECRET` ("corre conve
 | Converge, antes de `.env` | `ses_inputs.yml`, `ses_image_gate.yml` | repite la validación con lo que recibe y exige la clase del proveedor en el JAR de la imagen exacta |
 | Converge, después de `.env` | `ses_delivery.yml` | Compose entregaría exactamente lo validado |
 | Deploy, antes de mutar | `ses_host_gate.yml`, `ses_image_gate.yml` | decisión y endpoint del `.env` iguales a los del environment y credenciales presentes; la imagen del deploy trae el proveedor si está habilitado |
+| Final de `keycloak_lifecycle.yml` | `keycloak_smtp.yml` | habilitado: escribe SMTP y recuperación en el realm `piedrazul` en cada converge, con la contraseña por stdin del exec; deshabilitado: limpia si queda algo; un host que no es de SES falla sin escribir; relee por la base, sin `user` ni `password` |
 | Final de `refresh_backend.yml` y `deploy.yml` | `ses_runtime.yml` | el contenedor tiene exactamente lo que Compose entregaría, credenciales incluidas |
 
-`ses_smtp_host_pattern` (`group_vars`) y `HOST_RE` (`ses-config.sh`) deben ser la misma expresión; `infra/tests/notifications-contract-check.sh` lo exige. La puerta de imagen lista `app.jar` con el `unzip` de la propia imagen, en un contenedor sin red, sin escritura y sin capacidades; no recibe entorno ni credenciales. Un deploy no recibe secretos: no comprueba que las credenciales del host coincidan con las de GitHub, ni las renueva.
+`ses_smtp_host_pattern` (`group_vars`) y `HOST_RE` (`ses-config.sh`) deben ser la misma expresión; `infra/tests/notifications-contract-check.sh` lo exige. La puerta de imagen lista `app.jar` con el `unzip` de la propia imagen, en un contenedor sin red, sin escritura y sin capacidades; no recibe entorno ni credenciales. Un deploy no recibe secretos: no comprueba que las credenciales del host coincidan con las de GitHub, ni las renueva, ni aplica o comprueba el SMTP de Keycloak.
 
 ### Bootstrap del primer `ADMIN` de negocio
 

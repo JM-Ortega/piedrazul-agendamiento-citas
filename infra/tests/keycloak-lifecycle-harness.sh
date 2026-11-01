@@ -16,6 +16,8 @@
 #     atrás, y después todos los escenarios P1/P3/REC/INT/ADMIN-H sobre la base migrada.
 #     Si HARNESS_KC_FROM_REF es la misma versión con otro digest: sin migración, la vuelta a
 #     ese digest es compatible (converge la admite) y se restaura la identidad declarada
+#   HARNESS_TARGET=smtp → P2 con SES habilitado contra un SMTP sintético (smtp-sink.py) y el
+#     escenario SMTP y fugas, también codificadas
 # Keycloak corre siempre por su identidad exacta: la referencia fijada se resuelve (como en
 # el workflow) a su manifiesto linux/amd64 y converge la recibe como keycloak_image_ref.
 # Requiere: docker (compose v2, buildx), jq, yq, ansible-playbook con community.docker 5.x
@@ -54,6 +56,11 @@
 #           sobrescritura; OTP retirado (comportamiento nativo aceptado: acceso solo con
 #           contraseña); borrado intencional sin recreación; creación interrumpida en una P2
 #           nueva (deshabilitada, visible, sin reparar)
+#   SMTP    (solo smtp) correo nativo con el interruptor de SES: autenticación y envío sintéticos;
+#           repetición, rotación, cambio de remitente y endpoint sin reiniciar Keycloak;
+#           deshabilitar; falla al escribir y al releer, y reintento; SMTP ajeno sin sobrescribir;
+#           realm anterior a manage-realm (P3 → recuperación); secretos fuera de argv, entorno,
+#           archivos y logs. Toda corrida sin este target comprueba P2 con SES ausente.
 # Salida: 0 si todo pasa; 1 si algo falla.
 set -uo pipefail
 
@@ -143,6 +150,15 @@ PY_IMAGE="${HARNESS_PYTHON_IMAGE:-python:3.12-slim}"
 mkdir -p "${W}/otp"
 SECRETS_SEEN=("${POSTGRES_PASSWORD}" "${APP_DB_PASSWORD}" "${MIGRATION_DB_PASSWORD}" "${KC_DB_PASSWORD}"
   "${BACKEND_SECRET}" "${AUTOMATION_SECRET}" "${PLATFORM_PW}" "${PLATFORM_NEW_PW}" "${PLATFORM_SHORT_PW}")
+# SES: ausente salvo en el target smtp. Host fuera del patrón real para que nunca salga de la red
+# de Docker; credenciales con lo que shell, JSON o Jinja podrían alterar, dentro del contrato SES.
+SES_ENABLED="" SES_HOST="" SES_USER="" SES_PASSWORD="" SES_ARGS=()
+if [ "${TARGET}" = smtp ]; then
+  SES_ENABLED=true SES_HOST=smtp-sink SES_USER="$(synthetic smtpuser)"
+  SES_PASSWORD="$(synthetic smtppw)'\"\$\\#&{{lookup('env','HOME')}}{%raw%}%"
+  SES_ARGS=(-e '{"ses_smtp_host_pattern": "^smtp-sink(-2)?\\Z", "kc_smtp_connection": {"port": "2525", "starttls": "false", "ssl": "false", "auth": "true"}}')
+  SECRETS_SEEN+=("${SES_USER}" "${SES_PASSWORD}")
+fi
 REPO_BACKEND_SECRET="$(sed -n 's/^KC_BACKEND_CLIENT_SECRET=//p' "${ROOT}/.env.example")"
 REPO_ADMIN_USER="$(sed -n 's/^KC_BOOTSTRAP_ADMIN_USERNAME=//p' "${ROOT}/.env.example")"
 REPO_ADMIN_PASSWORD="$(sed -n 's/^KC_BOOTSTRAP_ADMIN_PASSWORD=//p' "${ROOT}/.env.example")"
@@ -173,6 +189,7 @@ cat > "${W}/converge.yml" <<'EOF'
     - ansible.builtin.include_role: {name: app, tasks_from: keycloak_backend_delivery.yml}
     - ansible.builtin.include_role: {name: app, tasks_from: db_converge.yml}
     - ansible.builtin.include_role: {name: app, tasks_from: keycloak_image.yml}
+    - ansible.builtin.include_role: {name: app, tasks_from: ses_inputs.yml}
     - ansible.builtin.include_role: {name: app, tasks_from: keycloak_lifecycle.yml}
 EOF
 # Verificación de la identidad en ejecución (la misma tarea que verify-release.yml)
@@ -190,13 +207,15 @@ ansible_run() { # <log> <playbook> [extra args...]
       MIGRATION_DB_PASSWORD="${MIGRATION_DB_PASSWORD}" KC_DB_PASSWORD="${KC_DB_PASSWORD}" \
       KC_BACKEND_CLIENT_SECRET="${BACKEND_SECRET}" KC_AUTOMATION_CLIENT_SECRET="${AUTOMATION_SECRET}" \
       KC_PLATFORM_ADMIN_INITIAL_PASSWORD="${PLATFORM_ENV_PW}" \
+      NOTIFICATIONS_SES_ENABLED="${SES_ENABLED}" SES_SMTP_HOST="${SES_HOST}" \
+      SES_SMTP_USERNAME="${SES_USER}" SES_SMTP_PASSWORD="${SES_PASSWORD}" \
       ANSIBLE_CONFIG="${ANSIBLE_DIR}/ansible.cfg" ANSIBLE_ROLES_PATH="${ANSIBLE_DIR}/roles" \
       ANSIBLE_BECOME=false ANSIBLE_NOCOLOR=1 \
     ansible-playbook -i "${ANSIBLE_DIR}/inventories/prod" -i "${W}/hosts.yml" "${W}/${pb}" \
       -e "app_dir=${W}" -e "compose_project_name=${PROJECT}" -e "db_lock_file=${W}/db.lock" \
       -e "repo_root=${ROOT}" -e "keycloak_compose_file=${W}/declared/keycloak.yml" \
       -e "keycloak_image_ref=${KC_REF}" -e "keycloak_image_index_digest=${KC_INDEX}" \
-      "$@" </dev/null > "${LOGS}/${log}.log" 2>&1
+      "${SES_ARGS[@]}" "$@" </dev/null > "${LOGS}/${log}.log" 2>&1
 }
 render_env() { ansible_run "render-$1" render.yml; }
 converge() { # <etiqueta> [true|false (recuperación)] [extra args...]
@@ -388,7 +407,7 @@ check "P2: el contenedor keycloak no recibe KC_BOOTSTRAP_ADMIN_*, KC_ADMIN_*, KC
 check "P2: sin identidades de negocio (solo el service account del backend en el realm)" \
   test "$(users_in_realm)" = "service-account-piedrazul-backend"
 check "P2: roles exactos de la automatización (solo piedrazul-realm)" \
-  test "$(sql "select string_agg(rc.client_id||':'||k.name, ',' order by k.name) from keycloak.user_entity u join keycloak.client c on c.id=u.service_account_client_link join keycloak.user_role_mapping m on m.user_id=u.id join keycloak.keycloak_role k on k.id=m.role_id join keycloak.client rc on rc.id=k.client where c.client_id='piedrazul-keycloak-automation'")" = "piedrazul-realm:manage-clients,piedrazul-realm:view-clients"
+  test "$(sql "select string_agg(rc.client_id||':'||k.name, ',' order by k.name) from keycloak.user_entity u join keycloak.client c on c.id=u.service_account_client_link join keycloak.user_role_mapping m on m.user_id=u.id join keycloak.keycloak_role k on k.id=m.role_id join keycloak.client rc on rc.id=k.client where c.client_id='piedrazul-keycloak-automation'")" = "piedrazul-realm:manage-clients,piedrazul-realm:manage-realm,piedrazul-realm:view-clients"
 check "P2: no quedan contenedores de un solo uso de bootstrap-admin" \
   test -z "$(docker ps -aq --filter "label=com.docker.compose.project=${PROJECT}" --filter 'label=com.docker.compose.oneoff=True')"
 REALM_ID="$(realm_id)"
@@ -400,6 +419,38 @@ PLATFORM_ENV_PW=""
 # demostrar que nada se recrea ni borra
 kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul create users -r piedrazul -s username=harness-sentinel -s enabled=true >/dev/null 2>&1
 check "sentinela de negocio creado por el backend" bash -c "users_in_realm | grep -q harness-sentinel"
+
+# Correo: el primer administrador de negocio no depende de él. La cuenta se crea como el
+# bootstrap: contraseña temporal + UPDATE_PASSWORD, correo sin verificar
+first_admin_expect() { # <etiqueta>
+  local user="harness-admin-$1" pw new id
+  pw="$(synthetic firstadmin)"; new="$(synthetic firstadminnew)"; SECRETS_SEEN+=("${pw}" "${new}")
+  kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul create users -r piedrazul -s "username=${user}" -s enabled=true \
+    -s firstName=Primer -s lastName=Administrador -s "email=${user}@harness.test" -s emailVerified=false \
+    -s 'requiredActions=["UPDATE_PASSWORD"]' >/dev/null 2>&1
+  id="$(kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q "username=${user}" -q exact=true --fields id --format csv --noquotes 2>/dev/null)"
+  jq -cn --arg p "${pw}" '{type: "password", value: $p, temporary: true}' \
+    | kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul update "users/${id}/reset-password" -r piedrazul -f - -n >/dev/null 2>&1
+  check "$1: administrador inicial: la contraseña temporal sola no da acceso" \
+    test "$(kc_user_state piedrazul "${user}" "${pw}")" = not_set_up
+  KBL_REALM=piedrazul KBL_CLIENT=piedrazul-frontend KBL_REDIRECT=http://localhost:4200/ \
+    KBL_USER="${user}" KBL_PASSWORD="${pw}" KBL_NEW_PASSWORD="${new}" \
+    browser realm-first-login "first-admin-$1" KBL_REALM KBL_CLIENT KBL_REDIRECT KBL_USER KBL_PASSWORD KBL_NEW_PASSWORD
+  check "$1: administrador inicial: UPDATE_PASSWORD por el tema real y entra, sin correo" \
+    bash -c "browser_has 'first-admin-$1' 'realm_first_login.page=login-update-password' && browser_has 'first-admin-$1' 'browser.token=ok'"
+  check "$1: administrador inicial: su contraseña elegida autentica y la temporal ya no" \
+    bash -c "test '$(kc_user_auth piedrazul "${user}" "${new}")' = ok && test '$(kc_user_auth piedrazul "${user}" "${pw}")' = rejected"
+}
+smtp_rows() { sql "select count(*) from keycloak.realm_smtp_config c join keycloak.realm r on r.id=c.realm_id where r.name='piedrazul'"; }
+reset_allowed() { sql "select reset_password_allowed from keycloak.realm where name='piedrazul'"; }
+if [ "${TARGET}" != smtp ]; then
+  check "P2 sin SES: ninguna entrada de correo y el realm sin SMTP ni recuperación" \
+    test "$(smtp_rows)|$(reset_allowed)" = "0|f"
+  check "P2 sin SES: no se llamó a la API e informa lo deshabilitado" \
+    bash -c "! task_ran p2 'Aplicar SMTP y recuperación al realm' && log_has p2 'sin SMTP y recuperación de contraseña deshabilitada'"
+  check "P2 sin SES: Keycloak no recibe ninguna clave de correo" bash -c "! kc_env_keys | grep -Eq '^(SES_|NOTIFICATIONS_)'"
+  first_admin_expect p2-sin-ses
+fi
 
 check "P2: Keycloak corre la identidad exacta recibida (manifiesto linux/amd64 de ${KC_DECLARED})" \
   test "$(docker inspect keycloak --format '{{.Config.Image}}')" = "${KC_REF}"
@@ -534,6 +585,7 @@ fi
 PLATFORM_STATUS_P1='CONFIGURADA'
 fi
 
+if [ "${TARGET}" != smtp ]; then
 # ══ IDENT: identidad de Keycloak inválida o distinta ═════════════════════════
 section "IDENT — identidad de Keycloak inválida o distinta: falla antes de tocar Keycloak"
 declare_keycloak() { printf 'services:\n  keycloak:\n    image: %s\n' "$1" > "${W}/declared/keycloak.yml"; }
@@ -705,6 +757,8 @@ check "ADMIN-H: la contraseña inicial sigue sin valer (no se restableció)" bro
 
 fi
 
+fi
+
 # ══ P3: divergencias → falla cerrada, sin mutar ══════════════════════════════
 p3_expect() { # <etiqueta> <motivo esperado (texto)> [extra args]: P3 recuperable
   local label="$1" reason="$2" before_temp before_users rc; shift 2
@@ -769,6 +823,7 @@ harness_admin_user() { # <username> <contraseña>: usuario temporal (no cliente)
   compose up -d --wait keycloak >/dev/null 2>&1
 }
 
+if [ "${TARGET}" != smtp ]; then
 # ══ P3 BLOQUEANTE: usuario temporal ajeno con nombre reconocible ═════════════
 section "P3 BLOQUEANTE — usuario temporal ajeno: intacto y sin exponer su nombre"
 PERSON="maria.fernanda.perez.$(head -c 3 /dev/urandom | od -An -tx1 | tr -d ' \n')"
@@ -868,7 +923,7 @@ recover_expect rec-after-interrupted
 check "INT: la recuperación eliminó también la huérfana propia del intento interrumpido" test "$(temp_count)" = 0
 
 section "INT — recuperación que falla después de reconciliar parcialmente"
-BAD_ROLES='{"kc_automation_roles": ["piedrazul-realm:manage-clients", "piedrazul-realm:view-clients", "piedrazul-realm:no-such-role"]}'
+BAD_ROLES='{"kc_automation_roles": ["piedrazul-realm:manage-clients", "piedrazul-realm:manage-realm", "piedrazul-realm:view-clients", "piedrazul-realm:no-such-role"]}'
 p3_expect p3-before-partial 'roles del service account de automatización divergentes' -e "${BAD_ROLES}"
 converge int-partial true -e "${BAD_ROLES}"; RC=$?
 check "INT-parcial: la recuperación falla (rc=${RC}) sin informar éxito" \
@@ -1023,6 +1078,180 @@ check "interrumpida: la contraseña inicial no da acceso (cuenta deshabilitada)"
 
 fi
 
+fi
+
+# ══ SMTP: correo nativo con el interruptor de SES ════════════════════════════
+if [ "${TARGET}" = smtp ]; then
+section "SMTP — instalación nueva con SES habilitado"
+SMTP_LOG="${W}/smtp/sink.log"
+mkdir -p "${W}/smtp"; : > "${SMTP_LOG}"
+docker run -d --name "${PROJECT}-smtp-sink" --label "com.docker.compose.project=${PROJECT}" --network piedrazul_net \
+  --network-alias smtp-sink --network-alias smtp-sink-2 --user "$(id -u):$(id -g)" \
+  -v "${ROOT}/infra/tests/smtp-sink.py:/sink.py:ro" -v "${W}/smtp:/out" "${PY_IMAGE}" python -I /sink.py >/dev/null
+credential_hash() { python3 -c 'import hashlib,sys; print(hashlib.sha256(sys.argv[1].encode()+bytes(1)+sys.argv[2].encode()).hexdigest())' "$1" "$2"; }
+smtp_value() { sql "select c.value from keycloak.realm_smtp_config c join keycloak.realm r on r.id=c.realm_id where r.name='piedrazul' and c.name='$1'"; }
+# Realm completo menos lo que W4 gobierna, y huella de lo que la representación no trae
+realm_fingerprint() {
+  kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul get realms/piedrazul 2>/dev/null \
+    | jq -S 'del(.smtpServer, .resetPasswordAllowed, .attributes.scimApiEnabled)' | md5sum
+  sql "select md5(string_agg(x, ',' order by x)) from (
+         select 'client:'||id||enabled from keycloak.client
+         union all select 'role:'||id||name from keycloak.keycloak_role
+         union all select 'user:'||id||username||enabled from keycloak.user_entity
+         union all select 'flow:'||id||alias from keycloak.authentication_flow
+         union all select 'exec:'||id||requirement from keycloak.authentication_execution
+         union all select 'action:'||id||enabled from keycloak.required_action_provider) t(x)"
+  technical_row
+}
+reset_expect() { # <etiqueta>: una recuperación real termina en una autenticación y un correo
+  local label="$1" mails rc
+  mails="$(grep -c '^mail ' "${SMTP_LOG}")"
+  KBL_REALM=piedrazul KBL_CLIENT=piedrazul-frontend KBL_REDIRECT=http://localhost:4200/ KBL_USER=harness-reset \
+    browser reset-request "reset-${label}" KBL_REALM KBL_CLIENT KBL_REDIRECT KBL_USER
+  check "${label}: la página de login ofrece la recuperación y Keycloak la acepta" \
+    bash -c "browser_has 'reset-${label}' 'reset.advertised=true' && browser_has 'reset-${label}' 'reset.page=200' && browser_has 'reset-${label}' 'reset.submitted=200'"
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [ "$(grep -c '^mail ' "${SMTP_LOG}")" -gt "${mails}" ] && break; sleep 1; done
+  check "${label}: llegó un correo más al SMTP sintético" test "$(grep -c '^mail ' "${SMTP_LOG}")" -eq "$((mails + 1))"
+}
+last_auth() { sed -n 's/^auth=//p' "${SMTP_LOG}" | tail -1; }
+last_from() { sed -n 's/^mail .* from=//p' "${SMTP_LOG}" | tail -1; }
+check "SMTP: P2 con SES termina bien y lo declara sin afirmar entrega" \
+  bash -c "log_has p2 'SES configurado y recuperación de contraseña habilitada; no prueba credenciales válidas ni entrega de correo'"
+check "SMTP: P2 configuró realm y recuperación en la misma convergencia" test "$(smtp_rows)|$(reset_allowed)" = "9|t"
+check "SMTP: valores de conexión, endpoint y remitente exactos" \
+  test "$(smtp_value host)|$(smtp_value port)|$(smtp_value starttls)|$(smtp_value ssl)|$(smtp_value auth)|$(smtp_value from)|$(smtp_value fromDisplayName)" \
+    = "smtp-sink|2525|false|false|true|$(yq -r .notifications_email_from "${ANSIBLE_DIR}/inventories/prod/group_vars/all.yml")|$(yq -r .notifications_email_from_name "${ANSIBLE_DIR}/inventories/prod/group_vars/all.yml")"
+check "SMTP: Keycloak no recibe ninguna clave de correo en su entorno" bash -c "! kc_env_keys | grep -Eq '^(SES_|NOTIFICATIONS_)'"
+kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul create users -r piedrazul -s username=harness-reset -s enabled=true \
+  -s email=reset@harness.test -s emailVerified=true >/dev/null 2>&1
+reset_expect smtp-enabled
+check "SMTP: Keycloak autentica con la credencial exacta (caracteres especiales incluidos)" \
+  test "$(last_auth)" = "$(credential_hash "${SES_USER}" "${SES_PASSWORD}")"
+check "SMTP: el correo sale al destinatario desde el remitente configurado" \
+  grep -q '^mail rcpt=reset@harness.test from=Piedrazul Salud <no-reply@mail.piedrazul.org>$' "${SMTP_LOG}"
+MAILS="$(grep -c '^mail ' "${SMTP_LOG}")"
+KBL_REALM=piedrazul KBL_CLIENT=piedrazul-frontend KBL_REDIRECT=http://localhost:4200/ KBL_USER=harness-sentinel \
+  browser reset-request reset-no-email KBL_REALM KBL_CLIENT KBL_REDIRECT KBL_USER
+check "SMTP: una cuenta sin correo recibe la misma respuesta y ningún correo" \
+  test "$(grep -c '^reset.submitted=200$' "${LOGS}/browser-reset-no-email.txt")|$(grep -c '^mail ' "${SMTP_LOG}")" = "1|${MAILS}"
+first_admin_expect smtp-enabled
+
+section "SMTP — convergencia repetida, sin reiniciar Keycloak"
+CONTAINER_SMTP="$(kc_container)"
+REALM_SNAP="$(realm_fingerprint)"
+converge smtp-repeat false -vvv; RC=$?
+check "repetición: termina bien (rc=${RC})" test "${RC}" -eq 0
+check "repetición: mismo realm salvo lo gobernado; mismos usuarios, clientes, roles y flujos" test "$(realm_fingerprint)" = "${REALM_SNAP}"
+check "repetición: Keycloak sin reiniciar" test "$(kc_container)" = "${CONTAINER_SMTP}"
+
+section "SMTP — rotación, remitente y endpoint"
+SES_USER="$(synthetic smtpuser)"; SES_PASSWORD="$(synthetic smtppw)'\"\$\\#&%"; SES_HOST=smtp-sink-2
+SECRETS_SEEN+=("${SES_USER}" "${SES_PASSWORD}")
+# Muestreo de argv en el host y de argv y entorno dentro de Keycloak durante la escritura. El
+# entorno del exec trae el secreto de automatización, así que queda fuera de la evidencia.
+SAMPLES="${W}/samples"; mkdir -p "${SAMPLES}"; touch "${W}/sample"
+(
+  while [ -f "${W}/sample" ]; do
+    ps -eww -o args >> "${SAMPLES}/host.txt" 2>/dev/null
+    docker exec keycloak bash -c 'for p in /proc/[0-9]*; do tr "\0" " " < "$p/cmdline"; echo; tr "\0" "\n" < "$p/environ"; done' >> "${SAMPLES}/keycloak.txt" 2>/dev/null
+  done
+) &
+SAMPLER=$!
+converge smtp-rotate false -e '{"notifications_email_from": "otro@mail.piedrazul.org", "notifications_email_from_name": "Otro Remitente"}'; RC=$?
+rm -f "${W}/sample"; wait "${SAMPLER}" 2>/dev/null
+SMTP_NEEDLE_USER="${SES_USER}"; SMTP_NEEDLE_PW="${SES_PASSWORD%%\'*}"
+check "rotación: termina bien (rc=${RC})" test "${RC}" -eq 0
+reset_expect smtp-rotated
+check "rotación: Keycloak autentica con la credencial nueva" test "$(last_auth)" = "$(credential_hash "${SES_USER}" "${SES_PASSWORD}")"
+check "rotación: remitente y endpoint nuevos" \
+  test "$(smtp_value host)|$(last_from)" = "smtp-sink-2|Otro Remitente <otro@mail.piedrazul.org>"
+check "rotación: mismo realm salvo lo gobernado; Keycloak sin reiniciar" \
+  test "$(realm_fingerprint)|$(kc_container)" = "${REALM_SNAP}|${CONTAINER_SMTP}"
+check "muestreo: control positivo: vio el exec smtp y su entorno" \
+  bash -c "grep -q 'keycloak-admin smtp' '${SAMPLES}/keycloak.txt' && grep -q '^KCL_AUTOMATION_SECRET=' '${SAMPLES}/keycloak.txt'"
+
+section "SMTP — deshabilitar"
+MAILS="$(grep -c '^mail ' "${SMTP_LOG}")"
+SES_ENABLED=false
+converge smtp-disable false; RC=$?
+check "deshabilitar con las entradas aún en el runner: termina bien (rc=${RC})" test "${RC}" -eq 0
+check "deshabilitar: sin filas SMTP, sin contraseña retenida y recuperación apagada" \
+  test "$(smtp_rows)|$(sql "select count(*) from keycloak.realm_smtp_config where name='password'")|$(reset_allowed)" = "0|0|f"
+SES_HOST="" SES_USER_KEPT="${SES_USER}" SES_PASSWORD_KEPT="${SES_PASSWORD}"; SES_ENABLED="" SES_USER="" SES_PASSWORD=""
+converge smtp-disable-again false; RC=$?
+check "deshabilitado sin entradas, ya limpio: termina bien sin llamar a la API (rc=${RC})" \
+  bash -c "test ${RC} -eq 0 && ! task_ran smtp-disable-again 'Aplicar SMTP y recuperación al realm'"
+KBL_REALM=piedrazul KBL_CLIENT=piedrazul-frontend KBL_REDIRECT=http://localhost:4200/ KBL_USER=harness-reset \
+  browser reset-request reset-disabled KBL_REALM KBL_CLIENT KBL_REDIRECT KBL_USER
+check "deshabilitado: la página no ofrece recuperación y Keycloak la rechaza" \
+  bash -c "browser_has reset-disabled 'reset.advertised=false' && browser_has reset-disabled 'reset.page=400'"
+check "deshabilitado: ningún correo más" test "$(grep -c '^mail ' "${SMTP_LOG}")" = "${MAILS}"
+first_admin_expect smtp-disabled
+
+section "SMTP — falla al escribir y reintento"
+SES_ENABLED=true SES_HOST=smtp-sink SES_USER="${SES_USER_KEPT}" SES_PASSWORD="${SES_PASSWORD_KEPT}"
+sql "create function keycloak.harness_smtp_block() returns trigger language plpgsql as \$\$ begin raise exception 'harness'; end \$\$;
+     create trigger harness_smtp_block before insert or update or delete on keycloak.realm_smtp_config for each row execute function keycloak.harness_smtp_block();" >/dev/null
+converge smtp-write-fail false; RC=$?
+check "falla al escribir: el converge falla (rc=${RC}) y lo dice" \
+  bash -c "test ${RC} -ne 0 && log_has smtp-write-fail 'el realm no aceptó la configuración' && log_has smtp-write-fail 'error=smtp_update'"
+check "falla al escribir: no informa éxito" bash -c "! log_has smtp-write-fail 'SES configurado y recuperación'"
+check "falla al escribir: transacción única: ni SMTP ni recuperación quedaron a medias" test "$(smtp_rows)|$(reset_allowed)" = "0|f"
+sql "drop trigger harness_smtp_block on keycloak.realm_smtp_config; drop function keycloak.harness_smtp_block();" >/dev/null
+converge smtp-write-retry false; RC=$?
+check "falla al escribir: el reintento converge (rc=${RC})" bash -c "test ${RC} -eq 0 && test \"\$(sql \"select count(*) from keycloak.realm_smtp_config\")\" = 9"
+check "falla al escribir: recuperación habilitada tras el reintento" test "$(reset_allowed)" = t
+
+section "SMTP — falla al releer y reintento"
+SES_ENABLED=false; converge smtp-before-readback false >/dev/null; SES_ENABLED=true
+sql "create function keycloak.harness_smtp_drop() returns trigger language plpgsql as \$\$ begin if new.name = 'from' then return null; end if; return new; end \$\$;
+     create trigger harness_smtp_drop before insert on keycloak.realm_smtp_config for each row execute function keycloak.harness_smtp_drop();" >/dev/null
+converge smtp-readback-fail false; RC=$?
+check "falla al releer: el converge falla (rc=${RC}) y no informa éxito" \
+  bash -c "test ${RC} -ne 0 && log_has smtp-readback-fail 'No se informa como éxito' && ! log_has smtp-readback-fail 'SES configurado y recuperación'"
+sql "drop trigger harness_smtp_drop on keycloak.realm_smtp_config; drop function keycloak.harness_smtp_drop();" >/dev/null
+converge smtp-readback-retry false; RC=$?
+check "falla al releer: el reintento converge sin reemplazar el realm (rc=${RC})" \
+  test "${RC}|$(smtp_rows)|$(realm_id)" = "0|9|${REALM_ID}"
+reset_expect smtp-after-retry
+
+section "SMTP — configuración ajena"
+foreign_smtp() { jq -cn "$1" | kc_as piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master update realms/piedrazul -f - >/dev/null 2>&1; }
+foreign_smtp '{smtpServer: {host: "mail.ajeno.test", port: "25", from: "ajeno@ajeno.test"}}'
+FOREIGN_SNAP="$(sql "select string_agg(name||'='||value, ',' order by name) from keycloak.realm_smtp_config")"
+check "ajena: preparación: otro host en el realm" test "$(smtp_value host)" = mail.ajeno.test
+for flag in true false; do
+  SES_ENABLED="${flag}"
+  converge "smtp-foreign-${flag}" false; RC=$?
+  check "ajena (SES=${flag}): el converge falla (rc=${RC}) sin escribir" \
+    bash -c "test ${RC} -ne 0 && log_has 'smtp-foreign-${flag}' 'no es de SES; este ciclo no lo puso y no se sobrescribe' && ! task_ran 'smtp-foreign-${flag}' 'Aplicar SMTP y recuperación al realm'"
+  check "ajena (SES=${flag}): configuración intacta" \
+    test "$(sql "select string_agg(name||'='||value, ',' order by name) from keycloak.realm_smtp_config")" = "${FOREIGN_SNAP}"
+done
+SES_ENABLED=true
+foreign_smtp '{smtpServer: {}}'
+converge smtp-foreign-cleared false; RC=$?
+check "ajena: retirada por el operador, converge reconcilia (rc=${RC})" test "${RC}|$(smtp_rows)" = "0|9"
+
+section "SMTP — realm anterior a manage-realm: P3 y recuperación autorizada"
+OLD_ROLES='{"kc_automation_roles": ["piedrazul-realm:manage-clients", "piedrazul-realm:view-clients"]}'
+automation_roles() { sa_roles piedrazul-keycloak-automation | tr ',' '\n' | grep -v default-roles | paste -sd, -; }
+SES_ENABLED=false; converge smtp-clean-for-old false >/dev/null
+converge smtp-to-old-roles true -e "${OLD_ROLES}"; RC=$?
+check "transición: preparación: automatización sin manage-realm (rc=${RC})" \
+  test "${RC}|$(automation_roles)" = "0|piedrazul-realm:manage-clients,piedrazul-realm:view-clients"
+SES_ENABLED=true
+SMTP_BEFORE="$(smtp_rows)|$(reset_allowed)"
+p3_expect smtp-p3-old-roles 'roles del service account de automatización divergentes'
+check "transición: P3 no toca SMTP ni amplía la autoridad" \
+  bash -c "! task_ran smtp-p3-old-roles 'Aplicar SMTP y recuperación al realm' && test '$(smtp_rows)|$(reset_allowed)' = '${SMTP_BEFORE}' && ! sa_roles piedrazul-keycloak-automation | grep -q manage-realm"
+recover_expect smtp-recovery
+check "transición: la recuperación autorizada agrega solo manage-realm, nada en master" \
+  test "$(automation_roles)" = "piedrazul-realm:manage-clients,piedrazul-realm:manage-realm,piedrazul-realm:view-clients"
+check "transición: la misma recuperación deja el SMTP en P1" test "$(smtp_rows)|$(reset_allowed)" = "9|t"
+reset_expect smtp-after-recovery
+fi
+
 # ══ Fugas ════════════════════════════════════════════════════════════════════
 section "Secretos en la salida"
 LEAKS=0
@@ -1033,6 +1262,29 @@ LEAKS=$(wc -l < "${W}/leaks.txt")
 grep -rqF --exclude=harness-admin.log -e "${REPO_BACKEND_SECRET}" "${LOGS}" && LEAKS=$((LEAKS + 1))
 check "la marca de los secretos sintéticos existe en el harness (control positivo)" grep -q 'synthetic' <<< "${BACKEND_SECRET}"
 check "ningún secreto (sintético o del repositorio) aparece en los logs de Ansible ni en las muestras" test "${LEAKS}" -eq 0
+if [ "${TARGET}" = smtp ]; then
+  # En base64, con las tres alineaciones posibles dentro de un valor mayor: la marca común para los
+  # logs; para las muestras, la credencial SMTP, porque reconcile lleva otros secretos así en el
+  # entorno de su exec (KCL_*_JSON_B64)
+  encoded() { python3 -c 'import base64, sys
+for pad in range(3):
+    text = base64.b64encode(b"x" * pad + sys.argv[1].encode()).decode().rstrip("=")
+    print(text[4 if pad else 0:-2])' "$1"; }
+  ENCODED="$(encoded synthetic)"
+  ENCODED_PW="$(encoded "${SMTP_NEEDLE_PW}")"
+  check "fugas codificadas: ninguna en logs de Ansible, incluida la corrida con -vvv" \
+    bash -c "! grep -rqF --exclude=harness-admin.log -e '$(sed -n 1p <<< "${ENCODED}")' -e '$(sed -n 2p <<< "${ENCODED}")' -e '$(sed -n 3p <<< "${ENCODED}")' '${LOGS}'"
+  check "muestras: las credenciales SMTP no están en argv del host ni en argv o entorno de Keycloak" \
+    bash -c "! grep -qF -e '${SMTP_NEEDLE_USER}' -e '${SMTP_NEEDLE_PW}' '${SAMPLES}/host.txt' '${SAMPLES}/keycloak.txt'"
+  check "muestras: tampoco codificadas" \
+    bash -c "! grep -qF -e '$(sed -n 1p <<< "${ENCODED_PW}")' -e '$(sed -n 2p <<< "${ENCODED_PW}")' -e '$(sed -n 3p <<< "${ENCODED_PW}")' '${SAMPLES}/host.txt' '${SAMPLES}/keycloak.txt'"
+  printf '%s' "${SES_PASSWORD}" > "${W}/.needle"
+  check "persistencia: la contraseña SMTP no queda en el espacio de trabajo ni en temporales de Ansible" \
+    bash -c "! grep -rqF --exclude-dir=evidence --exclude-dir=samples --exclude=.needle -f '${W}/.needle' '${W}' \"\${HOME}/.ansible/tmp\" 2>/dev/null"
+  rm -f "${W}/.needle"
+  check "persistencia: sin sesiones de kcadm en /dev/shm de Keycloak" test -z "$(docker exec keycloak ls /dev/shm 2>/dev/null)"
+  cp "${SMTP_LOG}" "${LOGS}/smtp-sink.log"
+fi
 
 echo
 if [ "${FAILS}" -gt 0 ]; then

@@ -89,10 +89,12 @@ kc_realm: piedrazul
 kc_port: 8180
 kc_backend_client_id: piedrazul-backend
 # Autoridad de reconciliación (service account en master, secreto solo en el runner).
-# Roles exactos: solo clientes del realm de la aplicación, nada en master.
+# Roles exactos: solo del realm de la aplicación, nada en master. manage-realm lo exige el
+# correo nativo (keycloak_smtp.yml): la API solo admite escribir SMTP con ese rol.
 kc_automation_client_id: piedrazul-keycloak-automation
 kc_automation_roles:
   - "{{ kc_realm }}-realm:manage-clients"
+  - "{{ kc_realm }}-realm:manage-realm"
   - "{{ kc_realm }}-realm:view-clients"
 # Autoridad temporal de un evento (P2 o recuperación P3): kc.sh bootstrap-admin service con
 # este prefijo + sufijo aleatorio y secreto aleatorio generado en el runner. Se elimina al
@@ -133,6 +135,13 @@ notifications_email_from_name: Piedrazul Salud
 # Endpoint SMTP público de SES: estándar o FIPS, en amazonaws.com o api.aws. Misma expresión que
 # .github/scripts/ses-config.sh; la región y la conectividad no se comprueban aquí.
 ses_smtp_host_pattern: '^email-smtp(-fips)?\.[a-z]{2}(-[a-z]+)+-[0-9]+\.(amazonaws\.com|api\.aws)\Z'
+# Conexión del SMTP nativo de Keycloak (keycloak_smtp.yml): STARTTLS obligatorio, sin degradar
+# (Keycloak fija mail.smtp.starttls.required). Valores de texto, como los guarda el realm.
+kc_smtp_connection:
+  port: "587"
+  starttls: "true"
+  ssl: "false"
+  auth: "true"
 # Lo que Compose debe entregar al backend, y solo a él (ses_delivery.yml, ses_runtime.yml)
 ses_backend_env_keys:
   - NOTIFICATIONS_SES_ENABLED

@@ -2611,9 +2611,9 @@ jobs:
             # Configuración, no entrega: ningún paso de esta cadena envía un correo
             case "${O_SES:-skipped}/${SES_ENABLED:-}/${SES_CREDENTIALS:-}" in
               skipped/*) ;;
-              success/false/*) echo "| correo SES | deshabilitado: sin proveedor real; los códigos responden 503 |" ;;
-              success/true/converge) echo "| correo SES | habilitado, entradas válidas; las credenciales llegan al host solo si el converge termina bien (fila deploy). Entrega de correo **no verificada** |" ;;
-              success/true/host) echo "| correo SES | habilitado: deploy sin secretos, **credenciales no renovadas ni comparadas** con GitHub. Entrega de correo **no verificada** |" ;;
+              success/false/*) echo "| correo SES | deshabilitado: sin proveedor real; los códigos responden 503 y la recuperación de contraseña de Keycloak queda deshabilitada |" ;;
+              success/true/converge) echo "| correo SES | habilitado, entradas válidas; las credenciales llegan al host solo si el converge termina bien (fila deploy), y ese converge configura también el SMTP de Keycloak y **habilita su recuperación de contraseña**. Entrega de correo **no verificada** |" ;;
+              success/true/host) echo "| correo SES | habilitado: deploy sin secretos, **credenciales no renovadas ni comparadas** con GitHub; el SMTP de Keycloak no se aplica ni se comprueba en este run. Entrega de correo **no verificada** |" ;;
               *) echo "| correo SES | **configuración no válida** (${O_SES}): el run no toca el servidor |" ;;
             esac
             echo "| HCP (workspace/idle/previo/estado/outputs) | ${O_HCP} — confirmación ${O_HCP_APPLY:-—} |"

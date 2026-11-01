@@ -28,7 +28,7 @@
 #     solo viaja en tránsito al contenedor de un solo uso de bootstrap-admin y al exec de
 #     kcadm (entorno y sesión en /dev/shm, borrada al terminar).
 #   - automatización (KC_AUTOMATION_CLIENT_SECRET): no se persiste en el host; en tránsito
-#     al exec de kcadm dentro del contenedor keycloak; roles manage-clients y
+#     al exec de kcadm dentro del contenedor keycloak; roles manage-clients, manage-realm y
 #     view-clients del realm de la aplicación, nada en master.
 #   - backend (KC_BACKEND_CLIENT_SECRET): runtime; el único secreto técnico en el host.
 #   - administrador humano permanente: no es una autoridad del ciclo. Su contraseña inicial
@@ -422,3 +422,7 @@
     success_msg: >-
       KEYCLOAK {{ app_kc_target_version }} en ejecución ({{ keycloak_image_ref }}); base en
       {{ app_kc_observed.migration_version }}
+
+# ── Correo nativo: solo con Keycloak ya verificado, nunca desde P3 ───────────
+- name: Reconciliar el correo nativo de Keycloak
+  ansible.builtin.include_tasks: keycloak_smtp.yml

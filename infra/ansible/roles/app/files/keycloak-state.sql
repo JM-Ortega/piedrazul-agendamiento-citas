@@ -12,8 +12,8 @@
 -- Salida: una línea clave=valor por hecho. Nunca selecciona columnas con secretos
 -- (client.secret, credential.secret_data/credential_data) ni usernames: solo existencia,
 -- conteos (de credenciales, solo por tipo), ids internos, clientIds técnicos, banderas y
--- asignaciones de roles de los principales técnicos y acciones requeridas del administrador
--- humano.
+-- asignaciones de roles de los principales técnicos, acciones requeridas del administrador
+-- humano y la configuración de correo no secreta del realm de la aplicación.
 --
 -- schema:
 --   absent         no existe el schema (lo crea 01-init-databases.sh: contrato P-1 roto)
@@ -152,6 +152,19 @@ SELECT 'platform_admin=' || CASE WHEN u.id IS NULL THEN 'absent' ELSE concat_ws(
   FROM realm r
   LEFT JOIN user_entity u ON u.realm_id = r.id AND u.username = :'platform_admin_username'
  WHERE r.name = 'master';
+
+-- Correo nativo del realm de la aplicación (keycloak_smtp.yml): recuperación de contraseña,
+-- campos con valor (solo sus nombres) y los valores no secretos. user y password nunca se leen.
+SELECT 'reset_password_allowed=' || reset_password_allowed FROM realm WHERE name = :'app_realm';
+SELECT 'smtp_fields=' || coalesce(string_agg(c.name, ',' ORDER BY c.name) FILTER (WHERE c.value <> ''), '')
+  FROM realm r
+  LEFT JOIN realm_smtp_config c ON c.realm_id = r.id
+ WHERE r.name = :'app_realm';
+SELECT 'smtp.' || c.name || '=' || c.value
+  FROM realm_smtp_config c
+  JOIN realm r ON r.id = c.realm_id AND r.name = :'app_realm'
+ WHERE c.name IN ('host', 'port', 'from', 'fromDisplayName', 'starttls', 'ssl', 'auth')
+ ORDER BY c.name;
 
 COMMIT;
 

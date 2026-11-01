@@ -28,6 +28,9 @@
 #      validada antes del evento, y la lectura de su estado no expone nombres ni credenciales.
 #   6. Desarrollo: docker-compose.yml raíz con .env.example sigue siendo válido y aplica el
 #      secreto local con keycloak-dev-secret.
+#   8. Correo nativo: el realm nace sin SMTP ni recuperación; autoridad exacta, sin master; STARTTLS
+#      obligatorio; Keycloak no recibe claves de correo; la contraseña SMTP solo viaja por stdin
+#      con no_log y escritura parcial; solo corre desde el final del ciclo; deploy no lo toca.
 #   7. Frontend del tema de login: el realm mantiene deshabilitado el registro nativo; solo
 #      keycloak recibe FRONTEND_PUBLIC_URL (https://<frontend_public_domain> en producción,
 #      el valor de .env.example en desarrollo); sin ella Compose falla, y setup.yml valida
@@ -231,6 +234,37 @@ check "salida: la lectura de la base no selecciona usernames (conteos, ids inter
 # credential solo como conteo por tipo: nunca secret_data, credential_data ni client.secret
 check "keycloak-state.sql: no selecciona columnas de secretos" \
   bash -c "! grep -Eiq '\\bsecret\\b|secret_data|credential_data|\\bsalt\\b' <(grep -v '^ *--' '${ANSIBLE_DIR}/roles/app/files/keycloak-state.sql') && test \"\$(grep -v '^ *--' '${ANSIBLE_DIR}/roles/app/files/keycloak-state.sql' | grep -ic credential)\" = \"\$(grep -v '^ *--' '${ANSIBLE_DIR}/roles/app/files/keycloak-state.sql' | grep -Ec \"count\\(\\*\\) FROM credential c WHERE c.user_id = u.id AND c.type = '(password|otp)'\")\""
+
+# ── 8. Correo nativo ─────────────────────────────────────────────────────────
+GROUP_VARS="${ANSIBLE_DIR}/inventories/prod/group_vars/all.yml"
+SMTP_TASKS="${TASKS}/keycloak_smtp.yml"
+ADMIN_SH="${ANSIBLE_DIR}/roles/app/files/keycloak-admin.sh"
+STATE_SQL="${ANSIBLE_DIR}/roles/app/files/keycloak-state.sql"
+check "correo: el realm del repositorio nace sin SMTP y sin recuperación" \
+  jq -e '.resetPasswordAllowed == false and .smtpServer == {}' "${REALM}"
+check "correo: la automatización tiene exactamente sus tres roles del realm de la aplicación, nada en master" \
+  test "$(yq -r '.kc_automation_roles | sort | join(" ")' "${GROUP_VARS}")" = '{{ kc_realm }}-realm:manage-clients {{ kc_realm }}-realm:manage-realm {{ kc_realm }}-realm:view-clients'
+check "correo: producción usa el puerto 587 con STARTTLS y autenticación, sin SSL implícito" \
+  test "$(yq -r '.kc_smtp_connection | [.port, .starttls, .ssl, .auth] | join("/")' "${GROUP_VARS}")" = "587/true/false/true"
+check "Compose: keycloak no recibe ninguna clave de correo" \
+  bash -c "! jq -r '.services.keycloak.environment | keys[]' '${TMP}/config.json' | grep -Eq '^(SES_|NOTIFICATIONS_|SMTP)'"
+check "correo: el SMTP se reconcilia solo al final del ciclo" \
+  test "$(yq -r '.[-1]."ansible.builtin.include_tasks"' "${TASKS}/keycloak_lifecycle.yml")" = "keycloak_smtp.yml"
+check "correo: ningún otro task file lo incluye; deploy no lo toca" \
+  test "$(grep -rlE 'keycloak_smtp.yml$|"smtp"\]' "${TASKS}" | xargs -r -n1 basename | sort | tr '\n' ' ')" = "keycloak_lifecycle.yml keycloak_smtp.yml "
+APPLY='.[] | select(.name == "Aplicar SMTP y recuperación al realm")'
+check "correo: la escritura lleva no_log y la contraseña va por stdin, fuera de argv y del entorno" \
+  bash -c "test \"\$(yq -r '${APPLY} | .no_log' '${SMTP_TASKS}')\" = true && yq -r '${APPLY} | .\"community.docker.docker_container_exec\".stdin' '${SMTP_TASKS}' | grep -q _realm_update && ! yq -r '${APPLY} | .\"community.docker.docker_container_exec\" | (.env, .argv)' '${SMTP_TASKS}' | grep -Eq 'app_ses_smtp|_realm_update'"
+check "correo: sin decisión de SES no se toca el realm (sin valor por defecto)" \
+  bash -c "yq -r '.[0].\"ansible.builtin.assert\".that[]' '${SMTP_TASKS}' | grep -qx 'app_ses_enabled is defined' && ! grep -q 'app_ses_enabled | default' '${SMTP_TASKS}'"
+check "correo: keycloak-admin.sh smtp escribe parcial (sin --merge) y lee stdin" \
+  bash -c "sed -n '/^smtp()/,/^}/p' '${ADMIN_SH}' | grep -q 'base64 -d | as automation update \"realms/\${KCL_REALM}\" -f - ||' && ! sed -n '/^smtp()/,/^}/p' '${ADMIN_SH}' | grep -q -- '--merge'"
+check "correo: keycloak-state.sql nunca selecciona los valores de user ni password" \
+  bash -c "! grep -v '^ *--' '${STATE_SQL}' | grep -E \"c.name IN\" | grep -Eq \"'(user|password)'\" && test \"\$(grep -v '^ *--' '${STATE_SQL}' | grep -c 'c.value')\" = 2"
+check "correo: la clasificación P1/P2/P3 no depende del SMTP" \
+  bash -c "! sed -n '/Calcular divergencias bloqueantes/,\$p' '${TASKS}/keycloak_state.yml' | grep -Eq 'smtp|reset_password'"
+check "workflow: el resumen avisa que habilitar SES enciende la recuperación de Keycloak" \
+  bash -c "yq -r '.jobs.production.steps[] | select(.name == \"Resumen de producción\") | .run' '${WORKFLOW}' | grep -q 'habilita su recuperación de contraseña'"
 
 # ── 6. Desarrollo ────────────────────────────────────────────────────────────
 if docker compose --project-name piedrazul-kc-dev-contract --file "${ROOT}/docker-compose.yml" \

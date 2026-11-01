@@ -73,7 +73,9 @@ ciclo no decide por sí mismo descartar el estado.
   tanto.
 - Se eliminan solo la autoridad temporal del evento y huérfanas inequívocamente propias.
 - `piedrazul-keycloak-automation` queda con el secreto deseado y exactamente los roles
-  `manage-clients` y `view-clients` de `piedrazul-realm`; roles adicionales se quitan.
+  `manage-clients`, `manage-realm` y `view-clients` de `piedrazul-realm`; roles adicionales se
+  quitan. Un realm instalado antes de `manage-realm` necesita esta recuperación una vez
+  ([correo-ses.md](correo-ses.md#correo-nativo-de-keycloak-y-recuperación-de-contraseña)).
 - `piedrazul-backend` queda con la forma y los roles de service account del realm del
   repositorio; su secreto queda en `KC_BACKEND_CLIENT_SECRET` (el anterior deja de valer).
 - No se tocan usuarios humanos de `master` (el run solo informa cuántos tienen rol `admin` y
@@ -100,7 +102,8 @@ ciclo no decide por sí mismo descartar el estado.
    - `KEYCLOAK: automation.client=…, backend.shape=reconciled, …`;
    - `KEYCLOAK: autoridad temporal piedrazul-tmp-admin-… eliminada y rechazada por Keycloak`;
    - `KEYCLOAK: estado P1 después del evento`;
-   - `KEYCLOAK P1: secreto del backend …; el backend autentica con él`.
+   - `KEYCLOAK P1: secreto del backend …; el backend autentica con él`;
+   - `KEYCLOAK SMTP: …`, según `NOTIFICATIONS_SES_ENABLED`.
 
 ## Verificar el resultado
 

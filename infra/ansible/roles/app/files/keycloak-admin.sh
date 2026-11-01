@@ -13,6 +13,8 @@
 #              y verifica que la propia ya no autentica
 #   platform-admin  autoridad temporal, solo P2: crea el administrador humano permanente de
 #              master. Nunca adopta ni modifica un usuario existente
+#   smtp       automatización: aplica al realm de la aplicación, en una sola escritura parcial,
+#              el JSON de stdin (solo SMTP y recuperación de contraseña; keycloak_smtp.yml)
 #
 # Secretos solo por entorno, nunca en argv ni en la salida. kcadm (desde 26.5)
 # ignora KC_CLI_CLIENT_SECRET junto con --no-config, así que cada sesión se abre con
@@ -40,6 +42,8 @@
 #   KCL_MASTER_PASSWORD_POLICY                                               platform-admin
 #     (el nombre lo valida Ansible; la credencial es {"type":"password","value":…,
 #     "temporary":true}, armada por Ansible como las demás)
+#   KCL_AUTOMATION_SECRET                     smtp. El JSON llega en base64 por stdin, nunca por
+#                                             entorno ni argv: lleva la contraseña SMTP.
 set -euo pipefail
 
 KCADM=/opt/keycloak/bin/kcadm.sh
@@ -123,6 +127,14 @@ reconcile() {
   # El consumidor real: client credentials del backend + lectura de su realm (view-realm)
   as backend get "realms/${KCL_REALM}" --fields realm >/dev/null || die backend_admin_api
   echo "backend.admin_api=ok"
+}
+
+# Sin --merge: kcadm enviaría la representación completa del realm. Un PUT parcial solo cambia
+# los campos que trae, en una transacción: SMTP y recuperación nunca quedan a medias.
+smtp() {
+  login automation master "${KCL_AUTOMATION_CLIENT_ID}" KCL_AUTOMATION_SECRET </dev/null || die automation_login
+  base64 -d | as automation update "realms/${KCL_REALM}" -f - || die smtp_update
+  echo "smtp.update=applied"
 }
 
 establish() {
@@ -262,7 +274,7 @@ platform_admin() {
 }
 
 case "${1:-}" in
-  probe|reconcile|establish|cleanup) "$1" ;;
+  probe|reconcile|establish|cleanup|smtp) "$1" ;;
   platform-admin) platform_admin ;;
-  *) echo "uso: $0 probe|reconcile|establish|cleanup|platform-admin" >&2; exit 64 ;;
+  *) echo "uso: $0 probe|reconcile|establish|cleanup|smtp|platform-admin" >&2; exit 64 ;;
 esac

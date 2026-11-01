@@ -13,6 +13,11 @@ Uso: python -I keycloak-browser-login.py <modo>
                (KBL_OTP_FILE) → código
   password     solo contraseña: informa si Keycloak entrega un código sin segundo factor
   direct-grant password grant del cliente admin-cli: sin OTP y, si hay KBL_OTP_FILE, con OTP
+  realm-first-login  en el realm de la aplicación (tema React): contraseña temporal →
+               UPDATE_PASSWORD (KBL_NEW_PASSWORD) → código, como el primer administrador de negocio
+  reset-request      en el realm de la aplicación: ¿la página de login ofrece recuperar la
+               contraseña? Pide la recuperación de KBL_USER, si Keycloak la admite. No sigue el
+               enlace del correo
 
 Entorno: KBL_BASE (p. ej. http://keycloak:8180), KBL_REALM, KBL_CLIENT, KBL_REDIRECT (por
 defecto, la consola de administración según el issuer del realm), KBL_USER, KBL_PASSWORD,
@@ -180,7 +185,7 @@ def discover_redirect():
     return issuer.rsplit("/realms/", 1)[0] + f"/admin/{REALM}/console/"
 
 
-def start():
+def authorize():
     global REDIRECT
     REDIRECT = REDIRECT or discover_redirect()
     verifier = secrets.token_urlsafe(48)
@@ -189,10 +194,25 @@ def start():
         "client_id": CLIENT, "redirect_uri": REDIRECT, "response_type": "code", "scope": "openid",
         "state": secrets.token_hex(8), "nonce": secrets.token_hex(8),
         "code_challenge": challenge, "code_challenge_method": "S256"})
-    code, status, page = follow(url)
+    _, status, page = follow(url)
+    return verifier, status, page
+
+
+def start():
+    verifier, status, page = authorize()
     if page_kind(page) != "login":
         raise Unrecognized(f"no_login_page:{status}")
     return verifier, page
+
+
+def context(page, key):
+    """Valor de kcContext: las páginas del tema del realm se dibujan con React, sin formularios
+    en el HTML."""
+    m = re.search(r'"?%s"?\s*:\s*(?:"([^"]*)"|(true|false))' % key, page)
+    if not m:
+        raise Unrecognized(f"no_context:{key}")
+    value = m.group(1) if m.group(1) is not None else m.group(2)
+    return html.unescape(value.replace("\\/", "/").replace("\\u0026", "&"))
 
 
 def exchange(code, verifier):
@@ -306,7 +326,31 @@ def direct_grant():
         out("direct_grant.with_otp", grant({"totp": fresh_totp(seed)}))
 
 
-MODES = {"first-login": first_login, "login": login, "password": password_only, "direct-grant": direct_grant}
+def realm_first_login():
+    verifier, _, page = authorize()
+    code, _, page = follow(context(page, "loginAction"), {
+        "username": ENV["KBL_USER"], "password": ENV["KBL_PASSWORD"], "credentialId": ""})
+    if not code:
+        out("realm_first_login.page", context(page, "pageId"))
+        code, _, page = follow(context(page, "loginAction"), {
+            "password-new": ENV["KBL_NEW_PASSWORD"], "password-confirm": ENV["KBL_NEW_PASSWORD"]})
+        if not code:
+            out("realm_first_login.stuck", context(page, "pageId"))
+    finish(code, verifier)
+
+
+def reset_request():
+    _, _, page = authorize()
+    out("reset.advertised", context(page, "resetPasswordAllowed"))
+    _, status, page = follow(context(page, "loginResetCredentialsUrl"))
+    out("reset.page", status)
+    if status == 200:
+        _, status, page = follow(context(page, "loginAction"), {"username": ENV["KBL_USER"]})
+        out("reset.submitted", status)
+
+
+MODES = {"first-login": first_login, "login": login, "password": password_only, "direct-grant": direct_grant,
+         "realm-first-login": realm_first_login, "reset-request": reset_request}
 
 if __name__ == "__main__":
     try:

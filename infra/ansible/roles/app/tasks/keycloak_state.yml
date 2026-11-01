@@ -76,6 +76,11 @@
       # absent | enabled:<b>,local:<b>,temporary:<b>,role:<b>,actions:<a+b>,password:<n>,otp:<n>
       platform_admin: "{{ _lines | select('match', '^platform_admin=') | map('regex_replace', '^[^=]+=', '') | first | default('') }}"
       master_password_policy: "{{ _lines | select('match', '^master_password_policy=') | map('regex_replace', '^[^=]+=', '') | first | default('') }}"
+      # Correo nativo del realm (keycloak_smtp.yml); no interviene en la clasificación
+      reset_password_allowed: "{{ _lines | select('match', '^reset_password_allowed=') | map('regex_replace', '^[^=]+=', '') | first | default('') }}"
+      smtp_fields: "{{ (_lines | select('match', '^smtp_fields=') | map('regex_replace', '^[^=]+=', '') | first | default('')).split(',') | reject('equalto', '') | sort }}"
+      smtp_host: "{{ _lines | select('match', '^smtp[.]host=') | map('regex_replace', '^[^=]+=', '') | first | default('') }}"
+      smtp_settings: "{{ _lines | select('match', '^smtp[.]') | sort }}"
   vars:
     _lines: "{{ app_kc_db_probe.stdout_lines }}"
 
