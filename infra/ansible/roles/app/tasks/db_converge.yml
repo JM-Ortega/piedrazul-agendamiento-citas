@@ -1,0 +1,49 @@
+---
+# Convergencia de la base: postgres con el .env vigente y reconciliación de autoridades.
+# Lo incluyen setup.yml y deploy.yml antes de cualquier consumidor de la base (Keycloak,
+# migrate, backend), así ningún consumidor recibe una credencial que la base todavía no
+# acepta ni depende de que la anterior siga valiendo.
+#
+# 1. postgres se (re)crea si cambió su configuración (imagen o credenciales declaradas en
+#    .env) y se espera a que esté healthy. PGDATA se conserva.
+# 2. 01-init-databases.sh (el mismo de la inicialización, dentro de la imagen exacta de
+#    postgres) se vuelve a correr por el socket local: crea lo que falte y fija las
+#    contraseñas declaradas de POSTGRES_USER, app, migraciones y Keycloak. No necesita las
+#    anteriores; las anteriores dejan de autenticar.
+#
+# La reconciliación toma el lock de base del host (db_lock_file), el mismo que la
+# migración.
+
+- name: Levantar postgres con la configuración vigente
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/compose"
+    project_name: "{{ compose_project_name }}"
+    files:
+      - prod.yml
+    services:
+      - postgres
+    state: present
+    # La imagen ya se descargó por digest en release_images.yml
+    pull: missing
+    wait: true
+    wait_timeout: 300
+    env_files:
+      - ../.env
+      - ../image.env
+
+- name: Reconciliar roles, credenciales y permisos de la base
+  ansible.builtin.command:
+    argv:
+      - flock
+      - --exclusive
+      - --timeout
+      - "{{ db_lock_timeout }}"
+      - "{{ db_lock_file }}"
+      - docker
+      - exec
+      - --user
+      - postgres
+      - postgres
+      - /docker-entrypoint-initdb.d/01-init-databases.sh
+  # Idempotente: fija siempre el estado declarado
+  changed_when: false

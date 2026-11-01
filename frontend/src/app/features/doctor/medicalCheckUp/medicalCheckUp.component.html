@@ -1,0 +1,130 @@
+<div class="min-2h-screen py-2 px-6">
+  <app-toast [message]="toastMessage()" [type]="toastType()"></app-toast>
+
+  <div class="max-w-8xl mx-auto">
+    @if (isLoadingPatient()) {
+      <div class="flex items-center justify-center py-12">
+        <div
+          class="w-8 h-8 border-3 border-[#215c98] border-t-transparent rounded-full animate-spin"
+        ></div>
+      </div>
+    } @else if (!patient()) {
+      <div
+        class="bg-red-50 border border-red-300 text-red-700 px-6 py-4 rounded-xl"
+      >
+        Paciente no encontrado.
+      </div>
+    }
+
+    @if (patient()) {
+      @if (isEditMode()) {
+        <app-button
+          variant="plain"
+          extraClass="!mb-5 !mt-1 !ml-1"
+          (buttonClick)="goBack()"
+        >
+          <svg lucideArrowLeft [size]="18"></svg>
+          Volver a Citas de Hoy
+        </app-button>
+      }
+      <!-- Info paciente -->
+      <app-patient-info-card
+        [patient]="patient()!"
+        (saved)="onPatientSaved($event)"
+      ></app-patient-info-card>
+      <!-- Layout de dos columnas -->
+      <div class="flex flex-col lg:flex-row gap-6 items-start">
+        <!-- Columna izquierda: nueva observación -->
+        <div class="w-full lg:w-7/12 space-y-2">
+          <div class="bg-white rounded-2xl shadow-md px-6 py-3 flex flex-col">
+            <h5
+              class="flex items-center gap-2 text-2sm font-semibold text-[#163c63] mb-4"
+            >
+              <svg lucideClipboardPen [size]="28" class="text-[#163c63]"></svg>
+              {{ isEditMode() ? 'Editar Observación' : 'Agregar Observación' }}
+            </h5>
+
+            <textarea
+              [value]="newObservation()"
+              (input)="onObservationChange($any($event.target).value)"
+              rows="7"
+              maxlength="300"
+              [placeholder]="
+                isEditMode()
+                  ? 'Edite la observación registrada para esta cita...'
+                  : 'Escriba las observaciones detalladas de la consulta...'
+              "
+              class="w-full min-h-50 border-2 border-[#d9e9f8] focus:border-[#a7c9ec] rounded-xl px-4 py-3 outline-none transition-colors resize-y leading-relaxed text-gray-700"
+            ></textarea>
+
+            <p class="text-sm text-gray-500 text-right mt-1 mb-3">
+              {{ remainingObservationChars() }} caracteres restantes
+            </p>
+
+            @if (saveError()) {
+              <div
+                class="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-xl mb-3 flex items-center gap-2"
+              >
+                <svg lucideTriangleAlert [size]="18" class="shrink-0"></svg>
+                <span>{{ saveError() }}</span>
+              </div>
+            }
+            <div>
+              <app-button
+                variant="primary"
+                [disabled]="isSaving()"
+                (buttonClick)="confirmAttendanceAndExit()"
+              >
+                @if (isSaving()) {
+                  <span
+                    class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
+                  ></span>
+                  Guardando...
+                } @else {
+                  <svg lucideSave [size]="25" class="text-white"></svg>
+                  {{ isEditMode() ? 'Guardar cambios' : 'Guardar y salir' }}
+                }
+              </app-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna derecha: historial -->
+        <div
+          class="w-full lg:w-5/12 lg:max-h-[75vh] lg:overflow-y-auto lg:pr-1"
+        >
+          <app-clinical-history-list
+            [records]="visibleRecords()"
+            [pagination]="medicalRecordsPagination()"
+            [loading]="isLoadingRecords()"
+            (pageChange)="onMedicalRecordsPageChange($event)"
+          ></app-clinical-history-list>
+        </div>
+      </div>
+    }
+  </div>
+  <!-- Modal: confirmar salida sin guardar -->
+  <app-confirm-modal
+    [visible]="showExitConfirmModal()"
+    title="¿Salir sin guardar?"
+    iconPosition="top"
+    [richMessage]="true"
+    maxWidth="max-w-md"
+    [fullWidthButtons]="true"
+    cancelLabel="Cancelar"
+    confirmLabel="Sí, salir"
+    confirmVariant="danger"
+    iconBg="bg-red-100"
+    (dismissed)="cancelExit()"
+    (confirmed)="confirmExit()"
+  >
+    <svg lucideTriangleAlert [size]="28" icon class="text-red-600"></svg>
+    <span message>
+      @if (isScheduledContext()) {
+        Los datos no guardados se perderán y la cita quedará sin atender.
+      } @else {
+        Los datos no guardados se perderán.
+      }
+    </span>
+  </app-confirm-modal>
+</div>

@@ -1,0 +1,458 @@
+<div class="min-h-screen bg-blue-50 py-2 px-8">
+  <div class="w-full">
+    <div class="mb-2">
+      <app-button variant="plain" (buttonClick)="goBack()">
+        <svg lucideArrowLeft [size]="18"></svg>
+        <span class="text-sm font-medium">Volver</span>
+      </app-button>
+      <div class="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
+        <h1 class="text-[#215c98] text-xl font-bold mt-2">Crear cuenta</h1>
+
+        <p class="text-gray-500 text-2sm">
+          Regístrate para agendar tus citas médicas
+        </p>
+      </div>
+    </div>
+
+    <div class="flex gap-6 mb-2">
+      @for (
+        label of [
+          '1. Verificar documento',
+          '2. Completar registro',
+          '3. Verificar código',
+        ];
+        track $index
+      ) {
+        <div
+          class="flex-1 text-center py-2 rounded-xl text-sm font-medium transition-all"
+          [ngClass]="{
+            'bg-[#e6f0fa] text-[#215c98] border border-[#a7c9ec]':
+              step() === $index + 1,
+            'bg-green-100 text-green-700': step() > $index + 1,
+            'bg-white text-gray-400 border border-gray-200':
+              step() < $index + 1,
+          }"
+        >
+          {{ label }}
+        </div>
+      }
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-xl p-4">
+      @if (step() === 1) {
+        <div>
+          <h2 class="text-[#163c63] text-lg font-bold">Verificar documento</h2>
+
+          <div class="mb-2">
+            <label for="documentNumber" class="block text-gray-700 text-2sm">
+              Número de documento
+            </label>
+            <div class="flex flex-col sm:flex-row gap-3">
+              <app-input
+                [id]="'documentNumber'"
+                type="text"
+                [sanitize]="documentSanitizeRule()"
+                [maxLength]="DOCUMENT_INPUT_MAX_LENGTH"
+                placeholder="Ingresa tu número de documento"
+                [fullWidth]="true"
+                [ngModel]="documentNumber()"
+                (valueChange)="onDocumentNumberChange($event)"
+                (enterPressed)="searchPatient()"
+                [errorMessage]="errors()['documentNumber']"
+              ></app-input>
+              <app-button
+                variant="primary"
+                (buttonClick)="searchPatient()"
+                [disabled]="isLoading()"
+              >
+                <svg lucideSearch [size]="18"></svg>
+                Buscar
+              </app-button>
+            </div>
+          </div>
+
+          @if (patientStatus() === 'found' && foundPatient(); as p) {
+            <div class="bg-green-50 border-2 border-green-300 rounded-xl p-5">
+              <div class="flex items-center gap-3 mb-3">
+                <svg lucideCheckCircle [size]="24" class="text-green-500"></svg>
+                <h3 class="text-green-800 text-lg font-semibold">
+                  Encontramos tus datos
+                </h3>
+              </div>
+              <p class="text-green-700 text-sm mb-4">
+                Confirma que estos son tus datos. Luego validaremos un código
+                para crear o vincular tu acceso.
+              </p>
+              <div class="grid grid-cols-2 gap-3 text-gray-700">
+                <div>
+                  <p class="text-gray-500 text-xs">Nombre</p>
+                  <p class="font-semibold">
+                    {{ p.firstName }} {{ p.lastName }}
+                  </p>
+                </div>
+                <div>
+                  <p class="text-gray-500 text-xs">Documento</p>
+                  <p class="font-semibold">{{ p.maskedDocument }}</p>
+                </div>
+                <div>
+                  <p class="text-gray-500 text-xs">Tipo de documento</p>
+                  <p class="font-semibold">
+                    {{ p.identificationType | formato }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          }
+
+          @if (patientStatus() === 'existing-user') {
+            <div
+              class="bg-blue-50 border-2 border-blue-300 rounded-xl py-4 px-5 mb-4"
+            >
+              <div class="flex items-center gap-3">
+                <svg lucideCheckCircle [size]="18" class="text-blue-500"></svg>
+                <h3 class="text-blue-800 text-2sm font-semibold">
+                  Ya existe una cuenta con este documento
+                </h3>
+              </div>
+              <p class="text-blue-700 text-sm">
+                Este documento ya tiene una cuenta del sistema. Completa tus
+                datos como paciente y validaremos un código. No necesitas crear
+                una nueva contraseña.
+              </p>
+            </div>
+          }
+
+          @if (patientStatus() === 'not-found') {
+            <div
+              class="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-2 mb-2 text-yellow-800 text-sm"
+            >
+              No encontramos tu documento en el sistema. Completa tus datos para
+              registrarte.
+            </div>
+          }
+
+          @if (needsPatientRoleOnly() && foundPatient(); as p) {
+            <div class="bg-blue-50 border-2 border-blue-300 rounded-xl p-5">
+              <div class="flex items-center gap-3 mb-3">
+                <svg lucideCheckCircle [size]="24" class="text-blue-500"></svg>
+                <h3 class="text-blue-800 text-lg font-semibold">
+                  Ya tienes una cuenta, falta habilitar tu acceso
+                </h3>
+              </div>
+              <p class="text-blue-700 text-sm mb-4">
+                Encontramos tu registro de paciente y tu cuenta, solo falta
+                habilitar tu acceso como paciente. Validaremos un código para
+                completar el proceso.
+              </p>
+              <div class="grid grid-cols-2 gap-3 text-gray-700">
+                <div>
+                  <p class="text-gray-500 text-xs">Nombre</p>
+                  <p class="font-semibold">
+                    {{ p.firstName }} {{ p.lastName }}
+                  </p>
+                </div>
+                <div>
+                  <p class="text-gray-500 text-xs">Documento</p>
+                  <p class="font-semibold">{{ p.maskedDocument }}</p>
+                </div>
+              </div>
+            </div>
+          }
+
+          @if (isInconsistentState()) {
+            <div
+              class="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm"
+            >
+              {{
+                errorMessage() ||
+                  'No fue posible validar tu estado de registro. Por favor contacta a soporte.'
+              }}
+            </div>
+          }
+
+          @if (patientStatus() === 'not-found') {
+            <app-patient-data-form
+              #patientForm
+              [maxBirthDate]="maxBirthDate"
+              [ngModel]="newPatientForm()"
+              (valueChange)="onNewPatientFormChange($event)"
+            ></app-patient-data-form>
+          }
+
+          @if (patientStatus() === 'existing-user') {
+            <app-user-data-form
+              #existingUserForm
+              [ngModel]="existingUsersForm()"
+              (valueChange)="onExistingUsersFormChange($event)"
+            ></app-user-data-form>
+          }
+
+          @if (patientStatus() === 'already-linked' && foundPatient(); as p) {
+            <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-5">
+              <h3 class="text-amber-800 text-lg font-semibold mb-3">
+                Ya existe una cuenta asociada
+              </h3>
+              <p class="text-amber-700 text-sm mb-4">
+                Este paciente ya tiene una cuenta creada. Inicia sesión o
+                recupera tu acceso si lo necesitas.
+              </p>
+              <div class="grid grid-cols-2 gap-3 text-gray-700">
+                <div>
+                  <p class="text-gray-500 text-xs">Nombre</p>
+                  <p class="font-semibold">
+                    {{ p.firstName }} {{ p.lastName }}
+                  </p>
+                </div>
+                <div>
+                  <p class="text-gray-500 text-xs">Documento</p>
+                  <p class="font-semibold">{{ p.maskedDocument }}</p>
+                </div>
+                <div>
+                  <p class="text-gray-500 text-xs">Tipo de documento</p>
+                  <p class="font-semibold">
+                    {{ p.identificationType | formato }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          }
+
+          @if (errorMessage()) {
+            <div
+              class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"
+            >
+              {{ errorMessage() }}
+            </div>
+          }
+
+          @if (
+            patientStatus() !== 'idle' &&
+            patientStatus() !== 'already-linked' &&
+            patientStatus() !== 'inconsistent'
+          ) {
+            <div class="flex justify-end mt-4">
+              <app-button variant="primary" (buttonClick)="goToStep2()">
+                Continuar
+              </app-button>
+            </div>
+          }
+        </div>
+      }
+
+      @if (step() === 2) {
+        <div class="space-y-2">
+          <div>
+            <h2 class="text-[#163c63] text-xl font-bold">
+              @if (requiresPassword()) {
+                Crear tu cuenta
+              } @else {
+                Confirmar acceso
+              }
+            </h2>
+
+            @if (displayName()) {
+              <p class="text-gray-500 mt-1 text-sm">
+                Hola, <strong>{{ displayName() }}</strong
+                >.
+                @if (requiresPassword()) {
+                  Tu usuario será tu número de documento. Define tu contraseña
+                  para completar el registro.
+                } @else if (isExistingPatient()) {
+                  Validaremos tu identidad con un código para vincular tu acceso
+                  como paciente.
+                } @else if (isExistingSystemUser()) {
+                  Ya tienes una cuenta del sistema. Validaremos tu identidad con
+                  un código para habilitar tu acceso como paciente sin cambiar
+                  tu contraseña actual.
+                } @else if (needsPatientRoleOnly()) {
+                  Ya tienes cuenta y registro de paciente. Solo validaremos tu
+                  identidad con un código para habilitar tu acceso.
+                }
+              </p>
+            } @else {
+              <p class="text-gray-500 mt-1">
+                @if (requiresPassword()) {
+                  Define tu contraseña para completar el registro.
+                } @else {
+                  Validaremos tu identidad con un código para completar el
+                  proceso.
+                }
+              </p>
+            }
+          </div>
+
+          @if (requiresPassword()) {
+            <div>
+              <label
+                for="password"
+                class="block text-gray-700 mb-1 text-sm font-medium"
+              >
+                Contraseña <span class="text-red-500">*</span>
+              </label>
+              <app-input
+                [id]="'password'"
+                [type]="showPassword() ? 'text' : 'password'"
+                [maxLength]="PASSWORD_MAX"
+                autocomplete="new-password"
+                placeholder="Mínimo 6 letras y números"
+                inputClass="pr-12"
+                [ngModel]="password()"
+                (valueChange)="onPasswordChange($event)"
+                [errorMessage]="errors()['password']"
+              >
+                <app-button
+                  suffix
+                  variant="icon"
+                  (buttonClick)="showPassword.set(!showPassword())"
+                >
+                  <svg
+                    [lucideIcon]="showPassword() ? Eye : EyeOff"
+                    [size]="18"
+                  ></svg>
+                </app-button>
+              </app-input>
+            </div>
+
+            <div>
+              <label
+                for="confirmPassword"
+                class="block text-gray-700 mb-1 text-sm font-medium"
+              >
+                Confirmar contraseña <span class="text-red-500">*</span>
+              </label>
+              <app-input
+                [id]="'confirmPassword'"
+                [type]="showConfirmPassword() ? 'text' : 'password'"
+                [maxLength]="PASSWORD_MAX"
+                autocomplete="new-password"
+                placeholder="Repite tu contraseña"
+                inputClass="pr-12"
+                [ngModel]="confirmPassword()"
+                (valueChange)="onConfirmPasswordChange($event)"
+                [errorMessage]="errors()['confirmPassword']"
+              >
+                <app-button
+                  suffix
+                  variant="icon"
+                  (buttonClick)="
+                    showConfirmPassword.set(!showConfirmPassword())
+                  "
+                >
+                  <svg
+                    [lucideIcon]="showConfirmPassword() ? Eye : EyeOff"
+                    [size]="18"
+                  ></svg>
+                </app-button>
+              </app-input>
+            </div>
+          } @else {
+            <div
+              class="bg-blue-50 border border-blue-200 text-blue-700 rounded-xl px-4 py-3 text-sm"
+            >
+              Al continuar solicitaremos un código de verificación para
+              completar el proceso.
+            </div>
+          }
+
+          @if (errorMessage()) {
+            <div
+              class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"
+            >
+              {{ errorMessage() }}
+            </div>
+          }
+
+          <div class="flex gap-4 mt-4">
+            <app-button variant="secondary" (buttonClick)="goBack()">
+              Atrás
+            </app-button>
+            <app-button
+              variant="primary"
+              (buttonClick)="submit()"
+              [disabled]="isLoading()"
+              [fullWidth]="true"
+              class="flex-1"
+            >
+              @if (isLoading()) {
+                <span>Procesando...</span>
+              } @else {
+                <svg lucideUserPlus [size]="18"></svg>
+                <span>Continuar</span>
+              }
+            </app-button>
+          </div>
+        </div>
+      }
+
+      @if (step() === 3) {
+        <div class="space-y-2">
+          <div>
+            <h2 class="text-blue-800 text-xl font-bold">Verificar código</h2>
+            <p class="text-gray-500 text-sm">
+              Ingresa el código de verificación para completar la creación de tu
+              cuenta.
+            </p>
+          </div>
+
+          @if (successMessage()) {
+            <div
+              class="bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-2 text-sm"
+            >
+              {{ successMessage() }}
+            </div>
+          }
+
+          <div>
+            <label
+              for="verificationCode"
+              class="block text-gray-700 mb-1 text-sm font-medium"
+            >
+              Código de verificación <span class="text-red-500">*</span>
+            </label>
+            <app-input
+              [id]="'verificationCode'"
+              type="text"
+              inputMode="numeric"
+              sanitize="numeric"
+              [maxLength]="6"
+              maxLengthMessage="Solo se permiten máximo 6 dígitos"
+              placeholder="Ej. 123456"
+              [ngModel]="verificationCode()"
+              (valueChange)="onVerificationCodeChange($event)"
+              [errorMessage]="errors()['verificationCode']"
+            ></app-input>
+          </div>
+
+          @if (errorMessage()) {
+            <div
+              class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"
+            >
+              {{ errorMessage() }}
+            </div>
+          }
+
+          <div class="flex gap-4 mt-4">
+            <app-button variant="secondary" (buttonClick)="goBack()">
+              Atrás
+            </app-button>
+
+            <app-button
+              variant="primary"
+              (buttonClick)="confirmCode()"
+              [disabled]="isLoading()"
+              [fullWidth]="true"
+              class="flex-1"
+            >
+              @if (isLoading()) {
+                <span>Verificando...</span>
+              } @else {
+                <svg lucideKeyRound [size]="18"></svg>
+                <span>Confirmar código</span>
+              }
+            </app-button>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>

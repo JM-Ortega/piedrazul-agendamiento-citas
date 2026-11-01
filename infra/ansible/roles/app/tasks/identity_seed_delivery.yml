@@ -1,0 +1,42 @@
+---
+# Lo que el backend recibiría del bootstrap del primer administrador a través de .env y
+# Compose, comparado sin mostrar valores (`compose config` escribe cada $ como $$):
+#   - habilitado: cada IDENTITY_SEED_* llega exactamente como se validó (contraseña con
+#     cualquier carácter admitido incluida);
+#   - deshabilitado: IDENTITY_SEED_ENABLED=false y todas las entradas vacías, en particular
+#     ninguna contraseña inicial.
+- name: Leer la configuración efectiva de Compose (bootstrap del primer administrador)
+  ansible.builtin.command:
+    argv: "{{ compose_cli + ['config', '--format', 'json'] }}"
+    chdir: "{{ app_dir }}/compose"
+  register: app_identity_seed_compose
+  changed_when: false
+  no_log: true
+
+- name: Comparar la entrega del bootstrap al backend
+  ansible.builtin.set_fact:
+    app_identity_seed_undelivered: >-
+      {%- set enabled = app_identity_seed_enabled | default(false) | bool -%}
+      {%- set delivered = (app_identity_seed_compose.stdout | from_json).services.backend.environment -%}
+      {%- set bad = [] -%}
+      {%- if (delivered['IDENTITY_SEED_ENABLED'] | default('') | string) != ('true' if enabled else 'false') -%}
+        {%- set _ = bad.append('IDENTITY_SEED_ENABLED') -%}
+      {%- endif -%}
+      {%- for k in ['USERNAME', 'IDENTIFICATION_TYPE', 'FIRST_NAME', 'LAST_NAME', 'EMAIL', 'PHONE', 'PASSWORD'] -%}
+        {%- set key = 'IDENTITY_SEED_ADMIN_' ~ k -%}
+        {%- if (delivered[key] | default('') | string | replace('$$', '$')) != (app_identity_seed[k] if enabled else '') -%}
+          {%- set _ = bad.append(key) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ bad }}
+  no_log: true
+
+- name: Verificar la entrega del bootstrap al backend
+  ansible.builtin.assert:
+    that:
+      - app_identity_seed_undelivered | length == 0
+    fail_msg: >-
+      El backend no recibiría intactas (habilitado) o vacías (deshabilitado) estas entradas del
+      bootstrap: {{ app_identity_seed_undelivered | join(', ') }} (valores no mostrados). Revisar
+      env.j2, compose/backend.yml o la versión de Docker Compose del host.
+    quiet: true

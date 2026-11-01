@@ -1,14 +1,16 @@
 ---
-# Playbook de deploy: rollout de nueva imagen.
-# No reconfigura el servidor ni toca Keycloak.
-# Requiere IMAGE_TAG como variable extra: -e "image_tag=abc123"
+# Playbook de deploy: rollout de las imágenes propias (backend y postgres).
+# No reconfigura el servidor ni toca Keycloak. No registra el último éxito.
+# Requiere identidades exactas como variables extra:
+#   -e backend_image_ref=<repo>/backend@sha256:<digest>
+#   -e postgres_image_ref=<repo>/postgres@sha256:<digest>
 
 - name: Deploy piedrazul
   hosts: vps
   gather_facts: false
 
   tasks:
-    - name: Desplegar nueva imagen
+    - name: Desplegar imágenes propias
       ansible.builtin.include_role:
         name: app
         tasks_from: deploy.yml

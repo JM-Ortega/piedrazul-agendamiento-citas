@@ -1,0 +1,56 @@
+---
+# Parte de deploy.yml, antes de cualquier mutación. Deploy no recibe secretos ni escribe .env: si
+# el GitHub Environment cambió (app_ses_intended y app_ses_intended_host, los pasa el workflow) y
+# el host no, un backend quedaría con una decisión o un endpoint obsoletos y el run parecería
+# configurado. Falla sin tocar nada: la corrección es la configuración del servidor.
+#
+# Lee app_env_file (deploy.yml). Un .env anterior a estas claves equivale a deshabilitado: Compose
+# entrega entonces false y vacíos. De las credenciales solo ve si están: este paso no las tiene y
+# no puede saber si coinciden con las de GitHub.
+- name: Leer la configuración de SES del .env del host
+  ansible.builtin.set_fact:
+    app_ses_env_enabled: "{{ _lines | select('match', '^NOTIFICATIONS_SES_ENABLED=true$') | list | length > 0 }}"
+    app_ses_env_flag_valid: >-
+      {{ _lines | select('match', '^NOTIFICATIONS_SES_ENABLED=') | reject('match', '^NOTIFICATIONS_SES_ENABLED=(true|false)$')
+         | list | length == 0 }}
+    app_ses_env_host: "{{ _lines | select('match', '^SES_SMTP_HOST=') | map('regex_replace', '^SES_SMTP_HOST=', '') | first | default('') }}"
+    app_ses_env_has_username: "{{ _lines | select('match', _username) | list | length > 0 }}"
+    app_ses_env_has_password: "{{ _lines | select('match', _password) | list | length > 0 }}"
+  vars:
+    _lines: "{{ (app_env_file.content | b64decode).splitlines() }}"
+    _username: '^SES_SMTP_USERNAME=(?!""$).+'
+    _password: '^SES_SMTP_PASSWORD=(?!""$).+'
+  no_log: true
+
+- name: Buscar diferencias de SES entre el environment y el host
+  ansible.builtin.set_fact:
+    app_ses_host_problems: >-
+      {{ (['NOTIFICATIONS_SES_ENABLED del .env no es true ni false'] if not (app_ses_env_flag_valid | bool) else [])
+         + (['SES está habilitado en el environment y no en el host']
+              if _known and _intended and not (app_ses_env_enabled | bool) else [])
+         + (['SES está deshabilitado en el environment y sigue habilitado en el host']
+              if _known and not _intended and (app_ses_env_enabled | bool) else [])
+         + (['SES_SMTP_HOST del host difiere del environment']
+              if _known and _intended and (app_ses_env_enabled | bool) and app_ses_env_host != (app_ses_intended_host | default('') | string) else [])
+         + (['el .env habilitado no tiene SES_SMTP_HOST']
+              if (app_ses_env_enabled | bool) and app_ses_env_host | length == 0 else [])
+         + (['el .env habilitado no tiene SES_SMTP_USERNAME']
+              if (app_ses_env_enabled | bool) and not (app_ses_env_has_username | bool) else [])
+         + (['el .env habilitado no tiene SES_SMTP_PASSWORD']
+              if (app_ses_env_enabled | bool) and not (app_ses_env_has_password | bool) else [])
+         + (['el .env deshabilitado conserva endpoint o credenciales de SES']
+              if not (app_ses_env_enabled | bool)
+                 and (app_ses_env_host | length > 0 or (app_ses_env_has_username | bool) or (app_ses_env_has_password | bool)) else []) }}
+  vars:
+    _known: "{{ app_ses_intended is defined }}"
+    _intended: "{{ (app_ses_intended | default('false') | string) == 'true' }}"
+  no_log: true
+
+- name: Verificar la configuración de SES del host
+  ansible.builtin.assert:
+    that:
+      - app_ses_host_problems | length == 0
+    fail_msg: >-
+      SES: {{ app_ses_host_problems | join('; ') }}. Deploy no recibe secretos ni corrige .env y no
+      tocó nada: correr la configuración del servidor (run_host_config=true; correo-ses.md).
+    quiet: true

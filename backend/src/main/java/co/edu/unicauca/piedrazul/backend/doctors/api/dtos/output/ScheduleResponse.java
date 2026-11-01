@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output;
 
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Workday;
 
 import java.time.LocalTime;
 import java.util.UUID;
@@ -16,8 +16,8 @@ public record ScheduleResponse(
     // Un método estático para convertir la entidad en DTO fácilmente
     public static ScheduleResponse fromEntity(Schedule schedule) {
         return new ScheduleResponse(
-                schedule.getIdSchedule(),
-                schedule.getDoctor().getIdDoctor(),
+                schedule.getId(),
+                schedule.getDoctor().getPersonId(),
                 schedule.getStartTime(),
                 schedule.getEndTime(),
                 schedule.getWorkday()

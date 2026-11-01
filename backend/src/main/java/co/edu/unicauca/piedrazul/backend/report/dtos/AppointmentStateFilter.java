@@ -2,5 +2,8 @@ package co.edu.unicauca.piedrazul.backend.report.dtos;
 
 public enum AppointmentStateFilter {
     AGENDADA,
-    CANCELADA
+    REPROGRAMADA,
+    CANCELADA,
+    NO_ASISTIO,
+    ATENDIDA
 }

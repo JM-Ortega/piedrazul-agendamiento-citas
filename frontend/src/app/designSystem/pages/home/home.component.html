@@ -1,0 +1,91 @@
+<!-- Hero Principal -->
+<section
+  class="relative text-white overflow-hidden flex items-center"
+  style="
+    background-image: url('/piedrazul.webp');
+    background-size: cover;
+    background-position: center;
+    min-height: calc(100vh - 80px);
+  "
+>
+  <div
+    class="absolute inset-0 bg-linear-to-r from-gray-900/75 to-gray-700/60"
+  ></div>
+
+  <div
+    class="relative max-w-4xl mx-auto px-6 py-12 flex flex-col items-center text-center gap-8"
+  >
+    <p
+      class="text-blue-200 text-xl md:text-2xl font-medium tracking-wide uppercase"
+    >
+      Centro Médico
+    </p>
+
+    <h1 class="text-5xl md:text-7xl font-bold drop-shadow-lg leading-tight">
+      Piedra Azul
+    </h1>
+
+    <p class="text-blue-100 text-xl md:text-2xl max-w-2xl leading-relaxed">
+      Sistema de Gestión de Citas Médicas
+    </p>
+
+    <app-button (buttonClick)="agendarCita()" variant="card">
+      <p class="flex gap-4 font-bold text-3xl">
+        <svg lucideCalendar [size]="40"></svg> Agendar mi Cita
+      </p>
+    </app-button>
+
+    <p class="flex items-center text-blue-200 text-lg">
+      ¿Es usted personal del centro?
+      <app-button
+        (buttonClick)="goAcceso()"
+        variant="link"
+        extraClass="text-white"
+      >
+        Ingrese aquí
+      </app-button>
+    </p>
+
+    <div class="flex flex-wrap justify-center gap-4 text-blue-100 mt-2">
+      <div
+        class="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-5 py-3 rounded-xl"
+      >
+        <svg lucideClock [size]="22" class="text-white"></svg>
+        <span class="text-lg">Lun – Vie · 6:00 AM a 1:00 PM</span>
+      </div>
+
+      <div
+        class="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-5 py-3 rounded-xl"
+      >
+        <svg lucideShield [size]="22" class="text-white"></svg>
+        <span class="text-lg">Sistema seguro</span>
+      </div>
+
+      <div
+        class="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-5 py-3 rounded-xl"
+      >
+        <svg lucidePhone [size]="22" class="text-white"></svg>
+        <span class="text-lg">Fácil de usar</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Info Section -->
+<section class="bg-[#215c98] text-white py-12 px-4">
+  <div class="max-w-4xl mx-auto text-center">
+    <h2 class="text-3xl mb-4">Piedra Azul Salud</h2>
+
+    <p class="text-blue-100 text-xl mb-4">
+      Centro médico sin ánimo de lucro, comprometido con brindar atención de
+      calidad y accesible a la comunidad.
+    </p>
+
+    <p class="text-white text-lg">
+      Horarios de atención: Lunes a Viernes de 7:00 AM a 12:00 M
+    </p>
+  </div>
+</section>
+@if (showModal) {
+  <app-appointment-modal (finish)="showModal = false" />
+}

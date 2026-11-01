@@ -1,8 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.user.exception;
 
-public class InvalidUserDataException extends UserException {
+import org.springframework.http.HttpStatus;
+
+public class InvalidUserDataException extends UserBusinessException {
 
     public InvalidUserDataException(String message) {
-        super(message);
+        super(message, "INVALID_USER_DATA", HttpStatus.BAD_REQUEST);
     }
 }

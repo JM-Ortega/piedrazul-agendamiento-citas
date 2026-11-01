@@ -1,35 +1,18 @@
 package co.edu.unicauca.piedrazul.backend.jackson.normalization;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
+import co.edu.unicauca.piedrazul.backend.jackson.sanitization.Sanitizer;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.ValueDeserializer;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.stream.Collectors;
-
-public class NameSanitizerDeserializer extends JsonDeserializer<String> {
+/**
+ * Limpia y normaliza un nombre. Siempre limpia el HTML: si el campo también tiene
+ * {@code @Sanitize}, Jackson usa uno solo de los dos deserializadores y ambos deben dar lo mismo.
+ */
+public class NameSanitizerDeserializer extends ValueDeserializer<String> {
 
     @Override
-    public String deserialize(JsonParser p, DeserializationContext ctxt)
-            throws IOException {
-
-        String value = p.getValueAsString();
-
-        if (value == null) {
-            return null;
-        }
-
-        value = value.trim();
-
-        value = value.replaceAll("\\s+", " ");
-
-        value = value.toLowerCase();
-
-        return Arrays.stream(value.split(" "))
-                .map(word ->
-                        Character.toUpperCase(word.charAt(0))
-                                + word.substring(1))
-                .collect(Collectors.joining(" "));
+    public String deserialize(JsonParser parser, DeserializationContext context) {
+        return NameNormalizer.normalize(Sanitizer.clean(parser.getValueAsString()));
     }
 }

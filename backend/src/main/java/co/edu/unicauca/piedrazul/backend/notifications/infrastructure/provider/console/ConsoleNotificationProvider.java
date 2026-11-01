@@ -4,19 +4,21 @@ import co.edu.unicauca.piedrazul.backend.notifications.application.exception.Not
 import co.edu.unicauca.piedrazul.backend.notifications.domain.message.ChannelMessage;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.message.ConsoleLogMessage;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.AttemptStatus;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.model.FailureType;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.NotificationChannel;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.RecipientSnapshot;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.DeliveryOutcome;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationProvider;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationSendResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.UUID;
-
 public class ConsoleNotificationProvider implements NotificationProvider {
 
     private static final Logger log = LoggerFactory.getLogger(ConsoleNotificationProvider.class);
     private static final String PROVIDER_NAME = "console";
+    private static final String SENSITIVE_PLACEHOLDER = "[contenido sensible oculto]";
+    public static final String DIAGNOSTIC_ONLY_ERROR_CODE = "CONSOLE_DIAGNOSTIC_ONLY";
 
     private final boolean showSensitiveContent;
 
@@ -46,24 +48,54 @@ public class ConsoleNotificationProvider implements NotificationProvider {
             );
         }
 
-        String renderedMessage = consoleMessage.sensitive() && !showSensitiveContent
-                ? "[contenido sensible oculto]"
-                : consoleMessage.message();
+        if (consoleMessage.sensitive()) {
+            return logSensitiveDiagnostic(consoleMessage, recipient);
+        }
 
         log.info(
-                "[CONSOLE_NOTIFICATION] recipient={} message={}",
+                "[CONSOLE_NOTIFICATION] recipient={} message={} (diagnóstico, no entregado al destinatario)",
+                maskRecipient(recipient),
+                consoleMessage.message()
+        );
+
+        return diagnosticOnlyResult();
+    }
+
+    /**
+     * El contenido sensible solo se muestra con el opt-in explícito (entornos con datos
+     * exclusivamente sintéticos); si no, se oculta. La salida es diagnóstico y no entrega.
+     */
+    private NotificationSendResult logSensitiveDiagnostic(
+            ConsoleLogMessage consoleMessage,
+            RecipientSnapshot recipient
+    ) {
+        String renderedMessage = showSensitiveContent
+                ? consoleMessage.message()
+                : SENSITIVE_PLACEHOLDER;
+
+        log.warn(
+                "[CONSOLE_DIAGNOSTIC] recipient={} message={} (diagnóstico, no entregado al destinatario)",
                 maskRecipient(recipient),
                 renderedMessage
         );
 
+        return diagnosticOnlyResult();
+    }
+
+    /**
+     * Ningún mensaje impreso en consola llega al destinatario: el resultado es error de proveedor
+     * (no aceptado, sin reintento) y nunca entregado ni aceptado.
+     */
+    private static NotificationSendResult diagnosticOnlyResult() {
         return new NotificationSendResult(
                 PROVIDER_NAME,
                 NotificationChannel.CONSOLE,
-                "console-" + UUID.randomUUID(),
-                AttemptStatus.DELIVERED,
                 null,
-                null,
-                null
+                AttemptStatus.FAILED,
+                FailureType.PERMANENT,
+                DIAGNOSTIC_ONLY_ERROR_CODE,
+                "Salida de diagnóstico en consola; no constituye entrega al destinatario",
+                DeliveryOutcome.PROVIDER_ERROR
         );
     }
 
@@ -80,10 +112,7 @@ public class ConsoleNotificationProvider implements NotificationProvider {
             return maskEmail(recipient.email());
         }
 
-        if (recipient.displayName() != null && !recipient.displayName().isBlank()) {
-            return recipient.displayName();
-        }
-
+        // El nombre visible identifica a la persona: no sustituye a un contacto enmascarado.
         return "unknown";
     }
 

@@ -4,7 +4,6 @@ import co.edu.unicauca.piedrazul.backend.notifications.domain.model.AggregateRef
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.Notification;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.NotificationType;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,9 +16,5 @@ public interface NotificationRepository {
     Optional<Notification> findActiveByAggregateAndType(
             AggregateReference aggregate,
             NotificationType type
-    );
-
-    List<Notification> findPendingByAggregate(
-            AggregateReference aggregate
     );
 }

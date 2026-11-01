@@ -1,7 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.port.output;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.*;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.DoctorDailyCount;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyGroupCount;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.statistics.MonthlyStateCount;
 
 import java.time.LocalDate;
 import java.util.Collection;
@@ -13,26 +15,24 @@ public interface AppointmentRepository {
     // Metodos que solo hablan en terminos del dominio
     Appointment save(Appointment appointment);
 
-    //metodo para el modulo de historia clinica
-    List<Appointment> findByDoctorId(UUID idDoctor);
-
     List<Appointment> findByPatientId(UUID idPatient);
-
-    List<Appointment> findByDate(LocalDate date);
 
     List<Appointment> findByDoctorIdAndDate(UUID idDoctor, LocalDate date);
 
     List<Appointment> findByDoctorIdAndDateAndState(UUID idDoctor, LocalDate date, String state);
 
+    List<Appointment> findByDoctorIdAndState(UUID idDoctor, String state);
+
+    List <Appointment> findByDoctorAndDateBetween (UUID idDoctor, LocalDate dateStart, LocalDate dateEnd);
+
+    //metodo para listar y usado en algo más
     List<Appointment> findByPatientIdAndDate(UUID idPatient, LocalDate date);
-
-    List<Appointment> findByDoctorIdAndPatientId(UUID idDoctor, UUID idPatient);
-
-    List<Appointment> findByDoctorIdAndPatientIdAndDate(UUID idDoctor, UUID idPatient, LocalDate date);
 
     boolean existsByPatientIdAndStates(UUID idPatient, Collection<AppointmentState> states);
 
-    List<Appointment> findAll();
+    boolean existsByDoctorAndState(UUID idDoctor, AppointmentState state);
+
+    boolean existsByIdAndState(UUID appointmentId, AppointmentState state);
 
     Appointment findById(UUID appointmentId);
   
@@ -42,4 +42,18 @@ public interface AppointmentRepository {
 
     UUID getPattientIdByAppointmentId(UUID appointmentId);
 
+    //Metodo unico para el caso de uso ListAppointmentsUseCase
+    PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery);
+
+    PagedResult<Appointment> ListDoctorDailyAgenda(UUID idDoctor, LocalDate date, PageQuery pageQuery);
+
+    long countByDateAndState(LocalDate date, AppointmentState state);
+
+    List<MonthlyGroupCount> countByMonthAndDoctor(int year, Collection<AppointmentState> states);
+
+    List<MonthlyGroupCount> countByMonthAndSpecialty(int year, Collection<AppointmentState> states);
+
+    List<MonthlyStateCount> countByMonthAndState(int year);
+
+    List<DoctorDailyCount> countByDateGroupedByDoctorExcludingState(LocalDate date, AppointmentState excludedState);
 }

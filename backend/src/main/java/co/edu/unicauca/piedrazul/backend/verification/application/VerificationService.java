@@ -2,49 +2,85 @@ package co.edu.unicauca.piedrazul.backend.verification.application;
 
 import co.edu.unicauca.piedrazul.backend.verification.VerificationModuleApi;
 import co.edu.unicauca.piedrazul.backend.verification.api.VerificationPurpose;
+import co.edu.unicauca.piedrazul.backend.verification.api.VerifiedCode;
 import co.edu.unicauca.piedrazul.backend.verification.domain.VerificationCode;
 import co.edu.unicauca.piedrazul.backend.verification.exception.InvalidVerificationCodeException;
+import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeAlreadyUsedException;
 import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeBlockedException;
 import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeExpiredException;
 import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeNotFoundException;
+import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationCodeRequestLimitException;
+import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationContactUnusableException;
+import co.edu.unicauca.piedrazul.backend.verification.exception.VerificationDeliveryUnavailableException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
-@Transactional
 public class VerificationService implements VerificationModuleApi {
 
     private static final int CODE_LENGTH = 6;
     private static final int MAX_ATTEMPTS = 5;
     private static final int EXPIRATION_MINUTES = 5;
 
+    // Límites de solicitud por sujeto y propósito. Pedir un código nuevo reinicia los intentos
+    // y envía un mensaje, así que sin límite se podría adivinar el código y saturar a la persona.
+    private static final Duration REQUEST_COOLDOWN = Duration.ofMinutes(1);
+    private static final Duration REQUEST_WINDOW = Duration.ofHours(1);
+    private static final int MAX_REQUESTS_PER_WINDOW = 5;
+
     private final VerificationCodeStore verificationCodeStore;
+    private final VerificationAttemptProcessor verificationAttemptProcessor;
     private final VerificationCodeSender sender;
     private final PasswordEncoder passwordEncoder;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public VerificationService(
             VerificationCodeStore verificationCodeStore,
+            VerificationAttemptProcessor verificationAttemptProcessor,
             VerificationCodeSender sender,
             PasswordEncoder passwordEncoder
     ) {
         this.verificationCodeStore = verificationCodeStore;
+        this.verificationAttemptProcessor = verificationAttemptProcessor;
         this.sender = sender;
         this.passwordEncoder = passwordEncoder;
     }
 
     @Override
-    public void requestCode(String subject, VerificationPurpose purpose, String displayName, String phone, String email) {
-        validateSubject(subject);
-        validateAtLeastOneContact(phone, email);
+    public void requireCodeDeliveryAvailable() {
+        if (!sender.isDeliveryAvailable()) {
+            throw new VerificationDeliveryUnavailableException();
+        }
+    }
 
+    @Override
+    @Transactional
+    public void requestCode(String subject, VerificationPurpose purpose, String displayName, String phone, String email, UUID recipientId) {
+        validateSubject(subject);
+        Objects.requireNonNull(recipientId, "recipientId cannot be null");
+
+        // Antes del bloqueo y de cualquier escritura: sin canal o sin contacto utilizable no se
+        // emite un código que no puede llegar, ni se invalida el activo ni se consume cupo.
+        requireCodeDeliveryAvailable();
+        if (!sender.isRecipientUsable(phone, email)) {
+            throw new VerificationContactUnusableException();
+        }
+
+        // El bloqueo sobre el código activo serializa las solicitudes simultáneas del mismo sujeto,
+        // para que ninguna se salte el conteo de los límites.
         Optional<VerificationCode> existing =
-                verificationCodeStore.findLatestActive(subject, purpose);
+                verificationCodeStore.findLatestActiveForUpdate(subject, purpose);
+
+        enforceRequestLimits(subject, purpose, Instant.now());
 
         existing.ifPresent(code -> {
             code.invalidate();
@@ -58,42 +94,58 @@ public class VerificationService implements VerificationModuleApi {
                 subject,
                 purpose,
                 codeHash,
-                LocalDateTime.now().plusMinutes(EXPIRATION_MINUTES),
+                Instant.now().plusSeconds(EXPIRATION_MINUTES * 60L),
                 MAX_ATTEMPTS
         );
 
         verificationCodeStore.save(verificationCode);
-        sender.sendCode(subject, displayName, phone, email, rawCode, EXPIRATION_MINUTES);
+        sender.sendCode(subject, displayName, phone, email, rawCode, EXPIRATION_MINUTES,
+                verificationCode.getExpiresAt(), recipientId, verificationCode.getId());
     }
 
     @Override
-    public boolean verifyCode(String subject, VerificationPurpose purpose, String code) {
+    public VerifiedCode verifyCode(String subject, VerificationPurpose purpose, String code) {
         validateSubject(subject);
         validateCode(code);
 
-        VerificationCode verificationCode = verificationCodeStore
-                .findLatestActive(subject, purpose)
-                .orElseThrow(() -> new VerificationCodeNotFoundException(subject));
+        VerificationAttemptResult result =
+                verificationAttemptProcessor.process(subject, purpose, code, Instant.now());
 
-        LocalDateTime now = LocalDateTime.now();
+        // Traduce el resultado después de finalizar la transacción del intento para
+        // que una excepción por verificación fallida no revierta el contador de intentos.
+        return switch (result.outcome()) {
+            case MATCHED -> new VerifiedCodeHandle(result.codeId());
+            case INVALID_CODE -> throw new InvalidVerificationCodeException();
+            case EXPIRED -> throw new VerificationCodeExpiredException();
+            case BLOCKED -> throw new VerificationCodeBlockedException();
+            case NOT_FOUND -> throw new VerificationCodeNotFoundException(subject);
+        };
+    }
 
-        if (verificationCode.isExpired(now)) {
-            throw new VerificationCodeExpiredException();
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void consumeCode(VerifiedCode verifiedCode) {
+        if (!(verifiedCode instanceof VerifiedCodeHandle handle)) {
+            throw new IllegalArgumentException("La referencia de verificación no fue emitida por este módulo");
         }
 
-        if (!verificationCode.hasAttemptsRemaining()) {
-            throw new VerificationCodeBlockedException();
+        int consumed = verificationCodeStore.consumeIfUnused(handle.codeId());
+
+        if (consumed == 0) {
+            throw new VerificationCodeAlreadyUsedException();
+        }
+    }
+
+    private void enforceRequestLimits(String subject, VerificationPurpose purpose, Instant now) {
+        if (verificationCodeStore.countIssuedSince(subject, purpose, now.minus(REQUEST_COOLDOWN)) > 0) {
+            throw new VerificationCodeRequestLimitException(
+                    "Ya se envió un código hace menos de un minuto. Espera antes de solicitar otro");
         }
 
-        if (!passwordEncoder.matches(code, verificationCode.getCodeHash())) {
-            verificationCode.increaseAttempts();
-            verificationCodeStore.save(verificationCode);
-            throw new InvalidVerificationCodeException();
+        if (verificationCodeStore.countIssuedSince(subject, purpose, now.minus(REQUEST_WINDOW)) >= MAX_REQUESTS_PER_WINDOW) {
+            throw new VerificationCodeRequestLimitException(
+                    "Se alcanzó el límite de códigos solicitados para este documento. Intenta de nuevo más tarde");
         }
-
-        verificationCode.markAsUsed();
-        verificationCodeStore.save(verificationCode);
-        return true;
     }
 
     private String generateCode() {
@@ -106,14 +158,6 @@ public class VerificationService implements VerificationModuleApi {
     private void validateSubject(String subject) {
         if (subject == null || subject.isBlank()) {
             throw new IllegalArgumentException("Subject cannot be blank");
-        }
-    }
-
-    private void validateAtLeastOneContact(String phone, String email) {
-        boolean hasPhone = phone != null && !phone.isBlank();
-        boolean hasEmail = email != null && !email.isBlank();
-        if (!hasPhone && !hasEmail) {
-            throw new IllegalArgumentException("At least one contact (phone or email) is required");
         }
     }
 

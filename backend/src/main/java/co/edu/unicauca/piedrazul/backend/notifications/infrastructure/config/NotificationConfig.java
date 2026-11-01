@@ -1,22 +1,22 @@
 package co.edu.unicauca.piedrazul.backend.notifications.infrastructure.config;
 
+import co.edu.unicauca.piedrazul.backend.appointment.eligibility.AppointmentEligibility;
 import co.edu.unicauca.piedrazul.backend.notifications.NotificationModuleApi;
 import co.edu.unicauca.piedrazul.backend.notifications.application.*;
 import co.edu.unicauca.piedrazul.backend.notifications.application.template.TemplateRenderer;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.ChannelFallbackPolicy;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.ReminderScheduleCalculator;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.policy.RetryPolicy;
-import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationAttemptRepository;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationDispatchStore;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationProvider;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationRepository;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationScheduleRepository;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.template.NotificationTemplateProvider;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.provider.console.ConsoleNotificationProvider;
-import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.provider.email.sendgrid.SendGridProperties;
 import co.edu.unicauca.piedrazul.backend.notifications.infrastructure.template.InMemoryNotificationTemplateProvider;
+import jakarta.validation.Validator;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -29,7 +29,6 @@ import java.util.List;
 @Configuration
 @EnableScheduling
 @EnableAsync
-@EnableConfigurationProperties(SendGridProperties.class)
 public class NotificationConfig {
 
     @Bean
@@ -95,39 +94,56 @@ public class NotificationConfig {
 
     @Bean
     public NotificationDispatcherService notificationDispatcherService(
-            NotificationRepository notificationRepository,
-            NotificationScheduleRepository scheduleRepository,
-            NotificationAttemptRepository attemptRepository,
+            NotificationDispatchStore dispatchStore,
             ProviderRegistry providerRegistry,
             TemplateRenderer templateRenderer,
             RetryPolicy retryPolicy,
-            ChannelFallbackPolicy fallbackPolicy
+            ChannelFallbackPolicy fallbackPolicy,
+            Validator validator,
+            AppointmentEligibility appointmentEligibility,
+            @Value("${notifications.console.show-sensitive-content:false}") boolean showSensitiveContent,
+            @Qualifier("notificationClock") Clock clock
     ) {
         return new NotificationDispatcherService(
-                notificationRepository,
-                scheduleRepository,
-                attemptRepository,
+                dispatchStore,
                 providerRegistry,
                 templateRenderer,
                 retryPolicy,
-                fallbackPolicy
+                fallbackPolicy,
+                new RecipientEmailPolicy(validator),
+                appointmentEligibility,
+                showSensitiveContent,
+                clock
         );
     }
 
     @Bean
     public NotificationOrchestrator notificationOrchestrator(
             NotificationRepository notificationRepository,
-            NotificationScheduleRepository scheduleRepository,
             NotificationFactory notificationFactory,
             NotificationSchedulerService schedulerService,
             ChannelFallbackPolicy fallbackPolicy
     ) {
         return new NotificationOrchestrator(
                 notificationRepository,
-                scheduleRepository,
                 notificationFactory,
                 schedulerService,
                 fallbackPolicy
+        );
+    }
+
+    @Bean
+    public OtpDeliveryCapability otpDeliveryCapability(
+            ProviderRegistry providerRegistry,
+            ChannelFallbackPolicy fallbackPolicy,
+            @Value("${notifications.console.show-sensitive-content:false}") boolean showSensitiveContent,
+            Validator validator
+    ) {
+        return new OtpDeliveryCapability(
+                providerRegistry,
+                fallbackPolicy,
+                showSensitiveContent,
+                validator
         );
     }
 
@@ -141,10 +157,12 @@ public class NotificationConfig {
     @Bean
     public NotificationModuleApi notificationModuleApi(
             NotificationOrchestrator orchestrator,
+            OtpDeliveryCapability otpDeliveryCapability,
             @Qualifier("notificationClock") Clock clock
     ) {
         return new NotificationModuleApiImpl(
                 orchestrator,
+                otpDeliveryCapability,
                 clock
         );
     }

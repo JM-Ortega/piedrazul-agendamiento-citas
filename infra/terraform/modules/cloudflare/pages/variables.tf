@@ -8,41 +8,23 @@ variable "project_name" {
   type        = string
 }
 
-variable "github_owner" {
-  description = "Propietario del repositorio en GitHub (usuario u organización)"
-  type        = string
-}
-
-variable "github_repo" {
-  description = "Nombre del repositorio en GitHub"
-  type        = string
-}
-
 variable "production_branch" {
-  description = "Rama de producción para despliegues automáticos"
+  description = "Rama de producción del proyecto (la que wrangler publica como producción)"
   type        = string
   default     = "main"
 }
 
-variable "build_command" {
-  description = "Comando de build del frontend"
-  type        = string
-  default     = "npm run build"
-}
-
-variable "output_dir" {
-  description = "Directorio de salida del build"
-  type        = string
-  default     = "dist/frontend/browser"
-}
-
-variable "root_dir" {
-  description = "Directorio raíz del frontend dentro del repositorio"
-  type        = string
-  default     = "frontend"
-}
-
 variable "custom_domain" {
-  description = "Dominio personalizado del proyecto Pages"
+  description = "Dominio propio del proyecto Pages"
+  type        = string
+
+  validation {
+    condition     = can(regex("^([a-z0-9-]+\\.)+[a-z]{2,}$", var.custom_domain))
+    error_message = "custom_domain debe ser un nombre de dominio."
+  }
+}
+
+variable "custom_domain_dns_record_id" {
+  description = "ID del registro DNS (módulo dns) que apunta custom_domain al subdominio *.pages.dev; ordena la asociación después del registro"
   type        = string
 }

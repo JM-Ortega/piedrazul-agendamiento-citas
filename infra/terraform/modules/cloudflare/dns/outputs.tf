@@ -12,3 +12,8 @@ output "auth_fqdn" {
   description = "FQDN del servicio de autenticación"
   value       = "auth.${var.base_domain}"
 }
+
+output "frontend_record_id" {
+  description = "ID del registro DNS del frontend (CNAME al subdominio *.pages.dev); ordena la asociación del dominio propio en Pages"
+  value       = cloudflare_dns_record.frontend.id
+}

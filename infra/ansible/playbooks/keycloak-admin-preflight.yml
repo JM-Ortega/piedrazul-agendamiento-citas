@@ -1,0 +1,34 @@
+---
+# Validación temprana de KC_PLATFORM_ADMIN_INITIAL_PASSWORD, en el runner y sin tocar el
+# servidor. La corre el workflow de producción ANTES de confirmar un saved plan que crea o
+# reemplaza el servidor: ese servidor nace sin Keycloak y su primer converge es P2, que
+# exige la contraseña. Así el Apply no se solicita si el converge iba a fallar por ella.
+#
+# Mismas reglas, de la misma fuente: keycloak_credentials.yml (sin copia). La exigencia en
+# P2 de keycloak_lifecycle.yml sigue siendo la defensa final. Solo nombra la regla
+# incumplida, nunca el valor. Entradas por entorno: KC_PLATFORM_ADMIN_INITIAL_PASSWORD,
+# KC_BACKEND_CLIENT_SECRET y KC_AUTOMATION_CLIENT_SECRET (la contraseña no puede coincidir
+# con ellas).
+
+- name: Validar la contraseña inicial del administrador humano antes del Apply
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+
+  tasks:
+    - name: Evaluar credenciales de Keycloak con las reglas del converge
+      ansible.builtin.include_role:
+        name: app
+        tasks_from: keycloak_credentials.yml
+
+    - name: Exigir la contraseña inicial del administrador humano (servidor nuevo o reemplazado)
+      ansible.builtin.assert:
+        that:
+          - app_kc_platform_admin_password_invalid | length == 0
+        fail_msg: >-
+          KEYCLOAK P2 (servidor nuevo o reemplazado): el primer converge crea el administrador
+          humano permanente y necesita KC_PLATFORM_ADMIN_INITIAL_PASSWORD válida:
+          {{ app_kc_platform_admin_password_invalid | join('; ') }} (valor no mostrado).
+          No se solicitó el Apply. Ver docs/operations/runbooks/administrador-keycloak.md.
+        success_msg: KC_PLATFORM_ADMIN_INITIAL_PASSWORD válida para la instalación nueva (valor no mostrado)

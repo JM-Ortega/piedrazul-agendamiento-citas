@@ -1,0 +1,61 @@
+---
+# Correo por el SMTP de Amazon SES. Ver docs/operations/runbooks/correo-ses.md.
+#
+# Solo con NOTIFICATIONS_SES_ENABLED=true se toman y validan las entradas, antes de escribir el
+# .env y de cualquier mutación. Deshabilitado (false o ausente) no se lee ni se exige ninguna:
+# env.j2 las deja vacías, así el .env y el backend recreado dejan de contenerlas. La decisión es
+# estricta, sin recortar ni normalizar. Mensajes con nombres y reglas, nunca valores.
+
+# Se evalúa en una sola expresión: Ansible convierte un "true" guardado en booleano
+- name: Tomar la decisión de correo SES
+  ansible.builtin.set_fact:
+    app_ses_flag_valid: "{{ lookup('env', 'NOTIFICATIONS_SES_ENABLED') in ['', 'true', 'false'] }}"
+    app_ses_enabled: "{{ lookup('env', 'NOTIFICATIONS_SES_ENABLED') == 'true' }}"
+
+- name: Verificar la decisión de correo SES
+  ansible.builtin.assert:
+    that:
+      - app_ses_flag_valid | bool
+    fail_msg: "NOTIFICATIONS_SES_ENABLED debe ser exactamente true o false, o no estar definida (variable del GitHub Environment)"
+    quiet: true
+
+- name: Tomar las entradas de SES desde el entorno
+  when: app_ses_enabled | bool
+  ansible.builtin.set_fact:
+    app_ses_smtp:
+      HOST: "{{ lookup('env', 'SES_SMTP_HOST') | string }}"
+      USERNAME: "{{ lookup('env', 'SES_SMTP_USERNAME') | string }}"
+      PASSWORD: "{{ lookup('env', 'SES_SMTP_PASSWORD') | string }}"
+  no_log: true
+
+- name: Detectar entradas de SES inválidas
+  when: app_ses_enabled | bool
+  ansible.builtin.set_fact:
+    app_ses_invalid: >-
+      {{ (['SES_SMTP_HOST no es un endpoint SMTP de SES']
+            if app_ses_smtp.HOST is not match(ses_smtp_host_pattern) else [])
+         + (['SES_SMTP_USERNAME vacío, con espacios, caracteres de control o no ASCII']
+              if app_ses_smtp.USERNAME is not match(_credential) else [])
+         + (['SES_SMTP_PASSWORD vacío, con espacios, caracteres de control o no ASCII']
+              if app_ses_smtp.PASSWORD is not match(_credential) else [])
+         + (['notifications_email_from no es un remitente válido']
+              if notifications_email_from | default('') is not match(_sender) else [])
+         + (['notifications_email_from_name vacío o con saltos de línea']
+              if notifications_email_from_name | default('') is not match(_sender_name) else []) }}
+  vars:
+    # Patrones como escalares YAML (sin escapes de literales Jinja)
+    _credential: '^[!-~]{1,512}\Z'
+    _sender: '^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+\Z'
+    _sender_name: '^[^\x00-\x1f\x7f]+\Z'
+  no_log: true
+
+- name: Verificar las entradas de SES
+  when: app_ses_enabled | bool
+  ansible.builtin.assert:
+    that:
+      - app_ses_invalid | length == 0
+    fail_msg: >-
+      Correo SES habilitado con entradas inválidas: {{ app_ses_invalid | join('; ') }} (valores no
+      mostrados). Variable SES_SMTP_HOST y secretos del GitHub Environment production-hetzner
+      (docs/operations/runbooks/correo-ses.md).
+    quiet: true

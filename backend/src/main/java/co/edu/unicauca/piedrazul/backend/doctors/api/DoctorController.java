@@ -1,249 +1,266 @@
 package co.edu.unicauca.piedrazul.backend.doctors.api;
 
+import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorAvailableResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorDetailedResponse;
-import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorShortResponse;
 import co.edu.unicauca.piedrazul.backend.doctors.application.DoctorService;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Specialty;
+import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
+import co.edu.unicauca.piedrazul.backend.shared.pagination.PageResponse;
+import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import co.edu.unicauca.piedrazul.backend.shared.audit.AuditTargetType;
+import co.edu.unicauca.piedrazul.backend.shared.audit.Auditable;
+import co.edu.unicauca.piedrazul.backend.shared.enums.AuditAction;
 
+@Tag(name = "Doctores", description = "Operaciones de consulta y administración de doctores")
 @RestController
-@RequestMapping("/api/doctor/doctors")
+@RequestMapping("/api/doctor")
 public class DoctorController {
-    private final DoctorService doctorService;
+        private final DoctorService doctorService;
+        private final PersonExternalService personExternalService;
+        private final AppointmentExternalService appointmentExternalService;
 
-    public DoctorController(DoctorService doctorService) {
-        this.doctorService = doctorService;
-    }
+        @Autowired
+        public DoctorController(DoctorService doctorService, PersonExternalService personExternalService,
+                        SecurityContextExtractor securityContextExtractor,
+                        AppointmentExternalService appointmentExternalService) {
+                this.doctorService = doctorService;
+                this.personExternalService = personExternalService;
+                this.appointmentExternalService = appointmentExternalService;
+        }
 
-    /**
-     * Obtener los datos del doctor autenticado (basado en el JWT)
-     * @param jwt
-     * @return
-     */
-    @GetMapping("/me")
-    @PreAuthorize("hasRole('DOCTOR')")
-    public DoctorDetailedResponse findMe(@AuthenticationPrincipal Jwt jwt) {
-        UUID keycloakId = UUID.fromString(jwt.getSubject());
-        Doctor doctor = doctorService.findByUserId(keycloakId);
-        return DoctorDetailedResponse.fromEntity(doctor);
-    }
+        public DoctorController(DoctorService doctorService, PersonExternalService personExternalService,
+                        SecurityContextExtractor securityContextExtractor) {
+                this(doctorService, personExternalService, securityContextExtractor, null);
+        }
 
-    /**
-     * Listar todos los doctores
-     * @return Lista de todos los doctores
-     */
-    @GetMapping
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<?> getAllDoctors() {
-        List<Doctor> doctors = doctorService.findAllDoctors();
-        List<DoctorShortResponse> responses = doctors.stream()
-                .map(DoctorShortResponse::fromEntity)
-                .toList();
-        return ResponseEntity.ok(responses);
-    }
+        @GetMapping("/me")
+        @PreAuthorize("hasRole('DOCTOR')")
+        @Operation(summary = "Obtener el doctor autenticado", description = "Devuelve la información detallada del doctor asociado al usuario autenticado, identificado a partir del token JWT.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "Doctor obtenido correctamente"),
+                        @ApiResponse(responseCode = "401", description = "No autenticado"),
+                        @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar el recurso"),
+                        @ApiResponse(responseCode = "404", description = "El usuario autenticado no tiene un doctor asociado")
+        })
+        public DoctorDetailedResponse findMe(@AuthenticationPrincipal Jwt jwt) {
+                Doctor doctor = doctorService.findByUserId(UUID.fromString(jwt.getSubject()));
 
-    /**
-     * Listar todos los doctores con más detalle
-     * @return Lista de todos los doctores
-     */
-    @GetMapping("/detailed")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> getAllDoctorsDetailed() {
-        List<Doctor> doctors = doctorService.findAllDoctors();
-        List<DoctorDetailedResponse> responses = doctors.stream()
-                .map(DoctorDetailedResponse::fromEntity)
-                .toList();
-        return ResponseEntity.ok(responses);
-    }
+                Map<UUID, String> names = personExternalService.getPersonNames(List.of(doctor.getPersonId()));
 
-    /**
-     * Obtener un doctor por su ID
-     * @param doctorId ID del doctor
-     * @return Los datos del doctor
-     */
-    @GetMapping("/{doctorId}")
-    @PreAuthorize("hasRole('DOCTOR')")
-    public ResponseEntity<?> getDoctorById(@PathVariable UUID doctorId) {
-        Doctor doctor = doctorService.getDoctorById(doctorId);
-        return ResponseEntity.ok(DoctorShortResponse.fromEntity(doctor));
-    }
+                return DoctorDetailedResponse.fromEntity(doctor, names.get(doctor.getPersonId()));
+        }
 
-    /**
-     * Obtiene las especialidades disponibles para un paciente
-     * @param patientId Id del paciente (opcional)
-     * @return Lista de especialidades
-     */
-    @GetMapping("/patients/specialties")
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<List<Specialty>> getSpecialties(@RequestParam(required = false) UUID patientId) {
-        List<Specialty> specialties = doctorService.getSpecialties(patientId);
-        return ResponseEntity.ok(specialties);
-    }
+        // No paginar se usa en el agendamiento
+        // Metodo unico que retorna los doctores disponibles validando si el paciente es
+        // nuevo o no
+        @GetMapping("/specialties-with-active-doctors")
+        @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
+        @Operation(summary = "Listar todos los doctores", description = "Devuelve la lista de los doctores con agendamiento disponible junto con sus especialidades. "
+                        +
+                        "Hace validaciones de negocio dependiendo de si el paciente es nuevo.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "Doctores obtenidos correctamente"),
+                        @ApiResponse(responseCode = "401", description = "No autenticado"),
+                        @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar doctores")
+        })
+        public ResponseEntity<List<DoctorAvailableResponse>> getSpecialtiesWithActiveDoctors(
+                        @RequestParam(required = false)
+                        UUID patientId,
+                        @RequestParam
+                        SchedulingOrigin schedulingOrigin
+        ) {
 
-    /**
-     * Agregar especialidades de un doctor específico
-     * @param specialties Especialidades a agregar para el doctor
-     * @param doctorId Id del doctor
-     * @return Sin contenido
-     */
-    @PostMapping("/{doctorId}/specialties")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> addSpecialties(
-            @PathVariable UUID doctorId,
-            @RequestBody List<Specialty> specialties) {
+                return ResponseEntity.ok(
+                                doctorService.getSpecialtiesWithActiveDoctors(
+                                                patientId,
+                                                schedulingOrigin));
+        }
 
-        doctorService.addSpecialities(doctorId, specialties);
+        @GetMapping("/{doctorId}/available-slots")
+        @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
+        @Operation(summary = "Obtener slots disponibles de un doctor", description = "Devuelve los horarios disponibles del doctor para una fecha específica, "
+                        + "consultando la disponibilidad actual del módulo de citas.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "Slots disponibles obtenidos correctamente"),
+                        @ApiResponse(responseCode = "400", description = "La fecha o el identificador del doctor no son válidos"),
+                        @ApiResponse(responseCode = "401", description = "No autenticado"),
+                        @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar los slots"),
+                        @ApiResponse(responseCode = "404", description = "No existe un doctor con el identificador proporcionado")
+        })
+        public ResponseEntity<List<LocalTime>> getAvailableSlots(
+                        @Parameter(description = "Identificador único del doctor")
+                        @PathVariable
+                        UUID doctorId,
+                        @Parameter(description = "Fecha para la que se solicitan los slots, en formato yyyy-MM-dd")
+                        @RequestParam
+                        LocalDate date) {
+                return ResponseEntity.ok(appointmentExternalService.getAvailableSlots(doctorId, date));
+        }
 
-        return ResponseEntity.noContent().build();
-    }
+        // No paginar sirve para filtrar las citas por doctor
+        @GetMapping
+        @PreAuthorize("hasRole('SCHEDULER')")
+        @Operation(summary = "Listar todos los doctores", description = "Devuelve la lista completa de doctores activos o inactivos registrados en el sistema, "
+                        +
+                        "incluyendo sus especialidades y nombre. La lista puede estar vacía si no hay doctores registrados.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "Doctores obtenidos correctamente"),
+                        @ApiResponse(responseCode = "401", description = "No autenticado"),
+                        @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar doctores")
+        })
+        public ResponseEntity<List<DoctorShortResponse>> getAllDoctors() {
+                List<Doctor> doctors = doctorService.findAllDoctors();
 
-    /**
-     * Eliminar especialidades de un doctor específico
-     * @param specialties Especialidades a agregar para el doctor
-     * @param doctorId Id del doctors
-     * @return Sin contenido
-     */
-    @DeleteMapping("/{doctorId}/specialties")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> removeSpecialties(
-            @PathVariable UUID doctorId,
-            @RequestBody List<Specialty> specialties) {
+                List<UUID> ids = doctors.stream()
+                                .map(Doctor::getPersonId)
+                                .toList();
 
-        doctorService.removeSpecialities(doctorId, specialties);
+                Map<UUID, String> names = personExternalService.getPersonNames(ids);
 
-        return ResponseEntity.noContent().build();
-    }
+                List<DoctorShortResponse> responses = doctors.stream()
+                                .map(d -> DoctorShortResponse.fromEntity(d, names.get(d.getPersonId())))
+                                .toList();
 
-    /**
-     * Obtiene todas las especialidades de los medicos
-     * @return Lista de especialidades
-     */
-    @GetMapping("/all-specialties")
-    @PreAuthorize("hasAnyRole('ADMIN')")
-    public ResponseEntity<?> getAllSpecialties() {
-        List<Specialty> specialties = doctorService.getAllSpecialties();
-        return ResponseEntity.ok(specialties);
-    }
+                return ResponseEntity.ok(responses);
+        }
 
-    /**
-     * Obtener doctores por especialidad
-     * @param specialty Especialidad a buscar
-     * @return Lista de doctores con esa especialidad
-     */
-    @GetMapping("/specialty/{specialty}")
-    @PreAuthorize("hasAnyRole('SCHEDULER', 'PATIENT', 'DOCTOR')")
-    public ResponseEntity<?> getDoctorsBySpecialty(@PathVariable Specialty specialty) {
-        List<Doctor> doctors = doctorService.getDoctorBySpeciality(specialty);
-        List<DoctorResponse> responses = doctors.stream()
-                .map(DoctorResponse::fromEntity)
-                .toList();
-        return ResponseEntity.ok(responses);
-    }
+        @GetMapping("/detailed")
+        @PreAuthorize("hasRole('ADMIN')")
+        @Operation(summary = "Listar doctores con información detallada", description = "Devuelve una página con doctores registrados, incluyendo información detallada, "
+                        + "ordenada y paginada según los parámetros recibidos. Permite filtrar por nombre o cédula.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "Doctores obtenidos correctamente"),
+                        @ApiResponse(responseCode = "401", description = "No autenticado"),
+                        @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar doctores")
+        })
+        public ResponseEntity<PageResponse<DoctorDetailedResponse>> getDoctorsDetailed(
+                        @Parameter(description = "Parámetros de paginación y ordenamiento")
+                        @PageableDefault(page = 0, size = 9, sort = "name", direction = Sort.Direction.ASC)
+                        Pageable pageable,
 
-    /**
-     * Habilitar un doctor (reactivar después de estar deshabilitado)
-     * @param doctorId ID del doctor
-     * @param laborStart Nueva fecha de inicio de labores
-     * @param laborEnd Nueva fecha de fin de labores
-     * @return Sin contenido
-     */
-    @PutMapping("/{doctorId}/enable")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> enableDoctor(
-            @PathVariable UUID doctorId,
-            @RequestParam LocalDate laborStart,
-            @RequestParam LocalDate laborEnd
-    ) {
-        doctorService.enableDoctor(doctorId, laborStart, laborEnd);
-        return ResponseEntity.noContent().build();
-    }
+                        @Parameter(description = "Término de búsqueda por nombre completo o cédula del doctor")
+                        @RequestParam(required = false)
+                        String search
+        ) {
+                Page<DoctorDetailedResponse> doctors = doctorService.findAllDoctorsDetailed(pageable, search);
+                return ResponseEntity.ok(PageResponse.from(doctors));
+        }
 
-    /**
-     * Actualizar la fecha de inicio laboral de un doctor
-     * @param doctorId ID del doctor
-     * @param laborStart Nueva fecha de inicio
-     * @return Sin contenido
-     */
-    @PutMapping("/{doctorId}/labor-start")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateDoctorLaborStart(
-            @PathVariable UUID doctorId,
-            @RequestParam LocalDate laborStart
-    ) {
-        doctorService.updateDoctorLaborStart(doctorId, laborStart);
-        return ResponseEntity.noContent().build();
-    }
+        @PutMapping("/{doctorId}/specialties")
+        @PreAuthorize("hasRole('ADMIN')")
+        @Operation(summary = "Actualizar especialidades de un doctor", description = "Reemplaza las especialidades actuales del doctor por las proporcionadas en la solicitud.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "204", description = "Especialidades actualizadas correctamente"),
+                        @ApiResponse(responseCode = "401", description = "No autenticado"),
+                        @ApiResponse(responseCode = "403", description = "No tiene permisos para actualizar especialidades"),
+                        @ApiResponse(responseCode = "404", description = "No existe un doctor con el identificador proporcionado")
+        })
+        public ResponseEntity<Void> changeSpecialties(
+                        @Parameter(description = "Identificador único (UUID) del doctor")
+                        @PathVariable
+                        UUID doctorId,
 
-    /**
-     * Actualizar la fecha de finalización laboral de un doctor
-     * @param doctorId ID del doctor
-     * @param laborEnd Nueva fecha de finalización
-     * @return Sin contenido
-     */
-    @PutMapping("/{doctorId}/labor-end")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateDoctorLaborEnd(
-            @PathVariable UUID doctorId,
-            @RequestParam LocalDate laborEnd
-    ) {
-        doctorService.updateDoctorLaborEnd(doctorId, laborEnd);
-        return ResponseEntity.noContent().build();
-    }
+                        @Parameter(description = "Lista de especialidades que tendrá el doctor")
+                        @RequestBody
+                        List<SpecialtyCode> specialties
+        ) {
+                doctorService.changeSpecialties(doctorId, specialties);
+                return ResponseEntity.noContent().build();
+        }
 
-    /**
-     * Actualizar el intervalo de atención de un doctor
-     * @param doctorId ID del doctor
-     * @param appointmentInterval Nuevo intervalo en minutos
-     * @return Sin contenido
-     */
-    @PutMapping("/{doctorId}/appointment-interval")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateDoctorAppointmentInterval(
-            @PathVariable UUID doctorId,
-            @RequestParam int appointmentInterval
-    ) {
-        doctorService.updateDoctorAppointmentInterval(doctorId, appointmentInterval);
-        return ResponseEntity.noContent().build();
-    }
+        @GetMapping("/all-specialties")
+        @PreAuthorize("hasAnyRole('ADMIN')")
+        @Operation(summary = "Listar todas las especialidades médicas", description = "Devuelve todas las especialidades médicas registradas en el sistema, sin filtrado por doctor o paciente.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "Especialidades obtenidas correctamente"),
+                        @ApiResponse(responseCode = "401", description = "No autenticado"),
+                        @ApiResponse(responseCode = "403", description = "No tiene permisos para consultar especialidades")
+        })
+        public ResponseEntity<List<SpecialtyCode>> getAllSpecialties() {
+                List<SpecialtyCode> specialties = doctorService.getAllSpecialties();
+                return ResponseEntity.ok(specialties);
+        }
 
-    /**
-     * Deshabilitar un doctor
-     * @param doctorId ID del doctor
-     * @param force Forzar deshabilitación incluso si aún no ha iniciado labores
-     * @return Sin contenido
-     */
-    @PutMapping("/{doctorId}/disable")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> disableDoctor(
-            @PathVariable UUID doctorId,
-            @RequestParam(defaultValue = "false") boolean force
-    ) {
-        doctorService.disableDoctor(doctorId, force);
-        return ResponseEntity.noContent().build();
-    }
+        @PutMapping("/{doctorId}/enable")
+        @PreAuthorize("hasRole('ADMIN')")
+        @Auditable(action = AuditAction.ROL_ASIGNADO, targetEntityType = AuditTargetType.DOCTOR, targetIdExpression = "#doctorId", onlyDenied = true)
+        @Operation(summary = "Habilitar un doctor", description = "Habilita un doctor previamente deshabilitado. La activación solo se realiza si el doctor "
+                        +
+                        "cumple todas las condiciones necesarias para prestar atención.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "204", description = "Doctor habilitado correctamente"),
+                        @ApiResponse(responseCode = "400", description = "El doctor no cumple los requisitos para ser habilitado"),
+                        @ApiResponse(responseCode = "401", description = "No autenticado"),
+                        @ApiResponse(responseCode = "403", description = "No tiene permisos para habilitar doctores"),
+                        @ApiResponse(responseCode = "404", description = "No existe un doctor con el identificador proporcionado"),
+                        @ApiResponse(responseCode = "409", description = "Conflicto con las fechas de inicio y fin de labor del doctor")
+        })
+        public ResponseEntity<Void> enableDoctor(
+                        @Parameter(description = "Identificador único (UUID) del doctor") @PathVariable UUID doctorId) {
+                doctorService.enableDoctor(doctorId);
+                return ResponseEntity.noContent().build();
+        }
 
-    /**
-     * Actualizar el estado del doctor basado en las fechas de labor
-     * (Se ejecuta automáticamente para sincronizar con la fecha actual)
-     * @param doctorId ID del doctor
-     * @return Sin contenido
-     */
-    @PutMapping("/{doctorId}/sync-status")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateDoctorStatus(@PathVariable UUID doctorId) {
-        doctorService.updateDoctorStatus(doctorId);
-        return ResponseEntity.noContent().build();
-    }
+        @PutMapping("/{doctorId}/update-info")
+        @PreAuthorize("hasRole('ADMIN')")
+        @Operation(summary = "Actualizar el período laboral de un doctor", description = "Modifica la fecha de inicio y la fecha de finalización de labores del doctor.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "204", description = "Período laboral actualizado correctamente"),
+                        @ApiResponse(responseCode = "401", description = "No autenticado"),
+                        @ApiResponse(responseCode = "403", description = "No tiene permisos para actualizar el período laboral"),
+                        @ApiResponse(responseCode = "404", description = "No existe un doctor con el identificador proporcionado"),
+                        @ApiResponse(responseCode = "409", description = "Conflicto con las fechas de inicio y fin de labor proporcionadas"),
+                        @ApiResponse(responseCode = "400", description = "El intervalo  o  ventana de agendamiento proporcionada no es válida")
+        })
+        public ResponseEntity<Void> updateDoctorInfo(
+                        @Parameter(description = "Identificador único (UUID) del doctor") @PathVariable UUID doctorId,
+                        @Parameter(description = "Nueva fecha de inicio de labores") @RequestParam LocalDate laborStart,
+                        @Parameter(description = "Nueva fecha de finalización de labores") @RequestParam LocalDate laborEnd,
+                        @Parameter(description = "Nueva duración de las citas, expresada en minutos") @RequestParam int appointmentInterval,
+                        @Parameter(description = "Nueva duración de las ventana de agendamiento " +
+                                        "expresada en semanas") @RequestParam int bookingWindowWeeks) {
+                doctorService.updateDoctorInfo(doctorId, laborStart, laborEnd, appointmentInterval, bookingWindowWeeks);
+                return ResponseEntity.noContent().build();
+        }
 
-
+        @PutMapping("/{doctorId}/disable")
+        @PreAuthorize("hasRole('ADMIN')")
+        @Auditable(action = AuditAction.ROL_REVOCADO, targetEntityType = AuditTargetType.DOCTOR, targetIdExpression = "#doctorId", onlyDenied = true)
+        @Operation(summary = "Deshabilitar un doctor", description = "Deshabilita un doctor. La desactivación solo se realiza si el doctor aun tiene citas.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "204", description = "Doctor deshabilitado correctamente"),
+                        @ApiResponse(responseCode = "401", description = "No autenticado"),
+                        @ApiResponse(responseCode = "403", description = "No tiene permisos para deshabilitar doctores"),
+                        @ApiResponse(responseCode = "404", description = "No existe un doctor con el identificador proporcionado"),
+                        @ApiResponse(responseCode = "409", description = "El doctor aún tiene citas por atender")
+        })
+        public ResponseEntity<Void> disableDoctor(
+                        @Parameter(description = "Identificador único (UUID) del doctor") @PathVariable UUID doctorId) {
+                doctorService.disableDoctor(doctorId);
+                return ResponseEntity.noContent().build();
+        }
 }

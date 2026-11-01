@@ -1,0 +1,99 @@
+@if (size() === 'sm') {
+  <!-- Variante compacta: pill pequeño, sin glow, sin botón -->
+  <div
+    class="flex items-center bg-white border rounded-full transition-all duration-200 flex-1 min-w-50"
+    [class]="
+      control.value
+        ? 'border-[#4e92d9] shadow-sm'
+        : 'border-gray-200 focus-within:border-[#4e92d9] focus-within:shadow-sm'
+    "
+  >
+    <div
+      class="pl-3.5 pr-1.5 flex items-center"
+      [class]="control.value ? 'text-[#215c98]' : 'text-gray-400'"
+    >
+      @if (loading()) {
+        <div
+          class="w-4 h-4 border-2 border-[#215c98] border-t-transparent rounded-full animate-spin"
+        ></div>
+      } @else {
+        <svg lucideSearch [size]="16"></svg>
+      }
+    </div>
+    <input
+      type="text"
+      [formControl]="control"
+      [placeholder]="placeholder()"
+      class="flex-1 py-2 pr-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none bg-transparent min-w-0"
+      (keydown.enter)="onSearchNow()"
+    />
+    @if (control.value) {
+      <button
+        type="button"
+        (click)="clear()"
+        class="pr-3.5 text-gray-400 hover:text-red-500 transition-colors duration-200 cursor-pointer"
+        aria-label="Limpiar búsqueda"
+      >
+        <svg lucideX [size]="14"></svg>
+      </button>
+    }
+  </div>
+} @else {
+  <!-- Variante estándar: con glow, spinner grande, botón "Buscar" -->
+  <div class="flex flex-col sm:flex-row gap-3">
+    <div class="relative flex-1 group">
+      <div
+        class="absolute inset-0 rounded-2xl bg-linear-to-r from-[#215c98] to-[#4e92d9] opacity-0 group-focus-within:opacity-30 blur-md transition-opacity duration-300 -z-10"
+      ></div>
+      <div
+        class="relative flex items-center bg-white border-2 rounded-2xl transition-all duration-300"
+        [class]="
+          control.value
+            ? 'border-[#4e92d9] shadow-md'
+            : 'border-gray-200 group-focus-within:border-[#4e92d9] group-focus-within:shadow-md'
+        "
+      >
+        <div
+          class="pl-4 pr-2 flex items-center transition-all duration-300 group-focus-within:scale-110"
+          [class]="control.value ? 'text-[#215c98]' : 'text-gray-400'"
+        >
+          @if (loading()) {
+            <div
+              class="w-5 h-5 border-2 border-[#215c98] border-t-transparent rounded-full animate-spin"
+            ></div>
+          } @else {
+            <svg lucideSearch [size]="20"></svg>
+          }
+        </div>
+        <input
+          type="text"
+          [formControl]="control"
+          [placeholder]="placeholder()"
+          class="flex-1 py-3.5 pr-2 text-base text-gray-700 placeholder-gray-400 focus:outline-none bg-transparent"
+          (keydown.enter)="onSearchNow()"
+        />
+        @if (control.value) {
+          <button
+            type="button"
+            (click)="clear()"
+            class="pr-4 text-gray-400 hover:text-red-500 transition-colors duration-200 cursor-pointer"
+            aria-label="Limpiar búsqueda"
+          >
+            <svg lucideX [size]="18"></svg>
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (showButton()) {
+      <button
+        type="button"
+        (click)="onSearchNow()"
+        class="flex items-center justify-center gap-2 bg-[#215c98] hover:bg-[#163c63] active:scale-95 text-white px-6 py-3.5 rounded-2xl font-semibold text-base transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer shrink-0"
+      >
+        <svg lucideSearch [size]="18"></svg>
+        {{ buttonLabel() }}
+      </button>
+    }
+  </div>
+}

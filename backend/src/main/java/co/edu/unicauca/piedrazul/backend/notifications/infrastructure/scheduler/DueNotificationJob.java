@@ -1,9 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.notifications.infrastructure.scheduler;
 
 import co.edu.unicauca.piedrazul.backend.notifications.application.NotificationDispatcherService;
-import co.edu.unicauca.piedrazul.backend.notifications.domain.model.Notification;
-import co.edu.unicauca.piedrazul.backend.notifications.domain.model.NotificationSchedule;
-import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.NotificationRepository;
+import co.edu.unicauca.piedrazul.backend.notifications.domain.port.output.ClaimedSchedule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -13,7 +11,6 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 
 @Component
 public class DueNotificationJob {
@@ -22,18 +19,15 @@ public class DueNotificationJob {
     private static final Logger log = LoggerFactory.getLogger(DueNotificationJob.class);
 
     private final ScheduleClaimService scheduleClaimService;
-    private final NotificationRepository notificationRepository;
     private final NotificationDispatcherService dispatcherService;
     private final Clock clock;
 
     public DueNotificationJob(
             ScheduleClaimService scheduleClaimService,
-            NotificationRepository notificationRepository,
             NotificationDispatcherService dispatcherService,
             @Qualifier("notificationClock") Clock clock
     ) {
         this.scheduleClaimService = scheduleClaimService;
-        this.notificationRepository = notificationRepository;
         this.dispatcherService = dispatcherService;
         this.clock = clock;
     }
@@ -42,28 +36,21 @@ public class DueNotificationJob {
     public void processDueNotifications() {
         Instant now = Instant.now(clock);
 
-        List<NotificationSchedule> claimedSchedules =
+        List<ClaimedSchedule> claimedSchedules =
                 scheduleClaimService.claimDueSchedules(now, BATCH_SIZE);
 
-        for (NotificationSchedule schedule : claimedSchedules) {
-            Optional<Notification> notification =
-                    notificationRepository.findById(schedule.getNotificationId());
-
-            if (notification.isEmpty()) {
-                scheduleClaimService.markScheduleFailed(schedule, now);
-                continue;
-            }
-
+        for (ClaimedSchedule claim : claimedSchedules) {
+            // El despachador resuelve sus propios errores con escrituras guardadas; esto solo evita
+            // que un error imprevisto abandone el resto del lote. No se marca el schedule desde
+            // aquí: sería una escritura sin cerca sobre estado posiblemente obsoleto.
             try {
-                dispatcherService.dispatch(
-                        notification.get(),
-                        schedule,
-                        notification.get().getVariables(),
-                        now
+                dispatcherService.dispatch(claim);
+            } catch (RuntimeException exception) {
+                log.error(
+                        "Error inesperado al despachar schedule={} errorType={}",
+                        claim.scheduleId(),
+                        exception.getClass().getName()
                 );
-            } catch (Exception e) {
-                log.error("Error inesperado al despachar schedule={}", schedule.getId(), e);
-                scheduleClaimService.markScheduleFailed(schedule, now);
             }
         }
     }

@@ -1,0 +1,59 @@
+<div class="space-y-5">
+  <div>
+    <h2 class="text-[#163c63] text-lg">Registrar Nuevo Paciente</h2>
+    <p class="text-gray-500 text-sm mt-1">
+      Complete los datos del paciente para continuar con el agendamiento.
+    </p>
+  </div>
+
+  <app-patient-data-form
+    #patientForm
+    [showDocumentNumber]="true"
+    [maxBirthDate]="maxBirthDate"
+    [ngModel]="patientFormValue()"
+    (valueChange)="onPatientFormChange($event)"
+  ></app-patient-data-form>
+
+  @if (this.globalErrorMessage()) {
+    <div class="mt-2 bg-red-100 text-red-700 p-3 rounded-lg text-sm">
+      {{ this.globalErrorMessage() }}
+    </div>
+  }
+
+  <div class="flex gap-4 mt-4">
+    <app-button variant="secondary" (buttonClick)="onGoBack()">
+      <svg lucideArrowLeft [size]="16"></svg> Buscar de nuevo
+    </app-button>
+    <app-button
+      variant="primary"
+      (buttonClick)="onContinue(patientForm)"
+      [disabled]="isChecking()"
+      [fullWidth]="true"
+      class="flex-1"
+    >
+      @if (isChecking()) {
+        Verificando...
+      } @else {
+        Continuar →
+      }
+    </app-button>
+  </div>
+</div>
+
+<app-confirm-modal
+  [visible]="showExistsModal()"
+  title="Este documento ya existe"
+  [message]="
+    'El documento ' +
+    existingDocument() +
+    ' ya está registrado en el sistema. ' +
+    'Se le devolverá al paso de búsqueda para confirmar su información.'
+  "
+  confirmLabel="Aceptar"
+  cancelLabel="Cancelar"
+  confirmVariant="primary"
+  (dismissed)="dismissExistsModal()"
+  (confirmed)="confirmExistingDocument()"
+>
+  <svg icon lucideAlertCircle [size]="32" class="text-amber-500"></svg>
+</app-confirm-modal>

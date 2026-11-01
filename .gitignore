@@ -391,3 +391,6 @@ infra/keycloak/themes/dist/*
 
 # permitir jars dentro de dist
 !infra/keycloak/themes/dist/**/*.jar
+
+# Resultados de pruebas de carga (loadtests/run.sh): evidencia local, no se versiona
+loadtests/results/

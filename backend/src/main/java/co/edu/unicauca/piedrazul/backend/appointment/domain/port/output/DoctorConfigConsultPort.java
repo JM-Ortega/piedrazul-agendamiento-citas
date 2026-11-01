@@ -1,28 +1,36 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.port.output;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.WorkingSchedule;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 
-import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface DoctorConfigConsultPort {
-    // Devuelve las franjas horarias que maneja el médico ese día
-    List<AppointmentTime> getSlotsByDoctor(UUID idDoctor, LocalDate date);
+
+    //Obtiene el id del doctor a través de el id de usuario
+    Optional<UUID> findByUserId(UUID userId);
+
+    // Retorna las fechas y slots y el intervalo en las que el doctor trabaja
+    WorkingSchedule workingSchedule(UUID idDoctor);
 
     // Devuelve el intervalo entre citas configurado para el médico
     int getIntervalMinutesByDoctor(UUID idDoctor);
 
-    // Obtener el nombre del doctor
-    String getDoctorName(UUID idDoctor);
+    // Indica si el doctor está en un periodo de descanso en esa fecha
+    boolean isOnTimeOff(UUID idDoctor, java.time.LocalDate date);
 
     // Obtener IDs de medicos activos
     List<UUID> getActiveDoctorIds();
 
-    // Obtener IDs de medicos generales activos
-    List<UUID> getActiveGeneralDoctorIds();
-
     // Obtener información de medicos en una sola operación por sus IDs
     List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds);
+
+    //obtiene el nombre de un doctor
+    String getDoctorName(UUID idDoctor);
+
+    List<SpecialtyCode> getSpecialtiesByDoctor(UUID idDoctor);
 }

@@ -1,0 +1,69 @@
+<div class="bg-white rounded-2xl shadow-xl px-4 py-3">
+  @if (isPatientStep) {
+    @if (patientSubStep === 'search') {
+      <app-booking-patient-search
+        [prefillDocument]="state.lastSearchedDocument()"
+        (patientConfirmed)="onPatientConfirmed()"
+        (patientMissing)="onPatientMissing()"
+      ></app-booking-patient-search>
+    }
+
+    @if (patientSubStep === 'register') {
+      <app-booking-patient-register
+        (advance)="onRegisterAdvance()"
+        (goBack)="onRegisterGoBack()"
+        (documentAlreadyExists)="onExistingDocumentConfirmed($event)"
+      ></app-booking-patient-register>
+    }
+  }
+
+  @if (state.step() === state.schedulingStep()) {
+    <app-booking-scheduling
+      (advance)="onSchedulingAdvance()"
+      (back)="onSchedulingBack()"
+    ></app-booking-scheduling>
+  }
+
+  @if (state.step() === state.confirmStep() && !state.success()) {
+    <app-booking-confirm
+      (confirmed)="onConfirmed()"
+      (back)="onConfirmBack()"
+    ></app-booking-confirm>
+  }
+</div>
+
+@if (state.success()) {
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-8 shadow-xl text-center w-80">
+      <div
+        class="flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mx-auto mb-5 animate-bounce"
+      >
+        <svg
+          class="w-10 h-10 text-green-500"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M5 13l4 4L19 7"
+          />
+        </svg>
+      </div>
+      <h2 class="text-2xl font-bold text-gray-800 mb-2">¡Cita Agendada!</h2>
+      <p class="text-gray-500 text-sm mb-8">
+        {{ state.successMessage() }}<br />
+        Será redirigido en unos segundos...
+      </p>
+      <app-button
+        variant="success"
+        [fullWidth]="true"
+        (buttonClick)="onSuccessGoBack()"
+      >
+        Volver al Inicio
+      </app-button>
+    </div>
+  </div>
+}

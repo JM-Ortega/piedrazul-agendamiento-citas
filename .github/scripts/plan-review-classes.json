@@ -1,0 +1,32 @@
+{
+  "$comment": "Valores que la revisión pública del plan (plan-review.sh) puede mostrar: solo atributos de primer nivel listados aquí, por tipo de recurso, y solo si el valor anterior y el nuevo cumplen la clase (y Terraform no los marca sensibles). Todo lo demás se muestra como ruta sin valor. El repositorio y sus resúmenes son públicos: agregar una entrada es publicar ese valor.",
+  "hcloud_server": {
+    "name": { "type": "pattern", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$" },
+    "server_type": { "type": "pattern", "pattern": "^[a-z]{2,4}[0-9]{1,3}$" },
+    "location": { "type": "enum", "values": ["fsn1", "nbg1", "hel1", "ash", "hil", "sin"] },
+    "image": { "type": "pattern", "pattern": "^(ubuntu|debian)-[0-9]{2}(\\.[0-9]{2})?$" }
+  },
+  "hcloud_firewall": {
+    "name": { "type": "pattern", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$" }
+  },
+  "cloudflare_dns_record": {
+    "name": { "type": "pattern", "pattern": "^([a-z0-9-]+\\.)*piedrazul\\.org$" },
+    "type": { "type": "enum", "values": ["A", "AAAA", "CNAME"] },
+    "proxied": { "type": "boolean" },
+    "ttl": { "type": "integer", "min": 1, "max": 86400 }
+  },
+  "cloudflare_zone_setting": {
+    "setting_id": {
+      "type": "enum",
+      "values": ["ssl", "min_tls_version", "tls_1_3", "always_use_https", "automatic_https_rewrites", "browser_check", "tls_client_auth"]
+    },
+    "value": { "type": "enum", "values": ["on", "off", "strict", "full", "flexible", "1.0", "1.1", "1.2", "1.3"] }
+  },
+  "cloudflare_pages_project": {
+    "name": { "type": "pattern", "pattern": "^[a-z0-9][a-z0-9-]{0,57}$" },
+    "production_branch": { "type": "pattern", "pattern": "^[a-z0-9][a-z0-9._/-]{0,63}$" }
+  },
+  "cloudflare_pages_domain": {
+    "name": { "type": "pattern", "pattern": "^([a-z0-9-]+\\.)*piedrazul\\.org$" }
+  }
+}

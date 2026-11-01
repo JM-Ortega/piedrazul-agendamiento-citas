@@ -1,8 +1,14 @@
 package co.edu.unicauca.piedrazul.backend.verification.exception;
 
-public class VerificationCodeExpiredException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class VerificationCodeExpiredException extends VerificationBusinessException {
 
     public VerificationCodeExpiredException() {
-        super("Verification code has expired");
+        super(
+                "El código de verificación expiró",
+                "VERIFICATION_CODE_EXPIRED",
+                HttpStatus.BAD_REQUEST
+        );
     }
 }

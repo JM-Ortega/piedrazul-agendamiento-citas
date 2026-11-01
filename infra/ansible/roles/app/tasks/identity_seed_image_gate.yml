@@ -1,0 +1,38 @@
+---
+# Compatibilidad de imagen del bootstrap del primer administrador. Se incluye solo con el
+# bootstrap habilitado y ANTES de que cualquier backend pueda arrancar con él:
+#   - setup.yml: antes de escribir .env (la contraseña no llega al host si la imagen no sirve);
+#   - deploy.yml: antes de migrar o arrancar postgres/backend (rollback a una imagen anterior).
+# refresh_backend.yml solo recrea un backend que ya corre exactamente backend_image_ref, la
+# misma imagen que setup.yml verificó en este run.
+#
+# Una imagen sin la etiqueta procesaría IDENTITY_SEED_ENABLED=true con su propio código: las
+# imágenes anteriores aprovisionan el ADMIN por la vía ordinaria (adoptan una cuenta existente
+# y le reasignan roles), fijan una contraseña permanente y crean agendadores y auditor de
+# demostración. Comprobarlo después del arranque no deshace esos efectos: por eso se bloquea antes.
+
+- name: Descargar la imagen del backend seleccionada (bootstrap del primer administrador)
+  community.docker.docker_image_pull:
+    name: "{{ backend_image_ref }}"
+    platform: linux/amd64
+    pull: not_present
+
+- name: Leer el contrato de bootstrap de la imagen del backend
+  community.docker.docker_image_info:
+    name: "{{ backend_image_ref }}"
+  register: app_identity_seed_image
+
+- name: Verificar que la imagen del backend implementa el bootstrap create-only
+  ansible.builtin.assert:
+    that:
+      - app_identity_seed_image.images | length == 1
+      - ((app_identity_seed_image.images[0].Config.Labels | default({}, true))[identity_bootstrap_image_label]
+          | default('')) == identity_bootstrap_image_contract
+    fail_msg: >-
+      Bootstrap del primer administrador habilitado, pero la imagen del backend seleccionada
+      ({{ backend_image_ref }}) no declara {{ identity_bootstrap_image_label }}={{ identity_bootstrap_image_contract }}:
+      su código anterior procesaría la contraseña inicial con aprovisionamiento ordinario y
+      datos de demostración. Este run no escribió .env con el bootstrap ni arrancó un backend con él.
+      Desplegar primero una imagen compatible con el bootstrap deshabilitado
+      (primer-admin-negocio.md, paso 2).
+    quiet: true

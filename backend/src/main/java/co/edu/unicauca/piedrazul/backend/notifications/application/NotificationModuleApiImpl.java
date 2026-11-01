@@ -1,7 +1,7 @@
 package co.edu.unicauca.piedrazul.backend.notifications.application;
 
 import co.edu.unicauca.piedrazul.backend.notifications.NotificationModuleApi;
-import co.edu.unicauca.piedrazul.backend.notifications.api.CancellationReason;
+import co.edu.unicauca.piedrazul.backend.notifications.api.OtpDeliveryMode;
 import co.edu.unicauca.piedrazul.backend.notifications.api.ScheduleNotificationCommand;
 import co.edu.unicauca.piedrazul.backend.notifications.api.SendNotificationCommand;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.AggregateReference;
@@ -15,13 +15,16 @@ import java.util.UUID;
 public class NotificationModuleApiImpl implements NotificationModuleApi {
 
     private final NotificationOrchestrator orchestrator;
+    private final OtpDeliveryCapability otpDeliveryCapability;
     private final Clock clock;
 
     public NotificationModuleApiImpl(
             NotificationOrchestrator orchestrator,
+            OtpDeliveryCapability otpDeliveryCapability,
             Clock clock
     ) {
         this.orchestrator = orchestrator;
+        this.otpDeliveryCapability = otpDeliveryCapability;
         this.clock = clock;
     }
 
@@ -46,18 +49,6 @@ public class NotificationModuleApiImpl implements NotificationModuleApi {
     }
 
     @Override
-    public void cancelPendingForAggregate(
-            AggregateReference aggregate,
-            CancellationReason reason
-    ) {
-        orchestrator.cancelPendingForAggregate(
-                aggregate,
-                reason,
-                Instant.now(clock)
-        );
-    }
-
-    @Override
     public boolean alreadySent(
             AggregateReference aggregate,
             NotificationType notificationType
@@ -66,5 +57,15 @@ public class NotificationModuleApiImpl implements NotificationModuleApi {
                 aggregate,
                 notificationType
         );
+    }
+
+    @Override
+    public OtpDeliveryMode otpDeliveryMode() {
+        return otpDeliveryCapability.mode();
+    }
+
+    @Override
+    public boolean isUsableOtpRecipient(String phone, String email) {
+        return otpDeliveryCapability.isUsableRecipient(phone, email);
     }
 }

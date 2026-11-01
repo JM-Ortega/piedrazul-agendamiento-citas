@@ -7,7 +7,7 @@ import java.util.UUID;
 public class PatientNotFoundException extends PatientBusinessException {
 
     public PatientNotFoundException(UUID id) {
-        super("Patient not found with id: " + id, "PATIENT_NOT_FOUND", HttpStatus.NOT_FOUND);
+        super("Paciente no encontrado con id: " + id, "PATIENT_NOT_FOUND", HttpStatus.NOT_FOUND);
     }
 
     public PatientNotFoundException(String documentNumber) {

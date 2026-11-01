@@ -1,0 +1,101 @@
+---
+# Correo nativo de Keycloak: SMTP de SES y recuperación de contraseña del realm de la aplicación.
+# Ver docs/operations/runbooks/correo-ses.md. Lo incluye keycloak_lifecycle.yml al final, ya en
+# P1; deploy no lo corre porque no recibe secretos.
+#
+# La decisión es la de app_ses_enabled (ses_inputs.yml): un solo interruptor.
+#   habilitado    se escribe en cada converge: Keycloak enmascara la contraseña, así que una
+#                 rotación no se puede detectar comparando.
+#   deshabilitado se limpia si queda algo; si no, no se llama a la API (instalación limpia).
+#   SMTP ajeno    un host que no es de SES no lo puso este ciclo: falla sin escribir.
+#
+# La contraseña viaja por stdin del exec, nunca por argv ni entorno. El JSON va en base64 solo
+# para que nada lo reinterprete en el camino. Keycloak la guarda en claro en su base: es propio
+# de su SMTP nativo y quedó aceptado.
+#
+# Verde establece configuración, no credenciales válidas ni entrega de un correo.
+
+# Sin valor por defecto: tratar una decisión ausente como false borraría el SMTP
+- name: Exigir la decisión de correo SES de este converge
+  ansible.builtin.assert:
+    that:
+      - app_ses_enabled is defined
+    fail_msg: "keycloak_smtp.yml necesita ses_inputs.yml antes: sin decisión no se toca el realm"
+    quiet: true
+
+- name: Fallar ante un SMTP ajeno en el realm
+  ansible.builtin.fail:
+    msg: >-
+      KEYCLOAK SMTP: el realm {{ kc_realm }} tiene un SMTP cuyo host ('{{ app_kc_observed.smtp_host }}')
+      no es de SES; este ciclo no lo puso y no se sobrescribe. No se escribió nada. Retirarlo o
+      decidir sobre él en la consola de administración y repetir el converge
+      (docs/operations/runbooks/correo-ses.md).
+  when:
+    - app_kc_observed.smtp_fields | length > 0
+    - app_kc_observed.smtp_host is not match(ses_smtp_host_pattern)
+
+- name: Aplicar SMTP y recuperación al realm
+  community.docker.docker_container_exec:
+    container: keycloak
+    argv: ["/bin/bash", "-c", "{{ lookup('ansible.builtin.file', 'keycloak-admin.sh') }}", "keycloak-admin", "smtp"]
+    stdin: "{{ _realm_update | to_json | b64encode }}"
+    env:
+      KCL_SERVER: "http://localhost:{{ kc_port }}"
+      KCL_REALM: "{{ kc_realm }}"
+      KCL_AUTOMATION_CLIENT_ID: "{{ kc_automation_client_id }}"
+      KCL_BACKEND_CLIENT_ID: "{{ kc_backend_client_id }}"
+      KCL_AUTOMATION_SECRET: "{{ app_kc_automation_secret }}"
+  vars:
+    _realm_update: >-
+      {{ {'resetPasswordAllowed': true,
+          'smtpServer': kc_smtp_connection | combine({
+            'host': app_ses_smtp.HOST, 'user': app_ses_smtp.USERNAME, 'password': app_ses_smtp.PASSWORD,
+            'from': notifications_email_from, 'fromDisplayName': notifications_email_from_name})}
+         if app_ses_enabled | bool else {'resetPasswordAllowed': false, 'smtpServer': {}} }}
+  register: app_kc_smtp_apply
+  changed_when: "'smtp.update=applied' in app_kc_smtp_apply.stdout_lines"
+  failed_when: false
+  no_log: true
+  when: >-
+    (app_ses_enabled | bool) or app_kc_observed.smtp_fields | length > 0
+    or app_kc_observed.reset_password_allowed != 'false'
+
+- name: Verificar la escritura en el realm
+  ansible.builtin.assert:
+    that:
+      - app_kc_smtp_apply.rc == 0
+      - "'smtp.update=applied' in app_kc_smtp_apply.stdout_lines"
+    fail_msg: >-
+      KEYCLOAK SMTP: el realm no aceptó la configuración
+      ({{ app_kc_smtp_apply.stdout_lines | default([]) | select('match', '^(error|auth[.][a-z]+)=') | join(', ') or 'sin salida' }}).
+      La escritura es una sola transacción: corregir la causa y repetir el converge.
+    quiet: true
+  when: app_kc_smtp_apply is not skipped
+
+- name: Leer el realm después de reconciliar el correo
+  ansible.builtin.include_tasks: keycloak_state.yml
+  vars:
+    app_kc_with_api: false
+
+- name: Verificar el correo nativo en el realm
+  ansible.builtin.assert:
+    that:
+      - (app_kc_observed.reset_password_allowed | string | lower) == (_enabled | string | lower)
+      - app_kc_observed.smtp_fields == (_fields if _enabled else [])
+      - app_kc_observed.smtp_settings == (_settings if _enabled else [])
+    fail_msg: >-
+      KEYCLOAK SMTP: la configuración leída del realm no es la deseada (recuperación
+      {{ app_kc_observed.reset_password_allowed }}, campos {{ app_kc_observed.smtp_fields | join(',') or 'ninguno' }}).
+      No se informa como éxito: revisar y repetir el converge.
+    success_msg: >-
+      KEYCLOAK SMTP: {{ 'SES configurado y recuperación de contraseña habilitada; no prueba
+      credenciales válidas ni entrega de correo' if _enabled
+      else 'sin SMTP y recuperación de contraseña deshabilitada' }}
+  vars:
+    _enabled: "{{ app_ses_enabled | bool }}"
+    _fields: ['auth', 'from', 'fromDisplayName', 'host', 'password', 'port', 'ssl', 'starttls', 'user']
+    _settings: >-
+      {{ (['smtp.auth=' ~ kc_smtp_connection.auth, 'smtp.from=' ~ notifications_email_from,
+           'smtp.fromDisplayName=' ~ notifications_email_from_name,
+           'smtp.host=' ~ (app_ses_smtp.HOST | default('')), 'smtp.port=' ~ kc_smtp_connection.port,
+           'smtp.ssl=' ~ kc_smtp_connection.ssl, 'smtp.starttls=' ~ kc_smtp_connection.starttls]) | sort }}

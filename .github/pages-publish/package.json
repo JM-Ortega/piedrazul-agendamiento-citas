@@ -1,0 +1,11 @@
+{
+  "name": "piedrazul-pages-publish",
+  "private": true,
+  "description": "Herramienta fijada para publicar en Cloudflare Pages el artefacto validado del frontend (production-hetzner.yml)",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "wrangler": "4.151.1"
+  }
+}

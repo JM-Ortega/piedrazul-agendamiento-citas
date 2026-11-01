@@ -12,4 +12,17 @@ export const environment = {
     phone: '6013891234',
     phoneDisplay: '601 389 1234',
   },
+  session: {
+    /** Minutos de inactividad permitidos por rol.
+     * `default` aplica si el rol es desconocido.
+     */
+    inactivityMinutes: {
+      PATIENT: 15,
+      SCHEDULER: 480,
+      DOCTOR: 480,
+      ADMIN: 480,
+      AUDITOR: 15,
+      default: 15,
+    } as Record<string, number>,
+  },
 };

@@ -1,6 +1,10 @@
 services:
   traefik:
-    image: traefik:v3.6
+    # Referencia fijada: <tag>@sha256:<índice OCI>. El digest es la identidad (el tag solo la
+    # hace legible y Ansible lo contrasta con la versión de la imagen). En producción prod.yml
+    # la reemplaza por TRAEFIK_IMAGE de image.env: el manifiesto linux/amd64 exacto de este
+    # índice, el mismo que se escaneó (ver ansible/roles/app/tasks/traefik_image.yml).
+    image: traefik:v3.7.14@sha256:575fa15b135078fe5e50aa847987d96dbddd7b093c172429618404df73f3fa7c
     container_name: traefik
     restart: unless-stopped
     command:
@@ -13,11 +17,12 @@ services:
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
-      # Docker provider
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=piedrazul_net"
-      # File provider — configuración dinámica TLS (AOP y opciones TLS)
+      # Un conflicto de opciones TLS sobre un mismo host desactiva sus routers en vez de
+      # caer a las opciones TLS por defecto (que no exigen el certificado de cliente de AOP)
+      - "--core.strictTLSOptions=true"
+      # File provider: única fuente de rutas. tls.yml (opciones TLS de AOP, del repositorio)
+      # y routes.yml (routers y servicios, generado por Ansible desde el inventario). Sin
+      # Docker provider ni socket de Docker.
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
       # Let's Encrypt via Cloudflare DNS challenge
@@ -32,11 +37,9 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      # Runtime Docker socket (read-only)
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       # Almacenamiento persistente de certificados Let's Encrypt
       - traefik_letsencrypt:/letsencrypt
-      # Configuración dinámica — opciones TLS para AOP
+      # Configuración dinámica: opciones TLS de AOP y rutas (file provider)
       - ../traefik/dynamic:/etc/traefik/dynamic:ro
       # CA de Cloudflare para Authenticated Origin Pulls
       - ../traefik/certs:/certs:ro

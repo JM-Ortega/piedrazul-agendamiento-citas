@@ -1,0 +1,18 @@
+@if (subStep() === 'search') {
+  <app-unscheduled-patient-search
+    [prefillDocument]="lastSearchedDocument()"
+    [specialtyOptions]="specialtyOptions()"
+    (found)="onFound($event)"
+    (notFound)="onNotFound($event)"
+  ></app-unscheduled-patient-search>
+}
+
+@if (subStep() === 'register') {
+  <app-unscheduled-patient-register
+    [prefillDocument]="lastSearchedDocument()"
+    [specialtyOptions]="specialtyOptions()"
+    (goBack)="onRegisterGoBack()"
+    (advance)="onRegisterAdvance()"
+    (documentAlreadyExists)="onExistingDocumentConfirmed($event)"
+  ></app-unscheduled-patient-register>
+}

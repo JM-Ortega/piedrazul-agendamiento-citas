@@ -1,0 +1,100 @@
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center p-4"
+  style="background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px)"
+  role="button"
+  tabindex="0"
+  (click)="onBackdropClick($event)"
+  (keydown.escape)="finish.emit()"
+>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+    <!-- Header -->
+    <div class="bg-[#215c98] px-6 py-5 flex items-start justify-between">
+      <div>
+        <h2 class="text-white text-xl font-bold">Agendar una cita</h2>
+        <p class="text-blue-200 text-sm mt-1">
+          Para agendar necesitas una cuenta en el sistema
+        </p>
+      </div>
+      <app-button
+        (buttonClick)="finish.emit()"
+        variant="danger"
+        size="sm"
+        extraClass="w-9 h-9"
+      >
+        ×
+      </app-button>
+    </div>
+
+    <!-- Opciones principales -->
+    <div class="p-6 flex flex-col gap-3">
+      <app-button
+        (buttonClick)="login()"
+        variant="primary"
+        extraClass="gap-4 w-full text-left justify-start"
+      >
+        <div class="bg-[#4e92d9] p-2 rounded-lg shrink-0">
+          <svg lucideLogIn [size]="22" color="white"></svg>
+        </div>
+        <div>
+          <div class="font-semibold text-base">Ya tengo una cuenta</div>
+          <div class="text-blue-200 text-sm">
+            Ingresa con tu usuario y contraseña
+          </div>
+        </div>
+      </app-button>
+      <app-button
+        (buttonClick)="register()"
+        extraClass="text-left justify-start gap-4 w-full bg-white text-[#215c98] border-2 border-[#215c98] hover:bg-blue-50 px-5 py-4 rounded-xl transition-all"
+      >
+        <div class="bg-[#d9e9f8] p-2 rounded-lg shrink-0">
+          <svg lucideUserPlus [size]="22" class="text-[#215c98]"></svg>
+        </div>
+        <div>
+          <div class="text-[#215c98] font-semibold text-base">
+            Crear mi cuenta
+          </div>
+          <div class="text-[#215c98] text-sm">
+            Regístrate para agendar tu cita
+          </div>
+        </div>
+      </app-button>
+    </div>
+
+    <!-- Contacto -->
+    <div class="border-t border-gray-100 px-6 py-4">
+      <p class="text-gray-600 text-sm text-center mb-3">
+        ¿Prefieres que te ayudemos?
+      </p>
+      <div class="flex gap-3">
+        <a
+          [href]="whatsappUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="flex items-center justify-center gap-2 flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-xl transition-all active:scale-95 text-left"
+        >
+          <svg
+            lucideMessageCircle
+            [size]="18"
+            color="white"
+            class="shrink-0"
+          ></svg>
+          <div>
+            <div class="text-sm font-medium">{{ whatsappDisplay }}</div>
+            <div class="text-green-100 text-xs">Escríbenos</div>
+          </div>
+        </a>
+
+        <a
+          [href]="phoneUrl"
+          class="flex items-center justify-center gap-2 flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-xl transition-all active:scale-95 text-left"
+        >
+          <svg lucidePhone [size]="18" class="shrink-0"></svg>
+          <div>
+            <div class="text-sm font-medium">{{ phoneDisplay }}</div>
+            <div class="text-gray-400 text-xs">Llámanos</div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

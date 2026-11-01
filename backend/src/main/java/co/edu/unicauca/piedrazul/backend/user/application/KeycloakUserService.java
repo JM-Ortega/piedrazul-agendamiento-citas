@@ -1,13 +1,15 @@
 package co.edu.unicauca.piedrazul.backend.user.application;
 
-import co.edu.unicauca.piedrazul.backend.shared.auth.Role;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Role;
 import co.edu.unicauca.piedrazul.backend.user.UserModuleApi;
 import co.edu.unicauca.piedrazul.backend.user.api.dto.internal.UserSummary;
 import co.edu.unicauca.piedrazul.backend.user.infrastructure.KeycloakUserClient;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+@Slf4j
 @Service
 public class KeycloakUserService implements UserModuleApi {
 
@@ -23,18 +25,29 @@ public class KeycloakUserService implements UserModuleApi {
     }
 
     @Override
-    public List<UserSummary> findSchedulers() {
-        return findUsersByRole(Role.SCHEDULER);
+    public List<UserSummary> getSystemUsers() {
+        return keycloakClient.getSystemUsers()
+                .stream()
+                .map(this::toUserSummary)
+                .toList();
     }
 
     @Override
     public List<UserSummary> findDoctors() {
-        return findUsersByRole(Role.DOCTOR);
+        return keycloakClient.findUsersByRole(Role.DOCTOR)
+                .stream()
+                .map(this::toUserSummary)
+                .toList();
     }
 
     @Override
     public List<String> getUserRoles (UUID userId) {
-        return keycloakClient.getUserRoles(userId);
+        return keycloakClient.getUserRoles(userId.toString());
+    }
+
+    @Override
+    public Map<UUID, List<String>> getUserRolesByIds(Collection<UUID> userIds) {
+        return keycloakClient.getUserRolesByIds(userIds);
     }
 
     @Override
@@ -53,13 +66,13 @@ public class KeycloakUserService implements UserModuleApi {
     }
 
     @Override
-    public void activateUser(UUID id) {
-        keycloakClient.activateUser(id);
+    public void ensureDoctorRole(UUID userId) {
+        keycloakClient.assignRoleIfMissing(userId, Role.DOCTOR);
     }
 
     @Override
-    public void deactivateUser(UUID id) {
-        keycloakClient.deactivateUser(id);
+    public void revokeDoctorRole(UUID userId) {
+        keycloakClient.revokeRoleIfPresent(userId, Role.DOCTOR);
     }
 
     @Override
@@ -72,11 +85,22 @@ public class KeycloakUserService implements UserModuleApi {
         keycloakClient.assignRoleIfMissing(userId, Role.PATIENT);
     }
 
-    private List<UserSummary> findUsersByRole(Role role) {
-        return keycloakClient.findUsersByRole(role)
-                .stream()
-                .map(this::toUserSummary)
-                .toList();
+    public void activateUser(UUID userId, UUID patientId) {
+        keycloakClient.setEnabled(userId, true, patientId);
+    }
+
+    public void deactivateUser(UUID userId, UUID patientId) {
+        keycloakClient.setEnabled(userId, false, patientId);
+    }
+
+    /** Si una cuenta está activada o desactivada, por su id. */
+    public Map<UUID, Boolean> getAccountsEnabledStatus(Collection<UUID> userIds) {
+        return keycloakClient.getEnabledStatusByIds(userIds);
+    }
+
+    @Override
+    public void updateUserIdentity(UUID userId, String username, String firstName, String lastName, String email) {
+        keycloakClient.updateUser(userId, username, firstName, lastName, email);
     }
 
     private UserSummary toUserSummary(org.keycloak.representations.idm.UserRepresentation user) {
@@ -85,7 +109,8 @@ public class KeycloakUserService implements UserModuleApi {
                 user.getUsername(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getEmail()
+                user.getEmail(),
+                user.getRealmRoles()
         );
     }
 }

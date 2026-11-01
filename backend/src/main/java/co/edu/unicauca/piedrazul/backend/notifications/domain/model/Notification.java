@@ -3,8 +3,12 @@ package co.edu.unicauca.piedrazul.backend.notifications.domain.model;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.exception.InvalidNotificationStateTransitionException;
 
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public class Notification {
@@ -14,10 +18,10 @@ public class Notification {
     private final AggregateReference aggregate;
     private final RecipientSnapshot recipient;
     private final ChannelPreference channelPreference;
-    private final Map<String, String> variables;
     private final String idempotencyKey;
     private final Instant createdAt;
 
+    private Map<String, String> variables;
     private NotificationStatus status;
     private Instant updatedAt;
 
@@ -188,6 +192,65 @@ public class Notification {
 
         this.status = NotificationStatus.EXPIRED;
         this.updatedAt = now;
+    }
+
+    /**
+     * Elimina las variables secretas (p. ej. el código de un solo uso) y conserva el resto para
+     * auditoría. Solo debe llamarse cuando ya no queda reintento ni canal que las necesite.
+     *
+     * @return {@code true} si había algo que eliminar
+     */
+    public boolean redactSensitiveVariables() {
+        Set<String> sensitive = type.sensitiveVariables();
+
+        if (sensitive.isEmpty() || variables.keySet().stream().noneMatch(sensitive::contains)) {
+            return false;
+        }
+
+        Map<String, String> remaining = new HashMap<>(variables);
+        remaining.keySet().removeAll(sensitive);
+        this.variables = Map.copyOf(remaining);
+        return true;
+    }
+
+    public int dispatchRecoveries() {
+        return Integer.parseInt(variables.getOrDefault(NotificationVariables.DISPATCH_RECOVERIES, "0"));
+    }
+
+    public void recordDispatchRecovery(Instant now) {
+        Objects.requireNonNull(now, "La fecha actual es obligatoria");
+
+        Map<String, String> updated = new HashMap<>(variables);
+        updated.put(NotificationVariables.DISPATCH_RECOVERIES, String.valueOf(dispatchRecoveries() + 1));
+        this.variables = Map.copyOf(updated);
+        this.updatedAt = now;
+    }
+
+    /**
+     * Instante de caducidad del contenido. Vacío si el tipo no caduca; si el tipo caduca y el
+     * valor falta o es ilegible, se devuelve {@link Instant#MIN} para que cuente como vencido.
+     */
+    public Optional<Instant> expiresAt() {
+        if (!type.requiresExpiry()) {
+            return Optional.empty();
+        }
+
+        String raw = variables.get(NotificationVariables.EXPIRES_AT);
+
+        if (raw == null || raw.isBlank()) {
+            return Optional.of(Instant.MIN);
+        }
+
+        try {
+            return Optional.of(Instant.parse(raw));
+        } catch (DateTimeParseException exception) {
+            return Optional.of(Instant.MIN);
+        }
+    }
+
+    /** El contenido ya no sirve en {@code instant} (vence en el mismo instante de caducidad). */
+    public boolean isExpiredAt(Instant instant) {
+        return expiresAt().map(expiry -> !instant.isBefore(expiry)).orElse(false);
     }
 
     private void requireStatus(NotificationStatus... allowedStatuses) {

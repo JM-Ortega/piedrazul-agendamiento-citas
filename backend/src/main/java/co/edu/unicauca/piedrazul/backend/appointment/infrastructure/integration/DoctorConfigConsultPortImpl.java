@@ -1,14 +1,15 @@
 package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration;
 
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentTime;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.doctors.DoctorExternalService;
+import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.internal.WorkingSchedule;
 import co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output.DoctorResponse;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -20,12 +21,8 @@ public class DoctorConfigConsultPortImpl implements DoctorConfigConsultPort {
     }
 
     @Override
-    public List<AppointmentTime> getSlotsByDoctor(UUID idDoctor, LocalDate date) {
-        List<LocalTime> slots = doctorExternalService.getSlotsByDoctor(idDoctor, date);
-
-        return slots.stream()
-                .map(AppointmentTime::new)
-                .toList();
+    public Optional<UUID> findByUserId(UUID userId) {
+        return doctorExternalService.findByUserId(userId);
     }
 
     @Override
@@ -34,8 +31,8 @@ public class DoctorConfigConsultPortImpl implements DoctorConfigConsultPort {
     }
 
     @Override
-    public String getDoctorName(UUID idDoctor) {
-        return doctorExternalService.getDoctorName(idDoctor);
+    public boolean isOnTimeOff(UUID idDoctor, java.time.LocalDate date) {
+        return doctorExternalService.isOnTimeOff(idDoctor, date);
     }
 
     @Override
@@ -44,12 +41,23 @@ public class DoctorConfigConsultPortImpl implements DoctorConfigConsultPort {
     }
 
     @Override
-    public List<UUID> getActiveGeneralDoctorIds(){
-        return doctorExternalService.getActiveGeneralDoctorIds();
+    public String getDoctorName(UUID idDoctor){
+        List<DoctorResponse> doctors = doctorExternalService.getDoctorInfoByIds(List.of(idDoctor));
+        return doctors.isEmpty() ? null : doctors.get(0).name();
     }
 
     @Override
     public List<DoctorResponse> getDoctorInfoByIds(List<UUID> doctorIds) {
         return doctorExternalService.getDoctorInfoByIds(doctorIds);
+    }
+
+    @Override
+    public List<SpecialtyCode> getSpecialtiesByDoctor(UUID idDoctor) {
+        return doctorExternalService.findSpecialtiesByPersonIds(List.of(idDoctor)).getOrDefault(idDoctor, List.of());
+    }
+
+    @Override
+    public WorkingSchedule workingSchedule(UUID idDoctor){
+        return doctorExternalService.workingSchedule(idDoctor);
     }
 }

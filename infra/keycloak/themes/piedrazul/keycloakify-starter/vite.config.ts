@@ -8,10 +8,11 @@ export default defineConfig({
         keycloakify({
             accountThemeImplementation: "none",
             keycloakifyBuildDirPath: "../../keycloak-theme",
-            environmentVariables: [
-                { name: "REGISTER_URL", default: "https://piedrazul.org/registro" },
-                { name: "HOME_URL", default: "https://piedrazul.org" }
-            ]
+            // Dirección pública del frontend Angular. Keycloak la resuelve en ejecución desde la
+            // variable de entorno del contenedor (theme.properties: ${env.FRONTEND_PUBLIC_URL:}),
+            // así el mismo JAR sirve en desarrollo y producción. Sin valor por defecto: si falta,
+            // el tema oculta los enlaces al frontend en vez de inventar un destino.
+            environmentVariables: [{ name: "FRONTEND_PUBLIC_URL", default: "" }]
         })
     ]
 });

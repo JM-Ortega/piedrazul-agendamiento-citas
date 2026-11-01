@@ -3,11 +3,16 @@ package co.edu.unicauca.piedrazul.backend.verification.domain;
 import co.edu.unicauca.piedrazul.backend.verification.api.VerificationPurpose;
 import jakarta.persistence.*;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "verification_codes")
+@Table(
+        name = "verification_code",
+        indexes = {
+                @Index(name = "idx_verification_code_purpose", columnList = "purpose_code")
+        }
+)
 public class VerificationCode {
 
     @Id
@@ -18,14 +23,14 @@ public class VerificationCode {
     private String subject;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "purpose_code", nullable = false, length = 40)
     private VerificationPurpose purpose;
 
     @Column(nullable = false)
     private String codeHash;
 
     @Column(nullable = false)
-    private LocalDateTime expiresAt;
+    private Instant expiresAt;
 
     @Column(nullable = false)
     private int attempts;
@@ -37,7 +42,7 @@ public class VerificationCode {
     private boolean used;
 
     @Column(nullable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     protected VerificationCode() {
     }
@@ -46,7 +51,7 @@ public class VerificationCode {
             String subject,
             VerificationPurpose purpose,
             String codeHash,
-            LocalDateTime expiresAt,
+            Instant expiresAt,
             int maxAttempts
     ) {
         this.subject = subject;
@@ -56,10 +61,10 @@ public class VerificationCode {
         this.maxAttempts = maxAttempts;
         this.attempts = 0;
         this.used = false;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = Instant.now();
     }
 
-    public boolean isExpired(LocalDateTime now) {
+    public boolean isExpired(Instant now) {
         return now.isAfter(expiresAt);
     }
 
@@ -67,16 +72,12 @@ public class VerificationCode {
         return attempts < maxAttempts;
     }
 
-    public boolean isUsable(LocalDateTime now) {
+    public boolean isUsable(Instant now) {
         return !used && !isExpired(now) && hasAttemptsRemaining();
     }
 
     public void increaseAttempts() {
         this.attempts++;
-    }
-
-    public void markAsUsed() {
-        this.used = true;
     }
 
     public void invalidate() {
@@ -99,7 +100,7 @@ public class VerificationCode {
         return codeHash;
     }
 
-    public LocalDateTime getExpiresAt() {
+    public Instant getExpiresAt() {
         return expiresAt;
     }
 
@@ -115,7 +116,7 @@ public class VerificationCode {
         return used;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 }

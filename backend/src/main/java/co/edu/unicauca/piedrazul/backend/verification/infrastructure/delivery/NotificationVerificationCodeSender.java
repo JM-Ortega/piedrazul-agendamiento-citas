@@ -1,12 +1,13 @@
 package co.edu.unicauca.piedrazul.backend.verification.infrastructure.delivery;
 
 import co.edu.unicauca.piedrazul.backend.notifications.NotificationModuleApi;
+import co.edu.unicauca.piedrazul.backend.notifications.api.OtpDeliveryMode;
 import co.edu.unicauca.piedrazul.backend.notifications.api.SendNotificationCommand;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.*;
 import co.edu.unicauca.piedrazul.backend.verification.application.VerificationCodeSender;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -22,14 +23,22 @@ public class NotificationVerificationCodeSender implements VerificationCodeSende
         this.notificationModuleApi = notificationModuleApi;
     }
 
+    @Override
+    public boolean isDeliveryAvailable() {
+        // Lista cerrada: un modo ausente o desconocido cuenta como no disponible.
+        OtpDeliveryMode mode = notificationModuleApi.otpDeliveryMode();
+        return mode == OtpDeliveryMode.EMAIL || mode == OtpDeliveryMode.DIAGNOSTIC_CONSOLE;
+    }
 
     @Override
-    public void sendCode(String subject, String displayName, String phone, String email, String code, int expirationMinutes) {
-        UUID subjectId = parseOrDerive(subject);
+    public boolean isRecipientUsable(String phone, String email) {
+        return notificationModuleApi.isUsableOtpRecipient(phone, email);
+    }
 
+    @Override
+    public void sendCode(String subject, String displayName, String phone, String email, String code, int expirationMinutes, Instant expiresAt, UUID recipientId, UUID verificationCodeId) {
         RecipientSnapshot recipient = new RecipientSnapshot(
-                subjectId,
-                RecipientType.PATIENT,
+                recipientId,
                 displayName,
                 phone,
                 email,
@@ -38,24 +47,18 @@ public class NotificationVerificationCodeSender implements VerificationCodeSende
         );
 
         Map<String, String> variables = Map.of(
-                "code", code,
+                NotificationVariables.CODE, code,
                 "expirationMinutes", String.valueOf(expirationMinutes),
+                // El despacho no entrega el código al proveedor a partir de este instante.
+                NotificationVariables.EXPIRES_AT, expiresAt.toString(),
                 "destination", phone != null ? phone : email
         );
 
         notificationModuleApi.sendNow(new SendNotificationCommand(
                 NotificationType.OTP_CODE,
-                new AggregateReference(AggregateType.VERIFICATION, subjectId),
+                new AggregateReference(AggregateType.VERIFICATION, verificationCodeId),
                 recipient,
                 variables
         ));
-    }
-
-    private UUID parseOrDerive(String subject) {
-        try {
-            return UUID.fromString(subject);
-        } catch (IllegalArgumentException e) {
-            return UUID.nameUUIDFromBytes(subject.getBytes(StandardCharsets.UTF_8));
-        }
     }
 }

@@ -7,7 +7,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
-import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Specialty;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -71,14 +71,14 @@ class BusySlotServiceTest {
     }
 
     @Test
-    void isBusyShouldReturnTrueWhenReprogramadaAppointmentCollidesWithNewSlot() {
-        // REPROGRAMADA también es activa → debe bloquear el slot
-        Appointment reprogramada = buildAppointmentWithState(
-                LocalTime.of(10, 0), AppointmentState.REPROGRAMADA
+    void isBusyShouldReturnTrueWhenOnlyAtendidaAppointmentExistsAtSameTime() {
+        // ATENDIDA también se considera activa/ocupante del slot
+        Appointment atendida = buildAppointmentWithState(
+                LocalTime.of(9, 0), AppointmentState.ATENDIDA
         );
-        AppointmentTime newSlot = new AppointmentTime(LocalTime.of(10, 0));
+        AppointmentTime newSlot = new AppointmentTime(LocalTime.of(9, 0));
 
-        boolean result = busySlotService.isBusy(List.of(reprogramada), newSlot, 30);
+        boolean result = busySlotService.isBusy(List.of(atendida), newSlot, 30);
 
         assertThat(result).isTrue();
     }
@@ -116,25 +116,26 @@ class BusySlotServiceTest {
     }
 
     @Test
-    void isBusyShouldReturnFalseWhenOnlyAtendidaAppointmentExistsAtSameTime() {
-        Appointment atendida = buildAppointmentWithState(
-                LocalTime.of(9, 0), AppointmentState.ATENDIDA
+    void isBusyShouldReturnFalseWhenOnlyNoAsistioAppointmentExistsAtSameTime() {
+        Appointment noAsistio = buildAppointmentWithState(
+                LocalTime.of(9, 0), AppointmentState.NO_ASISTIO
         );
-        AppointmentTime newSlot = new AppointmentTime(LocalTime.of(9, 0));
+        AppointmentTime newSlot = new AppointmentTime(LocalTime.of(10, 0));
 
-        boolean result = busySlotService.isBusy(List.of(atendida), newSlot, 30);
+        boolean result = busySlotService.isBusy(List.of(noAsistio), newSlot, 30);
 
         assertThat(result).isFalse();
     }
 
     @Test
-    void isBusyShouldReturnFalseWhenOnlyNoAsistioAppointmentExistsAtSameTime() {
-        Appointment noAsistio = buildAppointmentWithState(
-                LocalTime.of(9, 0), AppointmentState.NO_ASISTIO
+    void isBusyShouldReturnFalseWhenOnlyReprogramadaAppointmentExistsAtSameTime() {
+        // REPROGRAMADA no se considera activa: no bloquea el slot
+        Appointment reprogramada = buildAppointmentWithState(
+                LocalTime.of(10, 0), AppointmentState.REPROGRAMADA
         );
-        AppointmentTime newSlot = new AppointmentTime(LocalTime.of(9, 0));
+        AppointmentTime newSlot = new AppointmentTime(LocalTime.of(10, 0));
 
-        boolean result = busySlotService.isBusy(List.of(noAsistio), newSlot, 30);
+        boolean result = busySlotService.isBusy(List.of(reprogramada), newSlot, 30);
 
         assertThat(result).isFalse();
     }
@@ -166,26 +167,12 @@ class BusySlotServiceTest {
      * diferente a AGENDADA desde fuera del dominio.
      */
     private Appointment buildAppointmentWithState(LocalTime time, AppointmentState state) {
-        PatientInfo patientInfo = PatientInfo.of(
-                DocumentType.CEDULA,
-                "12345678",
-                "Carlos",
-                "Gomez",
-                "3001234567",
-                Gender.MASCULINO,
-                LocalDate.of(1990, 6, 15),
-                "carlos@correo.com",
-                null
-        );
 
         return Appointment.reconstruct(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                "Dra. Lopez",
                 UUID.randomUUID(),
-                "Carlos Gomez",
-                patientInfo,
-                Specialty.FISIOTERAPIA,
+                SpecialtyCode.FISIOTERAPIA,
                 state,
                 LocalDate.now().plusDays(1),
                 new AppointmentTime(time),

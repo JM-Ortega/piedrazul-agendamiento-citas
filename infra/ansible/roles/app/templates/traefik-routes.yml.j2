@@ -1,0 +1,33 @@
+# Generado por Ansible (app/tasks/traefik_routes.yml) desde el inventario: no editar en el
+# servidor. Traefik lo lee con el file provider (watch) junto a tls.yml.
+#
+# Los servicios apuntan al nombre del contenedor en piedrazul_net; Traefik lo resuelve en
+# cada conexión nueva, así que recrear backend o keycloak no deja rutas obsoletas. Mientras
+# un upstream no existe o no responde, su router devuelve 502/503 (no 404).
+http:
+  routers:
+    backend:
+      rule: "Host(`{{ api_public_domain }}`)"
+      entryPoints:
+        - websecure
+      service: backend
+      tls:
+        certResolver: letsencrypt
+        options: cloudflare-aop
+    keycloak:
+      rule: "Host(`{{ kc_hostname }}`)"
+      entryPoints:
+        - websecure
+      service: keycloak
+      tls:
+        certResolver: letsencrypt
+        options: cloudflare-aop
+  services:
+    backend:
+      loadBalancer:
+        servers:
+          - url: "http://backend:{{ server_port }}"
+    keycloak:
+      loadBalancer:
+        servers:
+          - url: "http://keycloak:{{ kc_port }}"

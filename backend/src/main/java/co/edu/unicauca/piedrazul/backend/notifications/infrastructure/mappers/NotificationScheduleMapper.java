@@ -14,7 +14,7 @@ public class NotificationScheduleMapper {
 
         NotificationScheduleEntity entity = new NotificationScheduleEntity();
 
-        entity.setIdSchedule(schedule.getId());
+        entity.setId(schedule.getId());
         entity.setNotificationId(schedule.getNotificationId());
         entity.setScheduledAt(schedule.getScheduledAt());
         entity.setStatus(schedule.getStatus());
@@ -33,7 +33,7 @@ public class NotificationScheduleMapper {
         }
 
         return NotificationSchedule.reconstruct(
-                entity.getIdSchedule(),
+                entity.getId(),
                 entity.getNotificationId(),
                 entity.getScheduledAt(),
                 entity.getStatus(),

@@ -3,19 +3,35 @@ spring:
     name: backend
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:app_db}?currentSchema=${DB_SCHEMA:piedrazul}
-    username: ${DB_USER:piedrazul}
-    password: ${DB_PASSWORD:piedrazul}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:piedrazul_db}
+    username: ${APP_DB_USERNAME:piedrazul_app}
+    password: ${APP_DB_PASSWORD:piedrazul_app}
     driver-class-name: org.postgresql.Driver
+
+  # En producción el backend corre con SPRING_FLYWAY_ENABLED=false y JPA_DDL_AUTO=validate
+  # (infra/compose/backend.yml); esta configuración la usa el servicio migrate
+  # (SchemaMigrationApplication, infra/compose/migrate.yml) con MIGRATION_DB_*.
+  flyway:
+    enabled: true
+    user: ${MIGRATION_DB_USERNAME:piedrazul_migration}
+    password: ${MIGRATION_DB_PASSWORD:piedrazul_migration}
+    default-schema: ${DB_SCHEMA:piedrazul}
+    schemas: ${DB_SCHEMA:piedrazul},extensions
+    locations: classpath:db/migration
+    clean-disabled: true
+    validate-on-migrate: true
+    baseline-on-migrate: false
+    placeholders:
+      # Mismo rol con el que se conecta la aplicación y que crea infra/postgres/init.
+      app_role: ${APP_DB_USERNAME:piedrazul_app}
 
   jpa:
     hibernate:
-      ddl-auto: ${JPA_DDL_AUTO:update}
+      ddl-auto: ${JPA_DDL_AUTO:validate}
     show-sql: ${JPA_SHOW_SQL:false}
     properties:
       hibernate:
         format_sql: ${JPA_FORMAT_SQL:false}
-        default_schema: ${DB_SCHEMA:piedrazul}
 
   security:
     oauth2:
@@ -35,9 +51,11 @@ spring:
 
   modulith:
     events:
+      completion-mode: archive
+      republish-outstanding-events-on-restart: true
       jdbc:
         schema-initialization:
-          enabled: ${MODULITH_SCHEMA_INIT:true}
+          enabled: false
 
 
 server:
@@ -51,15 +69,26 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
 
   seed:
+    # Bootstrap create-only del primer administrador de negocio (rol ADMIN del realm de la
+    # aplicación). Deshabilitado no usa ninguna de estas propiedades, tampoco la contraseña.
+    # Ver docs/operations/runbooks/primer-admin-negocio.md.
     identity:
       enabled: ${IDENTITY_SEED_ENABLED:false}
 
       admin:
         username: ${IDENTITY_SEED_ADMIN_USERNAME:}
+        identification-type: ${IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE:}
         first-name: ${IDENTITY_SEED_ADMIN_FIRST_NAME:}
         last-name: ${IDENTITY_SEED_ADMIN_LAST_NAME:}
         email: ${IDENTITY_SEED_ADMIN_EMAIL:}
+        phone: ${IDENTITY_SEED_ADMIN_PHONE:}
         password: ${IDENTITY_SEED_ADMIN_PASSWORD:}
+
+    # Datos de demostración (médicos, pacientes, agendadores, auditor; todos ficticios).
+    # Además de este opt-in exigen el perfil dev exclusivo: con prod, sin perfil o con un
+    # perfil desconocido no corren (DemoSeedCondition).
+    demo:
+      enabled: ${APP_DEMO_SEED_ENABLED:false}
 
 keycloak:
   server-url: ${KC_SERVER_URL:http://localhost:8180}
@@ -67,32 +96,59 @@ keycloak:
   client-id: ${KC_BACKEND_CLIENT_ID:piedrazul-backend}
   client-secret: ${KC_BACKEND_CLIENT_SECRET:}
 
-notifications:
-  encryption:
-    key: ${NOTIFICATION_ENCRYPTION_KEY:}
+audit:
+  # Inicios de sesión del personal, leídos de los eventos de Keycloak (requiere el rol view-events).
+  login-events:
+    enabled: ${AUDIT_LOGIN_EVENTS_ENABLED:true}
+    initial-delay: ${AUDIT_LOGIN_EVENTS_INITIAL_DELAY:60000}
+    fixed-delay: ${AUDIT_LOGIN_EVENTS_FIXED_DELAY:120000}
 
+notifications:
   console:
+    # La consola es diagnóstico, no entrega. Con true, el contenido sensible (códigos de
+    # verificación y datos de citas) se escribe en el log solo si no hay ningún proveedor real
+    # habilitado; con un proveedor real nunca se muestra. Solo en entornos con datos
+    # exclusivamente sintéticos. Todo envío por consola (sensible o no) queda FAILED
+    # (CONSOLE_DIAGNOSTIC_ONLY), nunca como entregado.
+    # Sin un canal apto para códigos (SES deshabilitado) y sin este diagnóstico, no se emiten
+    # códigos: la solicitud responde 503 (VERIFICATION_DELIVERY_UNAVAILABLE).
     show-sensitive-content: ${NOTIFICATIONS_CONSOLE_SHOW_SENSITIVE:false}
   email:
-    sendgrid:
-      enabled: ${NOTIFICATIONS_SENDGRID_ENABLED:false}
-      api-key: ${SENDGRID_API_KEY:}
-      from-email: ${NOTIFICATIONS_EMAIL_FROM:no-reply@piedrazul.org}
+    # Correo por el SMTP de Amazon SES. Deshabilitado no usa ninguna de estas propiedades, ni
+    # credenciales; habilitado, una configuración incompleta impide el arranque.
+    ses:
+      enabled: ${NOTIFICATIONS_SES_ENABLED:false}
+      host: ${SES_SMTP_HOST:}
+      port: ${SES_SMTP_PORT:587}
+      username: ${SES_SMTP_USERNAME:}
+      password: ${SES_SMTP_PASSWORD:}
+      from-email: ${NOTIFICATIONS_EMAIL_FROM:}
       from-name: ${NOTIFICATIONS_EMAIL_FROM_NAME:Piedrazul}
-      sandbox-mode: ${SENDGRID_SANDBOX_MODE:true}
+      # Por operación de socket; connect, lectura y escritura pueden repetirse en cada etapa, así
+      # que su suma no acota el envío: eso lo hace total-deadline.
+      connect-timeout: ${SES_SMTP_CONNECT_TIMEOUT:5s}
+      read-timeout: ${SES_SMTP_READ_TIMEOUT:15s}
+      write-timeout: ${SES_SMTP_WRITE_TIMEOUT:15s}
+      total-deadline: ${SES_SMTP_TOTAL_DEADLINE:60s}
+      circuit-breaker:
+        minimum-calls: ${SES_BREAKER_MINIMUM_CALLS:5}
+        window-size: ${SES_BREAKER_WINDOW_SIZE:10}
+        failure-rate: ${SES_BREAKER_FAILURE_RATE:50}
+        open-wait: ${SES_BREAKER_OPEN_WAIT:30s}
+        half-open-calls: ${SES_BREAKER_HALF_OPEN_CALLS:3}
 
 
   due-job:
     fixed-delay: ${NOTIFICATIONS_DUE_JOB_FIXED_DELAY:30000}
 
+  # Recuperación del trabajo interrumpido. Un intento en curso, o un reclamo sin intentos en curso,
+  # cuenta como interrumpido tras el umbral; debe superar lo que puede tardar una llamada real al
+  # proveedor, porque un intento cerrado por antigüedad queda como aceptación desconocida.
   stale-attempt:
     enabled: ${NOTIFICATIONS_STALE_ATTEMPT_ENABLED:true}
     fixed-delay: ${NOTIFICATIONS_STALE_ATTEMPT_FIXED_DELAY:300000}
     thresholds:
-      email: ${NOTIFICATIONS_STALE_EMAIL_THRESHOLD:6h}
-      sms: ${NOTIFICATIONS_STALE_SMS_THRESHOLD:30m}
-      whatsapp: ${NOTIFICATIONS_STALE_WHATSAPP_THRESHOLD:30m}
-      default: ${NOTIFICATIONS_STALE_DEFAULT_THRESHOLD:2h}
+      default: ${NOTIFICATIONS_STALE_DEFAULT_THRESHOLD:15m}
 
 
 management:
@@ -108,17 +164,13 @@ management:
 logging:
   level:
     root: ${LOG_LEVEL_ROOT:INFO}
+    # En FINE o inferior, Jakarta Mail y Angus escriben respuestas del servidor y direcciones. El
+    # transporte de SES fija además el nivel de sus propios loggers (SmtpTransaction).
+    jakarta.mail: WARN
+    org.eclipse.angus.mail: WARN
     org.springframework.security: ${LOG_LEVEL_SECURITY:INFO}
     org.hibernate.SQL: ${LOG_LEVEL_SQL:WARN}
+    # TRACE escribe los valores de cada sentencia, incluidas las variables de las notificaciones
+    # (el código de verificación). Mantener en WARN donde haya códigos reales.
     org.hibernate.orm.jdbc.bind: ${LOG_LEVEL_SQL_BIND:WARN}
     org.springframework.modulith: ${LOG_LEVEL_MODULITH:WARN}
-
-resilience4j:
-  circuitbreaker:
-    instances:
-      sendgrid:
-        sliding-window-size: ${RESILIENCE4J_SENDGRID_WINDOW_SIZE:10}
-        failure-rate-threshold: ${RESILIENCE4J_SENDGRID_FAILURE_RATE:50}
-        wait-duration-in-open-state: ${RESILIENCE4J_SENDGRID_WAIT_DURATION:30s}
-        permitted-number-of-calls-in-half-open-state: ${RESILIENCE4J_SENDGRID_HALF_OPEN_CALLS:3}
-        register-health-indicator: true

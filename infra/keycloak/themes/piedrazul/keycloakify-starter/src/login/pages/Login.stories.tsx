@@ -42,7 +42,51 @@ export const WithInvalidCredential: Story = {
     )
 };
 
-export const WithoutRegistration: Story = {
+/** Tras pedir la recuperación, Keycloak vuelve al login con este mensaje (exista o no la cuenta). */
+export const WithRecoveryEmailSent: Story = {
+    render: () => (
+        <KcPageStory
+            kcContext={{
+                message: {
+                    type: "success",
+                    summary: "En breve deberías recibir un mensaje con más instrucciones"
+                }
+            }}
+        />
+    )
+};
+
+export const WithInfoMessage: Story = {
+    render: () => (
+        <KcPageStory
+            kcContext={{
+                message: {
+                    type: "info",
+                    summary: "Tu cuenta fue actualizada. Inicia sesión para continuar."
+                }
+            }}
+        />
+    )
+};
+
+export const WithWarningMessage: Story = {
+    render: () => (
+        <KcPageStory
+            kcContext={{
+                message: {
+                    type: "warning",
+                    summary: "La sesión anterior expiró. Vuelve a identificarte."
+                }
+            }}
+        />
+    )
+};
+
+/**
+ * Configuración del realm: registro nativo de Keycloak deshabilitado. El enlace de registro
+ * de pacientes sigue visible porque lleva al frontend (/registro), no a Keycloak.
+ */
+export const WithNativeRegistrationDisabled: Story = {
     render: () => (
         <KcPageStory
             kcContext={{
@@ -50,6 +94,31 @@ export const WithoutRegistration: Story = {
             }}
         />
     )
+};
+
+/** Login pedido por otro cliente del realm (p. ej. la consola de cuenta): sin registro de pacientes. */
+export const FromAnotherClient: Story = {
+    render: () => <KcPageStory kcContext={{ client: { clientId: "account-console" } }} />
+};
+
+/** Contexto en el que Keycloak suprime el registro (registrationDisabled). */
+export const WithRegistrationDisabledByKeycloak: Story = {
+    render: () => <KcPageStory kcContext={{ registrationDisabled: true }} />
+};
+
+/** Frontend publicado bajo una ruta base: el registro queda debajo de ella. */
+export const WithFrontendBasePath: Story = {
+    render: () => <KcPageStory kcContext={{ properties: { FRONTEND_PUBLIC_URL: "https://piedrazul.example/app" } }} />
+};
+
+/** Sin FRONTEND_PUBLIC_URL en el contenedor: se ocultan inicio y registro (error en consola). */
+export const WithoutFrontendUrl: Story = {
+    render: () => <KcPageStory kcContext={{ properties: { FRONTEND_PUBLIC_URL: "" } }} />
+};
+
+/** Valor inválido (esquema no http/https): se trata igual que ausente. */
+export const WithInvalidFrontendUrl: Story = {
+    render: () => <KcPageStory kcContext={{ properties: { FRONTEND_PUBLIC_URL: "javascript:alert(1)" } }} />
 };
 
 export const WithoutRememberMe: Story = {

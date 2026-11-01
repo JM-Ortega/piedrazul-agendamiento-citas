@@ -1,0 +1,75 @@
+---
+# Identidad exacta de Traefik (tercero) para este converge. La incluye setup.yml antes de
+# escribir image.env. Mismo contrato que keycloak_image.yml:
+#
+# El repositorio declara la referencia fijada en compose/traefik.yml (traefik_compose_file):
+#   traefik:<versión>@sha256:<índice OCI>   (Docker Hub, imagen oficial)
+# El workflow (image_targets, sin credenciales de producción) la resuelve una sola vez a su
+# único manifiesto linux/amd64, escanea ese manifiesto y lo pasa:
+#   traefik_image_ref          = docker.io/library/traefik@sha256:<manifiesto linux/amd64>
+#   traefik_image_index_digest = sha256:<índice OCI>
+# Aquí no se resuelve ningún tag: la identidad recibida debe corresponder a la declaración
+# que este mismo converge copia al servidor; se descarga por digest y la versión de la
+# imagen descargada debe ser la del tag declarado. Sin identidad válida, falla antes de
+# tocar image.env.
+#
+# Docker registra las imágenes oficiales de Docker Hub en forma corta (traefik@sha256:...)
+# en RepoDigests; docker.io/library/traefik y traefik son la misma referencia.
+
+- name: Leer la referencia declarada de Traefik
+  ansible.builtin.set_fact:
+    app_traefik_declared_ref: >-
+      {{ ((lookup('ansible.builtin.file', traefik_compose_file) | from_yaml).services.traefik.image
+          | default('')) | string | trim }}
+
+- name: Validar la identidad exacta de Traefik
+  ansible.builtin.assert:
+    that:
+      # Declaración fijada: traefik:<tag>@sha256:<índice>, nunca solo un tag
+      - app_traefik_declared_ref is match('^traefik:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}@sha256:[0-9a-f]{64}\Z')
+      - (traefik_image_ref | default('') | string) is match('^' ~ (traefik_image | regex_escape) ~ '@sha256:[0-9a-f]{64}\Z')
+      - (traefik_image_index_digest | default('') | string) is match('^sha256:[0-9a-f]{64}\Z')
+      # El índice resuelto es el declarado en este commit
+      - traefik_image_index_digest == app_traefik_declared_ref.split('@')[1]
+      # Se ejecuta el manifiesto de plataforma, no el índice (no son intercambiables)
+      - traefik_image_ref.split('@')[1] != traefik_image_index_digest
+    fail_msg: >-
+      IDENTIDAD DE TRAEFIK inválida o distinta de la declarada. Declarada en
+      {{ traefik_compose_file | basename }}: '{{ app_traefik_declared_ref }}' (debe ser
+      traefik:<tag>@sha256:<índice>); recibida: traefik_image_ref='{{ traefik_image_ref | default('') }}',
+      traefik_image_index_digest='{{ traefik_image_index_digest | default('') }}' (deben ser el manifiesto
+      linux/amd64 exacto de ese índice y el índice). Las resuelve el workflow de producción; no se aceptan tags.
+    quiet: true
+
+# Por digest el contenido es inmutable: si ya está en el daemon es el mismo
+- name: Descargar Traefik por digest
+  community.docker.docker_image_pull:
+    name: "{{ traefik_image_ref }}"
+    platform: linux/amd64
+    pull: not_present
+
+- name: Leer la imagen de Traefik descargada
+  community.docker.docker_image_info:
+    name: "{{ traefik_image_ref }}"
+  register: app_traefik_image_info
+
+- name: Verificar la imagen de Traefik descargada
+  ansible.builtin.assert:
+    that:
+      - app_traefik_image_info.images | length == 1
+      - _short_ref in (app_traefik_image_info.images[0].RepoDigests | default([]) | map('regex_replace', '^docker\.io/library/', '') | list)
+      - app_traefik_image_info.images[0].Os == 'linux'
+      - app_traefik_image_info.images[0].Architecture == 'amd64'
+      - _version | length > 0
+      - _version == app_traefik_declared_ref.split('@')[0].split(':')[-1]
+    fail_msg: >-
+      IDENTIDAD DE TRAEFIK: {{ traefik_image_ref }} no es la imagen linux/amd64 de la versión
+      declarada ({{ app_traefik_declared_ref }}): versión de la imagen '{{ _version }}',
+      plataforma {{ (app_traefik_image_info.images | first | default({})).Os | default('?') }}/{{ (app_traefik_image_info.images | first | default({})).Architecture | default('?') }}.
+      No se escribe image.env.
+    success_msg: "traefik {{ _version }} = {{ traefik_image_ref }} (índice {{ traefik_image_index_digest }})"
+  vars:
+    _short_ref: "{{ traefik_image_ref | regex_replace('^docker\\.io/library/', '') }}"
+    _version: >-
+      {{ ((((app_traefik_image_info.images | first | default({})).Config | default({}, true)).Labels
+          | default({}, true))['org.opencontainers.image.version'] | default('')) | string }}

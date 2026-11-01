@@ -17,6 +17,4 @@ public interface NotificationScheduleRepository {
             Instant now,
             int limit
     );
-
-    List<NotificationSchedule> findPendingByNotificationId(UUID notificationId);
 }

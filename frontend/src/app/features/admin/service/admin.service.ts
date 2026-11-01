@@ -2,12 +2,15 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { dtoSchedule } from '../../../shared/models/dtos/schedule.dto';
+import { PageResponse } from '../../../shared/models/dtos/pageResponse.dto';
 import { Doctor } from '../../../shared/models/interfaces/doctor.model';
+import { Patient } from '../../../shared/models/interfaces/patient.model';
+import { SystemPatient } from '../../../shared/models/interfaces/systemPatient.model';
 import { CreateUserRequestDto } from '../models/dtos/CreateUserRequestDto';
-
 import { DoctorAdminDto } from '../models/dtos/DoctorAdminDto';
-import { SystemUser } from '../models/interfaces/system-user.model';
+import { dtoSchedule } from '../models/dtos/schedule.dto';
+import { CreateTimeOffRequest, TimeOffDto } from '../models/dtos/timeOff.dto';
+import { SystemUser } from '../models/interfaces/systemUser.model';
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Injectable({ providedIn: 'root' })
@@ -16,85 +19,151 @@ export class AdminService {
   private apiUrl = environment.apiUrl;
 
   // ── Doctors ──────────────────────────────────────────────────────────────
+
+  /**
+   * Crea un nuevo usuario en el sistema, opcionalmente con rol de médico
+   * y/o agendador según el payload recibido.
+   *
+   * @param payload - Datos del usuario, y opcionalmente del médico, a crear.
+   * @returns Observable que completa sin contenido si la creación fue exitosa.
+   */
   createUser(payload: CreateUserRequestDto): Observable<void> {
     return this.http.post<void>(`${this.apiUrl}/user/users`, payload);
   }
-  getDoctors(): Observable<Doctor[]> {
-    return this.http.get<Doctor[]>(`${this.apiUrl}/doctor/doctors/detailed`);
-  }
 
-  getDoctorsAdmin(): Observable<DoctorAdminDto[]> {
-    return this.http.get<DoctorAdminDto[]>(
-      `${this.apiUrl}/user/system-doctors`
+  /**
+   * Obtiene una página de médicos con información detallada.
+   *
+   * @param page - Índice de página (base 0).
+   * @param size - Cantidad de médicos por página.
+   * @param sort - Campo y dirección de ordenamiento, formato 'campo,asc|desc'.
+   * @returns Observable con la respuesta paginada completa (content + metadata).
+   */
+  getDoctors(
+    page = 0,
+    size = 4,
+    sort = 'appointmentInterval,asc',
+    search?: string
+  ): Observable<PageResponse<Doctor>> {
+    const params: Record<string, string | number> = { page, size, sort };
+    if (search) {
+      params['search'] = search;
+    }
+    return this.http.get<PageResponse<Doctor>>(
+      `${this.apiUrl}/doctor/detailed`,
+      { params }
     );
   }
-  updateAppointmentInterval(
+
+  /**
+   * Obtiene una página de médicos con información detallada para el panel
+   * de administración (roles y especialidades).
+   *
+   * @param page - Índice de página (base 0).
+   * @param size - Cantidad de médicos por página.
+   * @param sort - Campo y dirección de ordenamiento, formato 'campo,asc|desc'.
+   * @returns Observable con la respuesta paginada completa (content + metadata).
+   */
+  getDoctorsAdmin(
+    page = 0,
+    size = 4,
+    sort = 'lastName,asc'
+  ): Observable<PageResponse<DoctorAdminDto>> {
+    return this.http.get<PageResponse<DoctorAdminDto>>(
+      `${this.apiUrl}/user/system-doctors`,
+      { params: { page, size, sort } }
+    );
+  }
+
+  /**
+   *
+   * Actualiza la información laboral de un médico: período laboral,
+   * intervalo entre citas y ventana de agendamiento.
+   *
+   * @param doctorId - Identificador del médico.
+   * @param laborStart - Nueva fecha de inicio laboral (formato ISO, ej. 'YYYY-MM-DD').
+   * @param laborEnd - Nueva fecha de fin laboral (formato ISO, ej. 'YYYY-MM-DD').
+   * @param appointmentInterval - Nueva duración de las citas, en minutos.
+   * @param bookingWindowWeeks - Nueva ventana de agendamiento, en semanas.
+   * @returns Observable que completa sin contenido si la actualización fue exitosa.
+   */
+  updateDoctorInfo(
     doctorId: string,
-    appointmentInterval: number
+    laborStart: string,
+    laborEnd: string,
+    appointmentInterval: number,
+    bookingWindowWeeks: number
   ): Observable<void> {
     return this.http.put<void>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}/appointment-interval`,
+      `${this.apiUrl}/doctor/${doctorId}/update-info`,
       null,
-      { params: { appointmentInterval } }
+      {
+        params: {
+          laborStart,
+          laborEnd,
+          appointmentInterval,
+          bookingWindowWeeks,
+        },
+      }
     );
   }
 
-  updateLaborStart(doctorId: string, laborStart: string): Observable<void> {
-    return this.http.put<void>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}/labor-start`,
-      null,
-      { params: { laborStart } }
-    );
-  }
-
-  updateLaborEnd(doctorId: string, laborEnd: string): Observable<void> {
-    return this.http.put<void>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}/labor-end`,
-      null,
-      { params: { laborEnd } }
-    );
-  }
-
+  /**
+   * Habilita a un médico en el sistema, asignándole un nuevo período laboral.
+   *
+   * @param doctorId - Identificador del médico.
+   * @param laborStart - Fecha de inicio laboral (formato ISO, ej. 'YYYY-MM-DD').
+   * @param laborEnd - Fecha de fin laboral (formato ISO, ej. 'YYYY-MM-DD').
+   * @returns Observable que completa sin contenido si la habilitación fue exitosa.
+   */
   enableDoctor(
     doctorId: string,
     laborStart: string,
     laborEnd: string
   ): Observable<void> {
     return this.http.put<void>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}/enable`,
+      `${this.apiUrl}/doctor/${doctorId}/enable`,
       null,
       { params: { laborStart, laborEnd } }
     );
   }
 
-  disableDoctor(doctorId: string, force = false): Observable<void> {
+  /**
+   * Deshabilita a un médico en el sistema.
+   *
+   * @param doctorId - Identificador del médico.
+   * @returns Observable que completa sin contenido si la deshabilitación fue exitosa.
+   */
+  disableDoctor(doctorId: string): Observable<void> {
     return this.http.put<void>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}/disable`,
-      null,
-      { params: { force } }
+      `${this.apiUrl}/doctor/${doctorId}/disable`,
+      null
     );
   }
-
   // ── Schedules ─────────────────────────────────────────────────────────────
 
+  /**
+   * Obtiene los horarios (días y franjas de atención) configurados para un médico.
+   *
+   * @param doctorId - Identificador del médico.
+   * @returns Observable con el arreglo de horarios del médico.
+   */
   getSchedulesByDoctor(doctorId: string): Observable<dtoSchedule[]> {
     return this.http.get<dtoSchedule[]>(
       `${this.apiUrl}/doctor/schedules/${doctorId}`
     );
   }
 
-  createSchedule(
-    doctorId: string,
-    workday: string,
-    startTime: string,
-    endTime: string
-  ): Observable<dtoSchedule> {
-    return this.http.post<dtoSchedule>(
-      `${this.apiUrl}/doctor/schedules/${doctorId}`,
-      { startTime, endTime, workday }
-    );
-  }
-
+  /**
+   * Crea o actualiza el horario de un médico para un día de la semana
+   * específico.
+   *
+   * @param doctorId - Identificador del médico.
+   * @param workday - Día de la semana a actualizar (ej. 'LUNES', 'MARTES').
+   * @param startTime - Hora de inicio de atención (formato 'HH:mm:ss').
+   * @param endTime - Hora de fin de atención (formato 'HH:mm:ss').
+   * @returns Observable con el horario actualizado.
+   */
   updateSchedule(
     doctorId: string,
     workday: string,
@@ -102,58 +171,239 @@ export class AdminService {
     endTime: string
   ): Observable<dtoSchedule> {
     return this.http.put<dtoSchedule>(
-      `${this.apiUrl}/doctor/schedules/${doctorId}/${workday}`,
+      `${this.apiUrl}/doctor/schedules/${doctorId}`,
       { startTime, endTime, workday }
     );
   }
 
+  /**
+   * Elimina el horario de un médico para un día de la semana específico.
+   *
+   * @param doctorId - Identificador del médico.
+   * @param workday - Día de la semana a eliminar (ej. 'LUNES', 'MARTES').
+   * @returns Observable que completa sin contenido si la eliminación fue exitosa.
+   */
   deleteSchedule(doctorId: string, workday: string): Observable<void> {
     return this.http.delete<void>(
       `${this.apiUrl}/doctor/schedules/${doctorId}/${workday}`
     );
   }
 
+  // ── Time off (descansos) ──────────────────────────────────────────────────
+
+  /**
+   * Registra un periodo de descanso (fechas inclusivas) para un doctor.
+   * Mientras dure, esas fechas no se pueden agendar.
+   *
+   * @param payload - Doctor, fechas de inicio/fin (yyyy-MM-dd) y motivo.
+   * @returns Observable con el descanso creado.
+   */
+  createTimeOff(payload: CreateTimeOffRequest): Observable<TimeOffDto> {
+    return this.http.post<TimeOffDto>(
+      `${this.apiUrl}/doctor/time-off`,
+      payload
+    );
+  }
+
+  /**
+   * Obtiene el historial completo de descansos de un doctor, del más
+   * reciente al más antiguo.
+   *
+   * @param doctorId - Identificador del médico.
+   * @returns Observable con la lista de descansos (puede estar vacía).
+   */
+  getTimeOffs(doctorId: string): Observable<TimeOffDto[]> {
+    return this.http.get<TimeOffDto[]>(
+      `${this.apiUrl}/doctor/time-off/${doctorId}`
+    );
+  }
+
+  /**
+   * Elimina un descanso que aún no empieza, o recorta uno en curso
+   * (su fecha de fin pasa a ser ayer). Uno finalizado no se puede modificar.
+   *
+   * @param timeOffId - Identificador del descanso.
+   * @returns Observable que completa sin contenido (204).
+   */
+  deleteTimeOff(timeOffId: string): Observable<void> {
+    return this.http.delete<void>(
+      `${this.apiUrl}/doctor/time-off/${timeOffId}`
+    );
+  }
+
   // ── System Users ──────────────────────────────────────────────────────────
 
-  getSystemUsers(): Observable<SystemUser[]> {
-    return this.http.get<SystemUser[]>(`${this.apiUrl}/user/system-users`);
+  /**
+   * Obtiene una página de usuarios del sistema (médicos y/o agendadores).
+   *
+   * @param page - Índice de página (base 0).
+   * @param size - Cantidad de usuarios por página.
+   * @param sort - Campo y dirección de ordenamiento, formato 'campo,asc|desc'.
+   * @returns Observable con la respuesta paginada completa (content + metadata).
+   */
+  getSystemUsers(
+    page = 0,
+    size = 6,
+    sort = 'lastName,asc'
+  ): Observable<PageResponse<SystemUser>> {
+    return this.http.get<PageResponse<SystemUser>>(
+      `${this.apiUrl}/user/system-users`,
+      { params: { page, size, sort } }
+    );
   }
 
   // ── Specialties ───────────────────────────────────────────────────────────
-
+  /**
+   * Obtiene el listado de todas las especialidades médicas disponibles
+   * en el sistema.
+   *
+   * @returns Observable con el arreglo de nombres de especialidades.
+   */
   getAllSpecialties(): Observable<string[]> {
-    return this.http.get<string[]>(
-      `${this.apiUrl}/doctor/doctors/all-specialties`
-    );
+    return this.http.get<string[]>(`${this.apiUrl}/doctor/all-specialties`);
   }
-  addSpecialties(doctorId: string, specialties: string[]): Observable<void> {
-    return this.http.post<void>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}/specialties`,
+
+  /**
+   * Actualiza las especialidades asociadas a un médico.
+   *
+   * @param doctorId - Identificador del médico.
+   * @param specialties - Arreglo con los nombres de las especialidades a asignar.
+   * @returns Observable que completa sin contenido si la actualización fue exitosa.
+   */
+  changeSpecialties(doctorId: string, specialties: string[]): Observable<void> {
+    return this.http.put<void>(
+      `${this.apiUrl}/doctor/${doctorId}/specialties`,
       specialties
     );
   }
+  // ── Agendamiento autónomo ────────────────────────────────────────────────
+  /**
+   * Consulta si el agendamiento autónomo de pacientes está habilitado.
+   *
+   * @returns Observable con el estado actual (true = habilitado).
+   */
+  getAutonomousSchedulingStatus(): Observable<boolean> {
+    return this.http.get<boolean>(
+      `${this.apiUrl}/appointments/config/autonomous-scheduling`
+    );
+  }
 
-  removeSpecialties(doctorId: string, specialties: string[]): Observable<void> {
-    return this.http.delete<void>(
-      `${this.apiUrl}/doctor/doctors/${doctorId}/specialties`,
-      { body: specialties }
+  /**
+   * Habilita o deshabilita el agendamiento autónomo de pacientes.
+   *
+   * @param enabled - Nuevo estado deseado.
+   * @returns Observable que completa sin contenido si la actualización fue exitosa.
+   */
+  setAutonomousSchedulingStatus(enabled: boolean): Observable<void> {
+    return this.http.put<void>(
+      `${this.apiUrl}/appointments/config/autonomous-scheduling`,
+      null,
+      { params: { enabled } }
     );
   }
   // ── Document Types ────────────────────────────────────────────────────────
-
+  /**
+   * Obtiene el listado de tipos de documento de identidad soportados
+   * por el sistema (ej. 'CEDULA', 'PASAPORTE').
+   *
+   * @returns Observable con el arreglo de tipos de documento.
+   */
   getAllDocumentTypes(): Observable<string[]> {
     return this.http.get<string[]>(`${this.apiUrl}/patients/document-types`);
   }
+
+  /**
+   * Otorga el rol de agendador a un usuario que ya tiene rol de médico.
+   *
+   * @param username - Nombre de usuario (username) del médico.
+   * @returns Observable que completa sin contenido si la operación fue exitosa.
+   */
   giveDoctorSchedulerRole(username: string): Observable<void> {
     return this.http.post<void>(
       `${this.apiUrl}/user/${username}/give-doctor-scheduler`,
       null
     );
   }
-
+  /**
+   * Revoca el rol de agendador de un usuario que tiene rol de médico,
+   * dejándolo únicamente con el rol de médico.
+   *
+   * @param username - Nombre de usuario (username) del médico.
+   * @returns Observable que completa sin contenido si la operación fue exitosa.
+   */
   revokeDoctorSchedulerRole(username: string): Observable<void> {
     return this.http.delete<void>(
       `${this.apiUrl}/user/${username}/revoke-doctor-scheduler`
+    );
+  }
+  // ── Patients ──────────────────────────────────────────────────────────────
+
+  /**
+   * Busca pacientes por nombre completo o número de documento para el panel
+   * de administración. A diferencia del buscador del agendador, esta
+   * respuesta incluye el estado de la cuenta (`accountEnabled`).
+   *
+   * Refleja `GET /user/patients?search=...&page=...&size=...`.
+   *
+   * @param search - Texto de búsqueda (nombre completo o documento).
+   * @param page - Índice de página (base 0). Por defecto 0.
+   * @param size - Cantidad de resultados por página. Por defecto 10.
+   * @returns Observable con la respuesta paginada de coincidencias.
+   */
+  searchPatients(
+    search: string,
+    page = 0,
+    size = 7
+  ): Observable<PageResponse<SystemPatient>> {
+    return this.http.get<PageResponse<SystemPatient>>(
+      `${this.apiUrl}/user/patients`,
+      { params: { search, page, size } }
+    );
+  }
+
+  /**
+   * Obtiene el perfil completo de un paciente a partir de su número de
+   * documento, para el panel de detalle de administración.
+   *
+   * NOTA: reutiliza el mismo recurso que `DoctorService.getPatientByDocument`
+   * (`GET /patients/document/{documentId}`). Se asume que también está
+   * autorizado para el rol ADMIN; si el backend lo restringe solo a DOCTOR,
+   * habrá que pedir/usar un endpoint específico de administración.
+   *
+   * @param documentId - Número de documento del paciente.
+   * @returns Observable con los datos completos del paciente.
+   */
+  getPatientDetail(documentId: string): Observable<Patient> {
+    return this.http.get<Patient>(
+      `${this.apiUrl}/patients/document/${documentId}`
+    );
+  }
+
+  /**
+   * Activa el usuario asociado a un paciente, devolviéndole el acceso para
+   * reservar o agendar citas en línea. No cambia nada si ya estaba activo.
+   *
+   * @param patientId - ID del paciente (UUID de su persona).
+   * @returns Observable que completa sin contenido (204) si la operación fue exitosa.
+   */
+  activatePatient(patientId: string): Observable<void> {
+    return this.http.put<void>(
+      `${this.apiUrl}/user/patients/${patientId}/activate`,
+      null
+    );
+  }
+
+  /**
+   * Desactiva el usuario asociado a un paciente, revocando su acceso para
+   * reservar o agendar citas en línea. No cambia nada si ya estaba desactivado.
+   *
+   * @param patientId - ID del paciente (UUID de su persona).
+   * @returns Observable que completa sin contenido (204) si la operación fue exitosa.
+   */
+  deactivatePatient(patientId: string): Observable<void> {
+    return this.http.put<void>(
+      `${this.apiUrl}/user/patients/${patientId}/deactivate`,
+      null
     );
   }
 }

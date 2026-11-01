@@ -6,5 +6,8 @@ import java.util.UUID;
 
 public interface DoctorProvisioningApi {
 
-    void createDoctor(UUID userId, String firstName, String lastName, String identificacion, CreateDoctorRequest request);
+    void createDoctor(UUID personId, CreateDoctorRequest request);
+
+    void deleteDoctor(UUID personId);
+
 }

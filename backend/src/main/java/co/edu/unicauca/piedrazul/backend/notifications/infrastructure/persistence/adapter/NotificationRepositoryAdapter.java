@@ -23,12 +23,6 @@ public class NotificationRepositoryAdapter implements NotificationRepository {
             NotificationStatus.DELIVERED
     );
 
-    private static final List<NotificationStatus> CANCELLABLE_STATUSES = List.of(
-            NotificationStatus.PENDING,
-            NotificationStatus.PROCESSING,
-            NotificationStatus.ACCEPTED
-    );
-
     private final JpaNotificationRepository repository;
     private final NotificationMapper mapper;
 
@@ -68,20 +62,5 @@ public class NotificationRepositoryAdapter implements NotificationRepository {
                         DEDUP_STATUSES
                 )
                 .map(mapper::toDomain);
-    }
-
-    @Override
-    public List<Notification> findPendingByAggregate(
-            AggregateReference aggregate
-    ) {
-        return repository
-                .findAllByAggregateTypeAndAggregateIdAndStatusIn(
-                        aggregate.type(),
-                        aggregate.id(),
-                        CANCELLABLE_STATUSES
-                )
-                .stream()
-                .map(mapper::toDomain)
-                .toList();
     }
 }

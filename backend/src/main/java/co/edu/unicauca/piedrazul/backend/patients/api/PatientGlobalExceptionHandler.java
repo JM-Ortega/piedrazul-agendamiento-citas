@@ -16,6 +16,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 public class PatientGlobalExceptionHandler extends BaseExceptionHandler {
 
+    /** errorCode de {@code VerificationDeliveryUnavailableException}: sin canal para códigos. */
+    private static final String OTP_DELIVERY_UNAVAILABLE = "VERIFICATION_DELIVERY_UNAVAILABLE";
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(
             MethodArgumentNotValidException ex,
@@ -26,12 +29,12 @@ public class PatientGlobalExceptionHandler extends BaseExceptionHandler {
                 .stream()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .findFirst()
-                .orElse("Validation error");
+                .orElse("Error de validación");
 
         log.warn("Error de validacion en patients: {}", detail);
         return buildProblem(
                 HttpStatus.BAD_REQUEST,
-                "Validation error",
+                "Error de validación",
                 detail,
                 "patients",
                 "VALIDATION_ERROR",
@@ -47,7 +50,7 @@ public class PatientGlobalExceptionHandler extends BaseExceptionHandler {
         log.warn("Argumento invalido en patients: {}", ex.getMessage());
         return buildProblem(
                 HttpStatus.BAD_REQUEST,
-                "Bad request",
+                "Solicitud inválida",
                 ex.getMessage(),
                 "patients",
                 "INVALID_ARGUMENT",
@@ -63,7 +66,7 @@ public class PatientGlobalExceptionHandler extends BaseExceptionHandler {
         log.warn("Estado invalido en patients: {}", ex.getMessage());
         return buildProblem(
                 HttpStatus.CONFLICT,
-                "Conflict",
+                "Conflicto",
                 ex.getMessage(),
                 "patients",
                 "INVALID_STATE",
@@ -88,7 +91,11 @@ public class PatientGlobalExceptionHandler extends BaseExceptionHandler {
         HttpStatus status = (ex instanceof BusinessException be) ? be.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
         String module = (ex instanceof BusinessException be) ? be.getModule() : "patients";
 
-        if (status.is5xxServerError()) {
+        if (status == HttpStatus.SERVICE_UNAVAILABLE && OTP_DELIVERY_UNAVAILABLE.equals(errorCode)) {
+            // Configuración conocida y ya avisada una vez al arrancar ([OTP_DELIVERY]): sin traza
+            // ni aviso repetido por cada solicitud. Cualquier otro 503 sigue como error.
+            log.debug("Solicitud de código rechazada en patients [{}]", errorCode);
+        } else if (status.is5xxServerError()) {
             log.error("Error no controlado en patients", ex);
         } else {
             log.warn("Error de negocio en patients [{}]: {}", ex.getClass().getSimpleName(), ex.getMessage());
@@ -96,7 +103,7 @@ public class PatientGlobalExceptionHandler extends BaseExceptionHandler {
 
         return buildProblem(
                 status,
-                status.getReasonPhrase(),
+                spanishTitle(status),
                 ex.getMessage(),
                 module,
                 errorCode,

@@ -1,0 +1,112 @@
+<div class="py-2 px-6">
+  <app-toast [message]="toastMessage()" [type]="toastType()"></app-toast>
+
+  <div class="max-w-8xl mx-auto">
+    <!-- Encabezado + buscador -->
+    <div
+      class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-1 mb-3"
+    >
+      <div>
+        <h1 class="text-[#163c63] text-2xl font-bold leading-tight">
+          Pacientes
+        </h1>
+        <p class="text-gray-600 text-sm mt-0.5">
+          Consulte la información, las citas y el historial de consultas de sus
+          pacientes
+        </p>
+      </div>
+      <div class="relative z-20 w-full md:w-[440px]">
+        <app-patient-quick-search
+          [selectedPatient]="selectedPatient()"
+          ctaLabel="Ver paciente"
+          clearLabel="Cambiar de paciente"
+          [disabled]="isEditingPatient()"
+          (patientSelected)="onPatientSelected($event)"
+          (cleared)="onClearPatient()"
+        ></app-patient-quick-search>
+      </div>
+    </div>
+
+    @if (isLoadingPatient()) {
+      <div class="flex items-center justify-center py-12">
+        <div
+          class="w-8 h-8 border-3 border-[#215c98] border-t-transparent rounded-full animate-spin"
+        ></div>
+      </div>
+    } @else if (patientError()) {
+      <div
+        animate.enter="animate-fade-in"
+        role="alert"
+        class="bg-red-50 border border-red-300 text-red-700 px-6 py-4 rounded-xl flex items-center gap-2"
+      >
+        <svg lucideTriangleAlert [size]="18" class="shrink-0"></svg>
+        <span>{{ patientError() }}</span>
+      </div>
+    } @else if (patient(); as p) {
+      <!-- Info paciente (igual que en control médico) -->
+      <div animate.enter="card-enter-animation">
+        <app-patient-info-card
+          [patient]="p"
+          (saved)="onPatientSaved($event)"
+        ></app-patient-info-card>
+      </div>
+
+      <!-- Layout de dos columnas -->
+      <div class="flex flex-col lg:flex-row gap-6 items-start">
+        <!-- Columna izquierda: citas con el médico -->
+        <div
+          animate.enter="card-enter-animation"
+          class="w-full lg:w-7/12 space-y-2 stagger-1"
+        >
+          @if (appointmentsError()) {
+            <div
+              animate.enter="animate-fade-in"
+              role="alert"
+              class="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-xl flex items-center gap-2"
+            >
+              <svg lucideTriangleAlert [size]="18" class="shrink-0"></svg>
+              <span>{{ appointmentsError() }}</span>
+            </div>
+          }
+          <app-patient-appointments-table
+            [appointments]="appointments()"
+            [pagination]="appointmentsPagination()"
+            [loading]="isLoadingAppointments()"
+            (pageChange)="onAppointmentsPageChange($event)"
+          ></app-patient-appointments-table>
+        </div>
+
+        <!-- Columna derecha: historial (igual que en control médico) -->
+        <div
+          animate.enter="card-enter-animation"
+          class="w-full lg:w-5/12 lg:max-h-[75vh] lg:overflow-y-auto lg:pr-1 stagger-2"
+        >
+          <app-clinical-history-list
+            [records]="records()"
+            [pagination]="recordsPagination()"
+            [loading]="isLoadingRecords()"
+            (pageChange)="onRecordsPageChange($event)"
+          ></app-clinical-history-list>
+        </div>
+      </div>
+    } @else {
+      <!-- Sin paciente seleccionado -->
+      <div
+        animate.enter="animate-fade-in"
+        class="flex flex-col items-center justify-center gap-3 text-center bg-white border-2 border-dashed border-[#d9e9f8] rounded-2xl py-16 px-6"
+      >
+        <div class="bg-[#e8f0fa] rounded-full p-4">
+          <svg lucideUserSearch [size]="36" class="text-[#215c98]"></svg>
+        </div>
+        <div>
+          <p class="text-[#163c63] text-lg font-semibold">
+            Seleccione un paciente
+          </p>
+          <p class="text-gray-500 text-sm mt-1">
+            Use el buscador para encontrarlo por nombre o número de documento.
+          </p>
+        </div>
+      </div>
+    }
+  </div>
+</div>

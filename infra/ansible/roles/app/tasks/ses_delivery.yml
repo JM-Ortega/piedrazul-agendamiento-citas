@@ -1,0 +1,43 @@
+---
+# Lo que el backend recibiría a través de .env y Compose, comparado sin mostrar valores con lo
+# que el converge tomó de su entorno (`compose config` escribe cada $ como $$):
+#   - habilitado: decisión, endpoint y credenciales exactos (cualquier carácter admitido);
+#   - deshabilitado: NOTIFICATIONS_SES_ENABLED=false y endpoint y credenciales vacíos.
+- name: Leer la configuración efectiva de Compose (SES)
+  ansible.builtin.command:
+    argv: "{{ compose_cli + ['config', '--format', 'json'] }}"
+    chdir: "{{ app_dir }}/compose"
+  register: app_ses_compose
+  changed_when: false
+  no_log: true
+
+- name: Comparar la configuración de SES que recibiría el backend
+  ansible.builtin.set_fact:
+    app_ses_undelivered: >-
+      {%- set enabled = app_ses_enabled | default(false) | bool -%}
+      {%- set delivered = (app_ses_compose.stdout | from_json).services.backend.environment -%}
+      {%- set expected = {
+            'NOTIFICATIONS_SES_ENABLED': 'true' if enabled else 'false',
+            'SES_SMTP_HOST': app_ses_smtp.HOST if enabled else '',
+            'SES_SMTP_USERNAME': app_ses_smtp.USERNAME if enabled else '',
+            'SES_SMTP_PASSWORD': app_ses_smtp.PASSWORD if enabled else '',
+            'NOTIFICATIONS_EMAIL_FROM': notifications_email_from,
+            'NOTIFICATIONS_EMAIL_FROM_NAME': notifications_email_from_name} -%}
+      {%- set bad = [] -%}
+      {%- for key in ses_backend_env_keys -%}
+        {%- if (delivered[key] | default('') | string | replace('$$', '$')) != expected[key] -%}
+          {%- set _ = bad.append(key) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ bad }}
+  no_log: true
+
+- name: Verificar la entrega de la configuración de SES al backend
+  ansible.builtin.assert:
+    that:
+      - app_ses_undelivered | length == 0
+    fail_msg: >-
+      El backend no recibiría intacta (habilitado) o vacía (deshabilitado) esta configuración de
+      SES: {{ app_ses_undelivered | join(', ') }} (valores no mostrados). Revisar env.j2,
+      compose/backend.yml o la versión de Docker Compose del host.
+    quiet: true

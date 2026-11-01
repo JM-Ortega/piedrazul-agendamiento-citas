@@ -1,0 +1,61 @@
+---
+# Capacidad de la imagen para SES. Se incluye solo con SES habilitado y ANTES de que un backend
+# pueda arrancar con esa configuración:
+#   - setup.yml: antes de escribir .env (las credenciales no llegan al host si la imagen no sirve);
+#   - deploy.yml: antes de escribir image.env o migrar (p. ej. un rollback a una imagen anterior).
+# refresh_backend.yml solo recrea un backend que ya corre exactamente backend_image_ref, la misma
+# imagen que setup.yml verificó en este run.
+#
+# Una imagen sin el proveedor arrancaría sana e ignoraría NOTIFICATIONS_SES_ENABLED=true: el
+# health no lo delata y el log de arranque no sirve de puerta. Por eso se lee el JAR de la imagen
+# exacta seleccionada, sin red ni credenciales. La clase demuestra que la imagen trae el
+# proveedor, no que el correo se entregue. Si no se puede establecer, falla cerrado.
+
+- name: Validar la identidad de la imagen del backend (SES)
+  ansible.builtin.assert:
+    that:
+      - (backend_image_ref | default('') | string) is match('^' ~ (backend_image | regex_escape) ~ '@sha256:[0-9a-f]{64}\Z')
+    fail_msg: >-
+      backend_image_ref debe ser la referencia exacta <repositorio>@sha256:<digest> de
+      {{ backend_image }} (recibido: '{{ backend_image_ref | default('') }}'). No se aceptan tags.
+    quiet: true
+
+- name: Descargar la imagen del backend seleccionada (SES)
+  community.docker.docker_image_pull:
+    name: "{{ backend_image_ref }}"
+    platform: linux/amd64
+    pull: not_present
+
+# unzip es el de la propia imagen (Alpine): corre sin red, sin escritura y sin capacidades, y
+# solo lista nombres. --pull=never: exactamente la imagen ya descargada por digest.
+- name: Listar el JAR de la imagen del backend seleccionada
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --pull=never
+      - --network=none
+      - --read-only
+      - --cap-drop=ALL
+      - --security-opt=no-new-privileges
+      - --entrypoint=unzip
+      - "{{ backend_image_ref }}"
+      - -l
+      - /app/app.jar
+  register: app_ses_image_jar
+  changed_when: false
+  failed_when: false
+
+- name: Verificar que la imagen del backend contiene el proveedor SES
+  ansible.builtin.assert:
+    that:
+      - app_ses_image_jar.rc == 0
+      - app_ses_image_jar.stdout_lines | select('search', '(^|\s)' ~ (ses_image_provider_class | regex_escape) ~ '$') | list | length == 1
+    fail_msg: >-
+      Correo SES habilitado, pero no se pudo establecer que la imagen del backend seleccionada
+      ({{ backend_image_ref }}) traiga {{ ses_image_provider_class | basename }}
+      (inspección con código {{ app_ses_image_jar.rc }}). Ignoraría la configuración y seguiría sin
+      enviar correo. Este run no escribió .env con SES ni arrancó esa imagen: seleccionar una
+      imagen compatible o deshabilitar SES (correo-ses.md).
+    quiet: true

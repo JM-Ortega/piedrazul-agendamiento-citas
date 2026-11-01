@@ -2,32 +2,40 @@ package co.edu.unicauca.piedrazul.backend.doctors.api.dtos.output;
 
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Schedule;
-import co.edu.unicauca.piedrazul.backend.doctors.domain.Workday;
+import co.edu.unicauca.piedrazul.backend.shared.enums.Workday;
+import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 
 import java.time.LocalDate;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 // Lo pidio Mar
+// Muere porque ahora el horario lo envia el back
 public record DoctorResponse(
-        String specialty,
+        List<String> specialty,
         UUID id,
         String name,
         LocalDate laborEnd,
+        LocalDate laborStart,
+        int bookingWindowWeeks,
         List<Integer> workdays
 ) {
-    // Un método estático para convertir la entidad en DTO fácilmente
-    public static DoctorResponse fromEntity(Doctor doctor) {
+    // Si el paciente es nuevo solo muestra como especialida de doctor la de tera neural aunque tenga otras
+    public static DoctorResponse fromEntity(Doctor doctor, String name, boolean isNewPatient) {
+        // Filtrar las especialidades a nivel de DTO sin tocar la entidad
+        List<String> specialties = doctor.getSpecialties().stream()
+                .filter(s -> !isNewPatient || s.getCode() == SpecialtyCode.TERAPIA_NEURAL)
+                .map(s -> s.getCode().name())
+                .toList();
+
         return new DoctorResponse(
-                doctor.getSpecialty().toString(),
-                doctor.getIdDoctor(),
-                doctor.getFirstName() + " " + doctor.getLastName(),
+                specialties,
+                doctor.getPersonId(),
+                name,
                 doctor.getLaborEnd(),
+                doctor.getLaborStart(),
+                doctor.getBookingWindowWeeks(),
                 Optional.ofNullable(doctor.getSchedules())
-                        .orElse(List.of())
+                        .orElse(new HashSet<>())
                         .stream()
                         .map(Schedule::getWorkday)
                         .filter(Objects::nonNull)
@@ -36,6 +44,11 @@ public record DoctorResponse(
                         .sorted(Comparator.naturalOrder())
                         .toList()
         );
+    }
+
+    // Sobrecarga por defecto para mantener retrocompatibilidad
+    public static DoctorResponse fromEntity(Doctor doctor, String name) {
+        return fromEntity(doctor, name, false);
     }
 
     private static int toWorkdayNumber(Workday workday) {
