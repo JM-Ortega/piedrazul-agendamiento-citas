@@ -1,0 +1,154 @@
+# Stack privado de métricas: Prometheus, Grafana y Alloy (métricas del host). Proyecto Compose
+# propio, separado de la aplicación (prod.yml / docker-compose.yml): se levanta, reinicia o
+# baja sin tocar ningún servicio de la aplicación, y ningún servicio de la aplicación depende
+# de él. Sin logs (Loki, journald) ni trazas.
+#
+# Conectividad privada:
+#   - obs_net (propia): prometheus, grafana y alloy.
+#   - red de la aplicación (externa, OBS_APP_NETWORK, piedrazul_net por defecto): solo
+#     prometheus, para leer backend:8081, keycloak:9000 y traefik:8082 por nombre. Debe
+#     existir antes (la crea la aplicación); si no existe, `up` falla sin crear nada.
+# Ningún puerto publicado salvo Grafana en loopback del host (acceso local o por túnel SSH). Sin
+# socket de Docker ni contenedores privilegiados.
+#
+# Uso (desde este directorio, con .env creado a partir de .env.example):
+#   docker compose up -d
+# Ver docs/operations/runbooks/metricas.md.
+name: piedrazul-obs
+
+networks:
+  obs_net:
+  app_net:
+    name: ${OBS_APP_NETWORK:-piedrazul_net}
+    external: true
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+services:
+  prometheus:
+    # Referencia fijada: <tag>@sha256:<índice OCI>
+    image: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      # Retención: lo que se cumpla primero. Para cumplir el tamaño Prometheus solo borra bloques
+      # persistidos; el WAL, el head y una compactación en curso pueden llevar el volumen por
+      # encima de ese valor: no es un tope duro del disco.
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-30d}
+      - --storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-2GB}
+      - --storage.tsdb.wal-compression
+      # Sin API de administración (borrado de series, snapshots) ni recepción remota
+      - --web.listen-address=:9090
+    volumes:
+      # Directorios, no archivos sueltos: una escritura atómica (Ansible, editores) cambia el
+      # inodo y un montaje de archivo seguiría viendo el anterior
+      - ./prometheus:/etc/prometheus:ro
+      - prometheus_data:/prometheus
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - obs_net
+      - app_net
+
+  grafana:
+    image: grafana/grafana:13.3.0@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD es requerido (ver .env.example)}
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_SECURITY_COOKIE_SAMESITE: strict
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SERVER_ROOT_URL: http://localhost:${GRAFANA_LOCAL_PORT:-3000}/
+      # Sin telemetría, avisos de versión, noticias ni plugins preinstalados (las conexiones
+      # salientes que harían). La red del contenedor no restringe otras salidas.
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      # Las alertas las evalúa Prometheus (prometheus/rules). Grafana no gestiona reglas ni
+      # puntos de contacto.
+      GF_UNIFIED_ALERTING_ENABLED: "false"
+      GF_LOG_MODE: console
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana-dashboards:ro
+      - grafana_data:/var/lib/grafana
+    tmpfs:
+      - /tmp
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512m
+    # Solo loopback del host: acceso local o por túnel SSH, nunca en una interfaz pública
+    ports:
+      - "127.0.0.1:${GRAFANA_LOCAL_PORT:-3000}:3000"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - obs_net
+
+  alloy:
+    image: grafana/alloy:v1.21.3@sha256:8ab871206bd2d8f89277f53abffee5f452a293980788d52f85fa183a87a505a4
+    restart: unless-stopped
+    # Nombre fijo: es el nodename de node_uname_info; el id del contenedor cambiaría al recrearlo
+    hostname: piedrazul-obs-alloy
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      # Solo métricas, sin remote_write ni WAL: el estado es descartable (tmpfs)
+      - --storage.path=/tmp/alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --disable-reporting
+    # Sin root: /proc, /sys y la raíz del host solo se leen (estadísticas y statfs); los
+    # archivos del host que no son legibles por cualquiera siguen sin serlo
+    user: "65534:65534"
+    volumes:
+      - ./alloy:/etc/alloy:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+    tmpfs:
+      - /tmp
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 192m
+    networks:
+      - obs_net

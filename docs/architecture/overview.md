@@ -312,7 +312,9 @@ El health de la aplicación es público y las métricas son privadas. Cada servi
 - **Etiquetas.** Las peticiones HTTP se miden por la plantilla de la ruta (`/api/patients/document/{documentNumber}/public`) y nunca por la URL concreta. Una petición rechazada antes de llegar a un controlador queda como `UNKNOWN`. La latencia usa buckets fijos (`management.metrics.distribution.slo`) en lugar del histograma completo. Traefik etiqueta por entrypoint y servicio, no por router. Keycloak no publica métricas de eventos de usuario.
 - **Independencia.** Ningún servicio depende de un recolector de métricas para arrancar ni para quedar healthy. Con la base de datos caída, el health responde 503 y las métricas siguen respondiendo. El puerto de gestión del backend sí debe estar libre: si no puede abrirlo, el backend no arranca.
 
-Verificación local de los contratos: `ManagementListenerBoundaryTest` (los dos listeners sobre Tomcat real) e `infra/tests/traefik-config-check.sh` (flags, rutas y, con Docker, el entrypoint de métricas en ejecución).
+- **Consumidor.** El stack privado de métricas (`infra/observability/`, proyecto Compose `piedrazul-obs`) lee estos tres listeners y el host: Prometheus es su único servicio en `piedrazul_net` y Grafana escucha solo en loopback del host. Prometheus evalúa las reglas de alerta; no hay notificaciones externas configuradas. Ver [Métricas](../operations/runbooks/metricas.md).
+
+Verificación local de los contratos: `ManagementListenerBoundaryTest` (los dos listeners sobre Tomcat real), `infra/tests/traefik-config-check.sh` (flags, rutas y, con Docker, el entrypoint de métricas en ejecución) e `infra/tests/metrics-stack-check.sh` (el stack de métricas contra los tres productores reales).
 
 ## Despliegue
 

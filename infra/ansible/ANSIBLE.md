@@ -23,11 +23,13 @@ infra/ansible/
 │   ├── deploy.yml                       # Rollout de backend y postgres por identidad exacta
 │   ├── verify-release.yml               # Verifica identidad en ejecución o health (solo lectura)
 │   ├── record-release.yml               # Registra el último despliegue exitoso
-│   └── keycloak-admin-preflight.yml     # Valida en el runner la contraseña inicial antes del Apply
+│   ├── keycloak-admin-preflight.yml     # Valida en el runner la contraseña inicial antes del Apply
+│   └── observability.yml                # Stack privado de métricas piedrazul-obs (fuera del workflow)
 └── roles/
     ├── common/                          # Paquetes base y timezone
     ├── docker_host/                     # Instalación y configuración de Docker
     ├── hardening/                       # Hardening del servidor
+    ├── observability/                   # Prometheus, Grafana y Alloy en /opt/piedrazul-obs
     └── app/                             # Gestión del stack de la aplicación
         ├── tasks/
         │   ├── main.yml                 # Punto de entrada (importa setup.yml)
@@ -192,6 +194,22 @@ ansible-playbook \
 ### `verify-release.yml` y `record-release.yml`
 
 `verify-release.yml` no modifica nada: con `release_check=identity` comprueba que los contenedores corren la identidad exacta esperada; con `release_check=health`, que quedaron `healthy`. `record-release.yml` escribe el último despliegue exitoso (ver abajo). El workflow los corre como pasos separados para que un fallo de identidad, de health o de registro se vea como tal.
+
+### `observability.yml` — stack de métricas
+
+Instala o actualiza el proyecto Compose `piedrazul-obs` (Prometheus, Grafana, Alloy) en
+`/opt/piedrazul-obs` con el rol `observability`, con el mismo contrato de conexión que los demás
+playbooks (`ansible` + `become`). No lo corre el workflow de producción ni lo incluyen
+`converge.yml` o `deploy.yml`, y no modifica la aplicación.
+
+- Exige Docker con Compose y la red `piedrazul_net`; si falta alguno, falla sin copiar nada.
+- Los directorios de configuración (`obs_managed_dirs`) quedan iguales al repositorio: copia y
+  borra lo retirado; reinicia el servicio cuyo directorio cambió (`obs_restart_on_change`).
+- `.env` (root, 0600) se crea solo si no existe, con una contraseña de Grafana que genera el
+  controlador; no viene de GitHub ni se regenera en un run posterior.
+- Verifica que los cinco destinos se leen y que los dashboards están cargados.
+
+Procedimiento, semántica de cambios y retiro: [Métricas](../../docs/operations/runbooks/metricas.md).
 
 ---
 

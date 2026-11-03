@@ -1,0 +1,17 @@
+# Fuente de datos única: el Prometheus de este proyecto Compose, por la red obs_net. uid fijo:
+# los dashboards versionados lo referencian. Sin credenciales (Prometheus no está publicado).
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      # Igual al scrape_interval de prometheus.yml: $__rate_interval cubre al menos 4 lecturas
+      timeInterval: 30s
+      prometheusType: Prometheus

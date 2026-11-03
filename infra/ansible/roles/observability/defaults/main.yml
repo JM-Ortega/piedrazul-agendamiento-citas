@@ -1,0 +1,22 @@
+# Stack privado de métricas, proyecto Compose propio. Ver docs/operations/runbooks/metricas.md.
+obs_dir: /opt/piedrazul-obs
+obs_compose_project_name: piedrazul-obs
+# Dueño de la configuración copiada y del .env (secreto: solo su dueño lo lee). Las tareas corren
+# con become (ansible.cfg), así que Compose lee .env como root.
+obs_owner: ansible
+obs_env_owner: root
+obs_src_dir: "{{ playbook_dir }}/../../observability"
+# Red de la aplicación a la que se une Prometheus (la crea prod.yml del proyecto piedrazul)
+obs_app_network: piedrazul_net
+# Destinos que deben quedar leídos tras levantar el stack (job de prometheus.yml)
+obs_expected_jobs: [backend, keycloak, traefik, host, prometheus]
+obs_expected_dashboards: [piedrazul-plataforma, piedrazul-backend-jvm]
+# Directorios de configuración del repositorio: se copian y se reconcilian (lo retirado del
+# repositorio se borra del host)
+obs_managed_dirs: [prometheus, alloy, grafana/provisioning, grafana/dashboards]
+# Servicio a reiniciar cuando cambia cada directorio ('' = se recarga solo)
+obs_restart_on_change:
+  prometheus: prometheus
+  alloy: alloy
+  grafana/provisioning: grafana
+  grafana/dashboards: ''

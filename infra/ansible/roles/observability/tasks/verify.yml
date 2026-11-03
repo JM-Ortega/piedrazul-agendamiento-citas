@@ -1,0 +1,59 @@
+# Comprueba desde dentro de los contenedores (ningún puerto de Prometheus está publicado) que
+# cada destino esperado se lee y que Grafana cargó la fuente de datos y los dashboards. Es la
+# verificación de la instalación, no una prueba de alertas ni de notificaciones.
+
+- name: Esperar la primera lectura de todos los destinos
+  ansible.builtin.command:
+    argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
+           exec, -T, prometheus, wget, -qO-, "http://localhost:9090/api/v1/targets?state=active"]
+    chdir: "{{ obs_dir }}"
+  register: obs_targets
+  changed_when: false
+  until: >-
+    obs_targets.rc == 0 and
+    ((obs_targets.stdout | from_json).data.activeTargets
+     | selectattr('health', 'equalto', 'up') | map(attribute='labels.job') | unique | sort)
+    == (obs_expected_jobs | sort)
+  retries: 12
+  delay: 10
+  failed_when: false
+
+- name: Destinos leídos
+  ansible.builtin.assert:
+    that:
+      - obs_targets.rc == 0
+      - >-
+        ((obs_targets.stdout | from_json).data.activeTargets
+         | selectattr('health', 'equalto', 'up') | map(attribute='labels.job') | unique | sort)
+        == (obs_expected_jobs | sort)
+    fail_msg: >-
+      Destinos sin leer: {{ ((obs_targets.stdout or '{}') | from_json).get('data', {}).get('activeTargets', [])
+      | rejectattr('health', 'equalto', 'up')
+      | map(attribute='scrapeUrl') | list }}. El stack quedó levantado; la aplicación no se tocó.
+    quiet: true
+
+- name: Leer los dashboards provisionados
+  ansible.builtin.command:
+    argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
+           exec, -T, grafana, sh, -c,
+           'wget -qO- --header "Authorization: Basic $(printf "admin:%s" "$GF_SECURITY_ADMIN_PASSWORD" | base64)" "http://localhost:3000/api/search?type=dash-db"']
+    chdir: "{{ obs_dir }}"
+  register: obs_dashboards
+  changed_when: false
+  # Grafana recién reiniciado tarda unos segundos en atender
+  until: >-
+    obs_dashboards.rc == 0 and
+    (obs_expected_dashboards | difference(obs_dashboards.stdout | from_json | map(attribute='uid') | list)) | length == 0
+  retries: 12
+  delay: 5
+  failed_when: false
+
+- name: Dashboards provisionados
+  ansible.builtin.assert:
+    that:
+      - obs_dashboards.rc == 0
+      - (obs_expected_dashboards | difference(obs_dashboards.stdout | from_json | map(attribute='uid') | list)) | length == 0
+    fail_msg: >-
+      Grafana no respondió o faltan dashboards:
+      {{ obs_expected_dashboards | difference((obs_dashboards.stdout or '[]') | from_json | map(attribute='uid') | list) }}
+    quiet: true

@@ -1,0 +1,46 @@
+// Alloy: solo métricas del host Linux (exportador unix). Sin logs, journald, Loki, trazas ni
+// remote_write: Prometheus lee este exportador en
+// alloy:12345/api/v0/component/prometheus.exporter.unix.host/metrics.
+//
+// Observa el host cuyos /proc, /sys y / se montan en /host (compose.yml). En un VPS Linux es el
+// propio host; en Docker Desktop es la VM Linux de Docker, no el equipo anfitrión.
+
+prometheus.exporter.unix "host" {
+  procfs_path = "/host/proc"
+  sysfs_path  = "/host/sys"
+  rootfs_path = "/host/root"
+
+  // Lista cerrada de colectores: CPU, memoria, carga, presión, disco y sistemas de archivos.
+  // Sin colectores de red: el contenedor tiene su propia red y reportaría sus interfaces, no las
+  // del host.
+  set_collectors = [
+    "cpu",
+    "diskstats",
+    "filesystem",
+    "loadavg",
+    "meminfo",
+    "pressure",
+    "stat",
+    "time",
+    "uname",
+    "vmstat",
+  ]
+
+  filesystem {
+    // Solo sistemas de archivos reales del host: sin pseudo-fs, overlays ni montajes de
+    // contenedores (cada uno sería una etiqueta mountpoint nueva), tmpfs ni recursos compartidos
+    // de WSL/Docker Desktop (9p, /mnt/wsl)
+    fs_types_exclude     = "^(9p|autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fuse\\..*|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|ramfs|rootfs|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tmpfs|tracefs)$"
+    mount_points_exclude = "^/(dev|proc|run|sys|mnt/wsl|mnt/wslg|usr/lib/wsl|var/lib/docker/.+|var/lib/containerd/.+|var/lib/kubelet/.+|snap/.+)($|/)"
+  }
+
+  disk {
+    device_exclude = "^(ram|loop|fd|sr|(h|s|v|xv)d[a-z]+[0-9]+|nvme[0-9]+n[0-9]+p[0-9]+)$"
+  }
+}
+
+// Solo advertencias y errores en la salida del contenedor
+logging {
+  level  = "warn"
+  format = "logfmt"
+}
