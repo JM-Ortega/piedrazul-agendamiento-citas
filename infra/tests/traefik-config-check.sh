@@ -12,11 +12,12 @@
 #   1. Compose: TRAEFIK_IMAGE obligatoria (sin ella Compose falla), sin socket de Docker ni
 #      Docker provider, sin labels traefik.* en ningún servicio, solo Traefik publica
 #      puertos, montajes de configuración de solo lectura, redirección HTTP → HTTPS,
-#      ACME por DNS de Cloudflare y strictTLSOptions.
+#      ACME por DNS de Cloudflare, strictTLSOptions, sin API ni dashboard y métricas
+#      Prometheus en el entrypoint privado metrics (:8082).
 #   2. Rutas (Ansible, plantilla y validaciones reales): routers backend/keycloak con los
-#      hosts del inventario, TLS cloudflare-aop + letsencrypt, servicios por nombre de
-#      contenedor y puerto interno; entradas vacías, inyectadas, repetidas o puertos
-#      inválidos fallan sin escribir routes.yml.
+#      hosts del inventario, solo en websecure, TLS cloudflare-aop + letsencrypt, servicios
+#      por nombre de contenedor y puerto interno; entradas vacías, inyectadas, repetidas o
+#      puertos inválidos fallan sin escribir routes.yml.
 # Runtime (Docker, red y proyecto propios, upstreams sintéticos traefik/whoami, CA y
 #   certificados de cliente sintéticos en lugar del CA de Cloudflare, ACME apuntado a un
 #   servidor inexistente: nunca contacta Let's Encrypt ni Cloudflare):
@@ -24,7 +25,9 @@
 #      verify_running_images.yml confirma que el contenedor lo ejecuta; un ref distinto falla
 #   4. enrutamiento: HTTPS con certificado de cliente → upstream correcto; sin certificado o
 #      con otro CA → rechazado; HTTP → 301 (GET) / 308 (otros métodos) a HTTPS; host desconocido → 404; cabeceras
-#      X-Forwarded-* las fija Traefik (las del cliente no se confían)
+#      X-Forwarded-* las fija Traefik (las del cliente no se confían); métricas en
+#      traefik:8082 dentro de la red, sin puerto en el host y sin etiquetas de router, host
+#      ni ruta; /metrics por websecure llega al upstream, no a Traefik
 #   5. ciclo de vida: upstream recreado con otra IP → enrutado sin API de Docker;
 #      upstream detenido → 502 visible y vuelve al arrancar; reinicio de Traefik conserva
 #      las rutas; cambio de rutas recargado sin reinicio
@@ -145,6 +148,10 @@ check "Compose: ningún servicio declara labels traefik.*" \
   bash -c "! jq -r '.services[].labels // {} | keys[]' '${TMP}/config.json' | grep -q '^traefik\\.'"
 check "Compose: solo traefik publica puertos (80 y 443)" \
   bash -c "test \"\$(jq -r '[.services | to_entries[] | select((.value.ports // []) | length > 0) | .key] | join(\",\")' '${TMP}/config.json')\" = traefik && test \"\$(jq -r '[.services.traefik.ports[].target | tonumber] | sort | map(tostring) | join(\",\")' '${TMP}/config.json')\" = '80,443'"
+check "Compose: métricas Prometheus en el entrypoint metrics (:8082), por entrypoint y servicio, sin router" \
+  bash -c "for f in '--entrypoints.metrics.address=:8082' '--metrics.prometheus=true' '--metrics.prometheus.entrypoint=metrics' '--metrics.prometheus.addEntryPointsLabels=true' '--metrics.prometheus.addServicesLabels=true' '--metrics.prometheus.addRoutersLabels=false'; do grep -qx -- \"\$f\" <<< \"\$1\" || exit 1; done" _ "${TCMD}"
+check "Compose: sin API ni dashboard (--api.dashboard=false, sin --api ni --api.insecure)" \
+  bash -c "grep -qx -- '--api.dashboard=false' <<< \"\$1\" && ! grep -qE -- '^--api(=|\\.insecure|\$)' <<< \"\$1\"" _ "${TCMD}"
 check "Compose: traefik, backend y keycloak comparten piedrazul_net" \
   bash -c "for s in traefik backend keycloak; do jq -e --arg s \"\$s\" '.services[\$s].networks | has(\"piedrazul_net\")' '${TMP}/config.json' || exit 1; done"
 check "Repositorio: sin configuración del Docker provider (labels ni flags) en compose ni Ansible" \
@@ -186,6 +193,8 @@ check "rutas: router backend → Host(${API_HOST}), websecure, servicio backend"
   bash -c "test \"\$(yq -r '.http.routers.backend | [.rule, (.entryPoints | join(\",\")), .service] | join(\"|\")' '${RF}')\" = 'Host(\`${API_HOST}\`)|websecure|backend'"
 check "rutas: router keycloak → Host(${KC_HOST}), websecure, servicio keycloak" \
   bash -c "test \"\$(yq -r '.http.routers.keycloak | [.rule, (.entryPoints | join(\",\")), .service] | join(\"|\")' '${RF}')\" = 'Host(\`${KC_HOST}\`)|websecure|keycloak'"
+check "rutas: todos los routers solo en websecure (ninguno en web ni en metrics)" \
+  test "$(yq -r '[.http.routers[].entryPoints[]] | unique | join(",")' "${RF}")" = websecure
 check "rutas: ambos routers con TLS cloudflare-aop y certResolver letsencrypt" \
   test "$(yq -r '[.http.routers[].tls | .options + "/" + .certResolver] | unique | join(",")' "${RF}")" = "cloudflare-aop/letsencrypt"
 SERVER_PORT="$(sed -n 's/^SERVER_PORT=//p' "${W}/.env")"
@@ -373,6 +382,18 @@ EOF
   check "runtime: HTTP POST → 308 permanente (conserva el método) a https://${T_API}/a (${REDIR})" test "${REDIR}" = "308 https://${T_API}/a"
   OUT="$(curl -sk --max-time 10 --resolve "unknown.traefik-check.test:${HTTPS_PORT}:127.0.0.1" -w '\n%{http_code}' "https://unknown.traefik-check.test:${HTTPS_PORT}/" || true)"
   check "runtime: host desconocido → 404 (sin ruta implícita)" test "$(code "${OUT}")" = 404
+
+  # Métricas: se piden al nombre del contenedor en la red (no a loopback), la posición del
+  # consumidor que comparta piedrazul_net. Las peticiones anteriores ya produjeron series.
+  METRICS="$(compose exec -T traefik wget -qO- http://traefik:8082/metrics 2>/dev/null || true)"
+  check "runtime: traefik:8082/metrics en la red, con peticiones y latencia por entrypoint y servicio" \
+    bash -c "grep -q '^traefik_entrypoint_requests_total{.*entrypoint=\"websecure\"' <<< \"\$1\" && grep -q '^traefik_service_requests_total{.*service=\"backend@file\"' <<< \"\$1\" && grep -q '^traefik_service_request_duration_seconds_bucket{' <<< \"\$1\"" _ "${METRICS}"
+  check "runtime: series de peticiones sin etiquetas de router, host ni ruta" \
+    bash -c "! grep -E '^traefik_(entrypoint|service)_' <<< \"\$1\" | grep -qE 'router=|host=|path=|${T_API}|/probe'" _ "${METRICS}"
+  if compose port traefik 8082 >/dev/null 2>&1; then ko "runtime: 8082 sin puerto en el host"; else ok "runtime: 8082 sin puerto en el host"; fi
+  OUT="$(curl -sk --max-time 10 "${as_origin[@]}" --resolve "${T_API}:${HTTPS_PORT}:127.0.0.1" -w '\n%{http_code}' "https://${T_API}:${HTTPS_PORT}/metrics" | tr -d '\r' || true)"
+  check "runtime: /metrics por websecure llega al upstream, nunca a las métricas de Traefik" \
+    bash -c "grep -q '^Name: backend' <<< \"\$1\" && ! grep -q '^traefik_' <<< \"\$1\"" _ "${OUT}"
 
   # 5. Ciclo de vida de los upstreams y de Traefik
   OLD_IP="$(docker inspect backend --format "{{(index .NetworkSettings.Networks \"${PROJECT}_net\").IPAddress}}")"

@@ -152,14 +152,27 @@ notifications:
 
 
 management:
+  # Listener privado del Actuator: solo se alcanza dentro de la red de contenedores, sin ruta en
+  # Traefik ni puerto publicado. /actuator/health sigue también en el puerto de la aplicación
+  # (ApplicationHealthEndpointConfig) y /actuator/prometheus solo existe aquí.
+  server:
+    port: ${MANAGEMENT_SERVER_PORT:8081}
+
   endpoints:
     web:
       exposure:
-        include: ${MANAGEMENT_EXPOSED_ENDPOINTS:health,info}
+        include: ${MANAGEMENT_EXPOSED_ENDPOINTS:health,info,prometheus}
 
   endpoint:
     health:
       show-details: ${MANAGEMENT_HEALTH_DETAILS:when-authorized}
+
+  metrics:
+    distribution:
+      # Buckets fijos en lugar del histograma completo: permiten calcular percentiles de latencia
+      # sin multiplicar las series por cada combinación de uri, método y estado.
+      slo:
+        http.server.requests: 50ms,100ms,250ms,500ms,1s,2500ms,5s
 
 logging:
   pattern:

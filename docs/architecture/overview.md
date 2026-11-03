@@ -298,6 +298,22 @@ incluida la recuperación, mientras dure.
 
 El header no se expone por CORS: un frontend en otro origen no puede leerlo.
 
+### Health y métricas
+
+El health de la aplicación es público y las métricas son privadas. Cada servicio publica sus métricas en un listener propio que no está enrutado por Traefik ni publicado en el host. Un consumidor solo las alcanza desde un contenedor conectado a `piedrazul_net`, por el nombre del contenedor:
+
+| Servicio | Health (contrato del despliegue) | Métricas (formato Prometheus, sin credenciales) | Configuración |
+|---|---|---|---|
+| backend | `:8080/actuator/health`, también público por Traefik (`https://<api>/actuator/health`) | `backend:8081/actuator/prometheus` | `MANAGEMENT_SERVER_PORT` (8081), `MANAGEMENT_EXPOSED_ENDPOINTS` (`health,info,prometheus`) |
+| keycloak | `:9000/health/ready` (healthcheck de Compose) | `keycloak:9000/metrics` | `KC_METRICS_ENABLED`, `KC_HEALTH_ENABLED` |
+| traefik | — | `traefik:8082/metrics` (entrypoint `metrics`) | flags `--metrics.prometheus.*` de `infra/compose/traefik.yml` |
+
+- **Backend.** El Actuator corre en el puerto de gestión (`management.server.port`). `/actuator/health` también se sirve en el puerto de la aplicación (`ApplicationHealthEndpointConfig`): es el mismo endpoint de Spring Boot, con el mismo estado y el mismo 503, y sin detalles para un anónimo (`MANAGEMENT_HEALTH_DETAILS=when-authorized`). Lo consultan el `HEALTHCHECK` de la imagen y la verificación pública de la cadena de producción. En el puerto de la aplicación, `/actuator/prometheus` no existe y su ruta exige `ADMIN` igual que el resto de `/actuator/**`. `SecurityConfig` solo admite Prometheus sin credenciales cuando la petición llega por el listener de gestión. Si los dos puertos llegan a coincidir, las métricas siguen exigiendo `ADMIN`. Los demás endpoints del Actuator (`info`) exigen `ADMIN` en cualquier listener.
+- **Etiquetas.** Las peticiones HTTP se miden por la plantilla de la ruta (`/api/patients/document/{documentNumber}/public`) y nunca por la URL concreta. Una petición rechazada antes de llegar a un controlador queda como `UNKNOWN`. La latencia usa buckets fijos (`management.metrics.distribution.slo`) en lugar del histograma completo. Traefik etiqueta por entrypoint y servicio, no por router. Keycloak no publica métricas de eventos de usuario.
+- **Independencia.** Ningún servicio depende de un recolector de métricas para arrancar ni para quedar healthy. Con la base de datos caída, el health responde 503 y las métricas siguen respondiendo. El puerto de gestión del backend sí debe estar libre: si no puede abrirlo, el backend no arranca.
+
+Verificación local de los contratos: `ManagementListenerBoundaryTest` (los dos listeners sobre Tomcat real) e `infra/tests/traefik-config-check.sh` (flags, rutas y, con Docker, el entrypoint de métricas en ejecución).
+
 ## Despliegue
 
 ### Entorno local

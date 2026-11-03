@@ -75,8 +75,11 @@ max_file_size: 10MB
 max_request_size: 10MB
 
 # Actuator
-management_exposed_endpoints: health,info
+# Listener privado de gestión: métricas Prometheus, solo dentro de la red de contenedores.
+# /actuator/health sigue también en server_port (HEALTHCHECK de la imagen y health público).
+management_exposed_endpoints: health,info,prometheus
 management_health_details: when-authorized
+management_server_port: 8081
 
 # Logging
 log_level_root: INFO
