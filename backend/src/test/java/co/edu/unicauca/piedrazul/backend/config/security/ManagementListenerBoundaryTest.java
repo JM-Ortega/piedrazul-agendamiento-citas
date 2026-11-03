@@ -33,6 +33,7 @@ import org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSec
 import org.springframework.boot.servlet.autoconfigure.HttpEncodingAutoConfiguration;
 import org.springframework.boot.servlet.autoconfigure.actuate.web.ServletManagementContextAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestComponent;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.tomcat.autoconfigure.actuate.web.server.TomcatServletManagementContextAutoConfiguration;
@@ -74,7 +75,12 @@ class ManagementListenerBoundaryTest {
     private static final AtomicBoolean HEALTHY = new AtomicBoolean(true);
     private static final String UNAUTHORIZED_BODY = "{\"error\":\"no autorizado\"}";
 
+    // Esta clase externa no tiene anotaciones ni métodos de prueba propios (todo está en los
+    // @Nested), así que el filtro de tests de Boot no la reconoce y el escaneo de
+    // BackendApplication registraría Config en los contextos completos. @TestComponent la excluye
+    // de ese escaneo sin volverla @TestConfiguration, que haría buscar BackendApplication.
     @SpringBootConfiguration
+    @TestComponent
     @ImportAutoConfiguration({
             PropertyPlaceholderAutoConfiguration.class,
             TomcatServletWebServerAutoConfiguration.class,
