@@ -23,10 +23,7 @@ public class GlobalErrorAdvice extends BaseExceptionHandler {
             HttpServletRequest request
     ) {
 
-        log.error(
-                "Excepción no controlada",
-                ex
-        );
+        logUnexpected(log, "Excepción no controlada", ex, request);
 
         return buildProblem(
                 HttpStatus.INTERNAL_SERVER_ERROR,
@@ -44,10 +41,10 @@ public class GlobalErrorAdvice extends BaseExceptionHandler {
             HttpServletRequest request
     ) {
 
+        // Sin la URI: la ruta puede traer el documento de un paciente
         log.warn(
-                "Ruta no encontrada: {} {}",
-                request.getMethod(),
-                request.getRequestURI()
+                "Ruta no encontrada: {}",
+                request.getMethod()
         );
 
         return buildProblem(
@@ -66,10 +63,10 @@ public class GlobalErrorAdvice extends BaseExceptionHandler {
             HttpServletRequest request
     ) {
 
+        // Sin la URI: la ruta puede traer el documento de un paciente
         log.warn(
-                "Método HTTP no permitido: {} {}",
-                request.getMethod(),
-                request.getRequestURI()
+                "Método HTTP no permitido: {}",
+                request.getMethod()
         );
 
         return buildProblem(

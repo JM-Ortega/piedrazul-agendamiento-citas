@@ -47,6 +47,10 @@ Piedra Azul es una clínica cuyo proceso de agendamiento de citas se ha basado h
 4. Si nadie la captura, un manejador global de respaldo la registra y responde con `500 Internal Server Error` genérico.
 5. El cliente siempre recibe un error con estructura consistente, sin importar su origen.
 
+**Mensajes y registro.** El `detail` de una excepción de negocio es texto redactado para el usuario y llega tal cual. En appointment, medicalCheckup, report y patients, una `RuntimeException` inesperada, sin manejador propio en el módulo, pasa por `buildUnexpectedProblem` y responde `Ocurrió un error inesperado en el servidor.`, sin el texto de la excepción. Los manejadores de esos módulos, el de statistics y el global registran los fallos inesperados en `ERROR` con el id de correlación, el método, la ruta declarada, y la clase y los marcos de cada causa, sin mensajes ni excepciones suprimidas: esos textos pueden traer valores de la petición o de la base de datos. En appointment, medicalCheckup, report y patients, un cuerpo o un parámetro mal formado queda como aviso, sin traza, aunque responda 500.
+
+Los avisos de 404 y 405 solo registran el método, porque la ruta puede traer el documento de un paciente; el aviso de negocio 4xx de patients registra la clase y el `errorCode`, no el mensaje. Una excepción de negocio 5xx de patients conserva en el registro su excepción original, y los demás avisos de excepciones esperadas conservan su texto. La protección se limita a los registros descritos aquí. Otros emisores (Hibernate, Tomcat, tareas programadas, integraciones) y la ruta `/error` de Spring Boot siguen su propia configuración.
+
 ### Despacho de notificaciones
 
 `DueNotificationJob` reclama los schedules vencidos (`FOR UPDATE SKIP LOCKED`, `PENDING` →

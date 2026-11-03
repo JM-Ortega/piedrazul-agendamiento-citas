@@ -53,7 +53,7 @@ public class StatisticsExceptionHandler extends BaseExceptionHandler {
         String module = (ex instanceof BusinessException be) ? be.getModule() : MODULE;
 
         if (status.is5xxServerError()) {
-            log.error("Excepción no controlada en el módulo statistics", ex);
+            logUnexpected(log, "Excepción no controlada en el módulo statistics", ex, request);
             return buildProblem(status, "Error interno del servidor",
                     "Ocurrió un error inesperado en el servidor.", module, errorCode, request);
         }
@@ -74,7 +74,7 @@ public class StatisticsExceptionHandler extends BaseExceptionHandler {
         if (ex instanceof AuthorizationDeniedException e) throw e;
         if (ex instanceof AccessDeniedException e) throw e;
 
-        log.error("Excepción no controlada en el módulo statistics", ex);
+        logUnexpected(log, "Excepción no controlada en el módulo statistics", ex, request);
         return buildProblem(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor",
                 "Ocurrió un error inesperado en el servidor.", MODULE, "INTERNAL_SERVER_ERROR", request);
     }

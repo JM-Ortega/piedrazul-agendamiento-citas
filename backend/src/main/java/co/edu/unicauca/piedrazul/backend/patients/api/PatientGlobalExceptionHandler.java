@@ -87,9 +87,13 @@ public class PatientGlobalExceptionHandler extends BaseExceptionHandler {
             throw accessDeniedException;
         }
 
-        String errorCode = (ex instanceof BusinessException be) ? be.getErrorCode() : "INTERNAL_ERROR";
-        HttpStatus status = (ex instanceof BusinessException be) ? be.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
-        String module = (ex instanceof BusinessException be) ? be.getModule() : "patients";
+        if (!(ex instanceof BusinessException be)) {
+            return buildUnexpectedProblem(log, ex, "patients", request);
+        }
+
+        String errorCode = be.getErrorCode();
+        HttpStatus status = be.getStatus();
+        String module = be.getModule();
 
         if (status == HttpStatus.SERVICE_UNAVAILABLE && OTP_DELIVERY_UNAVAILABLE.equals(errorCode)) {
             // Configuración conocida y ya avisada una vez al arrancar ([OTP_DELIVERY]): sin traza
@@ -98,7 +102,8 @@ public class PatientGlobalExceptionHandler extends BaseExceptionHandler {
         } else if (status.is5xxServerError()) {
             log.error("Error no controlado en patients", ex);
         } else {
-            log.warn("Error de negocio en patients [{}]: {}", ex.getClass().getSimpleName(), ex.getMessage());
+            // Sin el mensaje: el de negocio puede traer el documento o el correo de la persona
+            log.warn("Error de negocio en patients [{}]: {}", ex.getClass().getSimpleName(), errorCode);
         }
 
         return buildProblem(
