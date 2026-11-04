@@ -78,31 +78,31 @@ export const routes: Routes = [
     path: 'medico',
     component: DoctorDashboardComponent,
     canActivate: [AuthGuard],
-    data: { role: 'DOCTOR' },
+    data: { role: 'DOCTOR', helpVideoId: '74op4dK3LpI' },
   },
   {
     path: 'medico/citas',
     component: DoctorAllAppointmentsComponent,
     canActivate: [AuthGuard],
-    data: { role: 'DOCTOR', helpVideoId: '...' },
+    data: { role: 'DOCTOR', helpVideoId: 'Y7zfvJ2-uZ0' },
   },
   {
     path: 'medico/pacientes',
     component: DoctorPatientsComponent,
     canActivate: [AuthGuard],
-    data: { role: 'DOCTOR', helpVideoId: '...' },
+    data: { role: 'DOCTOR', helpVideoId: 't5ux8BMStBk' },
   },
   {
     path: 'medico/nueva-cita',
     component: NewAppointmentDoctorComponent,
     canActivate: [AuthGuard],
-    data: { role: 'DOCTOR', helpVideoId: '...' },
+    data: { role: 'DOCTOR', helpVideoId: 'mV4EIkks9n0' },
   },
   {
     path: 'medico/atencion-sin-cita',
     component: DoctorUnscheduledAttentionComponent,
     canActivate: [AuthGuard],
-    data: { role: 'DOCTOR', helpVideoId: '...' },
+    data: { role: 'DOCTOR', helpVideoId: 'eHBz9479Nyg' },
   },
   {
     path: 'medico/control-medico/sin-cita',
@@ -112,7 +112,7 @@ export const routes: Routes = [
     data: {
       role: 'DOCTOR',
       confirmExitLocally: true,
-      helpVideoId: '...',
+      helpVideoId: 'vygc5EbWJVg',
     },
   },
   {
@@ -123,14 +123,14 @@ export const routes: Routes = [
     data: {
       role: 'DOCTOR',
       confirmExitLocally: true,
-      helpVideoId: '...',
+      helpVideoId: 'vygc5EbWJVg',
     },
   },
   {
     path: 'paciente/agendar',
     component: PatientNewAppointmentComponent,
     canActivate: [AuthGuard],
-    data: { role: 'PATIENT', helpVideoId: '...' },
+    data: { role: 'PATIENT', helpVideoId: 'EZwjGLAGGL8' },
   },
   {
     path: 'paciente',
@@ -148,13 +148,13 @@ export const routes: Routes = [
     path: 'paciente/editar-perfil',
     component: EditProfileComponent,
     canActivate: [AuthGuard],
-    data: { role: 'PATIENT', helpVideoId: '...' },
+    data: { role: 'PATIENT', helpVideoId: 'vpw0tfBKGMg' },
   },
   {
     path: 'auditor/auditoria',
     component: AuditComponent,
     canActivate: [AuthGuard],
-    data: { role: 'AUDITOR', helpVideoId: '...' },
+    data: { role: 'AUDITOR', helpVideoId: 'u2dHGpCot08' },
   },
   { path: 'registro', component: RegisterComponent },
 
