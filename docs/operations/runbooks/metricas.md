@@ -8,8 +8,9 @@ reglas de alerta y Grafana las muestra en dos dashboards. Es un proyecto Compose
 (`piedrazul-obs`) que la aplicación no necesita para arrancar ni para quedar healthy.
 
 Los productores y sus contratos están en
-[Health y métricas](../../architecture/overview.md#health-y-métricas). El stack no recolecta logs
-ni trazas, no tiene acceso público y **no envía notificaciones de alertas**.
+[Health y métricas](../../architecture/overview.md#health-y-métricas). El mismo proyecto Compose
+recolecta los logs seleccionados con Loki (ver [Logs](logs.md)). No recolecta trazas, no tiene
+acceso público y **no envía notificaciones de alertas**.
 
 ## Arquitectura
 
@@ -27,17 +28,18 @@ ni trazas, no tiene acceso público y **no envía notificaciones de alertas**.
 - **Prometheus** es el único servicio del stack en la red de la aplicación; lee cada productor por
   el nombre de su contenedor. Sin puerto publicado. Evalúa las reglas de
   `prometheus/rules/alerts.yml`. Sin Alertmanager ni API de administración.
-- **Alloy** solo ejecuta `prometheus.exporter.unix` (CPU, memoria, carga, presión PSI, discos y
-  sistemas de archivos) sobre `/proc`, `/sys` y `/` del host montados de solo lectura. Corre como
-  `nobody`, sin capacidades, sin red ni PID del host, sin socket de Docker. No recolecta logs ni
-  métricas de red del host (el contenedor tiene su propia red y reportaría sus interfaces).
-- **Grafana** usa una sola fuente de datos (`uid: prometheus`) y los dashboards de
-  `grafana/dashboards/`, provisionados de solo lectura. Exige usuario y contraseña (sin acceso
+- **Alloy** ejecuta `prometheus.exporter.unix` (CPU, memoria, carga, presión PSI, discos y
+  sistemas de archivos) sobre `/proc`, `/sys` y `/` del host montados de solo lectura, y además
+  lee el journal del host para los logs (ver [Logs](logs.md)). Corre como `nobody`, sin
+  capacidades, sin red ni PID del host, sin socket de Docker. No recolecta métricas de red del
+  host (el contenedor tiene su propia red y reportaría sus interfaces).
+- **Grafana** usa la fuente de datos `uid: prometheus` (por defecto) y `uid: loki` (logs) y los
+  dashboards de `grafana/dashboards/`, provisionados de solo lectura. Exige usuario y contraseña (sin acceso
   anónimo ni registro). Tiene deshabilitados la telemetría, los avisos de versión, las noticias y
   la descarga de plugins; su red no restringe otras conexiones salientes. Las alertas de Grafana
   están deshabilitadas: las evalúa Prometheus.
-- Los tres corren con raíz de solo lectura, `cap_drop: ALL`, `no-new-privileges` y límites de CPU y
-  memoria. Ninguno depende de la aplicación para arrancar: si un productor no existe, su destino
+- Los cuatro (con Loki) corren con raíz de solo lectura, `cap_drop: ALL`, `no-new-privileges` y
+  límites de CPU y memoria. Ninguno depende de la aplicación para arrancar: si un productor no existe, su destino
   queda `up = 0`.
 
 ### Etiquetas
@@ -54,9 +56,9 @@ pseudo-fs, overlays y montajes de contenedores (cada uno sería un `mountpoint` 
 | `infra/observability/compose.yml` | proyecto `piedrazul-obs`: servicios, redes, volúmenes, límites |
 | `infra/observability/.env.example` | variables (`GRAFANA_ADMIN_PASSWORD` obligatoria; red, puerto y retención opcionales) |
 | `infra/observability/prometheus/` | destinos (`prometheus.yml`) y reglas (`rules/*.yml`) |
-| `infra/observability/alloy/config.alloy` | exportador del host |
+| `infra/observability/alloy/config.alloy` | exportador del host y lectura del journal ([Logs](logs.md)) |
 | `infra/observability/grafana/provisioning/` | fuente de datos y proveedor de dashboards |
-| `infra/observability/grafana/dashboards/` | `plataforma.json`, `backend-jvm.json` |
+| `infra/observability/grafana/dashboards/` | `plataforma.json`, `backend-jvm.json` y `logs.json` ([Logs](logs.md)) |
 | `infra/observability/tests/alerts.test.yml` | pruebas unitarias de las reglas |
 | `infra/ansible/roles/observability/`, `infra/ansible/playbooks/observability.yml` | instalación en un host |
 | `infra/tests/metrics-stack-check.sh` | verificación local de configuración y ejecución |
@@ -71,7 +73,8 @@ el anterior.
 |---|---|---|---|
 | prometheus | 512 MiB | 0,50 | `prometheus_data` (TSDB) |
 | grafana | 512 MiB | 0,50 | `grafana_data` (base SQLite: usuarios, preferencias, dashboards propios) |
-| alloy | 192 MiB | 0,25 | ninguno (tmpfs; sin WAL porque no reenvía) |
+| alloy | 256 MiB | 0,25 | `alloy_data` (posiciones de lectura del journal; sin WAL de métricas) |
+| loki | 768 MiB | 0,50 | `loki_data` (ver [Logs](logs.md#recursos-y-almacenamiento)) |
 
 - **Retención**: `PROMETHEUS_RETENTION_TIME` (30d) y `PROMETHEUS_RETENTION_SIZE` (2GB); se aplica la
   primera que se cumpla. Para cumplir el tamaño Prometheus solo borra bloques persistidos: el WAL,
@@ -145,9 +148,10 @@ el mismo Trivy y las mismas opciones que `.github/actions/trivy-scan` y decidir 
 El rol:
 
 1. Comprueba Docker y la red de la aplicación.
-2. Copia `compose.yml` y los directorios de configuración (`prometheus/`, `alloy/`,
+2. Copia `compose.yml` y los directorios de configuración (`prometheus/`, `alloy/`, `loki/`,
    `grafana/provisioning/`, `grafana/dashboards/`), del usuario `ansible`, legibles por los
-   contenedores; no contienen secretos.
+   contenedores; no contienen secretos. Antes prepara el journal del host para los logs (ver
+   [Logs](logs.md#instalación-con-ansible)).
 3. Borra de esos directorios lo que el repositorio ya no tiene (ver
    [Cambios y retiro de configuración](#cambios-y-retiro-de-configuración)).
 4. Crea `/opt/piedrazul-obs/.env` **solo si no existe** (root, 0600), con la contraseña del
@@ -157,7 +161,8 @@ El rol:
    cuando `.env` no existe y no aparece en la salida (`no_log`). Un run posterior no la regenera
    ni la reescribe.
 5. Valida y levanta el proyecto, reinicia los servicios cuya configuración cambió y verifica que los
-   cinco destinos se leen y que los dos dashboards están cargados.
+   siete destinos se leen (los cinco de métricas, `alloy` y `loki`), que los tres dashboards están
+   cargados y la canalización de logs.
 
 Repetirlo sin cambios en el repositorio no cambia nada.
 
@@ -171,6 +176,7 @@ propios. `.env`, `compose.yml` y los volúmenes no entran en esa reconciliación
 |---|---|
 | regla en `prometheus/rules/` agregada, cambiada o borrada; `prometheus.yml` | reinicio de Prometheus; una regla borrada deja de evaluarse |
 | `alloy/config.alloy` | reinicio de Alloy |
+| `loki/config.yaml` | reinicio de Loki |
 | `grafana/provisioning/` (fuente de datos, proveedor) | reinicio de Grafana |
 | dashboard en `grafana/dashboards/` agregado, cambiado o borrado | sin reinicio: Grafana lo recarga en ≤ 60 s y un archivo borrado retira su dashboard |
 | `compose.yml` | Compose recrea los servicios afectados |
@@ -220,6 +226,9 @@ evalúa ninguna regla.
 En la raíz, el piso de 10 GiB domina en discos de hasta ≈67 GiB y el 15 % en los mayores. El panel
 **Raíz del host: espacio libre y umbral** muestra los dos valores.
 
+Las reglas de la canalización de logs (`prometheus/rules/logs.yml`) están en
+[Logs](logs.md#operación-y-diagnóstico).
+
 `tests/alerts.test.yml` cubre el caso normal, la falla y la ausencia de datos de cada regla (en la
 raíz, las dos ramas del umbral). `metrics-stack-check.sh` además detiene el backend y comprueba la
 transición real a `pending` (y a `firing` con `ALERT_FIRING=1`) y su resolución.
@@ -232,7 +241,7 @@ transición real a `pending` (y a `firing` con `ALERT_FIRING=1`) y su resolució
 | Detener | `docker compose stop` | ninguno |
 | Retirar conservando datos | `docker compose down` | ninguno; volúmenes intactos |
 | Volver a levantar | `docker compose up -d --wait` | ninguno; TSDB y Grafana conservan su estado |
-| Borrar todo el estado | `docker compose down -v` | ninguno; se pierden el histórico y la base de Grafana (en el host, `.env` sigue y la contraseña se reaplica al recrear la base) |
+| Borrar todo el estado | `docker compose down -v` | ninguno; se pierden el histórico, los logs de Loki, las posiciones de Alloy y la base de Grafana (en el host, `.env` sigue y la contraseña se reaplica al recrear la base) |
 | Volver a una versión anterior | checkout de la versión y repetir el playbook | ninguno; la configuración queda igual a esa versión |
 
 La aplicación no depende del stack: detenerlo o borrarlo no cambia su health ni sus rutas.

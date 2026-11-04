@@ -1,4 +1,5 @@
-# Stack privado de métricas, proyecto Compose propio. Ver docs/operations/runbooks/metricas.md.
+# Stack privado de observabilidad (métricas y logs), proyecto Compose propio. Ver
+# docs/operations/runbooks/metricas.md y docs/operations/runbooks/logs.md.
 obs_dir: /opt/piedrazul-obs
 obs_compose_project_name: piedrazul-obs
 # Dueño de la configuración copiada y del .env (secreto: solo su dueño lo lee). Las tareas corren
@@ -9,14 +10,55 @@ obs_src_dir: "{{ playbook_dir }}/../../observability"
 # Red de la aplicación a la que se une Prometheus (la crea prod.yml del proyecto piedrazul)
 obs_app_network: piedrazul_net
 # Destinos que deben quedar leídos tras levantar el stack (job de prometheus.yml)
-obs_expected_jobs: [backend, keycloak, traefik, host, prometheus]
-obs_expected_dashboards: [piedrazul-plataforma, piedrazul-backend-jvm]
+obs_expected_jobs: [backend, keycloak, traefik, host, prometheus, alloy, loki]
+obs_expected_dashboards: [piedrazul-plataforma, piedrazul-backend-jvm, piedrazul-logs]
 # Directorios de configuración del repositorio: se copian y se reconcilian (lo retirado del
 # repositorio se borra del host)
-obs_managed_dirs: [prometheus, alloy, grafana/provisioning, grafana/dashboards]
+obs_managed_dirs: [prometheus, alloy, loki, grafana/provisioning, grafana/dashboards]
 # Servicio a reiniciar cuando cambia cada directorio ('' = se recarga solo)
 obs_restart_on_change:
   prometheus: prometheus
   alloy: alloy
+  loki: loki
   grafana/provisioning: grafana
   grafana/dashboards: ''
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+# Fuentes que Alloy envía a Loki: servicios del proyecto Compose obs_log_project que escriben en
+# el journal (logging.driver: journald en su archivo Compose). Esta lista no activa el driver:
+# solo selecciona. Va a .env como OBS_LOG_PROJECT / OBS_LOG_SERVICES.
+obs_log_project: piedrazul
+obs_log_services: [traefik]
+# Política de fuentes. El rol falla, sin tocar nada, si obs_log_services incluye un servicio
+# fuera de lo admitido:
+#   - admitidos: sus logs no llevan datos personales conocidos;
+#   - condicionados: admitidos solo cuando figuran también en obs_log_privacy_controls_done,
+#     es decir, cuando sus controles de privacidad en el productor están completos (ver
+#     docs/operations/runbooks/logs.md, "Política de fuentes");
+#   - excluidos: nunca.
+obs_log_services_allowed: [traefik]
+obs_log_services_conditional: [backend, keycloak]
+obs_log_privacy_controls_done: []
+obs_log_services_excluded: [postgres, migrate, prometheus, grafana, alloy, loki]
+
+# GID dueño de /var/lib/alloy/data en la imagen de Alloy (grupo suplementario en compose.yml). No
+# debe existir en el host: daría a Alloy los permisos de ese grupo sobre la raíz montada.
+obs_alloy_data_gid: 473
+
+# Journal persistente del host. Grupo dueño de sus archivos (Alloy lo recibe como grupo
+# suplementario) y ruta; el GID se descubre en cada run.
+obs_journal_dir: /var/log/journal
+obs_journal_group: systemd-journal
+
+# Drop-in de journald propio de este rol (alcance: todo el host, no solo Piedra Azul). Con
+# obs_journald_manage: false el rol no lo escribe ni reinicia journald, pero sigue exigiendo un
+# journal persistente.
+obs_journald_manage: true
+obs_journald_dropin: /etc/systemd/journald.conf.d/60-piedrazul-obs.conf
+obs_journald_system_max_use: 2G
+obs_journald_system_max_file_size: 128M
+obs_journald_max_retention: 7day
+
+# Retirada de logs (playbooks/observability-logs-rollback.yml, segundo paso): con true borra
+# además los volúmenes de Loki (todos los logs) y de Alloy (posiciones de lectura)
+obs_logs_purge: false

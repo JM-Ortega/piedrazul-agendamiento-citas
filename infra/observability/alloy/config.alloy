@@ -1,6 +1,8 @@
-// Alloy: solo métricas del host Linux (exportador unix). Sin logs, journald, Loki, trazas ni
-// remote_write: Prometheus lee este exportador en
-// alloy:12345/api/v0/component/prometheus.exporter.unix.host/metrics.
+// Alloy: métricas del host Linux (exportador unix) y logs del journal del host hacia Loki.
+//
+// Métricas: Prometheus lee este exportador en
+// alloy:12345/api/v0/component/prometheus.exporter.unix.host/metrics y las métricas propias de
+// Alloy (incluida la canalización de logs) en alloy:12345/metrics. Sin remote_write ni trazas.
 //
 // Observa el host cuyos /proc, /sys y / se montan en /host (compose.yml). En un VPS Linux es el
 // propio host; en Docker Desktop es la VM Linux de Docker, no el equipo anfitrión.
@@ -36,6 +38,207 @@ prometheus.exporter.unix "host" {
 
   disk {
     device_exclude = "^(ram|loop|fd|sr|(h|s|v|xv)d[a-z]+[0-9]+|nvme[0-9]+n[0-9]+p[0-9]+)$"
+  }
+}
+
+// ── Logs: journal persistente del host → selección → Loki ──────────────────────────────────
+//
+// Lee el journal del host por el montaje de / (solo lectura) con el grupo dueño de sus archivos
+// (group_add en compose.yml); sin socket de Docker ni root. Entrega de mejor esfuerzo: las
+// posiciones (cursor del journal) se guardan en --storage.path (volumen alloy_data) y avanzan al
+// leer, no al confirmar Loki; un reinicio puede repetir lo leído en los últimos segundos y un
+// lote que agota sus reintentos se pierde. Ver docs/operations/runbooks/logs.md.
+
+// Procedencia. Los campos que empiezan por "_" (_TRANSPORT, _SYSTEMD_UNIT, _COMM, _UID) los
+// pone journald a partir de las credenciales del proceso que escribe; un cliente no puede
+// fijarlos. Todos los demás (COM_DOCKER_COMPOSE_*, CONTAINER_ID, MESSAGE_ID, PRIORITY) los
+// elige quien escribe: cualquier proceso del host puede mandar al journal una entrada con
+// COM_DOCKER_COMPOSE_PROJECT=piedrazul. La selección exige por eso que la entrada venga de
+// dockerd (unidad docker.service, comando dockerd, UID 0) antes de mirar el proyecto y el
+// servicio, y los avisos de supresión se toman de _TRANSPORT=driver (solo journald) con la
+// unidad afectada en OBJECT_SYSTEMD_UNIT (también la pone journald), nunca del texto. Lo que
+// no trae estos campos se descarta. Los campos del proyecto y el servicio siguen siendo los
+// que dockerd copia de las etiquetas del contenedor: quien puede crear contenedores en este
+// Docker puede elegirlas (y ya es root en el host).
+
+// 1. Lectura: todo el journal pasa por aquí para que loki_source_journal_target_lines_total
+// muestre que se lee aunque ninguna fuente seleccionada escriba. Los campos que decide la
+// selección pasan a etiquetas tmp_*; las demás (__journal_*) se descartan al salir.
+loki.relabel "journal_fields" {
+  forward_to = []
+
+  // Etiqueta fija: una entrada sin etiquetas se descartaría antes de llegar a la selección
+  rule {
+    target_label = "tmp_read"
+    replacement  = "journal"
+  }
+  rule {
+    source_labels = ["__journal__transport"]
+    target_label  = "tmp_transport"
+  }
+  // Campos de confianza (los pone journald): proceso que escribió la entrada
+  rule {
+    source_labels = ["__journal__systemd_unit", "__journal__comm", "__journal__uid"]
+    separator     = ";"
+    target_label  = "tmp_writer"
+  }
+  // Unidad a la que se refiere un aviso de journald (_TRANSPORT=driver)
+  rule {
+    source_labels = ["__journal_object_systemd_unit"]
+    target_label  = "tmp_object_unit"
+  }
+  // Etiquetas de Compose que el driver journald de Docker agrega como campos cuando el
+  // contenedor las declara en logging.options.labels (COM_DOCKER_COMPOSE_*)
+  rule {
+    source_labels = ["__journal_com_docker_compose_project"]
+    target_label  = "tmp_project"
+  }
+  rule {
+    source_labels = ["__journal_com_docker_compose_service"]
+    target_label  = "tmp_service"
+  }
+  // Docker: stdout = PRIORITY 6, stderr = PRIORITY 3
+  rule {
+    source_labels = ["__journal_priority"]
+    target_label  = "tmp_priority"
+  }
+  rule {
+    source_labels = ["__journal_container_id"]
+    target_label  = "tmp_container_id"
+  }
+  rule {
+    source_labels = ["__journal_message_id"]
+    target_label  = "tmp_message_id"
+  }
+}
+
+loki.source.journal "host" {
+  // Journal persistente del host a través del montaje /:/host/root
+  path           = "/host/root/var/log/journal"
+  // Sin posición guardada (primer arranque o estado borrado): solo lo de las últimas 12 h
+  max_age        = "12h"
+  format_as_json = false
+  relabel_rules  = loki.relabel.journal_fields.rules
+  forward_to     = [loki.relabel.select.receiver]
+}
+
+// 2. Selección (allowlist). Solo pasan:
+//   - entradas escritas por dockerd (_TRANSPORT=journal, _SYSTEMD_UNIT=docker.service,
+//     _COMM=dockerd, _UID=0) de contenedores del proyecto Compose OBS_LOG_PROJECT cuyo servicio
+//     está en OBS_LOG_SERVICES;
+//   - avisos de journald (_TRANSPORT=driver) de mensajes suprimidos por límite de tasa
+//     (MESSAGE_ID de SD_MESSAGE_JOURNAL_DROPPED) cuya unidad es docker.service
+//     (OBJECT_SYSTEMD_UNIT).
+// Todo lo demás (otras unidades, otros procesos, postgres, migraciones, este stack) se descarta
+// aquí y no sale de Alloy.
+loki.relabel "select" {
+  forward_to = [loki.process.logs.receiver]
+
+  rule {
+    source_labels = ["tmp_transport", "tmp_writer", "tmp_project", "tmp_service"]
+    separator     = ";"
+    regex         = string.format("journal;docker\\.service;dockerd;0;%s;(%s)", coalesce(sys.env("OBS_LOG_PROJECT"), "piedrazul"), coalesce(sys.env("OBS_LOG_SERVICES"), "traefik"))
+    target_label  = "source"
+    replacement   = "docker"
+  }
+  rule {
+    source_labels = ["tmp_transport", "tmp_message_id", "tmp_object_unit"]
+    separator     = ";"
+    regex         = "driver;a596d6fe7bfa4994828e72309e95d61e;docker\\.service"
+    target_label  = "source"
+    replacement   = "journald"
+  }
+  rule {
+    source_labels = ["source"]
+    regex         = "docker|journald"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["source", "tmp_service"]
+    separator     = ";"
+    regex         = "docker;(.+)"
+    target_label  = "service"
+  }
+  rule {
+    source_labels = ["source"]
+    regex         = "journald"
+    target_label  = "service"
+    replacement   = "journald"
+  }
+  rule {
+    source_labels = ["source", "tmp_priority"]
+    separator     = ";"
+    regex         = "docker;6"
+    target_label  = "stream"
+    replacement   = "stdout"
+  }
+  rule {
+    source_labels = ["source", "tmp_priority"]
+    separator     = ";"
+    regex         = "docker;3"
+    target_label  = "stream"
+    replacement   = "stderr"
+  }
+  // tmp_container_id lo usa loki.process; las demás tmp_* no salen de aquí
+  rule {
+    regex  = "tmp_(read|transport|writer|object_unit|project|service|priority|message_id)"
+    action = "labeldrop"
+  }
+}
+
+// 3. Procesamiento. Etiquetas finales acotadas: source, service, stream y level. El id del
+// contenedor y el id de correlación van como metadatos estructurados (no crean streams).
+loki.process "logs" {
+  forward_to = [loki.write.loki.receiver]
+
+  // Severidad solo donde el formato es conocido: la palabra de nivel tras la marca de tiempo
+  // (Spring Boot y Keycloak: INFO/WARN/ERROR; Traefik: INF/WRN/ERR). Una línea sin ese formato
+  // (continuación de una traza, salida libre) queda sin etiqueta level.
+  stage.match {
+    selector = "{source=\"docker\"}"
+
+    stage.regex {
+      expression = "^\\S+(?:\\s\\S+)?\\s+(?P<level_raw>TRACE|DEBUG|INFO|WARN|ERROR|FATAL|TRC|DBG|INF|WRN|ERR|FTL)\\b"
+    }
+    stage.template {
+      source   = "level"
+      template = "{{ with .level_raw }}{{ if eq . \"ERROR\" \"ERR\" }}error{{ else if eq . \"WARN\" \"WRN\" }}warn{{ else if eq . \"INFO\" \"INF\" }}info{{ else if eq . \"DEBUG\" \"DBG\" }}debug{{ else if eq . \"TRACE\" \"TRC\" }}trace{{ else }}fatal{{ end }}{{ end }}"
+    }
+    stage.labels {
+      values = { level = "" }
+    }
+
+    // Id de correlación del backend: [<uuid canónico>] (logging.pattern.correlation)
+    stage.regex {
+      expression = "\\[(?P<correlation_id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\\]"
+    }
+    stage.structured_metadata {
+      values = {
+        correlation_id = "",
+        container_id   = "tmp_container_id",
+      }
+    }
+  }
+
+  // job lo agrega loki.source.journal con el nombre del componente: no aporta nada
+  stage.label_drop {
+    values = ["tmp_container_id", "job"]
+  }
+}
+
+// 4. Envío a Loki por obs_net. Reintenta con espera creciente (≈8 min en total) y después
+// descarta el lote (loki_write_dropped_entries_total): pérdida que no se reenvía.
+loki.write "loki" {
+  endpoint {
+    url                 = "http://loki:3100/loki/api/v1/push"
+    batch_wait          = "1s"
+    batch_size          = "1MiB"
+    remote_timeout      = "10s"
+    min_backoff_period  = "500ms"
+    max_backoff_period  = "5m"
+    max_backoff_retries = 10
+    retry_on_http_429   = true
   }
 }
 

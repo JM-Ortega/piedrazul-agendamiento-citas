@@ -312,9 +312,20 @@ El health de la aplicación es público y las métricas son privadas. Cada servi
 - **Etiquetas.** Las peticiones HTTP se miden por la plantilla de la ruta (`/api/patients/document/{documentNumber}/public`) y nunca por la URL concreta. Una petición rechazada antes de llegar a un controlador queda como `UNKNOWN`. La latencia usa buckets fijos (`management.metrics.distribution.slo`) en lugar del histograma completo. Traefik etiqueta por entrypoint y servicio, no por router. Keycloak no publica métricas de eventos de usuario.
 - **Independencia.** Ningún servicio depende de un recolector de métricas para arrancar ni para quedar healthy. Con la base de datos caída, el health responde 503 y las métricas siguen respondiendo. El puerto de gestión del backend sí debe estar libre: si no puede abrirlo, el backend no arranca.
 
-- **Consumidor.** El stack privado de métricas (`infra/observability/`, proyecto Compose `piedrazul-obs`) lee estos tres listeners y el host: Prometheus es su único servicio en `piedrazul_net` y Grafana escucha solo en loopback del host. Prometheus evalúa las reglas de alerta; no hay notificaciones externas configuradas. Ver [Métricas](../operations/runbooks/metricas.md).
+- **Consumidor.** El stack privado de observabilidad (`infra/observability/`, proyecto Compose `piedrazul-obs`) lee estos tres listeners y el host: Prometheus es su único servicio en `piedrazul_net` y Grafana escucha solo en loopback del host. Prometheus evalúa las reglas de alerta; no hay notificaciones externas configuradas. Ver [Métricas](../operations/runbooks/metricas.md).
 
 Verificación local de los contratos: `ManagementListenerBoundaryTest` (los dos listeners sobre Tomcat real), `infra/tests/traefik-config-check.sh` (flags, rutas y, con Docker, el entrypoint de métricas en ejecución) e `infra/tests/metrics-stack-check.sh` (el stack de métricas contra los tres productores reales).
+
+### Logs centralizados
+
+Los logs de los servicios admitidos se centralizan sin tocar la aplicación en ejecución: el servicio escribe en stdout/stderr como siempre, el driver `journald` de Docker (elegido en su archivo Compose, en modo `non-blocking`) los deja en el journal persistente del host y Alloy, en el stack privado `piedrazul-obs`, envía a Loki solo los del proyecto y los servicios seleccionados. Loki no está publicado ni en `piedrazul_net`; Grafana lo consulta por la red del stack.
+
+- **Selección.** Una fuente se envía solo si escribe en el journal y está seleccionada, y solo se aceptan entradas que journald atribuye a dockerd (campos `_SYSTEMD_UNIT`, `_COMM`, `_UID`, que un cliente no puede fijar); los campos de Compose de una entrada no prueban por sí solos su origen. Traefik está admitido; backend y Keycloak quedan condicionados a controles de privacidad en el productor; PostgreSQL, las migraciones y el propio stack, excluidos. Ningún archivo Compose de la aplicación activa todavía `journald`. El filtro de Alloy no limpia el journal: lo escrito queda en el host hasta su rotación.
+- **Etiquetas.** `source`, `service`, `stream` y `level` (solo donde el formato lo expone). El id de correlación del backend (`[<uuid>]`) y el del contenedor van como metadatos, no como etiquetas.
+- **Entrega.** De mejor esfuerzo: puede perderse o repetirse una línea (posiciones de lectura, reintentos acotados, buffer del driver). Retención de 14 días en Loki y de 2 GiB / 7 días en el journal de todo el host; ninguna es un tope del disco.
+- **Independencia.** Ningún servicio de la aplicación depende de Loki ni de Alloy; con Loki caído el driver sigue escribiendo en el journal.
+
+Operación, política de fuentes, límites y retirada: [Logs](../operations/runbooks/logs.md).
 
 ## Despliegue
 

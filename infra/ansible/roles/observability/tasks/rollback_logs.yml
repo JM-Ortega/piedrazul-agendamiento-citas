@@ -1,0 +1,140 @@
+# Segundo paso de la vuelta a métricas sin logs (docs/operations/runbooks/logs.md, "Retirada").
+# El primero, repetir playbooks/observability.yml desde la versión sin logs, deja Prometheus,
+# Alloy y Grafana con la configuración de métricas; quedan Loki (contenedor huérfano, sigue
+# sirviendo), su configuración, la fuente de datos Loki en la base de Grafana (provisionada de
+# solo lectura: ni el archivo retirado ni la API la borran), el drop-in de journald y las
+# variables de logs de .env. Este paso los retira. Sin el primero falla sin cambiar nada.
+#
+# Se localiza todo por etiquetas de Compose y rutas, no por compose.yml (el del host ya es el de
+# la versión sin logs). No toca los volúmenes de Prometheus y Grafana ni la aplicación; con
+# obs_logs_purge borra además los de Loki y Alloy. Repetirlo no cambia nada.
+
+- name: Leer la configuración vigente de Alloy y Prometheus en el host
+  ansible.builtin.slurp:
+    src: "{{ obs_dir }}/{{ item }}"
+  loop: [alloy/config.alloy, prometheus/prometheus.yml]
+  register: obs_rb_config
+
+- name: Exigir que el host ya tenga la configuración sin logs
+  ansible.builtin.assert:
+    that:
+      - "'loki.source.journal' not in (obs_rb_config.results[0].content | b64decode)"
+      - "'job_name: loki' not in (obs_rb_config.results[1].content | b64decode)"
+    fail_msg: >-
+      {{ obs_dir }} todavía tiene la configuración con logs (Alloy lee el journal o Prometheus
+      lee Loki). Primero repetir playbooks/observability.yml desde la versión sin logs; después,
+      esta retirada. No se cambió nada.
+    quiet: true
+
+# Fuente de datos Loki: solo un deleteDatasources de provisioning la borra. Archivo temporal,
+# reinicio de Grafana y retiro del archivo (el borrado no se repite ni se deshace sin él).
+- name: Buscar la fuente de datos Loki en Grafana
+  ansible.builtin.command:
+    argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
+           exec, -T, grafana, sh, -c,
+           'wget -qO /dev/null --header "Authorization: Basic $(printf "admin:%s" "$GF_SECURITY_ADMIN_PASSWORD" | base64)" "http://localhost:3000/api/datasources/uid/loki"']
+    chdir: "{{ obs_dir }}"
+  register: obs_rb_loki_ds
+  changed_when: false
+  failed_when: obs_rb_loki_ds.rc != 0 and '404' not in obs_rb_loki_ds.stderr
+
+- name: Retirar la fuente de datos Loki de Grafana
+  when: obs_rb_loki_ds.rc == 0
+  block:
+    - name: Escribir el retiro de la fuente de datos (temporal)
+      ansible.builtin.copy:
+        dest: "{{ obs_dir }}/grafana/provisioning/datasources/zz-retire-loki.yml"
+        mode: "0644"
+        content: |
+          apiVersion: 1
+          deleteDatasources:
+            - name: Loki
+              orgId: 1
+
+    - name: Reiniciar Grafana para aplicar el retiro
+      community.docker.docker_compose_v2:
+        project_src: "{{ obs_dir }}"
+        project_name: "{{ obs_compose_project_name }}"
+        files: [compose.yml]
+        services: [grafana]
+        state: restarted
+        wait: true
+        wait_timeout: 180
+
+    - name: Comprobar que la fuente de datos Loki ya no existe
+      ansible.builtin.command:
+        argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
+               exec, -T, grafana, sh, -c,
+               'wget -qO /dev/null --header "Authorization: Basic $(printf "admin:%s" "$GF_SECURITY_ADMIN_PASSWORD" | base64)" "http://localhost:3000/api/datasources/uid/loki"']
+        chdir: "{{ obs_dir }}"
+      register: obs_rb_loki_ds_after
+      changed_when: false
+      until: obs_rb_loki_ds_after.rc != 0 and '404' in obs_rb_loki_ds_after.stderr
+      # Éxito = 404; seguir existiendo o cualquier otro error = falla
+      failed_when: not (obs_rb_loki_ds_after.rc != 0 and '404' in obs_rb_loki_ds_after.stderr)
+      retries: 12
+      delay: 5
+  always:
+    - name: Quitar el archivo temporal de retiro
+      ansible.builtin.file:
+        path: "{{ obs_dir }}/grafana/provisioning/datasources/zz-retire-loki.yml"
+        state: absent
+
+- name: Buscar el contenedor de Loki del stack
+  ansible.builtin.command:
+    argv: [docker, ps, -aq,
+           --filter, "label=com.docker.compose.project={{ obs_compose_project_name }}",
+           --filter, "label=com.docker.compose.service=loki"]
+  register: obs_loki_containers
+  changed_when: false
+
+- name: Eliminar el contenedor de Loki
+  ansible.builtin.command:
+    argv: "{{ ['docker', 'rm', '-f'] + obs_loki_containers.stdout_lines }}"
+  when: obs_loki_containers.stdout_lines | length > 0
+  changed_when: true
+
+- name: Borrar la configuración de Loki del host
+  ansible.builtin.file:
+    path: "{{ obs_dir }}/loki"
+    state: absent
+
+- name: Quitar las variables de logs de .env
+  ansible.builtin.lineinfile:
+    path: "{{ obs_dir }}/.env"
+    regexp: "^{{ item }}="
+    state: absent
+  loop: [OBS_JOURNAL_GID, OBS_LOG_PROJECT, OBS_LOG_SERVICES]
+
+- name: Retirar el drop-in de journald
+  ansible.builtin.file:
+    path: "{{ obs_journald_dropin }}"
+    state: absent
+  register: obs_journald_dropin_removed
+  when: obs_journald_manage
+
+# Vuelve a la configuración de journald de la distribución. El journal ya escrito en
+# /var/log/journal se conserva (Storage=auto lo sigue usando si el directorio existe).
+- name: Reiniciar journald sin el drop-in
+  ansible.builtin.systemd_service:
+    name: systemd-journald
+    state: restarted
+  when: obs_journald_manage and obs_journald_dropin_removed is changed
+
+# Destructivo y opcional. Tras el primer paso ningún contenedor usa estos volúmenes.
+- name: Buscar los volúmenes de Loki y Alloy
+  ansible.builtin.command:
+    argv: [docker, volume, ls, -q,
+           --filter, "label=com.docker.compose.project={{ obs_compose_project_name }}",
+           --filter, "label=com.docker.compose.volume={{ item }}"]
+  loop: [loki_data, alloy_data]
+  register: obs_logs_volumes
+  changed_when: false
+  when: obs_logs_purge | bool
+
+- name: Borrar los volúmenes de Loki y Alloy (obs_logs_purge)
+  ansible.builtin.command:
+    argv: [docker, volume, rm, "{{ item }}"]
+  loop: "{{ obs_logs_volumes.results | default([]) | map(attribute='stdout_lines', default=[]) | flatten }}"
+  when: obs_logs_purge | bool
+  changed_when: true

@@ -1,19 +1,23 @@
-# Stack privado de métricas: Prometheus, Grafana y Alloy (métricas del host). Proyecto Compose
-# propio, separado de la aplicación (prod.yml / docker-compose.yml): se levanta, reinicia o
-# baja sin tocar ningún servicio de la aplicación, y ningún servicio de la aplicación depende
-# de él. Sin logs (Loki, journald) ni trazas.
+# Stack privado de observabilidad: Prometheus, Grafana, Alloy (métricas del host y logs del
+# journal) y Loki. Proyecto Compose propio, separado de la aplicación (prod.yml /
+# docker-compose.yml): se levanta, reinicia o baja sin tocar ningún servicio de la aplicación, y
+# ningún servicio de la aplicación depende de él. Sin trazas.
 #
 # Conectividad privada:
-#   - obs_net (propia): prometheus, grafana y alloy.
+#   - obs_net (propia): prometheus, grafana, alloy y loki.
 #   - red de la aplicación (externa, OBS_APP_NETWORK, piedrazul_net por defecto): solo
 #     prometheus, para leer backend:8081, keycloak:9000 y traefik:8082 por nombre. Debe
 #     existir antes (la crea la aplicación); si no existe, `up` falla sin crear nada.
 # Ningún puerto publicado salvo Grafana en loopback del host (acceso local o por túnel SSH). Sin
-# socket de Docker ni contenedores privilegiados.
+# socket de Docker ni contenedores privilegiados. Loki solo en obs_net.
+#
+# Logs: Alloy lee el journal persistente del host (solo lectura, con el grupo dueño del journal)
+# y envía a Loki solo las fuentes seleccionadas (alloy/config.alloy). Qué contenedores escriben
+# en el journal lo decide cada archivo Compose de la aplicación (logging.driver), no este.
 #
 # Uso (desde este directorio, con .env creado a partir de .env.example):
 #   docker compose up -d
-# Ver docs/operations/runbooks/metricas.md.
+# Ver docs/operations/runbooks/metricas.md y docs/operations/runbooks/logs.md.
 name: piedrazul-obs
 
 networks:
@@ -25,6 +29,10 @@ networks:
 volumes:
   prometheus_data:
   grafana_data:
+  # Chunks, índice, WAL y compactor de Loki
+  loki_data:
+  # Posiciones de lectura del journal (y demás estado de Alloy)
+  alloy_data:
 
 services:
   prometheus:
@@ -127,17 +135,38 @@ services:
     command:
       - run
       - /etc/alloy/config.alloy
-      # Solo métricas, sin remote_write ni WAL: el estado es descartable (tmpfs)
-      - --storage.path=/tmp/alloy
+      # Estado persistente: posiciones de lectura del journal. Sin WAL de métricas ni de logs.
+      - --storage.path=/var/lib/alloy/data
       - --server.http.listen-addr=0.0.0.0:12345
       - --disable-reporting
-    # Sin root: /proc, /sys y la raíz del host solo se leen (estadísticas y statfs); los
-    # archivos del host que no son legibles por cualquiera siguen sin serlo
+    # Sin root: /proc, /sys y la raíz del host solo se leen (estadísticas, statfs y el journal);
+    # los archivos del host que no son legibles por cualquiera ni por los grupos de abajo siguen
+    # sin serlo
     user: "65534:65534"
+    # Grupos suplementarios, solo estos dos:
+    #   - 473: dueño de /var/lib/alloy/data en la imagen (0770); un volumen nuevo hereda ese
+    #     dueño y modo, y así nobody puede escribir las posiciones. En el host ese GID no debe
+    #     pertenecer a ningún grupo (el rol de Ansible lo comprueba).
+    #   - OBS_JOURNAL_GID: grupo dueño de los archivos del journal del host (systemd-journal en
+    #     Ubuntu). Por defecto 65534 (nogroup), que no da acceso: sin él, Alloy no lee el
+    #     journal (sd-journal omite sin error los archivos ilegibles; el componente sigue sano
+    #     y no lee nada), sin afectar a las métricas.
+    group_add:
+      - "473"
+      - "${OBS_JOURNAL_GID:-65534}"
+    environment:
+      # Selección de fuentes (alloy/config.alloy): proyecto Compose de la aplicación y servicios
+      # cuyos logs se envían a Loki (expresión regular, alternativas con |)
+      OBS_LOG_PROJECT: ${OBS_LOG_PROJECT:-piedrazul}
+      OBS_LOG_SERVICES: ${OBS_LOG_SERVICES:-traefik}
+      # El recolector de Go devuelve memoria antes de llegar al límite del contenedor
+      GOMEMLIMIT: 200MiB
     volumes:
       - ./alloy:/etc/alloy:ro
+      - alloy_data:/var/lib/alloy/data
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
+      # Incluye el journal persistente del host (/var/log/journal)
       - /:/host/root:ro
     tmpfs:
       - /tmp
@@ -149,6 +178,37 @@ services:
       resources:
         limits:
           cpus: "0.25"
-          memory: 192m
+          memory: 256m
+    networks:
+      - obs_net
+
+  loki:
+    # Referencia fijada: <tag>@sha256:<índice OCI>
+    image: grafana/loki:3.7.9@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/loki/config.yaml
+    # Usuario de la imagen (10001, dueño de /loki): el volumen nuevo hereda ese dueño
+    user: "10001:10001"
+    environment:
+      # El recolector de Go devuelve memoria antes de llegar al límite del contenedor
+      GOMEMLIMIT: 640MiB
+    volumes:
+      - ./loki:/etc/loki:ro
+      - loki_data:/loki
+    tmpfs:
+      - /tmp
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 768m
+    # Sin healthcheck de Compose: la imagen no trae shell, wget ni subcomando de salud. La
+    # disponibilidad la miden Prometheus (up{job="loki"}) y el rol de Ansible (/ready desde
+    # Prometheus).
     networks:
       - obs_net

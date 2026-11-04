@@ -1,6 +1,7 @@
 # Recolección de métricas de Piedra Azul. Cada productor se lee por el nombre de su
 # contenedor en la red de la aplicación; ninguno está publicado en el host ni enrutado por
-# Traefik (ver docs/architecture/overview.md, "Health y métricas").
+# Traefik (ver docs/architecture/overview.md, "Health y métricas"). Loki y las métricas propias
+# de Alloy (canalización de logs) se leen por obs_net.
 #
 # Etiquetas: job (productor) e instance (destino fijo). No se agregan etiquetas por petición,
 # usuario ni URL; las que traen los productores ya están acotadas (plantilla de ruta en el
@@ -41,3 +42,29 @@ scrape_configs:
     metrics_path: /api/v0/component/prometheus.exporter.unix.host/metrics
     static_configs:
       - targets: [alloy:12345]
+
+  # Canalización de logs, lado Alloy: lectura del journal, selección, envío a Loki y salud de
+  # los componentes. Mismo proceso que job=host, pero el endpoint global de Alloy y no el del
+  # exportador. Solo las series que usan las reglas y el dashboard de logs.
+  - job_name: alloy
+    metrics_path: /metrics
+    static_configs:
+      - targets: [alloy:12345]
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: "loki_source_journal_target_(lines|parsing_errors)_total|loki_relabel_entries_(processed|written)|loki_process_dropped_lines_total|loki_write_(sent_entries|sent_bytes|dropped_entries|dropped_bytes|batch_retries)_total|loki_write_request_duration_seconds_count|alloy_component_controller_running_components|alloy_config_last_load_successful|alloy_build_info|process_resident_memory_bytes|process_start_time_seconds"
+        action: keep
+      # loki_write_* lleva host="loki:3100" (destino de envío, un único valor): fuera, como toda
+      # etiqueta host en este Prometheus
+      - regex: host
+        action: labeldrop
+
+  # Loki: recepción, descartes, WAL, retención (compactor) y memoria
+  - job_name: loki
+    metrics_path: /metrics
+    static_configs:
+      - targets: [loki:3100]
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: "loki_distributor_(lines|bytes)_received_total|loki_discarded_(samples|bytes)_total|loki_ingester_memory_streams|loki_ingester_wal_(disk_full_failures|corruptions)_total|loki_ingester_chunks_flush_failures_total|loki_compactor_apply_retention_last_successful_run_timestamp_seconds|loki_build_info|process_resident_memory_bytes|process_start_time_seconds"
+        action: keep

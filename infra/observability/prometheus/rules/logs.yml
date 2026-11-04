@@ -1,0 +1,108 @@
+# Reglas de alerta de la canalización de logs: journal del host → Alloy → Loki. Mismo modelo que
+# alerts.yml: Prometheus las evalúa y no hay ningún destino de notificación. Pruebas:
+# infra/observability/tests/logs-alerts.test.yml (promtool test rules).
+#
+# Solo las señales que no da ninguna otra; cada regla separa una causa:
+#   - Alloy caído: no está aquí. Es el mismo proceso que el exportador del host y ya lo cubre
+#     PiedrazulTargetDown{job="host"} (alerts.yml).
+#   - Loki caído: PiedrazulLokiDown.
+#   - Journal que no se puede abrir (ruta inexistente) o componente roto:
+#     PiedrazulAlloyComponentUnhealthy.
+#   - Journal sin lecturas: PiedrazulLogsJournalNotRead. Incluye archivos del journal sin
+#     permiso de lectura para Alloy (grupo equivocado): el componente sigue sano y no lee nada.
+#     Cuenta todo lo leído, antes de la selección: un servicio seleccionado callado no la
+#     dispara. Umbral provisional (ver la regla).
+#   - Pérdida consumada: PiedrazulLogsDropped. Los reintentos sin pérdida no alertan: se ven en
+#     el dashboard de logs; si se agotan, dispara esta.
+#   - Retención sin ejecutarse: PiedrazulLokiRetentionNotRunning.
+# Un servicio seleccionado sin logs no es una falla y no alerta. Sin series (Loki o Alloy sin
+# leer) ninguna de estas dispara: lo dicen PiedrazulLokiDown y PiedrazulTargetDown{job="host"}.
+groups:
+  - name: piedrazul-logs
+    rules:
+      # 5 m: diez lecturas seguidas fallidas, más que un reinicio normal de Loki (reproducción
+      # del WAL incluida). Mientras tanto Alloy reintenta los lotes.
+      - alert: PiedrazulLokiDown
+        expr: up{job="loki"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus no puede leer las métricas de Loki"
+          description: >-
+            {{ $labels.instance }} no responde desde hace 5 minutos: Loki está caído o
+            reiniciándose en bucle. Alloy retiene y reintenta los logs; pasado su plazo de
+            reintentos los descarta (PiedrazulLogsDropped).
+
+      # Un componente de Alloy que no pudo arrancar o falló: en la práctica
+      # loki.source.journal sin directorio del journal que abrir (journal no persistente, ruta o
+      # montaje). Alloy sigue corriendo y exportando las métricas del host. Archivos sin permiso
+      # de lectura NO lo marcan unhealthy: los cubre PiedrazulLogsJournalNotRead.
+      - alert: PiedrazulAlloyComponentUnhealthy
+        expr: sum by (instance) (alloy_component_controller_running_components{job="alloy", health_type!="healthy"}) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alloy tiene componentes sin funcionar"
+          description: >-
+            {{ $value }} componente(s) de Alloy no están sanos desde hace 10 minutos. Si es
+            loki.source.journal, Alloy no pudo abrir el journal y no llega ningún log a Loki;
+            las métricas del host no se ven afectadas. Ver la página de componentes de Alloy.
+
+      # Alloy lleva más de 6 h arriba sin leer ninguna entrada del journal (de cualquier unidad,
+      # antes de la selección). Es la señal de un journal ilegible por permisos: sd-journal
+      # omite sin error los archivos que no puede abrir. 6 h es provisional: supone que un host
+      # con actividad normal escribe en el journal en ese plazo (sesiones SSH, temporizadores de
+      # systemd, Docker), sin medir aún en el servidor. Si el servidor tiene periodos más largos
+      # sin entradas, esta regla da falsos positivos y el umbral se ajusta con esa medición.
+      # Con la serie de líneas ausente (componente sin construir) también dispara.
+      - alert: PiedrazulLogsJournalNotRead
+        expr: |
+          (
+            up{job="alloy"} == 1
+            and on (instance)
+            (time() - process_start_time_seconds{job="alloy"}) > 6 * 3600
+          )
+          unless on (instance)
+          increase(loki_source_journal_target_lines_total{job="alloy"}[6h]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alloy no lee entradas del journal desde hace 6 horas"
+          description: >-
+            Alloy responde pero no leyó ninguna entrada del journal del host en 6 horas: sus
+            archivos no son legibles para Alloy (OBS_JOURNAL_GID), la lectura está detenida o el
+            journal no recibe nada. No depende de que los servicios seleccionados escriban.
+
+      # Logs descartados por Alloy: el lote agotó los reintentos o Loki lo rechazó de forma
+      # definitiva (4xx). Es pérdida consumada, también si Loki ya volvió.
+      - alert: PiedrazulLogsDropped
+        expr: sum by (instance, reason) (increase(loki_write_dropped_entries_total{job="alloy"}[15m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Se descartaron logs antes de llegar a Loki ({{ $labels.reason }})"
+          description: >-
+            Alloy descartó {{ $value | humanize }} entradas en los últimos 15 minutos (motivo
+            {{ $labels.reason }}). No se reenvían: faltan en Loki.
+
+      # La retención de Loki (compactor) no corrió en 3 h con Loki arriba más de 3 h: lo antiguo
+      # deja de borrarse y el volumen crece. La métrica existe desde el arranque (0 = aún no
+      # corrió) y avanza en cada ciclo del compactor (10 min) aunque no haya datos que borrar
+      # (comprobado con la imagen de compose.yml). Sin la serie (Loki caído) no dispara: lo dice
+      # PiedrazulLokiDown.
+      - alert: PiedrazulLokiRetentionNotRunning
+        expr: |
+          (time() - loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"}) > 3 * 3600
+          and on (instance)
+          (time() - process_start_time_seconds{job="loki"}) > 3 * 3600
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "La retención de Loki no se ejecuta"
+          description: >-
+            El compactor de Loki no completa la retención desde hace más de 3 horas: los logs
+            de más de 14 días no se borran y el volumen loki_data sigue creciendo.

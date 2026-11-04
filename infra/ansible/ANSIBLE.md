@@ -24,12 +24,13 @@ infra/ansible/
 │   ├── verify-release.yml               # Verifica identidad en ejecución o health (solo lectura)
 │   ├── record-release.yml               # Registra el último despliegue exitoso
 │   ├── keycloak-admin-preflight.yml     # Valida en el runner la contraseña inicial antes del Apply
-│   └── observability.yml                # Stack privado de métricas piedrazul-obs (fuera del workflow)
+│   ├── observability.yml                # Stack privado de observabilidad piedrazul-obs (fuera del workflow)
+│   └── observability-logs-rollback.yml  # Segundo paso de la retirada de logs (Loki, fuente de datos, drop-in)
 └── roles/
     ├── common/                          # Paquetes base y timezone
     ├── docker_host/                     # Instalación y configuración de Docker
     ├── hardening/                       # Hardening del servidor
-    ├── observability/                   # Prometheus, Grafana y Alloy en /opt/piedrazul-obs
+    ├── observability/                   # Prometheus, Grafana, Alloy y Loki en /opt/piedrazul-obs
     └── app/                             # Gestión del stack de la aplicación
         ├── tasks/
         │   ├── main.yml                 # Punto de entrada (importa setup.yml)
@@ -195,9 +196,9 @@ ansible-playbook \
 
 `verify-release.yml` no modifica nada: con `release_check=identity` comprueba que los contenedores corren la identidad exacta esperada; con `release_check=health`, que quedaron `healthy`. `record-release.yml` escribe el último despliegue exitoso (ver abajo). El workflow los corre como pasos separados para que un fallo de identidad, de health o de registro se vea como tal.
 
-### `observability.yml` — stack de métricas
+### `observability.yml` — stack de métricas y logs
 
-Instala o actualiza el proyecto Compose `piedrazul-obs` (Prometheus, Grafana, Alloy) en
+Instala o actualiza el proyecto Compose `piedrazul-obs` (Prometheus, Grafana, Alloy, Loki) en
 `/opt/piedrazul-obs` con el rol `observability`, con el mismo contrato de conexión que los demás
 playbooks (`ansible` + `become`). No lo corre el workflow de producción ni lo incluyen
 `converge.yml` o `deploy.yml`, y no modifica la aplicación.
@@ -207,9 +208,24 @@ playbooks (`ansible` + `become`). No lo corre el workflow de producción ni lo i
   borra lo retirado; reinicia el servicio cuyo directorio cambió (`obs_restart_on_change`).
 - `.env` (root, 0600) se crea solo si no existe, con una contraseña de Grafana que genera el
   controlador; no viene de GitHub ni se regenera en un run posterior.
-- Verifica que los cinco destinos se leen y que los dashboards están cargados.
+- Logs: antes de copiar nada comprueba la política de fuentes (`obs_log_services` frente a
+  admitidos, condicionados con `obs_log_privacy_controls_done` y excluidos) y que el GID 473 no
+  sea un grupo del host; escribe su drop-in de journald
+  (`/etc/systemd/journald.conf.d/60-piedrazul-obs.conf`, todo el host: persistente, 2G, 128M,
+  7 días; `obs_journald_manage: false` lo omite) y reinicia journald solo si cambia; descubre el
+  grupo del journal y lo mantiene en `.env` (`OBS_JOURNAL_GID`) junto a la selección de fuentes.
+  No cambia `daemon.json` ni el driver de logs de ningún contenedor.
+- Verifica que los siete destinos se leen, que los dashboards están cargados, que Loki está listo
+  y que Alloy lee el journal.
 
-Procedimiento, semántica de cambios y retiro: [Métricas](../../docs/operations/runbooks/metricas.md).
+`observability-logs-rollback.yml` es el segundo paso de la vuelta a métricas sin logs, después
+de repetir `observability.yml` desde una versión sin logs (si no, falla sin cambiar nada). Retira
+la fuente de datos Loki de Grafana, el contenedor y la configuración de Loki, las variables de
+logs de `.env` y el drop-in de journald (reinicia journald); con `-e obs_logs_purge=true` borra
+además los volúmenes de logs. No toca los volúmenes de Prometheus y Grafana ni la aplicación.
+
+Procedimiento, semántica de cambios y retiro: [Métricas](../../docs/operations/runbooks/metricas.md)
+y [Logs](../../docs/operations/runbooks/logs.md).
 
 ---
 

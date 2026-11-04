@@ -1,0 +1,243 @@
+# Pruebas unitarias de prometheus/rules/logs.yml con series sintéticas:
+#   docker run --rm -v "$PWD/infra/observability:/w:ro" --entrypoint promtool \
+#     prom/prometheus:<ref de compose.yml> test rules /w/tests/logs-alerts.test.yml
+# Cada regla con su caso normal, de falla y sin datos, y las separaciones entre causas (Loki
+# caído no dispara las de envío; un servicio callado no dispara la de lectura). Prueban la
+# expresión y su duración, no la canalización real.
+rule_files:
+  - ../prometheus/rules/logs.yml
+
+evaluation_interval: 1m
+
+tests:
+  # ── PiedrazulLokiDown ───────────────────────────────────────────────────────
+  - name: Loki caído 5 m dispara y se recupera
+    interval: 1m
+    input_series:
+      - series: 'up{job="loki", instance="loki:3100"}'
+        values: '1 1 0 0 0 0 0 0 0 1 1'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: PiedrazulLokiDown
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: PiedrazulLokiDown
+        exp_alerts:
+          - exp_labels: {severity: warning, job: loki, instance: "loki:3100"}
+            exp_annotations:
+              summary: "Prometheus no puede leer las métricas de Loki"
+              description: "loki:3100 no responde desde hace 5 minutos: Loki está caído o reiniciándose en bucle. Alloy retiene y reintenta los logs; pasado su plazo de reintentos los descarta (PiedrazulLogsDropped)."
+      - eval_time: 10m
+        alertname: PiedrazulLokiDown
+        exp_alerts: []
+
+  - name: Loki sin serie up (sin destino) no dispara
+    interval: 1m
+    input_series:
+      - series: 'up{job="backend", instance="backend:8081"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: PiedrazulLokiDown
+        exp_alerts: []
+
+  # ── PiedrazulAlloyComponentUnhealthy ────────────────────────────────────────
+  - name: componente unhealthy 10 m dispara; healthy no
+    interval: 1m
+    input_series:
+      - series: 'alloy_component_controller_running_components{job="alloy", instance="alloy:12345", controller_id="", controller_path="/", health_type="healthy"}'
+        values: '6 6 5x20'
+      - series: 'alloy_component_controller_running_components{job="alloy", instance="alloy:12345", controller_id="", controller_path="/", health_type="unhealthy"}'
+        values: '0 0 1x20'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: PiedrazulAlloyComponentUnhealthy
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: PiedrazulAlloyComponentUnhealthy
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: PiedrazulAlloyComponentUnhealthy
+        exp_alerts:
+          - exp_labels: {severity: warning, instance: "alloy:12345"}
+            exp_annotations:
+              summary: "Alloy tiene componentes sin funcionar"
+              description: "1 componente(s) de Alloy no están sanos desde hace 10 minutos. Si es loki.source.journal, Alloy no pudo abrir el journal y no llega ningún log a Loki; las métricas del host no se ven afectadas. Ver la página de componentes de Alloy."
+
+  - name: todos los componentes sanos no dispara
+    interval: 1m
+    input_series:
+      - series: 'alloy_component_controller_running_components{job="alloy", instance="alloy:12345", controller_id="", controller_path="/", health_type="healthy"}'
+        values: '6x20'
+      - series: 'alloy_component_controller_running_components{job="alloy", instance="alloy:12345", controller_id="", controller_path="/", health_type="unhealthy"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: PiedrazulAlloyComponentUnhealthy
+        exp_alerts: []
+
+  # ── PiedrazulLogsJournalNotRead ─────────────────────────────────────────────
+  # Alloy arrancó en t=0 (process_start_time_seconds = 0); se evalúa pasadas 6 h
+  - name: journal sin lecturas 6 h con Alloy arriba dispara
+    interval: 5m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '1x100'
+      - series: 'process_start_time_seconds{job="alloy", instance="alloy:12345"}'
+        values: '0x100'
+      - series: 'loki_source_journal_target_lines_total{job="alloy", instance="alloy:12345", component_id="loki.source.journal.host", component_path="/"}'
+        values: '0x100'
+    alert_rule_test:
+      # 6 h de arranque aún no cumplidas
+      - eval_time: 5h
+        alertname: PiedrazulLogsJournalNotRead
+        exp_alerts: []
+      - eval_time: 6h30m
+        alertname: PiedrazulLogsJournalNotRead
+        exp_alerts:
+          - exp_labels: {severity: warning, job: alloy, instance: "alloy:12345"}
+            exp_annotations:
+              summary: "Alloy no lee entradas del journal desde hace 6 horas"
+              description: "Alloy responde pero no leyó ninguna entrada del journal del host en 6 horas: sus archivos no son legibles para Alloy (OBS_JOURNAL_GID), la lectura está detenida o el journal no recibe nada. No depende de que los servicios seleccionados escriban."
+
+  # El journal se lee (otras unidades) aunque ningún servicio seleccionado escriba
+  - name: journal leído sin líneas seleccionadas no dispara (servicio callado)
+    interval: 5m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '1x100'
+      - series: 'process_start_time_seconds{job="alloy", instance="alloy:12345"}'
+        values: '0x100'
+      - series: 'loki_source_journal_target_lines_total{job="alloy", instance="alloy:12345", component_id="loki.source.journal.host", component_path="/"}'
+        values: '0+3x100'
+      - series: 'loki_relabel_entries_written{job="alloy", instance="alloy:12345", component_id="loki.relabel.select", component_path="/"}'
+        values: '0x100'
+    alert_rule_test:
+      - eval_time: 8h
+        alertname: PiedrazulLogsJournalNotRead
+        exp_alerts: []
+
+  # Componente de lectura sin construir: no hay serie de líneas y la regla dispara igual
+  - name: sin serie de líneas del journal con Alloy arriba dispara
+    interval: 5m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '1x100'
+      - series: 'process_start_time_seconds{job="alloy", instance="alloy:12345"}'
+        values: '0x100'
+    alert_rule_test:
+      - eval_time: 6h30m
+        alertname: PiedrazulLogsJournalNotRead
+        exp_alerts:
+          - exp_labels: {severity: warning, job: alloy, instance: "alloy:12345"}
+            exp_annotations:
+              summary: "Alloy no lee entradas del journal desde hace 6 horas"
+              description: "Alloy responde pero no leyó ninguna entrada del journal del host en 6 horas: sus archivos no son legibles para Alloy (OBS_JOURNAL_GID), la lectura está detenida o el journal no recibe nada. No depende de que los servicios seleccionados escriban."
+
+  # Alloy caído: lo cubre PiedrazulTargetDown{job="host"}, no esta
+  - name: Alloy caído no dispara la de lectura
+    interval: 5m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '0x100'
+    alert_rule_test:
+      - eval_time: 8h
+        alertname: PiedrazulLogsJournalNotRead
+        exp_alerts: []
+
+  # ── Sin alerta de reintentos ────────────────────────────────────────────────
+  # Reintentos sostenidos sin pérdida no alertan (se ven en el dashboard); si se agotan,
+  # PiedrazulLogsDropped. Con Loki caído, solo PiedrazulLokiDown.
+  - name: reintentos con Loki caído - solo PiedrazulLokiDown, sin pérdida no hay PiedrazulLogsDropped
+    interval: 1m
+    input_series:
+      - series: 'up{job="loki", instance="loki:3100"}'
+        values: '0x30'
+      - series: 'loki_write_batch_retries_total{job="alloy", instance="alloy:12345", component_id="loki.write.loki", component_path="/"}'
+        values: '0+2x30'
+      - series: 'loki_write_dropped_entries_total{job="alloy", instance="alloy:12345", component_id="loki.write.loki", component_path="/", reason="ingester_error"}'
+        values: '0x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: PiedrazulLogsDropped
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: PiedrazulLokiDown
+        exp_alerts:
+          - exp_labels: {severity: warning, job: loki, instance: "loki:3100"}
+            exp_annotations:
+              summary: "Prometheus no puede leer las métricas de Loki"
+              description: "loki:3100 no responde desde hace 5 minutos: Loki está caído o reiniciándose en bucle. Alloy retiene y reintenta los logs; pasado su plazo de reintentos los descarta (PiedrazulLogsDropped)."
+
+  # ── PiedrazulLogsDropped ────────────────────────────────────────────────────
+  - name: entradas descartadas disparan por motivo; sin descartes no
+    interval: 1m
+    input_series:
+      - series: 'loki_write_dropped_entries_total{job="alloy", instance="alloy:12345", component_id="loki.write.loki", component_path="/", reason="ingester_error"}'
+        values: '0x5 40x30'
+      - series: 'loki_write_dropped_entries_total{job="alloy", instance="alloy:12345", component_id="loki.write.loki", component_path="/", reason="rate_limited"}'
+        values: '0x35'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: PiedrazulLogsDropped
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: PiedrazulLogsDropped
+        exp_alerts:
+          - exp_labels: {severity: warning, instance: "alloy:12345", reason: ingester_error}
+            exp_annotations:
+              summary: "Se descartaron logs antes de llegar a Loki (ingester_error)"
+              description: "Alloy descartó 40 entradas en los últimos 15 minutos (motivo ingester_error). No se reenvían: faltan en Loki."
+      # Sin descartes nuevos en 15 m se resuelve
+      - eval_time: 30m
+        alertname: PiedrazulLogsDropped
+        exp_alerts: []
+
+  # ── PiedrazulLokiRetentionNotRunning ────────────────────────────────────────
+  - name: retención detenida con Loki arriba más de 3 h dispara
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="loki", instance="loki:3100"}'
+        values: '0x300'
+      # Corrió a los 10 m (marca 600) y no volvió a correr
+      - series: 'loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki", instance="loki:3100"}'
+        values: '0x9 600x290'
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: PiedrazulLokiRetentionNotRunning
+        exp_alerts: []
+      - eval_time: 4h
+        alertname: PiedrazulLokiRetentionNotRunning
+        exp_alerts:
+          - exp_labels: {severity: warning, job: loki, instance: "loki:3100"}
+            exp_annotations:
+              summary: "La retención de Loki no se ejecuta"
+              description: "El compactor de Loki no completa la retención desde hace más de 3 horas: los logs de más de 14 días no se borran y el volumen loki_data sigue creciendo."
+
+  - name: retención al día no dispara; recién arrancado tampoco
+    interval: 1m
+    input_series:
+      - series: 'process_start_time_seconds{job="loki", instance="loki:3100"}'
+        values: '0x400'
+      # Corre continuamente (la marca sigue al reloj)
+      - series: 'loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki", instance="loki:3100"}'
+        values: '0+60x400'
+      # Otro Loki arrancado a las 5 h que aún no corrió la retención (marca 0)
+      - series: 'process_start_time_seconds{job="loki", instance="loki-nuevo:3100"}'
+        values: '18000x400'
+      - series: 'loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki", instance="loki-nuevo:3100"}'
+        values: '0x400'
+    alert_rule_test:
+      - eval_time: 6h
+        alertname: PiedrazulLokiRetentionNotRunning
+        exp_alerts: []
+
+  - name: retención sin series no dispara
+    interval: 1m
+    input_series:
+      - series: 'up{job="loki", instance="loki:3100"}'
+        values: '0x400'
+    alert_rule_test:
+      - eval_time: 6h
+        alertname: PiedrazulLokiRetentionNotRunning
+        exp_alerts: []

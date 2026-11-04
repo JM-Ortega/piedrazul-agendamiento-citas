@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Verificación de integración del stack de métricas (infra/observability): configuración, Ansible y
 # comportamiento en ejecución contra productores reales (backend, Keycloak, Traefik) levantados
-# con los archivos Compose de la aplicación en un proyecto y una red propios. Credenciales
+# con los archivos Compose de la aplicación en un proyecto y una red propios. Los logs (Loki y la
+# canalización del journal en Alloy) los verifica infra/tests/logs-stack-check.sh; aquí solo se
+# comprueba que no alteran las métricas. Credenciales
 # sintéticas que nunca se imprimen; no contacta producción, GitHub, Cloudflare ni Let's Encrypt.
 #
 # Uso: infra/tests/metrics-stack-check.sh
@@ -24,14 +26,15 @@
 #      digest; solo Grafana publica un puerto y solo en 127.0.0.1; sin socket de Docker,
 #      privilegios, red ni PID del host; cap_drop ALL, no-new-privileges y raíz de solo
 #      lectura; solo Prometheus en la red de la aplicación; destinos de prometheus.yml = contrato
-#      de los productores; promtool check config/rules y test rules; Alloy sin logs, journald,
-#      Loki ni remote_write; dashboards JSON válidos con la fuente de datos provisionada; los
-#      archivos Compose de la aplicación no mencionan el stack.
+#      de los productores (más alloy y loki por obs_net); promtool check config/rules y test
+#      rules; Alloy con el exportador del host y sin remote_write; dashboards JSON válidos con
+#      las fuentes de datos provisionadas; los archivos Compose de la aplicación no mencionan el
+#      stack.
 #   2. Ansible: playbook observability.yml sintácticamente válido y fuera del workflow de
 #      producción.
 #   3. Recolección: los cinco destinos up; muestras de cada productor; etiquetas acotadas
 #      (rutas por plantilla, sin etiquetas de usuario, URL ni host); host = el kernel que ve Alloy.
-#   4. Grafana: fuente de datos sana, dos dashboards, todas sus consultas sin error y con
+#   4. Grafana: fuente de datos sana, dashboards de métricas, todas sus consultas sin error y con
 #      datos donde los productores los tienen; sin acceso anónimo.
 #   5. Aislamiento: Grafana y Alloy no alcanzan los productores; Prometheus, Alloy y los
 #      listeners de métricas sin puerto en el host.
@@ -91,18 +94,18 @@ check "Compose: sin GRAFANA_ADMIN_PASSWORD falla" \
 C="${TMP}/obs.json"
 check "Compose: nombre de proyecto declarado piedrazul-obs" \
   test "$(yq -r '.name' "${OBS}/compose.yml")" = piedrazul-obs
-check "Compose: servicios prometheus, grafana y alloy (sin Loki ni otros)" \
-  test "$(jq -r '.services | keys | sort | join(",")' "${C}")" = "alloy,grafana,prometheus"
+check "Compose: servicios prometheus, grafana, alloy y loki (sin otros)" \
+  test "$(jq -r '.services | keys | sort | join(",")' "${C}")" = "alloy,grafana,loki,prometheus"
 check "Compose: imágenes fijadas <tag>@sha256:<digest>" \
   bash -c "jq -r '.services[].image' '${C}' | grep -vqE '^[a-z0-9./-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}\$' && exit 1 || exit 0"
 check "Compose: solo grafana publica un puerto, en 127.0.0.1" \
   bash -c "test \"\$(jq -r '[.services | to_entries[] | select((.value.ports // []) | length > 0) | .key] | join(\",\")' '${C}')\" = grafana && test \"\$(jq -r '[.services.grafana.ports[] | .host_ip] | unique | join(\",\")' '${C}')\" = 127.0.0.1"
 check "Compose: sin socket de Docker, privileged, red ni PID del host" \
   bash -c "! jq -e '.services[] | select(.privileged == true or .network_mode == \"host\" or .pid == \"host\" or ((.volumes // []) | map(.source // \"\") | any(test(\"docker.sock\"))))' '${C}'"
-check "Compose: cap_drop ALL, no-new-privileges y raíz de solo lectura en los tres" \
-  bash -c "test \"\$(jq '[.services[] | select((.cap_drop == [\"ALL\"]) and (.read_only == true) and ((.security_opt // []) | index(\"no-new-privileges:true\")))] | length' '${C}')\" = 3"
-check "Compose: límites de memoria y CPU en los tres" \
-  bash -c "test \"\$(jq '[.services[] | select(.deploy.resources.limits.memory and .deploy.resources.limits.cpus)] | length' '${C}')\" = 3"
+check "Compose: cap_drop ALL, no-new-privileges y raíz de solo lectura en los cuatro" \
+  bash -c "test \"\$(jq '[.services[] | select((.cap_drop == [\"ALL\"]) and (.read_only == true) and ((.security_opt // []) | index(\"no-new-privileges:true\")))] | length' '${C}')\" = 4"
+check "Compose: límites de memoria y CPU en los cuatro" \
+  bash -c "test \"\$(jq '[.services[] | select(.deploy.resources.limits.memory and .deploy.resources.limits.cpus)] | length' '${C}')\" = 4"
 check "Compose: solo prometheus en la red de la aplicación (externa)" \
   bash -c "test \"\$(jq -r '[.services | to_entries[] | select(.value.networks | has(\"app_net\")) | .key] | join(\",\")' '${C}')\" = prometheus && jq -e '.networks.app_net.external == true' '${C}'"
 check "Compose: Alloy sin root y montajes del host de solo lectura" \
@@ -115,9 +118,9 @@ check "Compose: Grafana sin anónimos, registro, telemetría, avisos de versión
   bash -c "e=\$(jq -r '.services.grafana.environment | to_entries[] | \"\(.key)=\(.value)\"' '${C}'); for kv in GF_AUTH_ANONYMOUS_ENABLED=false GF_USERS_ALLOW_SIGN_UP=false GF_ANALYTICS_REPORTING_ENABLED=false GF_ANALYTICS_CHECK_FOR_UPDATES=false GF_PLUGINS_PREINSTALL_DISABLED=true GF_UNIFIED_ALERTING_ENABLED=false; do grep -qx \"\$kv\" <<< \"\$e\" || exit 1; done"
 
 # Contrato de los productores (docs/architecture/overview.md, "Health y métricas")
-check "Prometheus: destinos = contrato (backend:8081/actuator/prometheus, keycloak:9000/metrics, traefik:8082/metrics, alloy, propio)" \
+check "Prometheus: destinos = contrato (backend:8081/actuator/prometheus, keycloak:9000/metrics, traefik:8082/metrics, host, propio; alloy y loki de logs)" \
   test "$(yq -r '[.scrape_configs[] | .job_name + "=" + (.static_configs[0].targets | join(",")) + (.metrics_path // "/metrics")] | sort | join(" ")' "${OBS}/prometheus/prometheus.yml")" \
-       = "backend=backend:8081/actuator/prometheus host=alloy:12345/api/v0/component/prometheus.exporter.unix.host/metrics keycloak=keycloak:9000/metrics prometheus=localhost:9090/metrics traefik=traefik:8082/metrics"
+       = "alloy=alloy:12345/metrics backend=backend:8081/actuator/prometheus host=alloy:12345/api/v0/component/prometheus.exporter.unix.host/metrics keycloak=keycloak:9000/metrics loki=loki:3100/metrics prometheus=localhost:9090/metrics traefik=traefik:8082/metrics"
 check "Prometheus: sin Alertmanager ni remote_write configurados" \
   bash -c "! yq -e '.alerting // .remote_write' '${OBS}/prometheus/prometheus.yml'"
 check "Notificaciones: sin provisioning de alertas de Grafana (puntos de contacto, políticas)" \
@@ -125,18 +128,18 @@ check "Notificaciones: sin provisioning de alertas de Grafana (puntos de contact
 check "Notificaciones: sin destinos externos (bots, webhooks) en la configuración, fuera de comentarios" \
   bash -c "! grep -rhvE '^\s*(#|//)' '${OBS}/compose.yml' '${OBS}/prometheus' '${OBS}/alloy' '${OBS}/grafana/provisioning' | grep -qiE 'telegram|discord|webhook|bot_token|chat_id'"
 check "promtool: check config" promtool check config /w/prometheus/prometheus.yml
-check "promtool: check rules" promtool check rules /w/prometheus/rules/alerts.yml
+check "promtool: check rules" promtool check rules /w/prometheus/rules/alerts.yml /w/prometheus/rules/logs.yml
 if promtool test rules /w/tests/alerts.test.yml > "${TMP}/promtool-test.log" 2>&1; then
   ok "promtool: test rules (casos normal, falla y sin datos de cada regla)"
 else
   ko "promtool: test rules"; tail -20 "${TMP}/promtool-test.log" >&2
 fi
-check "Alloy: solo prometheus.exporter.unix (sin loki, journal, remote_write, otelcol ni discovery.docker)" \
-  bash -c "c=\$(grep -vE '^\s*//' '${OBS}/alloy/config.alloy'); test \"\$(grep -oE '^[a-z_.]+( \"[a-z_]+\")? \\{' <<< \"\$c\" | sort | tr '\n' ' ')\" = 'logging { prometheus.exporter.unix \"host\" { ' && ! grep -qiE 'loki|journal|remote_write|otelcol|discovery\.docker|docker\.sock' <<< \"\$c\""
+check "Alloy: exportador del host prometheus.exporter.unix \"host\" (sin remote_write, otelcol, discovery.docker ni socket)" \
+  bash -c "c=\$(grep -vE '^\s*//' '${OBS}/alloy/config.alloy'); grep -qE '^prometheus\.exporter\.unix \"host\" \\{' <<< \"\$c\" && ! grep -qiE 'remote_write|otelcol|discovery\.docker|docker\.sock' <<< \"\$c\""
 check "Alloy: la configuración se valida (alloy fmt)" \
   docker run --rm -v "${OBS}/alloy:/a:ro" --entrypoint /bin/alloy "$(yq -r '.services.alloy.image' "${OBS}/compose.yml")" fmt /a/config.alloy
-check "Grafana: dashboards JSON válidos, uid fijo y solo la fuente de datos prometheus" \
-  bash -c "for f in '${OBS}'/grafana/dashboards/*.json; do jq -e '.uid and (.uid | length > 0) and ([.. | objects | select(has(\"datasource\")) | .datasource.uid] | unique == [\"prometheus\"])' \"\$f\" || exit 1; done"
+check "Grafana: dashboards de métricas JSON válidos, uid fijo y solo la fuente de datos prometheus" \
+  bash -c "for f in '${OBS}'/grafana/dashboards/plataforma.json '${OBS}'/grafana/dashboards/backend-jvm.json; do jq -e '.uid and (.uid | length > 0) and ([.. | objects | select(has(\"datasource\")) | .datasource.uid] | unique == [\"prometheus\"])' \"\$f\" || exit 1; done"
 check "Grafana: fuente de datos provisionada con uid prometheus" \
   test "$(yq -r '.datasources[0].uid + " " + .datasources[0].url' "${OBS}/grafana/provisioning/datasources/prometheus.yml")" = "prometheus http://prometheus:9090"
 check "Aplicación: infra/compose y docker-compose.yml no mencionan el stack de métricas" \
@@ -304,8 +307,8 @@ done
 check "etiquetas: ninguna de usuario, correo, URL, host, sesión, token ni IP" test -z "${BAD_LABELS}"
 check "etiquetas: rutas por plantilla, sin identificadores numéricos concretos" \
   bash -c "! printf '%s' \"\$1\" | jq -r '.data[]' | grep -qE '/[0-9]{3,}(/|$)'" _ "$(obs exec -T prometheus wget -qO- 'http://localhost:9090/api/v1/label/uri/values')"
-check "reglas: todas cargadas y evaluadas sin error" \
-  bash -c "obs_rules=\"\$1\"; test \"\$(jq '[.data.groups[].rules[]] | length' <<< \"\$obs_rules\")\" = 7 && jq -e '[.data.groups[].rules[] | .health] | all(. == \"ok\")' <<< \"\$obs_rules\"" _ "$(obs exec -T prometheus wget -qO- http://localhost:9090/api/v1/rules)"
+check "reglas: todas cargadas (7 de métricas y 5 de logs) y evaluadas sin error" \
+  bash -c "obs_rules=\"\$1\"; test \"\$(jq '[.data.groups[].rules[]] | length' <<< \"\$obs_rules\")\" = 12 && jq -e '[.data.groups[].rules[] | .health] | all(. == \"ok\")' <<< \"\$obs_rules\"" _ "$(obs exec -T prometheus wget -qO- http://localhost:9090/api/v1/rules)"
 check "reglas: la raíz del host (/) se reporta: PiedrazulHostRootFilesystemMissing sin condición" \
   test -n "$(pv 'node_filesystem_size_bytes{job="host",mountpoint="/"}')"
 echo "      raíz local (indicativo, VM de WSL2): libre $(pv 'node_filesystem_avail_bytes{job="host",mountpoint="/"}') B de $(pv 'node_filesystem_size_bytes{job="host",mountpoint="/"}') B; umbral $(pv 'clamp_min(node_filesystem_size_bytes{job="host",mountpoint="/"} * 0.15, 10 * 1024 * 1024 * 1024)') B"
@@ -318,8 +321,8 @@ export GRAFANA_AUTH="admin:${GRAFANA_ADMIN_PASSWORD}"
 G="http://127.0.0.1:${GPORT}"
 check "Grafana: fuente de datos prometheus sana" \
   bash -c "curl -sf -u \"\${GRAFANA_AUTH}\" '${G}/api/datasources/uid/prometheus/health' | jq -e '.status == \"OK\"'"
-check "Grafana: dashboards piedrazul-plataforma y piedrazul-backend-jvm en la carpeta Piedra Azul" \
-  bash -c "test \"\$(curl -sf -u \"\${GRAFANA_AUTH}\" '${G}/api/search?type=dash-db' | jq -r '[.[] | select(.folderTitle == \"Piedra Azul\") | .uid] | sort | join(\",\")')\" = piedrazul-backend-jvm,piedrazul-plataforma"
+check "Grafana: dashboards piedrazul-plataforma, piedrazul-backend-jvm y piedrazul-logs en la carpeta Piedra Azul" \
+  bash -c "test \"\$(curl -sf -u \"\${GRAFANA_AUTH}\" '${G}/api/search?type=dash-db' | jq -r '[.[] | select(.folderTitle == \"Piedra Azul\") | .uid] | sort | join(\",\")')\" = piedrazul-backend-jvm,piedrazul-logs,piedrazul-plataforma"
 check "Grafana: sin acceso anónimo (401)" test "$(curl -s -o /dev/null -w '%{http_code}' "${G}/api/search")" = 401
 cat > "${TMP}/panels.py" <<'EOF'
 import base64, json, os, sys, urllib.request
@@ -409,14 +412,14 @@ H="$(app exec -T traefik wget -qO- --no-check-certificate --header 'Host: api.me
 check "operación: con el stack detenido el health público responde UP" grep -q '"status":"UP"' <<< "${H}"
 obs down >/dev/null 2>&1
 check "operación: down (sin -v) conserva los volúmenes" \
-  test "$(docker volume ls -q --filter label=com.docker.compose.project="${OBS_PROJECT}" | wc -l)" = 2
+  test "$(docker volume ls -q --filter label=com.docker.compose.project="${OBS_PROJECT}" | wc -l)" = 4
 obs up -d --wait --wait-timeout 180 >/dev/null 2>&1
 same_before() { test -n "${BEFORE}" && test "$(pv 'up{job="keycloak"}' "${T0}")" = "${BEFORE}"; }
 check "persistencia: datos de Prometheus anteriores a la recreación" wait_for 60 same_before
 check "persistencia: estado de Grafana (dashboard marcado) tras la recreación" \
   bash -c "test '${STAR}' = 200 && curl -sf -u \"\${GRAFANA_AUTH}\" '${G}/api/search?starred=true' | jq -e '[.[].uid] | index(\"piedrazul-plataforma\")'"
 check "persistencia: dashboards y fuente de datos provisionados tras la recreación" \
-  bash -c "test \"\$(curl -sf -u \"\${GRAFANA_AUTH}\" '${G}/api/search?type=dash-db' | jq length)\" = 2 && curl -sf -u \"\${GRAFANA_AUTH}\" '${G}/api/datasources/uid/prometheus/health' | jq -e '.status == \"OK\"'"
+  bash -c "test \"\$(curl -sf -u \"\${GRAFANA_AUTH}\" '${G}/api/search?type=dash-db' | jq length)\" = 3 && curl -sf -u \"\${GRAFANA_AUTH}\" '${G}/api/datasources/uid/prometheus/health' | jq -e '.status == \"OK\"'"
 check "persistencia: los cinco destinos up tras la recreación" wait_for 120 all_up
 
 # Muestra indicativa de recursos (entorno local, no representa el VPS)

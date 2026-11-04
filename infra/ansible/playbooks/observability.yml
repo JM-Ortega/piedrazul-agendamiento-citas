@@ -1,10 +1,11 @@
 ---
-# Instalación del stack privado de métricas: Prometheus, Grafana y Alloy en el proyecto Compose
-# piedrazul-obs. Independiente de converge/deploy: no lo corre el workflow de producción ni
-# modifica la aplicación. Requiere la aplicación instalada (red piedrazul_net). Ver
-# docs/operations/runbooks/metricas.md.
+# Instalación del stack privado de observabilidad: Prometheus, Grafana, Alloy y Loki en el
+# proyecto Compose piedrazul-obs. Independiente de converge/deploy: no lo corre el workflow de
+# producción ni modifica la aplicación. Requiere la aplicación instalada (red piedrazul_net).
+# Fuera de /opt/piedrazul-obs solo escribe el drop-in de journald del rol (todo el host). Ver
+# docs/operations/runbooks/metricas.md y docs/operations/runbooks/logs.md.
 
-- name: Stack de métricas
+- name: Stack de observabilidad
   hosts: vps
   gather_facts: false
 

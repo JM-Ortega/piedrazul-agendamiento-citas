@@ -1,10 +1,14 @@
-# Instala o actualiza el stack de métricas en el host. No toca el proyecto de la aplicación
-# (piedrazul): solo exige que su red exista y se une a ella con Prometheus. Idempotente: un
-# segundo run no cambia nada salvo que cambien los archivos del repositorio.
+# Instala o actualiza el stack de observabilidad (métricas y logs) en el host. No toca el
+# proyecto de la aplicación (piedrazul): solo exige que su red exista y se une a ella con
+# Prometheus. Idempotente: un segundo run no cambia nada salvo que cambien los archivos del
+# repositorio o las variables del rol.
 #
 # Los directorios de configuración (obs_managed_dirs) son del repositorio: el rol copia sus
-# archivos y borra en el host los que el repositorio ya no tiene. .env y los volúmenes de
-# Prometheus y Grafana no se tocan.
+# archivos y borra en el host los que el repositorio ya no tiene. Los volúmenes no se tocan; de
+# .env solo se mantienen las variables de logs (journal y fuentes).
+#
+# Fuera de /opt/piedrazul-obs el rol solo escribe el drop-in de journald (obs_journald_dropin) y
+# reinicia journald cuando ese archivo cambia.
 
 - name: Exigir Docker con el plugin Compose
   ansible.builtin.command:
@@ -35,6 +39,12 @@
       No existe la red {{ obs_app_network }}: el stack de métricas se instala después de la
       aplicación (converge). No se copió ni levantó nada.
     quiet: true
+
+- name: Comprobar la política de logs
+  ansible.builtin.include_tasks: logs_preflight.yml
+
+- name: Preparar el journal del host
+  ansible.builtin.include_tasks: journal.yml
 
 - name: Crear los directorios del stack de métricas
   ansible.builtin.file:
@@ -126,6 +136,23 @@
       GRAFANA_ADMIN_PASSWORD={{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits'], length=32) }}
   no_log: true
 
+# Variables de logs: se mantienen en cada run (a diferencia de la contraseña). Un cambio recrea
+# Alloy en el paso de levantar (su configuración de Compose cambia).
+- name: Mantener las variables de logs en .env
+  ansible.builtin.lineinfile:
+    path: "{{ obs_dir }}/.env"
+    regexp: "^{{ item.key }}="
+    line: "{{ item.key }}={{ item.value }}"
+    owner: "{{ obs_env_owner }}"
+    group: "{{ obs_env_owner }}"
+    mode: "0600"
+  loop:
+    - {key: OBS_JOURNAL_GID, value: "{{ obs_journal_gid }}"}
+    - {key: OBS_LOG_PROJECT, value: "{{ obs_log_project }}"}
+    - {key: OBS_LOG_SERVICES, value: "{{ obs_log_services | join('|') }}"}
+  loop_control:
+    label: "{{ item.key }}"
+
 - name: Validar la configuración de Compose
   ansible.builtin.command:
     argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml, config, --quiet]
@@ -143,8 +170,8 @@
     wait: true
     wait_timeout: 180
 
-# Compose no detecta cambios dentro de un directorio montado. Prometheus, Alloy y el
-# provisioning de Grafana (fuente de datos, proveedor de dashboards) se leen solo al arrancar;
+# Compose no detecta cambios dentro de un directorio montado. Prometheus, Alloy, Loki y el
+# provisioning de Grafana (fuentes de datos, proveedor de dashboards) se leen solo al arrancar;
 # los dashboards los recarga Grafana por sí mismo, incluido su retiro. Un compose.yml cambiado
 # ya recreó lo que corresponde en el paso anterior.
 - name: Reiniciar los servicios cuya configuración cambió
@@ -168,3 +195,6 @@
 
 - name: Verificar la recolección y los dashboards
   ansible.builtin.include_tasks: verify.yml
+
+- name: Verificar la canalización de logs
+  ansible.builtin.include_tasks: verify_logs.yml
