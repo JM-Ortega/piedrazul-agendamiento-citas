@@ -23,7 +23,7 @@
 #   GRAFANA_LOCAL_PORT  puerto de loopback para Grafana (por defecto 13200)
 #   KEEP=1          no elimina los proyectos al terminar
 # Requiere: Linux con systemd-journald y journal persistente, Docker nativo (no Docker Desktop)
-#   con compose v2, jq, yq (mikefarah v4), python3, openssl, curl, journalctl.
+#   con compose v2, jq, python3, openssl, curl, journalctl.
 #
 # Verifica:
 #   1. Host: journald activo, journal persistente, drop-in del rol vigente (2G/128M/7 días),
@@ -64,7 +64,7 @@ GPORT="${GRAFANA_LOCAL_PORT:-13200}"
 # busybox fijado por digest: solo imprime líneas
 BUSYBOX="busybox:1.37.0@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec"
 
-for bin in docker jq yq python3 openssl curl journalctl systemctl; do
+for bin in docker jq python3 openssl curl journalctl systemctl; do
   command -v "$bin" >/dev/null || { echo "falta $bin" >&2; exit 2; }
 done
 [ "$(uname -s)" = Linux ] || { echo "requiere Linux" >&2; exit 2; }
@@ -137,7 +137,9 @@ emit() {
   local redir=""; [ "$2" = stderr ] && redir=" >&2"
   syn run --rm --no-deps -T "$1" sh -c "printf '%s\n' \"\$0\"${redir}; sleep 2" "$3" >/dev/null 2>&1
 }
-in_journal() { journalctl -q --no-pager -o cat --since "-30min" | grep -qF -- "$1"; }
+# Sin grep -q: con pipefail, grep -q sale en la primera coincidencia, journalctl recibe SIGPIPE (141) y
+# la tubería falla aunque la línea esté (un journal real tiene miles de entradas en 30 min)
+in_journal() { journalctl -q --no-pager -o cat --since "-30min" | grep -F -- "$1" >/dev/null; }
 
 STARTED=true
 docker pull -q "${BUSYBOX}" >/dev/null
@@ -183,13 +185,15 @@ obs up -d --wait --wait-timeout 180 > "${TMP}/obs-up.log" 2>&1 \
   && ok "stack: levantado (proyecto ${OBS_PROJECT})" || { ko "stack: levantado"; tail -20 "${TMP}/obs-up.log" >&2; exit 1; }
 
 pexec() { obs exec -T prometheus "$@"; }
+# Loki y Alloy por nombre absoluto (loki., alloy.): el wget de busybox de Prometheus no resuelve
+# nombres cortos con "search ." en resolv.conf (systemd-resolved del host). Ver verify_logs.yml.
 urlq() { python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))' "$1"; }
-lq() { pexec wget -qO- "http://loki:3100/loki/api/v1/query_range?query=$(urlq "$1")&start=$(( $(date +%s) - 3600 ))000000000&limit=1000" 2>/dev/null; }
+lq() { pexec wget -qO- "http://loki.:3100/loki/api/v1/query_range?query=$(urlq "$1")&start=$(( $(date +%s) - 3600 ))000000000&limit=1000" 2>/dev/null; }
 lcount() { lq "$1" | jq '[.data.result[].values | length] | add // 0'; }
 pv() { pexec wget -qO- "http://localhost:9090/api/v1/query?query=$(urlq "$1")" 2>/dev/null | jq -r '.data.result[0].value[1] // empty'; }
-loki_ready() { test "$(pexec wget -qO- http://loki:3100/ready 2>/dev/null)" = ready; }
-journal_state() { pexec wget -qO- http://alloy:12345/api/v0/web/components 2>/dev/null | jq -r '.[] | select(.localID == "loki.source.journal.host") | .health.state'; }
-alloy_metric() { pexec wget -qO- http://alloy:12345/metrics 2>/dev/null | awk -v m="$1" 'index($0, m"{") == 1 || $1 == m {s += $NF} END {print s + 0}'; }
+loki_ready() { test "$(pexec wget -qO- http://loki.:3100/ready 2>/dev/null)" = ready; }
+journal_state() { pexec wget -qO- http://alloy.:12345/api/v0/web/components 2>/dev/null | jq -r '.[] | select(.localID == "loki.source.journal.host") | .health.state'; }
+alloy_metric() { pexec wget -qO- http://alloy.:12345/metrics 2>/dev/null | awk -v m="$1" 'index($0, m"{") == 1 || $1 == m {s += $NF} END {print s + 0}'; }
 healthy() { test "$(journal_state)" = healthy; }
 has() { test "$(lcount "$1")" = "$2"; }
 
@@ -207,7 +211,7 @@ check "ingesta: etiquetas de traefik (docker, stdout, error)" \
 check "ingesta: stderr real → stream=stderr, level=warn" \
   test "$(lq "{service=\"traefik\"} |= \"${RUN}-traefik-stderr\"" | jq -c '.data.result[0].stream | {stream, level}')" = '{"stream":"stderr","level":"warn"}'
 check "ingesta: backend con correlation_id" has "{service=\"backend\"} | correlation_id=\"${CID}\"" 1
-LABELS="$(pexec wget -qO- "http://loki:3100/loki/api/v1/labels?start=$(( $(date +%s) - 3600 ))000000000" 2>/dev/null | jq -r '.data | sort | join(",")')"
+LABELS="$(pexec wget -qO- "http://loki.:3100/loki/api/v1/labels?start=$(( $(date +%s) - 3600 ))000000000" 2>/dev/null | jq -r '.data | sort | join(",")')"
 check "ingesta: etiquetas solo source, service, stream, level (${LABELS})" \
   bash -c "test -z \"\$(tr ',' '\n' <<< '${LABELS}' | grep -vxE 'source|service|stream|level')\""
 T0="$(date +%s%N)"; emit traefik stdout "2026-11-03T10:00:04Z INF ${RUN}-latency"
@@ -247,9 +251,11 @@ SERVICES_IN_LOKI="$(lq '{source="docker"}' | jq -r '[.data.result[].stream.servi
 check "exclusión: en Loki solo los servicios seleccionados (${SERVICES_IN_LOKI})" test "${SERVICES_IN_LOKI}" = backend,traefik
 
 # ── 6. Permisos del journal ──────────────────────────────────────────────────
+# T_STOP antes de recrear Alloy: su posición guardada es la del Alloy anterior, así que lo que
+# escribe el host durante la recreación (dockerd, red, kernel) también queda pendiente de leer
+T_STOP="$(date '+%Y-%m-%d %H:%M:%S')"
 sed -i 's/^OBS_JOURNAL_GID=.*/OBS_JOURNAL_GID=65534/' "${TMP}/obs.env"
 obs up -d --wait alloy >/dev/null 2>&1
-T_STOP="$(date '+%Y-%m-%d %H:%M:%S')"
 sleep 15
 emit traefik stdout "2026-11-03T10:00:05Z INF ${RUN}-while-unreadable"
 sleep 20

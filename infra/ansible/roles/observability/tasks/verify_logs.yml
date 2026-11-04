@@ -2,11 +2,17 @@
 # publicados): Loki listo, Alloy leyendo el journal y Grafana con la fuente de datos de Loki. No
 # exige que una fuente seleccionada haya escrito (puede estar callada ni que el driver journald
 # esté activado en ella): eso lo prueba infra/tests/logs-e2e-lab.sh.
+#
+# Loki y Alloy se piden por nombre absoluto (loki., alloy.): el wget de busybox de la imagen de
+# Prometheus no resuelve un nombre corto si el resolv.conf del contenedor trae "search .", que
+# Docker copia del host con systemd-resolved sin dominios de búsqueda (Ubuntu 24.04 en Hetzner).
+# El DNS interno de Docker responde igual el nombre absoluto. Prometheus (resolución de Go) lee
+# esos destinos con nombre corto sin problema: afecta solo a estas sondas.
 
 - name: Esperar a que Loki esté listo
   ansible.builtin.command:
     argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
-           exec, -T, prometheus, wget, -qO-, "http://loki:3100/ready"]
+           exec, -T, prometheus, wget, -qO-, "http://loki.:3100/ready"]
     chdir: "{{ obs_dir }}"
   register: obs_loki_ready
   changed_when: false
@@ -31,7 +37,7 @@
 - name: Leer el estado de la lectura del journal en Alloy
   ansible.builtin.command:
     argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
-           exec, -T, prometheus, wget, -qO-, "http://alloy:12345/api/v0/web/components"]
+           exec, -T, prometheus, wget, -qO-, "http://alloy.:12345/api/v0/web/components"]
     chdir: "{{ obs_dir }}"
   register: obs_alloy_components
   changed_when: false
@@ -62,7 +68,7 @@
 - name: Leer las entradas leídas del journal
   ansible.builtin.command:
     argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
-           exec, -T, prometheus, wget, -qO-, "http://alloy:12345/metrics"]
+           exec, -T, prometheus, wget, -qO-, "http://alloy.:12345/metrics"]
     chdir: "{{ obs_dir }}"
   register: obs_alloy_metrics
   changed_when: false

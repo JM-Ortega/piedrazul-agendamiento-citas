@@ -275,17 +275,21 @@ El umbral de 6 h de `PiedrazulLogsJournalNotRead` es provisional: supone que el 
 el journal al menos una vez en ese plazo. Se confirma o ajusta midiendo en el servidor el mayor
 intervalo sin entradas (`loki_source_journal_target_lines_total` en el dashboard).
 
-Comandos útiles en el host (`/opt/piedrazul-obs`):
+Comandos útiles en el host (`/opt/piedrazul-obs`). Loki y Alloy se piden por nombre absoluto
+(`loki.`, `alloy.`): con systemd-resolved sin dominios de búsqueda (Ubuntu 24.04) Docker copia
+`search .` al resolv.conf de los contenedores y el `wget` de busybox de la imagen de Prometheus
+no resuelve los nombres cortos (`bad address 'loki:3100'`). Prometheus lee esos destinos sin
+problema (`up{job=~"alloy|loki"}`); afecta solo a estas sondas manuales.
 
 ```bash
 # Componentes de Alloy y su salud (loki.source.journal.host)
-sudo docker compose exec -T prometheus wget -qO- http://alloy:12345/api/v0/web/components \
+sudo docker compose exec -T prometheus wget -qO- http://alloy.:12345/api/v0/web/components \
   | jq -r '.[] | "\(.localID) \(.health.state) \(.health.message)"'
 # Entradas leídas, seleccionadas, enviadas y descartadas
-sudo docker compose exec -T prometheus wget -qO- http://alloy:12345/metrics \
+sudo docker compose exec -T prometheus wget -qO- http://alloy.:12345/metrics \
   | grep -E '^loki_(source_journal_target_lines_total|relabel_entries_written|write_(sent|dropped)_entries_total)'
 # Loki listo
-sudo docker compose exec -T prometheus wget -qO- http://loki:3100/ready
+sudo docker compose exec -T prometheus wget -qO- http://loki.:3100/ready
 # Qué escribe un servicio en el journal y con qué campos
 journalctl -o json -n 1 COM_DOCKER_COMPOSE_SERVICE=traefik | jq '{_TRANSPORT, PRIORITY, COM_DOCKER_COMPOSE_PROJECT}'
 # Uso y límites efectivos del journal
@@ -353,3 +357,19 @@ Lo que la retirada no deshace:
 
 Que la verificación local pase no demuestra la ingesta desde contenedores reales: el driver
 journald y los permisos del journal de un host solo los prueba `logs-e2e-lab.sh`.
+
+Requisitos del laboratorio, además de los de la cabecera de cada script:
+
+- Controlador con `ansible-core` 2.17 o posterior: las colecciones fijadas en
+  `infra/ansible/requirements.yml` (`community.docker` 5.2.0, `community.general` 12.5.0) no
+  admiten versiones anteriores.
+- En el host: el usuario `ansible` con sudo sin contraseña (`obs_owner` y `LAB_USER` por defecto),
+  Docker con Compose (rol `docker_host`), `jq` para `logs-e2e-lab.sh` y la red `piedrazul_net`.
+- Destinos de métricas de la aplicación. La instalación (y el paso 1 de la retirada con la versión
+  sin logs) falla en "Destinos leídos" si `backend`, `keycloak` y `traefik` no están up: no basta
+  con crear `piedrazul_net` vacía. Sin la aplicación hacen falta productores **sintéticos** en
+  esa red con esos nombres y puertos y en las rutas de `prometheus.yml`
+  (`/actuator/prometheus` en 8081, `/metrics` en 9000 y 8082), sin puertos publicados, que
+  respondan con `Content-Type: text/plain; version=0.0.4` (Prometheus 3 rechaza la lectura sin
+  un tipo de exposición válido). Con ellos el run verifica el stack, no la aplicación: un destino
+  sintético up no es evidencia de las métricas reales de backend, Keycloak ni Traefik.

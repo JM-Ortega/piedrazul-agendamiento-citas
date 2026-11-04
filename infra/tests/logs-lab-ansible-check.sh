@@ -5,8 +5,15 @@
 # purge opcional y reinstalación.
 #
 # SOLO contra un host de laboratorio desechable: instala el stack, escribe el drop-in de
-# journald, reinicia journald y retira Loki. El host debe tener Docker y la red de la aplicación
-# (converge, o en un laboratorio sin aplicación: docker network create piedrazul_net).
+# journald, reinicia journald y retira Loki. El host debe tener el usuario LAB_USER con sudo sin
+# contraseña, Docker con Compose (rol docker_host) y la red de la aplicación con sus destinos de
+# métricas: la verificación del rol (verify.yml) exige backend, keycloak y traefik leídos, también
+# en el paso 1 con LAB_BASE_REF. Con la aplicación instalada (converge) ya están; en un laboratorio
+# sin aplicación no basta con docker network create piedrazul_net: hacen falta productores
+# SINTÉTICOS en esa red con esos nombres, puertos y rutas (backend:8081/actuator/prometheus,
+# keycloak:9000/metrics, traefik:8082/metrics) y un Content-Type de exposición de Prometheus
+# (text/plain; version=0.0.4), sin el cual Prometheus 3 rechaza la lectura. Que esos destinos
+# estén up no verifica la aplicación. Ver docs/operations/runbooks/logs.md, "Verificación".
 #
 # Inventario aislado: nunca usa inventories/prod. Genera un inventario de un solo host (vps, el
 # nombre que esperan los playbooks) en un directorio temporal sin group_vars ni host_vars, y le
@@ -112,11 +119,14 @@ play() { # play <nombre del log> <directorio ansible> <playbook> [args...]
 }
 recap() { grep -E '^vps\s+:' "${TMP}/$1.log" | tail -1; }
 changed() { recap "$1" | sed -nE 's/.*changed=([0-9]+).*/\1/p'; }
-host() { # host <comando de shell> (como root en el laboratorio)
+# host <comando de shell> (como root en el laboratorio). El comando pasa por la plantilla de Ansible:
+# las llaves de Go de docker --format se escapan ({{ "{{" }} … {{ "}}" }}). La salida de -o es una
+# línea (los saltos llegan como \n literal): los comandos imprimen una sola línea.
+host() {
   ansible -i "${INV}" vps -b -m ansible.builtin.shell -a "$1" -o 2>/dev/null \
     | sed -nE 's/^vps \| [A-Z]+ \| rc=[0-9]+ \| \(stdout\) ?//p'
 }
-OBS_PS='docker ps --filter label=com.docker.compose.project=piedrazul-obs --format "{{.Label \"com.docker.compose.service\"}}" | sort | tr "\n" ","'
+OBS_PS='docker ps --filter label=com.docker.compose.project=piedrazul-obs --format "{{ "{{" }}.Label \"com.docker.compose.service\"{{ "}}" }}" | sort | tr "\n" ","'
 GRAFANA_DS='cd /opt/piedrazul-obs && docker compose exec -T grafana sh -c '"'"'wget -qO- --header "Authorization: Basic $(printf "admin:%s" "$GF_SECURITY_ADMIN_PASSWORD" | base64)" http://localhost:3000/api/datasources'"'"' | python3 -c "import json,sys; print(\",\".join(sorted(d[\"uid\"] for d in json.load(sys.stdin))))"'
 
 # ── 1. Instalación ───────────────────────────────────────────────────────────
@@ -156,7 +166,7 @@ if play step2 "${ANSIBLE_DIR}" observability-logs-rollback.yml; then ok "paso 2:
 check "paso 2: sin Loki" test "$(host "${OBS_PS}")" = "alloy,grafana,prometheus,"
 check "paso 2: fuente de datos Loki retirada" test "$(host "${GRAFANA_DS}")" = prometheus
 check "paso 2: sin configuración de Loki, drop-in ni variables de logs" \
-  test "$(host 'ls -d /opt/piedrazul-obs/loki /etc/systemd/journald.conf.d/60-piedrazul-obs.conf 2>/dev/null | wc -l; grep -c "^OBS_\(JOURNAL_GID\|LOG_PROJECT\|LOG_SERVICES\)=" /opt/piedrazul-obs/.env')" = "0 0"
+  test "$(host 'echo "$(ls -d /opt/piedrazul-obs/loki /etc/systemd/journald.conf.d/60-piedrazul-obs.conf 2>/dev/null | wc -l) $(grep -c "^OBS_\(JOURNAL_GID\|LOG_PROJECT\|LOG_SERVICES\)=" /opt/piedrazul-obs/.env)"')" = "0 0"
 check "paso 2: journald activo" test "$(host 'systemctl is-active systemd-journald')" = active
 check "paso 2: volúmenes conservados" test "$(host "${VOLS}")" = "alloy_data,grafana_data,loki_data,prometheus_data,"
 play step2-again "${ANSIBLE_DIR}" observability-logs-rollback.yml

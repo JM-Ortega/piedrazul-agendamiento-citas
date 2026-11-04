@@ -388,6 +388,23 @@ journal_state() { pexec wget -qO- http://alloy:12345/api/v0/web/components 2>/de
 alloy_metric() { pexec wget -qO- http://alloy:12345/metrics 2>/dev/null | awk -v m="$1" 'index($0, m"{") == 1 || $1 == m {s += $NF} END {print s + 0}'; }
 
 check "runtime: Loki listo (/ready por obs_net)" wait_for 120 loki_ready
+# Regresión del laboratorio nativo (Ubuntu 24.04): con "search ." en resolv.conf (lo copia Docker
+# de systemd-resolved sin dominios de búsqueda) el wget de busybox de la imagen de Prometheus no
+# resuelve nombres cortos. Las sondas del rol y de logs-e2e-lab.sh usan nombres absolutos.
+printf 'nameserver 127.0.0.11\nsearch .\noptions ndots:0\n' > "${TMP}/resolv-search-dot.conf"
+chmod 644 "${TMP}/resolv-search-dot.conf"
+dotwget() { docker run --rm --network "${OBS_PROJECT}_obs_net" -v "${TMP}/resolv-search-dot.conf:/etc/resolv.conf:ro" --entrypoint wget "${PROM_IMAGE}" -qO- -T 5 "$1"; }
+short_name_fails() { ! dotwget http://loki:3100/ready; }
+# Sin grep -q: con pipefail, el SIGPIPE de wget haría fallar la tubería aunque la serie esté
+absolute_names_ok() { test "$(dotwget http://loki.:3100/ready)" = ready && dotwget http://alloy.:12345/metrics | grep '^loki_source_journal_target_lines_total' >/dev/null; }
+check "resolución con \"search .\": se reproduce el fallo del nombre corto en la imagen de Prometheus" short_name_fails
+check "resolución con \"search .\": loki. y alloy. responden" absolute_names_ok
+# Los comandos de host() en logs-lab-ansible-check.sh pasan por la plantilla de Ansible: una llave
+# de Go sin escapar ({{.Label …}}) rompe el comando y la comprobación falla sin mirar el host
+check "laboratorio: host() de logs-lab-ansible-check.sh sin llaves de Go sin escapar" \
+  bash -c "! grep -nE '\\{\\{ *\\.[A-Z]' '${ROOT}/infra/tests/logs-lab-ansible-check.sh'"
+check "resolución: las sondas del rol y de logs-e2e-lab.sh a Loki y Alloy usan nombres absolutos" \
+  bash -c "! grep -nE 'http://(loki|alloy):' '${ROOT}/infra/ansible/roles/observability/tasks/verify_logs.yml' '${ROOT}/infra/tests/logs-e2e-lab.sh' && grep -q 'http://loki.:3100/ready' '${ROOT}/infra/ansible/roles/observability/tasks/verify_logs.yml'"
 healthy() { test "$(journal_state)" = healthy; }
 check "runtime: loki.source.journal sano con el grupo del journal (OBS_JOURNAL_GID=${SYN_GID})" wait_for 60 healthy
 traefik_in() { test "$(lcount "{service=\"traefik\"} |= \"${RUN}-traefik-error\"")" = 1; }
