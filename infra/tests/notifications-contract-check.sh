@@ -629,8 +629,28 @@ check ".env: root:root 0600" \
   test "$(yq -r ".[] | select(.name == \"${ENV_TASK}\") | .\"ansible.builtin.template\" | .owner + \":\" + .group + \" \" + .mode" "${SETUP}")" = "root:root 0600"
 check ".env: la tarea lleva no_log" test "$(yq -r ".[] | select(.name == \"${ENV_TASK}\") | .no_log" "${SETUP}")" = true
 check ".env: Ansible corre con become por defecto" grep -qE '^become +\= +True' "${ANSIBLE_DIR}/ansible.cfg"
-check ".env: ninguna tarea del rol ni playbook que lo lea renuncia a become" \
-  bash -c "! grep -rlE '^ *become: *(false|no)' '${ANSIBLE_DIR}/roles' '${ANSIBLE_DIR}/playbooks' | grep -v keycloak-admin-preflight.yml | grep -q ."
+# Renunciar a become solo se admite donde no hay host: un play hosts: localhost con
+# connection: local, o una tarea/bloque con delegate_to: localhost; y nunca si menciona .env.
+# Cualquier otro become que no sea literalmente verdadero (false, no, una plantilla) cuenta
+# como renuncia del lado del host. Imprime las renuncias que incumplen; falla si hay alguna o
+# si algún YAML no se puede leer.
+host_become_waivers() {
+  local files out
+  files="$(find "$@" -type f \( -name '*.yml' -o -name '*.yaml' \) | sort)" || return 1
+  [ -n "${files}" ] || return 1
+  # shellcheck disable=SC2086
+  out="$(yq -o=json -I=0 '.. | select(tag == "!!map" and has("become"))
+      | {"file": filename, "name": (.name // ""), "become": (.become | tostring | downcase),
+         "hosts": (.hosts // "" | tostring), "connection": (.connection // "" | tostring),
+         "delegate_to": (.delegate_to // "" | tostring), "env": (tojson | test("\\.env"))}' ${files} \
+    | jq -c 'select((.become | IN("true", "yes", "on", "1", "y")) | not)
+      | select(((((.hosts | IN("localhost", "127.0.0.1")) and .connection == "local")
+                 or (.hosts == "" and (.delegate_to | IN("localhost", "127.0.0.1"))))
+                and (.env | not)) | not)')" || return 1
+  [ -z "${out}" ] || { printf '%s\n' "${out}"; return 1; }
+}
+check ".env: ninguna tarea ni play del lado del host renuncia a become (solo el controlador local)" \
+  host_become_waivers "${ANSIBLE_DIR}/roles" "${ANSIBLE_DIR}/playbooks"
 check ".env: keycloak-admin-preflight, sin become, no lo toca" bash -c "! grep -q '\.env' '${ANSIBLE_DIR}/playbooks/keycloak-admin-preflight.yml'"
 check "setup.yml: entradas → imagen → copia de Compose" \
   bash -c "[ '$(task_index "${SETUP}" 'Tomar y validar la configuración del correo SES')' -lt '$(task_index "${SETUP}" 'Verificar que la imagen del backend trae el proveedor SES')' ] && [ '$(task_index "${SETUP}" 'Verificar que la imagen del backend trae el proveedor SES')' -lt '$(task_index "${SETUP}" 'Copiar archivos compose al servidor')' ]"
