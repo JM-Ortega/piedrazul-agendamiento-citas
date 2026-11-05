@@ -253,16 +253,9 @@ kc_client_auth() {
     elif grep -qiE "invalid client|unauthorized_client|401" <<<"$out"; then echo rejected
     else echo unavailable; fi' "$1" "$2" 2>/dev/null || echo unavailable
 }
-kc_user_state() { # <realm> <user> <password> → ok|not_set_up|rejected|unavailable
-  docker exec -e "S=$3" keycloak bash -c '
-    c="$(mktemp -u /dev/shm/h.XXXXXX)"; trap "rm -f $c" EXIT
-    if out="$(KC_CLI_PASSWORD="$S" /opt/keycloak/bin/kcadm.sh config credentials --config "$c" \
-        --server http://localhost:8180 --realm "$0" --user "$1" 2>&1)"; then echo ok
-    elif grep -qi "not fully set up" <<<"$out"; then echo not_set_up
-    elif grep -qiE "invalid user|invalid_grant|401" <<<"$out"; then echo rejected
-    else echo unavailable; fi' "$1" "$2" 2>/dev/null || echo unavailable
-}
-kc_user_auth() { # <realm> <user> <password>
+# kc_user_auth <realm> <user> <password>: password grant de admin-cli, solo para master (el
+# admin-cli de piedrazul no lo tiene: ahí se usa realm_login, por el flujo browser)
+kc_user_auth() {
   docker exec -e "S=$3" keycloak bash -c '
     c="$(mktemp -u /dev/shm/h.XXXXXX)"; trap "rm -f $c" EXIT
     if out="$(KC_CLI_PASSWORD="$S" /opt/keycloak/bin/kcadm.sh config credentials --config "$c" \
@@ -315,9 +308,45 @@ browser() {
     "${PY_IMAGE}" python -I /kbl.py "${mode}" > "${LOGS}/browser-${outf}.txt" 2>&1
 }
 browser_has() { grep -qxF -- "$2" "${LOGS}/browser-$1.txt"; }
+browser_all() { local f="$1" l; shift; for l in "$@"; do browser_has "${f}" "${l}" || return 1; done; }
+# realm_login <salida> <usuario> <contraseña> [cliente]: un intento independiente (proceso
+# nuevo, sin cookies ni sesión previas) en el realm de la aplicación por el flujo browser del
+# frontend: su admin-cli no tiene password grant, así que kcadm no puede probar contraseñas ahí
+realm_login() {
+  KBL_REALM=piedrazul KBL_CLIENT="${4:-piedrazul-frontend}" KBL_REDIRECT=http://localhost:4200/ \
+    KBL_USER="$2" KBL_PASSWORD="$3" browser realm-login "$1" KBL_REALM KBL_CLIENT KBL_REDIRECT KBL_USER KBL_PASSWORD
+}
+# login_error_counts <id> → "<invalid_user_credentials> <otros motivos>" en el registro de
+# eventos del realm (el backend tiene view-events); vacío si no se pudo leer
+login_error_counts() {
+  kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul get events -r piedrazul -q "user=$1" -q type=LOGIN_ERROR -q max=1000 --fields error 2>/dev/null \
+    | jq -r '"\([.[] | select(.error == "invalid_user_credentials")] | length) \([.[] | select(.error != "invalid_user_credentials")] | length)"'
+}
+# realm_rejected <salida> <usuario> <id> <contraseña>: realm_login y anota en su salida el
+# motivo que registró Keycloak. La página de un rechazo por contraseña y la de una cuenta
+# bloqueada son iguales a propósito: solo el evento distingue
+# event.login_error=invalid_user_credentials (exactamente un fallo nuevo, de ese motivo).
+realm_rejected() {
+  local before after i o
+  # Más que quickLoginCheckMilliSeconds (1 s): dos fallos más seguidos bloquean la cuenta
+  sleep 2
+  before="$(login_error_counts "$3")"
+  realm_login "$1" "$2" "$4"
+  after="$(login_error_counts "$3")"
+  read -r i o <<< "${before:-x x}"
+  if [ -n "${before}" ] && [ "${after}" = "$((i + 1)) ${o}" ]; then
+    echo event.login_error=invalid_user_credentials >> "${LOGS}/browser-$1.txt"
+  else
+    echo "event.login_error=unexpected:${before:-?}->${after:-?}" >> "${LOGS}/browser-$1.txt"
+  fi
+}
+# Una contraseña que Keycloak no acepta todavía por una acción requerida: ni código, ni cookie
+# de identidad, ni reautorización silenciosa en el mismo navegador
+REALM_PENDING_SETUP=('realm_login.outcome=required_action:login-update-password' 'realm_login.identity_cookie=absent' 'realm_login.silent_reauth=login_required')
+REALM_REJECTED=('realm_login.outcome=invalid_credentials' 'realm_login.identity_cookie=absent' 'realm_login.silent_reauth=login_required' 'event.login_error=invalid_user_credentials')
 # check usa bash -c: las comprobaciones necesitan estas funciones en el subshell
 export -f sql temp_count realm_id realms sa_roles users_in_realm kc_env_keys kc_client_auth kc_user_auth log_has task_ran
-export -f kc_db_version kc_image_version kc_container kc_user_state
+export -f kc_db_version kc_image_version kc_container
 export -f platform_row platform_facts platform_count platform_status browser_has
 export LOGS PLATFORM_USER
 
@@ -425,23 +454,37 @@ check "sentinela de negocio creado por el backend" bash -c "users_in_realm | gre
 # Correo: el primer administrador de negocio no depende de él. La cuenta se crea como el
 # bootstrap: contraseña temporal + UPDATE_PASSWORD, correo sin verificar
 first_admin_expect() { # <etiqueta>
-  local user="harness-admin-$1" pw new id
-  pw="$(synthetic firstadmin)"; new="$(synthetic firstadminnew)"; SECRETS_SEEN+=("${pw}" "${new}")
+  local user="harness-admin-$1" tag="first-admin-$1" pw new bad id
+  pw="$(synthetic firstadmin)"; new="$(synthetic firstadminnew)"; bad="$(synthetic firstadminwrong)"
+  SECRETS_SEEN+=("${pw}" "${new}" "${bad}")
   kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul create users -r piedrazul -s "username=${user}" -s enabled=true \
     -s firstName=Primer -s lastName=Administrador -s "email=${user}@harness.test" -s emailVerified=false \
     -s 'requiredActions=["UPDATE_PASSWORD"]' >/dev/null 2>&1
   id="$(kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q "username=${user}" -q exact=true --fields id --format csv --noquotes 2>/dev/null)"
   jq -cn --arg p "${pw}" '{type: "password", value: $p, temporary: true}' \
     | kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul update "users/${id}/reset-password" -r piedrazul -f - -n >/dev/null 2>&1
+  # Cada sondeo, por el flujo browser del frontend (realm_login), es un intento independiente
+  realm_login "first-admin-$1-temp" "${user}" "${pw}"
   check "$1: administrador inicial: la contraseña temporal sola no da acceso" \
-    test "$(kc_user_state piedrazul "${user}" "${pw}")" = not_set_up
+    browser_all "first-admin-$1-temp" "${REALM_PENDING_SETUP[@]}"
+  realm_login "first-admin-$1-probe" "${user}" "${pw}" admin-cli
+  check "$1: control: un sondeo inutilizable (cliente sin flujo browser) es un error del sondeo, no un resultado" \
+    bash -c "! grep -q '^realm_login.outcome=' '${LOGS}/browser-first-admin-$1-probe.txt' && grep -q '^error=Unrecognized:' '${LOGS}/browser-first-admin-$1-probe.txt'"
+  realm_rejected "first-admin-$1-wrong-before" "${user}" "${id}" "${bad}"
+  check "$1: administrador inicial: antes del cambio, una contraseña incorrecta se rechaza por credenciales" \
+    browser_all "first-admin-$1-wrong-before" "${REALM_REJECTED[@]}"
   KBL_REALM=piedrazul KBL_CLIENT=piedrazul-frontend KBL_REDIRECT=http://localhost:4200/ \
     KBL_USER="${user}" KBL_PASSWORD="${pw}" KBL_NEW_PASSWORD="${new}" \
     browser realm-first-login "first-admin-$1" KBL_REALM KBL_CLIENT KBL_REDIRECT KBL_USER KBL_PASSWORD KBL_NEW_PASSWORD
   check "$1: administrador inicial: UPDATE_PASSWORD por el tema real y entra, sin correo" \
     bash -c "browser_has 'first-admin-$1' 'realm_first_login.page=login-update-password' && browser_has 'first-admin-$1' 'browser.token=ok'"
+  realm_login "first-admin-$1-new" "${user}" "${new}"
+  realm_rejected "first-admin-$1-old" "${user}" "${id}" "${pw}"
   check "$1: administrador inicial: su contraseña elegida autentica y la temporal ya no" \
-    bash -c "test '$(kc_user_auth piedrazul "${user}" "${new}")' = ok && test '$(kc_user_auth piedrazul "${user}" "${pw}")' = rejected"
+    eval 'browser_has "${tag}-new" realm_login.outcome=authenticated && browser_all "${tag}-old" "${REALM_REJECTED[@]}"'
+  realm_rejected "first-admin-$1-wrong" "${user}" "${id}" "${bad}"
+  check "$1: administrador inicial: una contraseña incorrecta se rechaza por credenciales (no por cliente, bloqueo ni sondeo)" \
+    browser_all "first-admin-$1-wrong" "${REALM_REJECTED[@]}"
 }
 smtp_rows() { sql "select count(*) from keycloak.realm_smtp_config c join keycloak.realm r on r.id=c.realm_id where r.name='piedrazul'"; }
 reset_allowed() { sql "select reset_password_allowed from keycloak.realm where name='piedrazul'"; }
@@ -482,8 +525,9 @@ kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul create users -r piedrazul 
 PENDING_ID="$(kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q username=harness-pending -q exact=true --fields id --format csv --noquotes 2>/dev/null)"
 jq -cn --arg p "${PENDING_PW}" '{type: "password", value: $p, temporary: true}' \
   | kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul update "users/${PENDING_ID}/reset-password" -r piedrazul -f - -n >/dev/null 2>&1
+realm_login pending-before harness-pending "${PENDING_PW}"
 check "previo: identidad de negocio pendiente: la contraseña temporal sola no da acceso" \
-  test "$(kc_user_state piedrazul harness-pending "${PENDING_PW}")" = not_set_up
+  browser_all pending-before "${REALM_PENDING_SETUP[@]}"
 pending_row() {
   sql "select u.id||'|'||u.enabled||'|'||coalesce((select string_agg(required_action,'+' order by required_action) from keycloak.user_required_action where user_id=u.id),'')
          ||'|'||coalesce((select string_agg(c.id||':'||c.type||':'||md5(coalesce(c.secret_data,'')||coalesce(c.credential_data,'')),',' order by c.id) from keycloak.credential c where c.user_id=u.id),'')
@@ -527,8 +571,9 @@ check "UPG: administrador humano intacto (id, estado, acciones, roles, atributos
 check "UPG: informa la preparación humana: CONFIGURADA" platform_status upgrade 'CONFIGURADA'
 check "UPG: identidad de negocio pendiente intacta (acción UPDATE_PASSWORD y contraseña temporal)" \
   test "$(pending_row)" = "${PENDING_SNAP}"
+realm_login pending-after harness-pending "${PENDING_PW}"
 check "UPG: su contraseña temporal sigue sin dar acceso sola (Keycloak exige la acción)" \
-  test "$(kc_user_state piedrazul harness-pending "${PENDING_PW}")" = not_set_up
+  browser_all pending-after "${REALM_PENDING_SETUP[@]}"
 KBL_PASSWORD="${PLATFORM_NEW_PW}" browser login upg-login KBL_PASSWORD
 check "UPG: login del administrador humano en ${TO_VERSION}: pide OTP, rechaza uno incorrecto, entra con el correcto" \
   bash -c "browser_has upg-login 'browser.otp_challenge=yes' && browser_has upg-login 'browser.wrong_otp=rejected' && browser_has upg-login 'browser.token=ok'"

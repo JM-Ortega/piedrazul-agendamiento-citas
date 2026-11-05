@@ -15,6 +15,9 @@ Uso: python -I keycloak-browser-login.py <modo>
   direct-grant password grant del cliente admin-cli: sin OTP y, si hay KBL_OTP_FILE, con OTP
   realm-first-login  en el realm de la aplicación (tema React): contraseña temporal →
                UPDATE_PASSWORD (KBL_NEW_PASSWORD) → código, como el primer administrador de negocio
+  realm-login        en el realm de la aplicación: un intento con KBL_PASSWORD, sin completar
+               acciones requeridas: authenticated | required_action:<página> |
+               invalid_credentials | unrecognized:<página> (ver realm_login)
   reset-request      en el realm de la aplicación: ¿la página de login ofrece recuperar la
                contraseña? Pide la recuperación de KBL_USER, si Keycloak la admite. No sigue el
                enlace del correo
@@ -185,16 +188,18 @@ def discover_redirect():
     return issuer.rsplit("/realms/", 1)[0] + f"/admin/{REALM}/console/"
 
 
-def authorize():
+def authorize(**extra):
     global REDIRECT
     REDIRECT = REDIRECT or discover_redirect()
     verifier = secrets.token_urlsafe(48)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
-    url = f"{BASE}/realms/{REALM}/protocol/openid-connect/auth?" + urllib.parse.urlencode({
+    url = f"{BASE}/realms/{REALM}/protocol/openid-connect/auth?" + urllib.parse.urlencode(dict({
         "client_id": CLIENT, "redirect_uri": REDIRECT, "response_type": "code", "scope": "openid",
         "state": secrets.token_hex(8), "nonce": secrets.token_hex(8),
-        "code_challenge": challenge, "code_challenge_method": "S256"})
-    _, status, page = follow(url)
+        "code_challenge": challenge, "code_challenge_method": "S256"}, **extra))
+    code, status, page = follow(url)
+    if code:  # solo con una sesión previa (prompt=none): el código cuenta, no la página
+        return verifier, status, "code"
     return verifier, status, page
 
 
@@ -339,6 +344,42 @@ def realm_first_login():
     finish(code, verifier)
 
 
+def realm_login():
+    """Un intento independiente (proceso nuevo: sin cookies, código ni sesión previos) con
+    KBL_PASSWORD en el realm de la aplicación, sin completar ninguna acción requerida. El
+    resultado distingue lo que el password grant ya no puede (admin-cli sin direct grants):
+      authenticated            código canjeado por un token de KBL_USER
+      required_action:<page>   Keycloak exige una acción antes de autenticar (no la completa)
+      invalid_credentials      vuelve el formulario de login con un error (el motivo exacto
+                               lo confirma el harness en el registro de eventos)
+      unrecognized:<page>      cualquier otra cosa: nunca cuenta como rechazo
+    Un fallo del sondeo (red, cliente, redirect_uri) termina en error=… con código 1."""
+    verifier, _, page = authorize()
+    if context(page, "pageId") != "login":
+        raise Unrecognized("no_login_page:" + context(page, "pageId"))
+    code, _, page = follow(context(page, "loginAction"), {
+        "username": ENV["KBL_USER"], "password": ENV["KBL_PASSWORD"], "credentialId": ""})
+    if code:
+        token = exchange(code, verifier)
+        outcome = "authenticated" if token == "ok" else "unrecognized:token_" + token
+    else:
+        page_id = context(page, "pageId")
+        if "/login-actions/required-action" in context(page, "loginAction"):
+            outcome = "required_action:" + page_id
+        elif page_id == "login" and re.search(r'"type"\s*:\s*"error"', page):
+            outcome = "invalid_credentials"
+        else:
+            outcome = "unrecognized:" + page_id
+    out("realm_login.outcome", outcome)
+    # Sin autenticación no hay sesión de usuario: ni cookie de identidad ni reautorización
+    # silenciosa (prompt=none) en este mismo navegador
+    if outcome != "authenticated":
+        out("realm_login.identity_cookie", "present" if "KEYCLOAK_IDENTITY" in COOKIES else "absent")
+        _, _, err = authorize(prompt="none")
+        out("realm_login.silent_reauth", err.removeprefix("error=") if err.startswith("error=") else
+            ("code" if err == "code" else "page"))
+
+
 def reset_request():
     _, _, page = authorize()
     out("reset.advertised", context(page, "resetPasswordAllowed"))
@@ -350,7 +391,7 @@ def reset_request():
 
 
 MODES = {"first-login": first_login, "login": login, "password": password_only, "direct-grant": direct_grant,
-         "realm-first-login": realm_first_login, "reset-request": reset_request}
+         "realm-first-login": realm_first_login, "realm-login": realm_login, "reset-request": reset_request}
 
 if __name__ == "__main__":
     try:
