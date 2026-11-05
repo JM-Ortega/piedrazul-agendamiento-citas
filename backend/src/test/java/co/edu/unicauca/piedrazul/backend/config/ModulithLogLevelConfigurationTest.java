@@ -6,6 +6,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -36,8 +37,12 @@ class ModulithLogLevelConfigurationTest {
         }
     }
 
+    // También antes de cada caso: si otra prueba de la misma JVM dejó abierto un contexto de Spring
+    // Boot (caché de TestContext), Boot da el LoggerContext por inicializado, no reinicia los
+    // niveles y este logger conservaría el que fijó ese contexto.
+    @BeforeEach
     @AfterEach
-    void restoreLogger() {
+    void clearExplicitLevel() {
         modulithLogger().setLevel(null);
     }
 
