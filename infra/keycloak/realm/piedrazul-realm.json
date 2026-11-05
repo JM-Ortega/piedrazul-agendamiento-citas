@@ -448,6 +448,7 @@
     "containerId": "2ce18505-528d-4620-ae3a-f629f88fc0cc"
   },
   "requiredCredentials": ["password"],
+  "passwordPolicy": "length(6) and maxLength(100)",
   "otpPolicyType": "totp",
   "otpPolicyAlgorithm": "HmacSHA1",
   "otpPolicyInitialCounter": 0,
@@ -639,7 +640,7 @@
       "consentRequired": false,
       "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": true,
+      "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "publicClient": true,
       "frontchannelLogout": false,
@@ -779,13 +780,11 @@
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
         "https://piedrazul.org/*",
-        "https://piedrazul.narvaezlab.dev/*",
         "http://localhost:4200/*"
       ],
       "webOrigins": [
         "https://piedrazul.org",
-        "http://localhost:4200",
-        "https://piedrazul.narvaezlab.dev"
+        "http://localhost:4200"
       ],
       "notBefore": 0,
       "bearerOnly": false,
@@ -804,7 +803,7 @@
         "backchannel.logout.session.required": "true",
         "standard.token.exchange.enabled": "false",
         "frontchannel.logout.session.required": "true",
-        "post.logout.redirect.uris": "http://localhost:4200##https://piedrazul.narvaezlab.dev##https://piedrazul.org",
+        "post.logout.redirect.uris": "http://localhost:4200##https://piedrazul.org",
         "display.on.consent.screen": "false",
         "oauth2.device.authorization.grant.enabled": "false",
         "pkce.code.challenge.method": "S256",

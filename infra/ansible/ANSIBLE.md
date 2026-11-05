@@ -128,6 +128,11 @@ kc_temp_admin_owned_regex: "^{{ kc_temp_admin_prefix }}-[0-9]{14}-[a-z0-9]{8}$"
 kc_realm_file: "{{ repo_root }}/infra/keycloak/realm/piedrazul-realm.json"
 ```
 
+`log_level_root`, `log_level_security`, `log_level_sql`, `log_level_sql_bind` y
+`log_level_modulith` producen las variables `LOG_LEVEL_*` del `.env`. `LOG_LEVEL_MODULITH` vale
+`WARN` si falta o está vacía en un `.env` anterior (`compose/backend.yml`): no llega vacía a
+Spring, que dejaría ese logger heredando el nivel del root.
+
 ### `host_vars/vps.yml` (Hetzner)
 
 ```yaml
@@ -518,7 +523,9 @@ SES_SMTP_PASSWORD            # converge, nunca el deploy (docs/operations/runboo
 
 Qué exige la verificación de credenciales depende del modo del run: con configuración del
 servidor (`run_host_config`) exige las contraseñas de la base, `CLOUDFLARE_DNS_API_TOKEN`,
-`KC_BACKEND_CLIENT_SECRET` y `KC_AUTOMATION_CLIENT_SECRET`, que solo recibe el converge. Un
+`KC_BACKEND_CLIENT_SECRET` y `KC_AUTOMATION_CLIENT_SECRET`, que solo recibe el converge. Con
+`IDENTITY_SEED_ENABLED=true` exige además las entradas del bootstrap, salvo en Run P, que no
+las recibe. Un
 deploy sin configuración del servidor no las recibe ni las exige (solo `TF_API_TOKEN` y
 `ANSIBLE_SSH_KEY`): usa el `.env` que dejó el converge, y `deploy.yml` falla antes de mutar si
 falta o le falta una clave de la base o `KC_BACKEND_CLIENT_SECRET` ("corre converge primero").
@@ -540,8 +547,9 @@ falta o le falta una clave de la base o `KC_BACKEND_CLIENT_SECRET` ("corre conve
 
 ### Bootstrap del primer `ADMIN` de negocio
 
-Variables `IDENTITY_SEED_*` del environment: con
-`IDENTITY_SEED_ENABLED=true`, `identity_seed_inputs.yml` valida las entradas antes de escribir
+Variables `IDENTITY_SEED_*` del environment. Run P solo valida la decisión; con
+`IDENTITY_SEED_ENABLED=true`, Run I y todo run con configuración del servidor exigen las entradas e
+`identity_seed_inputs.yml` valida las entradas antes de escribir
 `.env`, `identity_seed_delivery.yml` comprueba que Compose las entregaría intactas e
 `identity_seed_runtime.yml` (al final de `refresh_backend.yml` y de `deploy.yml`) exige que el
 backend en ejecución tenga en vigor la configuración del `.env` (sus `IDENTITY_SEED_*` son los
@@ -609,7 +617,7 @@ environment:
 1. Agregar a `host_vars/vps.yml`:
 
 ```yaml
-traefik_domain: traefik.piedrazul.narvaezlab.dev
+traefik_domain: traefik.piedrazul.org
 ```
 
 2. Agregar a `host_vars/vps_oci.yml`:

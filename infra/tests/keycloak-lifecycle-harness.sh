@@ -381,10 +381,12 @@ check "P2: habilitado, rol admin de master, contraseña temporal, acciones CONFI
 check "P2: estado informado aparte del técnico: creada, primer login pendiente" platform_status p2 'CREADA, primer login pendiente'
 check "P2: política de contraseñas de master = length(16) (fijada en el evento, informada)" \
   bash -c "test \"\$(sql \"select password_policy from keycloak.realm where name='master'\")\" = 'length(16)' && log_has p2 'política de contraseñas de master length(16)'"
-check "P2: la política del realm de la aplicación no cambia (la del repositorio: ninguna)" \
+check "P2: la política del realm de la aplicación es la del repositorio" \
   test "$(sql "select coalesce(password_policy,'') from keycloak.realm where name='piedrazul'")" = "$(jq -r '.passwordPolicy // ""' "${ROOT}/infra/keycloak/realm/piedrazul-realm.json")"
 check "P2: el hash de la contraseña inicial es el de Keycloak por defecto (argon2)" \
   test "$(sql "select string_agg(c.credential_data::json->>'algorithm', ',') from keycloak.credential c join keycloak.user_entity u on u.id=c.user_id where u.username='${PLATFORM_USER}' and c.type='password'")" = argon2
+check "P2: admin-cli del realm de la aplicación sin password grant" \
+  test "$(sql "select c.direct_access_grants_enabled from keycloak.client c join keycloak.realm r on r.id=c.realm_id where r.name='piedrazul' and c.client_id='admin-cli'")" = f
 KBL_PASSWORD="${PLATFORM_PW}" browser direct-grant p2-initial-pw KBL_PASSWORD
 check "P2: la contraseña inicial llegó literal (' \" \$ \\ # & espacio {{ }} {% %}) y sola no da acceso: Keycloak exige las acciones" \
   browser_has p2-initial-pw 'direct_grant.without_otp=account_is_not_fully_set_up'

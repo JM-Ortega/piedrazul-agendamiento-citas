@@ -139,28 +139,85 @@ class AppointmentExternalServiceImplTest {
     class FindAllByDateTests {
 
         @Test
-        void shouldReturnOnlyAgendadaAppointmentsMappedToSchedulerSummary() {
+        void shouldIncludeAgendadaAtendidaAndNoAsistioAndExcludeCanceladaAndReprogramada() {
             LocalDate date = LocalDate.now().plusDays(1);
             UUID idDoctor = UUID.randomUUID();
             UUID idPatientAgendada = UUID.randomUUID();
-            UUID idPatientCancelada = UUID.randomUUID();
+            UUID idPatientAtendida = UUID.randomUUID();
+            UUID idPatientNoAsistio = UUID.randomUUID();
 
-            Appointment agendada = buildAppointment(idDoctor, idPatientAgendada, date, LocalTime.of(9, 0),
-                    AppointmentState.AGENDADA, SpecialtyCode.FISIOTERAPIA);
-            Appointment cancelada = buildAppointment(idDoctor, idPatientCancelada, date, LocalTime.of(10, 0),
-                    AppointmentState.CANCELADA, SpecialtyCode.FISIOTERAPIA);
+            List<Appointment> appointments = List.of(
+                    buildAppointment(idDoctor, idPatientAgendada, date, LocalTime.of(9, 0),
+                            AppointmentState.AGENDADA, SpecialtyCode.FISIOTERAPIA),
+                    buildAppointment(idDoctor, idPatientAtendida, date, LocalTime.of(10, 0),
+                            AppointmentState.ATENDIDA, SpecialtyCode.FISIOTERAPIA),
+                    buildAppointment(idDoctor, idPatientNoAsistio, date, LocalTime.of(11, 0),
+                            AppointmentState.NO_ASISTIO, SpecialtyCode.FISIOTERAPIA),
+                    buildAppointment(idDoctor, UUID.randomUUID(), date, LocalTime.of(12, 0),
+                            AppointmentState.CANCELADA, SpecialtyCode.FISIOTERAPIA),
+                    buildAppointment(idDoctor, UUID.randomUUID(), date, LocalTime.of(12, 30),
+                            AppointmentState.REPROGRAMADA, SpecialtyCode.FISIOTERAPIA));
 
-            when(appointmentRepository.findAllByDate(date)).thenReturn(List.of(agendada, cancelada));
+            when(appointmentRepository.findAllByDate(date)).thenReturn(appointments);
             when(doctorConfigConsultPort.getDoctorInfoByIds(List.of(idDoctor)))
-                    .thenReturn(List.of(new DoctorResponse(List.of("FISIOTERAPIA"), idDoctor, "Dra. Prueba",
-                            LocalDate.now().plusMonths(1), LocalDate.now(), 4, List.of(1))));
-            when(patientConsultPort.findByIds(Set.of(idPatientAgendada)))
-                    .thenReturn(Map.of(idPatientAgendada, buildPatientInfo()));
+                    .thenReturn(List.of(doctorResponse(idDoctor)));
+            when(patientConsultPort.findByIds(Set.of(idPatientAgendada, idPatientAtendida, idPatientNoAsistio)))
+                    .thenReturn(Map.of(
+                            idPatientAgendada, buildPatientInfo(),
+                            idPatientAtendida, buildPatientInfo(),
+                            idPatientNoAsistio, buildPatientInfo()));
 
             List<SchedulerAppointmentSummary> result = service.findAllByDate(date);
 
             assertThat(result).containsExactly(
-                    new SchedulerAppointmentSummary("Dra. Prueba", "Carlos Gomez", LocalTime.of(9, 0)));
+                    new SchedulerAppointmentSummary("Dra. Prueba", "Carlos Gomez", LocalTime.of(9, 0)),
+                    new SchedulerAppointmentSummary("Dra. Prueba", "Carlos Gomez", LocalTime.of(10, 0)),
+                    new SchedulerAppointmentSummary("Dra. Prueba", "Carlos Gomez", LocalTime.of(11, 0)));
+        }
+
+        @Test
+        void shouldReturnAppointmentsOfPastDateWhenNoneIsAgendada() {
+            LocalDate pastDate = LocalDate.now().minusDays(10);
+            UUID idDoctor = UUID.randomUUID();
+            UUID idPatientNoAsistio = UUID.randomUUID();
+            UUID idPatientAtendida = UUID.randomUUID();
+
+            when(appointmentRepository.findAllByDate(pastDate)).thenReturn(List.of(
+                    buildAppointment(idDoctor, idPatientNoAsistio, pastDate, LocalTime.of(8, 0),
+                            AppointmentState.NO_ASISTIO, SpecialtyCode.FISIOTERAPIA),
+                    buildAppointment(idDoctor, idPatientAtendida, pastDate, LocalTime.of(8, 30),
+                            AppointmentState.ATENDIDA, SpecialtyCode.FISIOTERAPIA)));
+            when(doctorConfigConsultPort.getDoctorInfoByIds(List.of(idDoctor)))
+                    .thenReturn(List.of(doctorResponse(idDoctor)));
+            when(patientConsultPort.findByIds(Set.of(idPatientNoAsistio, idPatientAtendida)))
+                    .thenReturn(Map.of(
+                            idPatientNoAsistio, buildPatientInfo(),
+                            idPatientAtendida, buildPatientInfo()));
+
+            List<SchedulerAppointmentSummary> result = service.findAllByDate(pastDate);
+
+            assertThat(result).containsExactly(
+                    new SchedulerAppointmentSummary("Dra. Prueba", "Carlos Gomez", LocalTime.of(8, 0)),
+                    new SchedulerAppointmentSummary("Dra. Prueba", "Carlos Gomez", LocalTime.of(8, 30)));
+        }
+
+        @Test
+        void shouldReturnEmptyListWhenAllAppointmentsAreCanceladaOrReprogramada() {
+            LocalDate date = LocalDate.now().minusDays(1);
+            UUID idDoctor = UUID.randomUUID();
+
+            when(appointmentRepository.findAllByDate(date)).thenReturn(List.of(
+                    buildAppointment(idDoctor, UUID.randomUUID(), date, LocalTime.of(9, 0),
+                            AppointmentState.CANCELADA, SpecialtyCode.FISIOTERAPIA),
+                    buildAppointment(idDoctor, UUID.randomUUID(), date, LocalTime.of(9, 30),
+                            AppointmentState.REPROGRAMADA, SpecialtyCode.FISIOTERAPIA)));
+
+            assertThat(service.findAllByDate(date)).isEmpty();
+        }
+
+        private DoctorResponse doctorResponse(UUID idDoctor) {
+            return new DoctorResponse(List.of("FISIOTERAPIA"), idDoctor, "Dra. Prueba",
+                    LocalDate.now().plusMonths(1), LocalDate.now(), 4, List.of(1));
         }
     }
 

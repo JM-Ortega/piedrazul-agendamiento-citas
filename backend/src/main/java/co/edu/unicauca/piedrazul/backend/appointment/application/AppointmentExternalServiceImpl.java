@@ -43,6 +43,12 @@ import java.util.stream.Collectors;
 @Service
 public class AppointmentExternalServiceImpl implements AppointmentExternalService {
 
+    // Citas que se mantuvieron en la agenda de la jornada; CANCELADA y REPROGRAMADA dejaron de existir en ella.
+    private static final Set<AppointmentState> SCHEDULER_VISIBLE_STATES = Set.of(
+            AppointmentState.AGENDADA,
+            AppointmentState.ATENDIDA,
+            AppointmentState.NO_ASISTIO);
+
     private final AppointmentRepository appointmentRepository;
     private final DoctorConfigConsultPort doctorConfigConsultPort;
     private final GetAvailableDatesAndSlotsUseCase getAvailableDatesAndSlotsUseCase;
@@ -106,7 +112,7 @@ public class AppointmentExternalServiceImpl implements AppointmentExternalServic
     public List<SchedulerAppointmentSummary> findAllByDate(LocalDate date) {
         List<Appointment> appointments = appointmentRepository.findAllByDate(date)
                 .stream()
-                .filter(a -> a.getAppointmentState() == AppointmentState.AGENDADA)
+                .filter(a -> SCHEDULER_VISIBLE_STATES.contains(a.getAppointmentState()))
                 .toList();
 
         // Aquí sí hay múltiples doctores distintos — usa el método en lote que YA

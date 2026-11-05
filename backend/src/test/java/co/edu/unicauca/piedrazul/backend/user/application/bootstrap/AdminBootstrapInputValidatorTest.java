@@ -99,6 +99,13 @@ class AdminBootstrapInputValidatorTest {
     }
 
     @Test
+    void oneHundredCharactersIsTheMaximumOfTheRealm() {
+        assertThat(validator.invalidInputs(withPassword("Z".repeat(100)))).isEmpty();
+        assertThat(validator.invalidInputs(withPassword("Z".repeat(101))))
+                .containsExactly("IDENTITY_SEED_ADMIN_PASSWORD");
+    }
+
+    @Test
     void sixteenCharactersIsTheMinimum() {
         assertThat(validator.invalidInputs(withPassword("Exacta-16-chars!"))).isEmpty();
     }

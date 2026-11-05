@@ -8,8 +8,11 @@
 # Requiere: docker compose, ansible-playbook, jq, yq (mikefarah v4).
 #
 # Verifica:
-#   1. El realm del repositorio no trae ningún secreto de cliente; el backend es
-#      confidencial con service account.
+#   1. El realm del repositorio no trae ningún secreto de cliente ni material de claves; el
+#      backend es confidencial con service account y roles exactos; el frontend solo admite
+#      Authorization Code con PKCE S256 desde producción y desarrollo local; guarda los eventos
+#      de la auditoría de inicios de sesión. (En 5: nace con la política de contraseñas aprobada,
+#      alineada con los límites del backend, y su admin-cli sin password grant.)
 #   2. .env producido: sin credenciales de administración de Keycloak, de automatización ni la
 #      contraseña inicial del administrador humano;
 #      KC_BACKEND_CLIENT_SECRET llega literal al backend aunque tenga ' " $ \ # o espacios
@@ -68,6 +71,22 @@ check "realm: piedrazul-backend confidencial, con service account, sin flujos in
 check "realm: el service account del backend declara sus roles técnicos" \
   jq -e '.users[] | select(.serviceAccountClientId == "piedrazul-backend") | (.clientRoles["realm-management"] | length) > 0' "${REALM}"
 check "realm: sin usuarios humanos (solo service accounts)" jq -e '[.users[] | select(has("serviceAccountClientId") | not)] | length == 0' "${REALM}"
+FRONTEND_CLIENT='.clients[] | select(.clientId == "piedrazul-frontend")'
+check "realm: redirecciones del frontend, solo producción y desarrollo local" \
+  jq -e "${FRONTEND_CLIENT} | (.redirectUris | sort) == [\"http://localhost:4200/*\", \"https://piedrazul.org/*\"]" "${REALM}"
+check "realm: orígenes del frontend, solo producción y desarrollo local" \
+  jq -e "${FRONTEND_CLIENT} | (.webOrigins | sort) == [\"http://localhost:4200\", \"https://piedrazul.org\"]" "${REALM}"
+check "realm: redirecciones de cierre de sesión, solo producción y desarrollo local" \
+  jq -e "${FRONTEND_CLIENT} | .attributes[\"post.logout.redirect.uris\"] == \"http://localhost:4200##https://piedrazul.org\"" "${REALM}"
+check "realm: el frontend es público, solo Authorization Code con PKCE S256" \
+  jq -e "${FRONTEND_CLIENT} | .publicClient and .standardFlowEnabled and (.implicitFlowEnabled | not) and (.directAccessGrantsEnabled | not) and (.serviceAccountsEnabled | not) and .attributes[\"pkce.code.challenge.method\"] == \"S256\"" "${REALM}"
+check "realm: ningún dominio retirado" bash -c "! grep -q 'narvaezlab' '${REALM}'"
+check "realm: roles técnicos exactos de la cuenta de servicio del backend" \
+  jq -e '.users[] | select(.serviceAccountClientId == "piedrazul-backend") | (.clientRoles | keys) == ["realm-management"] and (.clientRoles["realm-management"] | sort) == ["manage-users", "query-users", "view-events", "view-realm", "view-users"]' "${REALM}"
+check "realm: guarda LOGIN y LOGIN_ERROR para la auditoría de inicios de sesión" \
+  jq -e '.eventsEnabled and (.enabledEventTypes | sort) == ["LOGIN", "LOGIN_ERROR"]' "${REALM}"
+check "realm: claves generadas por Keycloak, sin material en el repositorio" \
+  jq -e '[.components["org.keycloak.keys.KeyProvider"][].config | keys[] | select(. != "priority" and . != "algorithm")] | length == 0' "${REALM}"
 
 # ── 2. .env producido ────────────────────────────────────────────────────────
 cat > "${TMP}/render.yml" <<'EOF'
@@ -213,8 +232,14 @@ check "política de master: se fija solo si master no tiene política y falla an
   bash -c "f='${ANSIBLE_DIR}/roles/app/files/keycloak-admin.sh'; sed -n '/^platform_admin()/,/^}/p' \"\$f\" | grep -q 'die master_password_policy_unexpected' && test \$(grep -n 'passwordPolicy=\${KCL_MASTER_PASSWORD_POLICY}' \"\$f\" | cut -d: -f1) -lt \$(grep -n 'create users -r master' \"\$f\" | cut -d: -f1) && test \$(grep -c 'passwordPolicy=' \"\$f\") = 1"
 check "política de master: ningún task file ni otra acción la escribe (solo platform-admin, en P2)" \
   bash -c "! grep -rq 'passwordPolicy' '${TASKS}' && ! sed -n '/^reconcile()/,/^}/p;/^establish()/,/^}/p;/^cleanup()/,/^}/p' '${ANSIBLE_DIR}/roles/app/files/keycloak-admin.sh' | grep -q passwordPolicy"
-check "realm de la aplicación: este cambio no le agrega política de contraseñas" \
-  jq -e 'has("passwordPolicy") | not' "${REALM}"
+check "realm de la aplicación: nace con la política de contraseñas aprobada" \
+  test "$(jq -r '.passwordPolicy' "${REALM}")" = 'length(6) and maxLength(100)'
+check "realm de la aplicación: la política coincide con los límites de creación de cuentas del backend" \
+  bash -c "grep -Fxq '        @Size(min = 6, max = 100)' '${ROOT}/backend/src/main/java/co/edu/unicauca/piedrazul/backend/user/api/dto/input/CreateSystemUserRequest.java' && grep -Fxq '    @Size(min = 6, max = 100)' '${ROOT}/backend/src/main/java/co/edu/unicauca/piedrazul/backend/patients/api/dto/input/CreatePatientWithUserRequest.java'"
+check "realm de la aplicación: admin-cli sin password grant" \
+  jq -e '[.clients[] | select(.clientId == "admin-cli") | .directAccessGrantsEnabled] == [false]' "${REALM}"
+check "realm de la aplicación: ninguna sesión de kcadm entra por piedrazul con usuario y contraseña" \
+  bash -c "! grep -rhE -- '--realm' '${ANSIBLE_DIR}/roles/app/files/keycloak-admin.sh' '${ROOT}/docker-compose.yml' | grep -- '--user' | grep -v -- '--realm master'"
 check "administrador humano: reconcile y establish no tocan usuarios humanos de master" \
   bash -c "! sed -n '/^reconcile()/,/^}/p;/^establish()/,/^}/p' '${ANSIBLE_DIR}/roles/app/files/keycloak-admin.sh' | grep -Eq 'users/|reset-password|PLATFORM_ADMIN'"
 check "keycloak-admin.sh: kcadm nunca recibe --secret/--password en argv" \

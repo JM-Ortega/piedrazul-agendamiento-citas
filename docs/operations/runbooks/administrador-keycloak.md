@@ -52,7 +52,10 @@ contraseñas. Una convergencia solo **informa** su estado.
 - Es una política **del realm `master`**, no solo de esta cuenta: vale para cualquier
   contraseña que se fije en `master` después de la instalación. No afecta a las contraseñas ya
   fijadas, a los clientes técnicos (autentican con secreto de cliente, no con contraseña) ni al
-  realm `piedrazul`, cuyas políticas no cambian.
+  realm `piedrazul`.
+- El realm `piedrazul` tiene su propia política, `length(6) and maxLength(100)`, que nace con
+  la importación de una instalación nueva (P2). Las convergencias no la reescriben: un realm ya
+  existente solo la cambia desde la consola (*Authentication* → *Policies*).
 - Solo la fija la instalación nueva, sobre un `master` recién creado. Si después un operador
   la cambia desde la consola, las convergencias la respetan y la informan; no la reescriben.
 
