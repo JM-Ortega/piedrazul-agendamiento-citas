@@ -94,6 +94,17 @@ log_level_sql: WARN
 log_level_sql_bind: WARN
 log_level_modulith: WARN
 
+# Logs centralizados: una sola lista para los dos lados de la canalización. converge escribe
+# <SERVICIO>_LOGGING=journald en .env para estos servicios (prod.yml extiende logging.yml: driver
+# journald al journal del host) y default para el resto (sin configuración propia: el driver y la
+# rotación de daemon.json, como antes); observability.yml selecciona los mismos en Alloy. La
+# política (roles/observability/tasks/log_policy.yml) rechaza en los dos playbooks lo no admitido:
+# backend, keycloak y postgres exigen obs_log_privacy_controls_done (decisión de privacidad para
+# datos reales) o, solo con datos sintéticos, el perfil profiles/logs-lab-synthetic.yml.
+# Ver docs/operations/runbooks/logs.md.
+obs_log_services: [traefik]
+obs_log_privacy_controls_done: []
+
 # Keycloak
 kc_realm: piedrazul
 kc_port: 8180

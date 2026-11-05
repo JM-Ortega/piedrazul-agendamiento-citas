@@ -1,28 +1,8 @@
 # Comprobaciones de los logs antes de copiar o levantar nada: política de fuentes y GID del
 # volumen de Alloy. Un fallo aquí no cambia nada en el host.
 
-- name: Calcular las fuentes de logs no admitidas
-  ansible.builtin.set_fact:
-    obs_log_services_rejected: >-
-      {{ obs_log_services
-         | reject('in', obs_log_services_allowed
-                        + (obs_log_services_conditional | intersect(obs_log_privacy_controls_done)))
-         | list
-         + (obs_log_services | intersect(obs_log_services_excluded)) | unique }}
-
-- name: Verificar la política de fuentes de logs
-  ansible.builtin.assert:
-    that:
-      - obs_log_services | length > 0
-      - obs_log_services | reject('match', '^[a-z0-9][a-z0-9_-]*$') | list | length == 0
-      - obs_log_project is match('^[a-z0-9][a-z0-9_-]*$')
-      - obs_log_services_rejected | length == 0
-    fail_msg: >-
-      obs_log_services={{ obs_log_services }} no cumple la política de fuentes. No admitidos:
-      {{ obs_log_services_rejected }}. backend y keycloak exigen figurar en
-      obs_log_privacy_controls_done (controles de privacidad del productor completos);
-      {{ obs_log_services_excluded | join(', ') }} nunca se envían. No se copió ni levantó nada.
-    quiet: true
+- name: Comprobar la política de fuentes de logs
+  ansible.builtin.include_tasks: log_policy.yml
 
 - name: Buscar el GID del volumen de Alloy en el host
   ansible.builtin.command:

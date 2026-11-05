@@ -233,7 +233,8 @@ playbooks (`ansible` + `become`). No lo corre el workflow de producción ni lo i
   (`/etc/systemd/journald.conf.d/60-piedrazul-obs.conf`, todo el host: persistente, 2G, 128M,
   7 días; `obs_journald_manage: false` lo omite) y reinicia journald solo si cambia; descubre el
   grupo del journal y lo mantiene en `.env` (`OBS_JOURNAL_GID`) junto a la selección de fuentes.
-  No cambia `daemon.json` ni el driver de logs de ningún contenedor.
+  No cambia `daemon.json` ni el driver de logs de ningún contenedor: eso lo hace converge con la
+  misma lista y la misma política (`tasks/log_policy.yml`, abajo).
 - Verifica que los ocho destinos se leen, que los dashboards están cargados, que Loki está listo,
   que Alloy lee el journal, que Prometheus entrega a Alertmanager, que Alertmanager corre con el
   receptor pedido, que Prometheus lleva la etiqueta del entorno y que Grafana tiene el modo de
@@ -247,6 +248,32 @@ además los volúmenes de logs. No toca los volúmenes de Prometheus y Grafana n
 
 Procedimiento, semántica de cambios y retiro: [Métricas](../../docs/operations/runbooks/metricas.md)
 y [Logs](../../docs/operations/runbooks/logs.md).
+
+### Logs de los servicios (`obs_log_services`)
+
+converge (`roles/app/tasks/setup.yml`) escribe en `.env` `TRAEFIK_LOGGING`, `KEYCLOAK_LOGGING`,
+`BACKEND_LOGGING` y `POSTGRES_LOGGING`: `journald` para los servicios de `obs_log_services`
+(group_vars, por defecto `[traefik]`) y `default` para el resto. `prod.yml` hace que cada uno
+extienda esa base de `compose/logging.yml`: `journald` (non-blocking, 4 MiB, etiquetas de Compose,
+`tag`) o `default` (sin configuración propia: la del daemon, como antes). Antes de copiar Compose o
+escribir `.env` aplica la política de logs del rol observability (`include_role`,
+`tasks_from: log_policy.yml`), la misma que usa `observability.yml` para la selección: backend,
+keycloak y postgres exigen `obs_log_privacy_controls_done` o, solo con datos sintéticos,
+`logs_lab_authorization=synthetic-data-only`. Cambiar el modo recrea el contenedor en su siguiente
+arranque; un run repetido no recrea nada.
+
+Adopción en operación: `obs_log_services` y `obs_log_privacy_controls_done` en group_vars, sin
+perfil. Validación con datos sintéticos: el perfil, pasado igual a converge, deploy y observability
+(deploy usa el `.env` de converge); no se guarda en el host. Sin él, observability solo cambia la
+selección de Alloy (los contenedores siguen en `journald`); devolver los productores a `default`
+es converge sin el perfil más la recreación del backend (deploy o `refresh_backend.yml`). Ver
+[Logs, "Reversión"](../../docs/operations/runbooks/logs.md#perfil-de-laboratorio-sintético):
+
+```bash
+ansible-playbook -i <inventario> -e @profiles/logs-lab-synthetic.yml playbooks/converge.yml
+```
+
+Ver [Logs, "Perfil de laboratorio sintético"](../../docs/operations/runbooks/logs.md#perfil-de-laboratorio-sintético).
 
 ---
 

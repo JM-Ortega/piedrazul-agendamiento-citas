@@ -82,6 +82,16 @@
   vars:
     _host_re: '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\Z'
 
+# Antes de copiar Compose o escribir .env: qué servicios escriben en el journal del host
+# (obs_log_services → <SERVICIO>_LOGGING). La misma política que aplica observability.yml a la
+# selección (una sola definición). Fuera de lo admitido falla sin tocar nada. El perfil de
+# laboratorio no se guarda en el host: un run sin él vuelve a la lista del inventario; cada
+# contenedor cambia de driver cuando se recrea (el backend, en deploy o refresh_backend).
+- name: Verificar la política de logs de los servicios
+  ansible.builtin.include_role:
+    name: observability
+    tasks_from: log_policy.yml
+
 # Compose files
 - name: Copiar archivos compose al servidor
   ansible.builtin.copy:

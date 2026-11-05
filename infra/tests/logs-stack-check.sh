@@ -27,7 +27,7 @@
 #      socket de Docker; Loki valida su configuración (retención, compactor, WAL bajo el límite);
 #      destinos de Prometheus = contrato (7); promtool check/test de las dos reglas; Alloy lee
 #      solo el journal y escribe solo a Loki; dashboards y fuentes de datos; la aplicación no
-#      activa journald ni menciona el stack.
+#      fija journald fuera de la base de logging.yml ni menciona el stack.
 #   2. Ansible: playbooks sintácticamente válidos y fuera del workflow; política de fuentes
 #      (admitidos, condicionados, excluidos, expresión inyectada); drop-in de journald.
 #   3. Ingesta: entradas seleccionadas llegan a Loki con etiquetas acotadas (source, service,
@@ -264,8 +264,11 @@ check "Grafana: fuentes de datos prometheus (por defecto) y loki" \
   test "$(yq -r '.datasources[0].uid + " " + (.datasources[0].isDefault | tostring)' "${OBS}/grafana/provisioning/datasources/prometheus.yml") $(yq -r '.datasources[0].uid + " " + .datasources[0].url + " " + (.datasources[0].isDefault | tostring)' "${OBS}/grafana/provisioning/datasources/loki.yml")" = "prometheus true loki http://loki:3100 false"
 # S3: traefik.yml crea la red de entrada de Grafana y la nombra en un comentario; fuera de
 # comentarios ningún archivo de la aplicación nombra el stack
-check "Aplicación: ningún archivo Compose activa journald ni menciona el stack (fuera de comentarios)" \
-  bash -c "! grep -rhvE '^\s*#' '${ROOT}/infra/compose' '${ROOT}/docker-compose.yml' | grep -qiE 'journald|loki|alloy|grafana|piedrazul-obs'"
+# journald solo en la base de logging.yml, que cada servicio extiende según .env
+# (<SERVICIO>_LOGGING): ningún servicio lo fija. El contrato completo (driver por servicio,
+# opciones, perfil, adopción) lo prueba log-producers-contract-check.sh.
+check "Aplicación: journald solo en la base de logging.yml; ningún archivo Compose menciona el stack (fuera de comentarios)" \
+  bash -c "! grep -rhvE '^\s*#' --exclude=logging.yml '${ROOT}/infra/compose' '${ROOT}/docker-compose.yml' | grep -qiE 'journald|loki|alloy|grafana|piedrazul-obs' && ! grep -vE '^\s*#' '${ROOT}/infra/compose/logging.yml' | grep -qiE 'loki|alloy|grafana|piedrazul-obs'"
 
 # ── 2. Ansible ───────────────────────────────────────────────────────────────
 for p in observability.yml observability-logs-rollback.yml; do
@@ -285,8 +288,7 @@ cat > "${TMP}/policy.yml" <<EOF
     - ansible.builtin.include_vars: ${ANSIBLE_DIR}/roles/observability/defaults/main.yml
     - ansible.builtin.include_tasks: ${TMP}/policy-tasks.yml
 EOF
-yq '[.[] | select(.name == "Calcular las fuentes de logs no admitidas" or .name == "Verificar la política de fuentes de logs")]' \
-  "${ANSIBLE_DIR}/roles/observability/tasks/logs_preflight.yml" > "${TMP}/policy-tasks.yml"
+cp "${ANSIBLE_DIR}/roles/observability/tasks/log_policy.yml" "${TMP}/policy-tasks.yml"
 policy() { # policy <extra-vars JSON>: 0 si la política la admite
   ANSIBLE_CONFIG="${ANSIBLE_DIR}/ansible.cfg" ANSIBLE_BECOME=false ansible-playbook -i localhost, "${TMP}/policy.yml" -e "$1" </dev/null >/dev/null 2>&1
 }
@@ -295,11 +297,29 @@ rejected() { ! policy "$1"; }
 check "política: backend sin controles de privacidad rechazado" rejected '{"obs_log_services": ["traefik", "backend"]}'
 check "política: backend y keycloak con controles completos admitidos" \
   policy '{"obs_log_services": ["traefik", "backend", "keycloak"], "obs_log_privacy_controls_done": ["backend", "keycloak"]}'
-check "política: postgres rechazado aunque figure como admitido y con controles" \
-  rejected '{"obs_log_services": ["postgres"], "obs_log_privacy_controls_done": ["postgres"], "obs_log_services_allowed": ["postgres"]}'
+check "política: postgres es condicionado: sin controles rechazado, con controles admitido" \
+  bash -c "$(declare -f policy); ANSIBLE_DIR='${ANSIBLE_DIR}' TMP='${TMP}'; ! policy '{\"obs_log_services\": [\"postgres\"]}' && policy '{\"obs_log_services\": [\"postgres\"], \"obs_log_privacy_controls_done\": [\"postgres\"]}'"
+check "política: migrate rechazado aunque figure como admitido y con controles" \
+  rejected '{"obs_log_services": ["migrate"], "obs_log_privacy_controls_done": ["migrate"], "obs_log_services_allowed": ["migrate"]}'
 check "política: expresión inyectada en un servicio rechazada" \
   rejected '{"obs_log_services": ["traefik|.*"], "obs_log_services_allowed": ["traefik|.*"]}'
 check "política: lista vacía rechazada" rejected '{"obs_log_services": []}'
+FOUR='["traefik", "keycloak", "backend", "postgres"]'
+check "política: perfil de laboratorio sintético admite los cuatro principales" \
+  policy "{\"logs_lab_authorization\": \"synthetic-data-only\", \"obs_log_services\": ${FOUR}}"
+check "política: adopción en operación (los cuatro con controles, sin perfil) admitida" \
+  policy "{\"obs_log_services\": ${FOUR}, \"obs_log_privacy_controls_done\": [\"keycloak\", \"backend\", \"postgres\"]}"
+check "política: los cuatro sin autorización ni controles rechazados" rejected "{\"obs_log_services\": ${FOUR}}"
+for v in true '"yes"' '"Synthetic-Data-Only"'; do
+  check "política: autorización de laboratorio con otro valor (${v}) rechazada" \
+    rejected "{\"logs_lab_authorization\": ${v}, \"obs_log_services\": ${FOUR}}"
+done
+for svc in migrate grafana alloy loki prometheus; do
+  check "política: el laboratorio no admite ${svc}" \
+    rejected "{\"logs_lab_authorization\": \"synthetic-data-only\", \"obs_log_services\": [\"${svc}\"]}"
+done
+check "política: el perfil no toma la decisión de privacidad (ninguna por defecto ni en el perfil; sin autorización por defecto)" \
+  bash -c "test \"\$(yq -r '.obs_log_privacy_controls_done | length' '${ANSIBLE_DIR}/roles/observability/defaults/main.yml')\" = 0 && ! yq -e 'has(\"logs_lab_authorization\")' '${ANSIBLE_DIR}/roles/observability/defaults/main.yml' && ! yq -e 'has(\"obs_log_privacy_controls_done\")' '${ANSIBLE_DIR}/profiles/logs-lab-synthetic.yml'"
 cat > "${TMP}/dropin.yml" <<EOF
 - hosts: localhost
   gather_facts: false
@@ -424,9 +444,9 @@ check "ingesta: PRIORITY 3 → stream=stderr; WRN → level=warn" \
 check "ingesta: backend INFO con correlation_id como metadato estructurado" \
   test "$(lcount "{service=\"backend\", level=\"info\"} | correlation_id=\"${CID}\"")" = 1
 check "ingesta: container_id como metadato estructurado, no etiqueta" \
-  test "$(lcount "{service=\"backend\"} | container_id=\"$(printf '%s' "${LOG_PROJECT}backend" | sha256sum | cut -c1-12)\"")" = 2
-check "ingesta: línea de continuación sin severidad (sin etiqueta level)" \
-  test "$(lq "{service=\"backend\"} |= \"${RUN}-backend-continuation\"" | jq -r '.data.result[0].stream.level // "ninguna"')" = ninguna
+  test "$(lcount "{service=\"backend\"} | container_id=\"$(printf '%s' "${LOG_PROJECT}backend" | sha256sum | cut -c1-12)\"")" = 1
+check "multilínea: la línea de continuación se une a su entrada (una entrada, con la severidad de la cabecera)" \
+  test "$(lq "{service=\"backend\"} |= \"${RUN}-backend-continuation\"" | jq -r '[.data.result[] | .stream.level as $l | .values[] | select(.[1] | contains("'"${RUN}"'-backend-request")) | $l] | join(",")')" = info
 check "ingesta: aviso de journald de docker.service → service=journald" \
   test "$(lcount '{source="journald", service="journald"} |= "docker.service"')" = 1
 check "exclusión: aviso de journald de otra unidad (cron.service)" test "$(lcount '{source="journald"} |= "cron.service"')" = 0
@@ -581,6 +601,63 @@ check "POST: ninguna línea de keycloak en Loki con el marcador sensible" \
 check "PRE: el marcador anterior a la selección no entra al seleccionar (posiciones)" \
   test "$(lcount "{service=~\".+\"} |= \"${RUN}-SENSITIVE-PRE\"")" = 0
 check "PRE: el journal lo conserva (no se exige su desaparición retroactiva)" synj_contains "${RUN}-SENSITIVE-PRE"
+
+# ── 7b. Perfil de laboratorio: los cuatro servicios principales ──────────────
+# Selección del perfil (logs-lab-synthetic.yml). Registros con el formato real de cada productor:
+# traza de Java con causa y SQLState, error de PostgreSQL con DETAIL y STATEMENT (stderr), aviso
+# LOGIN_ERROR de Keycloak y un marcador sintético con forma de secreto. El canal no filtra el
+# contenido: lo que el productor escribe llega; el detector de abajo es la consulta de revisión.
+sed -i "s/^OBS_LOG_SERVICES=.*/OBS_LOG_SERVICES=traefik|keycloak|backend|postgres/" "${TMP}/obs.env"
+obs up -d --wait alloy >> "${TMP}/alloy-recreate.log" 2>&1
+check "laboratorio: Alloy recreado con los cuatro servicios seleccionados" wait_for 60 healthy
+CID2="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+synj_write lab \
+  "$(docker_rec "${LOG_PROJECT}" backend 6 "2026-11-03T10:04:00.000Z ERROR 1 --- [piedrazul] [nio-8080-exec-2] [${CID2}] c.e.u.p.s.BaseExceptionHandler : ${RUN}-lab-backend-error [POST /api/patients]")" \
+  "$(docker_rec "${LOG_PROJECT}" backend 6 "org.springframework.dao.DataIntegrityViolationException: could not execute statement")" \
+  "$(docker_rec "${LOG_PROJECT}" backend 6 "	at co.edu.unicauca.piedrazul.backend.patients.application.PatientService.create(PatientService.java:42)")" \
+  "$(docker_rec "${LOG_PROJECT}" backend 6 "Caused by: org.postgresql.util.PSQLException: ERROR: duplicate key value violates unique constraint \"uk_synthetic\" [SQLState: 23505] ${RUN}-lab-backend-cause")" \
+  "$(docker_rec "${LOG_PROJECT}" backend 6 "2026-11-03T10:04:00.500Z  WARN 1 --- [piedrazul] [nio-8080-exec-3] [-] c.e.u.Synthetic : ${RUN}-lab-secret-marker password=SYNTHETIC-NOT-A-SECRET")" \
+  "$(docker_rec "${LOG_PROJECT}" postgres 3 "2026-11-03 10:04:01.000 UTC [77] piedrazul_app@piedrazul_db ERROR:  duplicate key value violates unique constraint \"uk_synthetic\" ${RUN}-lab-pg-error")" \
+  "$(docker_rec "${LOG_PROJECT}" postgres 3 "2026-11-03 10:04:01.000 UTC [77] piedrazul_app@piedrazul_db DETAIL:  Key (document_number)=(SYNTH-0001) already exists. ${RUN}-lab-pg-detail")" \
+  "$(docker_rec "${LOG_PROJECT}" postgres 3 "2026-11-03 10:04:01.000 UTC [77] piedrazul_app@piedrazul_db STATEMENT:  insert into piedrazul.synthetic (document_number) values (\$1) ${RUN}-lab-pg-statement")" \
+  "$(docker_rec "${LOG_PROJECT}" postgres 3 "2026-11-03 10:04:02.000 UTC [27] LOG:  checkpoint starting: time ${RUN}-lab-pg-checkpoint")" \
+  "$(docker_rec "${LOG_PROJECT}" keycloak 6 "2026-11-03 10:04:03,000 WARN  [org.keycloak.events] (executor-thread-1) type=\"LOGIN_ERROR\", realmId=\"synthetic\", clientId=\"piedrazul-frontend\", userId=\"null\", ipAddress=\"203.0.113.7\", error=\"user_not_found\", username=\"synthetic-user\" ${RUN}-lab-keycloak-event")" \
+  "$(docker_rec "${LOG_PROJECT}" migrate 6 "2026-11-03T10:04:04.000Z  INFO 1 --- [migrate] Flyway ${RUN}-lab-migrate-excluded")" \
+  || ko "laboratorio: journal sintético escrito"
+lab_in() { test "$(lcount "{service=\"postgres\"} |= \"${RUN}-lab-pg-checkpoint\"")" = 1 && test "$(lcount "{service=\"backend\"} |= \"${RUN}-lab-secret-marker\"")" = 1; }
+check "laboratorio: entradas de backend y postgres en Loki" wait_for 90 lab_in
+entry() { lq "$1" | jq -r '[.data.result[] | .stream.level as $l | .values[] | {level: $l, line: .[1]}]'; }
+BE="$(entry "{service=\"backend\"} |= \"${RUN}-lab-backend-error\"")"
+check "laboratorio: backend: traza completa en una entrada (excepción, marco, causa y SQLState), level=error" \
+  jq -e 'length == 1 and .[0].level == "error" and (.[0].line | contains("DataIntegrityViolationException") and contains("PatientService.java:42") and contains("Caused by: org.postgresql.util.PSQLException") and contains("SQLState: 23505"))' <<< "${BE}"
+check "laboratorio: backend: correlation_id de la cabecera como metadato" \
+  test "$(lcount "{service=\"backend\", level=\"error\"} | correlation_id=\"${CID2}\"")" = 1
+check "laboratorio: backend: [-] fuera de petición no produce correlation_id" \
+  test "$(lcount "{service=\"backend\"} |= \"${RUN}-lab-secret-marker\" | correlation_id!=\"\"")" = 0
+PG="$(entry "{service=\"postgres\"} |= \"${RUN}-lab-pg-error\"")"
+check "laboratorio: postgres: ERROR con DETAIL y STATEMENT en una entrada, level=error, con rol@base" \
+  jq -e 'length == 1 and .[0].level == "error" and (.[0].line | contains("DETAIL:  Key") and contains("STATEMENT:  insert") and contains("piedrazul_app@piedrazul_db ERROR:"))' <<< "${PG}"
+check "laboratorio: postgres: stream=stderr" \
+  test "$(lq "{service=\"postgres\"} |= \"${RUN}-lab-pg-error\"" | jq -r '.data.result[0].stream.stream')" = stderr
+check "laboratorio: postgres: LOG de proceso de fondo → level=info, entrada propia" \
+  test "$(lq "{service=\"postgres\"} |= \"${RUN}-lab-pg-checkpoint\"" | jq -r '[.data.result[] | .stream.level] | join(",")')" = info
+check "laboratorio: postgres: dos entradas (error unido y checkpoint)" \
+  test "$(lcount "{service=\"postgres\"} |= \"${RUN}-lab-pg-\"")" = 2
+check "laboratorio: keycloak: LOGIN_ERROR (aviso de eventos) → level=warn, contenido íntegro" \
+  test "$(lq "{service=\"keycloak\"} |= \"${RUN}-lab-keycloak-event\"" | jq -r '.data.result[0].stream.level + " " + (.data.result[0].values[0][1] | contains("username=\"synthetic-user\"") | tostring)')" = "warn true"
+check "laboratorio: migrate sigue excluido" test "$(lcount "{service=~\".+\"} |= \"${RUN}-lab-migrate-excluded\"")" = 0
+# Detector de revisión (runbook "Revisión de contenido"): encuentra el marcador sintético
+SECRET_Q='{service=~".+"} |~ "(?i)(password|passwd|secret|token|bearer|authorization|cookie)[\"]?\\s*[=:]"'
+check "laboratorio: el detector de secretos de la revisión encuentra el marcador sintético" \
+  test "$(lcount "${SECRET_Q} |= \"${RUN}-lab-secret-marker\"")" = 1
+check "laboratorio: el detector no marca los demás registros del laboratorio" \
+  test "$(lcount "${SECRET_Q} |= \"${RUN}-lab-\"")" = 1
+SERVICES="$(pexec wget -qO- "http://loki:3100/loki/api/v1/label/service/values?start=$(( $(date +%s) - 3600 ))000000000" 2>/dev/null | jq -r '.data | sort | join(",")')"
+check "laboratorio: valores de service = los cuatro productores y journald (${SERVICES})" \
+  test "${SERVICES}" = backend,journald,keycloak,postgres,traefik
+LABELS="$(pexec wget -qO- "http://loki:3100/loki/api/v1/labels?start=$(( $(date +%s) - 3600 ))000000000" 2>/dev/null | jq -r '.data | sort | join(",")')"
+check "laboratorio: etiquetas siguen siendo solo source, service, stream y level" \
+  bash -c "test -z \"\$(tr ',' '\n' <<< '${LABELS}' | grep -vxE 'source|service|stream|level')\""
 
 # down + up conserva los logs (volumen loki_data) y las posiciones (alloy_data)
 TOTAL_BEFORE_DOWN="$(lcount '{service=~".+"}')"

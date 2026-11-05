@@ -1,0 +1,23 @@
+# Bases de logging para prod.yml (extends con <SERVICIO>_LOGGING de .env). No es un proyecto ni se
+# incluye: solo lo referencian los extends de prod.yml. Ver docs/operations/runbooks/logs.md,
+# "Activación de una fuente".
+services:
+  # Al journal del host, de donde Alloy toma lo seleccionado (procedencia: dockerd).
+  #   - mode non-blocking + 4 MiB: si el buffer se llena Docker descarta líneas, nunca bloquea al
+  #     servicio por el journal;
+  #   - labels: campos COM_DOCKER_COMPOSE_PROJECT/SERVICE en el journal (selección de Alloy);
+  #   - tag: nombre del contenedor como SYSLOG_IDENTIFIER (journalctl -t backend).
+  # En un host sin journald el contenedor no arranca (error visible de Docker).
+  journald:
+    logging:
+      driver: journald
+      options:
+        mode: non-blocking
+        max-buffer-size: 4m
+        labels: com.docker.compose.project,com.docker.compose.service
+        tag: "{{.Name}}"
+
+  # Sin configuración propia: el driver, las opciones y la rotación de daemon.json (json-file
+  # 10m x 3, modo blocking por defecto de Docker), exactamente como sin este archivo. El hash de
+  # configuración de Compose es el mismo: no recrea contenedores.
+  default: {}

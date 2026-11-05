@@ -47,29 +47,36 @@ público ni puerto en el host.
 
 ## Política de fuentes
 
-| Fuente | Estado | Condición |
-|---|---|---|
-| Traefik | admitida | se envía cuando su servicio escribe en el journal |
-| Avisos de journald por límite de tasa de `docker.service` | admitidos | se envían siempre; son la evidencia de líneas suprimidas |
-| Backend | condicionada | controles de privacidad del productor completos (abajo) |
-| Keycloak | condicionada | sin eventos de usuario en stdout, conservando el almacén de eventos y `LoginAuditJob` |
-| PostgreSQL, migraciones, el propio stack, otras unidades del host | excluidas | nunca |
+| Fuente | Estado | En operación | [Perfil de laboratorio sintético](#perfil-de-laboratorio-sintético) |
+|---|---|---|---|
+| Traefik | admitida | activada y seleccionada por defecto | sí |
+| Avisos de journald por límite de tasa de `docker.service` | admitidos | se envían siempre; son la evidencia de líneas suprimidas | sí |
+| Backend | condicionada | cuando figura en `obs_log_privacy_controls_done` ([Adopción en operación](#adopción-en-operación)) | sí, sin esa decisión |
+| Keycloak | condicionada | ídem | sí, sin esa decisión |
+| PostgreSQL | condicionada | ídem | sí, sin esa decisión |
+| Migraciones, el propio stack, otras unidades del host | excluidas | nunca | no |
 
-Controles de privacidad del backend antes de admitirlo: detalles de error del servidor de pgJDBC,
-excepciones con nombres de usuario, números de documento de pacientes en mensajes, valores crudos
-en las rutas de excepción de estadísticas y auditoría, cuerpos de error crudos de Keycloak y la
-excepción original en la ruta 5xx de pacientes. Hasta que estén completos, sus logs pueden llevar
-datos personales y no se envían.
+`obs_log_privacy_controls_done` es una decisión humana, no una casilla técnica: que los logs de
+ese servicio son aceptables con datos reales, con la evidencia del laboratorio y los cambios del
+productor que haga falta. Lo que hay que decidir por servicio está en
+[Adopción en operación](#adopción-en-operación). Mientras no se tome, sus logs pueden llevar datos
+personales y no se envían.
 
-La política se aplica dos veces:
+Una sola política (`roles/observability/tasks/log_policy.yml`) y una sola lista
+(`obs_log_services`, inventario), aplicadas en dos playbooks, más el filtro de Alloy:
 
+0. **converge** (`roles/app/tasks/setup.yml`, `include_role` de la política): decide qué
+   contenedores escriben en el journal (driver `journald`), que es la activación con efecto de
+   privacidad. Falla antes de copiar Compose o escribir `.env` si la lista incluye un servicio
+   fuera de lo admitido.
 1. **Alloy** (`alloy/config.alloy`, `loki.relabel "select"`) solo deja pasar entradas escritas
    por dockerd del proyecto `OBS_LOG_PROJECT` cuyo servicio coincide con `OBS_LOG_SERVICES`, y
    los avisos de journald de mensajes suprimidos de `docker.service` (ver
    [Procedencia](#procedencia-de-las-entradas)). Todo lo demás se descarta dentro de Alloy.
-2. **Ansible** (`roles/observability`, `obs_log_services`) falla sin tocar el host si la lista
-   incluye un servicio excluido, uno condicionado que no figura en `obs_log_privacy_controls_done`
-   o algo que no es un nombre de servicio.
+2. **observability** (`logs_preflight.yml`, la misma política) falla sin tocar el host si la
+   lista incluye un servicio excluido, uno condicionado que no figura en
+   `obs_log_privacy_controls_done` (salvo con el perfil de laboratorio) o algo que no es un
+   nombre de servicio.
 
 El filtro de Alloy **no limpia el journal**: lo que un contenedor escribe con el driver journald
 queda en el journal del host (hasta 7 días o 2 GiB) aunque no se envíe a Loki, y lo pueden leer
@@ -112,28 +119,273 @@ Límites:
 Seleccionar un servicio (`obs_log_services`) no hace que escriba en el journal; activarlo en el
 journal no lo envía si no está seleccionado. Activar una fuente requiere las dos cosas:
 
-1. En el archivo Compose del servicio (`infra/compose/<servicio>.yml`), un cambio de despliegue
-   propio de la aplicación:
+1. **Driver en el productor.** En `infra/compose/prod.yml` traefik, keycloak, backend y
+   postgres extienden (`extends`) una de las dos bases de `infra/compose/logging.yml`, la que
+   indica `.env` (`<SERVICIO>_LOGGING`):
 
-   ```yaml
-   logging:
-     driver: journald
-     options:
-       mode: non-blocking
-       max-buffer-size: 4m
-       # Campos COM_DOCKER_COMPOSE_PROJECT y COM_DOCKER_COMPOSE_SERVICE: los usa la selección
-       labels: com.docker.compose.project,com.docker.compose.service
-       tag: "{{.Name}}"
-   ```
+   - `journald`: driver `journald` con
 
-   Cambiar el driver recrea el contenedor. Con `journald`, `docker logs` sigue funcionando (lee
-   del journal). En modo `non-blocking`, si el buffer de 4 MiB se llena, Docker descarta líneas
-   en vez de bloquear al servicio.
-2. En el inventario, el servicio en `obs_log_services` (y, si es condicionado, en
-   `obs_log_privacy_controls_done`) y repetir `playbooks/observability.yml`.
+     | Opción | Valor | Para qué |
+     |---|---|---|
+     | `mode` / `max-buffer-size` | `non-blocking` / `4m` | si el buffer se llena Docker descarta líneas, nunca bloquea al servicio por el journal |
+     | `labels` | `com.docker.compose.project,com.docker.compose.service` | campos `COM_DOCKER_COMPOSE_*` que usa la selección |
+     | `tag` | `{{.Name}}` | `SYSLOG_IDENTIFIER` = nombre del contenedor (`journalctl -t backend`) |
 
-Hoy ningún archivo Compose de la aplicación activa `journald`: en un host instalado solo llegan a
-Loki los avisos de journald, hasta que se active Traefik.
+   - `default`: **ninguna** configuración propia. El contenedor usa el driver, las opciones y la
+     rotación de `daemon.json` (`json-file`, 10 MiB × 3, modo `blocking` por defecto de Docker),
+     exactamente como antes de este cambio: mismo hash de Compose, sin recreación, sin modo
+     non-blocking ni buffer. Es también lo que da un `.env` sin la variable (desarrollo,
+     harnesses, `.env` anteriores). Un valor desconocido hace fallar Compose.
+
+   `env.j2` escribe `journald` para los servicios de `obs_log_services` (inventario; por defecto
+   `[traefik]`) y `default` para el resto. Todas las llamadas de Compose del rol `app` usan
+   `prod.yml` con el mismo `.env`, así que todas ven la misma configuración: un run repetido no
+   recrea nada y cambiar el modo de un servicio lo recrea una vez, en la siguiente llamada que
+   lo levanta (converge para traefik y postgres, `keycloak_lifecycle.yml` para keycloak, deploy
+   o `refresh_backend.yml` para el backend). Con `journald`, `docker logs` sigue funcionando
+   (lee del journal). `daemon.json` no cambia.
+
+   En un host sin journald (Docker Desktop) un contenedor con `journald` no arranca
+   (`journald is not enabled on this host`): falla visible, nunca descarte silencioso.
+   Desarrollo (`docker-compose.yml`) no incluye `prod.yml`.
+2. **Selección.** La misma lista `obs_log_services`: repetir `playbooks/observability.yml`.
+
+Con la configuración por defecto solo Traefik va al journal y a Loki.
+
+## Perfil de laboratorio sintético
+
+Para un host de laboratorio desechable con **identidades y datos sintéticos** el perfil
+`infra/ansible/profiles/logs-lab-synthetic.yml` lleva al journal y a Loki los cuatro servicios
+principales con su diagnóstico completo, sin recortar mensajes:
+
+| Servicio | Qué llega | Qué no se activa |
+|---|---|---|
+| traefik | errores de rutas, TLS, ACME, proveedor de archivos y arranque (nivel ERROR por defecto) | access log (IP, rutas, consultas) |
+| keycloak | arranque, base de datos, configuración, correo, proveedores; eventos `LOGIN_ERROR` del listener `jboss-logging` (WARN: usuario intentado, IP, cliente, error). `LOGIN` correcto es DEBUG y no aparece | más nivel de consola; el almacén de eventos y `LoginAuditJob` (API de administración) no dependen de la consola |
+| backend | mensajes, clases de excepción, trazas completas con causas, SQLState, `correlation_id` | SQL (`org.hibernate.SQL`) y valores de parámetros (`org.hibernate.orm.jdbc.bind`) siguen en WARN |
+| postgres | arranque/parada, recuperación, checkpoints, autenticación fallida, esperas de lock (`log_lock_waits`), errores con SQLSTATE, `DETAIL` y la sentencia (con `$n`) en una entrada, `rol@base` en cada línea de sesión | `log_statement`, `log_min_duration_statement`, `log_connections`, valores de parámetros (`log_parameter_max_length_on_error=0`) |
+
+El perfil valida, con datos sintéticos, la misma configuración que usará la operación: la misma
+lista, las mismas bases de `logging.yml`, la misma canalización. No es otra arquitectura. Lo que
+**no** es: no toma la decisión de privacidad (`obs_log_privacy_controls_done` no cambia), no
+admite backend, keycloak ni postgres para datos clínicos reales y no se guarda en el host. Sus logs pueden llevar identificadores de personas
+(sintéticas), valores de error (`Key (document_number)=(…)`), cuerpos de error de Keycloak y
+nombres de usuario de intentos de inicio de sesión. Con datos reales no se usa.
+
+**Autorización.** `logs_lab_authorization: synthetic-data-only` (valor exacto) en el mismo run.
+Sin ella, o con otro valor, converge y observability rechazan backend, keycloak y postgres
+(sin decisión de privacidad) antes de cambiar nada. migrate, el propio stack y cualquier otro nombre se rechazan
+aunque esté.
+
+**Activación.** Pasar el perfil a los tres playbooks, siempre:
+
+```bash
+ansible-playbook -i <inventario> -e @profiles/logs-lab-synthetic.yml playbooks/converge.yml
+```
+
+```bash
+ansible-playbook -i <inventario> -e @profiles/logs-lab-synthetic.yml playbooks/deploy.yml
+```
+
+```bash
+ansible-playbook -i <inventario> -e @profiles/logs-lab-synthetic.yml playbooks/observability.yml
+```
+
+converge escribe `.env` con `journald` en los cuatro y recrea postgres y keycloak; traefik ya
+está en `journald` por defecto y no cambia. El backend se recrea en su siguiente arranque
+(deploy o `refresh_backend.yml`). deploy no
+reescribe `.env` (usa el de converge): el perfil no le cambia nada y se pasa igual para no
+depender del orden. Sin el perfil, cada playbook vuelve a la lista del inventario **solo en su
+lado**:
+
+- observability sin el perfil cambia **solo la selección de Alloy**: Loki deja de recibir
+  keycloak, backend y postgres, pero sus contenedores siguen corriendo con `journald` y siguen
+  escribiendo en el journal del host (7 días / 2 GiB), que no se envía pero tampoco se limpia;
+- converge sin el perfil reescribe `.env` con `default` para keycloak, backend y postgres y
+  recrea postgres (converge) y keycloak (`keycloak_lifecycle.yml`); traefik sigue en `journald`
+  (con y sin el perfil) y no se recrea; el **backend** solo cambia de driver cuando se recrea
+  (deploy o `refresh_backend.yml`).
+
+Desactivar la recolección del laboratorio es, por eso, los dos lados (ver **Reversión**).
+
+**Inspección.**
+
+```bash
+# Driver y opciones efectivos de cada contenedor
+for c in traefik keycloak backend postgres; do printf '%s ' "$c"; sudo docker inspect -f '{{json .HostConfig.LogConfig}}' "$c"; done
+```
+
+```bash
+# Valores que dio Ansible (en /opt/piedrazul)
+sudo grep -E '_LOGGING=|laboratorio' /opt/piedrazul/.env
+```
+
+```bash
+# Campos de procedencia de una entrada real (deben ser docker.service, dockerd, 0)
+journalctl -o json -n 1 COM_DOCKER_COMPOSE_SERVICE=backend | jq '{_TRANSPORT, _SYSTEMD_UNIT, _COMM, _UID, COM_DOCKER_COMPOSE_PROJECT, COM_DOCKER_COMPOSE_SERVICE}'
+```
+
+```bash
+# Selección efectiva de Alloy (en /opt/piedrazul-obs)
+sudo grep -E '^OBS_LOG_(PROJECT|SERVICES)=' /opt/piedrazul-obs/.env
+```
+
+**Consultas** (Explore o dashboard **Piedra Azul – Logs**, fuente `loki`):
+
+| Para | LogQL |
+|---|---|
+| un servicio | `{service="postgres"}` |
+| errores de todos | `{service=~".+", level=~"error\|fatal"}` |
+| una petición en todos los servicios | `{service=~".+"} \|= "<correlation_id>"` o `{service="backend"} \| correlation_id="<id>"` |
+| errores de SQL de la aplicación | `{service="postgres", level="error"} \|= "piedrazul_app@"` |
+| inicios de sesión fallidos | `{service="keycloak"} \|= "LOGIN_ERROR"` |
+| por tiempo | el selector de rango de Grafana; en API, `start`/`end` |
+
+**Revisión de contenido.** El canal no filtra contenido: lo que el productor escribe llega. Antes
+de dar por buena una sesión de laboratorio, revisar con
+
+```text
+{service=~".+"} |~ "(?i)(password|passwd|secret|token|bearer|authorization|cookie)[\"]?\\s*[=:]"
+```
+
+Un resultado con un valor real (no sintético) es un hallazgo del productor: se corrige en su
+origen y lo ya escrito sigue en el journal (7 días) y en Loki (14 días) hasta su retención, o se
+borra con la retirada y `obs_logs_purge=true`. `logs-stack-check.sh` comprueba que esta consulta
+encuentra un marcador sintético.
+
+**Riesgos conocidos que el perfil acepta** (datos sintéticos):
+
+- Backend: `ex.getMessage()` y valores de la petición en varios manejadores de excepciones,
+  cuerpos de error de Keycloak (`KeycloakUserClient`), la excepción completa en el 5xx de
+  pacientes y el `Detail: Key (…)=(…)` de pgJDBC: llevan los valores que el usuario envió.
+- Keycloak: `LOGIN_ERROR` con el nombre de usuario intentado y la IP.
+- PostgreSQL: `DETAIL` con valores de claves y la sentencia que falló. Los clientes locales del
+  contenedor (reconciliación de roles con contraseñas, `psql` de un operador) corren con
+  `PGOPTIONS=-c log_min_error_statement=panic`: una sentencia suya que falla no se registra con
+  su texto. Un error de sintaxis de `psql` en la primera inicialización puede mostrar el
+  fragmento de la sentencia en la salida del contenedor (las variables de `psql` van citadas y
+  no rompen la sintaxis).
+- Las trazas de más de 256 líneas se parten en varias entradas.
+
+Cerrar esos puntos es trabajo del productor (backend, Keycloak), no de la canalización, y es
+condición para admitirlos fuera del laboratorio (`obs_log_privacy_controls_done`).
+
+**Reversión.** Quitar la recolección de laboratorio tiene dos lados independientes, y
+observability solo hace uno:
+
+1. **Productores (lo que llega al journal).** converge **sin** el perfil: `.env` vuelve a
+   `TRAEFIK_LOGGING=journald` y `default` en los otros tres; recrea postgres y keycloak.
+   Después, deploy (o `refresh_backend.yml`) **sin** el perfil para recrear el backend. Hasta
+   esa recreación, un contenedor sigue escribiendo en el journal con el driver con que se creó,
+   aunque `.env` ya diga otra cosa.
+2. **Selección (lo que llega a Loki).** observability **sin** el perfil: Alloy deja de enviar
+   keycloak, backend y postgres. Solo esto **no** devuelve ningún contenedor a `default`.
+
+Comprobar los dos:
+
+```bash
+for c in traefik keycloak backend postgres; do printf '%s ' "$c"; sudo docker inspect -f '{{.HostConfig.LogConfig.Type}}' "$c"; done
+```
+
+```bash
+sudo grep -E '_LOGGING=' /opt/piedrazul/.env; sudo grep -E '^OBS_LOG_SERVICES=' /opt/piedrazul-obs/.env
+```
+
+Esperado: `journald` solo en traefik (los otros tres con el driver del daemon, `json-file`) y
+`OBS_LOG_SERVICES=traefik`. Lo ya escrito queda en el journal hasta su rotación y en Loki hasta
+la retención; para borrarlo en un laboratorio: retirada de logs con `-e obs_logs_purge=true` (ver
+[Retirada](#retirada)) y `journalctl --rotate --vacuum-time=1s`, o reconstruir el host.
+
+### Verificación en el host de laboratorio
+
+Lo que las pruebas locales no pueden mostrar y se comprueba en el host con el perfil activo:
+
+1. `docker inspect`: `journald` con las opciones del contrato en los cuatro; en migrate y en el
+   stack, la configuración del daemon sin opciones propias (`json-file`, `max-size`/`max-file`).
+2. `journalctl -o json` de cada servicio: `_SYSTEMD_UNIT=docker.service`, `_COMM=dockerd`,
+   `_UID=0`, `COM_DOCKER_COMPOSE_PROJECT=piedrazul` y el servicio.
+3. En Loki, entradas reales de los cuatro (`label_values(service)`), con `level` donde
+   corresponde; ninguna de `migrate` ni del stack.
+4. Diagnóstico provocado con datos sintéticos: un error del backend con traza completa y su
+   `correlation_id`, seguido en Traefik/Keycloak/PostgreSQL por el mismo rango de tiempo; un
+   error de PostgreSQL (clave duplicada) en una entrada con `DETAIL`, `STATEMENT` y `rol@base`;
+   un `LOGIN_ERROR` de Keycloak que también aparece en el almacén de eventos (y que
+   `LoginAuditJob` registra); un reinicio de postgres con su secuencia de arranque.
+5. La consulta de **Revisión de contenido** sin valores reales; ninguna contraseña de
+   `.env` en Loki ni en el journal (`journalctl | grep -F` por cada una, sin imprimirla).
+6. Recreación y desactivación: un run de converge con el perfil no recrea nada; observability
+   sin el perfil deja de enviar a Loki keycloak, backend y postgres **sin** cambiar su driver
+   (`docker inspect` sigue en `journald`); converge sin el perfil recrea postgres y keycloak en
+   `default`, y el backend pasa a `default` al recrearse en deploy o `refresh_backend.yml`.
+7. Recursos con la topología real: memoria de Alloy y Loki, uso del journal por día y
+   reintentos o descartes en el dashboard.
+
+## Ajustes de PostgreSQL
+
+`prod.yml` fija para postgres tres ajustes, con y sin el perfil (no dependen de dónde vayan sus
+logs). Se verificaron con PostgreSQL 16 (base de la imagen) y clientes de protocolo extendido
+(como pgJDBC: sentencia con `$n` y valores aparte) y de consulta simple:
+
+| Ajuste | Clase | Qué registra | Qué no |
+|---|---|---|---|
+| `log_line_prefix=%m [%p] %q%u@%d ` | operación normal | `rol@base` en cada línea de sesión: distingue backend, Keycloak, migraciones y operadores en un clúster compartido | — |
+| `log_lock_waits=on` | operación normal | esperas de lock de más de `deadlock_timeout` (1 s): `LOG` con los procesos implicados y la sentencia, **también cuando la consulta termina bien** | los valores de un cliente de protocolo extendido: la sentencia lleva `$n` (verificado) |
+| `PGOPTIONS=-c log_min_error_statement=panic` (solo clientes `libpq` dentro del contenedor) | protección permanente | — | la sentencia de un error o de una espera de lock de la reconciliación de roles (`ALTER ROLE … PASSWORD`) o de un `psql` por `docker exec` (verificado: el marcador no aparece; sin `PGOPTIONS`, sí) |
+
+Lo demás queda en los valores de PostgreSQL: `log_min_error_statement=error` (la sentencia que
+falla, con `$n`, sin parámetros: `log_parameter_max_length_on_error=0`), `log_error_verbosity`
+por defecto (`DETAIL` incluido) y sin `log_statement`, `log_min_duration_statement` ni
+`log_connections`. Lo que puede llevar valores, en cualquier destino (`json-file` del host o
+Loki):
+
+- `DETAIL` de una violación de restricción (`Key (document_number)=(…) already exists`): es el
+  comportamiento por defecto de PostgreSQL, anterior a este cambio, y el dato más útil para
+  diagnosticar el error.
+- La sentencia de un cliente que escribe literales en el SQL (un operador con `psql` por la red;
+  no la aplicación ni Keycloak, que usan parámetros), en dos casos:
+  - un **error**: comportamiento por defecto de PostgreSQL, anterior a este cambio;
+  - una **espera de lock de más de 1 s**: lo agrega `log_lock_waits`, **aunque la consulta
+    termine bien** y antes no hubiera dejado ninguna línea. Es exposición adicional, no la misma:
+    un `SELECT … WHERE document_number = '…'` correcto que esperó un lock queda registrado con
+    su literal (verificado: dos líneas, `still waiting` y `acquired`, ambas con la sentencia).
+    Se conserva porque las esperas de lock son una causa frecuente de lentitud y este es el
+    único registro que identifica la sentencia y los procesos implicados; el volumen es bajo (solo
+    esperas de más de `deadlock_timeout`).
+
+  Los clientes locales del contenedor no registran la sentencia en ninguno de los dos casos
+  (`PGOPTIONS`). Para un operador por la red: consultas con parámetros (`\bind` en `psql` 16) o
+  desde `docker exec` cuando la consulta lleva datos de personas.
+
+## Adopción en operación
+
+El destino es el mismo que valida el laboratorio: los cuatro servicios en Loki con su diagnóstico.
+Pasar de la configuración por defecto a esa operación no cambia ningún archivo: es inventario.
+
+```yaml
+# inventories/prod/group_vars/all.yml
+obs_log_services: [traefik, keycloak, backend, postgres]
+obs_log_privacy_controls_done: [keycloak, backend, postgres]
+```
+
+y repetir converge, deploy y observability **sin** el perfil. `logs-stack-check.sh` y
+`log-producers-contract-check.sh` prueban que esa combinación se admite y produce exactamente la
+misma configuración de Compose que el laboratorio.
+
+Añadir un servicio a `obs_log_privacy_controls_done` es la decisión, por servicio, de que sus
+logs son aceptables con datos reales en el journal del host (7 días) y en Loki (14 días), con el
+acceso a Grafana como única vía de lectura. El acceso restringido no autoriza a guardar
+credenciales; la decisión se toma con la evidencia del laboratorio (sección
+[Verificación en el host de laboratorio](#verificación-en-el-host-de-laboratorio)) y estas
+preguntas abiertas:
+
+| Servicio | Pendiente de decidir |
+|---|---|
+| backend | si los valores de la petición en mensajes de excepción, los cuerpos de error de Keycloak y la excepción completa del 5xx de pacientes se aceptan, se recortan en el productor (sin perder clase, causa, SQLState ni `correlation_id`) o se mueven a DEBUG |
+| keycloak | si `LOGIN_ERROR` en consola (usuario intentado, IP) se acepta o se deja solo en el almacén de eventos (`KC_LOG_LEVEL=…,org.keycloak.events:error`, sin tocar `LoginAuditJob`) |
+| postgres | si el `DETAIL` con valores de clave se acepta (diagnóstico más útil) o se reduce (`log_error_verbosity=terse`, que también quita `HINT` y `CONTEXT`) |
+
+Hasta esa decisión la lista por defecto es `[traefik]` y backend, keycloak y postgres siguen en
+`default` (sus logs en `json-file` del host, como siempre).
 
 ## Etiquetas y campos
 
@@ -147,8 +399,20 @@ Loki los avisos de journald, hasta que se active Traefik.
 | `correlation_id` | metadato estructurado | UUID de la petición en el backend (`[<uuid>]`, ver [Correlación de peticiones HTTP](../../architecture/overview.md#correlación-de-peticiones-http)) |
 
 La severidad se toma de la palabra de nivel tras la marca de tiempo (Spring Boot y Keycloak:
-`INFO`/`WARN`/`ERROR`; Traefik: `INF`/`WRN`/`ERR`). Una línea sin ese formato (continuación de una
-traza, salida libre) no tiene `level`; Loki no adivina niveles (`discover_log_levels: false`).
+`INFO`/`WARN`/`ERROR`; Traefik: `INF`/`WRN`/`ERR`; PostgreSQL: `LOG`/`NOTICE` → `info`, `WARNING` →
+`warn`, `ERROR`, `FATAL`/`PANIC` → `fatal`, tras `<fecha> <hora> <zona> [pid] [rol@base]`). Una
+entrada sin ese formato (salida libre) no tiene `level`; Loki no adivina niveles
+(`discover_log_levels: false`).
+
+**Multilínea.** Docker escribe una entrada del journal por línea. Alloy une a la entrada que
+las abre las líneas que no empiezan una nueva: las de una traza de Java (`at …`,
+`Caused by: …`) y, en PostgreSQL, `DETAIL`, `HINT`, `CONTEXT`, `STATEMENT`, `QUERY` y `LOCATION`
+de un error. Así un error llega con su causa y su sentencia en **una** entrada, con la severidad
+y el `correlation_id` de la cabecera. Un bloque se cierra con la siguiente línea de apertura, a
+los 3 s sin líneas nuevas o a las 256 líneas (el resto de una traza más larga sigue en otro
+bloque, sin severidad); Loki trunca además en 256 KB. Los bloques se arman por contenedor y flujo
+(stdout/stderr). Si Alloy se detiene con un bloque abierto, ese bloque sigue la regla de
+pérdida y duplicación de las posiciones.
 Ningún campo con valores por petición es etiqueta: los streams quedan acotados por servicio,
 flujo y nivel.
 
@@ -158,6 +422,11 @@ flujo y nivel.
 |---|---|
 | `infra/observability/compose.yml` | servicio `loki`, acceso de Alloy al journal, volúmenes `loki_data` y `alloy_data` |
 | `infra/observability/.env.example` | `OBS_JOURNAL_GID`, `OBS_LOG_PROJECT`, `OBS_LOG_SERVICES` |
+| `infra/compose/prod.yml`, `infra/compose/logging.yml` | `extends` de los cuatro servicios y sus dos bases (`journald`, `default`); prefijo, `log_lock_waits` y `PGOPTIONS` de postgres |
+| `infra/ansible/inventories/prod/group_vars/all.yml` | `obs_log_services` y `obs_log_privacy_controls_done` (operación) |
+| `infra/ansible/roles/observability/tasks/log_policy.yml` | la política, aplicada por converge y por observability |
+| `infra/ansible/roles/app/tasks/setup.yml`, `templates/env.j2` | política antes de escribir `.env` y `<SERVICIO>_LOGGING` |
+| `infra/ansible/profiles/logs-lab-synthetic.yml` | perfil de laboratorio sintético |
 | `infra/observability/alloy/config.alloy` | lectura del journal, selección, procesamiento, envío |
 | `infra/observability/loki/config.yaml` | almacenamiento, límites, WAL, retención |
 | `infra/observability/prometheus/prometheus.yml` | destinos `alloy` y `loki` con lista de series |
@@ -168,6 +437,7 @@ flujo y nivel.
 | `infra/ansible/roles/observability/` | política de fuentes, journal, drop-in, `.env`, verificación, retirada |
 | `infra/ansible/playbooks/observability-logs-rollback.yml` | retirada de Loki y del drop-in |
 | `infra/tests/logs-stack-check.sh` | verificación local con journal sintético |
+| `infra/tests/log-producers-contract-check.sh` | contrato de los productores: política, `.env`, Compose, Docker |
 | `infra/tests/logs-rollback-check.sh` | verificación local de la retirada |
 | `infra/tests/logs-e2e-lab.sh`, `infra/tests/logs-lab-ansible-check.sh` | pruebas en un host Linux de laboratorio |
 
@@ -341,8 +611,10 @@ Lo que la retirada no deshace:
   configuración de la distribución; con `Storage=auto` (por defecto) el journal sigue siendo
   persistente mientras exista ese directorio, con los límites por defecto (10 % del sistema de
   archivos, hasta 4 GiB).
-- Si algún servicio de la aplicación se había pasado al driver `journald`, volver a `json-file`
-  es un cambio de su archivo Compose.
+- Los servicios de la aplicación siguen en el modo que les da `obs_log_services` (por defecto
+  traefik en `journald`). Volver a `default` es un run de converge (y deploy) con la lista sin ese
+  servicio: ver [Perfil de laboratorio sintético](#perfil-de-laboratorio-sintético),
+  "Reversión".
 - Alertmanager y el acceso a Grafana por Access (S3) no son parte de los logs: desde una versión
   con S3, la retirada de logs los deja en marcha. Su retirada está en [Alertas](alertas.md#retirada)
   y [Acceso a Grafana](grafana-acceso.md#desactivación).
@@ -354,12 +626,15 @@ Lo que la retirada no deshace:
 | `promtool test rules tests/logs-alerts.test.yml` | cualquier Docker | expresiones y duraciones de las 5 reglas, y que cada causa dispara solo la suya |
 | `infra/tests/logs-stack-check.sh` | cualquier Docker (también Docker Desktop) | configuración, Ansible (sintaxis, política, drop-in) y la canalización Alloy → Loki → Grafana real sobre **journals sintéticos**: selección, procedencia (productores que imitan los campos de Docker), etiquetas, correlación, posiciones, cortes de Loki y de Alloy, journal ilegible, PRE/POST, persistencia, aislamiento; inventario aislado del laboratorio sin conectar |
 | `ROLLBACK_BASE_REF=<commit sin logs> infra/tests/logs-rollback-check.sh` | cualquier Docker | los dos pasos de la retirada con el playbook real en local: orden obligatorio, sin estado degradado, fuente de datos retirada, estado de Grafana y volúmenes de métricas conservados, repetición y purge (sin el drop-in de journald) |
+| `infra/tests/log-producers-contract-check.sh` (`DIND=1` para la rotación efectiva) | cualquier Docker (también Docker Desktop) | `.env` por defecto, de laboratorio y de adopción en operación; `journald` con sus opciones solo donde se pide y `default` idéntico a antes (hash de HEAD, configuración implícita del daemon, rotación 10m × 3 y modo blocking con un daemon `json-file`); valor desconocido rechazado; render determinista; diagnóstico de postgres sin volcados; la política real (casos positivos y negativos); una sola política y una sola lista; llamadas de Compose coherentes; fallo visible de `journald` sin journald |
 | `infra/tests/metrics-stack-check.sh` | cualquier Docker | que las métricas siguen igual con Loki y la canalización |
 | `LAB_CONFIRM=1 infra/tests/logs-e2e-lab.sh` | host Linux de laboratorio con Docker nativo | campos reales del driver journald (incluidos `_COMM`, `_UID`), falsificación real con `logger --journald`, permisos reales del journal, drop-in efectivo, WAL de Loki ante SIGKILL, avisos de supresión (`BURST=1`), pérdida en un corte largo (`LONG_OUTAGE=1`) |
 | `LAB_HOST=<ip> LAB_CONFIRM=<ip> LAB_BASE_REF=<commit sin logs> infra/tests/logs-lab-ansible-check.sh` | controlador contra el laboratorio | instalación, idempotencia, rechazo de fuentes sin cambios, orden y pasos de la retirada, drop-in, reinstalación. Inventario aislado de un host (nunca `inventories/prod`), IP literal, `-F /dev/null` y `StrictHostKeyChecking=yes` |
 
 Que la verificación local pase no demuestra la ingesta desde contenedores reales: el driver
-journald y los permisos del journal de un host solo los prueba `logs-e2e-lab.sh`.
+journald y los permisos del journal de un host solo los prueba `logs-e2e-lab.sh`, y los
+productores reales de la aplicación solo la verificación del perfil de laboratorio en el host
+([lista](#verificación-en-el-host-de-laboratorio)).
 
 Requisitos del laboratorio, además de los de la cabecera de cada script:
 

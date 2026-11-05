@@ -1,0 +1,44 @@
+# Política de fuentes de logs: una sola, aplicada dos veces con la misma lista (obs_log_services):
+#   - converge (roles/app/tasks/setup.yml, include_role) antes de escribir .env: decide qué
+#     contenedores escriben en el journal del host (driver journald), que es la activación con
+#     efecto de privacidad (el journal conserva lo escrito aunque no se envíe);
+#   - observability (logs_preflight.yml) antes de copiar o levantar nada: decide qué selecciona
+#     Alloy para Loki.
+# Un fallo no cambia nada en el host.
+#
+# Admitidos: obs_log_services_allowed siempre; obs_log_services_conditional cuando figuran en
+# obs_log_privacy_controls_done (decisión humana de que sus logs son aceptables con datos reales:
+# controles del productor completos y verificados). obs_log_services_excluded, nunca.
+#
+# Validación con datos sintéticos (infra/ansible/profiles/logs-lab-synthetic.yml): con
+# logs_lab_authorization=synthetic-data-only (valor exacto, en el mismo run, nunca guardado en el
+# host) también se admiten los condicionados sin esa decisión. Es una autorización de
+# laboratorio, no una aprobación: obs_log_privacy_controls_done no cambia. La operación normal
+# no la usa ni la necesita.
+
+- name: Calcular las fuentes de logs no admitidas
+  ansible.builtin.set_fact:
+    obs_log_lab: "{{ logs_lab_authorization | default('') == 'synthetic-data-only' }}"
+    obs_log_services_rejected: >-
+      {%- set lab = logs_lab_authorization | default('') == 'synthetic-data-only' -%}
+      {%- set admitted = obs_log_services_allowed
+                         + (obs_log_services_conditional
+                            if lab else obs_log_services_conditional | intersect(obs_log_privacy_controls_done)) -%}
+      {{ (obs_log_services | reject('in', admitted) | list
+          + obs_log_services | intersect(obs_log_services_excluded) | list) | unique }}
+
+- name: Verificar la política de fuentes de logs
+  ansible.builtin.assert:
+    that:
+      - obs_log_services | type_debug == 'list'
+      - obs_log_services | length > 0
+      - obs_log_services | reject('match', '^[a-z0-9][a-z0-9_-]*$') | list | length == 0
+      - obs_log_project is match('^[a-z0-9][a-z0-9_-]*$')
+      - obs_log_services_rejected | length == 0
+    fail_msg: >-
+      LOGS: obs_log_services={{ obs_log_services }} no cumple la política de fuentes. No
+      admitidos: {{ obs_log_services_rejected }}. {{ obs_log_services_conditional | join(', ') }}
+      exigen figurar en obs_log_privacy_controls_done (decisión de privacidad para datos reales)
+      o, solo con datos sintéticos, logs_lab_authorization=synthetic-data-only (activa:
+      {{ obs_log_lab }}); {{ obs_log_services_excluded | join(', ') }} nunca. No se cambió nada.
+    quiet: true

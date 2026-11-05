@@ -28,22 +28,26 @@ obs_restart_on_change:
   grafana/dashboards: ''
 
 # ── Logs ─────────────────────────────────────────────────────────────────────
-# Fuentes que Alloy envía a Loki: servicios del proyecto Compose obs_log_project que escriben en
-# el journal (logging.driver: journald en su archivo Compose). Esta lista no activa el driver:
-# solo selecciona. Va a .env como OBS_LOG_PROJECT / OBS_LOG_SERVICES.
+# Fuentes que Alloy envía a Loki: servicios del proyecto Compose obs_log_project. La misma lista
+# (inventario, group_vars) decide en converge qué servicios escriben en el journal (driver
+# journald, <SERVICIO>_LOGGING en el .env de la aplicación). Va a .env como OBS_LOG_PROJECT /
+# OBS_LOG_SERVICES.
 obs_log_project: piedrazul
 obs_log_services: [traefik]
-# Política de fuentes. El rol falla, sin tocar nada, si obs_log_services incluye un servicio
-# fuera de lo admitido:
+# Política de fuentes (tasks/log_policy.yml): la aplican converge (driver journald del servicio)
+# y este rol (selección de Alloy), con la misma lista obs_log_services. Fallan, sin tocar nada,
+# si la lista incluye un servicio fuera de lo admitido:
 #   - admitidos: sus logs no llevan datos personales conocidos;
-#   - condicionados: admitidos solo cuando figuran también en obs_log_privacy_controls_done,
-#     es decir, cuando sus controles de privacidad en el productor están completos (ver
-#     docs/operations/runbooks/logs.md, "Política de fuentes");
+#   - condicionados: admitidos cuando figuran también en obs_log_privacy_controls_done, la
+#     decisión humana de que sus logs son aceptables con datos reales (ver
+#     docs/operations/runbooks/logs.md, "Política de fuentes" y "Adopción en operación");
 #   - excluidos: nunca.
+# Con logs_lab_authorization=synthetic-data-only (solo datos sintéticos, en el mismo run; sin
+# valor por defecto) los condicionados se admiten sin esa decisión, que no cambia.
 obs_log_services_allowed: [traefik]
-obs_log_services_conditional: [backend, keycloak]
+obs_log_services_conditional: [backend, keycloak, postgres]
 obs_log_privacy_controls_done: []
-obs_log_services_excluded: [postgres, migrate, prometheus, grafana, alloy, loki]
+obs_log_services_excluded: [migrate, prometheus, grafana, alloy, loki]
 
 # GID dueño de /var/lib/alloy/data en la imagen de Alloy (grupo suplementario en compose.yml). No
 # debe existir en el host: daría a Alloy los permisos de ese grupo sobre la raíz montada.
