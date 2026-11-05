@@ -176,8 +176,10 @@ check "driver: stderr con PRIORITY=3" \
 
 # ── Stack aislado desde este checkout, con la raíz real del host ─────────────
 docker network create "${APP_NET}" >/dev/null
-printf 'GRAFANA_ADMIN_PASSWORD=%s\nOBS_APP_NETWORK=%s\nGRAFANA_LOCAL_PORT=%s\nOBS_JOURNAL_GID=%s\nOBS_LOG_PROJECT=%s\nOBS_LOG_SERVICES=traefik|backend\n' \
-  "$(openssl rand -hex 16)" "${APP_NET}" "${GPORT}" "${JGID}" "${SYN_PROJECT}" > "${TMP}/obs.env"
+# S3 en modo privado: sin red de entrada; webhook vacío (receptor none)
+mkdir -p "${TMP}/secrets" && : > "${TMP}/secrets/discord_webhook_url" && chmod 644 "${TMP}/secrets/discord_webhook_url"
+printf 'GRAFANA_ADMIN_PASSWORD=%s\nOBS_APP_NETWORK=%s\nOBS_DISCORD_WEBHOOK_FILE=%s\nGRAFANA_LOCAL_PORT=%s\nOBS_JOURNAL_GID=%s\nOBS_LOG_PROJECT=%s\nOBS_LOG_SERVICES=traefik|backend\n' \
+  "$(openssl rand -hex 16)" "${APP_NET}" "${TMP}/secrets/discord_webhook_url" "${GPORT}" "${JGID}" "${SYN_PROJECT}" > "${TMP}/obs.env"
 chmod 600 "${TMP}/obs.env"
 obs() { (cd "${OBS}" && docker compose -p "${OBS_PROJECT}" --env-file "${TMP}/obs.env" -f compose.yml "$@"); }
 T_UP="$(date +%s)"
@@ -337,7 +339,7 @@ fi
 # ── 10. Métricas y aislamiento ─────────────────────────────────────────────────────
 check "métricas: host, alloy, loki y prometheus up" bash -c "test \"\$1\" = 4" _ "$(pv 'count(up{job=~"host|alloy|loki|prometheus"} == 1)')"
 check "métricas: métricas del host (raíz /)" test -n "$(pv 'node_filesystem_size_bytes{job="host",mountpoint="/"}')"
-check "métricas: 12 reglas sanas" bash -c "pexec_rules=\$1; test \"\$(jq '[.data.groups[].rules[] | select(.health == \"ok\")] | length' <<< \"\$pexec_rules\")\" = 12" _ "$(pexec wget -qO- http://localhost:9090/api/v1/rules 2>/dev/null)"
+check "métricas: 16 reglas sanas (12 de S1/S2 + 4 de notificaciones)" bash -c "pexec_rules=\$1; test \"\$(jq '[.data.groups[].rules[] | select(.health == \"ok\")] | length' <<< \"\$pexec_rules\")\" = 16" _ "$(pexec wget -qO- http://localhost:9090/api/v1/rules 2>/dev/null)"
 BINDINGS="$(for c in $(obs ps -q); do docker inspect "$c" --format '{{index .Config.Labels "com.docker.compose.service"}} {{json .HostConfig.PortBindings}}' | jq -Rr 'split(" ") as [$s, $b] | ($b | fromjson // {}) | to_entries[] | .key as $p | .value[] | "\($s) \($p) \(.HostIp):\(.HostPort)"'; done)"
 check "aislamiento: único puerto publicado grafana en 127.0.0.1:${GPORT}" test "${BINDINGS}" = "grafana 3000/tcp 127.0.0.1:${GPORT}"
 check "aislamiento: el stack instalado y la aplicación no cambiaron" test "$(others | sort | tr '\n' ' ')" = "${OTHERS_BEFORE}"

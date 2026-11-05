@@ -14,6 +14,10 @@
 # Entorno opcional: GRAFANA_LOCAL_PORT (por defecto 13400), KEEP=1.
 # Requiere: git, docker (compose v2), jq, ansible-playbook, ansible-galaxy (instala las colecciones
 #   de requirements.yml en el temporal; red la primera vez), openssl, curl.
+# S3: la versión actual trae además Alertmanager (receptor none, modo privado sin red de entrada).
+# La retirada de logs no lo toca:
+# queda en marcha con su volumen (su retirada es la de S3, docs/operations/runbooks/alertas.md).
+#
 # Salida: 0 si todo pasa; 1 si algo falla; 2 sin ROLLBACK_BASE_REF o herramientas.
 set -uo pipefail
 
@@ -84,11 +88,12 @@ cp -r "${ROOT}/infra/observability/." "${H}/"
 printf 'GRAFANA_ADMIN_PASSWORD=%s\nOBS_APP_NETWORK=%s\nGRAFANA_LOCAL_PORT=%s\nOBS_JOURNAL_GID=65534\nOBS_LOG_PROJECT=piedrazul\nOBS_LOG_SERVICES=traefik\n' \
   "$(openssl rand -hex 16)" "${NET}" "${GPORT}" > "${H}/.env"
 chmod 600 "${H}/.env"
+mkdir -p "${H}/secrets" && : > "${H}/secrets/discord_webhook_url" && chmod 644 "${H}/secrets/discord_webhook_url"
 docker network create "${NET}" >/dev/null
 STARTED=true
 dc up -d --wait --wait-timeout 180 > "${TMP}/up.log" 2>&1 || { ko "con logs: stack levantado"; tail -20 "${TMP}/up.log" >&2; exit 1; }
 wait_for 90 grafana_ok
-check "con logs: cuatro servicios" test "$(svc_running)" = "alloy,grafana,loki,prometheus,"
+check "con logs: cinco servicios (con Alertmanager de S3)" test "$(svc_running)" = "alertmanager,alloy,grafana,loki,prometheus,"
 check "con logs: fuentes de datos loki y prometheus" test "$(ds_uids)" = "loki,prometheus"
 STAR="$(curl -s -o /dev/null -w '%{http_code}' -u "$(gauth)" -X POST "${G}/api/user/stars/dashboard/uid/piedrazul-plataforma")"
 check "con logs: estado propio de Grafana (dashboard marcado)" test "${STAR}" = 200
@@ -118,11 +123,11 @@ check "paso 1: siete reglas (las de logs retiradas)" test "$(rule_count)" = 7
 check "paso 1: dashboard de logs retirado" wait_for 90 bash -c "test \"\$(curl -sf -u '$(gauth)' '${G}/api/search?type=dash-db' | jq -r '[.[].uid] | sort | join(\",\")')\" = piedrazul-backend-jvm,piedrazul-plataforma"
 echo "      estado intermedio: servicios $(svc_running) fuentes de datos $(ds_uids)"
 check "paso 1: estado intermedio sin degradación (Loki huérfano sirve su fuente de datos)" \
-  bash -c "test \"\$1\" = alloy,grafana,loki,prometheus, && test \"\$2\" = loki,prometheus && curl -sf -u '$(gauth)' '${G}/api/datasources/uid/loki/health' | jq -e '.status == \"OK\"'" _ "$(svc_running)" "$(ds_uids)"
+  bash -c "test \"\$1\" = alertmanager,alloy,grafana,loki,prometheus, && test \"\$2\" = loki,prometheus && curl -sf -u '$(gauth)' '${G}/api/datasources/uid/loki/health' | jq -e '.status == \"OK\"'" _ "$(svc_running)" "$(ds_uids)"
 
 # ── Paso 2: retirada ─────────────────────────────────────────────────────────
 if rollback step2; then ok "paso 2: la retirada termina (changed=$(changed step2))"; else ko "paso 2: la retirada"; tail -30 "${TMP}/step2.log" >&2; fi
-check "paso 2: sin Loki" test "$(svc_running)" = "alloy,grafana,prometheus,"
+check "paso 2: sin Loki (Alertmanager de S3 intacto)" test "$(svc_running)" = "alertmanager,alloy,grafana,prometheus,"
 check "paso 2: fuente de datos Loki retirada de Grafana" test "$(ds_uids)" = prometheus
 check "paso 2: sin archivo temporal de retiro" test ! -e "${H}/grafana/provisioning/datasources/zz-retire-loki.yml"
 check "paso 2: sin configuración de Loki" test ! -e "${H}/loki"
@@ -131,15 +136,15 @@ check "paso 2: .env sin variables de logs, con la contraseña" \
 check "paso 2: Grafana conserva su estado (dashboard marcado)" \
   bash -c "curl -sf -u '$(gauth)' '${G}/api/search?starred=true' | jq -e '[.[].uid] | index(\"piedrazul-plataforma\")'"
 check "paso 2: fuente de datos prometheus sana" bash -c "curl -sf -u '$(gauth)' '${G}/api/datasources/uid/prometheus/health' | jq -e '.status == \"OK\"'"
-check "paso 2: volúmenes de métricas y de logs conservados (sin purge)" test "$(vols)" = "alloy_data,grafana_data,loki_data,prometheus_data,"
+check "paso 2: volúmenes de métricas y de logs conservados (sin purge)" test "$(vols)" = "alertmanager_data,alloy_data,grafana_data,loki_data,prometheus_data,"
 
 rollback again
 check "repetición: la retirada no cambia nada (changed=$(changed again))" test "$(changed again)" = 0
 
 rollback purge -e obs_logs_purge=true
-check "purge: borra loki_data y alloy_data, conserva los de métricas" test "$(vols)" = "grafana_data,prometheus_data,"
+check "purge: borra loki_data y alloy_data, conserva los de métricas y alertas" test "$(vols)" = "alertmanager_data,grafana_data,prometheus_data,"
 rollback purge-again -e obs_logs_purge=true
 check "purge: repetirlo no cambia nada (changed=$(changed purge-again))" test "$(changed purge-again)" = 0
-check "final: métricas en marcha (prometheus, grafana, alloy)" test "$(svc_running)" = "alloy,grafana,prometheus,"
+check "final: métricas en marcha (prometheus, grafana, alloy) y Alertmanager intacto" test "$(svc_running)" = "alertmanager,alloy,grafana,prometheus,"
 
 if [ "${FAILS}" -eq 0 ]; then echo "OK"; exit 0; else echo "${FAILS} comprobación(es) fallida(s)"; exit 1; fi

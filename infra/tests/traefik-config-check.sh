@@ -154,6 +154,8 @@ check "Compose: sin API ni dashboard (--api.dashboard=false, sin --api ni --api.
   bash -c "grep -qx -- '--api.dashboard=false' <<< \"\$1\" && ! grep -qE -- '^--api(=|\\.insecure|\$)' <<< \"\$1\"" _ "${TCMD}"
 check "Compose: traefik, backend y keycloak comparten piedrazul_net" \
   bash -c "for s in traefik backend keycloak; do jq -e --arg s \"\$s\" '.services[\$s].networks | has(\"piedrazul_net\")' '${TMP}/config.json' || exit 1; done"
+check "Compose: traefik también en la red de entrada de Grafana (piedrazul_obs_edge, interna); ningún otro servicio" \
+  bash -c "test \"\$(jq -r '.networks | to_entries[] | select(.key == \"obs_edge\") | .value.name + \" \" + (.value.internal | tostring)' '${TMP}/config.json')\" = 'piedrazul_obs_edge true' && test \"\$(jq -r '[.services | to_entries[] | select(.value.networks | has(\"obs_edge\")) | .key] | join(\",\")' '${TMP}/config.json')\" = traefik"
 check "Repositorio: sin configuración del Docker provider (labels ni flags) en compose ni Ansible" \
   bash -c "! grep -rqE 'traefik\\.(enable|http\\.)|providers\\.docker|docker\\.sock' '${COMPOSE_DIR}' '${ANSIBLE_DIR}/roles'"
 check "Repositorio: infra/traefik/dynamic solo versiona tls.yml (routes.yml lo genera Ansible)" \
@@ -299,6 +301,8 @@ EOF
     echo "networks:"
     echo "  piedrazul_net:"
     echo "    name: ${PROJECT}_net"
+    echo "  obs_edge:"
+    echo "    name: ${PROJECT}_edge"
     echo "include:"
     echo "  - ./traefik.yml"
     echo "services:"

@@ -196,14 +196,28 @@ ansible-playbook \
 
 `verify-release.yml` no modifica nada: con `release_check=identity` comprueba que los contenedores corren la identidad exacta esperada; con `release_check=health`, que quedaron `healthy`. `record-release.yml` escribe el último despliegue exitoso (ver abajo). El workflow los corre como pasos separados para que un fallo de identidad, de health o de registro se vea como tal.
 
-### `observability.yml` — stack de métricas y logs
+### `observability.yml` — stack de métricas, logs y alertas
 
-Instala o actualiza el proyecto Compose `piedrazul-obs` (Prometheus, Grafana, Alloy, Loki) en
+Instala o actualiza el proyecto Compose `piedrazul-obs` (Prometheus, Grafana, Alloy, Loki,
+Alertmanager) en
 `/opt/piedrazul-obs` con el rol `observability`, con el mismo contrato de conexión que los demás
 playbooks (`ansible` + `become`). No lo corre el workflow de producción ni lo incluyen
 `converge.yml` o `deploy.yml`, y no modifica la aplicación.
 
-- Exige Docker con Compose y la red `piedrazul_net`; si falta alguno, falla sin copiar nada.
+- Exige Docker con Compose y la red `piedrazul_net`; con el acceso público a Grafana habilitado,
+  también `piedrazul_obs_edge` (interna, la crea `compose/traefik.yml` de la aplicación desde S3).
+  Si falta alguna, falla sin copiar nada. Sin acceso público (modo privado) no la necesita.
+- Acceso a Grafana y notificaciones (S3): estado deseado **persistente** en `.env` (dado con `-e` >
+  guardado en el host > inicial; un run sin `-e` no cambia nada, desactivar es explícito). Antes de
+  copiar nada valida `obs_grafana_access_*` (dominio del equipo de Access, AUD de 64 hex, correos
+  en minúsculas sin `.invalid`), `obs_alert_receiver` (`none`/`discord`), `obs_environment`
+  (obligatorio con `discord`) y el webhook, que llega solo por la variable de entorno
+  `OBS_DISCORD_WEBHOOK_URL` del controlador y nunca se muestra. Elige los archivos de Compose
+  (`compose.access.yml` solo con el acceso público, también en `COMPOSE_FILE`). Mantiene el estado en `.env` y
+  escribe el webhook en `/opt/piedrazul-obs/secrets/discord_webhook_url` (directorio root 0700,
+  archivo del UID 65534 0400) y, si cambió, recrea Alertmanager (el montaje de archivo no ve el
+  reemplazo). Ver [Acceso a Grafana](../../docs/operations/runbooks/grafana-acceso.md)
+  y [Alertas](../../docs/operations/runbooks/alertas.md).
 - Los directorios de configuración (`obs_managed_dirs`) quedan iguales al repositorio: copia y
   borra lo retirado; reinicia el servicio cuyo directorio cambió (`obs_restart_on_change`).
 - `.env` (root, 0600) se crea solo si no existe, con una contraseña de Grafana que genera el
@@ -215,8 +229,10 @@ playbooks (`ansible` + `become`). No lo corre el workflow de producción ni lo i
   7 días; `obs_journald_manage: false` lo omite) y reinicia journald solo si cambia; descubre el
   grupo del journal y lo mantiene en `.env` (`OBS_JOURNAL_GID`) junto a la selección de fuentes.
   No cambia `daemon.json` ni el driver de logs de ningún contenedor.
-- Verifica que los siete destinos se leen, que los dashboards están cargados, que Loki está listo
-  y que Alloy lee el journal.
+- Verifica que los ocho destinos se leen, que los dashboards están cargados, que Loki está listo,
+  que Alloy lee el journal, que Prometheus entrega a Alertmanager, que Alertmanager corre con el
+  receptor pedido, que Prometheus lleva la etiqueta del entorno y que Grafana tiene el modo de
+  acceso pedido. No envía ninguna notificación.
 
 `observability-logs-rollback.yml` es el segundo paso de la vuelta a métricas sin logs, después
 de repetir `observability.yml` desde una versión sin logs (si no, falla sin cambiar nada). Retira
@@ -281,6 +297,7 @@ Traefik enruta solo con el **file provider**: no tiene Docker provider ni socket
 |---|---|---|
 | `tls.yml` | opción TLS `cloudflare-aop` (certificado de cliente de Cloudflare obligatorio, CA en `traefik/certs/`) | `infra/traefik/dynamic/tls.yml`, copiado tal cual |
 | `routes.yml` | routers `backend` (`Host(api_public_domain)`) y `keycloak` (`Host(kc_hostname)`), entrypoint `websecure`, TLS `cloudflare-aop` + resolver `letsencrypt`; servicios `http://backend:<server_port>` y `http://keycloak:<kc_port>` | generado por `traefik_routes.yml` desde `templates/traefik-routes.yml.j2` con las mismas variables del inventario que `.env` |
+| `routes.yml` (opcional, S3) | con `grafana_public_domain` no vacío: router `grafana` (`Host(...) && !PathPrefix(/login)`, `websecure`, `cloudflare-aop` + `letsencrypt`) con el middleware `grafana-access-only` (quita `Authorization` y `Cookie`) y servicio `http://grafana:3000` por la red interna `piedrazul_obs_edge`. Vacío en `group_vars` hasta la activación ([Acceso a Grafana](../../docs/operations/runbooks/grafana-acceso.md)) | mismo template; el nombre se valida como los demás y distinto de ellos |
 
 - Métricas Prometheus en el entrypoint `metrics` (`:8082`, flags en `infra/compose/traefik.yml`). No tiene puerto publicado ni router: los routers de `routes.yml` declaran solo `websecure`. Se alcanza en `/metrics`, puerto 8082 del contenedor `traefik`, desde `piedrazul_net`. La API y el dashboard siguen deshabilitados. Ver [Health y métricas](../../docs/architecture/overview.md#health-y-métricas).
 - Para cambiar un host o puerto se cambia el inventario (`host_vars`/`group_vars`) y se corre converge; `routes.yml` no se edita en el servidor (converge lo sobrescribe). Antes de escribirlo, `traefik_routes.yml` valida las entradas (nombres DNS en minúsculas, distintos; puertos numéricos) y el documento generado; si algo falla, converge se detiene sin tocar el archivo vigente. Traefik recarga el cambio sin reiniciarse.

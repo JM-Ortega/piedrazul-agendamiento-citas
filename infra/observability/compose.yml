@@ -1,15 +1,23 @@
 # Stack privado de observabilidad: Prometheus, Grafana, Alloy (métricas del host y logs del
-# journal) y Loki. Proyecto Compose propio, separado de la aplicación (prod.yml /
+# journal), Loki y Alertmanager (notificaciones de las alertas de Prometheus). Proyecto Compose propio, separado de la aplicación (prod.yml /
 # docker-compose.yml): se levanta, reinicia o baja sin tocar ningún servicio de la aplicación, y
 # ningún servicio de la aplicación depende de él. Sin trazas.
 #
 # Conectividad privada:
-#   - obs_net (propia): prometheus, grafana, alloy y loki.
+#   - obs_net (propia): prometheus, grafana, alloy, loki y alertmanager.
 #   - red de la aplicación (externa, OBS_APP_NETWORK, piedrazul_net por defecto): solo
 #     prometheus, para leer backend:8081, keycloak:9000 y traefik:8082 por nombre. Debe
 #     existir antes (la crea la aplicación); si no existe, `up` falla sin crear nada.
+#   - red de entrada de Grafana (piedrazul_obs_edge): solo con el acceso público, en
+#     compose.access.yml. Este archivo solo (modo privado, S1/S2) no la necesita.
 # Ningún puerto publicado salvo Grafana en loopback del host (acceso local o por túnel SSH). Sin
-# socket de Docker ni contenedores privilegiados. Loki solo en obs_net.
+# socket de Docker ni contenedores privilegiados. Loki y Alertmanager solo en obs_net.
+#
+# Acceso de operadores a Grafana (docs/operations/runbooks/grafana-acceso.md): por
+# grafana.<dominio> detrás de Cloudflare Access, que Grafana valida (JWT de Access: firma, emisor,
+# audiencia, tipo y expiración) y autoriza por lista de correos; o por túnel SSH al loopback con
+# el administrador local (recuperación). GRAFANA_ACCESS_ENABLED=false (por defecto) deja solo el
+# túnel. Con el acceso público se usa además compose.access.yml (COMPOSE_FILE en .env).
 #
 # Logs: Alloy lee el journal persistente del host (solo lectura, con el grupo dueño del journal)
 # y envía a Loki solo las fuentes seleccionadas (alloy/config.alloy). Qué contenedores escriben
@@ -26,9 +34,17 @@ networks:
     name: ${OBS_APP_NETWORK:-piedrazul_net}
     external: true
 
+# Webhook de Discord (secreto). Archivo del host, nunca en .env ni en el repositorio; debe
+# existir aunque OBS_ALERT_RECEIVER=none (vacío). Solo Alertmanager lo monta.
+secrets:
+  discord_webhook_url:
+    file: ${OBS_DISCORD_WEBHOOK_FILE:-./secrets/discord_webhook_url}
+
 volumes:
   prometheus_data:
   grafana_data:
+  # Silencios y registro de notificaciones enviadas (evita repetirlas tras un reinicio)
+  alertmanager_data:
   # Chunks, índice, WAL y compactor de Loki
   loki_data:
   # Posiciones de lectura del journal (y demás estado de Alloy)
@@ -39,6 +55,10 @@ services:
     # Referencia fijada: <tag>@sha256:<índice OCI>
     image: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
     restart: unless-stopped
+    environment:
+      # Etiqueta externa environment (prometheus.yml): identifica el origen en cada alerta que
+      # se envía a Alertmanager (y en los mensajes de Discord). No toca reglas ni series.
+      OBS_ENVIRONMENT: ${OBS_ENVIRONMENT:-sin-definir}
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -80,21 +100,63 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD es requerido (ver .env.example)}
+      # Correo reservado (TLD .invalid) del administrador local: ninguna identidad de Access
+      # puede tenerlo, así que un JWT nunca se vincula a esta cuenta. Grafana lo aplica solo al
+      # crear su base (como la contraseña).
+      GF_SECURITY_ADMIN_EMAIL: admin@piedrazul-obs.invalid
       GF_SECURITY_DISABLE_GRAVATAR: "true"
       GF_SECURITY_COOKIE_SAMESITE: strict
+      # Cookies solo por HTTPS; los navegadores y curl tratan http://localhost (túnel) como
+      # contexto seguro, así que el inicio de sesión local sigue funcionando
+      GF_SECURITY_COOKIE_SECURE: "true"
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_USERS_ALLOW_ORG_CREATE: "false"
       GF_AUTH_ANONYMOUS_ENABLED: "false"
-      GF_SERVER_ROOT_URL: http://localhost:${GRAFANA_LOCAL_PORT:-3000}/
+      # URL pública (https://grafana.<dominio>/ con Access) o el loopback del túnel
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:${GRAFANA_LOCAL_PORT:-3000}/}
+      # ── Cloudflare Access (JWT) ──
+      # Cada petición trae Cf-Access-Jwt-Assertion (lo pone Access); Grafana valida firma
+      # (JWKS del equipo de Access), iss, aud, type=app y exp, y no crea sesión: la identidad se
+      # revalida en cada petición. Sin cabecera o con un JWT inválido no hay acceso por esta vía.
+      GF_AUTH_JWT_ENABLED: ${GRAFANA_ACCESS_ENABLED:-false}
+      GF_AUTH_JWT_HEADER_NAME: Cf-Access-Jwt-Assertion
+      GF_AUTH_JWT_JWK_SET_URL: https://${GRAFANA_ACCESS_TEAM_DOMAIN:-access.invalid}/cdn-cgi/access/certs
+      # Grafana guarda el JWKS en su base (sobrevive a reinicios) durante este plazo: es lo que
+      # tarda en aceptar una clave rotada por Access y lo que tolera sin alcanzar el JWKS antes de
+      # rechazar los JWT nuevos (falla cerrado; el túnel sigue funcionando)
+      GF_AUTH_JWT_CACHE_TTL: 5m
+      GF_AUTH_JWT_EXPECT_CLAIMS: '{"iss":"https://${GRAFANA_ACCESS_TEAM_DOMAIN:-access.invalid}","aud":"${GRAFANA_ACCESS_AUD:-}","type":"app"}'
+      GF_AUTH_JWT_EMAIL_CLAIM: email
+      GF_AUTH_JWT_USERNAME_CLAIM: email
+      GF_AUTH_JWT_AUTO_SIGN_UP: "true"
+      GF_AUTH_JWT_URL_LOGIN: "false"
+      # Autorización: rol de organización solo por lista de correos (minúsculas, separados por
+      # comas). Editor antes que Viewer; un correo fuera de ambas, con comas (no podría
+      # compararse contra la lista) o un token sin exp no obtiene rol y, con strict, se rechaza
+      # (403). Nunca Admin ni administrador del servidor por JWT: la administración de Grafana es
+      # del administrador local (túnel).
+      GF_AUTH_JWT_ROLE_ATTRIBUTE_PATH: >-
+        exp && !contains(email, ',') && (
+        contains(',${GRAFANA_ACCESS_EDITORS:-},', join('', [',', lower(email), ','])) && 'Editor'
+        || contains(',${GRAFANA_ACCESS_VIEWERS:-},', join('', [',', lower(email), ','])) && 'Viewer'
+        ) || ''
+      GF_AUTH_JWT_ROLE_ATTRIBUTE_STRICT: "true"
+      GF_AUTH_JWT_SKIP_ORG_ROLE_SYNC: "false"
+      GF_AUTH_JWT_ALLOW_ASSIGN_GRAFANA_ADMIN: "false"
+      # Sin accesos por enlace que no pasen por la lista: snapshots y dashboards compartidos
+      # públicamente se ven sin JWT (solo con el enlace)
+      GF_SNAPSHOTS_ENABLED: "false"
+      GF_PUBLIC_DASHBOARDS_ENABLED: "false"
       # Sin telemetría, avisos de versión, noticias ni plugins preinstalados (las conexiones
-      # salientes que harían). La red del contenedor no restringe otras salidas.
+      # salientes que harían). La red del contenedor no restringe otras salidas; con Access,
+      # Grafana descarga el JWKS de <equipo>.cloudflareaccess.com por obs_net.
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
       GF_NEWS_NEWS_FEED_ENABLED: "false"
       GF_PLUGINS_PREINSTALL_DISABLED: "true"
-      # Las alertas las evalúa Prometheus (prometheus/rules). Grafana no gestiona reglas ni
-      # puntos de contacto.
+      # Las alertas las evalúa Prometheus (prometheus/rules) y las notifica Alertmanager.
+      # Grafana no gestiona reglas ni puntos de contacto.
       GF_UNIFIED_ALERTING_ENABLED: "false"
       GF_LOG_MODE: console
     volumes:
@@ -210,5 +272,47 @@ services:
     # Sin healthcheck de Compose: la imagen no trae shell, wget ni subcomando de salud. La
     # disponibilidad la miden Prometheus (up{job="loki"}) y el rol de Ansible (/ready desde
     # Prometheus).
+    networks:
+      - obs_net
+
+  # Notificaciones de las alertas que evalúa Prometheus (prometheus/rules): agrupa, deduplica,
+  # reintenta y envía disparos y resoluciones al receptor de OBS_ALERT_RECEIVER: discord (webhook
+  # del secreto discord_webhook_url) o none (no envía; por defecto). Sin clúster ni puerto
+  # publicado; solo Prometheus le habla, por obs_net. Ver docs/operations/runbooks/alertas.md.
+  alertmanager:
+    # Referencia fijada: <tag>@sha256:<índice OCI>
+    image: prom/alertmanager:v0.34.1@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/${OBS_ALERT_RECEIVER:-none}.yml
+      - --storage.path=/alertmanager
+      - --web.listen-address=:9093
+      # Una sola instancia: sin gossip de clúster
+      - --cluster.listen-address=
+    # Usuario de la imagen (nobody, dueño de /alertmanager): el volumen nuevo hereda ese dueño.
+    # El secreto del host debe ser legible por este UID (el rol de Ansible lo deja 0400 suyo).
+    user: "65534:65534"
+    volumes:
+      - ./alertmanager:/etc/alertmanager:ro
+      - alertmanager_data:/alertmanager
+    secrets:
+      - discord_webhook_url
+    tmpfs:
+      - /tmp
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.10"
+          memory: 64m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9093/-/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       - obs_net

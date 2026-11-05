@@ -1,0 +1,22 @@
+{{/*
+  Mensajes de Discord. El título empieza por el entorno de origen (etiqueta externa environment de
+  Prometheus, OBS_ENVIRONMENT): varios entornos pueden compartir un webhook. Solo usan además el
+  nombre de la alerta, su severidad y las anotaciones summary y
+  description de prometheus/rules: etiquetas acotadas, sin datos de pacientes ni de usuarios. El
+  enlace no se incluye: Grafana y Prometheus no son públicos (o están tras Access).
+*/}}
+{{ define "piedrazul.discord.title" -}}
+[{{ with .CommonLabels.environment }}{{ . }}{{ else }}sin-entorno{{ end }}] [{{ if eq .Status "firing" }}FIRING{{ else }}RESUELTA{{ end }}{{ if gt (len .Alerts.Firing) 1 }} ×{{ len .Alerts.Firing }}{{ end }}] {{ .CommonLabels.alertname }}{{ with .CommonLabels.severity }} ({{ . }}){{ end }}
+{{- end }}
+
+{{ define "piedrazul.discord.message" -}}
+{{ range .Alerts.Firing -}}
+🔴 {{ .Annotations.summary }}
+{{ .Annotations.description }}
+Desde: {{ .StartsAt.Format "2006-01-02 15:04 MST" }}
+{{ end -}}
+{{ range .Alerts.Resolved -}}
+✅ {{ .Annotations.summary }}
+Resuelta: {{ .EndsAt.Format "2006-01-02 15:04 MST" }}
+{{ end -}}
+{{- end }}

@@ -14,6 +14,9 @@
 # keycloak:9000/metrics, traefik:8082/metrics) y un Content-Type de exposición de Prometheus
 # (text/plain; version=0.0.4), sin el cual Prometheus 3 rechaza la lectura. Que esos destinos
 # estén up no verifica la aplicación. Ver docs/operations/runbooks/logs.md, "Verificación".
+# S3: sin variables de acceso el rol instala el modo privado (sin la red piedrazul_obs_edge, que
+# solo exige el acceso público a Grafana); Alertmanager queda con el receptor none y la retirada de
+# logs no lo toca.
 #
 # Inventario aislado: nunca usa inventories/prod. Genera un inventario de un solo host (vps, el
 # nombre que esperan los playbooks) en un directorio temporal sin group_vars ni host_vars, y le
@@ -133,7 +136,7 @@ GRAFANA_DS='cd /opt/piedrazul-obs && docker compose exec -T grafana sh -c '"'"'w
 if play install "${ANSIBLE_DIR}" observability.yml; then ok "instalación: observability.yml termina ($(recap install))"; else ko "instalación: observability.yml"; tail -30 "${TMP}/install.log" >&2; exit 1; fi
 check "instalación: drop-in de journald con los valores del rol" \
   test "$(host 'grep -E "^(Storage|SystemMaxUse|SystemMaxFileSize|MaxRetentionSec)=" /etc/systemd/journald.conf.d/60-piedrazul-obs.conf | tr "\n" " "')" = "Storage=persistent SystemMaxUse=2G SystemMaxFileSize=128M MaxRetentionSec=7day "
-check "instalación: cuatro servicios en piedrazul-obs" test "$(host "${OBS_PS}")" = "alloy,grafana,loki,prometheus,"
+check "instalación: cinco servicios en piedrazul-obs" test "$(host "${OBS_PS}")" = "alertmanager,alloy,grafana,loki,prometheus,"
 check "instalación: OBS_JOURNAL_GID = grupo de los archivos del journal" \
   test "$(host 'grep ^OBS_JOURNAL_GID= /opt/piedrazul-obs/.env | cut -d= -f2')" = "$(host 'stat -c %g /var/log/journal/$(cat /etc/machine-id)')"
 
@@ -161,9 +164,9 @@ check "orden: ese fallo no cambió nada" test "$(host "${STATE}")" = "${BEFORE}"
 VOLS='docker volume ls -q --filter label=com.docker.compose.project=piedrazul-obs | sed "s/^piedrazul-obs_//" | sort | tr "\n" ","'
 if play step1 "${TMP}/base/infra/ansible" observability.yml; then ok "paso 1: observability.yml de ${LAB_BASE_REF} termina ($(recap step1))"; else ko "paso 1"; tail -30 "${TMP}/step1.log" >&2; fi
 check "paso 1: Loki huérfano sigue y su fuente de datos sigue en Grafana" \
-  bash -c "test \"\$1\" = alloy,grafana,loki,prometheus, && test \"\$2\" = loki,prometheus" _ "$(host "${OBS_PS}")" "$(host "${GRAFANA_DS}")"
+  bash -c "test \"\$1\" = alertmanager,alloy,grafana,loki,prometheus, && test \"\$2\" = loki,prometheus" _ "$(host "${OBS_PS}")" "$(host "${GRAFANA_DS}")"
 if play step2 "${ANSIBLE_DIR}" observability-logs-rollback.yml; then ok "paso 2: la retirada termina ($(recap step2))"; else ko "paso 2"; tail -30 "${TMP}/step2.log" >&2; fi
-check "paso 2: sin Loki" test "$(host "${OBS_PS}")" = "alloy,grafana,prometheus,"
+check "paso 2: sin Loki (Alertmanager de S3 intacto)" test "$(host "${OBS_PS}")" = "alertmanager,alloy,grafana,prometheus,"
 check "paso 2: fuente de datos Loki retirada" test "$(host "${GRAFANA_DS}")" = prometheus
 check "paso 2: sin configuración de Loki, drop-in ni variables de logs" \
   test "$(host 'echo "$(ls -d /opt/piedrazul-obs/loki /etc/systemd/journald.conf.d/60-piedrazul-obs.conf 2>/dev/null | wc -l) $(grep -c "^OBS_\(JOURNAL_GID\|LOG_PROJECT\|LOG_SERVICES\)=" /opt/piedrazul-obs/.env)"')" = "0 0"

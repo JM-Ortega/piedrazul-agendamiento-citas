@@ -10,12 +10,23 @@ global:
   scrape_interval: 30s
   scrape_timeout: 10s
   evaluation_interval: 30s
+  # Origen de cada alerta enviada a Alertmanager (staging, producción): lo distingue en Discord
+  # cuando varios entornos comparten un webhook. Prometheus 3 expande la variable del entorno del
+  # contenedor (compose.yml). No se agrega a las series ni a ALERTS: las reglas no cambian.
+  external_labels:
+    environment: ${OBS_ENVIRONMENT}
 
 rule_files:
   - /etc/prometheus/rules/*.yml
 
-# Sin Alertmanager: las reglas se evalúan y su estado se ve en Prometheus y en Grafana
-# (serie ALERTS), pero no se notifica a nadie. Ver el runbook de métricas.
+# Notificaciones: Prometheus envía las alertas a Alertmanager (obs_net), que las agrupa y las
+# entrega al receptor configurado (OBS_ALERT_RECEIVER en compose.yml; ninguno por defecto). El
+# estado de las reglas se sigue viendo en Prometheus y en Grafana (serie ALERTS). Ver
+# docs/operations/runbooks/alertas.md.
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: [alertmanager:9093]
 
 scrape_configs:
   - job_name: prometheus
@@ -67,4 +78,15 @@ scrape_configs:
     metric_relabel_configs:
       - source_labels: [__name__]
         regex: "loki_distributor_(lines|bytes)_received_total|loki_discarded_(samples|bytes)_total|loki_ingester_memory_streams|loki_ingester_wal_(disk_full_failures|corruptions)_total|loki_ingester_chunks_flush_failures_total|loki_compactor_apply_retention_last_successful_run_timestamp_seconds|loki_build_info|process_resident_memory_bytes|process_start_time_seconds"
+        action: keep
+
+  # Alertmanager: entrega de notificaciones (enviadas, fallidas) y su configuración. Solo las
+  # series que usan las reglas de notifications.yml.
+  - job_name: alertmanager
+    metrics_path: /metrics
+    static_configs:
+      - targets: [alertmanager:9093]
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: "alertmanager_notifications_(total|failed_total)|alertmanager_notification_requests_(total|failed_total)|alertmanager_config_last_reload_successful|alertmanager_build_info|process_start_time_seconds"
         action: keep

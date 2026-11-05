@@ -9,8 +9,10 @@ reglas de alerta y Grafana las muestra en dos dashboards. Es un proyecto Compose
 
 Los productores y sus contratos están en
 [Health y métricas](../../architecture/overview.md#health-y-métricas). El mismo proyecto Compose
-recolecta los logs seleccionados con Loki (ver [Logs](logs.md)). No recolecta trazas, no tiene
-acceso público y **no envía notificaciones de alertas**.
+recolecta los logs seleccionados con Loki (ver [Logs](logs.md)). No recolecta trazas. Las alertas
+las entrega Alertmanager a Discord cuando se activa (ver [Alertas](alertas.md); por defecto, receptor
+`none`: no se envía nada) y Grafana se usa por túnel SSH o, cuando se activa, por
+`grafana.piedrazul.org` detrás de Cloudflare Access (ver [Acceso a Grafana](grafana-acceso.md)).
 
 ## Arquitectura
 
@@ -27,18 +29,22 @@ acceso público y **no envía notificaciones de alertas**.
 
 - **Prometheus** es el único servicio del stack en la red de la aplicación; lee cada productor por
   el nombre de su contenedor. Sin puerto publicado. Evalúa las reglas de
-  `prometheus/rules/alerts.yml`. Sin Alertmanager ni API de administración.
+  `prometheus/rules/*.yml` y envía las alertas a Alertmanager (obs_net). Sin API de administración.
+- **Alertmanager** agrupa y entrega las alertas al receptor configurado (Discord o ninguno). Sin
+  puerto publicado, solo en obs_net. Ver [Alertas](alertas.md).
 - **Alloy** ejecuta `prometheus.exporter.unix` (CPU, memoria, carga, presión PSI, discos y
   sistemas de archivos) sobre `/proc`, `/sys` y `/` del host montados de solo lectura, y además
   lee el journal del host para los logs (ver [Logs](logs.md)). Corre como `nobody`, sin
   capacidades, sin red ni PID del host, sin socket de Docker. No recolecta métricas de red del
   host (el contenedor tiene su propia red y reportaría sus interfaces).
 - **Grafana** usa la fuente de datos `uid: prometheus` (por defecto) y `uid: loki` (logs) y los
-  dashboards de `grafana/dashboards/`, provisionados de solo lectura. Exige usuario y contraseña (sin acceso
-  anónimo ni registro). Tiene deshabilitados la telemetría, los avisos de versión, las noticias y
+  dashboards de `grafana/dashboards/`, provisionados de solo lectura. Exige autenticación (sin acceso
+  anónimo ni registro): administrador local por túnel o JWT de Cloudflare Access
+  ([Acceso a Grafana](grafana-acceso.md)). Solo con el acceso público (`compose.access.yml`) está
+  además en la red interna `piedrazul_obs_edge`, compartida solo con Traefik. Tiene deshabilitados la telemetría, los avisos de versión, las noticias y
   la descarga de plugins; su red no restringe otras conexiones salientes. Las alertas de Grafana
   están deshabilitadas: las evalúa Prometheus.
-- Los cuatro (con Loki) corren con raíz de solo lectura, `cap_drop: ALL`, `no-new-privileges` y
+- Los cinco (con Loki y Alertmanager) corren con raíz de solo lectura, `cap_drop: ALL`, `no-new-privileges` y
   límites de CPU y memoria. Ninguno depende de la aplicación para arrancar: si un productor no existe, su destino
   queda `up = 0`.
 
@@ -55,7 +61,8 @@ pseudo-fs, overlays y montajes de contenedores (cada uno sería un `mountpoint` 
 |---|---|
 | `infra/observability/compose.yml` | proyecto `piedrazul-obs`: servicios, redes, volúmenes, límites |
 | `infra/observability/.env.example` | variables (`GRAFANA_ADMIN_PASSWORD` obligatoria; red, puerto y retención opcionales) |
-| `infra/observability/prometheus/` | destinos (`prometheus.yml`) y reglas (`rules/*.yml`) |
+| `infra/observability/prometheus/` | destinos (`prometheus.yml`), envío a Alertmanager y reglas (`rules/*.yml`) |
+| `infra/observability/alertmanager/` | receptores `discord.yml` y `none.yml` y plantilla de mensajes ([Alertas](alertas.md)) |
 | `infra/observability/alloy/config.alloy` | exportador del host y lectura del journal ([Logs](logs.md)) |
 | `infra/observability/grafana/provisioning/` | fuente de datos y proveedor de dashboards |
 | `infra/observability/grafana/dashboards/` | `plataforma.json`, `backend-jvm.json` y `logs.json` ([Logs](logs.md)) |
@@ -190,7 +197,10 @@ correspondiente (`docker compose restart prometheus`, `alloy` o `grafana`).
 
 ### Acceso a Grafana
 
-Grafana escucha solo en `127.0.0.1:3000` del host; es el único acceso implementado. Por túnel SSH:
+Grafana escucha en `127.0.0.1:3000` del host. El acceso diario previsto es por
+`grafana.piedrazul.org` con Cloudflare Access, todavía no activado
+([Acceso a Grafana](grafana-acceso.md)); el túnel SSH sigue siendo el acceso del administrador local
+y la recuperación:
 
 ```bash
 ssh -L 3000:127.0.0.1:3000 ansible@<host>
@@ -208,10 +218,10 @@ y reflejarla en `.env`.
 
 ## Alertas
 
-Prometheus evalúa las reglas cada 30 s. **No hay notificaciones externas configuradas**: sin
-Alertmanager ni punto de contacto, una alerta solo se ve en el dashboard Plataforma (estadística
-**Alertas disparadas** y tabla de alertas) y en la serie `ALERTS`. Con Prometheus detenido no se
-evalúa ninguna regla.
+Prometheus evalúa las reglas cada 30 s. Una alerta se ve en el dashboard Plataforma (estadística
+**Alertas disparadas** y tabla de alertas) y en la serie `ALERTS` y, con el receptor `discord`
+activado, llega a Discord por Alertmanager ([Alertas](alertas.md), que también describe las cuatro
+reglas de la entrega). Con Prometheus detenido no se evalúa ninguna regla.
 
 | Alerta | Fuente | Condición | Duración | Ausencia de datos |
 |---|---|---|---|---|
@@ -252,6 +262,8 @@ Prometheus solo se une a `piedrazul_net`; no crea ni modifica la red.
 | Síntoma | Causa probable | Acción |
 |---|---|---|
 | `up` falla con `network piedrazul_net declared as external, but could not be found` | la aplicación no está instalada o levantada | levantar la aplicación primero |
+| `up` falla con `network piedrazul_obs_edge ... could not be found` | modo público (`COMPOSE_FILE` con `compose.access.yml`) y la aplicación corre una versión anterior a S3 | converge/deploy de la aplicación con esta versión, o modo privado ([Acceso a Grafana](grafana-acceso.md#estado-deseado)) |
+| `up` falla con `secret ... discord_webhook_url ... no such file` | falta el archivo del webhook (local) | `mkdir -p secrets && : > secrets/discord_webhook_url` (vacío con receptor `none`) |
 | `GRAFANA_ADMIN_PASSWORD es requerido` | falta `.env` | crearlo desde `.env.example` (local) o repetir el playbook (host) |
 | destino `down` con `no such host` | el contenedor del productor no existe en la red | `docker ps`; levantar el servicio |
 | destino `down` con `connection refused` | el productor corre sin su listener de métricas | revisar `MANAGEMENT_SERVER_PORT`, `KC_METRICS_ENABLED` o los flags de Traefik |

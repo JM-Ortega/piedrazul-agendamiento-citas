@@ -343,6 +343,9 @@ Lo que la retirada no deshace:
   archivos, hasta 4 GiB).
 - Si algún servicio de la aplicación se había pasado al driver `journald`, volver a `json-file`
   es un cambio de su archivo Compose.
+- Alertmanager y el acceso a Grafana por Access (S3) no son parte de los logs: desde una versión
+  con S3, la retirada de logs los deja en marcha. Su retirada está en [Alertas](alertas.md#retirada)
+  y [Acceso a Grafana](grafana-acceso.md#desactivación).
 
 ## Verificación
 

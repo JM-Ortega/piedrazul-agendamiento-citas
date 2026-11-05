@@ -1,11 +1,14 @@
-# Instala o actualiza el stack de observabilidad (métricas y logs) en el host. No toca el
-# proyecto de la aplicación (piedrazul): solo exige que su red exista y se une a ella con
-# Prometheus. Idempotente: un segundo run no cambia nada salvo que cambien los archivos del
+# Instala o actualiza el stack de observabilidad (métricas, logs, notificaciones y acceso a
+# Grafana) en el host. No toca el proyecto de la aplicación (piedrazul): solo exige que sus redes
+# existan y se une a ellas (Prometheus a la de la aplicación, Grafana a la de entrada de
+# Traefik). Idempotente: un segundo run no cambia nada salvo que cambien los archivos del
 # repositorio o las variables del rol.
 #
 # Los directorios de configuración (obs_managed_dirs) son del repositorio: el rol copia sus
 # archivos y borra en el host los que el repositorio ya no tiene. Los volúmenes no se tocan; de
-# .env solo se mantienen las variables de logs (journal y fuentes).
+# .env solo se mantienen las variables de logs (journal y fuentes), de acceso a Grafana y del
+# receptor de notificaciones; la contraseña de Grafana no se reescribe. El webhook de Discord es un
+# archivo aparte (obs_secrets_dir), no una variable de .env.
 #
 # Fuera de /opt/piedrazul-obs el rol solo escribe el drop-in de journald (obs_journald_dropin) y
 # reinicia journald cuando ese archivo cambia.
@@ -43,6 +46,9 @@
 - name: Comprobar la política de logs
   ansible.builtin.include_tasks: logs_preflight.yml
 
+- name: Comprobar el acceso a Grafana y las notificaciones
+  ansible.builtin.include_tasks: access_alerts_preflight.yml
+
 - name: Preparar el journal del host
   ansible.builtin.include_tasks: journal.yml
 
@@ -57,13 +63,14 @@
 
 # Legibles por todos: los contenedores (nobody, grafana) los leen por bind mount. No contienen
 # secretos; el único (contraseña de Grafana) está en .env, solo de su dueño.
-- name: Copiar compose.yml
+- name: Copiar compose.yml y compose.access.yml
   ansible.builtin.copy:
-    src: "{{ obs_src_dir }}/compose.yml"
-    dest: "{{ obs_dir }}/compose.yml"
+    src: "{{ obs_src_dir }}/{{ item }}"
+    dest: "{{ obs_dir }}/{{ item }}"
     owner: "{{ obs_owner }}"
     group: "{{ obs_owner }}"
     mode: "0644"
+  loop: [compose.yml, compose.access.yml]
 
 - name: Copiar los directorios de configuración
   ansible.builtin.copy:
@@ -153,9 +160,14 @@
   loop_control:
     label: "{{ item.key }}"
 
+# Estado deseado de S3 en .env y webhook de Discord (access_alerts_state.yml)
+- name: Guardar el estado deseado de S3 y el webhook
+  ansible.builtin.include_tasks: access_alerts_state.yml
+
 - name: Validar la configuración de Compose
   ansible.builtin.command:
-    argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml, config, --quiet]
+    argv: "{{ ['docker', 'compose', '--project-name', obs_compose_project_name]
+              + (obs_compose_files | map('regex_replace', '^', '--file=') | list) + ['config', '--quiet'] }}"
     chdir: "{{ obs_dir }}"
   changed_when: false
 
@@ -163,8 +175,7 @@
   community.docker.docker_compose_v2:
     project_src: "{{ obs_dir }}"
     project_name: "{{ obs_compose_project_name }}"
-    files:
-      - compose.yml
+    files: "{{ obs_compose_files }}"
     state: present
     pull: missing
     wait: true
@@ -178,8 +189,7 @@
   community.docker.docker_compose_v2:
     project_src: "{{ obs_dir }}"
     project_name: "{{ obs_compose_project_name }}"
-    files:
-      - compose.yml
+    files: "{{ obs_compose_files }}"
     services: "{{ obs_restart }}"
     state: restarted
     wait: true
@@ -193,8 +203,25 @@
       {{ obs_changed_dirs | map('extract', obs_restart_on_change) | reject('equalto', '')
          | unique | list }}
 
+# Webhook rotado: contenedor nuevo de Alertmanager para que monte el archivo nuevo. Silencios y
+# registro de notificaciones siguen en alertmanager_data: no reenvía lo ya entregado.
+- name: Recrear Alertmanager con el webhook nuevo
+  community.docker.docker_compose_v2:
+    project_src: "{{ obs_dir }}"
+    project_name: "{{ obs_compose_project_name }}"
+    files: "{{ obs_compose_files }}"
+    services: [alertmanager]
+    state: present
+    recreate: always
+    wait: true
+    wait_timeout: 120
+  when: obs_alertmanager_recreate | bool
+
 - name: Verificar la recolección y los dashboards
   ansible.builtin.include_tasks: verify.yml
 
 - name: Verificar la canalización de logs
   ansible.builtin.include_tasks: verify_logs.yml
+
+- name: Verificar las notificaciones y el acceso a Grafana
+  ansible.builtin.include_tasks: verify_access_alerts.yml

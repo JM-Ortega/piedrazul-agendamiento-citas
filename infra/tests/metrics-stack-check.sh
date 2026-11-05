@@ -29,7 +29,10 @@
 #      de los productores (más alloy y loki por obs_net); promtool check config/rules y test
 #      rules; Alloy con el exportador del host y sin remote_write; dashboards JSON válidos con
 #      las fuentes de datos provisionadas; los archivos Compose de la aplicación no mencionan el
-#      stack.
+#      stack salvo la red de entrada de Grafana (traefik.yml). S3: Alertmanager como quinto
+#      servicio (receptor none por defecto, webhook solo por archivo secreto) y Grafana sin JWT por
+#      defecto; el acceso y la entrega los prueban grafana-access-check.sh y
+#      alert-delivery-check.sh.
 #   2. Ansible: playbook observability.yml sintácticamente válido y fuera del workflow de
 #      producción.
 #   3. Recolección: los cinco destinos up; muestras de cada productor; etiquetas acotadas
@@ -53,6 +56,9 @@ ID="$$"
 APP_PROJECT="pzobs-check-${ID}"
 OBS_PROJECT="pzobs-check-${ID}-obs"
 APP_NET="pzobs_check_${ID}_net"
+# Red de entrada de Grafana: la crea el proyecto de la aplicación (traefik.yml); el stack corre en
+# modo privado (sin compose.access.yml) y no la usa. Nombre propio para no chocar con otra
+EDGE_NET="pzobs_check_${ID}_edge"
 GPORT="${GRAFANA_LOCAL_PORT:-13000}"
 
 for bin in docker jq yq ansible-playbook python3 openssl; do
@@ -79,8 +85,10 @@ PROM_IMAGE="$(yq -r '.services.prometheus.image' "${OBS}/compose.yml")"
 promtool() { docker run --rm -v "${OBS}:/w:ro" --entrypoint promtool "${PROM_IMAGE}" "$@"; }
 
 # ── 1. Configuración ─────────────────────────────────────────────────────────
-printf 'GRAFANA_ADMIN_PASSWORD=%s\nOBS_APP_NETWORK=%s\nGRAFANA_LOCAL_PORT=%s\n' \
-  "$(openssl rand -hex 16)" "${APP_NET}" "${GPORT}" > "${TMP}/obs.env"
+# Webhook de Discord: archivo vacío (receptor none por defecto), como lo deja el rol sin webhook
+mkdir -p "${TMP}/secrets" && : > "${TMP}/secrets/discord_webhook_url" && chmod 644 "${TMP}/secrets/discord_webhook_url"
+printf 'GRAFANA_ADMIN_PASSWORD=%s\nOBS_APP_NETWORK=%s\nGRAFANA_LOCAL_PORT=%s\nOBS_DISCORD_WEBHOOK_FILE=%s\n' \
+  "$(openssl rand -hex 16)" "${APP_NET}" "${GPORT}" "${TMP}/secrets/discord_webhook_url" > "${TMP}/obs.env"
 chmod 600 "${TMP}/obs.env"
 obs() { (cd "${OBS}" && docker compose -p "${OBS_PROJECT}" --env-file "${TMP}/obs.env" "$@"); }
 
@@ -94,18 +102,18 @@ check "Compose: sin GRAFANA_ADMIN_PASSWORD falla" \
 C="${TMP}/obs.json"
 check "Compose: nombre de proyecto declarado piedrazul-obs" \
   test "$(yq -r '.name' "${OBS}/compose.yml")" = piedrazul-obs
-check "Compose: servicios prometheus, grafana, alloy y loki (sin otros)" \
-  test "$(jq -r '.services | keys | sort | join(",")' "${C}")" = "alloy,grafana,loki,prometheus"
+check "Compose: servicios prometheus, grafana, alloy, loki y alertmanager (sin otros)" \
+  test "$(jq -r '.services | keys | sort | join(",")' "${C}")" = "alertmanager,alloy,grafana,loki,prometheus"
 check "Compose: imágenes fijadas <tag>@sha256:<digest>" \
   bash -c "jq -r '.services[].image' '${C}' | grep -vqE '^[a-z0-9./-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}\$' && exit 1 || exit 0"
 check "Compose: solo grafana publica un puerto, en 127.0.0.1" \
   bash -c "test \"\$(jq -r '[.services | to_entries[] | select((.value.ports // []) | length > 0) | .key] | join(\",\")' '${C}')\" = grafana && test \"\$(jq -r '[.services.grafana.ports[] | .host_ip] | unique | join(\",\")' '${C}')\" = 127.0.0.1"
 check "Compose: sin socket de Docker, privileged, red ni PID del host" \
   bash -c "! jq -e '.services[] | select(.privileged == true or .network_mode == \"host\" or .pid == \"host\" or ((.volumes // []) | map(.source // \"\") | any(test(\"docker.sock\"))))' '${C}'"
-check "Compose: cap_drop ALL, no-new-privileges y raíz de solo lectura en los cuatro" \
-  bash -c "test \"\$(jq '[.services[] | select((.cap_drop == [\"ALL\"]) and (.read_only == true) and ((.security_opt // []) | index(\"no-new-privileges:true\")))] | length' '${C}')\" = 4"
-check "Compose: límites de memoria y CPU en los cuatro" \
-  bash -c "test \"\$(jq '[.services[] | select(.deploy.resources.limits.memory and .deploy.resources.limits.cpus)] | length' '${C}')\" = 4"
+check "Compose: cap_drop ALL, no-new-privileges y raíz de solo lectura en los cinco" \
+  bash -c "test \"\$(jq '[.services[] | select((.cap_drop == [\"ALL\"]) and (.read_only == true) and ((.security_opt // []) | index(\"no-new-privileges:true\")))] | length' '${C}')\" = 5"
+check "Compose: límites de memoria y CPU en los cinco" \
+  bash -c "test \"\$(jq '[.services[] | select(.deploy.resources.limits.memory and .deploy.resources.limits.cpus)] | length' '${C}')\" = 5"
 check "Compose: solo prometheus en la red de la aplicación (externa)" \
   bash -c "test \"\$(jq -r '[.services | to_entries[] | select(.value.networks | has(\"app_net\")) | .key] | join(\",\")' '${C}')\" = prometheus && jq -e '.networks.app_net.external == true' '${C}'"
 check "Compose: Alloy sin root y montajes del host de solo lectura" \
@@ -115,21 +123,26 @@ check "Compose: retención por defecto 30d y 2GB en Prometheus" \
 check "Compose: Prometheus sin API de administración ni receptor remoto" \
   bash -c "! jq -r '.services.prometheus.command[]' '${C}' | grep -qE 'enable-admin-api|remote-write-receiver|enable-feature'"
 check "Compose: Grafana sin anónimos, registro, telemetría, avisos de versión ni plugins descargados" \
-  bash -c "e=\$(jq -r '.services.grafana.environment | to_entries[] | \"\(.key)=\(.value)\"' '${C}'); for kv in GF_AUTH_ANONYMOUS_ENABLED=false GF_USERS_ALLOW_SIGN_UP=false GF_ANALYTICS_REPORTING_ENABLED=false GF_ANALYTICS_CHECK_FOR_UPDATES=false GF_PLUGINS_PREINSTALL_DISABLED=true GF_UNIFIED_ALERTING_ENABLED=false; do grep -qx \"\$kv\" <<< \"\$e\" || exit 1; done"
+  bash -c "e=\$(jq -r '.services.grafana.environment | to_entries[] | \"\(.key)=\(.value)\"' '${C}'); for kv in GF_AUTH_ANONYMOUS_ENABLED=false GF_USERS_ALLOW_SIGN_UP=false GF_ANALYTICS_REPORTING_ENABLED=false GF_ANALYTICS_CHECK_FOR_UPDATES=false GF_PLUGINS_PREINSTALL_DISABLED=true GF_UNIFIED_ALERTING_ENABLED=false GF_AUTH_JWT_ENABLED=false; do grep -qx \"\$kv\" <<< \"\$e\" || exit 1; done"
 
 # Contrato de los productores (docs/architecture/overview.md, "Health y métricas")
-check "Prometheus: destinos = contrato (backend:8081/actuator/prometheus, keycloak:9000/metrics, traefik:8082/metrics, host, propio; alloy y loki de logs)" \
+check "Prometheus: destinos = contrato (backend:8081/actuator/prometheus, keycloak:9000/metrics, traefik:8082/metrics, host, propio; alloy y loki de logs; alertmanager)" \
   test "$(yq -r '[.scrape_configs[] | .job_name + "=" + (.static_configs[0].targets | join(",")) + (.metrics_path // "/metrics")] | sort | join(" ")' "${OBS}/prometheus/prometheus.yml")" \
-       = "alloy=alloy:12345/metrics backend=backend:8081/actuator/prometheus host=alloy:12345/api/v0/component/prometheus.exporter.unix.host/metrics keycloak=keycloak:9000/metrics loki=loki:3100/metrics prometheus=localhost:9090/metrics traefik=traefik:8082/metrics"
-check "Prometheus: sin Alertmanager ni remote_write configurados" \
-  bash -c "! yq -e '.alerting // .remote_write' '${OBS}/prometheus/prometheus.yml'"
+       = "alertmanager=alertmanager:9093/metrics alloy=alloy:12345/metrics backend=backend:8081/actuator/prometheus host=alloy:12345/api/v0/component/prometheus.exporter.unix.host/metrics keycloak=keycloak:9000/metrics loki=loki:3100/metrics prometheus=localhost:9090/metrics traefik=traefik:8082/metrics"
+# S3: Prometheus entrega a Alertmanager (único destino de alertas); sigue sin remote_write
+check "Prometheus: alertas solo a alertmanager:9093 y sin remote_write" \
+  bash -c "test \"\$(yq -r '[.alerting.alertmanagers[].static_configs[].targets[]] | join(\",\")' '${OBS}/prometheus/prometheus.yml')\" = alertmanager:9093 && ! yq -e '.remote_write' '${OBS}/prometheus/prometheus.yml'"
 check "Notificaciones: sin provisioning de alertas de Grafana (puntos de contacto, políticas)" \
   test ! -e "${OBS}/grafana/provisioning/alerting"
-check "Notificaciones: sin destinos externos (bots, webhooks) en la configuración, fuera de comentarios" \
-  bash -c "! grep -rhvE '^\s*(#|//)' '${OBS}/compose.yml' '${OBS}/prometheus' '${OBS}/alloy' '${OBS}/grafana/provisioning' | grep -qiE 'telegram|discord|webhook|bot_token|chat_id'"
+# S3: el único destino es Discord, por el archivo secreto de Alertmanager; ninguna URL ni token
+# en la configuración versionada
+check "Notificaciones: sin URL de webhook, bots ni tokens en la configuración, fuera de comentarios" \
+  bash -c "! grep -rhvE '^\s*(#|//)' '${OBS}/compose.yml' '${OBS}/prometheus' '${OBS}/alloy' '${OBS}/alertmanager' '${OBS}/grafana/provisioning' | grep -qiE 'https?://[^ ]*(discord|webhook)|telegram|bot_token|chat_id|(^|[^_a-z])webhook_url:'"
+check "Notificaciones: Discord solo en Alertmanager, por webhook_url_file" \
+  test "$(grep -rlE '^[^#]*discord' "${OBS}/compose.yml" "${OBS}/prometheus" "${OBS}/alloy" "${OBS}/grafana/provisioning" "${OBS}/alertmanager" | xargs -n1 basename | sort | paste -sd,)" = "compose.yml,discord.tmpl,discord.yml"
 check "promtool: check config" promtool check config /w/prometheus/prometheus.yml
-check "promtool: check rules" promtool check rules /w/prometheus/rules/alerts.yml /w/prometheus/rules/logs.yml
-if promtool test rules /w/tests/alerts.test.yml > "${TMP}/promtool-test.log" 2>&1; then
+check "promtool: check rules" promtool check rules /w/prometheus/rules/alerts.yml /w/prometheus/rules/logs.yml /w/prometheus/rules/notifications.yml
+if promtool test rules /w/tests/alerts.test.yml /w/tests/notifications-alerts.test.yml > "${TMP}/promtool-test.log" 2>&1; then
   ok "promtool: test rules (casos normal, falla y sin datos de cada regla)"
 else
   ko "promtool: test rules"; tail -20 "${TMP}/promtool-test.log" >&2
@@ -142,8 +155,9 @@ check "Grafana: dashboards de métricas JSON válidos, uid fijo y solo la fuente
   bash -c "for f in '${OBS}'/grafana/dashboards/plataforma.json '${OBS}'/grafana/dashboards/backend-jvm.json; do jq -e '.uid and (.uid | length > 0) and ([.. | objects | select(has(\"datasource\")) | .datasource.uid] | unique == [\"prometheus\"])' \"\$f\" || exit 1; done"
 check "Grafana: fuente de datos provisionada con uid prometheus" \
   test "$(yq -r '.datasources[0].uid + " " + .datasources[0].url' "${OBS}/grafana/provisioning/datasources/prometheus.yml")" = "prometheus http://prometheus:9090"
-check "Aplicación: infra/compose y docker-compose.yml no mencionan el stack de métricas" \
-  bash -c "! grep -rqiE 'grafana|alloy|piedrazul-obs|obs_net' '${COMPOSE_DIR}' '${ROOT}/docker-compose.yml'"
+# S3: la única referencia permitida es la red de entrada de Grafana que crea traefik.yml
+check "Aplicación: infra/compose y docker-compose.yml no mencionan el stack salvo la red de entrada (traefik.yml)" \
+  bash -c "! grep -rqiE 'grafana|alloy|piedrazul-obs|obs_net' \$(ls '${COMPOSE_DIR}'/*.yml | grep -v '/traefik.yml\$') '${ROOT}/docker-compose.yml' && ! grep -vE '^\s*#' '${COMPOSE_DIR}/traefik.yml' | grep -qiE 'grafana|alloy|piedrazul-obs|obs_net'"
 
 # ── 2. Ansible ───────────────────────────────────────────────────────────────
 check "Ansible: playbooks/observability.yml sintácticamente válido" \
@@ -186,6 +200,8 @@ name: ${APP_PROJECT}
 networks:
   piedrazul_net:
     name: ${APP_NET}
+  obs_edge:
+    name: ${EDGE_NET}
 services:
   postgres:
     image: ${POSTGRES_IMAGE}
@@ -307,8 +323,8 @@ done
 check "etiquetas: ninguna de usuario, correo, URL, host, sesión, token ni IP" test -z "${BAD_LABELS}"
 check "etiquetas: rutas por plantilla, sin identificadores numéricos concretos" \
   bash -c "! printf '%s' \"\$1\" | jq -r '.data[]' | grep -qE '/[0-9]{3,}(/|$)'" _ "$(obs exec -T prometheus wget -qO- 'http://localhost:9090/api/v1/label/uri/values')"
-check "reglas: todas cargadas (7 de métricas y 5 de logs) y evaluadas sin error" \
-  bash -c "obs_rules=\"\$1\"; test \"\$(jq '[.data.groups[].rules[]] | length' <<< \"\$obs_rules\")\" = 12 && jq -e '[.data.groups[].rules[] | .health] | all(. == \"ok\")' <<< \"\$obs_rules\"" _ "$(obs exec -T prometheus wget -qO- http://localhost:9090/api/v1/rules)"
+check "reglas: todas cargadas (7 de métricas, 5 de logs y 4 de notificaciones) y evaluadas sin error" \
+  bash -c "obs_rules=\"\$1\"; test \"\$(jq '[.data.groups[].rules[]] | length' <<< \"\$obs_rules\")\" = 16 && jq -e '[.data.groups[].rules[] | .health] | all(. == \"ok\")' <<< \"\$obs_rules\"" _ "$(obs exec -T prometheus wget -qO- http://localhost:9090/api/v1/rules)"
 check "reglas: la raíz del host (/) se reporta: PiedrazulHostRootFilesystemMissing sin condición" \
   test -n "$(pv 'node_filesystem_size_bytes{job="host",mountpoint="/"}')"
 echo "      raíz local (indicativo, VM de WSL2): libre $(pv 'node_filesystem_avail_bytes{job="host",mountpoint="/"}') B de $(pv 'node_filesystem_size_bytes{job="host",mountpoint="/"}') B; umbral $(pv 'clamp_min(node_filesystem_size_bytes{job="host",mountpoint="/"} * 0.15, 10 * 1024 * 1024 * 1024)') B"
@@ -379,7 +395,10 @@ traffic 20 /actuator/health
 sleep 35
 check "falla: Traefik cuenta los 502 del backend detenido" \
   test -n "$(pv 'sum(traefik_service_requests_total{service="backend@file",code="502"})')"
-alert_state() { pq 'ALERTS{alertname="PiedrazulTargetDown",job="backend"}' | jq -r '.data.result[0].metric.alertstate // empty'; }
+# Estado efectivo de la alerta: /api/v1/alerts (lo que Prometheus envía a Alertmanager). No la serie
+# ALERTS: tras reiniciar Prometheus su última muestra sigue visible ≈ 5 min (sin marcador de
+# obsolescencia) aunque la alerta ya no exista, y daba un falso negativo en la recuperación.
+alert_state() { obs exec -T prometheus wget -qO- http://localhost:9090/api/v1/alerts | jq -r '[.data.alerts[] | select(.labels.alertname == "PiedrazulTargetDown" and .labels.job == "backend") | .state] | first // empty'; }
 pending() { test "$(alert_state)" = pending; }
 check "falla: PiedrazulTargetDown{job=backend} pending (for: 5m)" wait_for 60 pending
 check "falla: otros destinos siguen up" test "$(pv 'count(up{job=~"keycloak|traefik|host"} == 1)')" = 3
@@ -412,7 +431,7 @@ H="$(app exec -T traefik wget -qO- --no-check-certificate --header 'Host: api.me
 check "operación: con el stack detenido el health público responde UP" grep -q '"status":"UP"' <<< "${H}"
 obs down >/dev/null 2>&1
 check "operación: down (sin -v) conserva los volúmenes" \
-  test "$(docker volume ls -q --filter label=com.docker.compose.project="${OBS_PROJECT}" | wc -l)" = 4
+  test "$(docker volume ls -q --filter label=com.docker.compose.project="${OBS_PROJECT}" | wc -l)" = 5
 obs up -d --wait --wait-timeout 180 >/dev/null 2>&1
 same_before() { test -n "${BEFORE}" && test "$(pv 'up{job="keycloak"}' "${T0}")" = "${BEFORE}"; }
 check "persistencia: datos de Prometheus anteriores a la recreación" wait_for 60 same_before

@@ -160,8 +160,10 @@ ALLOY_IMAGE="$(yq -r '.services.alloy.image' "${OBS}/compose.yml")"
 promtool() { docker run --rm --network none -v "${OBS}:/w:ro" --entrypoint promtool "${PROM_IMAGE}" "$@"; }
 
 # ── 1. Configuración ─────────────────────────────────────────────────────────
-printf 'GRAFANA_ADMIN_PASSWORD=%s\nOBS_APP_NETWORK=%s\nGRAFANA_LOCAL_PORT=%s\n' \
-  "$(openssl rand -hex 16)" "${APP_NET}" "${GPORT}" > "${TMP}/obs.env"
+# S3 en modo privado (sin acceso público): sin red de entrada; webhook vacío (receptor none)
+mkdir -p "${TMP}/secrets" && : > "${TMP}/secrets/discord_webhook_url" && chmod 644 "${TMP}/secrets/discord_webhook_url"
+printf 'GRAFANA_ADMIN_PASSWORD=%s\nOBS_APP_NETWORK=%s\nGRAFANA_LOCAL_PORT=%s\nOBS_DISCORD_WEBHOOK_FILE=%s\n' \
+  "$(openssl rand -hex 16)" "${APP_NET}" "${GPORT}" "${TMP}/secrets/discord_webhook_url" > "${TMP}/obs.env"
 chmod 600 "${TMP}/obs.env"
 # Raíz sintética para Alloy: el journal sintético en lugar del de la máquina
 cat > "${TMP}/override.yml" <<EOF
@@ -183,8 +185,8 @@ else
   ko "Compose: compose.yml renderiza con .env"; cat "${TMP}/obs-config.err" >&2
 fi
 C="${TMP}/obs.json"
-check "Compose: servicios alloy, grafana, loki y prometheus" \
-  test "$(jq -r '.services | keys | sort | join(",")' "${C}")" = "alloy,grafana,loki,prometheus"
+check "Compose: servicios alertmanager, alloy, grafana, loki y prometheus" \
+  test "$(jq -r '.services | keys | sort | join(",")' "${C}")" = "alertmanager,alloy,grafana,loki,prometheus"
 check "Compose: imágenes fijadas <tag>@sha256:<digest>" \
   bash -c "jq -r '.services[].image' '${C}' | grep -vqE '^[a-z0-9./-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}\$' && exit 1 || exit 0"
 check "Compose: Loki es la imagen oficial grafana/loki" \
@@ -197,8 +199,8 @@ check "Compose: Loki con 768 MiB y datos en el volumen loki_data" \
   jq -e '.services.loki.deploy.resources.limits.memory == "805306368" and ([.services.loki.volumes[] | select(.type == "volume") | .source + ":" + .target] == ["loki_data:/loki"])' "${C}"
 check "Compose: sin socket de Docker, privileged, red ni PID del host en ningún servicio" \
   bash -c "! jq -e '.services[] | select(.privileged == true or .network_mode == \"host\" or .pid == \"host\" or ((.volumes // []) | map(.source // \"\") | any(test(\"docker.sock\"))))' '${C}'"
-check "Compose: los cuatro con cap_drop ALL, no-new-privileges, raíz de solo lectura y límites" \
-  test "$(jq '[.services[] | select((.cap_drop == ["ALL"]) and (.read_only == true) and ((.security_opt // []) | index("no-new-privileges:true")) and .deploy.resources.limits.memory and .deploy.resources.limits.cpus)] | length' "${C}")" = 4
+check "Compose: los cinco con cap_drop ALL, no-new-privileges, raíz de solo lectura y límites" \
+  test "$(jq '[.services[] | select((.cap_drop == ["ALL"]) and (.read_only == true) and ((.security_opt // []) | index("no-new-privileges:true")) and .deploy.resources.limits.memory and .deploy.resources.limits.cpus)] | length' "${C}")" = 5
 check "Compose: Alloy sin root, grupos 473 y nogroup por defecto, 256 MiB" \
   jq -e '.services.alloy.user == "65534:65534" and .services.alloy.group_add == ["473", "65534"] and .services.alloy.deploy.resources.limits.memory == "268435456"' "${C}"
 check "Compose: OBS_JOURNAL_GID llega a group_add de Alloy" \
@@ -228,9 +230,9 @@ check "Loki: sin telemetría, sin descubrimiento de nivel ni de service_name" \
 check "Loki: escritura y consultas acotadas (tasa, streams, etiquetas, rango = retención)" \
   test "$(yq -r '[.limits_config.ingestion_rate_mb, .limits_config.max_global_streams_per_user, .limits_config.max_label_names_per_series, .limits_config.max_query_lookback] | join(" ")' "${LC}")" = "4 1000 8 336h"
 
-check "Prometheus: destinos = contrato (5 de métricas + alloy y loki por obs_net)" \
+check "Prometheus: destinos = contrato (5 de métricas + alloy y loki por obs_net + alertmanager de S3)" \
   test "$(yq -r '[.scrape_configs[] | .job_name + "=" + (.static_configs[0].targets | join(",")) + (.metrics_path // "/metrics")] | sort | join(" ")' "${OBS}/prometheus/prometheus.yml")" \
-       = "alloy=alloy:12345/metrics backend=backend:8081/actuator/prometheus host=alloy:12345/api/v0/component/prometheus.exporter.unix.host/metrics keycloak=keycloak:9000/metrics loki=loki:3100/metrics prometheus=localhost:9090/metrics traefik=traefik:8082/metrics"
+       = "alertmanager=alertmanager:9093/metrics alloy=alloy:12345/metrics backend=backend:8081/actuator/prometheus host=alloy:12345/api/v0/component/prometheus.exporter.unix.host/metrics keycloak=keycloak:9000/metrics loki=loki:3100/metrics prometheus=localhost:9090/metrics traefik=traefik:8082/metrics"
 check "Prometheus: alloy y loki con allowlist de series (metric_relabel keep)" \
   test "$(yq -r '[.scrape_configs[] | select(.job_name == "alloy" or .job_name == "loki") | .metric_relabel_configs[0].action] | join(",")' "${OBS}/prometheus/prometheus.yml")" = "keep,keep"
 check "promtool: check config" promtool check config /w/prometheus/prometheus.yml
@@ -260,8 +262,10 @@ check "Grafana: dashboard de logs piedrazul-logs con filtros de servicio, severi
   test "$(jq -r '.uid + " " + ([.templating.list[].name] | join(","))' "${OBS}/grafana/dashboards/logs.json")" = "piedrazul-logs service,level,correlation_id,search"
 check "Grafana: fuentes de datos prometheus (por defecto) y loki" \
   test "$(yq -r '.datasources[0].uid + " " + (.datasources[0].isDefault | tostring)' "${OBS}/grafana/provisioning/datasources/prometheus.yml") $(yq -r '.datasources[0].uid + " " + .datasources[0].url + " " + (.datasources[0].isDefault | tostring)' "${OBS}/grafana/provisioning/datasources/loki.yml")" = "prometheus true loki http://loki:3100 false"
-check "Aplicación: ningún archivo Compose activa journald ni menciona el stack" \
-  bash -c "! grep -rqiE 'journald|loki|alloy|grafana|piedrazul-obs' '${ROOT}/infra/compose' '${ROOT}/docker-compose.yml'"
+# S3: traefik.yml crea la red de entrada de Grafana y la nombra en un comentario; fuera de
+# comentarios ningún archivo de la aplicación nombra el stack
+check "Aplicación: ningún archivo Compose activa journald ni menciona el stack (fuera de comentarios)" \
+  bash -c "! grep -rhvE '^\s*#' '${ROOT}/infra/compose' '${ROOT}/docker-compose.yml' | grep -qiE 'journald|loki|alloy|grafana|piedrazul-obs'"
 
 # ── 2. Ansible ───────────────────────────────────────────────────────────────
 for p in observability.yml observability-logs-rollback.yml; do
@@ -370,6 +374,8 @@ synj_write pre \
 ok "runtime: journal sintético PRE escrito (16 entradas, 6 de productores que imitan a Docker)"
 
 docker network create "${APP_NET}" >/dev/null || { ko "runtime: red externa propia"; exit 1; }
+check "modo privado: no existe ninguna red de entrada de Grafana para este stack" \
+  bash -c "! docker network ls --format '{{.Name}}' | grep -qx 'piedrazul_obs_edge\|${APP_NET}_edge'"
 RUNTIME_STARTED=true
 obs up -d --wait --wait-timeout 180 > "${TMP}/obs-up.log" 2>&1 \
   && ok "runtime: stack levantado (proyecto ${OBS_PROJECT})" \
@@ -495,8 +501,8 @@ check "Grafana: sin acceso anónimo (401)" test "$(curl -s -o /dev/null -w '%{ht
 up_logs() { test "$(pv 'count(up{job=~"alloy|loki|host|prometheus"} == 1)')" = 4; }
 check "Prometheus: alloy, loki, host y prometheus up" wait_for 120 up_logs
 RULES="$(pexec wget -qO- http://localhost:9090/api/v1/rules 2>/dev/null)"
-check "Prometheus: 12 reglas cargadas (7 de métricas + 5 de logs), todas sanas" \
-  bash -c "test \"\$(jq '[.data.groups[].rules[]] | length' <<< \"\$1\")\" = 12 && jq -e '[.data.groups[].rules[] | .health] | all(. == \"ok\")' <<< \"\$1\"" _ "${RULES}"
+check "Prometheus: 16 reglas cargadas (7 de métricas + 5 de logs + 4 de notificaciones), todas sanas" \
+  bash -c "test \"\$(jq '[.data.groups[].rules[]] | length' <<< \"\$1\")\" = 16 && jq -e '[.data.groups[].rules[] | .health] | all(. == \"ok\")' <<< \"\$1\"" _ "${RULES}"
 ALLOY_NAMES="$(pq 'count by (__name__) ({job="alloy"})' | jq -r '[.data.result[].metric.__name__] | sort | join(" ")')"
 echo "      series de job=alloy: ${ALLOY_NAMES}"
 check "Prometheus: job=alloy solo con series de la allowlist (más up/scrape_*)" \
@@ -579,8 +585,8 @@ check "PRE: el journal lo conserva (no se exige su desaparición retroactiva)" s
 # down + up conserva los logs (volumen loki_data) y las posiciones (alloy_data)
 TOTAL_BEFORE_DOWN="$(lcount '{service=~".+"}')"
 obs down >/dev/null 2>&1
-check "operación: down (sin -v) conserva los cuatro volúmenes" \
-  test "$(docker volume ls -q --filter label=com.docker.compose.project="${OBS_PROJECT}" | wc -l)" = 4
+check "operación: down (sin -v) conserva los cinco volúmenes" \
+  test "$(docker volume ls -q --filter label=com.docker.compose.project="${OBS_PROJECT}" | wc -l)" = 5
 obs up -d --wait --wait-timeout 180 >/dev/null 2>&1
 check "persistencia: Loki listo tras recrear" wait_for 120 loki_ready
 same_total() { test "$(lcount '{service=~".+"}')" = "${TOTAL_BEFORE_DOWN}"; }

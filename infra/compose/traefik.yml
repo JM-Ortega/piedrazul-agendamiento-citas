@@ -54,6 +54,16 @@ services:
       - ../traefik/certs:/certs:ro
     networks:
       - piedrazul_net
+      - obs_edge
 
 volumes:
   traefik_letsencrypt:
+
+networks:
+  # Red interna (sin salida) que Traefik comparte solo con Grafana del stack de observabilidad
+  # (proyecto aparte, la usa como externa). La crea la aplicación para no depender de ese stack;
+  # Traefik solo la usa si routes.yml declara el router grafana (grafana_public_domain). Ningún
+  # otro servicio de la aplicación se une a ella.
+  obs_edge:
+    name: piedrazul_obs_edge
+    internal: true
