@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.model;
 
+import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentStateConflictException;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 
@@ -137,7 +138,7 @@ public class Appointment {
     // Cambiar cuando se implemente lo de reprogramadas
     public void changeState(AppointmentState appointmentState) {
         if (this.appointmentState != AppointmentState.AGENDADA) {
-            throw new IllegalStateException(
+            throw new AppointmentStateConflictException(
                     "Solo se puede cambiar el estado de citas agendadas"
             );
         }
@@ -147,7 +148,7 @@ public class Appointment {
 
     public void cancel() {
         if (this.appointmentState != AppointmentState.AGENDADA) {
-            throw new IllegalStateException(
+            throw new AppointmentStateConflictException(
                     "Solo las citas AGENDADAS pueden cancelarse. Estado actual: " + this.appointmentState
             );
         }

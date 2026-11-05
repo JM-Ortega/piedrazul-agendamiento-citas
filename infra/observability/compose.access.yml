@@ -1,0 +1,15 @@
+# Acceso público a Grafana (docs/operations/runbooks/grafana-acceso.md): se agrega a compose.yml
+# solo con GRAFANA_ACCESS_ENABLED=true (el rol de Ansible pone COMPOSE_FILE en .env). Une Grafana a
+# la red interna (sin salida) que comparte solo con Traefik; la crea infra/compose/traefik.yml de
+# la aplicación y debe existir antes. Sin este archivo (modo privado) Grafana solo está en obs_net
+# y en el loopback del host, y no hace falta la red.
+networks:
+  edge_net:
+    name: ${OBS_EDGE_NETWORK:-piedrazul_obs_edge}
+    external: true
+
+services:
+  grafana:
+    networks:
+      - obs_net
+      - edge_net

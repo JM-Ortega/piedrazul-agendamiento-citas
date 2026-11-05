@@ -3,6 +3,8 @@
 # La incluye setup.yml después de copiar traefik/ y antes de levantar Traefik.
 #
 # Mismas fuentes que .env (env.j2): api_public_domain, kc_hostname, server_port, kc_port.
+# grafana_public_domain (opcional, vacío por defecto): agrega el router de Grafana detrás de
+# Cloudflare Access (docs/operations/runbooks/grafana-acceso.md).
 # Antes de escribir se valida la entrada y el documento generado: un valor vacío o
 # malformado produciría un router inválido (Traefik lo descarta y solo lo registra en su
 # log), así que aquí falla visible sin tocar el archivo vigente. El archivo se reemplaza
@@ -14,33 +16,50 @@
       - api_public_domain | default('') | string is match(_host_re)
       - kc_hostname | default('') | string is match(_host_re)
       - api_public_domain != kc_hostname
+      - _grafana | length == 0 or _grafana is match(_host_re)
+      - _grafana | length == 0 or _grafana not in [api_public_domain, kc_hostname]
       - server_port | default('') | string is match('^[0-9]{1,5}\Z')
       - kc_port | default('') | string is match('^[0-9]{1,5}\Z')
     fail_msg: >-
       RUTAS DE TRAEFIK: api_public_domain='{{ api_public_domain | default('') }}',
-      kc_hostname='{{ kc_hostname | default('') }}' (nombres DNS distintos, en minúsculas),
+      kc_hostname='{{ kc_hostname | default('') }}', grafana_public_domain='{{ _grafana }}' (opcional)
+      (nombres DNS distintos, en minúsculas),
       server_port='{{ server_port | default('') }}', kc_port='{{ kc_port | default('') }}'.
       No se escribió routes.yml.
     quiet: true
   vars:
     _host_re: '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\Z'
+    _grafana: "{{ grafana_public_domain | default('') | string }}"
 
 - name: Validar el documento de rutas generado
   ansible.builtin.assert:
     that:
-      - _doc.http.routers | dict2items | map(attribute='key') | sort == ['backend', 'keycloak']
-      - _doc.http.services | dict2items | map(attribute='key') | sort == ['backend', 'keycloak']
+      - _doc.http.routers | dict2items | map(attribute='key') | sort == _names
+      - _doc.http.services | dict2items | map(attribute='key') | sort == _names
       - _doc.http.routers.backend.rule == 'Host(`' ~ api_public_domain ~ '`)'
       - _doc.http.routers.keycloak.rule == 'Host(`' ~ kc_hostname ~ '`)'
-      - _doc.http.routers | dict2items | map(attribute='value.service') | sort == ['backend', 'keycloak']
+      - _doc.http.routers | dict2items | map(attribute='value.service') | sort == _names
       - _doc.http.routers | dict2items | map(attribute='value.tls.options') | unique == ['cloudflare-aop']
       - _doc.http.routers | dict2items | map(attribute='value.tls.certResolver') | unique == ['letsencrypt']
       - _doc.http.services.backend.loadBalancer.servers | map(attribute='url') | list == ['http://backend:' ~ server_port]
       - _doc.http.services.keycloak.loadBalancer.servers | map(attribute='url') | list == ['http://keycloak:' ~ kc_port]
+      - _doc.http.routers.backend.middlewares is not defined
+      - _doc.http.routers.keycloak.middlewares is not defined
+      # Grafana: solo con grafana_public_domain, sin /login y sin credenciales que no sean el JWT
+      - _grafana | length > 0 or _doc.http.middlewares is not defined
+      - >-
+        _grafana | length == 0 or (
+          _doc.http.routers.grafana.rule == 'Host(`' ~ _grafana ~ '`) && !PathPrefix(`/login`)'
+          and _doc.http.routers.grafana.middlewares == ['grafana-access-only']
+          and _doc.http.middlewares | dict2items | map(attribute='key') | list == ['grafana-access-only']
+          and _doc.http.middlewares['grafana-access-only'].headers.customRequestHeaders == {'Authorization': '', 'Cookie': ''}
+          and _doc.http.services.grafana.loadBalancer.servers | map(attribute='url') | list == ['http://grafana:3000'])
     fail_msg: "RUTAS DE TRAEFIK: el documento generado no tiene la forma esperada. No se escribió routes.yml."
     quiet: true
   vars:
     _doc: "{{ lookup('ansible.builtin.template', 'traefik-routes.yml.j2') | from_yaml }}"
+    _grafana: "{{ grafana_public_domain | default('') | string }}"
+    _names: "{{ (['backend', 'keycloak'] + (['grafana'] if _grafana | length > 0 else [])) | sort }}"
 
 - name: Generar las rutas de Traefik
   ansible.builtin.template:

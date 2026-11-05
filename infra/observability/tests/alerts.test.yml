@@ -1,0 +1,310 @@
+# Pruebas unitarias de prometheus/rules/alerts.yml con series sintéticas:
+#   docker run --rm -v "$PWD/infra/observability:/w:ro" --entrypoint promtool \
+#     prom/prometheus:<ref de compose.yml> test rules /w/tests/alerts.test.yml
+# Cada regla con su caso normal, de falla y sin datos. Que pasen prueba la expresión y su
+# duración, no la entrega de ninguna notificación.
+rule_files:
+  - ../prometheus/rules/alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # ── PiedrazulTargetDown ─────────────────────────────────────────────────────
+  - name: productor caído 5 m dispara; se recupera; prometheus propio no cuenta
+    interval: 1m
+    input_series:
+      - series: 'up{job="backend", instance="backend:8081"}'
+        values: '1 1 0 0 0 0 0 0 0 1 1'
+      - series: 'up{job="keycloak", instance="keycloak:9000"}'
+        values: '1x10'
+      - series: 'up{job="prometheus", instance="localhost:9090"}'
+        values: '0x10'
+    alert_rule_test:
+      # 3 min caído: pendiente, sin disparar
+      - eval_time: 5m
+        alertname: PiedrazulTargetDown
+        exp_alerts: []
+      # 5 min caído (desde t=2m): dispara solo backend
+      - eval_time: 7m
+        alertname: PiedrazulTargetDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: backend, instance: "backend:8081"}
+            exp_annotations:
+              summary: "Prometheus no puede leer las métricas de backend"
+              description: "backend:8081 no responde a la lectura de métricas desde hace 5 minutos: el servicio está caído, reiniciándose en bucle o fuera de la red de la aplicación. Con job=host, es Alloy (sin él no se evalúan las alertas de disco ni de memoria)."
+      # recuperado
+      - eval_time: 10m
+        alertname: PiedrazulTargetDown
+        exp_alerts: []
+
+  - name: host (Alloy) caído dispara con job=host
+    interval: 1m
+    input_series:
+      - series: 'up{job="host", instance="alloy:12345"}'
+        values: '0x6'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: PiedrazulTargetDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: host, instance: "alloy:12345"}
+            exp_annotations:
+              summary: "Prometheus no puede leer las métricas de host"
+              description: "alloy:12345 no responde a la lectura de métricas desde hace 5 minutos: el servicio está caído, reiniciándose en bucle o fuera de la red de la aplicación. Con job=host, es Alloy (sin él no se evalúan las alertas de disco ni de memoria)."
+
+  # ── PiedrazulHttp5xxRatioHigh ───────────────────────────────────────────────
+  # 1 req/s, 10 % 5xx (502 de un upstream caído) sostenido → dispara a los 10 m
+  - name: 5xx sostenido sobre el umbral dispara
+    interval: 1m
+    input_series:
+      - series: 'traefik_service_requests_total{service="backend@file", code="200", method="GET", protocol="http"}'
+        values: '0+54x30'
+      - series: 'traefik_service_requests_total{service="backend@file", code="502", method="GET", protocol="http"}'
+        values: '0+6x30'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: PiedrazulHttp5xxRatioHigh
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: PiedrazulHttp5xxRatioHigh
+        exp_alerts:
+          - exp_labels: {severity: warning, service: backend@file}
+            exp_annotations:
+              summary: "Más del 5 % de respuestas 5xx en backend@file"
+              description: "10% de las respuestas de backend@file vistas por Traefik son 5xx desde hace 10 minutos."
+
+  - name: 5xx bajo el umbral no dispara
+    interval: 1m
+    input_series:
+      - series: 'traefik_service_requests_total{service="backend@file", code="200", method="GET", protocol="http"}'
+        values: '0+59x30'
+      - series: 'traefik_service_requests_total{service="backend@file", code="500", method="GET", protocol="http"}'
+        values: '0+1x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: PiedrazulHttp5xxRatioHigh
+        exp_alerts: []
+
+  # Todo 5xx pero con tráfico bajo el piso (0,01 req/s) → no dispara
+  - name: tráfico casi nulo no dispara aunque todo sea 5xx
+    interval: 1m
+    input_series:
+      - series: 'traefik_service_requests_total{service="keycloak@file", code="503", method="GET", protocol="http"}'
+        values: '0 1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3 3 3 3 3 3 3 3 3'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: PiedrazulHttp5xxRatioHigh
+        exp_alerts: []
+
+  - name: sin series de Traefik no dispara (lo cubre PiedrazulTargetDown)
+    interval: 1m
+    input_series:
+      - series: 'up{job="traefik", instance="traefik:8082"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: PiedrazulHttp5xxRatioHigh
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: PiedrazulTargetDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: traefik, instance: "traefik:8082"}
+            exp_annotations:
+              summary: "Prometheus no puede leer las métricas de traefik"
+              description: "traefik:8082 no responde a la lectura de métricas desde hace 5 minutos: el servicio está caído, reiniciándose en bucle o fuera de la red de la aplicación. Con job=host, es Alloy (sin él no se evalúan las alertas de disco ni de memoria)."
+
+  # ── PiedrazulHostRootFilesystemLow: libre < max(15 % de la capacidad, 10 GiB) en / ──
+  # Rama porcentual: 200 GiB con 20 GiB libres (10 %): sobre el piso de 10 GiB, bajo el 15 %
+  - name: raíz grande bajo el 15 % dispara a los 15 m (rama porcentual)
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_size_bytes{job="host", instance="a:12345", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '214748364800x20'
+      - series: 'node_filesystem_avail_bytes{job="host", instance="a:12345", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '21474836480x20'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: PiedrazulHostRootFilesystemLow
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: PiedrazulHostRootFilesystemLow
+        exp_alerts:
+          - exp_labels: {severity: warning, job: host, instance: "a:12345", device: /dev/sda1, fstype: ext4, mountpoint: /}
+            exp_annotations:
+              summary: "Poco espacio libre en el sistema de archivos raíz del host"
+              description: "/ (/dev/sda1) tiene 20GiB libres desde hace 15 minutos, por debajo de max(15 % de su capacidad, 10 GiB)."
+
+  # Rama absoluta: 40 GiB con 8 GiB libres (20 %): sobre el 15 %, bajo el piso de 10 GiB
+  - name: raíz chica bajo 10 GiB dispara aunque supere el 15 % (rama absoluta)
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_size_bytes{job="host", instance="b:12345", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '42949672960x20'
+      - series: 'node_filesystem_avail_bytes{job="host", instance="b:12345", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '8589934592x20'
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: PiedrazulHostRootFilesystemLow
+        exp_alerts:
+          - exp_labels: {severity: warning, job: host, instance: "b:12345", device: /dev/sda1, fstype: ext4, mountpoint: /}
+            exp_annotations:
+              summary: "Poco espacio libre en el sistema de archivos raíz del host"
+              description: "/ (/dev/sda1) tiene 8GiB libres desde hace 15 minutos, por debajo de max(15 % de su capacidad, 10 GiB)."
+
+  # Normal: sobre ambos umbrales; y otro montaje casi lleno no cuenta (solo /)
+  - name: raíz holgada y otros montajes llenos no disparan
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_size_bytes{job="host", instance="c:12345", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '214748364800x20'
+      - series: 'node_filesystem_avail_bytes{job="host", instance="c:12345", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '107374182400x20'
+      - series: 'node_filesystem_size_bytes{job="host", instance="d:12345", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '42949672960x20'
+      - series: 'node_filesystem_avail_bytes{job="host", instance="d:12345", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '12884901888x20'
+      - series: 'node_filesystem_size_bytes{job="host", instance="c:12345", device="/dev/sdb1", fstype="ext4", mountpoint="/data"}'
+        values: '107374182400x20'
+      - series: 'node_filesystem_avail_bytes{job="host", instance="c:12345", device="/dev/sdb1", fstype="ext4", mountpoint="/data"}'
+        values: '1073741824x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: PiedrazulHostRootFilesystemLow
+        exp_alerts: []
+
+  # Se recupera: libera espacio y la alerta se resuelve
+  - name: raíz recuperada resuelve la alerta
+    interval: 1m
+    input_series:
+      - series: 'node_filesystem_size_bytes{job="host", instance="e:12345", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '42949672960x30'
+      - series: 'node_filesystem_avail_bytes{job="host", instance="e:12345", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '8589934592x20 21474836480x10'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: PiedrazulHostRootFilesystemLow
+        exp_alerts:
+          - exp_labels: {severity: warning, job: host, instance: "e:12345", device: /dev/sda1, fstype: ext4, mountpoint: /}
+            exp_annotations:
+              summary: "Poco espacio libre en el sistema de archivos raíz del host"
+              description: "/ (/dev/sda1) tiene 8GiB libres desde hace 15 minutos, por debajo de max(15 % de su capacidad, 10 GiB)."
+      - eval_time: 25m
+        alertname: PiedrazulHostRootFilesystemLow
+        exp_alerts: []
+
+  # Sin datos: Alloy responde pero no reporta / → PiedrazulHostRootFilesystemMissing
+  - name: host sin serie de la raíz dispara la alerta de raíz ausente
+    interval: 1m
+    input_series:
+      - series: 'up{job="host", instance="alloy:12345"}'
+        values: '1x20'
+      - series: 'node_filesystem_size_bytes{job="host", instance="alloy:12345", device="/dev/sdb1", fstype="ext4", mountpoint="/data"}'
+        values: '107374182400x20'
+      - series: 'node_filesystem_avail_bytes{job="host", instance="alloy:12345", device="/dev/sdb1", fstype="ext4", mountpoint="/data"}'
+        values: '53687091200x20'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: PiedrazulHostRootFilesystemMissing
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: PiedrazulHostRootFilesystemMissing
+        exp_alerts:
+          - exp_labels: {severity: warning, job: host, instance: "alloy:12345"}
+            exp_annotations:
+              summary: "Alloy no reporta el sistema de archivos raíz del host"
+              description: "alloy:12345 responde pero sin node_filesystem_* para \"/\": la alerta de espacio en la raíz no puede evaluarse. Revisar el montaje de / en Alloy."
+      - eval_time: 16m
+        alertname: PiedrazulHostRootFilesystemLow
+        exp_alerts: []
+
+  - name: host con la raíz reportada no dispara la alerta de raíz ausente
+    interval: 1m
+    input_series:
+      - series: 'up{job="host", instance="alloy:12345"}'
+        values: '1x20'
+      - series: 'node_filesystem_size_bytes{job="host", instance="alloy:12345", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '214748364800x20'
+      - series: 'node_filesystem_avail_bytes{job="host", instance="alloy:12345", device="/dev/sda1", fstype="ext4", mountpoint="/"}'
+        values: '107374182400x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: PiedrazulHostRootFilesystemMissing
+        exp_alerts: []
+
+  # ── PiedrazulHostMemoryLow ──────────────────────────────────────────────────
+  - name: memoria disponible bajo el 10 % durante 10 m dispara; recuperada no
+    interval: 1m
+    input_series:
+      - series: 'node_memory_MemAvailable_bytes{job="host", instance="alloy:12345"}'
+        values: '50 5x12 50x5'
+      - series: 'node_memory_MemTotal_bytes{job="host", instance="alloy:12345"}'
+        values: '100x18'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: PiedrazulHostMemoryLow
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: PiedrazulHostMemoryLow
+        exp_alerts:
+          - exp_labels: {severity: warning, job: host, instance: "alloy:12345"}
+            exp_annotations:
+              summary: "Memoria disponible del host bajo el 10 %"
+              description: "Disponible: 5% de la memoria total desde hace 10 minutos."
+      - eval_time: 16m
+        alertname: PiedrazulHostMemoryLow
+        exp_alerts: []
+
+  - name: "Alloy caído (up = 0) no dispara memoria, raíz baja ni raíz ausente; lo cubre PiedrazulTargetDown"
+    interval: 1m
+    input_series:
+      - series: 'up{job="host", instance="alloy:12345"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: PiedrazulHostMemoryLow
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: PiedrazulHostRootFilesystemLow
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: PiedrazulHostRootFilesystemMissing
+        exp_alerts: []
+
+  # ── Reglas sobre Prometheus mismo ───────────────────────────────────────────
+  - name: evaluaciones de reglas fallidas disparan; contador estable no
+    interval: 1m
+    input_series:
+      - series: 'prometheus_rule_evaluation_failures_total{job="prometheus", instance="localhost:9090", rule_group="/etc/prometheus/rules/alerts.yml;piedrazul-host"}'
+        values: '0x5 1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2'
+      - series: 'prometheus_rule_evaluation_failures_total{job="prometheus", instance="localhost:9090", rule_group="/etc/prometheus/rules/alerts.yml;piedrazul-disponibilidad"}'
+        values: '0x22'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: PiedrazulRuleEvaluationFailing
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: PiedrazulRuleEvaluationFailing
+        exp_alerts:
+          - exp_labels: {severity: warning, job: prometheus, instance: "localhost:9090", rule_group: "/etc/prometheus/rules/alerts.yml;piedrazul-host"}
+            exp_annotations:
+              summary: "Fallan evaluaciones de reglas en /etc/prometheus/rules/alerts.yml;piedrazul-host"
+              description: "Prometheus no pudo evaluar reglas del grupo /etc/prometheus/rules/alerts.yml;piedrazul-host en los últimos 10 minutos: sus alertas no reflejan el estado real."
+      - eval_time: 22m
+        alertname: PiedrazulRuleEvaluationFailing
+        exp_alerts: []
+
+  - name: recarga de configuración fallida 5 m dispara
+    interval: 1m
+    input_series:
+      - series: 'prometheus_config_last_reload_successful{job="prometheus", instance="localhost:9090"}'
+        values: '1 0x8'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: PiedrazulPrometheusConfigReloadFailed
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: PiedrazulPrometheusConfigReloadFailed
+        exp_alerts:
+          - exp_labels: {severity: warning, job: prometheus, instance: "localhost:9090"}
+            exp_annotations:
+              summary: "Prometheus no pudo cargar su configuración"
+              description: "La última recarga de la configuración falló; sigue en vigor la anterior."

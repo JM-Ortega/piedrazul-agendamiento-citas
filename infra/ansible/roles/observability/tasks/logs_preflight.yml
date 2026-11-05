@@ -1,0 +1,41 @@
+# Comprobaciones de los logs antes de copiar o levantar nada: política de fuentes y GID del
+# volumen de Alloy. Un fallo aquí no cambia nada en el host.
+
+- name: Calcular las fuentes de logs no admitidas
+  ansible.builtin.set_fact:
+    obs_log_services_rejected: >-
+      {{ obs_log_services
+         | reject('in', obs_log_services_allowed
+                        + (obs_log_services_conditional | intersect(obs_log_privacy_controls_done)))
+         | list
+         + (obs_log_services | intersect(obs_log_services_excluded)) | unique }}
+
+- name: Verificar la política de fuentes de logs
+  ansible.builtin.assert:
+    that:
+      - obs_log_services | length > 0
+      - obs_log_services | reject('match', '^[a-z0-9][a-z0-9_-]*$') | list | length == 0
+      - obs_log_project is match('^[a-z0-9][a-z0-9_-]*$')
+      - obs_log_services_rejected | length == 0
+    fail_msg: >-
+      obs_log_services={{ obs_log_services }} no cumple la política de fuentes. No admitidos:
+      {{ obs_log_services_rejected }}. backend y keycloak exigen figurar en
+      obs_log_privacy_controls_done (controles de privacidad del productor completos);
+      {{ obs_log_services_excluded | join(', ') }} nunca se envían. No se copió ni levantó nada.
+    quiet: true
+
+- name: Buscar el GID del volumen de Alloy en el host
+  ansible.builtin.command:
+    argv: [getent, group, "{{ obs_alloy_data_gid }}"]
+  register: obs_alloy_gid_host
+  changed_when: false
+  failed_when: obs_alloy_gid_host.rc not in [0, 2]
+
+- name: Verificar que el GID del volumen de Alloy no es un grupo del host
+  ansible.builtin.assert:
+    that: obs_alloy_gid_host.rc == 2
+    fail_msg: >-
+      El GID {{ obs_alloy_data_gid }} es el grupo {{ obs_alloy_gid_host.stdout.split(':')[0] }}
+      del host: Alloy lo recibe como grupo suplementario (dueño de su volumen de estado) y
+      tendría sus permisos sobre la raíz montada. No se copió ni levantó nada.
+    quiet: true

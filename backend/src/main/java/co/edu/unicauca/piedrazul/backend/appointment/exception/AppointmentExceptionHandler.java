@@ -56,17 +56,17 @@ public class AppointmentExceptionHandler extends BaseExceptionHandler {
             throw accessDeniedException;
         }
 
-        String errorCode = (ex instanceof BusinessException be) ? be.getErrorCode() : "INTERNAL_ERROR";
-        HttpStatus status = (ex instanceof BusinessException be) ? be.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
-        String module = (ex instanceof BusinessException be) ? be.getModule() : "appointment";
+        if (!(ex instanceof BusinessException be)) {
+            return buildUnexpectedProblem(log, ex, "appointment", request);
+        }
 
         log.warn("Error de negocio en el modulo appointment [{}]: {}", ex.getClass().getSimpleName(), ex.getMessage());
         return buildProblem(
-                status,
-                spanishTitle(status),
+                be.getStatus(),
+                spanishTitle(be.getStatus()),
                 ex.getMessage(),
-                module,
-                errorCode,
+                be.getModule(),
+                be.getErrorCode(),
                 request
         );
     }
@@ -100,7 +100,7 @@ public class AppointmentExceptionHandler extends BaseExceptionHandler {
             throw accessDeniedException;
         }
 
-        log.error("Excepción no controlada en el módulo appointment", ex);
+        logUnexpected(log, "Excepción no controlada en el módulo appointment", ex, request);
         return buildProblem(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Error interno del servidor",

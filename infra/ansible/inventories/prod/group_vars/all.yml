@@ -40,6 +40,12 @@ traefik_compose_file: "{{ compose_src_dir }}/traefik.yml"
 # Dominio base
 base_domain: piedrazul.org
 
+# Grafana detrás de Cloudflare Access (router de Traefik por la red piedrazul_obs_edge). Vacío:
+# sin router, Grafana solo por túnel SSH. Habilitarlo exige antes la aplicación de Access, el DNS
+# y el stack de observabilidad con obs_grafana_access_enabled (ver
+# docs/operations/runbooks/grafana-acceso.md, "Activación").
+grafana_public_domain: ""
+
 # Spring / backend
 spring_profiles_active: prod
 server_port: 8080
@@ -75,8 +81,11 @@ max_file_size: 10MB
 max_request_size: 10MB
 
 # Actuator
-management_exposed_endpoints: health,info
+# Listener privado de gestión: métricas Prometheus, solo dentro de la red de contenedores.
+# /actuator/health sigue también en server_port (HEALTHCHECK de la imagen y health público).
+management_exposed_endpoints: health,info,prometheus
 management_health_details: when-authorized
+management_server_port: 8081
 
 # Logging
 log_level_root: INFO

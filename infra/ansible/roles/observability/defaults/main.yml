@@ -1,0 +1,104 @@
+# Stack privado de observabilidad (métricas y logs), proyecto Compose propio. Ver
+# docs/operations/runbooks/metricas.md y docs/operations/runbooks/logs.md.
+obs_dir: /opt/piedrazul-obs
+obs_compose_project_name: piedrazul-obs
+# Dueño de la configuración copiada y del .env (secreto: solo su dueño lo lee). Las tareas corren
+# con become (ansible.cfg), así que Compose lee .env como root.
+obs_owner: ansible
+obs_env_owner: root
+obs_src_dir: "{{ playbook_dir }}/../../observability"
+# Red de la aplicación a la que se une Prometheus (la crea prod.yml del proyecto piedrazul)
+obs_app_network: piedrazul_net
+# Red interna de entrada de Grafana, compartida solo con Traefik (la crea la aplicación en
+# compose/traefik.yml). Va a .env como OBS_EDGE_NETWORK.
+obs_edge_network: piedrazul_obs_edge
+# Destinos que deben quedar leídos tras levantar el stack (job de prometheus.yml)
+obs_expected_jobs: [backend, keycloak, traefik, host, prometheus, alloy, loki, alertmanager]
+obs_expected_dashboards: [piedrazul-plataforma, piedrazul-backend-jvm, piedrazul-logs]
+# Directorios de configuración del repositorio: se copian y se reconcilian (lo retirado del
+# repositorio se borra del host)
+obs_managed_dirs: [prometheus, alloy, loki, alertmanager, grafana/provisioning, grafana/dashboards]
+# Servicio a reiniciar cuando cambia cada directorio ('' = se recarga solo)
+obs_restart_on_change:
+  prometheus: prometheus
+  alloy: alloy
+  loki: loki
+  alertmanager: alertmanager
+  grafana/provisioning: grafana
+  grafana/dashboards: ''
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+# Fuentes que Alloy envía a Loki: servicios del proyecto Compose obs_log_project que escriben en
+# el journal (logging.driver: journald en su archivo Compose). Esta lista no activa el driver:
+# solo selecciona. Va a .env como OBS_LOG_PROJECT / OBS_LOG_SERVICES.
+obs_log_project: piedrazul
+obs_log_services: [traefik]
+# Política de fuentes. El rol falla, sin tocar nada, si obs_log_services incluye un servicio
+# fuera de lo admitido:
+#   - admitidos: sus logs no llevan datos personales conocidos;
+#   - condicionados: admitidos solo cuando figuran también en obs_log_privacy_controls_done,
+#     es decir, cuando sus controles de privacidad en el productor están completos (ver
+#     docs/operations/runbooks/logs.md, "Política de fuentes");
+#   - excluidos: nunca.
+obs_log_services_allowed: [traefik]
+obs_log_services_conditional: [backend, keycloak]
+obs_log_privacy_controls_done: []
+obs_log_services_excluded: [postgres, migrate, prometheus, grafana, alloy, loki]
+
+# GID dueño de /var/lib/alloy/data en la imagen de Alloy (grupo suplementario en compose.yml). No
+# debe existir en el host: daría a Alloy los permisos de ese grupo sobre la raíz montada.
+obs_alloy_data_gid: 473
+
+# Journal persistente del host. Grupo dueño de sus archivos (Alloy lo recibe como grupo
+# suplementario) y ruta; el GID se descubre en cada run.
+obs_journal_dir: /var/log/journal
+obs_journal_group: systemd-journal
+
+# Drop-in de journald propio de este rol (alcance: todo el host, no solo Piedra Azul). Con
+# obs_journald_manage: false el rol no lo escribe ni reinicia journald, pero sigue exigiendo un
+# journal persistente.
+obs_journald_manage: true
+obs_journald_dropin: /etc/systemd/journald.conf.d/60-piedrazul-obs.conf
+obs_journald_system_max_use: 2G
+obs_journald_system_max_file_size: 128M
+obs_journald_max_retention: 7day
+
+# Retirada de logs (playbooks/observability-logs-rollback.yml, segundo paso): con true borra
+# además los volúmenes de Loki (todos los logs) y de Alloy (posiciones de lectura)
+obs_logs_purge: false
+
+# ── Estado deseado de S3 (acceso a Grafana, notificaciones) ──────────────────
+# Contrato: el estado deseado no secreto vive en /opt/piedrazul-obs/.env del host y es persistente.
+# Cada variable de abajo vale ~ (null) = "conservar lo que el host ya tiene" (o, si el host no lo
+# tiene, el valor inicial indicado). Darla (-e, host_vars) la cambia y queda guardada: un run de
+# mantenimiento sin -e no activa ni desactiva nada. Desactivar es explícito (-e ...=false / none).
+# La credencial (webhook) no es parte de este estado: va aparte, en obs_secrets_dir.
+# Ver docs/operations/runbooks/grafana-acceso.md y alertas.md, "Estado deseado".
+#
+# Acceso a Grafana por Cloudflare Access (inicial: false). Los identificadores son de la cuenta
+# (no secretos); los correos son personales: nunca en el repositorio, solo en el host.
+obs_grafana_access_enabled: ~
+# Nombre público (https://<este>/ es la root_url de Grafana)
+obs_grafana_public_domain: ~
+# <equipo>.cloudflareaccess.com: emisor (iss) y origen del JWKS
+obs_grafana_access_team_domain: ~
+# Application Audience (AUD) Tag de la aplicación de Access de Grafana (64 hex)
+obs_grafana_access_aud: ~
+# Autorización en Grafana por correo (minúsculas). Editor: edita dashboards; Viewer: lectura.
+# Ninguna lista da Admin: la administración es del administrador local por túnel.
+obs_grafana_access_editors: ~
+obs_grafana_access_viewers: ~
+
+# ── Notificaciones ───────────────────────────────────────────────────────────
+# Receptor de Alertmanager (inicial: none): none (no envía) o discord.
+obs_alert_receiver: ~
+# Entorno de origen que encabeza cada mensaje (staging, produccion, …): obligatorio con discord,
+# porque varios entornos pueden compartir un webhook. Minúsculas, dígitos y guiones.
+obs_environment: ~
+# URL del webhook de Discord: solo del entorno del controlador (nunca en el inventario ni en el
+# repositorio). Vacía: se conserva la del host. Se escribe en obs_secrets_dir, solo legible por
+# Alertmanager (UID obs_alertmanager_uid).
+obs_discord_webhook_url: "{{ lookup('ansible.builtin.env', 'OBS_DISCORD_WEBHOOK_URL') }}"
+obs_discord_webhook_re: '^https://(discord\.com|discordapp\.com|ptb\.discord\.com|canary\.discord\.com)/api/webhooks/[0-9]{15,25}/[A-Za-z0-9_-]{30,100}\Z'
+obs_secrets_dir: "{{ obs_dir }}/secrets"
+obs_alertmanager_uid: 65534

@@ -13,6 +13,15 @@ services:
       # Entrypoints
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      # Métricas Prometheus en un entrypoint propio, solo dentro de piedrazul_net: sin puerto
+      # publicado y sin router (los de routes.yml declaran websecure). Etiquetas por entrypoint
+      # y servicio; las de router repetirían las de servicio (uno a uno).
+      - "--entrypoints.metrics.address=:8082"
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.entrypoint=metrics"
+      - "--metrics.prometheus.addEntryPointsLabels=true"
+      - "--metrics.prometheus.addServicesLabels=true"
+      - "--metrics.prometheus.addRoutersLabels=false"
       # Redirigir HTTP → HTTPS globalmente
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
@@ -45,6 +54,16 @@ services:
       - ../traefik/certs:/certs:ro
     networks:
       - piedrazul_net
+      - obs_edge
 
 volumes:
   traefik_letsencrypt:
+
+networks:
+  # Red interna (sin salida) que Traefik comparte solo con Grafana del stack de observabilidad
+  # (proyecto aparte, la usa como externa). La crea la aplicación para no depender de ese stack;
+  # Traefik solo la usa si routes.yml declara el router grafana (grafana_public_domain). Ningún
+  # otro servicio de la aplicación se une a ella.
+  obs_edge:
+    name: piedrazul_obs_edge
+    internal: true

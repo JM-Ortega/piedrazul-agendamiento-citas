@@ -1,0 +1,66 @@
+# Reglas de la entrega de notificaciones: Prometheus → Alertmanager → Discord. No cambian ninguna
+# regla de alerts.yml ni de logs.yml; vigilan que sus disparos lleguen al operador. Pruebas:
+# infra/observability/tests/notifications-alerts.test.yml (promtool test rules).
+#
+# Una falla de entrega no puede avisarse por el mismo canal que falla: estas reglas se ven en
+# Prometheus y en Grafana (serie ALERTS) y, cuando la falla es parcial o transitoria, también
+# llegan a Discord. Lo que no se ve desde dentro (host, Prometheus o Alertmanager caídos, webhook
+# revocado) lo delata la falta del latido diario. Ver docs/operations/runbooks/alertas.md.
+groups:
+  - name: piedrazul-notificaciones
+    rules:
+      # Latido: siempre en firing. Alertmanager lo envía una vez al día (repeat_interval de su
+      # ruta). Si un día no llega a Discord, algo en la cadena falla; si llega su resolución,
+      # Prometheus dejó de enviarlo. Sin severidad de incidente.
+      - alert: PiedrazulNotificationHeartbeat
+        expr: vector(1)
+        labels:
+          severity: info
+        annotations:
+          summary: "Latido diario de las notificaciones de Piedra Azul"
+          description: >-
+            Prometheus evalúa reglas y Alertmanager entrega a este canal. Si este mensaje deja
+            de llegar un día, revisar la cadena (runbook de alertas). Si llega como resuelta,
+            Prometheus dejó de enviar alertas.
+
+      # Prometheus no alcanza Alertmanager (caído, fuera de obs_net). 5 m, como los demás
+      # destinos. Mientras dura, ninguna alerta se notifica.
+      - alert: PiedrazulAlertmanagerDown
+        expr: up{job="alertmanager"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Alertmanager no responde: las alertas no se notifican"
+          description: >-
+            {{ $labels.instance }} no responde desde hace 5 minutos. Las alertas siguen
+            evaluándose en Prometheus pero no llegan a Discord.
+
+      # Prometheus no pudo entregar alertas a Alertmanager (errores de envío o cola descartada):
+      # pérdida de notificaciones entre ambos aunque Alertmanager esté arriba.
+      - alert: PiedrazulPrometheusNotificationsFailing
+        expr: |
+          sum by (instance) (increase(prometheus_notifications_errors_total{job="prometheus"}[15m])) > 0
+          or
+          sum by (instance) (increase(prometheus_notifications_dropped_total{job="prometheus"}[15m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus no pudo entregar alertas a Alertmanager"
+          description: >-
+            En los últimos 15 minutos Prometheus registró errores o descartes al enviar alertas
+            a Alertmanager: alguna notificación pudo perderse.
+
+      # Envíos de Alertmanager a Discord que fallaron tras sus reintentos (webhook revocado,
+      # 4xx, Discord o la red caídos). Disparo puntual de cada lote perdido; si persiste, sigue
+      # en firing.
+      - alert: PiedrazulAlertNotificationsFailing
+        expr: sum by (integration) (increase(alertmanager_notifications_failed_total{job="alertmanager"}[15m])) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "Fallan las notificaciones a {{ $labels.integration }}"
+          description: >-
+            {{ $value | humanize }} envíos a {{ $labels.integration }} fallaron en los últimos 15
+            minutos tras sus reintentos: esas alertas no llegaron. Revisar el webhook y los
+            logs de Alertmanager.

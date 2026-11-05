@@ -1,0 +1,24 @@
+# Loki de este proyecto Compose, por la red obs_net. uid fijo: el dashboard de logs lo
+# referencia. Sin credenciales (Loki no está publicado). No es la fuente por defecto.
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: false
+    editable: false
+    jsonData:
+      timeout: 60
+      maxLines: 1000
+      # Id de correlación del backend ([<uuid>]): enlace a todas las líneas que lo contienen,
+      # de cualquier servicio
+      derivedFields:
+        - name: correlation_id
+          matcherType: regex
+          matcherRegex: '\[([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]'
+          url: '{service=~".+"} |= "${__value.raw}"'
+          datasourceUid: loki
+          urlDisplayLabel: Ver todas las líneas de esta petición
