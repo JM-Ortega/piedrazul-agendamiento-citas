@@ -148,17 +148,20 @@ if promtool test rules /w/tests/alerts.test.yml /w/tests/notifications-alerts.te
 else
   ko "promtool: test rules"; tail -20 "${TMP}/promtool-test.log" >&2
 fi
-# Las consultas que prueba tests/dashboards.test.yml son las de los paneles ($__rate_interval = 2m)
+# Las consultas que prueba tests/dashboards.test.yml son las de los paneles ($__rate_interval = 2m).
+# <archivo>:<id>[:<consulta>], con la consulta por posición (0 si se omite).
 dash_exprs_tested() {
-  local t e p
+  local t e p f id n
   t="$(yq -r '[.tests[].promql_expr_test[].expr] | unique | .[]' "${OBS}/tests/dashboards.test.yml")"
-  for p in plataforma.json:7 plataforma.json:14 plataforma.json:15 logs.json:10; do
-    e="$(jq -r --argjson id "${p##*:}" '[.panels[] | ., (.panels // [])[]] | map(select(.id == $id))[0].targets[0].expr // empty' "${OBS}/grafana/dashboards/${p%%:*}")"
+  for p in plataforma.json:7 plataforma.json:14 plataforma.json:15 plataforma.json:20 plataforma.json:22 \
+      backend-jvm.json:24 logs.json:10 logs.json:11 logs.json:12 logs.json:13 logs.json:15:1 logs.json:17 logs.json:18; do
+    IFS=: read -r f id n <<< "$p"
+    e="$(jq -r --argjson id "${id}" --argjson n "${n:-0}" '[.panels[] | ., (.panels // [])[]] | map(select(.id == $id))[0].targets[$n].expr // empty' "${OBS}/grafana/dashboards/${f}")"
     e="${e//\$__rate_interval/2m}"
     [ -n "$e" ] && grep -qxF -- "$e" <<< "$t" || { echo "panel ${p}: consulta sin probar" >&2; return 1; }
   done
 }
-check "Grafana: las consultas probadas en dashboards.test.yml son las de Plataforma 7, 14 y 15 y Logs 10" dash_exprs_tested
+check "Grafana: las consultas probadas en dashboards.test.yml son las de sus paneles (Plataforma, Backend y Logs)" dash_exprs_tested
 check "Alloy: exportador del host prometheus.exporter.unix \"host\" (sin remote_write, otelcol, discovery.docker ni socket)" \
   bash -c "c=\$(grep -vE '^\s*//' '${OBS}/alloy/config.alloy'); grep -qE '^prometheus\.exporter\.unix \"host\" \\{' <<< \"\$c\" && ! grep -qiE 'remote_write|otelcol|discovery\.docker|docker\.sock' <<< \"\$c\""
 check "Alloy: la configuración se valida (alloy fmt)" \
@@ -263,10 +266,11 @@ traffic() { # traffic <n> <ruta> [host]
   app exec -T traefik sh -c "i=0; while [ \$i -lt $1 ]; do wget -q -O /dev/null --no-check-certificate --header 'Host: ${3:-api.metrics-check.test}' https://localhost$2 2>/dev/null; i=\$((i+1)); done; true"
 }
 # Tráfico en dos tandas separadas: un contador recién creado necesita al menos dos lecturas para
-# que rate() tenga valor
+# que rate() tenga valor. 25 peticiones a la API por tanda superan el mínimo de 20 de los paneles de
+# latencia p95 del backend (que no cuentan /actuator), así que también deben tener datos.
 traffic_rounds() {
   for _ in 1 2; do
-    traffic 30 /actuator/health; traffic 10 /api/patients
+    traffic 30 /actuator/health; traffic 25 /api/patients
     traffic 10 /realms/piedrazul/.well-known/openid-configuration auth.metrics-check.test
     sleep 35
   done

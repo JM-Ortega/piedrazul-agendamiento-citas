@@ -5,7 +5,7 @@
 Instalar, operar, verificar y retirar la recolección privada de logs de Piedra Azul: los
 contenedores seleccionados escriben en el journal del host con el driver `journald` de Docker,
 Alloy lee ese journal y envía solo las fuentes admitidas a Loki, y Grafana las muestra en el
-dashboard **Piedra Azul – Logs**. Forma parte del proyecto Compose `piedrazul-obs` (ver
+dashboard **Logs**. Forma parte del proyecto Compose `piedrazul-obs` (ver
 [Métricas](metricas.md)); la aplicación no lo necesita para arrancar ni para quedar healthy.
 
 La entrega es de **mejor esfuerzo**: una línea puede faltar o repetirse (ver
@@ -230,7 +230,7 @@ journalctl -o json -n 1 COM_DOCKER_COMPOSE_SERVICE=backend | jq '{_TRANSPORT, _S
 sudo grep -E '^OBS_LOG_(PROJECT|SERVICES)=' /opt/piedrazul-obs/.env
 ```
 
-**Consultas** (Explore o dashboard **Piedra Azul – Logs**, fuente `loki`):
+**Consultas** (Explore o dashboard **Logs**, fuente `loki`):
 
 | Para | LogQL |
 |---|---|
@@ -432,7 +432,7 @@ flujo y nivel.
 | `infra/observability/prometheus/prometheus.yml` | destinos `alloy` y `loki` con lista de series |
 | `infra/observability/prometheus/rules/logs.yml` | reglas de la canalización |
 | `infra/observability/grafana/provisioning/datasources/loki.yml` | fuente de datos `loki` |
-| `infra/observability/grafana/dashboards/logs.json` | dashboard **Piedra Azul – Logs** |
+| `infra/observability/grafana/dashboards/logs.json` | dashboard **Logs** |
 | `infra/observability/tests/logs-alerts.test.yml` | pruebas unitarias de las reglas |
 | `infra/ansible/roles/observability/` | política de fuentes, journal, drop-in, `.env`, verificación, retirada |
 | `infra/ansible/playbooks/observability-logs-rollback.yml` | retirada de Loki y del drop-in |
@@ -518,32 +518,42 @@ Repetirlo sin cambios no cambia nada.
 
 ## Operación y diagnóstico
 
-Dashboard **Piedra Azul – Logs** (carpeta Piedra Azul):
+Dashboard **Logs** (carpeta Piedra Azul), de arriba abajo:
 
-- **Logs** es la vista general: filtros de servicio, severidad (*All* incluye líneas sin
-  severidad), id de correlación (vacío: sin filtrar) y búsqueda (expresión regular, sin
-  mayúsculas). Cada línea muestra su servicio y severidad; el detalle, todas sus etiquetas y
-  metadatos.
+- **Estado de la recolección**: Loki y Alloy (lectura de sus métricas), componentes de Alloy sin
+  funcionar y alertas de logs disparadas (0 en verde solo si Prometheus evaluó el grupo
+  `piedrazul-logs` en los últimos 2 min; si no, **SIN DATOS**).
+- **Volumen y búsqueda de logs**: líneas por servicio (con todos los filtros), errores y avisos
+  por servicio (solo con el filtro de servicio) y **Logs filtrados**, la vista general: filtros de
+  servicio, severidad (*All* incluye líneas sin severidad), id de correlación (vacío: sin filtrar)
+  y búsqueda (expresión regular, sin mayúsculas). Cada línea muestra su servicio y severidad; el
+  detalle, todas sus etiquetas y metadatos.
 - **Líneas con el id de correlación**: con un id, todas las líneas de cualquier servicio que lo
   contienen (cabecera `X-Correlation-Id`); sin id no muestra nada. En el detalle de una línea del
   backend, el campo `correlation_id` enlaza a la misma búsqueda. Solo el backend escribe el id:
   que otro servicio no aparezca no prueba que no participó.
-- **Salud de la recolección**: Loki y Alloy arriba, componentes de Alloy sin funcionar, entradas
-  leídas del journal (todas las unidades, antes de la selección), seleccionadas, descartadas,
-  flujo, reintentos y rechazos, memoria y última retención.
+- **Diagnóstico de la canalización (Alloy → Loki)**: entradas leídas del journal (todas las
+  unidades, antes de la selección), seleccionadas, descartadas, última retención, flujo,
+  reintentos y rechazos (solo resultados con problema; los envíos correctos están en el flujo) y
+  memoria. Los contadores de Alloy muestran **SIN DATOS** (morado) si Alloy no se lee ahora, en
+  lugar de una cifra vieja o un 0. La retención sigue el criterio de
+  `PiedrazulLokiRetentionNotRunning`: **AÚN NO CORRIÓ** (azul) si Loki arrancó hace menos de 3 h y
+  todavía no completó ninguna; **NINGUNA EN 3 H** (naranja) si lleva más de 3 h arriba sin
+  completar ninguna.
 
 Cómo distinguir las causas cuando no aparecen logs:
 
 | Señal | Significa | Alerta |
 |---|---|---|
-| Loki **CAÍDO** | Loki no responde; Alloy retiene y reintenta | `PiedrazulLokiDown` |
-| Alloy **CAÍDO** (y host caído en Plataforma) | Alloy no corre: ni logs ni métricas del host | `PiedrazulTargetDown{job="host"}` |
+| Loki **CAÍDO** | Prometheus no lee las métricas de Loki: normalmente Loki no responde (Alloy retiene y reintenta), aunque puede fallar solo la lectura; si **Logs filtrados** carga líneas recientes, Loki responde | `PiedrazulLokiDown` |
+| Alloy **CAÍDO** (y host caído en Plataforma) | Prometheus no lee Alloy: si Alloy no corre, no hay logs ni métricas del host; si siguen llegando líneas nuevas, solo falla la lectura | `PiedrazulTargetDown{job="host"}` |
 | Componentes sin funcionar > 0 | normalmente `loki.source.journal` sin directorio del journal que abrir | `PiedrazulAlloyComponentUnhealthy` |
 | Componentes sin funcionar **CAÍDO** / **SIN DATOS** | Prometheus no lee Alloy / Alloy responde sin métricas de componentes (o no es destino): el estado de los componentes es desconocido, no sano | `PiedrazulTargetDown{job="host"}` (Alloy caído); SIN DATOS con Alloy arriba no alerta: revisar `metric_relabel_configs` de `alloy` en `prometheus.yml` |
 | Entradas leídas = 0 con Alloy arriba | archivos del journal ilegibles para Alloy (grupo) o lectura detenida; el componente sigue sano | `PiedrazulLogsJournalNotRead` (6 h) |
 | Leídas > 0, seleccionadas = 0 | ningún servicio seleccionado escribió en el journal: callado, sin driver journald o fuera de la selección | ninguna |
 | Reintentos con Loki arriba | Loki rechaza (límite de tasa, error); se ve en **Reintentos, rechazos y descartes** | ninguna mientras no haya pérdida |
 | Descartadas > 0 | pérdida consumada | `PiedrazulLogsDropped` |
+| Leídas, seleccionadas o descartadas **SIN DATOS** | Alloy no se lee ahora o no publica esa métrica: no se sabe si hubo lectura ni pérdida | `PiedrazulTargetDown{job="host"}` (Alloy caído) |
 
 Un servicio seleccionado sin líneas no es una falla y no alerta. Sin las series de Loki o de
 Alloy (no se leen) las reglas de logs no se evalúan: lo dicen `PiedrazulLokiDown` y

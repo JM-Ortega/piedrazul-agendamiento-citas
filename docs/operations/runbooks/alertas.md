@@ -92,9 +92,9 @@ prueba que la cadena funcione. Lo que nadie dentro del servidor puede avisar no 
 - webhook revocado o borrado sin nada que enviar: se descubre en el siguiente incidente, cuando su
   envío falla (`PiedrazulAlertNotificationsFailing` en Grafana).
 
-Para eso hay que mirar Grafana (Plataforma: **Alertas accionables disparadas** en 0 y verde
-significa reglas evaluadas hace menos de 2 min y ningún incidente; **SIN DATOS**, que Prometheus no
-evalúa) y probar la entrega de punta a punta al instalar, rotar el webhook y en cada verificación
+Para eso hay que mirar Grafana (Plataforma: **Alertas que requieren atención** en 0 y verde
+significa reglas evaluadas hace menos de 2 min y ningún incidente; **SIN DATOS** (morado), que
+Prometheus no evalúa) y probar la entrega de punta a punta al instalar, rotar el webhook y en cada verificación
 del entorno (paso 3 de [Credencial](#credencial)). La disponibilidad pública de la aplicación la
 vigila además UptimeRobot cuando se active ([Monitoreo externo](monitoreo-externo.md)).
 

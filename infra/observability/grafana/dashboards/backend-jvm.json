@@ -1,7 +1,7 @@
 {
   "uid": "piedrazul-backend-jvm",
-  "title": "Backend JVM",
-  "description": "JVM, pool de conexiones y HTTP del backend (Micrometer, backend:8081).",
+  "title": "Backend",
+  "description": "Backend (Spring Boot): API HTTP, conexiones a PostgreSQL (HikariCP), memoria y GC de la JVM, CPU, hilos y descriptores de archivo.",
   "tags": [
     "piedrazul"
   ],
@@ -58,7 +58,7 @@
     {
       "type": "stat",
       "title": "Métricas del backend",
-      "description": "CAÍDO: Prometheus no lee backend:8081. Mientras tanto los demás paneles no tienen datos nuevos.",
+      "description": "Resultado de la última lectura (scrape, cada 30 s) del endpoint de métricas del backend (backend:8081, serie up). OK: el proceso responde y expone métricas; no prueba que la API funcione (ver API HTTP). CAÍDO: la lectura falla y los demás paneles dejan de recibir datos nuevos. SIN DATOS (morado): estado desconocido.",
       "targets": [
         {
           "datasource": {
@@ -97,7 +97,7 @@
                 "match": "null+nan",
                 "result": {
                   "text": "SIN DATOS",
-                  "color": "red",
+                  "color": "purple",
                   "index": 9
                 }
               }
@@ -154,7 +154,7 @@
     {
       "type": "stat",
       "title": "Tiempo en ejecución",
-      "description": "Desde el último arranque de la JVM.",
+      "description": "Tiempo desde el último arranque de la JVM del backend. Un valor bajo inesperado indica un reinicio (despliegue, caída o falta de memoria): conviene revisar los logs del backend.",
       "targets": [
         {
           "datasource": {
@@ -178,7 +178,7 @@
                 "match": "null+nan",
                 "result": {
                   "text": "SIN DATOS",
-                  "color": "red",
+                  "color": "purple",
                   "index": 9
                 }
               }
@@ -231,8 +231,8 @@
     },
     {
       "type": "stat",
-      "title": "Heap usado / máximo",
-      "description": "Heap usado sobre el máximo configurado (MaxRAMPercentage del contenedor).",
+      "title": "Heap ahora / máximo",
+      "description": "Fracción del heap de la JVM (la memoria de los objetos Java) ocupada ahora, respecto de su máximo. El backend arranca con -XX:MaxRAMPercentage=75: el máximo es el 75 % de la memoria que ve la JVM, que es la del host porque los archivos Compose actuales no le fijan límite de memoria al contenedor (con un límite, sería el 75 % de ese límite). Sube mientras la aplicación crea objetos y baja en cada recolección (GC), como muestra la curva: un pico alto antes de un GC es normal, por eso no hay rojo. Naranja (≥ 90 %): mira Heap de larga vida tras GC; si también está alto, el heap puede estar quedando justo para la carga.",
       "targets": [
         {
           "datasource": {
@@ -242,8 +242,8 @@
           "expr": "sum(jvm_memory_used_bytes{job=\"backend\", area=\"heap\"}) / sum(jvm_memory_max_bytes{job=\"backend\", area=\"heap\"} > 0)",
           "legendFormat": "__auto",
           "refId": "A",
-          "range": false,
-          "instant": true
+          "range": true,
+          "instant": false
         }
       ],
       "fieldConfig": {
@@ -256,7 +256,7 @@
                 "match": "null+nan",
                 "result": {
                   "text": "SIN DATOS",
-                  "color": "red",
+                  "color": "purple",
                   "index": 9
                 }
               }
@@ -270,20 +270,18 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "blue",
                 "value": null
               },
               {
                 "color": "orange",
-                "value": 0.8
-              },
-              {
-                "color": "red",
                 "value": 0.9
               }
             ]
           },
-          "decimals": 1
+          "decimals": 1,
+          "min": 0,
+          "max": 1
         },
         "overrides": []
       },
@@ -295,8 +293,8 @@
           "fields": "",
           "values": false
         },
-        "colorMode": "background",
-        "graphMode": "none",
+        "colorMode": "value",
+        "graphMode": "area",
         "justifyMode": "auto",
         "textMode": "auto",
         "orientation": "auto",
@@ -318,7 +316,7 @@
     {
       "type": "stat",
       "title": "Hilos vivos",
-      "description": "",
+      "description": "Hilos de la JVM del backend en este momento. No hay un valor correcto fijo: depende de los pools (Tomcat, HikariCP, tareas internas). Importa la tendencia: un número que sube sin bajar sugiere hilos que no terminan (ver Hilos por estado).",
       "targets": [
         {
           "datasource": {
@@ -342,7 +340,7 @@
                 "match": "null+nan",
                 "result": {
                   "text": "SIN DATOS",
-                  "color": "red",
+                  "color": "purple",
                   "index": 9
                 }
               }
@@ -394,8 +392,8 @@
     },
     {
       "type": "stat",
-      "title": "Conexiones a la base en uso",
-      "description": "Conexiones activas del pool Hikari (máximo en el panel del pool).",
+      "title": "Conexiones BD en uso",
+      "description": "Conexiones del pool HikariCP a PostgreSQL prestadas ahora a una petición (activas). El máximo del pool y las esperas están en Conexiones del pool.",
       "targets": [
         {
           "datasource": {
@@ -419,7 +417,7 @@
                 "match": "null+nan",
                 "result": {
                   "text": "SIN DATOS",
-                  "color": "red",
+                  "color": "purple",
                   "index": 9
                 }
               }
@@ -496,7 +494,7 @@
                 "match": "null+nan",
                 "result": {
                   "text": "SIN DATOS",
-                  "color": "red",
+                  "color": "purple",
                   "index": 9
                 }
               }
@@ -548,9 +546,9 @@
     },
     {
       "type": "row",
-      "title": "Memoria y GC",
+      "title": "API HTTP",
       "collapsed": false,
-      "id": 8,
+      "id": 21,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -561,35 +559,24 @@
     },
     {
       "type": "timeseries",
-      "title": "Heap por región",
-      "description": "Uso por región del heap (G1) y máximo total.",
+      "title": "Peticiones por ruta (top 10)",
+      "description": "Peticiones por segundo de las 10 rutas con más tráfico, por método y plantilla de ruta (por ejemplo /api/patients/{id}, nunca la URL concreta). Incluye /actuator/health (healthcheck de Docker cada 30 s), que con poco tráfico real puede encabezar la lista. UNKNOWN: rechazada antes de llegar a un controlador. La lista se recalcula en cada punto, así que en rangos largos la leyenda puede tener más de 10 rutas.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "jvm_memory_used_bytes{job=\"backend\", area=\"heap\"}",
-          "legendFormat": "{{id}}",
+          "expr": "topk(10, sum by (method, uri) (rate(http_server_requests_seconds_count{job=\"backend\"}[$__rate_interval])))",
+          "legendFormat": "{{method}} {{uri}}",
           "refId": "A",
-          "range": true,
-          "instant": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(jvm_memory_max_bytes{job=\"backend\", area=\"heap\"} > 0)",
-          "legendFormat": "máximo",
-          "refId": "B",
           "range": true,
           "instant": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
+          "unit": "reqps",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,
@@ -617,7 +604,7 @@
           "sort": "desc"
         }
       },
-      "id": 9,
+      "id": 22,
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -631,35 +618,24 @@
     },
     {
       "type": "timeseries",
-      "title": "Memoria fuera del heap",
-      "description": "Metaspace, code cache y buffers directos/mapeados: también cuentan contra el límite del contenedor.",
+      "title": "Errores 5xx por ruta",
+      "description": "Respuestas 5xx por segundo generadas por el backend, por código, método y ruta. «Sin respuestas 5xx» es lo normal mientras Métricas del backend esté en OK; si está CAÍDO o SIN DATOS, el vacío no prueba nada. No incluye los 502 o 504 que Traefik devuelve cuando el backend no responde (ver Plataforma).",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "jvm_memory_used_bytes{job=\"backend\", area=\"nonheap\"}",
-          "legendFormat": "{{id}}",
+          "expr": "sum by (method, uri, status) (rate(http_server_requests_seconds_count{job=\"backend\", status=~\"5..\"}[$__rate_interval]))",
+          "legendFormat": "{{status}} {{method}} {{uri}}",
           "refId": "A",
-          "range": true,
-          "instant": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum by (id) (jvm_buffer_memory_used_bytes{job=\"backend\"})",
-          "legendFormat": "buffer {{id}}",
-          "refId": "B",
           "range": true,
           "instant": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
+          "unit": "reqps",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,
@@ -672,7 +648,8 @@
           },
           "color": {
             "mode": "palette-classic"
-          }
+          },
+          "noValue": "Sin respuestas 5xx"
         },
         "overrides": []
       },
@@ -687,7 +664,7 @@
           "sort": "desc"
         }
       },
-      "id": 10,
+      "id": 23,
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -701,86 +678,16 @@
     },
     {
       "type": "timeseries",
-      "title": "Pausas de GC",
-      "description": "Segundos de pausa por segundo y pausas por segundo, por colector.",
+      "title": "Latencia p95 por ruta de la API (top 10 por tráfico)",
+      "description": "p95 del tiempo de respuesta de cada plantilla de ruta, para las 10 rutas de la API con más tráfico (sin /actuator). El p95 no es la petición más lenta: el 5 % tardó más. Una ruta solo se dibuja con al menos 20 peticiones en la ventana: con poco tráfico la mayoría no tendrá línea, y eso no significa que sea rápida. Mismos buckets fijos que la latencia general (50 ms … 5 s): el valor se interpola dentro del bucket y 5 s significa 5 s o más.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (gc) (rate(jvm_gc_pause_seconds_sum{job=\"backend\"}[$__rate_interval]))",
-          "legendFormat": "tiempo en pausa {{gc}}",
-          "refId": "A",
-          "range": true,
-          "instant": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum by (gc) (rate(jvm_gc_pause_seconds_count{job=\"backend\"}[$__rate_interval]))",
-          "legendFormat": "pausas/s {{gc}}",
-          "refId": "B",
-          "range": true,
-          "instant": false
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "none"
-            }
-          },
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "id": 11,
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 14
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      }
-    },
-    {
-      "type": "timeseries",
-      "title": "Pausa máxima de GC",
-      "description": "Pausa más larga en la ventana reciente de Micrometer.",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "max by (gc) (jvm_gc_pause_seconds_max{job=\"backend\"})",
-          "legendFormat": "{{gc}}",
+          "expr": "histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job=\"backend\", uri!~\"/actuator.*\"}[$__rate_interval]))) and on (uri) topk(10, sum by (uri) (rate(http_server_requests_seconds_count{job=\"backend\", uri!~\"/actuator.*\"}[$__rate_interval]))) and on (uri) sum by (uri) (increase(http_server_requests_seconds_count{job=\"backend\", uri!~\"/actuator.*\"}[$__rate_interval])) >= 20",
+          "legendFormat": "{{uri}}",
           "refId": "A",
           "range": true,
           "instant": false
@@ -816,11 +723,11 @@
           "sort": "desc"
         }
       },
-      "id": 12,
+      "id": 24,
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
+        "w": 12,
+        "x": 0,
         "y": 14
       },
       "datasource": {
@@ -830,35 +737,24 @@
     },
     {
       "type": "timeseries",
-      "title": "Sobrecarga de GC y heap tras GC",
-      "description": "Un heap tras GC que crece sin bajar indica retención de memoria.",
+      "title": "Eventos de log por nivel",
+      "description": "Eventos por segundo que el backend escribió en su log con nivel error (rojo) y warn (naranja), contados por Logback: solo la cantidad, no el texto (para leerlos, dashboard Logs). Funciona aunque Loki no esté disponible. Un warn ocasional es normal; errores sostenidos o un salto tras un despliegue merecen revisar los logs.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "jvm_gc_overhead{job=\"backend\"}",
-          "legendFormat": "fracción de CPU en GC",
+          "expr": "sum by (level) (rate(logback_events_total{job=\"backend\", level=~\"error|warn\"}[$__rate_interval]))",
+          "legendFormat": "{{level}}",
           "refId": "A",
-          "range": true,
-          "instant": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "jvm_memory_usage_after_gc{job=\"backend\"}",
-          "legendFormat": "heap de larga vida tras GC",
-          "refId": "B",
           "range": true,
           "instant": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
+          "unit": "suffix:/s",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,
@@ -871,11 +767,40 @@
           },
           "color": {
             "mode": "palette-classic"
-          },
-          "min": 0,
-          "max": 1
+          }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "error"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "warn"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -888,11 +813,11 @@
           "sort": "desc"
         }
       },
-      "id": 13,
+      "id": 25,
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
+        "w": 12,
+        "x": 12,
         "y": 14
       },
       "datasource": {
@@ -902,9 +827,9 @@
     },
     {
       "type": "row",
-      "title": "CPU e hilos",
+      "title": "Base de datos (HikariCP)",
       "collapsed": false,
-      "id": 14,
+      "id": 18,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -915,222 +840,8 @@
     },
     {
       "type": "timeseries",
-      "title": "CPU",
-      "description": "",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "process_cpu_usage{job=\"backend\"}",
-          "legendFormat": "proceso",
-          "refId": "A",
-          "range": true,
-          "instant": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "system_cpu_usage{job=\"backend\"}",
-          "legendFormat": "sistema (visto por la JVM)",
-          "refId": "B",
-          "range": true,
-          "instant": false
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "none"
-            }
-          },
-          "color": {
-            "mode": "palette-classic"
-          },
-          "min": 0,
-          "max": 1
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "id": 15,
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 23
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      }
-    },
-    {
-      "type": "timeseries",
-      "title": "Hilos por estado",
-      "description": "",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "jvm_threads_states_threads{job=\"backend\"}",
-          "legendFormat": "{{state}}",
-          "refId": "A",
-          "range": true,
-          "instant": false
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "normal"
-            }
-          },
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "id": 16,
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 23
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      }
-    },
-    {
-      "type": "timeseries",
-      "title": "Descriptores de archivo",
-      "description": "",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "process_files_open_files{job=\"backend\"}",
-          "legendFormat": "abiertos",
-          "refId": "A",
-          "range": true,
-          "instant": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "process_files_max_files{job=\"backend\"}",
-          "legendFormat": "máximo",
-          "refId": "B",
-          "range": true,
-          "instant": false
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "none"
-            }
-          },
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "id": 17,
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 23
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      }
-    },
-    {
-      "type": "row",
-      "title": "Base de datos (Hikari)",
-      "collapsed": false,
-      "id": 18,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 31
-      },
-      "panels": []
-    },
-    {
-      "type": "timeseries",
       "title": "Conexiones del pool",
-      "description": "En espera > 0 sostenido o timeouts: el pool no alcanza.",
+      "description": "Pool de conexiones HikariCP con PostgreSQL: activas (prestadas a una petición), ociosas (abiertas y libres), en espera (peticiones esperando que se libere una) y máximo del pool (línea gris punteada). timeouts: peticiones que se rindieron esperando una conexión, contadas por intervalo del gráfico (cantidad, no por segundo). Activas cerca del máximo con en espera > 0 sostenido, o cualquier timeout, sugieren que el pool no alcanza o que las consultas tardan demasiado; la latencia de la API y los logs del backend ayudan a distinguirlo.",
       "targets": [
         {
           "datasource": {
@@ -1205,7 +916,103 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "activas"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ociosas"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "light-blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "en espera"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "timeouts"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "máximo"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e8e"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "mode": "none"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -1223,7 +1030,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 32
+        "y": 23
       },
       "datasource": {
         "type": "prometheus",
@@ -1233,7 +1040,7 @@
     {
       "type": "timeseries",
       "title": "Espera para obtener conexión",
-      "description": "Tiempo promedio para obtener una conexión del pool.",
+      "description": "Tiempo promedio que una petición esperó para obtener una conexión del pool. Lo normal es muy poco (milisegundos o menos); si sube, todas las conexiones están ocupadas: mira Conexiones del pool y la latencia de la API. Sin línea: no se pidieron conexiones en la ventana.",
       "targets": [
         {
           "datasource": {
@@ -1282,7 +1089,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 32
+        "y": 23
       },
       "datasource": {
         "type": "prometheus",
@@ -1291,37 +1098,48 @@
     },
     {
       "type": "row",
-      "title": "HTTP (backend)",
+      "title": "Memoria y GC",
       "collapsed": false,
-      "id": 21,
+      "id": 8,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 40
+        "y": 31
       },
       "panels": []
     },
     {
       "type": "timeseries",
-      "title": "Peticiones por ruta (top 10)",
-      "description": "Por plantilla de ruta (nunca la URL concreta). UNKNOWN: rechazada antes de llegar a un controlador.",
+      "title": "Heap por región (apilado) y máximo",
+      "description": "Heap ocupado por cada región del colector G1, apilado: la altura total es el heap usado. Eden: objetos nuevos (se vacía en cada GC joven); Survivor: objetos que sobrevivieron a algún GC; Old Gen: objetos de larga vida, que G1 libera en ciclos menos frecuentes. Línea gris punteada: máximo del heap. Lo normal es una sierra. Un Old Gen que crece durante mucho tiempo sin bajar puede ser retención de memoria; confírmalo con Heap de larga vida tras GC.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "topk(10, sum by (method, uri) (rate(http_server_requests_seconds_count{job=\"backend\"}[$__rate_interval])))",
-          "legendFormat": "{{method}} {{uri}}",
+          "expr": "jvm_memory_used_bytes{job=\"backend\", area=\"heap\"}",
+          "legendFormat": "{{id}}",
           "refId": "A",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(jvm_memory_max_bytes{job=\"backend\", area=\"heap\"} > 0)",
+          "legendFormat": "máximo",
+          "refId": "B",
           "range": true,
           "instant": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "reqps",
+          "unit": "bytes",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,
@@ -1329,14 +1147,51 @@
             "showPoints": "never",
             "spanNulls": false,
             "stacking": {
-              "mode": "none"
+              "mode": "normal",
+              "group": "A"
             }
           },
           "color": {
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "máximo"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e8e"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "mode": "none"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -1349,12 +1204,12 @@
           "sort": "desc"
         }
       },
-      "id": 22,
+      "id": 9,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 41
+        "y": 32
       },
       "datasource": {
         "type": "prometheus",
@@ -1363,24 +1218,35 @@
     },
     {
       "type": "timeseries",
-      "title": "Errores 5xx por ruta",
-      "description": "Respuestas 5xx generadas por el backend (no incluye 502 de Traefik con el backend caído).",
+      "title": "Memoria fuera del heap",
+      "description": "Memoria de la JVM fuera del heap: Metaspace (clases cargadas), code cache (código compilado) y buffers directos o mapeados (E/S). No la limita el máximo del heap y se suma a la memoria total del proceso (y contaría contra el límite del contenedor si lo tuviera). Normal: estable tras el arranque; un Metaspace que crece sin parar sugiere carga continua de clases.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (method, uri, status) (rate(http_server_requests_seconds_count{job=\"backend\", status=~\"5..\"}[$__rate_interval]))",
-          "legendFormat": "{{status}} {{method}} {{uri}}",
+          "expr": "jvm_memory_used_bytes{job=\"backend\", area=\"nonheap\"}",
+          "legendFormat": "{{id}}",
           "refId": "A",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (id) (jvm_buffer_memory_used_bytes{job=\"backend\"})",
+          "legendFormat": "buffer {{id}}",
+          "refId": "B",
           "range": true,
           "instant": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "reqps",
+          "unit": "bytes",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,
@@ -1408,12 +1274,12 @@
           "sort": "desc"
         }
       },
-      "id": 23,
+      "id": 10,
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 41
+        "y": 32
       },
       "datasource": {
         "type": "prometheus",
@@ -1422,16 +1288,109 @@
     },
     {
       "type": "timeseries",
-      "title": "Latencia p95 por ruta (top 10 por tráfico)",
-      "description": "Con los buckets fijos 50 ms … 5 s del backend.",
+      "title": "Pausas de GC: tiempo y frecuencia",
+      "description": "Pausas en que el colector G1 detiene la aplicación. Eje izquierdo: fracción del tiempo en pausa (1 % = la aplicación estuvo detenida 0,6 s de cada minuto). Eje derecho: pausas por segundo. Muchas pausas cortas son normales con actividad. Una fracción sostenida de varios por ciento, o que crece con el tráfico, merece revisarse: puede venir de un heap justo para la carga o de mucha creación de objetos; compárala con Heap de larga vida tras GC.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job=\"backend\"}[$__rate_interval])) and on (uri) topk(10, sum by (uri) (rate(http_server_requests_seconds_count{job=\"backend\"}[$__rate_interval]))))",
-          "legendFormat": "{{uri}}",
+          "expr": "sum by (gc) (rate(jvm_gc_pause_seconds_sum{job=\"backend\"}[$__rate_interval]))",
+          "legendFormat": "tiempo en pausa {{gc}}",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (gc) (rate(jvm_gc_pause_seconds_count{job=\"backend\"}[$__rate_interval]))",
+          "legendFormat": "pausas/s {{gc}}",
+          "refId": "B",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none"
+            },
+            "axisLabel": "tiempo en pausa"
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^pausas/s.*"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix:/s"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "pausas por segundo"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 11,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 40
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Pausa máxima de GC",
+      "description": "Pausa más larga observada recientemente por cada colector (Micrometer reinicia este máximo cada pocos minutos: sin GC vuelve a 0). G1 apunta a pausas de menos de 200 ms; las que se acercan o superan ese valor pueden notarse como latencia en la API.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (gc) (jvm_gc_pause_seconds_max{job=\"backend\"})",
+          "legendFormat": "{{gc}}",
           "refId": "A",
           "range": true,
           "instant": false
@@ -1467,10 +1426,167 @@
           "sort": "desc"
         }
       },
-      "id": 24,
+      "id": 12,
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 8,
+        "x": 8,
+        "y": 40
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Heap de larga vida tras GC y CPU en GC",
+      "description": "heap de larga vida tras GC: fracción ocupada del área de objetos de larga vida (Old Gen) justo después de la última recolección, respecto de su máximo. Es la mejor señal de capacidad de memoria: si sus valores mínimos crecen de forma sostenida y no bajan, puede haber objetos que no se liberan (posible fuga) o un heap justo para la carga. CPU en GC: fracción aproximada del tiempo de CPU usada por el recolector en el último periodo; valores altos sostenidos (por ejemplo, más del 10 %) significan que la JVM dedica mucho tiempo a recolectar, normalmente por heap justo o por mucha creación de objetos.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "jvm_gc_overhead{job=\"backend\"}",
+          "legendFormat": "CPU en GC",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "jvm_memory_usage_after_gc{job=\"backend\"}",
+          "legendFormat": "heap de larga vida tras GC",
+          "refId": "B",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 13,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 40
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "row",
+      "title": "CPU, hilos y descriptores de archivo",
+      "collapsed": false,
+      "id": 14,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 48
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU del backend",
+      "description": "proceso: CPU usada por la JVM del backend como fracción de las CPU que ve (las del host, porque los archivos Compose actuales no fijan límite de CPU al contenedor); 100 % = todas. sistema: uso de CPU del sistema tal como lo informa Java; según la versión y la configuración del contenedor puede referirse al contenedor o al host, así que para el host el dato fiable está en Plataforma. Proceso alto sostenido con latencia creciente sugiere falta de CPU.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "process_cpu_usage{job=\"backend\"}",
+          "legendFormat": "proceso",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "system_cpu_usage{job=\"backend\"}",
+          "legendFormat": "sistema (visto por la JVM)",
+          "refId": "B",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 15,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
         "x": 0,
         "y": 49
       },
@@ -1481,17 +1597,148 @@
     },
     {
       "type": "timeseries",
-      "title": "Eventos de log por nivel",
-      "description": "Eventos por segundo de nivel error y warn (cantidad, sin contenido).",
+      "title": "Hilos por estado",
+      "description": "Hilos de la JVM apilados por estado: RUNNABLE (ejecutando o listos para ejecutar), WAITING y TIMED_WAITING (esperando trabajo o un temporizador; es lo habitual en pools ociosos) y BLOCKED (esperando un lock que tiene otro hilo). Muchos WAITING no son un problema. Merecen atención BLOCKED sostenido o un total que crece sin parar.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (level) (rate(logback_events_total{job=\"backend\", level=~\"error|warn\"}[$__rate_interval]))",
-          "legendFormat": "{{level}}",
+          "expr": "jvm_threads_states_threads{job=\"backend\"}",
+          "legendFormat": "{{state}}",
           "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "normal"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "runnable"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "blocked"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(waiting|timed-waiting)$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(new|terminated)$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e8e"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 16,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 49
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Descriptores de archivo abiertos",
+      "description": "Descriptores de archivo abiertos por el proceso Java: cada conexión de red (clientes, PostgreSQL), archivo o socket usa uno. El límite del proceso (máximo) suele ser enorme (por ejemplo 1 048 576), así que figura en la leyenda y no se dibuja, para no aplastar la línea. Normal: estable con el tráfico. Un crecimiento sostenido que no baja cuando cae el tráfico sugiere conexiones o archivos que no se cierran; al llegar al límite fallan las conexiones nuevas.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "process_files_open_files{job=\"backend\"}",
+          "legendFormat": "abiertos",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "process_files_max_files{job=\"backend\"}",
+          "legendFormat": "máximo",
+          "refId": "B",
           "range": true,
           "instant": false
         }
@@ -1511,26 +1758,59 @@
           },
           "color": {
             "mode": "palette-classic"
-          }
+          },
+          "min": 0
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "máximo"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "viz": true,
+                  "legend": false,
+                  "tooltip": false
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e8e"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
-          "displayMode": "list",
+          "displayMode": "table",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
         },
         "tooltip": {
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "id": 25,
+      "id": 17,
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
+        "w": 8,
+        "x": 16,
         "y": 49
       },
       "datasource": {

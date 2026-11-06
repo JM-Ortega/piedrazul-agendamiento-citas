@@ -1,7 +1,7 @@
 {
   "uid": "piedrazul-logs",
-  "title": "Piedra Azul – Logs",
-  "description": "Logs de los servicios seleccionados (journal del host → Alloy → Loki) y salud de su recolección. Entrega de mejor esfuerzo: puede faltar o repetirse alguna línea. Ver docs/operations/runbooks/logs.md.",
+  "title": "Logs",
+  "description": "Estado de la recolección de logs, volumen y búsqueda, investigación por id de correlación y diagnóstico de la canalización Alloy → Loki.",
   "tags": [
     "piedrazul",
     "logs"
@@ -18,7 +18,18 @@
   "timezone": "browser",
   "fiscalYearStartMonth": 0,
   "liveNow": false,
-  "links": [],
+  "links": [
+    {
+      "type": "dashboards",
+      "tags": [
+        "piedrazul"
+      ],
+      "asDropdown": false,
+      "title": "Piedra Azul",
+      "includeVars": false,
+      "keepTime": true
+    }
+  ],
   "annotations": {
     "list": []
   },
@@ -106,8 +117,8 @@
   "panels": [
     {
       "type": "row",
-      "title": "Logs",
-      "id": 1,
+      "title": "Estado de la recolección",
+      "id": 7,
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -118,9 +129,386 @@
       "panels": []
     },
     {
+      "type": "stat",
+      "title": "Loki",
+      "description": "Última lectura (scrape) de Prometheus a las métricas de Loki, que guarda y consulta los logs. CAÍDO: Prometheus no consigue leerlas. Puede ser que Loki no responda (entonces no se guardan logs nuevos: Alloy los retiene y reintenta) o solo que falle la lectura. Para distinguirlo: si Logs filtrados carga líneas recientes, Loki responde (Grafana lo consulta directamente). Si CAÍDO dura 5 min, dispara PiedrazulLokiDown. SIN DATOS (morado): estado desconocido.",
+      "id": 8,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "up{job=\"loki\"}",
+          "refId": "A",
+          "legendFormat": "__auto",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "CAÍDO",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "SIN DATOS",
+                  "color": "purple",
+                  "index": 9
+                }
+              }
+            }
+          ],
+          "noValue": "SIN DATOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "orientation": "auto"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Alloy",
+      "description": "Última lectura (scrape) de Prometheus a las métricas propias de Alloy, el agente que lee el journal del host, envía los logs a Loki y publica las métricas del host. CAÍDO: Prometheus no consigue leerlas. Puede ser que Alloy esté detenido (entonces no se recolectan logs ni métricas del host, y Host también aparece CAÍDO en Plataforma) o solo que falle la lectura; si Logs filtrados sigue mostrando líneas nuevas, Alloy está enviando. SIN DATOS (morado): estado desconocido.",
+      "id": 9,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "up{job=\"alloy\"}",
+          "refId": "A",
+          "legendFormat": "__auto",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "CAÍDO",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "SIN DATOS",
+                  "color": "purple",
+                  "index": 9
+                }
+              }
+            }
+          ],
+          "noValue": "SIN DATOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "orientation": "auto"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Componentes de Alloy sin funcionar",
+      "description": "Componentes de Alloy (las piezas de su configuración: lectura del journal, selección, envío) que no están sanos. 0 (verde): Alloy responde y todos funcionan. Más de 0 (rojo): con más frecuencia loki.source.journal sin directorio del journal que abrir (journal no persistente o sin montar). CAÍDO: Prometheus no puede leer Alloy. SIN DATOS (morado): no hay métricas de componentes (destino ausente o métricas filtradas): estado desconocido, no sano. Un journal ilegible por permisos no aparece aquí: se ve en Entradas leídas del journal = 0.",
+      "id": 10,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(alloy_component_controller_running_components{job=\"alloy\", health_type!=\"healthy\"}) or on() (0 * sum(alloy_component_controller_running_components{job=\"alloy\"}) and on() (max(up{job=\"alloy\"}) == 1)) or on() ((max(up{job=\"alloy\"}) == 0) - 1)",
+          "refId": "A",
+          "legendFormat": "__auto",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "CAÍDO",
+                  "color": "red",
+                  "index": 0
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "SIN DATOS",
+                  "color": "purple",
+                  "index": 9
+                }
+              }
+            }
+          ],
+          "noValue": "SIN DATOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "orientation": "auto"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Alertas de logs disparadas",
+      "description": "Alertas de la canalización de logs (grupo de reglas piedrazul-logs: Loki sin leer, componentes de Alloy, journal sin leer, descartes y retención) en estado firing. 0 en verde solo si Prometheus evaluó ese grupo en los últimos 2 min; si no, SIN DATOS (morado): estado desconocido, no sano. También cuentan en Alertas que requieren atención de Plataforma.",
+      "id": 18,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "count(ALERTS{alertstate=\"firing\", alertname=~\"PiedrazulLoki.*|PiedrazulLogs.*|PiedrazulAlloyComponentUnhealthy\"}) or on() (0 * (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{job=\"prometheus\", rule_group=~\".+/logs.yml;piedrazul-logs\"}) < 120))",
+          "refId": "A",
+          "legendFormat": "__auto",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "SIN DATOS",
+                  "color": "purple",
+                  "index": 9
+                }
+              }
+            }
+          ],
+          "noValue": "SIN DATOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "orientation": "auto"
+      }
+    },
+    {
+      "type": "row",
+      "title": "Volumen y búsqueda de logs",
+      "id": 1,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "panels": []
+    },
+    {
       "type": "timeseries",
       "title": "Líneas por servicio",
-      "description": "Líneas recibidas en Loki por servicio con los filtros del dashboard. Un servicio sin líneas puede estar simplemente callado: la salud de la recolección está en la última fila.",
+      "description": "Líneas de log guardadas en Loki por servicio, con todos los filtros del dashboard (servicio, severidad, id de correlación y búsqueda). Cada barra cuenta las líneas de su intervalo, que cambia con el rango elegido. Un servicio sin líneas puede estar simplemente callado: si la recolección funciona lo dice Estado de la recolección, arriba.",
       "id": 2,
       "datasource": {
         "type": "loki",
@@ -130,7 +518,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 1
+        "y": 6
       },
       "targets": [
         {
@@ -178,7 +566,7 @@
     {
       "type": "timeseries",
       "title": "Errores y avisos por servicio",
-      "description": "Líneas con severidad error, fatal o warn. La severidad solo existe donde el formato del servicio la expone (backend, Keycloak, Traefik); las líneas sin ella (continuaciones de trazas) no cuentan aquí.",
+      "description": "Líneas con severidad error o fatal (tonos de rojo) y warn (tonos de naranja), por servicio. Solo aplica el filtro Servicio: ignora Severidad, Id de correlación y Búsqueda, para mostrar siempre todos los problemas de los servicios elegidos. La severidad solo existe donde el formato del servicio la expone (backend, Keycloak, Traefik); las líneas sin ella (por ejemplo, continuaciones de una traza de error) no cuentan aquí.",
       "id": 3,
       "datasource": {
         "type": "loki",
@@ -188,7 +576,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 1
+        "y": 6
       },
       "targets": [
         {
@@ -200,7 +588,7 @@
           "refId": "A",
           "queryType": "range",
           "editorMode": "code",
-          "legendFormat": "{{service}} {{level}}"
+          "legendFormat": "{{level}} · {{service}}"
         }
       ],
       "fieldConfig": {
@@ -219,7 +607,38 @@
             "spanNulls": false
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(error|fatal) · .*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "shades",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^warn · .*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "shades",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -235,8 +654,8 @@
     },
     {
       "type": "logs",
-      "title": "Logs",
-      "description": "Vista general: líneas de los servicios seleccionados, la más reciente primero, con el servicio y la severidad de cada línea. Filtros: servicio, severidad (Todas incluye las líneas sin severidad), id de correlación (vacío: sin filtrar) y búsqueda (expresión regular, sin distinguir mayúsculas). El detalle de cada línea muestra sus etiquetas, container_id y, en el backend, correlation_id.",
+      "title": "Logs filtrados",
+      "description": "Líneas de los servicios seleccionados, la más reciente primero, con el servicio y la severidad de cada una. Aplica todos los filtros: servicio, severidad (Todas incluye las líneas sin severidad), id de correlación (vacío: sin filtrar) y búsqueda (expresión regular, sin distinguir mayúsculas). El detalle de cada línea muestra sus etiquetas, container_id y, en el backend, correlation_id.",
       "id": 4,
       "datasource": {
         "type": "loki",
@@ -246,7 +665,7 @@
         "h": 16,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 13
       },
       "targets": [
         {
@@ -280,14 +699,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 29
       },
       "panels": []
     },
     {
       "type": "logs",
       "title": "Líneas con el id de correlación (todos los servicios)",
-      "description": "Con un id en la variable Id de correlación (UUID de la cabecera X-Correlation-Id): todas las líneas que lo contienen, de cualquier servicio y severidad, sin los demás filtros. Sin id no muestra nada (la vista general es el panel Logs). Que un servicio no muestre el id no prueba que no participó: solo el backend lo escribe en sus líneas.",
+      "description": "Con un id en la variable Id de correlación (UUID de la cabecera X-Correlation-Id): todas las líneas que lo contienen, de cualquier servicio y severidad, sin los demás filtros. Sin id no muestra nada (la vista general es Logs filtrados). Que un servicio no muestre el id no prueba que no participó: solo el backend lo escribe en sus líneas.",
       "id": 6,
       "datasource": {
         "type": "loki",
@@ -297,7 +716,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 25
+        "y": 30
       },
       "targets": [
         {
@@ -324,304 +743,21 @@
     },
     {
       "type": "row",
-      "title": "Salud de la recolección",
-      "id": 7,
+      "title": "Diagnóstico de la canalización (Alloy → Loki)",
       "collapsed": false,
+      "id": 19,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 35
+        "y": 40
       },
       "panels": []
     },
     {
       "type": "stat",
-      "title": "Loki",
-      "description": "Última lectura de métricas de Loki (serie up). CAÍDO: Loki no responde; Alloy retiene y reintenta.",
-      "id": 8,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 0,
-        "y": 36
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "up{job=\"loki\"}",
-          "refId": "A",
-          "legendFormat": "__auto",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "CAÍDO",
-                  "color": "red",
-                  "index": 0
-                },
-                "1": {
-                  "text": "OK",
-                  "color": "green",
-                  "index": 1
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null+nan",
-                "result": {
-                  "text": "SIN DATOS",
-                  "color": "red",
-                  "index": 9
-                }
-              }
-            }
-          ],
-          "noValue": "SIN DATOS",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "textMode": "auto",
-        "wideLayout": true,
-        "showPercentChange": false,
-        "orientation": "auto"
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Alloy",
-      "description": "Última lectura de las métricas propias de Alloy. CAÍDO: no se leen ni el journal ni las métricas del host.",
-      "id": 9,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 4,
-        "y": 36
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "up{job=\"alloy\"}",
-          "refId": "A",
-          "legendFormat": "__auto",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "CAÍDO",
-                  "color": "red",
-                  "index": 0
-                },
-                "1": {
-                  "text": "OK",
-                  "color": "green",
-                  "index": 1
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null+nan",
-                "result": {
-                  "text": "SIN DATOS",
-                  "color": "red",
-                  "index": 9
-                }
-              }
-            }
-          ],
-          "noValue": "SIN DATOS",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "textMode": "auto",
-        "wideLayout": true,
-        "showPercentChange": false,
-        "orientation": "auto"
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Componentes de Alloy sin funcionar",
-      "description": "Componentes de Alloy no sanos. 0 (verde): Alloy responde y todos sus componentes funcionan. Más de 0 (rojo): con más frecuencia loki.source.journal sin directorio del journal que abrir (journal no persistente, montaje). CAÍDO: Prometheus no puede leer Alloy. SIN DATOS: no hay métricas de componentes (destino ausente o métricas filtradas): el estado es desconocido, no sano. Un journal ilegible por permisos no aparece aquí: se ve en Entradas leídas del journal = 0.",
-      "id": 10,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 36
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(alloy_component_controller_running_components{job=\"alloy\", health_type!=\"healthy\"}) or on() (0 * sum(alloy_component_controller_running_components{job=\"alloy\"}) and on() (max(up{job=\"alloy\"}) == 1)) or on() ((max(up{job=\"alloy\"}) == 0) - 1)",
-          "refId": "A",
-          "legendFormat": "__auto",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "-1": {
-                  "text": "CAÍDO",
-                  "color": "red",
-                  "index": 0
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null+nan",
-                "result": {
-                  "text": "SIN DATOS",
-                  "color": "orange",
-                  "index": 1
-                }
-              }
-            }
-          ],
-          "noValue": "SIN DATOS",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "textMode": "auto",
-        "wideLayout": true,
-        "showPercentChange": false,
-        "orientation": "auto"
-      }
-    },
-    {
-      "type": "stat",
       "title": "Entradas leídas del journal (1 h)",
-      "description": "Todas las entradas del journal del host que Alloy leyó en la última hora, antes de la selección. 0 con Alloy arriba durante horas: archivos del journal ilegibles para Alloy (OBS_JOURNAL_GID) o lectura detenida.",
+      "description": "Entradas del journal de systemd (el registro del host, donde escriben los contenedores con el driver journald) que Alloy leyó en la última hora, de todas las unidades y antes de la selección. Verde: la lectura funciona. 0 (naranja) con Alloy en OK: puede ser un host callado; si dura horas, el journal es ilegible para Alloy (permisos, OBS_JOURNAL_GID) o la lectura se detuvo, y a las 6 h dispara PiedrazulLogsJournalNotRead. SIN DATOS (morado): Alloy no se lee o no publica esta métrica; estado desconocido.",
       "id": 11,
       "datasource": {
         "type": "prometheus",
@@ -629,9 +765,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 36
+        "w": 6,
+        "x": 0,
+        "y": 41
       },
       "targets": [
         {
@@ -639,7 +775,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(loki_source_journal_target_lines_total{job=\"alloy\"}[1h]))",
+          "expr": "sum(increase(loki_source_journal_target_lines_total{job=\"alloy\"}[1h])) and on() (max(up{job=\"alloy\"}) == 1)",
           "refId": "A",
           "legendFormat": "__auto",
           "range": false,
@@ -649,7 +785,19 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "mappings": [],
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "SIN DATOS",
+                  "color": "purple",
+                  "index": 9
+                }
+              }
+            }
+          ],
           "noValue": "SIN DATOS",
           "color": {
             "mode": "thresholds"
@@ -690,7 +838,7 @@
     {
       "type": "stat",
       "title": "Seleccionadas para Loki (1 h)",
-      "description": "Entradas que pasaron la selección de fuentes en la última hora. 0 con lecturas: ninguna fuente seleccionada escribió (puede ser normal).",
+      "description": "Entradas de la última hora que pasaron la selección de fuentes de Alloy (los servicios de Piedra Azul que se envían a Loki). Informativo (azul): 0 con lecturas > 0 significa que ningún servicio seleccionado escribió, lo que puede ser normal. SIN DATOS (morado): Alloy no se lee; estado desconocido.",
       "id": 12,
       "datasource": {
         "type": "prometheus",
@@ -698,9 +846,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 36
+        "w": 6,
+        "x": 6,
+        "y": 41
       },
       "targets": [
         {
@@ -708,7 +856,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(loki_relabel_entries_written{job=\"alloy\", component_id=\"loki.relabel.select\"}[1h]))",
+          "expr": "sum(increase(loki_relabel_entries_written{job=\"alloy\", component_id=\"loki.relabel.select\"}[1h])) and on() (max(up{job=\"alloy\"}) == 1)",
           "refId": "A",
           "legendFormat": "__auto",
           "range": false,
@@ -718,7 +866,19 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "mappings": [],
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "SIN DATOS",
+                  "color": "purple",
+                  "index": 9
+                }
+              }
+            }
+          ],
           "noValue": "SIN DATOS",
           "color": {
             "mode": "thresholds"
@@ -755,7 +915,7 @@
     {
       "type": "stat",
       "title": "Descartadas antes de Loki (24 h)",
-      "description": "Entradas que Alloy descartó al agotar los reintentos o por rechazo definitivo de Loki en las últimas 24 h. Es pérdida: no se reenvían.",
+      "description": "Entradas de log que Alloy descartó en las últimas 24 h porque agotó los reintentos o Loki las rechazó de forma definitiva (por ejemplo, por límite de tasa o tamaño). Es pérdida real: no se reenvían. 0 en verde solo con Alloy leído ahora; SIN DATOS (morado): Alloy no se lee y no se puede saber si hubo pérdida. Más de 0: PiedrazulLogsDropped, y el motivo en Reintentos, rechazos y descartes.",
       "id": 13,
       "datasource": {
         "type": "prometheus",
@@ -763,9 +923,9 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 20,
-        "y": 36
+        "w": 6,
+        "x": 12,
+        "y": 41
       },
       "targets": [
         {
@@ -773,7 +933,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(loki_write_dropped_entries_total{job=\"alloy\"}[24h]))",
+          "expr": "sum(increase(loki_write_dropped_entries_total{job=\"alloy\"}[24h])) and on() (max(up{job=\"alloy\"}) == 1)",
           "refId": "A",
           "legendFormat": "__auto",
           "range": false,
@@ -783,7 +943,19 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "mappings": [],
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "SIN DATOS",
+                  "color": "purple",
+                  "index": 9
+                }
+              }
+            }
+          ],
           "noValue": "SIN DATOS",
           "color": {
             "mode": "thresholds"
@@ -822,9 +994,105 @@
       }
     },
     {
+      "type": "stat",
+      "title": "Desde la última retención de Loki",
+      "description": "Tiempo desde la última retención completa de Loki: el compactor borra los logs más antiguos que el plazo configurado y lo intenta cada 10 min. Verde: la última se completó hace menos de 3 h. Naranja: más de 3 h; si sigue así 30 min con Loki arriba más de 3 h, dispara PiedrazulLokiRetentionNotRunning y lo antiguo deja de borrarse. AÚN NO CORRIÓ (azul): Loki arrancó hace menos de 3 h y todavía no completó ninguna; es lo esperado tras un arranque. NINGUNA EN 3 H (naranja): Loki lleva más de 3 h arriba sin completar ninguna, la misma condición que vigila la alerta. SIN DATOS (morado): Loki no se lee o no publica su hora de arranque; estado desconocido.",
+      "id": 17,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 41
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(time() - loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job=\"loki\"} and on() loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job=\"loki\"} > 0) or on() (0 * loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job=\"loki\"} - 1 and on (instance) (time() - process_start_time_seconds{job=\"loki\"}) <= 3 * 3600) or on() (0 * loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job=\"loki\"} - 2 and on (instance) (time() - process_start_time_seconds{job=\"loki\"}) > 3 * 3600)",
+          "refId": "A",
+          "legendFormat": "__auto",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "AÚN NO CORRIÓ",
+                  "color": "blue",
+                  "index": 0
+                },
+                "-2": {
+                  "text": "NINGUNA EN 3 H",
+                  "color": "orange",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "SIN DATOS",
+                  "color": "purple",
+                  "index": 9
+                }
+              }
+            }
+          ],
+          "noValue": "SIN DATOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 10800
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "orientation": "auto"
+      }
+    },
+    {
       "type": "timeseries",
       "title": "Flujo de entradas",
-      "description": "Leídas del journal (todas), seleccionadas, enviadas por Alloy y recibidas por Loki, por segundo.",
+      "description": "Recorrido de los logs, en entradas por segundo: leídas del journal (todas las unidades), seleccionadas (las de Piedra Azul), enviadas por Alloy y recibidas por Loki. Normal: seleccionadas ≈ enviadas ≈ recibidas, muy por debajo de leídas. Si enviadas queda por debajo de seleccionadas de forma sostenida, probablemente Alloy está reteniendo y reintentando (ver Reintentos, rechazos y descartes). Es la evidencia de los envíos correctos.",
       "id": 14,
       "datasource": {
         "type": "prometheus",
@@ -834,7 +1102,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 40
+        "y": 45
       },
       "targets": [
         {
@@ -915,7 +1183,7 @@
     {
       "type": "timeseries",
       "title": "Reintentos, rechazos y descartes",
-      "description": "Reintentos de envío de Alloy, respuestas de Loki por código, muestras que Loki rechazó (por motivo) y entradas que Alloy descartó (por motivo).",
+      "description": "Solo los resultados problemáticos del envío, por segundo. En naranja, reintentos de Alloy y respuestas de error de Loki por código: Alloy reintenta los 429 (límite de tasa) y los 5xx, que pueden terminar bien o acabar descartados; otros 4xx no se reintentan y esas entradas se pierden. En rojo, muestras que Loki rechazó y entradas que Alloy descartó, por motivo: pérdida. Lo normal son líneas en 0. Los envíos correctos están en Flujo de entradas.",
       "id": 15,
       "datasource": {
         "type": "prometheus",
@@ -925,7 +1193,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 40
+        "y": 45
       },
       "targets": [
         {
@@ -944,9 +1212,9 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (status_code) (rate(loki_write_request_duration_seconds_count{job=\"alloy\"}[$__rate_interval]))",
+          "expr": "sum by (status_code) (rate(loki_write_request_duration_seconds_count{job=\"alloy\", status_code!~\"2..\"}[$__rate_interval]))",
           "refId": "B",
-          "legendFormat": "respuestas {{status_code}}",
+          "legendFormat": "respuestas con error {{status_code}}",
           "range": true,
           "instant": false
         },
@@ -989,7 +1257,53 @@
             "spanNulls": false
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^reintentos.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^respuestas con error.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "shades",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(rechazadas|descartadas).*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "shades",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -1006,7 +1320,7 @@
     {
       "type": "timeseries",
       "title": "Memoria residente (RSS) de Loki y Alloy",
-      "description": "process_resident_memory_bytes de cada proceso. Incluye páginas de archivos mapeados (el binario) que el cgroup puede no cobrar al contenedor: no es la memoria que cuenta contra los límites (Loki 768 MiB, Alloy 256 MiB) y puede acercarse a ellos sin riesgo. La memoria cobrada al contenedor no se recolecta (docker stats en el host). Una RSS que crece sin bajar sí indica presión.",
+      "description": "RSS (memoria residente): la memoria física que ocupa ahora cada proceso según el sistema operativo (process_resident_memory_bytes). Sirve para ver tendencias: una RSS que crece de forma sostenida merece mirarse, aunque por sí sola no prueba una fuga ni presión de memoria (puede ser más volumen de logs o caché). No es la memoria que cuenta contra los límites del contenedor (Loki 768 MiB, Alloy 256 MiB): incluye páginas de archivos mapeados (el binario) que el cgroup puede no cobrar, así que puede acercarse a esos límites sin riesgo. Para la memoria cobrada al contenedor, que no se recolecta: docker stats en el host.",
       "id": 16,
       "datasource": {
         "type": "prometheus",
@@ -1014,9 +1328,9 @@
       },
       "gridPos": {
         "h": 7,
-        "w": 12,
+        "w": 24,
         "x": 0,
-        "y": 48
+        "y": 53
       },
       "targets": [
         {
@@ -1060,144 +1374,14 @@
           "sort": "desc"
         }
       }
-    },
-    {
-      "type": "stat",
-      "title": "Desde la última retención de Loki",
-      "description": "Tiempo desde la última ejecución completa de la retención (compactor). Corre cada 10 min; más de 3 h con Loki arriba dispara PiedrazulLokiRetentionNotRunning.",
-      "id": 17,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 6,
-        "x": 12,
-        "y": 48
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "time() - loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job=\"loki\"} and on() loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job=\"loki\"} > 0",
-          "refId": "A",
-          "legendFormat": "__auto",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "mappings": [],
-          "noValue": "AÚN NO CORRIÓ",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 10800
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "textMode": "auto",
-        "wideLayout": true,
-        "showPercentChange": false,
-        "orientation": "auto"
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Alertas de logs disparadas",
-      "description": "Alertas de la canalización de logs en estado firing. Se ven aquí, en Plataforma y en la serie ALERTS; Alertmanager las entrega a Discord solo con el receptor discord.",
-      "id": 18,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 6,
-        "x": 18,
-        "y": 48
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "count(ALERTS{alertstate=\"firing\", alertname=~\"PiedrazulLoki.*|PiedrazulLogs.*|PiedrazulAlloyComponentUnhealthy\"}) or vector(0)",
-          "refId": "A",
-          "legendFormat": "__auto",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "mappings": [],
-          "noValue": "SIN DATOS",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "textMode": "auto",
-        "wideLayout": true,
-        "showPercentChange": false,
-        "orientation": "auto"
-      }
     }
-  ]
+  ],
+  "timepicker": {
+    "refresh_intervals": [
+      "30s",
+      "1m",
+      "5m",
+      "15m"
+    ]
+  }
 }

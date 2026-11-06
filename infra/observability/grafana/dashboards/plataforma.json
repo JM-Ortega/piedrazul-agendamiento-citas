@@ -1,7 +1,7 @@
 {
   "uid": "piedrazul-plataforma",
   "title": "Plataforma",
-  "description": "Estado de la recolección, alertas, HTTP en Traefik, backend, Keycloak y host.",
+  "description": "Resumen operativo: alertas activas, lectura de métricas de cada servicio, HTTP en Traefik, backend, Keycloak, host y autoobservación de Prometheus.",
   "tags": [
     "piedrazul"
   ],
@@ -44,7 +44,7 @@
   "panels": [
     {
       "type": "row",
-      "title": "Estado de la recolección",
+      "title": "Alertas activas",
       "collapsed": false,
       "id": 1,
       "gridPos": {
@@ -57,488 +57,8 @@
     },
     {
       "type": "stat",
-      "title": "Backend",
-      "description": "Última lectura de métricas del destino backend (serie up). CAÍDO: Prometheus no pudo leerlo; SIN DATOS: no hay serie (Prometheus sin el destino o sin datos).",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "up{job=\"backend\"}",
-          "legendFormat": "__auto",
-          "refId": "A",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "CAÍDO",
-                  "color": "red",
-                  "index": 0
-                },
-                "1": {
-                  "text": "OK",
-                  "color": "green",
-                  "index": 1
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null+nan",
-                "result": {
-                  "text": "SIN DATOS",
-                  "color": "red",
-                  "index": 9
-                }
-              }
-            }
-          ],
-          "noValue": "SIN DATOS",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "textMode": "auto",
-        "orientation": "auto",
-        "wideLayout": true,
-        "showPercentChange": false
-      },
-      "id": 2,
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 0,
-        "y": 1
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Keycloak",
-      "description": "Última lectura de métricas del destino keycloak (serie up). CAÍDO: Prometheus no pudo leerlo; SIN DATOS: no hay serie (Prometheus sin el destino o sin datos).",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "up{job=\"keycloak\"}",
-          "legendFormat": "__auto",
-          "refId": "A",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "CAÍDO",
-                  "color": "red",
-                  "index": 0
-                },
-                "1": {
-                  "text": "OK",
-                  "color": "green",
-                  "index": 1
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null+nan",
-                "result": {
-                  "text": "SIN DATOS",
-                  "color": "red",
-                  "index": 9
-                }
-              }
-            }
-          ],
-          "noValue": "SIN DATOS",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "textMode": "auto",
-        "orientation": "auto",
-        "wideLayout": true,
-        "showPercentChange": false
-      },
-      "id": 3,
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 4,
-        "y": 1
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Traefik",
-      "description": "Última lectura de métricas del destino traefik (serie up). CAÍDO: Prometheus no pudo leerlo; SIN DATOS: no hay serie (Prometheus sin el destino o sin datos).",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "up{job=\"traefik\"}",
-          "legendFormat": "__auto",
-          "refId": "A",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "CAÍDO",
-                  "color": "red",
-                  "index": 0
-                },
-                "1": {
-                  "text": "OK",
-                  "color": "green",
-                  "index": 1
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null+nan",
-                "result": {
-                  "text": "SIN DATOS",
-                  "color": "red",
-                  "index": 9
-                }
-              }
-            }
-          ],
-          "noValue": "SIN DATOS",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "textMode": "auto",
-        "orientation": "auto",
-        "wideLayout": true,
-        "showPercentChange": false
-      },
-      "id": 4,
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 1
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Host (Alloy)",
-      "description": "Última lectura de métricas del destino host (serie up). CAÍDO: Prometheus no pudo leerlo; SIN DATOS: no hay serie (Prometheus sin el destino o sin datos).",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "up{job=\"host\"}",
-          "legendFormat": "__auto",
-          "refId": "A",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "CAÍDO",
-                  "color": "red",
-                  "index": 0
-                },
-                "1": {
-                  "text": "OK",
-                  "color": "green",
-                  "index": 1
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null+nan",
-                "result": {
-                  "text": "SIN DATOS",
-                  "color": "red",
-                  "index": 9
-                }
-              }
-            }
-          ],
-          "noValue": "SIN DATOS",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "textMode": "auto",
-        "orientation": "auto",
-        "wideLayout": true,
-        "showPercentChange": false
-      },
-      "id": 5,
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 1
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Prometheus",
-      "description": "Última lectura de métricas del destino prometheus (serie up). CAÍDO: Prometheus no pudo leerlo; SIN DATOS: no hay serie (Prometheus sin el destino o sin datos).",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "up{job=\"prometheus\"}",
-          "legendFormat": "__auto",
-          "refId": "A",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "CAÍDO",
-                  "color": "red",
-                  "index": 0
-                },
-                "1": {
-                  "text": "OK",
-                  "color": "green",
-                  "index": 1
-                }
-              }
-            },
-            {
-              "type": "special",
-              "options": {
-                "match": "null+nan",
-                "result": {
-                  "text": "SIN DATOS",
-                  "color": "red",
-                  "index": 9
-                }
-              }
-            }
-          ],
-          "noValue": "SIN DATOS",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "textMode": "auto",
-        "orientation": "auto",
-        "wideLayout": true,
-        "showPercentChange": false
-      },
-      "id": 6,
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 16,
-        "y": 1
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Alertas accionables disparadas",
-      "description": "Alertas en firing con severidad distinta de info (warning, critical o sin severidad): incidentes que piden acción; las informativas no cuentan (se ven en la tabla). 0 (verde): ninguna, con todas las reglas evaluadas en los últimos 2 min. SIN DATOS: Prometheus no evaluó sus reglas hace poco (sin reglas cargadas o evaluación detenida) o no responde: el estado es desconocido, no sano. Alertmanager las entrega a Discord solo con el receptor discord (con none, solo se ven aquí).",
+      "title": "Alertas que requieren atención",
+      "description": "Alertas en estado firing con severidad distinta de info (warning, critical o sin severidad): incidentes que piden atención. 0 en verde solo si además Prometheus evaluó sus reglas en los últimos 2 min; sin evaluación reciente se ve SIN DATOS (morado): estado desconocido, nunca 0. Las pendientes (pending) y las informativas no cuentan; se ven en la tabla. Que una alerta llegue a Discord depende de Alertmanager y del receptor configurado.",
       "targets": [
         {
           "datasource": {
@@ -562,7 +82,7 @@
                 "match": "null+nan",
                 "result": {
                   "text": "SIN DATOS",
-                  "color": "red",
+                  "color": "purple",
                   "index": 9
                 }
               }
@@ -606,9 +126,9 @@
       },
       "id": 7,
       "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 20,
+        "h": 6,
+        "w": 5,
+        "x": 0,
         "y": 1
       },
       "datasource": {
@@ -619,7 +139,7 @@
     {
       "type": "table",
       "title": "Alertas pendientes y disparadas",
-      "description": "Serie ALERTS de Prometheus, incluidas las informativas (severity info), que no son incidentes. pending: la condición se cumple pero aún no dura lo exigido (for).",
+      "description": "Alertas de Prometheus (serie ALERTS) en este momento. pending: la condición se cumple pero todavía no duró lo exigido (for); firing: disparada. Severidad: critical en rojo, warning en naranja, info en azul (informativa, no es un incidente). Solo muestra el presente: una alerta ya resuelta no aparece. La tabla vacía solo prueba que no hay alertas si Alertas que requieren atención muestra 0.",
       "targets": [
         {
           "datasource": {
@@ -674,6 +194,30 @@
                 ]
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*"
+            },
+            "properties": [
+              {
+                "id": "noValue",
+                "value": " "
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "alertname"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              }
+            ]
           }
         ]
       },
@@ -703,9 +247,9 @@
       "id": 8,
       "gridPos": {
         "h": 6,
-        "w": 16,
-        "x": 0,
-        "y": 5
+        "w": 19,
+        "x": 5,
+        "y": 1
       },
       "datasource": {
         "type": "prometheus",
@@ -713,58 +257,492 @@
       }
     },
     {
-      "type": "timeseries",
-      "title": "Duración de la lectura por destino",
-      "description": "Tiempo que tarda cada lectura. Cerca de scrape_timeout (10 s) anticipa lecturas fallidas.",
+      "type": "row",
+      "title": "Lectura de métricas por servicio (up)",
+      "collapsed": false,
+      "id": 31,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Backend",
+      "description": "Resultado de la última lectura (scrape, cada 30 s, serie up) del endpoint de métricas del backend (backend:8081). OK prueba que el proceso responde y expone métricas, no que toda la API funcione (eso lo muestran HTTP y las alertas). Si CAÍDO dura 5 min, dispara PiedrazulTargetDown. SIN DATOS (morado): no hay serie; estado desconocido.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "scrape_duration_seconds",
-          "legendFormat": "{{job}}",
+          "expr": "up{job=\"backend\"}",
+          "legendFormat": "__auto",
           "refId": "A",
-          "range": true,
-          "instant": false
+          "range": false,
+          "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "none"
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "CAÍDO",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "SIN DATOS",
+                  "color": "purple",
+                  "index": 9
+                }
+              }
             }
-          },
+          ],
+          "noValue": "SIN DATOS",
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
           }
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
       },
-      "id": 9,
+      "id": 2,
       "gridPos": {
-        "h": 6,
-        "w": 8,
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Keycloak",
+      "description": "Resultado de la última lectura (scrape, cada 30 s, serie up) del endpoint de métricas de Keycloak. OK no prueba que el inicio de sesión funcione. Si CAÍDO dura 5 min, dispara PiedrazulTargetDown. SIN DATOS (morado): no hay serie; estado desconocido.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "up{job=\"keycloak\"}",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "CAÍDO",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "SIN DATOS",
+                  "color": "purple",
+                  "index": 9
+                }
+              }
+            }
+          ],
+          "noValue": "SIN DATOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      },
+      "id": 3,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Traefik",
+      "description": "Resultado de la última lectura (scrape, cada 30 s, serie up) del endpoint de métricas de Traefik, el proxy que recibe todo el tráfico público. OK no prueba que cada ruta pública responda (ver HTTP en el borde). Si CAÍDO dura 5 min, dispara PiedrazulTargetDown. SIN DATOS (morado): no hay serie; estado desconocido.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "up{job=\"traefik\"}",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "CAÍDO",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "SIN DATOS",
+                  "color": "purple",
+                  "index": 9
+                }
+              }
+            }
+          ],
+          "noValue": "SIN DATOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      },
+      "id": 4,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Host (vía Alloy)",
+      "description": "Resultado de la última lectura (scrape, cada 30 s, serie up) del endpoint de métricas del host, que publica el exportador integrado en Alloy. CAÍDO: Prometheus no consigue leerlo. Puede ser que Alloy esté detenido (entonces tampoco se recolectarían logs) o solo que falle la lectura (red, puerto); para distinguirlo, mira en el dashboard Logs si siguen llegando líneas nuevas. Si CAÍDO dura 5 min, dispara PiedrazulTargetDown. SIN DATOS (morado): no hay serie; estado desconocido.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "up{job=\"host\"}",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "CAÍDO",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "SIN DATOS",
+                  "color": "purple",
+                  "index": 9
+                }
+              }
+            }
+          ],
+          "noValue": "SIN DATOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      },
+      "id": 5,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Prometheus",
+      "description": "Resultado de la última lectura (scrape, cada 30 s, serie up) del endpoint de métricas de Prometheus sobre sí mismo. Si Prometheus está detenido, Grafana no puede consultarlo: los paneles muestran error o SIN DATOS, no CAÍDO. SIN DATOS (morado): no hay serie; estado desconocido.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "up{job=\"prometheus\"}",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "CAÍDO",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "SIN DATOS",
+                  "color": "purple",
+                  "index": 9
+                }
+              }
+            }
+          ],
+          "noValue": "SIN DATOS",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      },
+      "id": 6,
+      "gridPos": {
+        "h": 4,
+        "w": 4,
         "x": 16,
-        "y": 5
+        "y": 8
       },
       "datasource": {
         "type": "prometheus",
@@ -772,58 +750,95 @@
       }
     },
     {
-      "type": "timeseries",
-      "title": "Series por destino",
-      "description": "Muestras por lectura. Un salto sostenido indica etiquetas nuevas (cardinalidad).",
+      "type": "stat",
+      "title": "Alertmanager",
+      "description": "Resultado de la última lectura (scrape, cada 30 s, serie up) del endpoint de métricas de Alertmanager, que agrupa las alertas y las entrega al receptor configurado (Discord o ninguno). OK no prueba que los mensajes lleguen a Discord: una entrega fallida la avisa PiedrazulAlertNotificationsFailing. CAÍDO: Prometheus no consigue leerlo; si dura 5 min, dispara PiedrazulAlertmanagerDown (critical). Si Alertmanager está realmente detenido, esa alerta no puede notificarse y solo se ve aquí. SIN DATOS (morado): estado desconocido.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "scrape_samples_post_metric_relabeling",
-          "legendFormat": "{{job}}",
+          "expr": "up{job=\"alertmanager\"}",
+          "legendFormat": "__auto",
           "refId": "A",
-          "range": true,
-          "instant": false
+          "range": false,
+          "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "none"
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "CAÍDO",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "SIN DATOS",
+                  "color": "purple",
+                  "index": 9
+                }
+              }
             }
-          },
+          ],
+          "noValue": "SIN DATOS",
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
           }
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
       },
-      "id": 10,
+      "id": 32,
       "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 0,
-        "y": 11
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 8
       },
       "datasource": {
         "type": "prometheus",
@@ -831,16 +846,16 @@
       }
     },
     {
-      "type": "timeseries",
-      "title": "Lecturas fallidas (up = 0)",
-      "description": "1 mientras Prometheus no puede leer el destino. Sin línea: sin datos para ese destino.",
+      "type": "state-timeline",
+      "title": "Historial de lectura por servicio",
+      "description": "Una franja por destino (job) con el resultado de cada lectura de Prometheus en el rango elegido: verde OK, rojo FALLIDA (up = 0). Un hueco es un periodo sin datos (Prometheus detenido o destino aún no configurado), no una lectura correcta. Sirve para ver desde cuándo falla un servicio y si un fallo ya pasó.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "1 - up",
+          "expr": "up",
           "legendFormat": "{{job}}",
           "refId": "A",
           "range": true,
@@ -849,42 +864,68 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "none"
-            }
-          },
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
-          "min": 0,
-          "max": 1
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "FALLIDA",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "OK",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "spanNulls": false
+          }
         },
         "overrides": []
       },
       "options": {
+        "mergeValues": true,
+        "showValue": "never",
+        "alignValue": "left",
+        "rowHeight": 0.8,
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
         "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "id": 11,
       "gridPos": {
         "h": 7,
-        "w": 12,
-        "x": 12,
-        "y": 11
+        "w": 24,
+        "x": 0,
+        "y": 12
       },
       "datasource": {
         "type": "prometheus",
@@ -900,7 +941,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 19
       },
       "panels": []
     },
@@ -956,7 +997,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 19
+        "y": 20
       },
       "datasource": {
         "type": "prometheus",
@@ -966,7 +1007,7 @@
     {
       "type": "timeseries",
       "title": "Proporción de respuestas 5xx por servicio",
-      "description": "Lo que evalúa PiedrazulHttp5xxRatioHigh: 5xx / total por servicio en ventanas de 5 m (incluye 502 de un upstream que no responde). En grafana los 501 de su interfaz (APIs no implementadas en esta instalación) no cuentan ni como 5xx ni en el total; se ven en Respuestas por código. Línea punteada: umbral de la alerta, que además exige > 0,02 req/s de ese mismo total durante 10 m. 0 solo con tráfico y sin 5xx; sin tráfico no hay línea.",
+      "description": "Fracción de respuestas 5xx por servicio en ventanas de 5 m: exactamente lo que evalúa PiedrazulHttp5xxRatioHigh. Línea roja punteada: umbral de la alerta (5 %), que además exige > 0,02 req/s de ese mismo total durante 10 m. Sin tráfico no hay línea; 0 significa tráfico sin 5xx. Incluye los 502 de un upstream que no responde. En grafana sus 501 (APIs de la interfaz no implementadas en esta instalación) no cuentan ni como 5xx ni en el total; se ven en Respuestas por código.",
       "targets": [
         {
           "datasource": {
@@ -1032,7 +1073,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 19
+        "y": 20
       },
       "datasource": {
         "type": "prometheus",
@@ -1091,7 +1132,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 19
+        "y": 20
       },
       "datasource": {
         "type": "prometheus",
@@ -1101,7 +1142,7 @@
     {
       "type": "timeseries",
       "title": "Respuestas por código (websecure)",
-      "description": "Todas las respuestas del entrypoint público HTTPS, por código. 0: conexión actualizada (WebSocket) sin código final; 499: el cliente cerró la petición; 501 de grafana: APIs de su interfaz no implementadas aquí.",
+      "description": "Todas las respuestas del entrypoint público HTTPS, apiladas por código. Color por clase: 2xx verde, 3xx azul, 4xx amarillo (errores del cliente: sin sesión, credenciales rechazadas, rutas inexistentes; por sí solos no son incidentes), 5xx rojo. En gris: 0 (conexión actualizada a WebSocket, sin código final) y 501 (aquí los genera la interfaz de Grafana con APIs no implementadas; un 501 de otro servicio sí cuenta en Proporción de respuestas 5xx). 499: el cliente cerró la petición antes de la respuesta.",
       "targets": [
         {
           "datasource": {
@@ -1132,7 +1173,98 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^2\\d\\d$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^3\\d\\d$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^4\\d\\d$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^5\\d\\d$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(0|1\\d\\d)$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e8e"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "501"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e8e"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -1150,7 +1282,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 27
+        "y": 28
       },
       "datasource": {
         "type": "prometheus",
@@ -1209,7 +1341,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 27
+        "y": 28
       },
       "datasource": {
         "type": "prometheus",
@@ -1225,14 +1357,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 35
+        "y": 36
       },
       "panels": []
     },
     {
       "type": "timeseries",
       "title": "Backend: peticiones por estado",
-      "description": "Peticiones atendidas por Spring (incluye health). Detalle por ruta en el dashboard Backend JVM.",
+      "description": "Peticiones por segundo atendidas por Spring en el backend, apiladas por código de estado (mismos colores que Respuestas por código). Incluye las de monitoreo a /actuator, como el healthcheck de Docker en /actuator/health cada 30 s: con poco tráfico real, buena parte de lo que se ve es ese tráfico. Detalle por ruta en el dashboard Backend.",
       "targets": [
         {
           "datasource": {
@@ -1263,7 +1395,83 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^2\\d\\d$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^3\\d\\d$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^4\\d\\d$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^5\\d\\d$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(0|1\\d\\d)$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e8e"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -1281,7 +1489,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 36
+        "y": 37
       },
       "datasource": {
         "type": "prometheus",
@@ -1290,15 +1498,15 @@
     },
     {
       "type": "timeseries",
-      "title": "Backend: latencia p95",
-      "description": "Percentil 95 con los buckets fijos del backend (50 ms … 5 s): su resolución es la del bucket.",
+      "title": "Backend: latencia p95 de la API",
+      "description": "Percentil 95 (p95) del tiempo de respuesta de la API medido dentro del backend: el 95 % de las peticiones tardó eso o menos. No es la petición más lenta. Excluye /actuator (healthchecks y monitoreo), que es rápido y dominaría con poco tráfico. Solo se dibuja con al menos 20 peticiones en la ventana: con menos, una o dos peticiones deciden el valor, así que no hay línea (sin línea no significa latencia buena). Se estima con buckets fijos de 50 ms, 100 ms, 250 ms, 500 ms, 1 s, 2,5 s y 5 s: el valor se interpola dentro del bucket y 5 s significa 5 s o más. No incluye la red ni Traefik (ver Latencia p95 por servicio).",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"backend\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"backend\", uri!~\"/actuator.*\"}[$__rate_interval]))) and on () sum(increase(http_server_requests_seconds_count{job=\"backend\", uri!~\"/actuator.*\"}[$__rate_interval])) >= 20",
           "legendFormat": "p95",
           "refId": "A",
           "range": true,
@@ -1340,7 +1548,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 36
+        "y": 37
       },
       "datasource": {
         "type": "prometheus",
@@ -1350,7 +1558,7 @@
     {
       "type": "timeseries",
       "title": "Keycloak: peticiones por resultado",
-      "description": "Peticiones HTTP de Keycloak sin las de métricas y health. CLIENT_ERROR incluye credenciales rechazadas.",
+      "description": "Peticiones por segundo atendidas por Keycloak (sin las de métricas y health), apiladas por resultado: SUCCESS (2xx), REDIRECTION (3xx, normales en el flujo de inicio de sesión), CLIENT_ERROR (4xx: incluye credenciales rechazadas y sesiones vencidas; no son por sí incidentes) y SERVER_ERROR (5xx, en rojo).",
       "targets": [
         {
           "datasource": {
@@ -1381,7 +1589,83 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SUCCESS"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "REDIRECTION"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CLIENT_ERROR"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SERVER_ERROR"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(INFORMATIONAL|UNKNOWN)$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e8e"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -1399,7 +1683,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 36
+        "y": 37
       },
       "datasource": {
         "type": "prometheus",
@@ -1408,15 +1692,15 @@
     },
     {
       "type": "timeseries",
-      "title": "Memoria heap usada (JVM)",
-      "description": "Heap usado por cada JVM.",
+      "title": "Heap usado / máximo de cada JVM",
+      "description": "Fracción del heap (la memoria donde la JVM guarda los objetos Java) en uso respecto de su máximo, para el backend y Keycloak. Cada JVM fija ese máximo con sus propias opciones; no es el límite de memoria del contenedor, y la JVM usa además memoria fuera del heap. El uso sube mientras la aplicación crea objetos; el garbage collector (GC) recupera la memoria de los que ya no se usan (inalcanzables) y conserva los que siguen vivos. Por eso una sierra con picos altos antes de cada GC es normal y no indica una fuga. Merece atención que los valores mínimos, justo después de cada GC (lo que queda vivo), suban de forma sostenida (detalle del backend en el dashboard Backend).",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (job) (jvm_memory_used_bytes{area=\"heap\", job=~\"backend|keycloak\"})",
+          "expr": "sum by (job) (jvm_memory_used_bytes{area=\"heap\", job=~\"backend|keycloak\"}) / sum by (job) (jvm_memory_max_bytes{area=\"heap\", job=~\"backend|keycloak\"} > 0)",
           "legendFormat": "{{job}}",
           "refId": "A",
           "range": true,
@@ -1425,7 +1709,7 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
+          "unit": "percentunit",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,
@@ -1438,7 +1722,9 @@
           },
           "color": {
             "mode": "palette-classic"
-          }
+          },
+          "min": 0,
+          "max": 1
         },
         "overrides": []
       },
@@ -1458,7 +1744,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 44
+        "y": 45
       },
       "datasource": {
         "type": "prometheus",
@@ -1467,8 +1753,8 @@
     },
     {
       "type": "timeseries",
-      "title": "CPU de proceso",
-      "description": "Uso de CPU del proceso respecto de las CPU disponibles para la JVM.",
+      "title": "CPU de cada JVM",
+      "description": "Uso de CPU de cada proceso Java (backend y Keycloak) como fracción de las CPU que ve esa JVM: las del host, salvo que el contenedor tenga un límite de CPU (los archivos Compose actuales no fijan ninguno). 100 % = todas en uso. Picos breves al arrancar o durante un GC son normales; un valor alto sostenido junto con latencia creciente sugiere falta de CPU.",
       "targets": [
         {
           "datasource": {
@@ -1498,7 +1784,8 @@
           "color": {
             "mode": "palette-classic"
           },
-          "min": 0
+          "min": 0,
+          "max": 1
         },
         "overrides": []
       },
@@ -1518,7 +1805,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 44
+        "y": 45
       },
       "datasource": {
         "type": "prometheus",
@@ -1534,14 +1821,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 51
+        "y": 52
       },
       "panels": []
     },
     {
       "type": "timeseries",
       "title": "CPU del host",
-      "description": "Fracción de CPU no ociosa, promedio de todas las CPU del host que observa Alloy.",
+      "description": "Fracción del tiempo en que las CPU del host no están ociosas, promedio de todas (medido por Alloy). iowait es la parte de ese tiempo en que la CPU espera al disco; ya está incluida en «en uso». CPU alta sostenida con latencia creciente sugiere falta de CPU; iowait alto apunta al disco.",
       "targets": [
         {
           "datasource": {
@@ -1549,7 +1836,7 @@
             "uid": "prometheus"
           },
           "expr": "1 - avg(rate(node_cpu_seconds_total{job=\"host\", mode=\"idle\"}[$__rate_interval]))",
-          "legendFormat": "en uso",
+          "legendFormat": "en uso (incluye iowait)",
           "refId": "A",
           "range": true,
           "instant": false
@@ -1603,7 +1890,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 52
+        "y": 53
       },
       "datasource": {
         "type": "prometheus",
@@ -1613,7 +1900,7 @@
     {
       "type": "timeseries",
       "title": "Memoria disponible del host",
-      "description": "MemAvailable / MemTotal. Línea punteada: umbral de PiedrazulHostMemoryLow.",
+      "description": "Memoria que el kernel estima disponible para nuevos procesos sin recurrir a swap (MemAvailable, incluye la caché que puede liberar), como fracción del total. Línea roja punteada: 10 %, umbral de PiedrazulHostMemoryLow (dispara tras 10 min por debajo).",
       "targets": [
         {
           "datasource": {
@@ -1652,11 +1939,11 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "transparent",
                 "value": null
               },
               {
-                "color": "green",
+                "color": "red",
                 "value": 0.1
               }
             ]
@@ -1680,7 +1967,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 52
+        "y": 53
       },
       "datasource": {
         "type": "prometheus",
@@ -1689,8 +1976,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Carga y presión",
-      "description": "Carga media normalizada por CPU y fracción del tiempo con tareas esperando memoria o E/S (PSI).",
+      "title": "Carga normalizada y presión (PSI)",
+      "description": "carga 5m / CPU (eje izquierdo): promedio de 5 min de tareas en ejecución o listas para ejecutarse más, en Linux, las bloqueadas en espera no interrumpible (normalmente E/S de disco), dividido por el número de CPU. Un valor cerca de 1 o mayor significa que hay tantas tareas como CPU, pero no dice si esperan CPU o disco: compáralo con CPU del host (uso e iowait) y con el PSI. PSI (Pressure Stall Information, eje derecho): fracción del tiempo en que alguna tarea estuvo detenida esperando memoria o E/S (10 % = 6 s de cada minuto). PSI de memoria sostenido junto con poca memoria disponible es una señal fuerte de falta de memoria; PSI de E/S alto apunta a un disco lento o saturado.",
       "targets": [
         {
           "datasource": {
@@ -1737,14 +2024,40 @@
             "spanNulls": false,
             "stacking": {
               "mode": "none"
-            }
+            },
+            "axisLabel": "carga / CPU"
           },
           "color": {
             "mode": "palette-classic"
           },
           "min": 0
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^PSI .*"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "PSI"
+              },
+              {
+                "id": "min",
+                "value": 0
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -1762,7 +2075,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 52
+        "y": 53
       },
       "datasource": {
         "type": "prometheus",
@@ -1772,7 +2085,7 @@
     {
       "type": "timeseries",
       "title": "Raíz del host: espacio libre y umbral",
-      "description": "Espacio libre en / frente al umbral de PiedrazulHostRootFilesystemLow: max(15 % de la capacidad, 10 GiB) durante 15 m. Sin líneas: Alloy no reporta / (PiedrazulHostRootFilesystemMissing).",
+      "description": "Espacio libre en / frente al umbral de PiedrazulHostRootFilesystemLow (línea roja punteada): el mayor entre el 15 % de la capacidad y 10 GiB; la alerta dispara tras 15 min por debajo. Sin líneas: Alloy no reporta / (PiedrazulHostRootFilesystemMissing).",
       "targets": [
         {
           "datasource": {
@@ -1815,7 +2128,43 @@
           },
           "min": 0
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^umbral.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "mode": "none"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -1833,7 +2182,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 60
+        "y": 61
       },
       "datasource": {
         "type": "prometheus",
@@ -1842,8 +2191,8 @@
     },
     {
       "type": "bargauge",
-      "title": "Espacio libre por sistema de archivos",
-      "description": "node_filesystem_avail_bytes / size por punto de montaje. Informativo: la alerta de espacio solo evalúa la raíz (panel anterior).",
+      "title": "Espacio libre por punto de montaje (informativo)",
+      "description": "Fracción libre de cada sistema de archivos que ve Alloy, en un solo color porque no es un veredicto: la alerta de espacio evalúa solo la raíz y con su propio umbral (panel Raíz del host, a la izquierda), que en discos pequeños es más exigente que un porcentaje fijo. SIN DATOS (morado): Alloy no reporta sistemas de archivos.",
       "targets": [
         {
           "datasource": {
@@ -1864,25 +2213,31 @@
           "max": 1,
           "noValue": "SIN DATOS",
           "color": {
-            "mode": "thresholds"
+            "mode": "fixed",
+            "fixedColor": "blue"
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "blue",
                 "value": null
-              },
-              {
-                "color": "orange",
-                "value": 0.15
-              },
-              {
-                "color": "green",
-                "value": 0.25
               }
             ]
-          }
+          },
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "text": "SIN DATOS",
+                  "color": "purple",
+                  "index": 9
+                }
+              }
+            }
+          ]
         },
         "overrides": []
       },
@@ -1903,7 +2258,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 60
+        "y": 61
       },
       "datasource": {
         "type": "prometheus",
@@ -1973,7 +2328,138 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 60
+        "y": 61
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "row",
+      "title": "Autoobservación de Prometheus",
+      "collapsed": false,
+      "id": 33,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 68
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Duración de la lectura por destino",
+      "description": "Cuánto tarda Prometheus en leer el endpoint de métricas de cada destino. Si se acerca a 10 s (scrape_timeout), la lectura se corta y cuenta como fallida (up = 0). Un aumento sostenido suele venir de un productor sobrecargado o de demasiadas series.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "scrape_duration_seconds",
+          "legendFormat": "{{job}}",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 9,
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 69
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Muestras por lectura y destino",
+      "description": "Muestras que entrega cada destino en cada lectura, después del relabeling de Prometheus (scrape_samples_post_metric_relabeling). Una muestra es un valor con su marca de tiempo; cada una pertenece a una serie (combinación única de métrica y etiquetas), y una lectura trae una muestra por cada serie que el destino expone en ese momento. Por eso el número aproxima cuánto aporta cada destino a la cardinalidad, que determina la memoria y el disco de Prometheus. No es el total de series activas (prometheus_tsdb_head_series), que también incluye las de reglas y las que siguen en memoria un tiempo tras desaparecer. Normal: estable, con cambios pequeños al arrancar o al aparecer rutas nuevas. Un salto sostenido sugiere una etiqueta nueva o con valores sin límite (por ejemplo, un id); para ver qué métrica creció, en Explore: count by (__name__) ({job=\"<destino>\"}).",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "scrape_samples_post_metric_relabeling",
+          "legendFormat": "{{job}}",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 10,
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 69
       },
       "datasource": {
         "type": "prometheus",

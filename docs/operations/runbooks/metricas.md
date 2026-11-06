@@ -4,7 +4,8 @@
 
 Instalar, operar, verificar y retirar el stack privado de métricas de Piedra Azul: Prometheus
 recolecta las métricas privadas de backend, Keycloak y Traefik y las del host (Alloy), evalúa las
-reglas de alerta y Grafana las muestra en dos dashboards. Es un proyecto Compose propio
+reglas de alerta y Grafana las muestra en tres dashboards (Plataforma, Backend y Logs). Es un
+proyecto Compose propio
 (`piedrazul-obs`) que la aplicación no necesita para arrancar ni para quedar healthy.
 
 Los productores y sus contratos están en
@@ -90,7 +91,9 @@ el anterior.
 - **Crecimiento**: con un backend, Keycloak, Traefik y un host hay unas 3 200–3 400 series activas
   (medido localmente). A 30 s son ≈10 M muestras/día; con 1–2 bytes por muestra comprimida,
   ≈10–20 MB/día y ≈300–600 MB en 30 días, más el WAL. Una etiqueta nueva de alta cardinalidad
-  cambia esto: el panel **Series por destino** lo muestra.
+  cambia esto. El panel **Muestras por lectura y destino** de Plataforma muestra cuánto entrega
+  cada destino en cada lectura tras el relabeling; el total de series activas de Prometheus es
+  `prometheus_tsdb_head_series`.
 - **Medición local indicativa** (Docker Desktop/WSL2, minutos de ejecución, tráfico sintético):
   Prometheus ≈35–45 MiB, Alloy ≈35–40 MiB, Grafana ≈210–230 MiB, CPU < 1 %. No describe el consumo
   en un VPS (ver [Mediciones locales](#mediciones-locales)).
@@ -216,11 +219,40 @@ sudo docker compose exec grafana grafana cli admin reset-admin-password '<nueva>
 
 y reflejarla en `.env`.
 
+## Dashboards
+
+Tres dashboards en la carpeta **Piedra Azul**, enlazados entre sí (barra superior, conservando el
+rango de tiempo). Cada panel explica en su descripción (icono ⓘ) qué mide, cómo leerlo y qué no
+se puede concluir de él.
+
+| Dashboard (uid) | Responde | Secciones, en orden |
+|---|---|---|
+| **Plataforma** (`piedrazul-plataforma`) | ¿hay un incidente?, ¿qué componente?, ¿desde cuándo? | Alertas activas · Lectura de métricas por servicio (up) e historial · HTTP en el borde (Traefik) · Backend y Keycloak · Host · Autoobservación de Prometheus |
+| **Backend** (`piedrazul-backend-jvm`) | ¿la API responde bien? y, si no, ¿por qué? | Estado · API HTTP · Base de datos (HikariCP) · Memoria y GC · CPU, hilos y descriptores de archivo |
+| **Logs** (`piedrazul-logs`) | ¿llegan los logs?, ¿qué errores hay?, ¿qué pasó con una petición? | Estado de la recolección · Volumen y búsqueda de logs · Investigación por id de correlación · Diagnóstico de la canalización (Alloy → Loki) |
+
+Colores con el mismo significado en los tres: **verde** solo cuando el estado sano está probado
+(por ejemplo, 0 alertas con reglas evaluadas hace poco); **azul** o neutro, una medición
+informativa; **naranja**, un aviso que merece mirarse; **rojo**, una falla (CAÍDO, pérdida,
+5xx, alerta critical); **morado** con el texto **SIN DATOS**, telemetría ausente o vencida:
+estado desconocido, nunca sano ni 0. Los códigos HTTP y los niveles de log tienen color fijo
+(2xx verde, 3xx azul, 4xx amarillo, 5xx rojo; error rojo, warn naranja); un 4xx clasifica la
+respuesta, no es por sí un incidente. Las líneas punteadas son umbrales de alerta (rojo) o límites
+de referencia (gris).
+
+Las estadísticas de **Lectura de métricas por servicio** dicen si Prometheus pudo leer el endpoint
+de métricas de cada servicio (`up`), no si toda la aplicación funciona; el **Historial de lectura
+por servicio** muestra desde cuándo falla una lectura. **Alertmanager** en OK no prueba que
+Discord reciba los mensajes ([Alertas](alertas.md)). **Espacio libre por punto de montaje** es solo
+informativo: el veredicto sobre el disco es el de **Raíz del host: espacio libre y umbral**, que usa
+el umbral de la alerta.
+
 ## Alertas
 
 Prometheus evalúa las reglas cada 30 s. Una alerta se ve en el dashboard Plataforma (estadística
-**Alertas accionables disparadas**, que cuenta las de severidad distinta de `info`, y tabla de
-alertas, que muestra todas con su severidad) y en la serie `ALERTS` y, con el receptor `discord`
+**Alertas que requieren atención**: las `firing` de severidad distinta de `info`; muestra
+**SIN DATOS** si Prometheus no evaluó sus reglas en los últimos 2 min, y tabla de alertas, que
+muestra todas con su severidad) y en la serie `ALERTS` y, con el receptor `discord`
 activado, llega a Discord por Alertmanager ([Alertas](alertas.md), que también describe las tres
 reglas de la entrega). Con Prometheus detenido no se evalúa ninguna regla.
 
@@ -250,6 +282,14 @@ Grafana Live), cuya duración es la de la conexión, y solo dibuja una ventana c
 peticiones: con menos el p95 no es fiable, y sin línea no significa latencia buena. Los buckets de
 Traefik son 0,1, 0,3, 1,2 y 5 s: el valor se interpola dentro del bucket y 5 s significa 5 s o
 más.
+
+**Latencia p95 del backend.** **Backend: latencia p95 de la API** (Plataforma) y **Latencia p95
+por ruta de la API** (Backend) siguen el mismo criterio con las métricas de Spring: excluyen
+`/actuator` (el healthcheck de Docker cada 30 s, rápido, que con poco tráfico real sería casi todo
+lo medido) y solo dibujan una ventana con al menos 20 peticiones de la API (en total, o por ruta).
+Con el tráfico actual es normal que no haya línea. Los buckets del backend son 50 ms, 100 ms,
+250 ms, 500 ms, 1 s, 2,5 s y 5 s. Los conteos de peticiones (**Backend: peticiones por estado**,
+**Peticiones por ruta**) sí incluyen `/actuator`.
 
 Las reglas de la canalización de logs (`prometheus/rules/logs.yml`) están en
 [Logs](logs.md#operación-y-diagnóstico).
@@ -282,7 +322,7 @@ Prometheus solo se une a `piedrazul_net`; no crea ni modifica la red.
 | `GRAFANA_ADMIN_PASSWORD es requerido` | falta `.env` | crearlo desde `.env.example` (local) o repetir el playbook (host) |
 | destino `down` con `no such host` | el contenedor del productor no existe en la red | `docker ps`; levantar el servicio |
 | destino `down` con `connection refused` | el productor corre sin su listener de métricas | revisar `MANAGEMENT_SERVER_PORT`, `KC_METRICS_ENABLED` o los flags de Traefik |
-| paneles con **SIN DATOS** | no hay serie: destino caído o Prometheus sin datos para ese rango | revisar **Estado de la recolección** |
+| paneles con **SIN DATOS** (morado) | no hay serie: destino caído o Prometheus sin datos para ese rango | revisar **Lectura de métricas por servicio (up)** en Plataforma |
 | `PiedrazulHostRootFilesystemMissing` | `/` no está montado en Alloy o lo excluye `config.alloy` | revisar el montaje `/:/host/root` y `mount_points_exclude` |
 | Alloy se reinicia en bucle | error en `config.alloy` | `docker compose logs alloy` |
 | cambio en `prometheus.yml`, las reglas, `config.alloy` o el provisioning sin efecto | se leen solo al arrancar | reiniciar el servicio; el playbook lo hace solo |

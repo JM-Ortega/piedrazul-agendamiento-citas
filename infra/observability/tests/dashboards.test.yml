@@ -5,10 +5,18 @@
 # Cada expr es la del panel con $__rate_interval = 2m; metrics-stack-check.sh comprueba que siguen
 # siendo idénticas a las de los dashboards. Prueban la consulta, no cómo la dibuja Grafana
 # (mapeos de valores y colores: ver el JSON del panel).
-#   Plataforma 7  Alertas accionables disparadas
+#   Plataforma 7  Alertas que requieren atención
 #   Plataforma 14 Proporción de respuestas 5xx por servicio
 #   Plataforma 15 Latencia p95 por servicio (peticiones HTTP)
+#   Plataforma 20 Backend: latencia p95 de la API
+#   Plataforma 22 Heap usado / máximo de cada JVM
+#   Backend 24    Latencia p95 por ruta de la API (top 10 por tráfico)
 #   Logs 10       Componentes de Alloy sin funcionar
+#   Logs 11, 12   Entradas leídas del journal / Seleccionadas para Loki (1 h)
+#   Logs 13       Descartadas antes de Loki (24 h)
+#   Logs 15 (B)   Reintentos, rechazos y descartes: respuestas con error
+#   Logs 17       Desde la última retención de Loki
+#   Logs 18       Alertas de logs disparadas
 rule_files:
   - ../prometheus/rules/alerts.yml
 
@@ -303,3 +311,634 @@ tests:
       - expr: 'sum(alloy_component_controller_running_components{job="alloy", health_type!="healthy"}) or on() (0 * sum(alloy_component_controller_running_components{job="alloy"}) and on() (max(up{job="alloy"}) == 1)) or on() ((max(up{job="alloy"}) == 0) - 1)'
         eval_time: 5m
         exp_samples: []
+
+  # ── Plataforma 20 y Backend 24: latencia p95 de la API del backend ─────────────
+  # Buckets del backend 50 ms … 5 s (los usados aquí: 0,05/0,1/0,25/5 s). API: 30/min entre 0,1 y
+  # 0,25 s → p95 = 0,1 + 0,95 × 0,15 = 0,2425. El healthcheck (100/min, < 50 ms) lo bajaría si contara.
+  - name: "Plataforma 20: /actuator no entra en el p95; la API con ≥ 20 peticiones sí"
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients", le="0.05"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients", le="0.25"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients", le="5.0"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="0.05"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="0.1"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="0.25"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="5.0"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="+Inf"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health"}'
+        values: '0+100x10'
+    promql_expr_test:
+      - expr: 'histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job="backend", uri!~"/actuator.*"}[2m]))) and on () sum(increase(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m])) >= 20'
+        eval_time: 10m
+        exp_samples:
+          - labels: '{}'
+            value: 0.2425
+
+  - name: "Plataforma 20: menos de 20 peticiones de la API, aunque haya mucho /actuator → sin línea"
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients", le="0.05"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients", le="0.25"}'
+        values: '0+5x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients", le="5.0"}'
+        values: '0+5x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients", le="+Inf"}'
+        values: '0+5x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients"}'
+        values: '0+5x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="0.05"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="0.1"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="0.25"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="5.0"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="+Inf"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health"}'
+        values: '0+100x10'
+    promql_expr_test:
+      - expr: 'histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job="backend", uri!~"/actuator.*"}[2m]))) and on () sum(increase(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m])) >= 20'
+        eval_time: 10m
+        exp_samples: []
+
+  - name: "Plataforma 20: solo tráfico de /actuator → sin línea (no un p95 del healthcheck)"
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="0.05"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="0.1"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="0.25"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="5.0"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="+Inf"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/prometheus", le="0.05"}'
+        values: '0+2x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/prometheus", le="0.1"}'
+        values: '0+2x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/prometheus", le="0.25"}'
+        values: '0+2x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/prometheus", le="5.0"}'
+        values: '0+2x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/prometheus", le="+Inf"}'
+        values: '0+2x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/prometheus"}'
+        values: '0+2x10'
+    promql_expr_test:
+      - expr: 'histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job="backend", uri!~"/actuator.*"}[2m]))) and on () sum(increase(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m])) >= 20'
+        eval_time: 10m
+        exp_samples: []
+
+  - name: "Plataforma 20: errores lentos de la API se ven (5 s = 5 s o más)"
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="500", uri="/api/patients", le="0.05"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="500", uri="/api/patients", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="500", uri="/api/patients", le="0.25"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="500", uri="/api/patients", le="5.0"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="500", uri="/api/patients", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="500", uri="/api/patients"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="0.05"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="0.1"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="0.25"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="5.0"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="+Inf"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health"}'
+        values: '0+100x10'
+    promql_expr_test:
+      - expr: 'histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job="backend", uri!~"/actuator.*"}[2m]))) and on () sum(increase(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m])) >= 20'
+        eval_time: 10m
+        exp_samples:
+          - labels: '{}'
+            value: 5
+
+  - name: "Plataforma 20: sin series del backend → sin línea"
+    interval: 1m
+    input_series:
+      - series: 'up{job="backend", instance="backend:8081"}'
+        values: '1x10'
+    promql_expr_test:
+      - expr: 'histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job="backend", uri!~"/actuator.*"}[2m]))) and on () sum(increase(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m])) >= 20'
+        eval_time: 10m
+        exp_samples: []
+
+  - name: "Backend 24: por ruta, solo las de la API con ≥ 20 peticiones; /actuator excluido"
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients", le="0.05"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients", le="0.25"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients", le="5.0"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/doctors", le="0.05"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/doctors", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/doctors", le="0.25"}'
+        values: '0+5x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/doctors", le="5.0"}'
+        values: '0+5x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/doctors", le="+Inf"}'
+        values: '0+5x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/doctors"}'
+        values: '0+5x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="0.05"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="0.1"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="0.25"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="5.0"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health", le="+Inf"}'
+        values: '0+100x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health"}'
+        values: '0+100x10'
+    promql_expr_test:
+      - expr: 'histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job="backend", uri!~"/actuator.*"}[2m]))) and on (uri) topk(10, sum by (uri) (rate(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m]))) and on (uri) sum by (uri) (increase(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m])) >= 20'
+        eval_time: 10m
+        exp_samples:
+          - labels: '{uri="/api/patients"}'
+            value: 0.2425
+
+  # /api/r01 (25/min, ≥ 20 en la ventana) es la de menos tráfico: la excluye el top 10, no el mínimo.
+  - name: "Backend 24: con 11 rutas suficientes se dibujan las 10 de más tráfico"
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r01", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r01", le="0.25"}'
+        values: '0+25x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r01", le="+Inf"}'
+        values: '0+25x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r01"}'
+        values: '0+25x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r02", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r02", le="0.25"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r02", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r02"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r03", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r03", le="0.25"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r03", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r03"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r04", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r04", le="0.25"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r04", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r04"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r05", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r05", le="0.25"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r05", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r05"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r06", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r06", le="0.25"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r06", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r06"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r07", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r07", le="0.25"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r07", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r07"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r08", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r08", le="0.25"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r08", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r08"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r09", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r09", le="0.25"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r09", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r09"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r10", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r10", le="0.25"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r10", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r10"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r11", le="0.1"}'
+        values: '0+0x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r11", le="0.25"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_bucket{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r11", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r11"}'
+        values: '0+30x10'
+    promql_expr_test:
+      - expr: 'histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job="backend", uri!~"/actuator.*"}[2m]))) and on (uri) topk(10, sum by (uri) (rate(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m]))) and on (uri) sum by (uri) (increase(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m])) >= 20'
+        eval_time: 10m
+        exp_samples:
+          - labels: '{uri="/api/r02"}'
+            value: 0.2425
+          - labels: '{uri="/api/r03"}'
+            value: 0.2425
+          - labels: '{uri="/api/r04"}'
+            value: 0.2425
+          - labels: '{uri="/api/r05"}'
+            value: 0.2425
+          - labels: '{uri="/api/r06"}'
+            value: 0.2425
+          - labels: '{uri="/api/r07"}'
+            value: 0.2425
+          - labels: '{uri="/api/r08"}'
+            value: 0.2425
+          - labels: '{uri="/api/r09"}'
+            value: 0.2425
+          - labels: '{uri="/api/r10"}'
+            value: 0.2425
+          - labels: '{uri="/api/r11"}'
+            value: 0.2425
+
+  # ── Plataforma 22: heap usado / máximo por JVM ──────────────────────────────
+  # G1 publica el máximo del heap en Old Gen; Eden y Survivor publican -1 (sin máximo propio).
+  - name: "Plataforma 22: fracción del heap por JVM (regiones sin máximo, -1, no restan; non-heap no cuenta)"
+    interval: 1m
+    input_series:
+      - series: 'jvm_memory_used_bytes{job="backend", instance="backend:8081", area="heap", id="G1 Eden Space"}'
+        values: '100x10'
+      - series: 'jvm_memory_used_bytes{job="backend", instance="backend:8081", area="heap", id="G1 Old Gen"}'
+        values: '200x10'
+      - series: 'jvm_memory_used_bytes{job="backend", instance="backend:8081", area="nonheap", id="Metaspace"}'
+        values: '900x10'
+      - series: 'jvm_memory_max_bytes{job="backend", instance="backend:8081", area="heap", id="G1 Eden Space"}'
+        values: '-1x10'
+      - series: 'jvm_memory_max_bytes{job="backend", instance="backend:8081", area="heap", id="G1 Survivor Space"}'
+        values: '-1x10'
+      - series: 'jvm_memory_max_bytes{job="backend", instance="backend:8081", area="heap", id="G1 Old Gen"}'
+        values: '1000x10'
+      - series: 'jvm_memory_max_bytes{job="backend", instance="backend:8081", area="nonheap", id="Metaspace"}'
+        values: '100x10'
+      - series: 'jvm_memory_used_bytes{job="keycloak", instance="keycloak:9000", area="heap", id="G1 Old Gen"}'
+        values: '50x10'
+      - series: 'jvm_memory_max_bytes{job="keycloak", instance="keycloak:9000", area="heap", id="G1 Eden Space"}'
+        values: '-1x10'
+      - series: 'jvm_memory_max_bytes{job="keycloak", instance="keycloak:9000", area="heap", id="G1 Old Gen"}'
+        values: '500x10'
+    promql_expr_test:
+      - expr: 'sum by (job) (jvm_memory_used_bytes{area="heap", job=~"backend|keycloak"}) / sum by (job) (jvm_memory_max_bytes{area="heap", job=~"backend|keycloak"} > 0)'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{job="backend"}'
+            value: 0.3
+          - labels: '{job="keycloak"}'
+            value: 0.1
+
+  - name: "Plataforma 22: una JVM sin máximo publicado → sin línea para ella (no un cociente inventado)"
+    interval: 1m
+    input_series:
+      - series: 'jvm_memory_used_bytes{job="backend", instance="backend:8081", area="heap", id="G1 Eden Space"}'
+        values: '100x10'
+      - series: 'jvm_memory_used_bytes{job="backend", instance="backend:8081", area="heap", id="G1 Old Gen"}'
+        values: '200x10'
+      - series: 'jvm_memory_used_bytes{job="backend", instance="backend:8081", area="nonheap", id="Metaspace"}'
+        values: '900x10'
+      - series: 'jvm_memory_max_bytes{job="backend", instance="backend:8081", area="heap", id="G1 Eden Space"}'
+        values: '-1x10'
+      - series: 'jvm_memory_max_bytes{job="backend", instance="backend:8081", area="heap", id="G1 Survivor Space"}'
+        values: '-1x10'
+      - series: 'jvm_memory_max_bytes{job="backend", instance="backend:8081", area="heap", id="G1 Old Gen"}'
+        values: '1000x10'
+      - series: 'jvm_memory_max_bytes{job="backend", instance="backend:8081", area="nonheap", id="Metaspace"}'
+        values: '100x10'
+      - series: 'jvm_memory_used_bytes{job="keycloak", instance="keycloak:9000", area="heap", id="G1 Old Gen"}'
+        values: '50x10'
+      - series: 'jvm_memory_max_bytes{job="keycloak", instance="keycloak:9000", area="heap", id="G1 Eden Space"}'
+        values: '-1x10'
+    promql_expr_test:
+      - expr: 'sum by (job) (jvm_memory_used_bytes{area="heap", job=~"backend|keycloak"}) / sum by (job) (jvm_memory_max_bytes{area="heap", job=~"backend|keycloak"} > 0)'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{job="backend"}'
+            value: 0.3
+
+  # ── Logs 11, 12 y 13: contadores de la canalización, solo con Alloy leído ahora ──────
+  - name: "Logs 11: Alloy arriba leyendo 1 entrada/s → 3600 en la hora"
+    interval: 1m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '1x70'
+      - series: 'loki_source_journal_target_lines_total{job="alloy", instance="alloy:12345", component_id="loki.source.journal.host"}'
+        values: '0+60x70'
+    promql_expr_test:
+      - expr: 'sum(increase(loki_source_journal_target_lines_total{job="alloy"}[1h])) and on() (max(up{job="alloy"}) == 1)'
+        eval_time: 65m
+        exp_samples:
+          - labels: '{}'
+            value: 3600
+
+  - name: "Logs 11: Alloy arriba sin entradas en la hora → 0 (naranja), no SIN DATOS"
+    interval: 1m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '1x70'
+      - series: 'loki_source_journal_target_lines_total{job="alloy", instance="alloy:12345", component_id="loki.source.journal.host"}'
+        values: '500x70'
+    promql_expr_test:
+      - expr: 'sum(increase(loki_source_journal_target_lines_total{job="alloy"}[1h])) and on() (max(up{job="alloy"}) == 1)'
+        eval_time: 65m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+
+  # La hora todavía contiene lecturas de antes de la caída: sin la condición sobre up se vería una cifra.
+  - name: "Logs 11 y 12: Alloy caído con historia en la ventana → sin valor (SIN DATOS), no la cifra vieja"
+    interval: 1m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '1x60 0x10'
+      - series: 'loki_source_journal_target_lines_total{job="alloy", instance="alloy:12345", component_id="loki.source.journal.host"}'
+        values: '0+60x60 stale'
+      - series: 'loki_relabel_entries_written{job="alloy", instance="alloy:12345", component_id="loki.relabel.select"}'
+        values: '0+6x60 stale'
+    promql_expr_test:
+      - expr: 'sum(increase(loki_source_journal_target_lines_total{job="alloy"}[1h])) and on() (max(up{job="alloy"}) == 1)'
+        eval_time: 65m
+        exp_samples: []
+      - expr: 'sum(increase(loki_relabel_entries_written{job="alloy", component_id="loki.relabel.select"}[1h])) and on() (max(up{job="alloy"}) == 1)'
+        eval_time: 65m
+        exp_samples: []
+
+  - name: "Logs 11 y 12: Alloy arriba sin las métricas de lectura → sin valor (SIN DATOS)"
+    interval: 1m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '1x70'
+    promql_expr_test:
+      - expr: 'sum(increase(loki_source_journal_target_lines_total{job="alloy"}[1h])) and on() (max(up{job="alloy"}) == 1)'
+        eval_time: 65m
+        exp_samples: []
+      - expr: 'sum(increase(loki_relabel_entries_written{job="alloy", component_id="loki.relabel.select"}[1h])) and on() (max(up{job="alloy"}) == 1)'
+        eval_time: 65m
+        exp_samples: []
+
+  - name: "Logs 12: seleccionadas en la hora (0,1/s) → 360"
+    interval: 1m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '1x70'
+      - series: 'loki_relabel_entries_written{job="alloy", instance="alloy:12345", component_id="loki.relabel.select"}'
+        values: '0+6x70'
+    promql_expr_test:
+      - expr: 'sum(increase(loki_relabel_entries_written{job="alloy", component_id="loki.relabel.select"}[1h])) and on() (max(up{job="alloy"}) == 1)'
+        eval_time: 65m
+        exp_samples:
+          - labels: '{}'
+            value: 360
+
+  # Alloy publica loki_write_dropped_entries_total en 0 desde el arranque (un motivo por serie).
+  - name: "Logs 13: Alloy arriba sin descartes en 24 h → 0 (verde)"
+    interval: 1m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '1x1500'
+      - series: 'loki_write_dropped_entries_total{job="alloy", instance="alloy:12345", component_id="loki.write.default", reason="rate_limited"}'
+        values: '0x1500'
+    promql_expr_test:
+      - expr: 'sum(increase(loki_write_dropped_entries_total{job="alloy"}[24h])) and on() (max(up{job="alloy"}) == 1)'
+        eval_time: 1500m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+
+  - name: "Logs 13: 5 descartes en las últimas 24 h → 5"
+    interval: 1m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '1x1500'
+      - series: 'loki_write_dropped_entries_total{job="alloy", instance="alloy:12345", component_id="loki.write.default", reason="rate_limited"}'
+        values: '0x1400 5x100'
+    promql_expr_test:
+      - expr: 'sum(increase(loki_write_dropped_entries_total{job="alloy"}[24h])) and on() (max(up{job="alloy"}) == 1)'
+        eval_time: 1500m
+        exp_samples:
+          - labels: '{}'
+            value: 5
+
+  - name: "Logs 13: Alloy caído → sin valor (SIN DATOS): no se sabe si hubo pérdida"
+    interval: 1m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '1x1440 0x60'
+      - series: 'loki_write_dropped_entries_total{job="alloy", instance="alloy:12345", component_id="loki.write.default", reason="rate_limited"}'
+        values: '0x1440 stale'
+    promql_expr_test:
+      - expr: 'sum(increase(loki_write_dropped_entries_total{job="alloy"}[24h])) and on() (max(up{job="alloy"}) == 1)'
+        eval_time: 1500m
+        exp_samples: []
+
+  # ── Logs 17: desde la última retención de Loki (criterio de PiedrazulLokiRetentionNotRunning) ──
+  - name: "Logs 17: retención completada a los 300 s → segundos desde entonces"
+    interval: 1m
+    input_series:
+      - series: 'loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki", instance="loki:3100"}'
+        values: '300x10'
+      - series: 'process_start_time_seconds{job="loki", instance="loki:3100"}'
+        values: '0x10'
+    promql_expr_test:
+      - expr: '(time() - loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} and on() loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} > 0) or on() (0 * loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} - 1 and on (instance) (time() - process_start_time_seconds{job="loki"}) <= 3 * 3600) or on() (0 * loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} - 2 and on (instance) (time() - process_start_time_seconds{job="loki"}) > 3 * 3600)'
+        eval_time: 10m
+        exp_samples:
+          - labels: '{instance="loki:3100", job="loki"}'
+            value: 300
+
+  # Loki publica la marca en 0 desde el arranque hasta la primera retención completa.
+  - name: "Logs 17: marca 0 con Loki arrancado hace ≤ 3 h → -1 (AÚN NO CORRIÓ, azul)"
+    interval: 1m
+    input_series:
+      - series: 'loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki", instance="loki:3100"}'
+        values: '0x10'
+      - series: 'process_start_time_seconds{job="loki", instance="loki:3100"}'
+        values: '0x10'
+    promql_expr_test:
+      - expr: '(time() - loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} and on() loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} > 0) or on() (0 * loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} - 1 and on (instance) (time() - process_start_time_seconds{job="loki"}) <= 3 * 3600) or on() (0 * loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} - 2 and on (instance) (time() - process_start_time_seconds{job="loki"}) > 3 * 3600)'
+        eval_time: 10m
+        exp_samples:
+          - labels: '{instance="loki:3100", job="loki"}'
+            value: -1
+
+  - name: "Logs 17: marca 0 con Loki arriba más de 3 h → -2 (NINGUNA EN 3 H, naranja): la condición de la alerta"
+    interval: 1m
+    input_series:
+      - series: 'loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki", instance="loki:3100"}'
+        values: '0x10'
+      - series: 'process_start_time_seconds{job="loki", instance="loki:3100"}'
+        values: '-20000x10'
+    promql_expr_test:
+      - expr: '(time() - loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} and on() loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} > 0) or on() (0 * loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} - 1 and on (instance) (time() - process_start_time_seconds{job="loki"}) <= 3 * 3600) or on() (0 * loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} - 2 and on (instance) (time() - process_start_time_seconds{job="loki"}) > 3 * 3600)'
+        eval_time: 10m
+        exp_samples:
+          - labels: '{instance="loki:3100", job="loki"}'
+            value: -2
+
+  - name: "Logs 17: marca 0 sin hora de arranque de Loki → sin valor (SIN DATOS): no se sabe si es esperable"
+    interval: 1m
+    input_series:
+      - series: 'loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki", instance="loki:3100"}'
+        values: '0x10'
+    promql_expr_test:
+      - expr: '(time() - loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} and on() loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} > 0) or on() (0 * loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} - 1 and on (instance) (time() - process_start_time_seconds{job="loki"}) <= 3 * 3600) or on() (0 * loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} - 2 and on (instance) (time() - process_start_time_seconds{job="loki"}) > 3 * 3600)'
+        eval_time: 10m
+        exp_samples: []
+
+  - name: "Logs 17: Loki sin leer (series vencidas) → sin valor (SIN DATOS)"
+    interval: 1m
+    input_series:
+      - series: 'loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki", instance="loki:3100"}'
+        values: '300x3 stale'
+      - series: 'process_start_time_seconds{job="loki", instance="loki:3100"}'
+        values: '0x3 stale'
+    promql_expr_test:
+      - expr: '(time() - loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} and on() loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} > 0) or on() (0 * loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} - 1 and on (instance) (time() - process_start_time_seconds{job="loki"}) <= 3 * 3600) or on() (0 * loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} - 2 and on (instance) (time() - process_start_time_seconds{job="loki"}) > 3 * 3600)'
+        eval_time: 10m
+        exp_samples: []
+
+  - name: "Logs 17: sin destino loki → sin valor (SIN DATOS)"
+    interval: 1m
+    input_series:
+      - series: 'up{job="prometheus", instance="localhost:9090"}'
+        values: '1x10'
+    promql_expr_test:
+      - expr: '(time() - loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} and on() loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} > 0) or on() (0 * loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} - 1 and on (instance) (time() - process_start_time_seconds{job="loki"}) <= 3 * 3600) or on() (0 * loki_compactor_apply_retention_last_successful_run_timestamp_seconds{job="loki"} - 2 and on (instance) (time() - process_start_time_seconds{job="loki"}) > 3 * 3600)'
+        eval_time: 10m
+        exp_samples: []
+
+  # ── Logs 18: alertas de la canalización de logs ─────────────────────────────
+  - name: "Logs 18: grupo piedrazul-logs al día y sin alertas → 0"
+    interval: 1m
+    input_series:
+      - series: 'prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", instance="localhost:9090", rule_group="/etc/prometheus/rules/logs.yml;piedrazul-logs"}'
+        values: '0+60x10'
+      - series: 'prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", instance="localhost:9090", rule_group="/etc/prometheus/rules/alerts.yml;piedrazul-host"}'
+        values: '0+60x10'
+    promql_expr_test:
+      - expr: 'count(ALERTS{alertstate="firing", alertname=~"PiedrazulLoki.*|PiedrazulLogs.*|PiedrazulAlloyComponentUnhealthy"}) or on() (0 * (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", rule_group=~".+/logs.yml;piedrazul-logs"}) < 120))'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+
+  - name: "Logs 18: cuenta las de logs en firing; no las pending ni las de otros grupos"
+    interval: 1m
+    input_series:
+      - series: 'prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", instance="localhost:9090", rule_group="/etc/prometheus/rules/logs.yml;piedrazul-logs"}'
+        values: '0+60x10'
+      - series: 'ALERTS{alertname="PiedrazulLokiDown", alertstate="firing", severity="warning", job="loki"}'
+        values: '1x10'
+      - series: 'ALERTS{alertname="PiedrazulLogsDropped", alertstate="pending", severity="warning"}'
+        values: '1x10'
+      - series: 'ALERTS{alertname="PiedrazulTargetDown", alertstate="firing", severity="critical", job="backend"}'
+        values: '1x10'
+    promql_expr_test:
+      - expr: 'count(ALERTS{alertstate="firing", alertname=~"PiedrazulLoki.*|PiedrazulLogs.*|PiedrazulAlloyComponentUnhealthy"}) or on() (0 * (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", rule_group=~".+/logs.yml;piedrazul-logs"}) < 120))'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+
+  - name: "Logs 18: grupo piedrazul-logs sin evaluar hace más de 2 min (aunque otros estén al día) → sin valor"
+    interval: 1m
+    input_series:
+      - series: 'prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", instance="localhost:9090", rule_group="/etc/prometheus/rules/logs.yml;piedrazul-logs"}'
+        values: '60x10'
+      - series: 'prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", instance="localhost:9090", rule_group="/etc/prometheus/rules/alerts.yml;piedrazul-host"}'
+        values: '0+60x10'
+    promql_expr_test:
+      - expr: 'count(ALERTS{alertstate="firing", alertname=~"PiedrazulLoki.*|PiedrazulLogs.*|PiedrazulAlloyComponentUnhealthy"}) or on() (0 * (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", rule_group=~".+/logs.yml;piedrazul-logs"}) < 120))'
+        eval_time: 5m
+        exp_samples: []
+
+  - name: "Logs 18: sin el grupo piedrazul-logs cargado → sin valor, no 0"
+    interval: 1m
+    input_series:
+      - series: 'prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", instance="localhost:9090", rule_group="/etc/prometheus/rules/alerts.yml;piedrazul-host"}'
+        values: '0+60x10'
+    promql_expr_test:
+      - expr: 'count(ALERTS{alertstate="firing", alertname=~"PiedrazulLoki.*|PiedrazulLogs.*|PiedrazulAlloyComponentUnhealthy"}) or on() (0 * (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", rule_group=~".+/logs.yml;piedrazul-logs"}) < 120))'
+        eval_time: 5m
+        exp_samples: []
+
+  # ── Logs 15 (consulta B): respuestas de Loki con error ──────────────────────
+  - name: "Logs 15 B: los 204 (envío correcto) no se dibujan; los 429 sí"
+    interval: 1m
+    input_series:
+      - series: 'loki_write_request_duration_seconds_count{job="alloy", instance="alloy:12345", component_id="loki.write.default", host="loki:3100", status_code="204"}'
+        values: '0+60x10'
+      - series: 'loki_write_request_duration_seconds_count{job="alloy", instance="alloy:12345", component_id="loki.write.default", host="loki:3100", status_code="429"}'
+        values: '0+6x10'
+    promql_expr_test:
+      - expr: 'sum by (status_code) (rate(loki_write_request_duration_seconds_count{job="alloy", status_code!~"2.."}[2m]))'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{status_code="429"}'
+            value: 0.1
