@@ -13,10 +13,11 @@
 #      (kc_platform_admin_username), una sola vez y nunca después.
 #   P3 desconocido/divergente → falla cerrado y explica por qué.
 #      - Bloqueante (schema ausente o parcial, falta master, el realm de la aplicación o el
-#        cliente backend, autoridad temporal ajena): falla antes de arrancar Keycloak y
-#        ninguna automatización lo corrige, tampoco la recuperación → escalar.
-#      - Recuperable (credencial de automatización rechazada, forma o roles técnicos
-#        divergentes, autoridad temporal propia de un evento interrumpido): solo con
+#        cliente backend o frontend, autoridad temporal ajena): falla antes de arrancar
+#        Keycloak y ninguna automatización lo corrige, tampoco la recuperación → escalar.
+#      - Recuperable (credencial de automatización rechazada, forma, roles o alcance de roles
+#        de los clientes propios divergentes, autoridad temporal propia de un evento
+#        interrumpido): solo con
 #        keycloak_recovery=true (workflow_dispatch con aprobación del environment) corre el
 #        evento con autoridad temporal sobre el estado existente. Nunca importa ni recrea
 #        master, el realm de la aplicación ni piedrazul-backend; sí puede crear o corregir el
@@ -77,10 +78,22 @@
         {%- for c, names in (_sa.clientRoles | default({})).items() -%}{%- for n in names -%}{%- set _ = r.append(c ~ ':' ~ n) -%}{%- endfor -%}{%- endfor -%}
         {%- for n in _sa.realmRoles | default([]) -%}{%- if not n.startswith('default-roles-') -%}{%- set _ = r.append('realm:' ~ n) -%}{%- endif -%}{%- endfor -%}
         {{ r | sort }}
+      # Alcance de roles explícito (Full Scope Allowed deshabilitado): backend y frontend según
+      # el realm del repositorio (clientScopeMappings / scopeMappings); la automatización, sus
+      # mismos roles asignados. <realm>:<rol> o <clientId>:<rol>, como los roles.
+      scope_automation: "{{ kc_automation_roles | unique | sort }}"
+      scope_backend: "{{ _scope_pairs | select('match', '^' ~ (kc_backend_client_id | regex_escape) ~ '[|]') | map('regex_replace', '^[^|]*[|]', '') | unique | sort }}"
+      scope_frontend: "{{ _scope_pairs | select('match', '^' ~ (kc_frontend_client_id | regex_escape) ~ '[|]') | map('regex_replace', '^[^|]*[|]', '') | unique | sort }}"
   vars:
     _realm: "{{ lookup('ansible.builtin.file', kc_realm_file) | from_json }}"
     _c: "{{ _realm.clients | selectattr('clientId', 'equalto', kc_backend_client_id) | first }}"
     _sa: "{{ _realm.users | default([]) | selectattr('serviceAccountClientId', 'defined') | selectattr('serviceAccountClientId', 'equalto', kc_backend_client_id) | first }}"
+    # <clientId>|<rol> por cada asignación de alcance del realm del repositorio
+    _scope_pairs: >-
+      {%- set r = [] -%}
+      {%- for m in _realm.scopeMappings | default([]) if m.client is defined -%}{%- for n in m.roles | default([]) -%}{%- set _ = r.append(m.client ~ '|realm:' ~ n) -%}{%- endfor -%}{%- endfor -%}
+      {%- for owner, ms in (_realm.clientScopeMappings | default({})).items() -%}{%- for m in ms if m.client is defined -%}{%- for n in m.roles | default([]) -%}{%- set _ = r.append(m.client ~ '|' ~ owner ~ ':' ~ n) -%}{%- endfor -%}{%- endfor -%}{%- endfor -%}
+      {{ r }}
 
 - name: Verificar que el realm del repositorio define al backend sin secreto
   ansible.builtin.assert:
@@ -94,6 +107,35 @@
     quiet: true
   vars:
     _c: "{{ (lookup('ansible.builtin.file', kc_realm_file) | from_json).clients | selectattr('clientId', 'equalto', kc_backend_client_id) | first }}"
+
+# Antes de tocar Keycloak: un rol de negocio nuevo en el realm sin su alcance en el frontend
+# no llegaría a los tokens (Angular y Spring no lo verían); un alcance del backend distinto de
+# sus roles asignados le daría menos (o pretendería más) autoridad de la que tiene.
+- name: Verificar el alcance de roles explícito declarado en el realm del repositorio
+  ansible.builtin.assert:
+    that:
+      - _backend.fullScopeAllowed is defined and not _backend.fullScopeAllowed
+      - _frontend.fullScopeAllowed is defined and not _frontend.fullScopeAllowed
+      - app_kc_expected.scope_backend == app_kc_expected.backend_roles
+      - app_kc_expected.scope_frontend == _business
+      - app_kc_expected.scope_frontend | length > 0
+    fail_msg: >-
+      {{ kc_realm_file | basename }}: {{ kc_backend_client_id }} y {{ kc_frontend_client_id }}
+      deben tener fullScopeAllowed=false; el alcance del backend debe ser exactamente sus roles
+      asignados ({{ app_kc_expected.backend_roles | join(',') }}; declarado:
+      {{ app_kc_expected.scope_backend | join(',') or 'ninguno' }}) y el del frontend exactamente
+      los roles de negocio del realm ({{ _business | join(',') }}; declarado:
+      {{ app_kc_expected.scope_frontend | join(',') or 'ninguno' }}).
+    quiet: true
+  vars:
+    _realm: "{{ lookup('ansible.builtin.file', kc_realm_file) | from_json }}"
+    _backend: "{{ _realm.clients | selectattr('clientId', 'equalto', kc_backend_client_id) | first }}"
+    _frontend: "{{ _realm.clients | selectattr('clientId', 'equalto', kc_frontend_client_id) | first | default({}) }}"
+    # Roles de negocio: los de realm salvo los que Keycloak crea en todo realm
+    _business: >-
+      {{ _realm.roles.realm | map(attribute='name')
+         | reject('in', ['offline_access', 'uma_authorization']) | reject('match', '^default-roles-')
+         | map('regex_replace', '^', 'realm:') | sort }}
 
 # ── Identidad de la imagen, antes de tocar Keycloak ─────────────────────────
 - name: Validar la identidad de Keycloak de este converge

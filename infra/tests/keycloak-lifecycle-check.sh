@@ -34,6 +34,13 @@
 #   8. Correo nativo: el realm nace sin SMTP ni recuperación; autoridad exacta, sin master; STARTTLS
 #      obligatorio; Keycloak no recibe claves de correo; la contraseña SMTP solo viaja por stdin
 #      con no_log y escritura parcial; solo corre desde el final del ciclo; deploy no lo toca.
+#   9. Alcance de roles explícito: backend y frontend con Full Scope Allowed deshabilitado y
+#      exactamente sus roles (backend: sus roles asignados; frontend: los roles de negocio, los
+#      mismos que convierte Spring); clientes integrados sin cambios y sin política global; el
+#      alcance solo se escribe en el evento con autoridad temporal, en orden seguro. Con las
+#      tareas reales de Ansible y lecturas sintéticas de la base: el orden no es divergencia;
+#      Full Scope habilitado, roles que faltan o sobran → P3 recuperable con motivo; frontend
+#      ausente → bloqueante; un rol de negocio nuevo sin alcance falla antes de tocar Keycloak.
 #   7. Frontend del tema de login: el realm mantiene deshabilitado el registro nativo; solo
 #      keycloak recibe FRONTEND_PUBLIC_URL (https://<frontend_public_domain> en producción,
 #      el valor de .env.example en desarrollo); sin ella Compose falla, y setup.yml valida
@@ -290,6 +297,96 @@ check "correo: la clasificación P1/P2/P3 no depende del SMTP" \
   bash -c "! sed -n '/Calcular divergencias bloqueantes/,\$p' '${TASKS}/keycloak_state.yml' | grep -Eq 'smtp|reset_password'"
 check "workflow: el resumen avisa que habilitar SES enciende la recuperación de Keycloak" \
   bash -c "yq -r '.jobs.production.steps[] | select(.name == \"Resumen de producción\") | .run' '${WORKFLOW}' | grep -q 'habilita su recuperación de contraseña'"
+
+# ── 9. Alcance de roles explícito ────────────────────────────────────────────
+ROLE_ENUM="$(sed -n '/enum Role/,/}/p' "${ROOT}/backend/src/main/java/co/edu/unicauca/piedrazul/backend/shared/enums/Role.java" | grep -oE '^\s+[A-Z_]+' | tr -d ' ' | sort | paste -sd, -)"
+check "alcance: backend y frontend con Full Scope Allowed deshabilitado" \
+  jq -e '[.clients[] | select(.clientId == "piedrazul-backend" or .clientId == "piedrazul-frontend") | .fullScopeAllowed] == [false, false]' "${REALM}"
+check "alcance: el del backend es exactamente sus roles asignados (realm-management), sin roles de realm" \
+  jq -e '([.clientScopeMappings[][] | select(.client == "piedrazul-backend")] | length == 1) and (.clientScopeMappings["realm-management"][] | select(.client == "piedrazul-backend") | .roles | sort) == (.users[] | select(.serviceAccountClientId == "piedrazul-backend") | .clientRoles["realm-management"] | sort) and ([.scopeMappings[] | select(.client == "piedrazul-backend")] | length == 0)' "${REALM}"
+check "alcance: el del frontend es exactamente los roles de negocio del realm, sin roles de clientes" \
+  jq -e '([.scopeMappings[] | select(.client == "piedrazul-frontend") | .roles[]] | sort) == ([.roles.realm[].name | select(. != "offline_access" and . != "uma_authorization" and (startswith("default-roles-") | not))] | sort) and ([.clientScopeMappings[][] | select(.client == "piedrazul-frontend")] | length == 0)' "${REALM}"
+check "alcance: los roles de negocio del frontend son los del enum Role que convierte Spring (${ROLE_ENUM})" \
+  test "$(jq -r '[.scopeMappings[] | select(.client == "piedrazul-frontend") | .roles[]] | sort | join(",")' "${REALM}")" = "${ROLE_ENUM}"
+check "alcance: Spring convierte solo realm_access.roles filtrados por Role (contrato sin cambios)" \
+  bash -c "f='${ROOT}/backend/src/main/java/co/edu/unicauca/piedrazul/backend/config/security/JwtAuthConverter.java'; grep -q 'jwt.getClaim(\"realm_access\")' \"\$f\" && grep -q 'realmAccess.get(\"roles\")' \"\$f\" && grep -q 'filter(BUSINESS_ROLES::contains)' \"\$f\""
+check "alcance: clientes integrados sin cambios (admin-cli y security-admin-console con Full Scope)" \
+  jq -e '[.clients[] | select(.clientId == "admin-cli" or .clientId == "security-admin-console") | .fullScopeAllowed] == [true, true]' "${REALM}"
+check "alcance: sin política global full-scope-disabled" bash -c "! grep -rq 'full-scope-disabled' '${REALM}' '${ANSIBLE_DIR}'"
+check "alcance: fullScopeAllowed nunca va en la forma de un cliente (se escribiría antes que sus roles)" \
+  bash -c "! yq -r '.[] | select(.name == \"Calcular la forma técnica esperada\") | .\"ansible.builtin.set_fact\".app_kc_expected.backend_shape_json' '${TASKS}/keycloak_lifecycle.yml' | grep -q fullScopeAllowed && ! sed -n '/^establish()/,/^}/p' '${ADMIN_SH}' | grep -q fullScopeAllowed"
+check "alcance: orden seguro en scopes: agregar → deshabilitar Full Scope → quitar → releer" \
+  bash -c "s=\$(sed -n '/^scopes()/,/^}/p' '${ADMIN_SH}'); a=\$(grep -n 'scope_role add' <<< \"\$s\" | cut -d: -f1); f=\$(grep -n 'fullScopeAllowed=false ||' <<< \"\$s\" | cut -d: -f1); r=\$(grep -n 'scope_role remove' <<< \"\$s\" | cut -d: -f1); b=\$(grep -n 'die \"scope_readback:' <<< \"\$s\" | cut -d: -f1); test -n \"\$a\" && test \"\$a\" -lt \"\$f\" && test \"\$f\" -lt \"\$r\" && test \"\$r\" -lt \"\$b\""
+check "alcance: solo establish lo escribe, después de los roles asignados; probe, reconcile, smtp y cleanup no" \
+  bash -c "test \"\$(sed -n '/^establish()/,/^}/p' '${ADMIN_SH}' | grep -E '^  scopes\$|add-roles \"\\\$\\{KCL_REALM\\}\"' | sed -E 's/.*add-roles.*/roles/; s/^  scopes\$/scopes/' | paste -sd' ')\" = 'roles scopes' && ! sed -n '/^probe()/,/^}/p;/^reconcile()/,/^}/p;/^smtp()/,/^}/p;/^cleanup()/,/^}/p' '${ADMIN_SH}' | grep -Eq 'scope|fullScopeAllowed'"
+check "alcance: KCL_SCOPES solo llega al evento con autoridad temporal (nunca a P1)" \
+  test "$(grep -rl 'KCL_SCOPES' "${TASKS}" | xargs -r -n1 basename | tr '\n' ' ')" = "keycloak_bootstrap.yml "
+check "alcance: keycloak-state.sql lo lee sin escribir (solo SELECT dentro de la transacción de lectura)" \
+  bash -c "grep -q 'BEGIN TRANSACTION READ ONLY' '${STATE_SQL}' && ! grep -v '^ *--' '${STATE_SQL}' | grep -Eiq '\\b(insert|update|delete)\\b'"
+
+# Tareas reales de Ansible (expectativa del realm, lectura e interpretación de la base y
+# divergencias) con lecturas sintéticas de la base: sin contenedores
+yq '[.[] | select(.name == "Calcular la forma técnica esperada" or .name == "Verificar el alcance de roles explícito declarado en el realm del repositorio")]' \
+  "${TASKS}/keycloak_lifecycle.yml" > "${TMP}/scope-expected.yml"
+yq '[.[] | select(.name == "Interpretar el estado de la base" or .name == "Calcular divergencias bloqueantes" or .name == "Calcular divergencias recuperables")]' \
+  "${TASKS}/keycloak_state.yml" > "${TMP}/scope-classify.yml"
+yq '[{"name": "KCL_SCOPES del evento", "ansible.builtin.set_fact": {"kcl_scopes": (.. | select(type == "!!map" and has("name")) | select(.name == "Establecer la automatización y la forma del backend") | ."community.docker.docker_container_exec".env.KCL_SCOPES)}}]' \
+  "${TASKS}/keycloak_bootstrap.yml" > "${TMP}/scope-event.yml"
+cat > "${TMP}/scope.yml" <<'EOF'
+- hosts: vps
+  gather_facts: false
+  connection: local
+  tasks:
+    - ansible.builtin.include_tasks: "{{ tmp }}/scope-expected.yml"
+    - ansible.builtin.include_tasks: "{{ tmp }}/scope-event.yml"
+    - ansible.builtin.set_fact:
+        app_kc_db_probe:
+          stdout_lines: >-
+            {{ ['schema=initialized', 'realm=master', 'realm=' ~ kc_realm, 'migration_version=26.8.1',
+                'client.automation=' ~ app_kc_expected.automation_shape, 'client.backend=' ~ app_kc_expected.backend_shape,
+                'roles.automation=' ~ (app_kc_expected.automation_roles | join(',')),
+                'roles.backend=' ~ (app_kc_expected.backend_roles | join(','))] + case_scope_lines }}
+    - ansible.builtin.include_tasks: "{{ tmp }}/scope-classify.yml"
+    - ansible.builtin.copy:
+        dest: "{{ out_file }}"
+        content: "{{ {'blocking': app_kc_blocking, 'reasons': app_kc_reasons, 'kcl_scopes': kcl_scopes} | to_json }}"
+EOF
+AUTO_T='piedrazul-realm:manage-clients,piedrazul-realm:manage-realm,piedrazul-realm:view-clients'
+BACK_T='realm-management:manage-users,realm-management:query-users,realm-management:view-events,realm-management:view-realm,realm-management:view-users'
+FRONT_T='realm:ADMIN,realm:AUDITOR,realm:DOCTOR,realm:PATIENT,realm:SCHEDULER'
+scope_case() { # <nombre> <lista JSON de líneas scope.*> [extra args]: deja ${TMP}/scope-<nombre>.json
+  local name="$1" lines="$2"; shift 2
+  ANSIBLE_CONFIG="${ANSIBLE_DIR}/ansible.cfg" ANSIBLE_BECOME=false \
+    ansible-playbook -i "${ANSIBLE_DIR}/inventories/prod" -i "${TMP}/hosts.yml" "${TMP}/scope.yml" \
+      -e "repo_root=${ROOT}" -e "tmp=${TMP}" -e "out_file=${TMP}/scope-${name}.json" \
+      -e "{\"case_scope_lines\": ${lines}}" "$@" </dev/null > "${TMP}/scope-${name}.log" 2>&1
+}
+# Un caso que no llega a escribir su resultado falla en sus checks, no aborta el resto
+scope_has() { jq -e --arg s "$2" "$3" "${TMP}/scope-$1.json" >/dev/null; }
+scope_case target "[\"scope.frontend=full:false;realm:PATIENT,realm:ADMIN,realm:SCHEDULER,realm:AUDITOR,realm:DOCTOR\", \"scope.automation=full:false;${AUTO_T}\", \"scope.backend=full:false;$(tr ',' '\n' <<< "${BACK_T}" | sort -r | paste -sd, -)\"]" || true
+check "alcance (Ansible): el estado esperado, en cualquier orden, no es divergencia" \
+  scope_has target '' '.blocking == [] and .reasons == []'
+check "alcance (Ansible): el evento recibe exactamente el alcance aprobado de los tres clientes" \
+  scope_has target "master|piedrazul-keycloak-automation|${AUTO_T};piedrazul|piedrazul-backend|${BACK_T};piedrazul|piedrazul-frontend|${FRONT_T}" '.kcl_scopes == $s'
+scope_case full-on '["scope.automation=full:true;", "scope.backend=full:true;", "scope.frontend=full:true;"]' || true
+check "alcance (Ansible): Full Scope habilitado y sin asignaciones en los tres clientes → P3 recuperable para cada uno" \
+  scope_has full-on '' '.blocking == [] and (.reasons | length == 3) and all(.reasons[]; test("^alcance de roles de piedrazul-(keycloak-automation|backend|frontend) divergente: Full Scope Allowed habilitado; faltan "))'
+check "alcance (Ansible): el motivo nombra los roles que faltan (sin secretos)" \
+  scope_has full-on "alcance de roles de piedrazul-frontend divergente: Full Scope Allowed habilitado; faltan ${FRONT_T}" '.reasons | index($s) != null'
+scope_case drift "[\"scope.automation=full:false;piedrazul-realm:manage-clients,piedrazul-realm:view-clients\", \"scope.backend=full:false;${BACK_T},realm-management:manage-realm\", \"scope.frontend=full:true;${FRONT_T}\"]" || true
+check "alcance (Ansible): rol faltante (automatización), rol sobrante (backend) y Full Scope habilitado tras un evento interrumpido (frontend)" \
+  scope_has drift '' '.blocking == [] and .reasons == ["alcance de roles de piedrazul-keycloak-automation divergente: faltan piedrazul-realm:manage-realm", "alcance de roles de piedrazul-backend divergente: sobran realm-management:manage-realm", "alcance de roles de piedrazul-frontend divergente: Full Scope Allowed habilitado"]'
+scope_case no-frontend "[\"scope.automation=full:false;${AUTO_T}\", \"scope.backend=full:false;${BACK_T}\"]" || true
+check "alcance (Ansible): sin el cliente frontend → P3 bloqueante (no se recrea)" \
+  scope_has no-frontend '' '.blocking == ["falta el cliente piedrazul-frontend en piedrazul"]'
+jq '.roles.realm += [{"name": "RECEPTIONIST", "composite": false, "clientRole": false}]' "${REALM}" > "${TMP}/realm-new-role.json"
+scope_case new-role '[]' -e "kc_realm_file=${TMP}/realm-new-role.json" && RC=0 || RC=$?
+check "alcance (Ansible): un rol de negocio nuevo sin su alcance en el frontend falla antes de tocar Keycloak (rc=${RC})" \
+  bash -c "test ${RC} -ne 0 && tr -s ' \n' '  ' < '${TMP}/scope-new-role.log' | grep -q 'exactamente los roles de negocio del realm (realm:ADMIN,realm:AUDITOR,realm:DOCTOR,realm:PATIENT,realm:RECEPTIONIST,realm:SCHEDULER'"
+jq '(.clients[] | select(.clientId == "piedrazul-backend") | .fullScopeAllowed) = true' "${REALM}" > "${TMP}/realm-full.json"
+scope_case realm-full '[]' -e "kc_realm_file=${TMP}/realm-full.json" && RC=0 || RC=$?
+check "alcance (Ansible): un realm del repositorio con Full Scope habilitado en el backend falla (rc=${RC})" \
+  bash -c "test ${RC} -ne 0 && grep -q 'deben tener fullScopeAllowed=false' '${TMP}/scope-realm-full.log'"
 
 # ── 6. Desarrollo ────────────────────────────────────────────────────────────
 if docker compose --project-name piedrazul-kc-dev-contract --file "${ROOT}/docker-compose.yml" \

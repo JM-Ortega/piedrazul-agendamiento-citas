@@ -513,6 +513,10 @@
     {
       "clientScope": "offline_access",
       "roles": ["offline_access"]
+    },
+    {
+      "client": "piedrazul-frontend",
+      "roles": ["ADMIN", "SCHEDULER", "DOCTOR", "PATIENT", "AUDITOR"]
     }
   ],
   "clientScopeMappings": {
@@ -520,6 +524,12 @@
       {
         "client": "account-console",
         "roles": ["manage-account", "view-groups"]
+      }
+    ],
+    "realm-management": [
+      {
+        "client": "piedrazul-backend",
+        "roles": ["view-realm", "view-users", "query-users", "manage-users", "view-events"]
       }
     ]
   },
@@ -747,7 +757,7 @@
         "dpop.bound.access.tokens": "false"
       },
       "authenticationFlowBindingOverrides": {},
-      "fullScopeAllowed": true,
+      "fullScopeAllowed": false,
       "nodeReRegistrationTimeout": -1,
       "defaultClientScopes": [
         "service_account",
@@ -811,7 +821,7 @@
         "dpop.bound.access.tokens": "false"
       },
       "authenticationFlowBindingOverrides": {},
-      "fullScopeAllowed": true,
+      "fullScopeAllowed": false,
       "nodeReRegistrationTimeout": -1,
       "defaultClientScopes": [
         "web-origins",

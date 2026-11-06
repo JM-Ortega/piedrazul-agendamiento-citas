@@ -109,6 +109,8 @@ obs_log_privacy_controls_done: []
 kc_realm: piedrazul
 kc_port: 8180
 kc_backend_client_id: piedrazul-backend
+# Cliente público del frontend: su alcance de roles (los roles de negocio) lo declara el realm
+kc_frontend_client_id: piedrazul-frontend
 # Autoridad de reconciliación (service account en master, secreto solo en el runner).
 # Roles exactos: solo del realm de la aplicación, nada en master. manage-realm lo exige el
 # correo nativo (keycloak_smtp.yml): la API solo admite escribir SMTP con ese rol.

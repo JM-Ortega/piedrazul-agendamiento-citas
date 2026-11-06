@@ -249,6 +249,12 @@ Asignación manual excepcional, con la cuenta de plataforma:
    *Assign*.
 4. El cambio vale desde el siguiente token del usuario (nuevo login o renovación).
 
+Solo los cinco roles de negocio llegan al token del frontend: su cliente tiene *Full Scope
+Allowed* deshabilitado y un alcance explícito con esos roles (ver
+[Alcance de roles de los clientes propios](recuperar-keycloak.md#alcance-de-roles-de-los-clientes-propios)).
+No habilitar *Full Scope Allowed* ni cambiar ese alcance desde la consola: la convergencia lo
+detecta como P3.
+
 Para quitarlo: mismo lugar, *Unassign*. Este camino solo cambia el rol en Keycloak: no pasa
 por el backend, así que no crea ni actualiza registros de la aplicación asociados al usuario.
 Las operaciones que dependan de esos registros siguen dependiendo de ellos. Es una

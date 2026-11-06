@@ -28,6 +28,7 @@ mensaje sugiere `keycloak_recovery=true`:
 | `autoridad temporal propia de un evento interrumpido` | un evento P2 o de recuperación anterior se interrumpió antes de limpiar (clientId `piedrazul-tmp-admin-<fecha>-<aleatorio>` con solo los roles de bootstrap-admin) |
 | `falta el cliente de automatización … en master` | se borró `piedrazul-keycloak-automation` |
 | `roles … divergentes` / `forma … divergente` | cambios manuales sobre `piedrazul-keycloak-automation` o `piedrazul-backend` |
+| `alcance de roles de <cliente> divergente: Full Scope Allowed habilitado; faltan …; sobran …` | cambios manuales en *Client scopes → Dedicated scope → Scope* de `piedrazul-keycloak-automation`, `piedrazul-backend` o `piedrazul-frontend` (ver [Alcance de roles de los clientes propios](#alcance-de-roles-de-los-clientes-propios)) |
 | `la automatización no ve el cliente piedrazul-backend` | roles de la automatización alterados |
 
 ## Casos no soportados: P3 BLOQUEANTE → escalar
@@ -38,7 +39,7 @@ Si el mensaje es `KEYCLOAK P3 BLOQUEANTE: …`, **no** hay automatización que l
 | Motivo | Por qué no se recupera solo |
 |--------|-----------------------------|
 | `falta el realm piedrazul` / `falta el realm master` | reimportarlo crearía un realm vacío en lugar del perdido: ocultaría pérdida de identidades |
-| `falta el cliente piedrazul-backend en piedrazul` | recrearlo cambia la identidad del cliente; puede indicar una alteración mayor del realm |
+| `falta el cliente piedrazul-backend en piedrazul` / `falta el cliente piedrazul-frontend en piedrazul` | recrearlo cambia la identidad del cliente; puede indicar una alteración mayor del realm |
 | `esquema de Keycloak parcialmente inicializado (N objetos, sin tabla realm)` | inicialización interrumpida o ajena; no se distingue de forma segura de datos dañados |
 | `falta el schema keycloak` | el contrato de la base (P-1) está roto |
 | `autoridad temporal ajena o ambigua presente` | un administrador temporal que este ciclo no creó (otro clientId, un usuario, o roles distintos de los de bootstrap-admin): nunca se adopta ni se borra |
@@ -99,7 +100,7 @@ ciclo no decide por sí mismo descartar el estado.
 5. Seguir el paso `Correr converge`. Mensajes esperados en orden:
    - `KEYCLOAK: estado P3` con los motivos (ninguno bloqueante);
    - `KEYCLOAK: evento de recuperación P3 autorizada con autoridad temporal piedrazul-tmp-admin-…`;
-   - `KEYCLOAK: automation.client=…, backend.shape=reconciled, …`;
+   - `KEYCLOAK: automation.client=…, backend.shape=reconciled, …, scope.<cliente>=updated|unchanged` (uno por cliente propio);
    - `KEYCLOAK: autoridad temporal piedrazul-tmp-admin-… eliminada y rechazada por Keycloak`;
    - `KEYCLOAK: estado P1 después del evento`;
    - `KEYCLOAK P1: secreto del backend …; el backend autentica con él`;
@@ -111,6 +112,10 @@ ciclo no decide por sí mismo descartar el estado.
 - Un `converge` normal posterior (sin `keycloak_recovery`) clasifica **P1** y no crea
   autoridad temporal. Hacerlo si la recuperación no vino acompañada de otro run.
 - El backend opera con normalidad (`refresh_backend.yml` le entregó el `.env` vigente).
+- Si el motivo era el alcance de roles: el run muestra `scope.<cliente>=updated` para los
+  clientes corregidos y el converge siguiente es P1 (la clasificación vuelve a comparar Full
+  Scope Allowed y las asignaciones de los tres clientes). Usuarios con sesión abierta ven el
+  cambio en su siguiente token.
 
 ## Si falla
 
@@ -121,11 +126,43 @@ ciclo no decide por sí mismo descartar el estado.
   healthy, volver a correr la recuperación: la reconoce como huérfana propia y la elimina.
 - **`el evento recovery falló (…)` sin autoridad temporal propia en la base**: el estado quedó
   parcialmente reconciliado; el mensaje muestra el avance (`automation.*`, `backend.*`,
-  `role.*`) y el error (`error=…`). Corregir la causa y repetir.
+  `role.*`, `scope.*`) y el error (`error=…`; p. ej. `scope_role:realm:<rol>` si el realm no
+  tiene un rol que el repositorio declara en un alcance). Corregir la causa y repetir. El
+  alcance se escribe por cliente en orden seguro (agregar lo que falta → deshabilitar Full
+  Scope Allowed → quitar lo que sobra → releer). Ese orden no crea por sí mismo un cliente
+  con Full Scope deshabilitado y roles faltantes: si el cliente partía con su autoridad
+  completa, una interrupción lo deja con al menos esa autoridad. Si ya partía de un estado
+  defectuoso (p. ej. Full Scope deshabilitado sin sus roles), puede seguir sin permisos
+  suficientes hasta que la recuperación termine. Repetirla parte del estado leído, completa lo
+  pendiente y no cambia lo que ya es correcto.
 - **`el evento terminó … pero el estado es P3`**: algo sigue divergente (motivos en el
   mensaje). Si es bloqueante, escalar; si no, revisar antes de repetir.
 - Un reintento de la recuperación es seguro: cada evento parte del estado observado, crea su
   propia autoridad temporal y elimina solo la propia.
+
+## Alcance de roles de los clientes propios
+
+Los tres clientes propios tienen *Full Scope Allowed* deshabilitado y un alcance de roles
+explícito: sus tokens solo llevan esos roles (si el usuario o el service account los tiene).
+
+| Cliente | Realm | Alcance | Se declara en |
+|---------|-------|---------|---------------|
+| `piedrazul-backend` | `piedrazul` | `realm-management`: `view-realm`, `view-users`, `query-users`, `manage-users`, `view-events` (= sus roles asignados) | realm del repositorio (`clientScopeMappings`) |
+| `piedrazul-frontend` | `piedrazul` | roles de realm `ADMIN`, `SCHEDULER`, `DOCTOR`, `PATIENT`, `AUDITOR` | realm del repositorio (`scopeMappings`) |
+| `piedrazul-keycloak-automation` | `master` | `piedrazul-realm`: `manage-clients`, `manage-realm`, `view-clients` (= `kc_automation_roles`) | `kc_automation_roles` |
+
+- Lo establece el evento con autoridad temporal (`keycloak-admin.sh establish`): en P2 el
+  realm importado ya trae backend y frontend; la automatización, que el evento crea, se ajusta
+  ahí. La convergencia P1 solo lo compara; nunca lo escribe.
+- Los clientes integrados de Keycloak (`admin-cli`, `security-admin-console`, la autoridad
+  temporal) no cambian y no hay política global de clientes.
+- Un rol de negocio nuevo exige agregarlo **también** al alcance del frontend en el realm del
+  repositorio (y al enum `Role` del backend): si no, no llega al token y ni Angular ni Spring
+  lo ven. Converge falla antes de tocar Keycloak si los roles de realm y el alcance del
+  frontend no coinciden. Un realm ya inicializado no recibe roles nuevos del archivo: ese
+  cambio requiere su propia decisión.
+- Revertir el código no revierte Keycloak: un commit anterior no lee el alcance ni lo escribe,
+  y el realm conserva el que tenga.
 
 ## Actualización de la versión de Keycloak
 
