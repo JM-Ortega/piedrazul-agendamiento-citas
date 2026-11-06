@@ -339,7 +339,7 @@ fi
 # ── 10. Métricas y aislamiento ─────────────────────────────────────────────────────
 check "métricas: host, alloy, loki y prometheus up" bash -c "test \"\$1\" = 4" _ "$(pv 'count(up{job=~"host|alloy|loki|prometheus"} == 1)')"
 check "métricas: métricas del host (raíz /)" test -n "$(pv 'node_filesystem_size_bytes{job="host",mountpoint="/"}')"
-check "métricas: 16 reglas sanas (12 de S1/S2 + 4 de notificaciones)" bash -c "pexec_rules=\$1; test \"\$(jq '[.data.groups[].rules[] | select(.health == \"ok\")] | length' <<< \"\$pexec_rules\")\" = 16" _ "$(pexec wget -qO- http://localhost:9090/api/v1/rules 2>/dev/null)"
+check "métricas: 15 reglas sanas (12 de S1/S2 + 3 de notificaciones)" bash -c "pexec_rules=\$1; test \"\$(jq '[.data.groups[].rules[] | select(.health == \"ok\")] | length' <<< \"\$pexec_rules\")\" = 15" _ "$(pexec wget -qO- http://localhost:9090/api/v1/rules 2>/dev/null)"
 BINDINGS="$(for c in $(obs ps -q); do docker inspect "$c" --format '{{index .Config.Labels "com.docker.compose.service"}} {{json .HostConfig.PortBindings}}' | jq -Rr 'split(" ") as [$s, $b] | ($b | fromjson // {}) | to_entries[] | .key as $p | .value[] | "\($s) \($p) \(.HostIp):\(.HostPort)"'; done)"
 check "aislamiento: único puerto publicado grafana en 127.0.0.1:${GPORT}" test "${BINDINGS}" = "grafana 3000/tcp 127.0.0.1:${GPORT}"
 check "aislamiento: el stack instalado y la aplicación no cambiaron" test "$(others | sort | tr '\n' ' ')" = "${OTHERS_BEFORE}"

@@ -27,7 +27,8 @@
 #      privilegios, red ni PID del host; cap_drop ALL, no-new-privileges y raíz de solo
 #      lectura; solo Prometheus en la red de la aplicación; destinos de prometheus.yml = contrato
 #      de los productores (más alloy y loki por obs_net); promtool check config/rules y test
-#      rules; Alloy con el exportador del host y sin remote_write; dashboards JSON válidos con
+#      rules (también las consultas de los paneles en tests/dashboards.test.yml, idénticas a las de
+#      los dashboards); Alloy con el exportador del host y sin remote_write; dashboards JSON válidos con
 #      las fuentes de datos provisionadas; los archivos Compose de la aplicación no mencionan el
 #      stack salvo la red de entrada de Grafana (traefik.yml). S3: Alertmanager como quinto
 #      servicio (receptor none por defecto, webhook solo por archivo secreto) y Grafana sin JWT por
@@ -142,11 +143,22 @@ check "Notificaciones: Discord solo en Alertmanager, por webhook_url_file" \
   test "$(grep -rlE '^[^#]*discord' "${OBS}/compose.yml" "${OBS}/prometheus" "${OBS}/alloy" "${OBS}/grafana/provisioning" "${OBS}/alertmanager" | xargs -n1 basename | sort | paste -sd,)" = "compose.yml,discord.tmpl,discord.yml"
 check "promtool: check config" promtool check config /w/prometheus/prometheus.yml
 check "promtool: check rules" promtool check rules /w/prometheus/rules/alerts.yml /w/prometheus/rules/logs.yml /w/prometheus/rules/notifications.yml
-if promtool test rules /w/tests/alerts.test.yml /w/tests/notifications-alerts.test.yml > "${TMP}/promtool-test.log" 2>&1; then
-  ok "promtool: test rules (casos normal, falla y sin datos de cada regla)"
+if promtool test rules /w/tests/alerts.test.yml /w/tests/notifications-alerts.test.yml /w/tests/dashboards.test.yml > "${TMP}/promtool-test.log" 2>&1; then
+  ok "promtool: test rules (casos normal, falla y sin datos de cada regla y de los paneles probados)"
 else
   ko "promtool: test rules"; tail -20 "${TMP}/promtool-test.log" >&2
 fi
+# Las consultas que prueba tests/dashboards.test.yml son las de los paneles ($__rate_interval = 2m)
+dash_exprs_tested() {
+  local t e p
+  t="$(yq -r '[.tests[].promql_expr_test[].expr] | unique | .[]' "${OBS}/tests/dashboards.test.yml")"
+  for p in plataforma.json:7 plataforma.json:14 plataforma.json:15 logs.json:10; do
+    e="$(jq -r --argjson id "${p##*:}" '[.panels[] | ., (.panels // [])[]] | map(select(.id == $id))[0].targets[0].expr // empty' "${OBS}/grafana/dashboards/${p%%:*}")"
+    e="${e//\$__rate_interval/2m}"
+    [ -n "$e" ] && grep -qxF -- "$e" <<< "$t" || { echo "panel ${p}: consulta sin probar" >&2; return 1; }
+  done
+}
+check "Grafana: las consultas probadas en dashboards.test.yml son las de Plataforma 7, 14 y 15 y Logs 10" dash_exprs_tested
 check "Alloy: exportador del host prometheus.exporter.unix \"host\" (sin remote_write, otelcol, discovery.docker ni socket)" \
   bash -c "c=\$(grep -vE '^\s*//' '${OBS}/alloy/config.alloy'); grep -qE '^prometheus\.exporter\.unix \"host\" \\{' <<< \"\$c\" && ! grep -qiE 'remote_write|otelcol|discovery\.docker|docker\.sock' <<< \"\$c\""
 check "Alloy: la configuración se valida (alloy fmt)" \
@@ -323,8 +335,8 @@ done
 check "etiquetas: ninguna de usuario, correo, URL, host, sesión, token ni IP" test -z "${BAD_LABELS}"
 check "etiquetas: rutas por plantilla, sin identificadores numéricos concretos" \
   bash -c "! printf '%s' \"\$1\" | jq -r '.data[]' | grep -qE '/[0-9]{3,}(/|$)'" _ "$(obs exec -T prometheus wget -qO- 'http://localhost:9090/api/v1/label/uri/values')"
-check "reglas: todas cargadas (7 de métricas, 5 de logs y 4 de notificaciones) y evaluadas sin error" \
-  bash -c "obs_rules=\"\$1\"; test \"\$(jq '[.data.groups[].rules[]] | length' <<< \"\$obs_rules\")\" = 16 && jq -e '[.data.groups[].rules[] | .health] | all(. == \"ok\")' <<< \"\$obs_rules\"" _ "$(obs exec -T prometheus wget -qO- http://localhost:9090/api/v1/rules)"
+check "reglas: todas cargadas (7 de métricas, 5 de logs y 3 de notificaciones) y evaluadas sin error" \
+  bash -c "obs_rules=\"\$1\"; test \"\$(jq '[.data.groups[].rules[]] | length' <<< \"\$obs_rules\")\" = 15 && jq -e '[.data.groups[].rules[] | .health] | all(. == \"ok\")' <<< \"\$obs_rules\"" _ "$(obs exec -T prometheus wget -qO- http://localhost:9090/api/v1/rules)"
 check "reglas: la raíz del host (/) se reporta: PiedrazulHostRootFilesystemMissing sin condición" \
   test -n "$(pv 'node_filesystem_size_bytes{job="host",mountpoint="/"}')"
 echo "      raíz local (indicativo, VM de WSL2): libre $(pv 'node_filesystem_avail_bytes{job="host",mountpoint="/"}') B de $(pv 'node_filesystem_size_bytes{job="host",mountpoint="/"}') B; umbral $(pv 'clamp_min(node_filesystem_size_bytes{job="host",mountpoint="/"} * 0.15, 10 * 1024 * 1024 * 1024)') B"

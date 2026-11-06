@@ -34,7 +34,7 @@
 #      stream, level) y metadatos (container_id, correlation_id); lo excluido (otro proyecto,
 #      postgres, servicio condicionado, otras unidades, avisos de journald de otras unidades) no.
 #   4. Grafana: fuente de datos Loki sana, dashboard de logs, consultas sin error, búsqueda por id
-#      de correlación.
+#      de correlación (con etiquetas; sin id no muestra nada) y vista general con el servicio.
 #   5. Prometheus: alloy y loki leídos, 12 reglas sanas, solo las series de la allowlist.
 #   6. Fallas y persistencia: reinicio de Alloy sin duplicar (posiciones en el volumen); entradas
 #      escritas con Alloy detenido llegan una vez; corte breve de Loki recuperado por reintentos;
@@ -501,18 +501,36 @@ for p in d["panels"]:
             errors.append(f"{p['title']}/{t['refId']}: HTTP {e.code} {e.read()[:200]!r}"); continue
         if r.get("error"):
             errors.append(f"{p['title']}/{t['refId']}: {r['error']}")
-# Búsqueda por id de correlación con la consulta del panel
-p = next(p for p in d["panels"] if p["title"].startswith("Líneas con el id de correlación"))
-t = p["targets"][0]
-r = call("/api/ds/query", {"from": "now-1h", "to": "now", "queries": [dict(t, expr=subst(t["expr"], cid), maxLines=100)]})["results"][t["refId"]]
-lines = [v for f in r.get("frames", []) for fld in f["schema"]["fields"] if fld["name"] in ("Line", "line")
-         for v in f["data"]["values"][f["schema"]["fields"].index(fld)]]
-print(json.dumps({"errors": errors, "cid_lines": len(lines), "cid_match": all(cid in l for l in lines)}, ensure_ascii=False))
+def run(panel_prefix, cid_value):
+    t = next(p for p in d["panels"] if p.get("targets") and (p["title"] == panel_prefix or p["title"].startswith(panel_prefix + " ")))["targets"][0]
+    r = call("/api/ds/query", {"from": "now-1h", "to": "now", "queries": [dict(t, expr=subst(t["expr"], cid_value), maxLines=100)]})["results"][t["refId"]]
+    def col(f, *names):
+        fs = f["schema"]["fields"]
+        return next((f["data"]["values"][i] for i, x in enumerate(fs) if x["name"] in names), [])
+    lines = [v for f in r.get("frames", []) for v in col(f, "Line", "line")]
+    labels = [v for f in r.get("frames", []) for v in col(f, "labels")]
+    return lines, labels
+# Búsqueda por id de correlación con la consulta del panel; sin id no devuelve nada (la vista
+# general es el panel Logs, que sí lista todo y con el servicio de cada línea)
+lines, labels = run("Líneas con el id de correlación", cid)
+empty_lines, _ = run("Líneas con el id de correlación", "")
+all_lines, all_labels = run("Logs", "")
+print(json.dumps({"errors": errors, "cid_lines": len(lines), "cid_match": all(cid in l for l in lines),
+                  "cid_service": all("service" in (l if isinstance(l, dict) else json.loads(l)) for l in labels) and len(labels) == len(lines),
+                  "cid_has_correlation_query": any("correlation_query" in (l if isinstance(l, dict) else json.loads(l)) for l in labels),
+                  "empty_cid_lines": len(empty_lines), "general_lines": len(all_lines),
+                  "general_service": len(all_labels) > 0 and all("service" in (l if isinstance(l, dict) else json.loads(l)) for l in all_labels)},
+                 ensure_ascii=False))
 EOF
 python3 -I "${TMP}/panels.py" "${G}" "${CID}" > "${TMP}/panels.json" 2>"${TMP}/panels.err" || cat "${TMP}/panels.err" >&2
 check "Grafana: todas las consultas del dashboard de logs sin error" jq -e '.errors == []' "${TMP}/panels.json"
 jq -r '.errors[]?' "${TMP}/panels.json" | sed 's/^/      error: /'
 check "Grafana: el panel de correlación devuelve la línea de la petición (y solo esa)" jq -e '.cid_lines == 1 and .cid_match' "${TMP}/panels.json"
+check "Grafana: el panel de correlación conserva las etiquetas (service) y no agrega la auxiliar" \
+  jq -e '.cid_service and (.cid_has_correlation_query | not)' "${TMP}/panels.json"
+check "Grafana: sin id el panel de correlación no muestra líneas" jq -e '.empty_cid_lines == 0' "${TMP}/panels.json"
+check "Grafana: sin id la vista general (Logs) sí lista líneas, con su servicio" \
+  jq -e '.general_lines > 0 and .general_service' "${TMP}/panels.json"
 check "Grafana: enlace derivado del id de correlación en la fuente de datos" \
   bash -c "curl -sf -u \"\${GRAFANA_AUTH}\" '${G}/api/datasources/uid/loki' | jq -e '.jsonData.derivedFields[0].name == \"correlation_id\"'"
 check "Grafana: sin acceso anónimo (401)" test "$(curl -s -o /dev/null -w '%{http_code}' "${G}/api/search")" = 401
@@ -521,8 +539,8 @@ check "Grafana: sin acceso anónimo (401)" test "$(curl -s -o /dev/null -w '%{ht
 up_logs() { test "$(pv 'count(up{job=~"alloy|loki|host|prometheus"} == 1)')" = 4; }
 check "Prometheus: alloy, loki, host y prometheus up" wait_for 120 up_logs
 RULES="$(pexec wget -qO- http://localhost:9090/api/v1/rules 2>/dev/null)"
-check "Prometheus: 16 reglas cargadas (7 de métricas + 5 de logs + 4 de notificaciones), todas sanas" \
-  bash -c "test \"\$(jq '[.data.groups[].rules[]] | length' <<< \"\$1\")\" = 16 && jq -e '[.data.groups[].rules[] | .health] | all(. == \"ok\")' <<< \"\$1\"" _ "${RULES}"
+check "Prometheus: 15 reglas cargadas (7 de métricas + 5 de logs + 3 de notificaciones), todas sanas" \
+  bash -c "test \"\$(jq '[.data.groups[].rules[]] | length' <<< \"\$1\")\" = 15 && jq -e '[.data.groups[].rules[] | .health] | all(. == \"ok\")' <<< \"\$1\"" _ "${RULES}"
 ALLOY_NAMES="$(pq 'count by (__name__) ({job="alloy"})' | jq -r '[.data.result[].metric.__name__] | sort | join(" ")')"
 echo "      series de job=alloy: ${ALLOY_NAMES}"
 check "Prometheus: job=alloy solo con series de la allowlist (más up/scrape_*)" \

@@ -456,6 +456,11 @@ flujo y nivel.
   antes de los 7 días; si Loki estaba caído, lo borrado antes de leerse se pierde.
 - Estos valores son de partida, no medidos en el servidor: confirmarlos con
   `infra/tests/logs-e2e-lab.sh` y los paneles de memoria y flujo del dashboard.
+- El panel **Memoria residente (RSS) de Loki y Alloy** muestra la RSS del proceso, que incluye
+  páginas del binario mapeadas en memoria que el cgroup puede no cobrar al contenedor: no se
+  compara con los límites de arriba (en el servidor, Alloy con 221 MiB de RSS tenía 43 MiB
+  cobrados). La memoria cobrada al contenedor no se recolecta; en el host: `docker stats` o
+  `memory.current`/`memory.events` del cgroup del contenedor.
 
 ## Pérdida, duplicación y retención
 
@@ -515,11 +520,14 @@ Repetirlo sin cambios no cambia nada.
 
 Dashboard **Piedra Azul – Logs** (carpeta Piedra Azul):
 
-- Filtros: servicio, severidad (*All* incluye líneas sin severidad), id de correlación y búsqueda
-  (expresión regular, sin mayúsculas).
-- **Líneas con el id de correlación**: todas las líneas de cualquier servicio que contienen el id
-  (cabecera `X-Correlation-Id`). En el detalle de una línea del backend, el campo
-  `correlation_id` enlaza a la misma búsqueda.
+- **Logs** es la vista general: filtros de servicio, severidad (*All* incluye líneas sin
+  severidad), id de correlación (vacío: sin filtrar) y búsqueda (expresión regular, sin
+  mayúsculas). Cada línea muestra su servicio y severidad; el detalle, todas sus etiquetas y
+  metadatos.
+- **Líneas con el id de correlación**: con un id, todas las líneas de cualquier servicio que lo
+  contienen (cabecera `X-Correlation-Id`); sin id no muestra nada. En el detalle de una línea del
+  backend, el campo `correlation_id` enlaza a la misma búsqueda. Solo el backend escribe el id:
+  que otro servicio no aparezca no prueba que no participó.
 - **Salud de la recolección**: Loki y Alloy arriba, componentes de Alloy sin funcionar, entradas
   leídas del journal (todas las unidades, antes de la selección), seleccionadas, descartadas,
   flujo, reintentos y rechazos, memoria y última retención.
@@ -531,6 +539,7 @@ Cómo distinguir las causas cuando no aparecen logs:
 | Loki **CAÍDO** | Loki no responde; Alloy retiene y reintenta | `PiedrazulLokiDown` |
 | Alloy **CAÍDO** (y host caído en Plataforma) | Alloy no corre: ni logs ni métricas del host | `PiedrazulTargetDown{job="host"}` |
 | Componentes sin funcionar > 0 | normalmente `loki.source.journal` sin directorio del journal que abrir | `PiedrazulAlloyComponentUnhealthy` |
+| Componentes sin funcionar **CAÍDO** / **SIN DATOS** | Prometheus no lee Alloy / Alloy responde sin métricas de componentes (o no es destino): el estado de los componentes es desconocido, no sano | `PiedrazulTargetDown{job="host"}` (Alloy caído); SIN DATOS con Alloy arriba no alerta: revisar `metric_relabel_configs` de `alloy` en `prometheus.yml` |
 | Entradas leídas = 0 con Alloy arriba | archivos del journal ilegibles para Alloy (grupo) o lectura detenida; el componente sigue sano | `PiedrazulLogsJournalNotRead` (6 h) |
 | Leídas > 0, seleccionadas = 0 | ningún servicio seleccionado escribió en el journal: callado, sin driver journald o fuera de la selección | ninguna |
 | Reintentos con Loki arriba | Loki rechaza (límite de tasa, error); se ve en **Reintentos, rechazos y descartes** | ninguna mientras no haya pérdida |

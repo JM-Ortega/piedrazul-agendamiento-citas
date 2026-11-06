@@ -5,24 +5,11 @@
 # Una falla de entrega no puede avisarse por el mismo canal que falla: estas reglas se ven en
 # Prometheus y en Grafana (serie ALERTS) y, cuando la falla es parcial o transitoria, también
 # llegan a Discord. Lo que no se ve desde dentro (host, Prometheus o Alertmanager caídos, webhook
-# revocado) lo delata la falta del latido diario. Ver docs/operations/runbooks/alertas.md.
+# revocado sin nada que enviar) no se notifica: no hay un mensaje periódico de "todo bien". Ver
+# docs/operations/runbooks/alertas.md.
 groups:
   - name: piedrazul-notificaciones
     rules:
-      # Latido: siempre en firing. Alertmanager lo envía una vez al día (repeat_interval de su
-      # ruta). Si un día no llega a Discord, algo en la cadena falla; si llega su resolución,
-      # Prometheus dejó de enviarlo. Sin severidad de incidente.
-      - alert: PiedrazulNotificationHeartbeat
-        expr: vector(1)
-        labels:
-          severity: info
-        annotations:
-          summary: "Latido diario de las notificaciones de Piedra Azul"
-          description: >-
-            Prometheus evalúa reglas y Alertmanager entrega a este canal. Si este mensaje deja
-            de llegar un día, revisar la cadena (runbook de alertas). Si llega como resuelta,
-            Prometheus dejó de enviar alertas.
-
       # Prometheus no alcanza Alertmanager (caído, fuera de obs_net). 5 m, como los demás
       # destinos. Mientras dura, ninguna alerta se notifica.
       - alert: PiedrazulAlertmanagerDown

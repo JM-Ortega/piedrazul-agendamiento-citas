@@ -219,14 +219,15 @@ y reflejarla en `.env`.
 ## Alertas
 
 Prometheus evalúa las reglas cada 30 s. Una alerta se ve en el dashboard Plataforma (estadística
-**Alertas disparadas** y tabla de alertas) y en la serie `ALERTS` y, con el receptor `discord`
-activado, llega a Discord por Alertmanager ([Alertas](alertas.md), que también describe las cuatro
+**Alertas accionables disparadas**, que cuenta las de severidad distinta de `info`, y tabla de
+alertas, que muestra todas con su severidad) y en la serie `ALERTS` y, con el receptor `discord`
+activado, llega a Discord por Alertmanager ([Alertas](alertas.md), que también describe las tres
 reglas de la entrega). Con Prometheus detenido no se evalúa ninguna regla.
 
 | Alerta | Fuente | Condición | Duración | Ausencia de datos |
 |---|---|---|---|---|
 | `PiedrazulTargetDown` (critical) | `up` | backend, keycloak, traefik o host no se pueden leer | 5 m | el destino es estático: caído = `up 0`, nunca ausente |
-| `PiedrazulHttp5xxRatioHigh` (warning) | `traefik_service_requests_total` | > 5 % de 5xx por servicio y > 0,02 req/s | 10 m | sin tráfico no se evalúa; Traefik caído lo cubre `PiedrazulTargetDown` |
+| `PiedrazulHttp5xxRatioHigh` (warning) | `traefik_service_requests_total` | > 5 % de 5xx por servicio y > 0,02 req/s; en `grafana@file`, sin sus 501 en ninguna parte | 10 m | sin tráfico no se evalúa; Traefik caído lo cubre `PiedrazulTargetDown` |
 | `PiedrazulHostRootFilesystemLow` (warning) | `node_filesystem_*{mountpoint="/"}` | libre en `/` < max(15 % de la capacidad, 10 GiB) | 15 m | Alloy caído: `PiedrazulTargetDown{job="host"}`; `/` sin reportar: la siguiente |
 | `PiedrazulHostRootFilesystemMissing` (warning) | `up`, `node_filesystem_size_bytes` | Alloy responde pero no reporta `/` | 15 m | — |
 | `PiedrazulHostMemoryLow` (warning) | `node_memory_*` | MemAvailable < 10 % | 10 m | Alloy caído: `PiedrazulTargetDown{job="host"}` |
@@ -235,6 +236,20 @@ reglas de la entrega). Con Prometheus detenido no se evalúa ninguna regla.
 
 En la raíz, el piso de 10 GiB domina en discos de hasta ≈67 GiB y el 15 % en los mayores. El panel
 **Raíz del host: espacio libre y umbral** muestra los dos valores.
+
+**HTTP en Traefik.** La interfaz de Grafana pide en uso normal APIs que esta instalación no
+implementa (cuotas) y recibe 501. Para `PiedrazulHttp5xxRatioHigh` y el panel **Proporción de
+respuestas 5xx por servicio** (que muestra exactamente lo que evalúa la regla) esos 501 no cuentan
+en ninguna parte: ni como 5xx, ni en el total, ni en el piso de tráfico, así que muchos 501 no
+diluyen los 500, 502, 503 y 504 de Grafana, que sí cuentan. Los 501 siguen en **Respuestas por
+código**. Sin la ruta en las métricas, un 501 genuino de Grafana tampoco cuenta. Ninguna regla
+vigila que Grafana responda cuando nadie la usa: los 5xx solo existen si hay peticiones.
+
+**Latencia p95 por servicio** excluye las conexiones actualizadas (código 0 o 101: los WebSocket de
+Grafana Live), cuya duración es la de la conexión, y solo dibuja una ventana con al menos 20
+peticiones: con menos el p95 no es fiable, y sin línea no significa latencia buena. Los buckets de
+Traefik son 0,1, 0,3, 1,2 y 5 s: el valor se interpola dentro del bucket y 5 s significa 5 s o
+más.
 
 Las reglas de la canalización de logs (`prometheus/rules/logs.yml`) están en
 [Logs](logs.md#operación-y-diagnóstico).

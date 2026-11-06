@@ -39,7 +39,8 @@ Prometheus ──(obs_net, cada evaluación)──▶ Alertmanager :9093 ──H
 - `OBS_ALERT_RECEIVER` elige el archivo: `none.yml` (por defecto) o `discord.yml`.
 - `prometheus.yml`: `alerting` hacia `alertmanager:9093` y el destino `alertmanager` (métricas de
   entrega).
-- `rules/notifications.yml`: cuatro reglas nuevas sobre la propia entrega; las de S1/S2 no cambian.
+- `rules/notifications.yml`: tres reglas sobre la propia entrega; las de S1/S2 no cambian. No hay
+  latido ni otra alerta siempre en firing: Discord solo recibe incidentes y sus resoluciones.
 
 ## Semántica de la entrega (`discord.yml`)
 
@@ -50,20 +51,28 @@ Prometheus ──(obs_net, cada evaluación)──▶ Alertmanager :9093 ──H
 | `group_interval` | 5 min | cambios de un grupo ya avisado, incluida la **resolución**: llega hasta 5 min después de que la condición se apaga |
 | `repeat_interval` | 12 h | recordatorio de lo que sigue en firing |
 | `send_resolved` | true | mensaje `[RESUELTA]` |
-| latido | `PiedrazulNotificationHeartbeat`, 24 h | un mensaje diario mientras la cadena funciona |
 | inhibiciones, silencios | ninguno por configuración | nada se oculta sin una acción explícita del operador |
 
-Mensaje: título `[<entorno>] [FIRING|RESUELTA] <alerta> (<severidad>)` y, por alerta, `summary`,
+Mensaje: título `[<entorno>] [FIRING|INFO|RESUELTA] <alerta> (<severidad>)` y, por alerta, `summary`,
 `description` y la hora. Solo usa anotaciones y etiquetas acotadas de las reglas: sin datos de
-pacientes, usuarios, URL ni IP.
+pacientes, usuarios, URL ni IP. La severidad distingue incidentes de avisos informativos:
+
+| Severidad | En firing | Resuelta |
+|---|---|---|
+| `critical` (o sin severidad) | `[FIRING]`, 🔴 | `[RESUELTA]`, ✅ |
+| `warning` | `[FIRING]`, 🟠 | `[RESUELTA]`, ✅ |
+| `info` (ninguna regla la usa; p. ej. la prueba manual de abajo) | `[INFO]`, 🔵: no pide acción | `[RESUELTA]`, ⚪ "ya no está activa" y su descripción |
+
+El color del embed lo pone Alertmanager (rojo en firing, verde resuelta) y Discord no permite
+cambiarlo desde la plantilla: un `[INFO]` llega con el borde rojo; la severidad se lee en el título
+y el ícono.
 
 **Entorno de origen.** El mismo webhook se reutiliza al principio para el staging temporal y para
 el despliegue definitivo, así que cada mensaje empieza por el entorno (`[staging]`,
 `[produccion]`). Viene de `OBS_ENVIRONMENT` (estado deseado `obs_environment`, obligatorio con el
 receptor `discord`): Prometheus lo pone como etiqueta externa `environment` en las alertas que envía
 a Alertmanager (`prometheus.yml`, `external_labels`). No entra en las series, en `ALERTS` ni en las
-reglas, que no cambian (probado), y no requiere ningún componente nuevo. El latido también lleva el
-entorno: cada entorno activo debe mandar el suyo cada día. Sin `OBS_ENVIRONMENT` las alertas de
+reglas, que no cambian (probado), y no requiere ningún componente nuevo. Sin `OBS_ENVIRONMENT` las alertas de
 Prometheus dicen `[sin-definir]` (el rol no lo permite con `discord`); una alerta sin la etiqueta,
 como una inyectada a mano en Alertmanager, dice `[sin-entorno]`.
 
@@ -71,15 +80,23 @@ como una inyectada a mano en Alertmanager, dice `[sin-entorno]`.
 
 | Alerta | Condición | Visible en |
 |---|---|---|
-| `PiedrazulNotificationHeartbeat` (info) | siempre (`vector(1)`) | Discord una vez al día; su **ausencia** es la señal |
 | `PiedrazulAlertmanagerDown` (critical) | `up{job="alertmanager"} == 0` 5 min | Grafana / Prometheus (Discord no puede recibirla) |
 | `PiedrazulPrometheusNotificationsFailing` (warning) | errores o descartes de Prometheus al enviar a Alertmanager en 15 min | Grafana; Discord si Alertmanager entrega |
 | `PiedrazulAlertNotificationsFailing` (critical) | `alertmanager_notifications_failed_total` crece en 15 min (envíos perdidos tras los reintentos) | Grafana; Discord cuando el webhook vuelve |
 
-Lo que nadie dentro del servidor puede avisar (host, Prometheus o Alertmanager caídos, webhook
-revocado sin que haya nada que enviar) lo delata la **falta del latido diario**. La disponibilidad
-pública de la aplicación la vigila además UptimeRobot cuando se active
-([Monitoreo externo](monitoreo-externo.md)).
+**Lo que no se notifica.** No hay un mensaje periódico de "todo bien": el silencio en Discord no
+prueba que la cadena funcione. Lo que nadie dentro del servidor puede avisar no llega a ningún lado:
+
+- host o Prometheus caídos: nada se evalúa;
+- Alertmanager caído: `PiedrazulAlertmanagerDown` solo se ve en Grafana;
+- webhook revocado o borrado sin nada que enviar: se descubre en el siguiente incidente, cuando su
+  envío falla (`PiedrazulAlertNotificationsFailing` en Grafana).
+
+Para eso hay que mirar Grafana (Plataforma: **Alertas accionables disparadas** en 0 y verde
+significa reglas evaluadas hace menos de 2 min y ningún incidente; **SIN DATOS**, que Prometheus no
+evalúa) y probar la entrega de punta a punta al instalar, rotar el webhook y en cada verificación
+del entorno (paso 3 de [Credencial](#credencial)). La disponibilidad pública de la aplicación la
+vigila además UptimeRobot cuando se active ([Monitoreo externo](monitoreo-externo.md)).
 
 ## Credencial
 
@@ -117,8 +134,8 @@ errores; probado con la red caída).
    Alertmanager con `discord.yml` y verifica que corre con ese receptor y que Prometheus lleva la
    etiqueta de ese entorno. Después, `observability.yml` sin `-e` ni la variable conserva el
    receptor, el entorno y el webhook ([estado deseado](grafana-acceso.md#estado-deseado)).
-3. **Verificación en vivo** (pendiente): el latido llega en ≈ 1 min. Prueba manual de extremo a
-   extremo sin tocar ninguna regla:
+3. **Verificación en vivo** (pendiente; también tras rotar el webhook y en cada verificación del
+   entorno): prueba manual de extremo a extremo, disparo y resolución, sin tocar ninguna regla:
 
    ```bash
    cd /opt/piedrazul-obs
@@ -131,7 +148,7 @@ errores; probado con la red caída).
 
    Esta alerta entra directo en Alertmanager, sin pasar por Prometheus: **no hereda** la etiqueta
    externa `environment`, por eso el comando la da explícita (la del `.env` del host). Sin ella el
-   título dice `[sin-entorno]`. Debe llegar `[<entorno>] [FIRING] PiedrazulPruebaManual (info)` en
+   título dice `[sin-entorno]`. Debe llegar `[<entorno>] [INFO] PiedrazulPruebaManual (info)` en
    ≈ 30 s y `[RESUELTA]` a los pocos minutos de vencer, en `#alertas`. Las alertas de las reglas sí
    llevan el entorno siempre (las etiqueta Prometheus). Verificado en local con la imagen fijada de
    Alertmanager, `discord.yml` y un receptor sintético: con la etiqueta, `[staging]`; sin ella,
@@ -158,11 +175,11 @@ errores; probado con la red caída).
 | Falla | Comportamiento (probado en local salvo donde se indica) | Señal |
 |---|---|---|
 | Discord 5xx transitorio | reintento con espera creciente dentro del ciclo del grupo; si una entrega posterior llega, no se pierde nada | `alertmanager_notification_requests_failed_total` |
-| Discord 429 (límite de tasa) | **no probado**; con un aviso al día y alertas agrupadas, el volumen esperado está muy por debajo del límite de un webhook | igual que 5xx si se agota |
+| Discord 429 (límite de tasa) | **no probado**; con alertas agrupadas y sin mensajes periódicos, el volumen esperado está muy por debajo del límite de un webhook | igual que 5xx si se agota |
 | Webhook borrado o revocado (404) | no se reintenta; el envío se da por perdido | `PiedrazulAlertNotificationsFailing` en Grafana; llega a Discord cuando el webhook vuelve a funcionar |
 | Red o DNS caídos | error registrado sin la URL; reintento | logs de Alertmanager; si se agota, la regla anterior |
-| Alertmanager caído | Prometheus acumula y reintenta; nada se notifica | `PiedrazulAlertmanagerDown` en Grafana; falta el latido |
-| Prometheus o el host caídos | nada se evalúa ni se notifica | falta el latido (o llega `[RESUELTA]` del latido); UptimeRobot si la aplicación también cae |
+| Alertmanager caído | Prometheus acumula y reintenta; nada se notifica | `PiedrazulAlertmanagerDown` en Grafana (no llega a Discord) |
+| Prometheus o el host caídos | nada se evalúa ni se notifica | **nada lo avisa**: Grafana sin datos (o inaccesible); UptimeRobot si la aplicación también cae |
 | Prometheus reiniciado durante una alerta | comportamiento propio de Prometheus 3.15, anterior a S3: una alerta con `for` ≤ 10 min no recupera su estado (`--rules.alert.for-grace-period`) y vuelve a *pending*; la serie `ALERTS` anterior queda visible ≈ 5 min. Observado (experimento acotado): sin mensajes nuevos al reiniciar y una sola `[RESUELTA]` correcta al recuperarse. **No probado**: una caída que siga más de ≈ 5 min tras el reinicio podría producir una `[RESUELTA]` prematura y un `[FIRING]` nuevo al cumplirse otra vez el `for` | Discord y `/api/v1/alerts` (no la serie `ALERTS`, que puede ir atrasada) |
 
 ## Diagnóstico
@@ -177,7 +194,7 @@ sudo docker compose exec prometheus wget -qO- http://alertmanager.:9093/metrics 
 
 | Síntoma | Causa probable | Acción |
 |---|---|---|
-| no llega nada, ni el latido | receptor `none`, webhook vacío o revocado, Alertmanager caído | `.env` (`OBS_ALERT_RECEIVER`), logs; `PiedrazulAlertNotificationsFailing` en Grafana |
+| no llega nada, ni la prueba manual | receptor `none`, webhook vacío o revocado, Alertmanager caído | `.env` (`OBS_ALERT_RECEIVER`), logs; `PiedrazulAlertNotificationsFailing` en Grafana |
 | `failed_total{reason="clientError"}` crece | webhook borrado (404) o URL mal copiada | rotar (paso 2) |
 | llega el disparo pero tarda la resolución | `group_interval` de 5 min | esperado |
 | `up` falla con `secret ... discord_webhook_url ... no such file` | falta el archivo (instalación manual) | repetir el playbook o crearlo vacío |
@@ -200,7 +217,10 @@ y revocar el webhook en Discord. Las reglas y Prometheus quedan como en S2.
 
 - `infra/observability/tests/notifications-alerts.test.yml` (`promtool test rules`): normal, falla
   y sin datos de cada regla de la entrega.
-- `infra/tests/alert-delivery-check.sh` (Docker, ≈ 15 min, sin red externa): receptor `none`,
-  activación, latido, reintentos (500, 500, 204), resolución, deduplicación, una regla real
+- `infra/tests/alert-delivery-check.sh` (Docker, ≈ 15 min, sin red externa; `STATIC_ONLY=1` solo
+  configuración y plantilla): la plantilla por severidad y estado (`amtool template render` con
+  grupos sintéticos), receptor `none`,
+  activación (una sonda info llega como `[INFO]`, nada periódico), reintentos (500, 500, 204),
+  resolución (✅ warning, ⚪ info), deduplicación, una regla real
   (`PiedrazulTargetDown`), webhook revocado (404) con su alerta, rotación recreando el contenedor (sin
   recrearlo no se aplica), red caída y ausencia del token en logs, estado y configuración.

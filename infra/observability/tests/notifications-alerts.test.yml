@@ -1,7 +1,7 @@
 # Pruebas unitarias de prometheus/rules/notifications.yml con series sintéticas:
 #   docker run --rm -v "$PWD/infra/observability:/w:ro" --entrypoint promtool \
 #     prom/prometheus:<ref de compose.yml> test rules /w/tests/notifications-alerts.test.yml
-# Cada regla con su caso normal, de falla y (salvo el latido) sin datos. Prueban las
+# Cada regla con su caso normal, de falla y sin datos. Prueban las
 # expresiones; la entrega real a un receptor la prueba infra/tests/alert-delivery-check.sh.
 rule_files:
   - ../prometheus/rules/notifications.yml
@@ -9,18 +9,6 @@ rule_files:
 evaluation_interval: 1m
 
 tests:
-  # ── PiedrazulNotificationHeartbeat ──────────────────────────────────────────
-  - name: el latido está siempre en firing, sin series de entrada
-    interval: 1m
-    alert_rule_test:
-      - eval_time: 1m
-        alertname: PiedrazulNotificationHeartbeat
-        exp_alerts:
-          - exp_labels: {severity: info}
-            exp_annotations:
-              summary: "Latido diario de las notificaciones de Piedra Azul"
-              description: "Prometheus evalúa reglas y Alertmanager entrega a este canal. Si este mensaje deja de llegar un día, revisar la cadena (runbook de alertas). Si llega como resuelta, Prometheus dejó de enviar alertas."
-
   # ── PiedrazulAlertmanagerDown ───────────────────────────────────────────────
   - name: Alertmanager caído 5 m dispara y se recupera
     interval: 1m

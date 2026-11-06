@@ -1,0 +1,305 @@
+# Pruebas de las consultas de los paneles de Grafana cuyo significado no es evidente (estados
+# sanos, fallas, telemetría ausente y tráfico escaso), con series sintéticas:
+#   docker run --rm -v "$PWD/infra/observability:/w:ro" --entrypoint promtool \
+#     prom/prometheus:<ref de compose.yml> test rules /w/tests/dashboards.test.yml
+# Cada expr es la del panel con $__rate_interval = 2m; metrics-stack-check.sh comprueba que siguen
+# siendo idénticas a las de los dashboards. Prueban la consulta, no cómo la dibuja Grafana
+# (mapeos de valores y colores: ver el JSON del panel).
+#   Plataforma 7  Alertas accionables disparadas
+#   Plataforma 14 Proporción de respuestas 5xx por servicio
+#   Plataforma 15 Latencia p95 por servicio (peticiones HTTP)
+#   Logs 10       Componentes de Alloy sin funcionar
+rule_files:
+  - ../prometheus/rules/alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # ── Plataforma 7: alertas accionables ────────────────────────────────────────
+  # prometheus_rule_group_last_evaluation_timestamp_seconds (autoobservación de Prometheus) prueba
+  # que las reglas se evalúan: valor = instante de la última evaluación (0+60xN: al día).
+  - name: "Plataforma 7: reglas al día y ninguna alerta → 0"
+    interval: 1m
+    input_series:
+      - series: 'prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", instance="localhost:9090", rule_group="/etc/prometheus/rules/alerts.yml;piedrazul-host"}'
+        values: '0+60x10'
+      - series: 'prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", instance="localhost:9090", rule_group="/etc/prometheus/rules/notifications.yml;piedrazul-notificaciones"}'
+        values: '0+60x10'
+    promql_expr_test:
+      - expr: 'count(ALERTS{alertstate="firing", severity!="info"}) or on() (0 * (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus"}) < 120))'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+
+  - name: "Plataforma 7: warning real en firing → 1; en pending no cuenta"
+    interval: 1m
+    input_series:
+      - series: 'prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", instance="localhost:9090", rule_group="/etc/prometheus/rules/alerts.yml;piedrazul-host"}'
+        values: '0+60x20'
+      - series: 'node_memory_MemAvailable_bytes{job="host", instance="alloy:12345"}'
+        values: '5x20'
+      - series: 'node_memory_MemTotal_bytes{job="host", instance="alloy:12345"}'
+        values: '100x20'
+    promql_expr_test:
+      - expr: 'count(ALERTS{alertstate="firing", severity!="info"}) or on() (0 * (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus"}) < 120))'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+      - expr: 'count(ALERTS{alertstate="firing", severity!="info"}) or on() (0 * (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus"}) < 120))'
+        eval_time: 15m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+
+  - name: "Plataforma 7: una alerta info no cuenta; una sin severidad sí"
+    interval: 1m
+    input_series:
+      - series: 'prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", instance="localhost:9090", rule_group="/etc/prometheus/rules/alerts.yml;piedrazul-host"}'
+        values: '0+60x10'
+      - series: 'ALERTS{alertname="PiedrazulAvisoInformativo", alertstate="firing", severity="info"}'
+        values: '1x10'
+      - series: 'ALERTS{alertname="PiedrazulAlgoNuevo", alertstate="firing"}'
+        values: '1x10'
+    promql_expr_test:
+      - expr: 'count(ALERTS{alertstate="firing", severity!="info"}) or on() (0 * (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus"}) < 120))'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+
+  - name: "Plataforma 7: un grupo sin evaluar hace más de 2 min → sin valor, no 0"
+    interval: 1m
+    input_series:
+      - series: 'prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", instance="localhost:9090", rule_group="/etc/prometheus/rules/alerts.yml;piedrazul-host"}'
+        values: '0+60x10'
+      - series: 'prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus", instance="localhost:9090", rule_group="/etc/prometheus/rules/notifications.yml;piedrazul-notificaciones"}'
+        values: '60x10'
+    promql_expr_test:
+      - expr: 'count(ALERTS{alertstate="firing", severity!="info"}) or on() (0 * (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus"}) < 120))'
+        eval_time: 5m
+        exp_samples: []
+
+  - name: "Plataforma 7: sin reglas cargadas → sin valor, no 0"
+    interval: 1m
+    input_series:
+      - series: 'up{job="prometheus", instance="localhost:9090"}'
+        values: '1x10'
+    promql_expr_test:
+      - expr: 'count(ALERTS{alertstate="firing", severity!="info"}) or on() (0 * (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{job="prometheus"}) < 120))'
+        eval_time: 5m
+        exp_samples: []
+
+  # ── Plataforma 14: proporción 5xx (la de PiedrazulHttp5xxRatioHigh) ──────────
+  - name: "Plataforma 14: 501 de Grafana → 0; 502 del backend → 10 %"
+    interval: 1m
+    input_series:
+      - series: 'traefik_service_requests_total{service="grafana@file", code="200", method="GET", protocol="http"}'
+        values: '0+18x10'
+      - series: 'traefik_service_requests_total{service="grafana@file", code="501", method="GET", protocol="http"}'
+        values: '0+6x10'
+      - series: 'traefik_service_requests_total{service="backend@file", code="200", method="GET", protocol="http"}'
+        values: '0+54x10'
+      - series: 'traefik_service_requests_total{service="backend@file", code="502", method="GET", protocol="http"}'
+        values: '0+6x10'
+    promql_expr_test:
+      - expr: '(sum by (service) (rate(traefik_service_requests_total{code=~"5..", service!~"grafana@.*"}[5m]) or rate(traefik_service_requests_total{code=~"5..", code!="501", service=~"grafana@.*"}[5m])) or 0 * sum by (service) (rate(traefik_service_requests_total{service!~"grafana@.*"}[5m]) or rate(traefik_service_requests_total{code!="501", service=~"grafana@.*"}[5m]))) / sum by (service) (rate(traefik_service_requests_total{service!~"grafana@.*"}[5m]) or rate(traefik_service_requests_total{code!="501", service=~"grafana@.*"}[5m]))'
+        eval_time: 8m
+        exp_samples:
+          - labels: '{service="backend@file"}'
+            value: 0.1
+          - labels: '{service="grafana@file"}'
+            value: 0
+
+  - name: "Plataforma 14: muchos 501 de Grafana no diluyen sus 502 (10 % de lo relevante)"
+    interval: 1m
+    input_series:
+      - series: 'traefik_service_requests_total{service="grafana@file", code="200", method="GET", protocol="http"}'
+        values: '0+18x10'
+      - series: 'traefik_service_requests_total{service="grafana@file", code="501", method="GET", protocol="http"}'
+        values: '0+600x10'
+      - series: 'traefik_service_requests_total{service="grafana@file", code="502", method="GET", protocol="http"}'
+        values: '0+2x10'
+    promql_expr_test:
+      - expr: '(sum by (service) (rate(traefik_service_requests_total{code=~"5..", service!~"grafana@.*"}[5m]) or rate(traefik_service_requests_total{code=~"5..", code!="501", service=~"grafana@.*"}[5m])) or 0 * sum by (service) (rate(traefik_service_requests_total{service!~"grafana@.*"}[5m]) or rate(traefik_service_requests_total{code!="501", service=~"grafana@.*"}[5m]))) / sum by (service) (rate(traefik_service_requests_total{service!~"grafana@.*"}[5m]) or rate(traefik_service_requests_total{code!="501", service=~"grafana@.*"}[5m]))'
+        eval_time: 8m
+        exp_samples:
+          - labels: '{service="grafana@file"}'
+            value: 0.1
+
+  # Sin series de Traefik (destino caído o sin peticiones desde su arranque) no hay línea; con
+  # series pero sin tráfico el cociente es NaN, que Grafana tampoco dibuja.
+  - name: "Plataforma 14: sin series de Traefik → sin línea (no 0)"
+    interval: 1m
+    input_series:
+      - series: 'up{job="traefik", instance="traefik:8082"}'
+        values: '1x10'
+    promql_expr_test:
+      - expr: '(sum by (service) (rate(traefik_service_requests_total{code=~"5..", service!~"grafana@.*"}[5m]) or rate(traefik_service_requests_total{code=~"5..", code!="501", service=~"grafana@.*"}[5m])) or 0 * sum by (service) (rate(traefik_service_requests_total{service!~"grafana@.*"}[5m]) or rate(traefik_service_requests_total{code!="501", service=~"grafana@.*"}[5m]))) / sum by (service) (rate(traefik_service_requests_total{service!~"grafana@.*"}[5m]) or rate(traefik_service_requests_total{code!="501", service=~"grafana@.*"}[5m]))'
+        eval_time: 8m
+        exp_samples: []
+
+  # ── Plataforma 15: latencia p95 ──────────────────────────────────────────────
+  # Buckets de Traefik 0,1/0,3/1,2/5 s. Peticiones normales ≤ 0,1 s (30/min) y WebSockets de
+  # Grafana Live (código 0, 3/min, más de 5 s): con ellos el p95 caería en +Inf y daría 5 s.
+  - name: "Plataforma 15: los WebSocket (código 0) no distorsionan el p95"
+    interval: 1m
+    input_series:
+      - series: 'traefik_service_request_duration_seconds_bucket{service="grafana@file", code="200", method="GET", protocol="http", le="0.1"}'
+        values: '0+30x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="grafana@file", code="200", method="GET", protocol="http", le="0.3"}'
+        values: '0+30x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="grafana@file", code="200", method="GET", protocol="http", le="1.2"}'
+        values: '0+30x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="grafana@file", code="200", method="GET", protocol="http", le="5.0"}'
+        values: '0+30x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="grafana@file", code="200", method="GET", protocol="http", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'traefik_service_request_duration_seconds_count{service="grafana@file", code="200", method="GET", protocol="http"}'
+        values: '0+30x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="grafana@file", code="0", method="GET", protocol="http", le="0.1"}'
+        values: '0+0x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="grafana@file", code="0", method="GET", protocol="http", le="0.3"}'
+        values: '0+0x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="grafana@file", code="0", method="GET", protocol="http", le="1.2"}'
+        values: '0+0x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="grafana@file", code="0", method="GET", protocol="http", le="5.0"}'
+        values: '0+0x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="grafana@file", code="0", method="GET", protocol="http", le="+Inf"}'
+        values: '0+3x10'
+      - series: 'traefik_service_request_duration_seconds_count{service="grafana@file", code="0", method="GET", protocol="http"}'
+        values: '0+3x10'
+    promql_expr_test:
+      - expr: 'histogram_quantile(0.95, sum by (le, service) (rate(traefik_service_request_duration_seconds_bucket{code!~"0|101"}[2m]))) and on (service) sum by (service) (increase(traefik_service_request_duration_seconds_count{code!~"0|101"}[2m])) >= 20'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{service="grafana@file"}'
+            value: 0.095
+
+  - name: "Plataforma 15: menos de 20 peticiones en la ventana → sin línea"
+    interval: 1m
+    input_series:
+      - series: 'traefik_service_request_duration_seconds_bucket{service="backend@file", code="200", method="GET", protocol="http", le="0.1"}'
+        values: '0+5x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="backend@file", code="200", method="GET", protocol="http", le="0.3"}'
+        values: '0+5x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="backend@file", code="200", method="GET", protocol="http", le="1.2"}'
+        values: '0+5x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="backend@file", code="200", method="GET", protocol="http", le="5.0"}'
+        values: '0+5x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="backend@file", code="200", method="GET", protocol="http", le="+Inf"}'
+        values: '0+5x10'
+      - series: 'traefik_service_request_duration_seconds_count{service="backend@file", code="200", method="GET", protocol="http"}'
+        values: '0+5x10'
+    promql_expr_test:
+      - expr: 'histogram_quantile(0.95, sum by (le, service) (rate(traefik_service_request_duration_seconds_bucket{code!~"0|101"}[2m]))) and on (service) sum by (service) (increase(traefik_service_request_duration_seconds_count{code!~"0|101"}[2m])) >= 20'
+        eval_time: 5m
+        exp_samples: []
+
+  - name: "Plataforma 15: solo conexiones actualizadas → sin línea"
+    interval: 1m
+    input_series:
+      - series: 'traefik_service_request_duration_seconds_bucket{service="grafana@file", code="0", method="GET", protocol="http", le="0.1"}'
+        values: '0+0x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="grafana@file", code="0", method="GET", protocol="http", le="0.3"}'
+        values: '0+0x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="grafana@file", code="0", method="GET", protocol="http", le="1.2"}'
+        values: '0+0x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="grafana@file", code="0", method="GET", protocol="http", le="5.0"}'
+        values: '0+0x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="grafana@file", code="0", method="GET", protocol="http", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'traefik_service_request_duration_seconds_count{service="grafana@file", code="0", method="GET", protocol="http"}'
+        values: '0+30x10'
+    promql_expr_test:
+      - expr: 'histogram_quantile(0.95, sum by (le, service) (rate(traefik_service_request_duration_seconds_bucket{code!~"0|101"}[2m]))) and on (service) sum by (service) (increase(traefik_service_request_duration_seconds_count{code!~"0|101"}[2m])) >= 20'
+        eval_time: 5m
+        exp_samples: []
+
+  - name: "Plataforma 15: lentas de verdad (> 5 s) siguen viéndose (5 s = 5 s o más)"
+    interval: 1m
+    input_series:
+      - series: 'traefik_service_request_duration_seconds_bucket{service="keycloak@file", code="200", method="GET", protocol="http", le="0.1"}'
+        values: '0+0x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="keycloak@file", code="200", method="GET", protocol="http", le="0.3"}'
+        values: '0+0x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="keycloak@file", code="200", method="GET", protocol="http", le="1.2"}'
+        values: '0+0x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="keycloak@file", code="200", method="GET", protocol="http", le="5.0"}'
+        values: '0+0x10'
+      - series: 'traefik_service_request_duration_seconds_bucket{service="keycloak@file", code="200", method="GET", protocol="http", le="+Inf"}'
+        values: '0+30x10'
+      - series: 'traefik_service_request_duration_seconds_count{service="keycloak@file", code="200", method="GET", protocol="http"}'
+        values: '0+30x10'
+    promql_expr_test:
+      - expr: 'histogram_quantile(0.95, sum by (le, service) (rate(traefik_service_request_duration_seconds_bucket{code!~"0|101"}[2m]))) and on (service) sum by (service) (increase(traefik_service_request_duration_seconds_count{code!~"0|101"}[2m])) >= 20'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{service="keycloak@file"}'
+            value: 5
+
+  # ── Logs 10: componentes de Alloy sin funcionar ──────────────────────────────
+  - name: "Logs 10: Alloy arriba, todos sanos (sin serie no sana) → 0"
+    interval: 1m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '1x10'
+      - series: 'alloy_component_controller_running_components{job="alloy", instance="alloy:12345", health_type="healthy"}'
+        values: '6x10'
+    promql_expr_test:
+      - expr: 'sum(alloy_component_controller_running_components{job="alloy", health_type!="healthy"}) or on() (0 * sum(alloy_component_controller_running_components{job="alloy"}) and on() (max(up{job="alloy"}) == 1)) or on() ((max(up{job="alloy"}) == 0) - 1)'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+
+  - name: "Logs 10: componentes no sanos → su cantidad"
+    interval: 1m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '1x10'
+      - series: 'alloy_component_controller_running_components{job="alloy", instance="alloy:12345", health_type="healthy"}'
+        values: '4x10'
+      - series: 'alloy_component_controller_running_components{job="alloy", instance="alloy:12345", health_type="unhealthy"}'
+        values: '1x10'
+      - series: 'alloy_component_controller_running_components{job="alloy", instance="alloy:12345", health_type="exited"}'
+        values: '1x10'
+    promql_expr_test:
+      - expr: 'sum(alloy_component_controller_running_components{job="alloy", health_type!="healthy"}) or on() (0 * sum(alloy_component_controller_running_components{job="alloy"}) and on() (max(up{job="alloy"}) == 1)) or on() ((max(up{job="alloy"}) == 0) - 1)'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: 2
+
+  - name: "Logs 10: Alloy caído (up 0, sin métricas propias) → -1 (CAÍDO), no 0"
+    interval: 1m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '0x10'
+    promql_expr_test:
+      - expr: 'sum(alloy_component_controller_running_components{job="alloy", health_type!="healthy"}) or on() (0 * sum(alloy_component_controller_running_components{job="alloy"}) and on() (max(up{job="alloy"}) == 1)) or on() ((max(up{job="alloy"}) == 0) - 1)'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: -1
+
+  - name: "Logs 10: Alloy arriba sin métricas de componentes → sin valor (SIN DATOS)"
+    interval: 1m
+    input_series:
+      - series: 'up{job="alloy", instance="alloy:12345"}'
+        values: '1x10'
+    promql_expr_test:
+      - expr: 'sum(alloy_component_controller_running_components{job="alloy", health_type!="healthy"}) or on() (0 * sum(alloy_component_controller_running_components{job="alloy"}) and on() (max(up{job="alloy"}) == 1)) or on() ((max(up{job="alloy"}) == 0) - 1)'
+        eval_time: 5m
+        exp_samples: []
+
+  - name: "Logs 10: sin destino alloy en Prometheus → sin valor (SIN DATOS)"
+    interval: 1m
+    input_series:
+      - series: 'up{job="host", instance="alloy:12345"}'
+        values: '1x10'
+    promql_expr_test:
+      - expr: 'sum(alloy_component_controller_running_components{job="alloy", health_type!="healthy"}) or on() (0 * sum(alloy_component_controller_running_components{job="alloy"}) and on() (max(up{job="alloy"}) == 1)) or on() ((max(up{job="alloy"}) == 0) - 1)'
+        eval_time: 5m
+        exp_samples: []

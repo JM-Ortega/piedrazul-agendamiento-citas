@@ -10,9 +10,9 @@
 # resolución. Un fallo de Discord (5xx, 429, red) se reintenta con espera creciente hasta el
 # siguiente ciclo del grupo; lo que sigue fallando cuenta en
 # alertmanager_notifications_failed_total y dispara PiedrazulAlertNotificationsFailing (visible
-# en Grafana aunque Discord no reciba nada). La ausencia del latido diario
-# (PiedrazulNotificationHeartbeat) avisa de lo que no se ve desde dentro: Prometheus,
-# Alertmanager o el host caídos, o el webhook revocado.
+# en Grafana aunque Discord no reciba nada). No hay mensaje periódico de "todo bien": lo que no
+# se ve desde dentro (Prometheus, Alertmanager o el host caídos, o el webhook revocado sin nada
+# que enviar) no llega a Discord.
 global:
   resolve_timeout: 5m
 
@@ -28,13 +28,6 @@ route:
   group_interval: 5m
   # Recordatorio de lo que sigue en firing
   repeat_interval: 12h
-  routes:
-    # Latido: un mensaje al día mientras toda la cadena funciona; su resolución significa que
-    # Prometheus dejó de enviarlo (detenido o sin conexión con Alertmanager)
-    - matchers: ['alertname="PiedrazulNotificationHeartbeat"']
-      receiver: discord
-      group_wait: 0s
-      repeat_interval: 24h
 
 receivers:
   - name: discord

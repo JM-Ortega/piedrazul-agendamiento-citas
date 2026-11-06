@@ -236,7 +236,7 @@
     {
       "type": "logs",
       "title": "Logs",
-      "description": "Líneas de los servicios seleccionados, la más reciente primero. Filtros: servicio, severidad (Todas incluye las líneas sin severidad), id de correlación y búsqueda (expresión regular, sin distinguir mayúsculas). El detalle de cada línea muestra container_id y, en el backend, correlation_id.",
+      "description": "Vista general: líneas de los servicios seleccionados, la más reciente primero, con el servicio y la severidad de cada línea. Filtros: servicio, severidad (Todas incluye las líneas sin severidad), id de correlación (vacío: sin filtrar) y búsqueda (expresión regular, sin distinguir mayúsculas). El detalle de cada línea muestra sus etiquetas, container_id y, en el backend, correlation_id.",
       "id": 4,
       "datasource": {
         "type": "loki",
@@ -262,7 +262,7 @@
       ],
       "options": {
         "showTime": true,
-        "showLabels": false,
+        "showLabels": true,
         "showCommonLabels": false,
         "wrapLogMessage": true,
         "prettifyLogMessage": false,
@@ -287,7 +287,7 @@
     {
       "type": "logs",
       "title": "Líneas con el id de correlación (todos los servicios)",
-      "description": "Escribir el id (UUID de la cabecera X-Correlation-Id) en la variable Id de correlación: muestra todas las líneas que lo contienen, de cualquier servicio y severidad, sin los demás filtros. Vacío, muestra todas las líneas.",
+      "description": "Con un id en la variable Id de correlación (UUID de la cabecera X-Correlation-Id): todas las líneas que lo contienen, de cualquier servicio y severidad, sin los demás filtros. Sin id no muestra nada (la vista general es el panel Logs). Que un servicio no muestre el id no prueba que no participó: solo el backend lo escribe en sus líneas.",
       "id": 6,
       "datasource": {
         "type": "loki",
@@ -305,7 +305,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service=~\".+\"} |= \"$correlation_id\"",
+          "expr": "{service=~\".+\"} |= \"$correlation_id\" | label_format correlation_query=`$correlation_id` | correlation_query != \"\" | drop correlation_query",
           "refId": "A",
           "queryType": "range",
           "editorMode": "code"
@@ -313,7 +313,7 @@
       ],
       "options": {
         "showTime": true,
-        "showLabels": false,
+        "showLabels": true,
         "showCommonLabels": false,
         "wrapLogMessage": true,
         "prettifyLogMessage": false,
@@ -530,7 +530,7 @@
     {
       "type": "stat",
       "title": "Componentes de Alloy sin funcionar",
-      "description": "Componentes de Alloy no sanos. 0 = todos funcionando. Más de 0, con más frecuencia loki.source.journal sin directorio del journal que abrir (journal no persistente, montaje). Un journal ilegible por permisos no aparece aquí: se ve en Entradas leídas del journal = 0.",
+      "description": "Componentes de Alloy no sanos. 0 (verde): Alloy responde y todos sus componentes funcionan. Más de 0 (rojo): con más frecuencia loki.source.journal sin directorio del journal que abrir (journal no persistente, montaje). CAÍDO: Prometheus no puede leer Alloy. SIN DATOS: no hay métricas de componentes (destino ausente o métricas filtradas): el estado es desconocido, no sano. Un journal ilegible por permisos no aparece aquí: se ve en Entradas leídas del journal = 0.",
       "id": 10,
       "datasource": {
         "type": "prometheus",
@@ -548,7 +548,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(alloy_component_controller_running_components{job=\"alloy\", health_type!=\"healthy\"})",
+          "expr": "sum(alloy_component_controller_running_components{job=\"alloy\", health_type!=\"healthy\"}) or on() (0 * sum(alloy_component_controller_running_components{job=\"alloy\"}) and on() (max(up{job=\"alloy\"}) == 1)) or on() ((max(up{job=\"alloy\"}) == 0) - 1)",
           "refId": "A",
           "legendFormat": "__auto",
           "range": false,
@@ -560,13 +560,23 @@
           "unit": "short",
           "mappings": [
             {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "CAÍDO",
+                  "color": "red",
+                  "index": 0
+                }
+              }
+            },
+            {
               "type": "special",
               "options": {
                 "match": "null+nan",
                 "result": {
                   "text": "SIN DATOS",
-                  "color": "red",
-                  "index": 9
+                  "color": "orange",
+                  "index": 1
                 }
               }
             }
@@ -995,8 +1005,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Memoria de Loki y Alloy",
-      "description": "Memoria residente de cada proceso. Límites del contenedor: Loki 768 MiB, Alloy 256 MiB.",
+      "title": "Memoria residente (RSS) de Loki y Alloy",
+      "description": "process_resident_memory_bytes de cada proceso. Incluye páginas de archivos mapeados (el binario) que el cgroup puede no cobrar al contenedor: no es la memoria que cuenta contra los límites (Loki 768 MiB, Alloy 256 MiB) y puede acercarse a ellos sin riesgo. La memoria cobrada al contenedor no se recolecta (docker stats en el host). Una RSS que crece sin bajar sí indica presión.",
       "id": 16,
       "datasource": {
         "type": "prometheus",
@@ -1016,7 +1026,7 @@
           },
           "expr": "process_resident_memory_bytes{job=~\"loki|alloy\"}",
           "refId": "A",
-          "legendFormat": "{{job}}",
+          "legendFormat": "{{job}} (RSS)",
           "range": true,
           "instant": false
         }
@@ -1123,7 +1133,7 @@
     {
       "type": "stat",
       "title": "Alertas de logs disparadas",
-      "description": "Alertas de la canalización de logs en estado firing (sin notificaciones externas: solo se ven aquí, en Plataforma y en la serie ALERTS).",
+      "description": "Alertas de la canalización de logs en estado firing. Se ven aquí, en Plataforma y en la serie ALERTS; Alertmanager las entrega a Discord solo con el receptor discord.",
       "id": 18,
       "datasource": {
         "type": "prometheus",

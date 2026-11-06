@@ -537,15 +537,15 @@
     },
     {
       "type": "stat",
-      "title": "Alertas disparadas",
-      "description": "Alertas de prometheus/rules en estado firing. Se evalúan en Prometheus; no hay notificación configurada.",
+      "title": "Alertas accionables disparadas",
+      "description": "Alertas en firing con severidad distinta de info (warning, critical o sin severidad): incidentes que piden acción; las informativas no cuentan (se ven en la tabla). 0 (verde): ninguna, con todas las reglas evaluadas en los últimos 2 min. SIN DATOS: Prometheus no evaluó sus reglas hace poco (sin reglas cargadas o evaluación detenida) o no responde: el estado es desconocido, no sano. Alertmanager las entrega a Discord solo con el receptor discord (con none, solo se ven aquí).",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "count(ALERTS{alertstate=\"firing\"}) or vector(0)",
+          "expr": "count(ALERTS{alertstate=\"firing\", severity!=\"info\"}) or on() (0 * (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{job=\"prometheus\"}) < 120))",
           "legendFormat": "__auto",
           "refId": "A",
           "range": false,
@@ -619,7 +619,7 @@
     {
       "type": "table",
       "title": "Alertas pendientes y disparadas",
-      "description": "Serie ALERTS de Prometheus. pending: la condición se cumple pero aún no dura lo exigido (for).",
+      "description": "Serie ALERTS de Prometheus, incluidas las informativas (severity info), que no son incidentes. pending: la condición se cumple pero aún no dura lo exigido (for).",
       "targets": [
         {
           "datasource": {
@@ -638,7 +638,44 @@
         "defaults": {
           "noValue": "Ninguna alerta pendiente ni disparada"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "severity"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "info": {
+                        "color": "blue",
+                        "index": 0
+                      },
+                      "warning": {
+                        "color": "orange",
+                        "index": 1
+                      },
+                      "critical": {
+                        "color": "red",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "showHeader": true,
@@ -870,7 +907,7 @@
     {
       "type": "timeseries",
       "title": "Peticiones por servicio",
-      "description": "Peticiones por segundo que Traefik entrega a cada servicio (backend, keycloak).",
+      "description": "Peticiones por segundo que Traefik entrega a cada servicio (backend, keycloak y grafana), de cualquier código, incluidas las conexiones WebSocket de Grafana (código 0).",
       "targets": [
         {
           "datasource": {
@@ -929,14 +966,14 @@
     {
       "type": "timeseries",
       "title": "Proporción de respuestas 5xx por servicio",
-      "description": "5xx / total en ventanas de 5 m (incluye 502 de un upstream que no responde). Línea punteada: umbral de PiedrazulHttp5xxRatioHigh. 0 solo con tráfico y sin 5xx; sin tráfico no hay línea.",
+      "description": "Lo que evalúa PiedrazulHttp5xxRatioHigh: 5xx / total por servicio en ventanas de 5 m (incluye 502 de un upstream que no responde). En grafana los 501 de su interfaz (APIs no implementadas en esta instalación) no cuentan ni como 5xx ni en el total; se ven en Respuestas por código. Línea punteada: umbral de la alerta, que además exige > 0,02 req/s de ese mismo total durante 10 m. 0 solo con tráfico y sin 5xx; sin tráfico no hay línea.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "(sum by (service) (rate(traefik_service_requests_total{code=~\"5..\"}[5m])) or 0 * sum by (service) (rate(traefik_service_requests_total[5m]))) / sum by (service) (rate(traefik_service_requests_total[5m]))",
+          "expr": "(sum by (service) (rate(traefik_service_requests_total{code=~\"5..\", service!~\"grafana@.*\"}[5m]) or rate(traefik_service_requests_total{code=~\"5..\", code!=\"501\", service=~\"grafana@.*\"}[5m])) or 0 * sum by (service) (rate(traefik_service_requests_total{service!~\"grafana@.*\"}[5m]) or rate(traefik_service_requests_total{code!=\"501\", service=~\"grafana@.*\"}[5m]))) / sum by (service) (rate(traefik_service_requests_total{service!~\"grafana@.*\"}[5m]) or rate(traefik_service_requests_total{code!=\"501\", service=~\"grafana@.*\"}[5m]))",
           "legendFormat": "{{service}}",
           "refId": "A",
           "range": true,
@@ -1004,15 +1041,15 @@
     },
     {
       "type": "timeseries",
-      "title": "Latencia p95 por servicio",
-      "description": "Percentil 95 del tiempo de respuesta medido en Traefik (incluye el upstream).",
+      "title": "Latencia p95 por servicio (peticiones HTTP)",
+      "description": "Percentil 95 del tiempo de respuesta medido en Traefik (incluye el upstream), sin las conexiones actualizadas (código 0 o 101: WebSocket de Grafana Live), cuya duración es la de la conexión. Solo con al menos 20 peticiones en la ventana: con menos, el p95 no es fiable y no hay línea (sin línea no significa latencia buena). Buckets de Traefik: 0,1, 0,3, 1,2 y 5 s; el valor se interpola dentro del bucket y 5 s significa 5 s o más.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (le, service) (rate(traefik_service_request_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le, service) (rate(traefik_service_request_duration_seconds_bucket{code!~\"0|101\"}[$__rate_interval]))) and on (service) sum by (service) (increase(traefik_service_request_duration_seconds_count{code!~\"0|101\"}[$__rate_interval])) >= 20",
           "legendFormat": "{{service}}",
           "refId": "A",
           "range": true,
@@ -1064,7 +1101,7 @@
     {
       "type": "timeseries",
       "title": "Respuestas por código (websecure)",
-      "description": "Todas las respuestas del entrypoint público HTTPS, por código.",
+      "description": "Todas las respuestas del entrypoint público HTTPS, por código. 0: conexión actualizada (WebSocket) sin código final; 499: el cliente cerró la petición; 501 de grafana: APIs de su interfaz no implementadas aquí.",
       "targets": [
         {
           "datasource": {

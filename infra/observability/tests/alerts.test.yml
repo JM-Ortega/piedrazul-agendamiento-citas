@@ -95,6 +95,112 @@ tests:
         alertname: PiedrazulHttp5xxRatioHigh
         exp_alerts: []
 
+  # Interfaz de Grafana: 501 de APIs no implementadas (cuotas) al 25 % con 0,4 req/s sostenido
+  # (sobre umbral y piso) → no es una falla de disponibilidad, no dispara
+  - name: 501 de la interfaz de Grafana no dispara
+    interval: 1m
+    input_series:
+      - series: 'traefik_service_requests_total{service="grafana@file", code="200", method="GET", protocol="http"}'
+        values: '0+18x40'
+      - series: 'traefik_service_requests_total{service="grafana@file", code="501", method="GET", protocol="http"}'
+        values: '0+6x40'
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: PiedrazulHttp5xxRatioHigh
+        exp_alerts: []
+
+  # Grafana o sus fuentes de datos fallando: 502 al 25 % de lo relevante (200 + 502) con muchos
+  # 501 de la interfaz al mismo tiempo → dispara, solo por grafana; los 501 no cuentan en el total
+  - name: 502 de Grafana dispara aunque haya 501 de la interfaz
+    interval: 1m
+    input_series:
+      - series: 'traefik_service_requests_total{service="grafana@file", code="200", method="GET", protocol="http"}'
+        values: '0+18x30'
+      - series: 'traefik_service_requests_total{service="grafana@file", code="501", method="GET", protocol="http"}'
+        values: '0+30x30'
+      - series: 'traefik_service_requests_total{service="grafana@file", code="502", method="GET", protocol="http"}'
+        values: '0+6x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: PiedrazulHttp5xxRatioHigh
+        exp_alerts:
+          - exp_labels: {severity: warning, service: grafana@file}
+            exp_annotations:
+              summary: "Más del 5 % de respuestas 5xx en grafana@file"
+              description: "25% de las respuestas de grafana@file vistas por Traefik son 5xx desde hace 10 minutos."
+
+  # 30× más 501 que tráfico relevante: con los 501 en el total, 2 de 620 (0,3 %) no dispararía;
+  # sin ellos, 2 de 20 (10 %) sostenido sí
+  - name: muchos 501 de Grafana no diluyen 502 sostenidos
+    interval: 1m
+    input_series:
+      - series: 'traefik_service_requests_total{service="grafana@file", code="200", method="GET", protocol="http"}'
+        values: '0+18x30'
+      - series: 'traefik_service_requests_total{service="grafana@file", code="501", method="GET", protocol="http"}'
+        values: '0+600x30'
+      - series: 'traefik_service_requests_total{service="grafana@file", code="502", method="GET", protocol="http"}'
+        values: '0+2x30'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: PiedrazulHttp5xxRatioHigh
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: PiedrazulHttp5xxRatioHigh
+        exp_alerts:
+          - exp_labels: {severity: warning, service: grafana@file}
+            exp_annotations:
+              summary: "Más del 5 % de respuestas 5xx en grafana@file"
+              description: "10% de las respuestas de grafana@file vistas por Traefik son 5xx desde hace 10 minutos."
+
+  # Tráfico relevante escaso (200 + 502 = 1/min = 0,017 req/s, bajo el piso de 0,02) con 501 a
+  # 1 req/s: los 501 no levantan el piso → no dispara aunque la mitad de lo relevante sea 502
+  - name: 501 de Grafana no cuentan para el piso de tráfico
+    interval: 1m
+    input_series:
+      - series: 'traefik_service_requests_total{service="grafana@file", code="200", method="GET", protocol="http"}'
+        values: '0+0.5x40'
+      - series: 'traefik_service_requests_total{service="grafana@file", code="502", method="GET", protocol="http"}'
+        values: '0+0.5x40'
+      - series: 'traefik_service_requests_total{service="grafana@file", code="501", method="GET", protocol="http"}'
+        values: '0+60x40'
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: PiedrazulHttp5xxRatioHigh
+        exp_alerts: []
+
+  # Solo 501 de Grafana (ningún tráfico relevante): sin cociente ni piso → no dispara
+  - name: solo 501 de Grafana no dispara
+    interval: 1m
+    input_series:
+      - series: 'traefik_service_requests_total{service="grafana@file", code="501", method="GET", protocol="http"}'
+        values: '0+60x40'
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: PiedrazulHttp5xxRatioHigh
+        exp_alerts: []
+
+  # 501 en una aplicación sí cuenta (la excepción es solo de Grafana); Grafana con sus 501 al
+  # mismo tiempo no dispara
+  - name: 5xx sostenido en Keycloak dispara, Grafana con 501 no
+    interval: 1m
+    input_series:
+      - series: 'traefik_service_requests_total{service="keycloak@file", code="200", method="POST", protocol="http"}'
+        values: '0+54x30'
+      - series: 'traefik_service_requests_total{service="keycloak@file", code="501", method="POST", protocol="http"}'
+        values: '0+6x30'
+      - series: 'traefik_service_requests_total{service="grafana@file", code="200", method="GET", protocol="http"}'
+        values: '0+54x30'
+      - series: 'traefik_service_requests_total{service="grafana@file", code="501", method="GET", protocol="http"}'
+        values: '0+6x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: PiedrazulHttp5xxRatioHigh
+        exp_alerts:
+          - exp_labels: {severity: warning, service: keycloak@file}
+            exp_annotations:
+              summary: "Más del 5 % de respuestas 5xx en keycloak@file"
+              description: "10% de las respuestas de keycloak@file vistas por Traefik son 5xx desde hace 10 minutos."
+
   - name: sin series de Traefik no dispara (lo cubre PiedrazulTargetDown)
     interval: 1m
     input_series:

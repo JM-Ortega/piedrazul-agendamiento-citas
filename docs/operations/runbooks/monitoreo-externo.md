@@ -51,10 +51,9 @@ ese webhook vive en la cuenta de UptimeRobot, nunca en el repositorio ni en el s
 
 ## Lo que no cubre
 
-- El stack de observabilidad (Prometheus, Alertmanager, Grafana): su silencio lo delata el
-  latido diario de Alertmanager en Discord ([Alertas](alertas.md)), no UptimeRobot. Un monitor de
-  latido (*heartbeat*) haría esa vigilancia automática, pero no es necesario para S3 y depende del
-  plan; queda como mejora opcional.
+- El stack de observabilidad (Prometheus, Alertmanager, Grafana): no hay latido ni mensaje
+  periódico, así que su caída no se notifica; se ve en Grafana y en la prueba de entrega
+  ([Alertas](alertas.md#reglas-de-la-entrega)). UptimeRobot no lo vigila.
 - Las funciones de la aplicación más allá del health (agendamiento, login completo).
 - Fallas de un solo usuario o de una región que UptimeRobot no ve.
 
