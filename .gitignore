@@ -397,3 +397,7 @@ loadtests/results/
 
 # Secretos locales del stack de observabilidad (webhook de Discord): nunca se versionan
 infra/observability/secrets/
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
