@@ -18,7 +18,10 @@
 #   5. Con la autoridad temporal: automatización con forma, secreto deseado y roles exactos;
 #      forma y roles exactos del backend; después, alcance de roles explícito de automatización,
 #      backend y frontend (agregar lo que falta → Full Scope Allowed deshabilitado → quitar lo
-#      que sobra → releer; ver keycloak-admin.sh scopes).
+#      que sobra → releer; ver keycloak-admin.sh scopes). Con una base de Keycloak >= 26.8.2,
+#      el client scope incorporado kc-admin-api por defecto en automatización y backend y
+#      ausente en el frontend (keycloak-admin.sh admin_api); la automatización termina
+#      haciendo una operación real de la API de administración.
 #   5b. Solo P2: administrador humano permanente de master (keycloak-admin.sh platform-admin):
 #      falla ante un usuario con el mismo nombre; nace deshabilitado, con la contraseña
 #      inicial temporal (KC_PLATFORM_ADMIN_INITIAL_PASSWORD, en tránsito como las demás) y
@@ -161,6 +164,13 @@
             {{ ['master|' ~ kc_automation_client_id ~ '|' ~ (app_kc_expected.scope_automation | join(',')),
                 kc_realm ~ '|' ~ kc_backend_client_id ~ '|' ~ (app_kc_expected.scope_backend | join(',')),
                 kc_realm ~ '|' ~ kc_frontend_client_id ~ '|' ~ (app_kc_expected.scope_frontend | join(','))] | join(';') }}
+          # Alcance incorporado de la API de administración (Keycloak >= 26.8.2, según la versión
+          # de la base leída arriba): por defecto en automatización y backend, nunca en el frontend
+          KCL_ADMIN_API_SCOPE: "{{ kc_admin_api_scope }}"
+          KCL_ADMIN_API_GRANT: >-
+            {{ ('master|' ~ kc_automation_client_id ~ ';' ~ kc_realm ~ '|' ~ kc_backend_client_id)
+               if app_kc_admin_api_required | bool else '' }}
+          KCL_ADMIN_API_DENY: "{{ (kc_realm ~ '|' ~ kc_frontend_client_id) if app_kc_admin_api_required | bool else '' }}"
       vars:
         # Un cliente de automatización sin forma válida (p. ej. sin service account) no
         # tiene roles legibles: se parte de cero
@@ -175,12 +185,13 @@
         that:
           - app_kc_establish.rc == 0
           - "'auth.automation=ok' in app_kc_establish.stdout_lines"
+          - "'automation.admin_api=ok' in app_kc_establish.stdout_lines"
         fail_msg: >-
           KEYCLOAK: no se pudo establecer la automatización; avance antes del fallo:
-          {{ app_kc_establish.stdout_lines | default([]) | select('match', '^(automation|backend|role|scope)[.]') | join(', ') or 'ninguno' }};
+          {{ app_kc_establish.stdout_lines | default([]) | select('match', '^(automation|backend|role|scope|admin_api)[.]') | join(', ') or 'ninguno' }};
           {{ app_kc_establish.stdout_lines | default([]) | select('match', '^(error|auth[.][a-z]+)=') | join(', ') or 'sin salida' }}
         success_msg: >-
-          KEYCLOAK: {{ app_kc_establish.stdout_lines | select('match', '^(automation|backend|role|scope)[.]') | join(', ') }}
+          KEYCLOAK: {{ app_kc_establish.stdout_lines | select('match', '^(automation|backend|role|scope|admin_api)[.]') | join(', ') }}
 
     # Solo P2, después de dejar operativa la automatización: si falla, el estado técnico ya es
     # P1 y la autoridad temporal igual se elimina (always). Una recuperación nunca crea,

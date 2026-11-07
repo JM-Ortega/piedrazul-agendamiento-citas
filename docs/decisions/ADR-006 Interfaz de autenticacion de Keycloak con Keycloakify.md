@@ -119,7 +119,7 @@ Razones para mantenerlo:
 * El equipo debe mantener conocimientos de React y del modelo de Keycloakify, además de Angular.
 * Construir el tema requiere Node, Maven y Java; la integración continua del repositorio no construye ni valida el tema.
 * Los JAR generados se versionan junto al código: todo cambio del tema debe incluir su JAR reconstruido. El workflow de producción detecta cambios en los JAR, no en el código fuente del tema.
-* Keycloakify 11.15.0 genera dos variantes (`keycloak-theme-for-kc-22-to-25.jar` y `keycloak-theme-for-kc-all-other-versions.jar`); el stack actual (Keycloak 26.8.1) usa la segunda. Actualizar Keycloak exige confirmar la compatibilidad de la versión de Keycloakify.
+* Keycloakify 11.15.0 genera dos variantes (`keycloak-theme-for-kc-22-to-25.jar` y `keycloak-theme-for-kc-all-other-versions.jar`); el stack actual (Keycloak 26.8.2) usa la segunda. Actualizar Keycloak exige confirmar la compatibilidad de la versión de Keycloakify.
 * Un Keycloak en ejecución no toma un JAR reconstruido hasta que su contenedor se recrea.
 * Las páginas personalizadas reemplazan el `Template` de Keycloakify, por lo que deben preservar explícitamente su contrato (inicialización de scripts de sesión, mensajes, enlaces de reinicio).
 

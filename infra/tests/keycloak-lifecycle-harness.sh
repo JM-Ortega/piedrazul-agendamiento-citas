@@ -532,6 +532,29 @@ kc_try() {
 }
 export -f scope_row fullscope_warnings
 export SCOPE_TARGET
+# API de administración (Keycloak >= kc_admin_api_scope_since): asignación del client scope
+# incorporado kc-admin-api en los tres clientes, leída de la base: <clientId>=default|optional|
+# default+optional|none
+admin_api_row() {
+  sql "select string_agg(c.client_id||'='||coalesce((select string_agg(case when csc.default_scope then 'default' else 'optional' end, '+' order by csc.default_scope desc) from keycloak.client_scope_client csc join keycloak.client_scope s on s.id=csc.scope_id and s.realm_id=c.realm_id where csc.client_id=c.id and s.name='kc-admin-api'),'none'), ' ' order by c.client_id) from keycloak.client c where c.client_id in ('piedrazul-backend','piedrazul-frontend','piedrazul-keycloak-automation')"
+}
+ADMIN_API_TARGET='piedrazul-backend=default piedrazul-frontend=none piedrazul-keycloak-automation=default'
+ADMIN_API_SINCE="$(yq -r '.kc_admin_api_scope_since' "${ANSIBLE_DIR}/inventories/prod/group_vars/all.yml")"
+ver_ge() { [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -1)" = "$2" ]; } # <a> <b>: a >= b
+# ¿La base (versión que la migró) exige kc-admin-api?
+admin_api_on() { ver_ge "$(kc_db_version)" "${ADMIN_API_SINCE}"; }
+# kc_api <clientId> <secreto> <realm de autenticación> <args kcadm...> → ok | unauthorized |
+# forbidden | error. unauthorized (401) = la API rechaza el token (p. ej. sin kc-admin-api);
+# forbidden (403) = el token vale pero sin autoridad para esa operación
+kc_api() {
+  local o
+  if o="$(kc_as "$@" 2>&1)"; then echo ok
+  elif grep -q 'HTTP 401' <<< "${o}"; then echo unauthorized
+  elif grep -qiE '403|forbidden' <<< "${o}"; then echo forbidden
+  else echo error; fi
+}
+export -f admin_api_row ver_ge admin_api_on kc_api
+export ADMIN_API_TARGET ADMIN_API_SINCE
 
 section "SCOPE — alcance de roles explícito establecido en P2"
 check "SCOPE-P2: los tres clientes propios con Full Scope deshabilitado y exactamente su alcance aprobado" \
@@ -622,6 +645,43 @@ check "SCOPE-AUTO: ve los clientes de la aplicación (lo que usan probe y reconc
   test "$(kc_try "${A[@]}" get clients -r piedrazul -q clientId=piedrazul-backend --fields id)" = ok
 check "SCOPE-AUTO: sin autoridad sobre usuarios ni sobre master" \
   test "$(kc_try "${A[@]}" get users -r piedrazul -q max=1)|$(kc_try "${A[@]}" get users -r master -q max=1)|$(kc_try "${A[@]}" get clients -r master -q max=1)" = "forbidden|forbidden|forbidden"
+# kc-admin-api: con una base >= kc_admin_api_scope_since las operaciones permitidas de arriba ya
+# son la prueba real de que la API acepta los tokens de backend y automatización
+if admin_api_on; then
+section "ADMIN-API — kc-admin-api establecido en P2 ($(kc_db_version))"
+check "ADMIN-API-P2: automatización y backend con kc-admin-api por defecto, frontend sin él" \
+  test "$(admin_api_row)" = "${ADMIN_API_TARGET}"
+check "ADMIN-API-P2: el evento lo asignó a los dos clientes (Keycloak no lo hace con el realm importado ni con un cliente creado por la API)" \
+  bash -c "log_has p2 'admin_api.piedrazul-keycloak-automation=updated' && log_has p2 'admin_api.piedrazul-backend=updated' && log_has p2 'admin_api.piedrazul-frontend=absent' && log_has p2 'automation.admin_api=ok'"
+check "ADMIN-API-P2: Keycloak no lo agregó a los alcances por defecto del realm (un cliente nuevo no lo recibe)" \
+  test "$(sql "select count(*) from keycloak.default_client_scope d join keycloak.client_scope s on s.id=d.scope_id join keycloak.realm r on r.id=d.realm_id where s.name='kc-admin-api'")" = 0
+check "ADMIN-API-P2: el scope no trae roles (no amplía la autoridad de nadie)" \
+  test "$(sql "select count(*) from keycloak.client_scope_role_mapping m join keycloak.client_scope s on s.id=m.scope_id where s.name='kc-admin-api'")" = 0
+check "ADMIN-API-P2: token del backend con kc-admin-api y audiencia de la API de su realm" \
+  browser_all scope-backend client.admin_api_scope=yes client.admin_api_aud=admin/realms/piedrazul
+check "ADMIN-API-P2: token de la automatización con kc-admin-api y audiencia de la API de master" \
+  browser_all scope-automation client.admin_api_scope=yes client.admin_api_aud=admin/realms/master
+check "ADMIN-API-P2: tokens de usuario del frontend (todos los roles de negocio) sin kc-admin-api ni audiencia de la API" \
+  bash -c "for f in admin scheduler doctor patient auditor multi tech; do browser_has fe-\$f token.admin_api_scope=no && browser_has fe-\$f token.admin_api_aud=none || exit 1; done"
+# Un cliente nuevo del realm no recibe kc-admin-api (no está entre los alcances por defecto del
+# realm): su token es rechazado con 401 antes de evaluar su autoridad (no 403). Lo crea y lo borra
+# la automatización (manage-clients); secreto sintético
+admin_api_new_client_rejected() {
+  local s id
+  s="$(synthetic noadminapi)"; SECRETS_SEEN+=("${s}")
+  kc_as piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master create clients -r piedrazul -s clientId=harness-noadminapi \
+    -s publicClient=false -s serviceAccountsEnabled=true -s standardFlowEnabled=false -s "secret=${s}" >/dev/null 2>&1 || return 1
+  id="$(kc_as piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master get clients -r piedrazul -q clientId=harness-noadminapi --fields id --format csv --noquotes)"
+  local auth="$(kc_client_auth piedrazul harness-noadminapi "${s}")" r1 r2
+  r1="$(kc_api harness-noadminapi "${s}" piedrazul get users -r piedrazul -q max=1)"
+  r2="$(kc_api harness-noadminapi "${s}" piedrazul get "realms/piedrazul" --fields realm)"
+  kc_as piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master delete "clients/${id}" -r piedrazul >/dev/null 2>&1
+  [ -n "${id}" ] && [ "${auth}" = ok ] && [ "${r1}|${r2}" = "unauthorized|unauthorized" ] \
+    && [ -z "$(kc_as piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master get clients -r piedrazul -q clientId=harness-noadminapi --fields id --format csv --noquotes)" ]
+}
+check "ADMIN-API-P2: un cliente nuevo del realm autentica pero la API rechaza su token (401, no 403); se retira" \
+  admin_api_new_client_rejected
+fi
 sleep 2
 check "SCOPE: tras emitir tokens reales de los tres clientes, Keycloak no avisa Full Scope para ninguno" \
   test "$(fullscope_warnings "${SCOPE_T0}")" = 0
@@ -671,7 +731,31 @@ section "UPG — actualización por convergencia normal a ${KC_TO_DECLARED}"
 use_keycloak "${KC_TO_DECLARED}"
 TO_VERSION="$(docker pull -q --platform linux/amd64 "${KC_REF}" >/dev/null; kc_image_version "${KC_REF}")"
 converge upgrade false; RC=$?
+# Cruzar kc_admin_api_scope_since: Keycloak crea kc-admin-api al migrar pero solo lo asigna a
+# admin-cli y security-admin-console. La automatización no puede asignárselo (la API ya rechaza su
+# token): la convergencia normal falla cerrada como P3 recuperable y la recuperación autorizada
+# existente lo establece. No hay migración propia ni se deshabilita la verificación.
+ADMIN_API_CROSS=false
+if ! ver_ge "${FROM_VERSION}" "${ADMIN_API_SINCE}" && ver_ge "${TO_VERSION}" "${ADMIN_API_SINCE}"; then ADMIN_API_CROSS=true; fi
+UPG_LOG=upgrade
+if [ "${ADMIN_API_CROSS}" = true ]; then
+check "UPG ${FROM_VERSION} → ${TO_VERSION}: la convergencia normal falla cerrada como P3 recuperable: kc-admin-api falta en automatización y backend (rc=${RC})" \
+  bash -c "test ${RC} -ne 0 && log_has upgrade 'KEYCLOAK P3 (desconocido/divergente)' && log_has upgrade 'alcance kc-admin-api de piedrazul-keycloak-automation divergente: none (esperado: default)' && log_has upgrade 'alcance kc-admin-api de piedrazul-backend divergente: none (esperado: default)' && ! log_has upgrade 'piedrazul-frontend divergente'"
+check "UPG: sin evento ni autoridad temporal, base ya migrada a ${TO_VERSION}" \
+  bash -c "! log_has upgrade 'Crear la autoridad temporal' && test \$(temp_count) = 0 && test \"\$(kc_db_version)\" = '${TO_VERSION}'"
+check "UPG: Keycloak creó kc-admin-api al migrar, sin asignarlo a los clientes propios" \
+  test "$(admin_api_row)" = 'piedrazul-backend=none piedrazul-frontend=none piedrazul-keycloak-automation=none'
+check "UPG: incompatibilidad acotada: backend y automatización autentican pero la API los rechaza (401) hasta la recuperación" \
+  test "$(kc_api piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q max=1)|$(kc_api piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master get clients -r piedrazul -q clientId=piedrazul-backend --fields id)" = "unauthorized|unauthorized"
+converge upgrade-recovery true; RC=$?
+UPG_LOG=upgrade-recovery
+check "UPG: la recuperación autorizada lo establece y deja P1 (rc=${RC})" \
+  bash -c "test ${RC} -eq 0 && log_has upgrade-recovery 'KEYCLOAK: estado P1 después del evento' && log_has upgrade-recovery 'admin_api.piedrazul-keycloak-automation=updated' && log_has upgrade-recovery 'admin_api.piedrazul-backend=updated' && log_has upgrade-recovery 'admin_api.piedrazul-frontend=absent' && test \"\$(admin_api_row)\" = \"\${ADMIN_API_TARGET}\" && test \$(temp_count) = 0"
+check "UPG: la recuperación no recrea el realm ni crea el administrador humano" \
+  bash -c "! task_ran upgrade-recovery 'Importar el realm de la aplicación' && ! task_ran upgrade-recovery 'Crear el administrador humano' && test '$(realm_id)' = '${REALM_ID}'"
+else
 check "UPG: la convergencia normal termina bien (rc=${RC})" test "${RC}" -eq 0
+fi
 if [ "${FROM_VERSION}" != "${TO_VERSION}" ]; then
 check "UPG: informa la migración hacia adelante ${FROM_VERSION} → ${TO_VERSION} antes de arrancar" \
   bash -c "log_has upgrade 'base migrada por ${FROM_VERSION}, arrancar ${TO_VERSION} la migra hacia adelante (sin vuelta atrás)'"
@@ -680,14 +764,16 @@ else
 check "UPG: misma versión ${TO_VERSION}, otro digest: informa que no hay migración" \
   log_has upgrade "base migrada por ${FROM_VERSION}, misma versión que la imagen: sin migración (imagen ${KC_REF}"
 fi
+if [ "${ADMIN_API_CROSS}" != true ]; then
 check "UPG: P1 sin evento ni autoridad temporal (la actualización no es un evento de identidad)" \
   bash -c "log_has upgrade 'KEYCLOAK: estado P1' && ! log_has upgrade 'Crear la autoridad temporal' && test \$(temp_count) = 0"
+fi
 check "UPG: Keycloak recreado con la identidad exacta nueva" \
   bash -c "c=\"\$(kc_container)\"; test \"\${c%%|*}\" != '${CONTAINER_BEFORE%%|*}' && test \"\${c##*|}\" = '${KC_REF}'"
 check "UPG: la base quedó migrada a ${TO_VERSION} (y conserva el registro de ${FROM_VERSION})" \
   bash -c "test \"\$(kc_db_version)\" = '${TO_VERSION}' && test \"\$(sql \"select count(*) from keycloak.migration_model where version='${FROM_VERSION}'\")\" = 1"
 check "UPG: converge verificó identidad en ejecución y versión de la base" \
-  log_has upgrade "KEYCLOAK ${TO_VERSION} en ejecución (${KC_REF}); base en ${TO_VERSION}"
+  log_has "${UPG_LOG}" "KEYCLOAK ${TO_VERSION} en ejecución (${KC_REF}); base en ${TO_VERSION}"
 check "UPG: mismo realm, mismas identidades de negocio" \
   bash -c "test '$(realm_id)' = '${REALM_ID}' && test \"\$(users_in_realm)\" = '${USERS_SNAP}'"
 check "UPG: clientes técnicos con el mismo secreto (hash), forma y roles" test "$(technical_row)" = "${TECH_SNAP}"
@@ -1117,6 +1203,38 @@ compose restart keycloak >/dev/null 2>&1; compose up -d --wait keycloak >/dev/nu
 converge rec-scope-then-p1 false; RC=$?
 check "REC-alcance: tras reiniciar Keycloak, la convergencia normal es P1 sin evento y la automatización reconcilia (rc=${RC})" \
   bash -c "test ${RC} -eq 0 && log_has rec-scope-then-p1 'KEYCLOAK: estado P1' && ! log_has rec-scope-then-p1 'Crear la autoridad temporal' && log_has rec-scope-then-p1 'el backend autentica con él' && test \"\$(scope_row)\" = \"\${SCOPE_TARGET}\""
+
+if admin_api_on; then
+section "P3/REC — kc-admin-api divergente en los tres clientes"
+# Automatización sin él, backend solo opcional (kcadm y el backend no piden alcances) y frontend
+# con él por defecto. En la base y con reinicio (la caché de Keycloak no ve cambios de SQL).
+sql "delete from keycloak.client_scope_client csc using keycloak.client c, keycloak.client_scope s where csc.client_id=c.id and csc.scope_id=s.id and s.name='kc-admin-api' and c.client_id='piedrazul-keycloak-automation';
+     update keycloak.client_scope_client csc set default_scope=false from keycloak.client c, keycloak.client_scope s where csc.client_id=c.id and csc.scope_id=s.id and s.name='kc-admin-api' and c.client_id='piedrazul-backend';
+     insert into keycloak.client_scope_client(client_id, scope_id, default_scope) select c.id, s.id, true from keycloak.client c join keycloak.client_scope s on s.realm_id=c.realm_id and s.name='kc-admin-api' where c.client_id='piedrazul-frontend'" >/dev/null
+compose restart keycloak >/dev/null 2>&1; compose up -d --wait keycloak >/dev/null 2>&1
+ADMIN_API_DRIFT="$(admin_api_row)"
+SCOPE_BEFORE_AA="$(scope_row)"
+check "P3-admin-api: preparación: los tres clientes divergen" \
+  test "${ADMIN_API_DRIFT}" = 'piedrazul-backend=optional piedrazul-frontend=default piedrazul-keycloak-automation=none'
+check "P3-admin-api: backend y automatización autentican pero la API rechaza sus tokens (401): la verificación de audiencia sigue activa" \
+  test "$(kc_client_auth piedrazul piedrazul-backend "${BACKEND_SECRET}")|$(kc_api piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q max=1)|$(kc_client_auth master piedrazul-keycloak-automation "${AUTOMATION_SECRET}")|$(kc_api piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master get clients -r piedrazul -q clientId=piedrazul-backend --fields id)" \
+    = "ok|unauthorized|ok|unauthorized"
+p3_expect p3-admin-api 'alcance kc-admin-api de piedrazul-keycloak-automation divergente: none (esperado: default)'
+check "P3-admin-api: también informa el backend solo opcional y el frontend con él" \
+  bash -c "log_has p3-admin-api 'alcance kc-admin-api de piedrazul-backend divergente: optional (esperado: default)' && log_has p3-admin-api 'alcance kc-admin-api de piedrazul-frontend divergente: default (esperado: none)'"
+check "P3-admin-api: la convergencia normal no lo tocó (ni el alcance de roles)" \
+  bash -c "test \"\$(admin_api_row)\" = '${ADMIN_API_DRIFT}' && test \"\$(scope_row)\" = '${SCOPE_BEFORE_AA}'"
+recover_expect rec-admin-api
+check "REC-admin-api: la recuperación existente (establish) lo restablece: por defecto en automatización y backend, retirado del frontend" \
+  bash -c "test \"\$(admin_api_row)\" = \"\${ADMIN_API_TARGET}\" && log_has rec-admin-api 'admin_api.piedrazul-keycloak-automation=updated' && log_has rec-admin-api 'admin_api.piedrazul-backend=updated' && log_has rec-admin-api 'admin_api.piedrazul-frontend=removed' && log_has rec-admin-api 'automation.admin_api=ok'"
+check "REC-admin-api: sin tocar el alcance de roles ni Full Scope" test "$(scope_row)" = "${SCOPE_TARGET}"
+check "REC-admin-api: backend y automatización vuelven a operar en la API con la misma autoridad (permitido ok, fuera de ella 403)" \
+  test "$(kc_api piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q max=1)|$(kc_api piedrazul-backend "${BACKEND_SECRET}" piedrazul create roles -r piedrazul -s name=HARNESS_DENIED)|$(kc_api piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master get clients -r piedrazul -q clientId=piedrazul-backend --fields id)|$(kc_api piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master get users -r master -q max=1)" \
+    = "ok|forbidden|ok|forbidden"
+converge rec-admin-api-then-p1 false; RC=$?
+check "REC-admin-api: la convergencia siguiente es P1 sin evento ni escritura (rc=${RC})" \
+  bash -c "test ${RC} -eq 0 && log_has rec-admin-api-then-p1 'KEYCLOAK: estado P1' && ! log_has rec-admin-api-then-p1 'Crear la autoridad temporal' && ! log_has rec-admin-api-then-p1 'admin_api.piedrazul' && test \"\$(admin_api_row)\" = \"\${ADMIN_API_TARGET}\""
+fi
 
 # ══ INT: recuperación interrumpida ═══════════════════════════════════════════
 section "INT — recuperación interrumpida antes de limpiar (huérfana propia)"

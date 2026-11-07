@@ -407,6 +407,13 @@ def token_roles(prefix, text):
     out(f"{prefix}.realm_roles", ",".join(sorted(claims.get("realm_access", {}).get("roles", []))) or "none")
     out(f"{prefix}.resource_access", ",".join(sorted(
         f"{c}:{r}" for c, v in claims.get("resource_access", {}).items() for r in v.get("roles", []))) or "none")
+    # API de administración (Keycloak >= 26.8.2): alcance kc-admin-api y audiencias
+    # <url>/admin/realms/<realm> (solo el sufijo admin/realms/<realm>)
+    out(f"{prefix}.admin_api_scope", "yes" if "kc-admin-api" in (claims.get("scope") or "").split() else "no")
+    aud = claims.get("aud") or []
+    aud = [aud] if isinstance(aud, str) else aud
+    out(f"{prefix}.admin_api_aud", ",".join(sorted(
+        a[a.index("/admin/realms/") + 1:] for a in aud if "/admin/realms/" in a)) or "none")
     if tokens.get("refresh_token") and ENV.get("KBL_TOKEN_FILE"):
         with open(os.open(ENV["KBL_TOKEN_FILE"], os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
             f.write(tokens["refresh_token"])

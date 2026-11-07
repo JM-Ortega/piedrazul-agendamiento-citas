@@ -31,7 +31,7 @@ services:
   # uso fija en Keycloak el KC_BACKEND_CLIENT_SECRET del .env local. Idempotente.
   keycloak-dev-secret:
     # Misma referencia fijada que infra/compose/keycloak.yml
-    image: quay.io/keycloak/keycloak:26.8.1@sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b
+    image: quay.io/keycloak/keycloak:26.8.2@sha256:3879c623248408de29a5303178b5816c77e8dfef3890c361f8c0bbeaa979ba3b
     restart: "no"
     depends_on:
       keycloak:
@@ -48,6 +48,14 @@ services:
         ID="$$("$$K" get clients -r "$$KC_REALM" -q "clientId=$$KC_BACKEND_CLIENT_ID" --fields id --format csv --noquotes --config "$$CFG")"
         printf '{"secret":"%s"}' "$$KC_BACKEND_CLIENT_SECRET" | "$$K" update "clients/$$ID" -r "$$KC_REALM" -f - --merge --config "$$CFG"
         echo "KC_BACKEND_CLIENT_SECRET de .env aplicado a $$KC_BACKEND_CLIENT_ID"
+        # Keycloak >= 26.8.2: la API de administración solo acepta tokens con el client scope
+        # incorporado kc-admin-api, que Keycloak crea después de importar los clientes (el realm
+        # no puede referirlo). Como en producción (keycloak-admin.sh establish): por defecto en
+        # el backend. No agrega roles.
+        SID="$$("$$K" get client-scopes -r "$$KC_REALM" --fields id,name --format csv --noquotes --config "$$CFG" | sed -n 's/^\([^,]*\),kc-admin-api$$/\1/p')"
+        [ -n "$$SID" ] && [ "$$(printf '%s\n' "$$SID" | wc -l)" -eq 1 ] || { echo "falta el client scope kc-admin-api en $$KC_REALM" >&2; exit 1; }
+        "$$K" update "clients/$$ID/default-client-scopes/$$SID" -r "$$KC_REALM" --config "$$CFG"
+        echo "kc-admin-api asignado por defecto a $$KC_BACKEND_CLIENT_ID"
     environment:
       KC_PORT: ${KC_PORT}
       KC_REALM: ${KC_REALM}

@@ -119,6 +119,14 @@ kc_automation_roles:
   - "{{ kc_realm }}-realm:manage-clients"
   - "{{ kc_realm }}-realm:manage-realm"
   - "{{ kc_realm }}-realm:view-clients"
+# API de administración (Keycloak >= 26.8.2, CVE-2026-19688): solo acepta tokens con la
+# audiencia y el alcance del client scope incorporado kc-admin-api. Keycloak lo crea en cada
+# realm y lo asigna solo a admin-cli y security-admin-console: la automatización y el backend lo
+# reciben como alcance por defecto en el evento con autoridad temporal (keycloak-admin.sh
+# establish); el frontend nunca. No agrega roles: la autoridad sigue siendo la de sus roles.
+# Desde kc_admin_api_scope_since (versión que migró la base) su ausencia es P3 recuperable.
+kc_admin_api_scope: kc-admin-api
+kc_admin_api_scope_since: "26.8.2"
 # Autoridad temporal de un evento (P2 o recuperación P3): kc.sh bootstrap-admin service con
 # este prefijo + sufijo aleatorio y secreto aleatorio generado en el runner. Se elimina al
 # terminar el evento. Ver app/tasks/keycloak_lifecycle.yml.

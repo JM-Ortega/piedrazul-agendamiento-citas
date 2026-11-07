@@ -30,6 +30,7 @@ mensaje sugiere `keycloak_recovery=true`:
 | `roles … divergentes` / `forma … divergente` | cambios manuales sobre `piedrazul-keycloak-automation` o `piedrazul-backend` |
 | `alcance de roles de <cliente> divergente: Full Scope Allowed habilitado; faltan …; sobran …` | cambios manuales en *Client scopes → Dedicated scope → Scope* de `piedrazul-keycloak-automation`, `piedrazul-backend` o `piedrazul-frontend` (ver [Alcance de roles de los clientes propios](#alcance-de-roles-de-los-clientes-propios)) |
 | `la automatización no ve el cliente piedrazul-backend` | roles de la automatización alterados |
+| `alcance kc-admin-api de <cliente> divergente: <actual> (esperado: default\|none)` | actualización de una base anterior a Keycloak 26.8.2 (Keycloak crea el scope pero no lo asigna a los clientes propios) o cambio manual en *Clients → <cliente> → Client scopes* (ver [API de administración: kc-admin-api](#api-de-administración-kc-admin-api)) |
 
 ## Casos no soportados: P3 BLOQUEANTE → escalar
 
@@ -164,6 +165,39 @@ explícito: sus tokens solo llevan esos roles (si el usuario o el service accoun
 - Revertir el código no revierte Keycloak: un commit anterior no lee el alcance ni lo escribe,
   y el realm conserva el que tenga.
 
+## API de administración: kc-admin-api
+
+Desde Keycloak 26.8.2 (CVE-2026-19688) la API de administración solo acepta tokens que traen
+**a la vez** la audiencia `<URL pública>/admin/realms/<realm>` y el alcance del client scope
+incorporado `kc-admin-api`; si no, responde **401** aunque el cliente autentique y tenga sus
+roles. Keycloak crea ese scope en cada realm (también en el importado en P2, después de sus
+clientes: una referencia en el JSON del realm se ignora) y solo lo asigna a `admin-cli`,
+`security-admin-console` y la autoridad temporal de `bootstrap-admin`.
+
+| Cliente | Realm | `kc-admin-api` |
+|---------|-------|----------------|
+| `piedrazul-keycloak-automation` | `master` | por defecto |
+| `piedrazul-backend` | `piedrazul` | por defecto |
+| `piedrazul-frontend` | `piedrazul` | nunca (ni por defecto ni opcional) |
+
+- Por defecto y no opcional: kcadm y el cliente de administración del backend no piden
+  alcances. El scope no trae roles: la autoridad sigue siendo exactamente la de sus roles
+  (fuera de ella, 403).
+- Lo asigna el evento con autoridad temporal (`keycloak-admin.sh establish`, salida
+  `admin_api.<cliente>=updated|unchanged|removed|absent`), que termina con una operación real de
+  la API como automatización (`automation.admin_api=ok`). La convergencia P1 solo lo compara
+  (desde la versión `kc_admin_api_scope_since` que registra la base); nunca lo escribe.
+- **Nunca** se deshabilita la verificación de audiencia de Keycloak ni se usa un scope propio
+  con la misma audiencia (Keycloak lo rechaza igual: exige el scope `kc-admin-api`).
+- Desarrollo (`docker-compose.yml`): `keycloak-dev-secret` lo asigna por defecto al backend.
+
+**Actualizar una base anterior a 26.8.2**: la convergencia normal migra la base y después
+falla cerrada como P3 recuperable (`alcance kc-admin-api de piedrazul-keycloak-automation …` y
+`… de piedrazul-backend …`). Hasta la recuperación, backend y automatización reciben 401 de la
+API. La automatización no puede corregirse a sí misma (su token ya es rechazado): correr la
+recuperación autorizada de este runbook. Una instalación nueva (P2) en 26.8.2 lo deja
+establecido sin pasos adicionales.
+
 ## Actualización de la versión de Keycloak
 
 Cambiar de versión **no es una recuperación** ni un evento con autoridad temporal: es una
@@ -185,7 +219,8 @@ manifiesto (ver [`ANSIBLE.md`](../../../infra/ansible/ANSIBLE.md#identidad-de-ke
 - lee la versión que migró la base por última vez (`migration_model`) e informa
   `KEYCLOAK: base migrada por <anterior>, arrancar <nueva> la migra hacia adelante (sin vuelta atrás)`;
 - recrea Keycloak con la imagen nueva (`Levantar Keycloak sobre la base ya inicializada`) y
-  sigue la clasificación normal (P1, sin autoridad temporal);
+  sigue la clasificación normal (P1, sin autoridad temporal; al cruzar 26.8.2, P3 recuperable
+  hasta la recuperación: ver [API de administración: kc-admin-api](#api-de-administración-kc-admin-api));
 - al final verifica que el contenedor corre esa identidad exacta y que la base quedó en la
   versión nueva (`KEYCLOAK <versión> en ejecución (…); base en <versión>`).
 
@@ -230,7 +265,14 @@ No se repara automáticamente: escalar (la base fue alterada fuera de Keycloak).
 El procedimiento se ejercitó con estos mismos task files contra PostgreSQL y Keycloak
 desechables (`infra/tests/keycloak-lifecycle-harness.sh`): 26.5.6 y 26.8.1 desde una base
 nueva, y 26.8.1 sobre una base creada por 26.5.6 y migrada por converge
-(`HARNESS_TARGET=upgrade`). Soportados: rotación de la
+(`HARNESS_TARGET=upgrade`). Con 26.8.2 se ejecutaron de nuevo el conjunto por defecto (base
+nueva) y `HARNESS_TARGET=upgrade` (26.5.6 → 26.8.2), todo PASS: kc-admin-api establecido en P2
+(automatización y backend por defecto, frontend sin él, sin roles), tokens de usuario del
+frontend sin el scope ni la audiencia de la API, un cliente nuevo rechazado con 401, divergencia
+en los tres clientes como P3 recuperable restablecida por la recuperación existente, y la
+actualización que cruza 26.8.2 fallando cerrada como P3 recuperable hasta la recuperación
+autorizada (después P1 sin evento). Los objetivos `migration-version` y `smtp` no se
+repitieron con 26.8.2. Soportados: rotación de la
 credencial de automatización (con caracteres especiales), escalada de roles, forma y roles del
 backend alterados, recuperación interrumpida (huérfana propia) y recuperación que falla después
 de reconciliar parcialmente. No soportados (bloquean también con recuperación, sin mutar):

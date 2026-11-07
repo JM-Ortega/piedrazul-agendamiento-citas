@@ -328,9 +328,9 @@ check "alcance: keycloak-state.sql lo lee sin escribir (solo SELECT dentro de la
 # divergencias) con lecturas sintéticas de la base: sin contenedores
 yq '[.[] | select(.name == "Calcular la forma técnica esperada" or .name == "Verificar el alcance de roles explícito declarado en el realm del repositorio")]' \
   "${TASKS}/keycloak_lifecycle.yml" > "${TMP}/scope-expected.yml"
-yq '[.[] | select(.name == "Interpretar el estado de la base" or .name == "Calcular divergencias bloqueantes" or .name == "Calcular divergencias recuperables")]' \
+yq '[.[] | select(.name == "Interpretar el estado de la base" or .name == "Decidir si se exige el alcance de la API de administración" or .name == "Calcular divergencias bloqueantes" or .name == "Calcular divergencias recuperables")]' \
   "${TASKS}/keycloak_state.yml" > "${TMP}/scope-classify.yml"
-yq '[{"name": "KCL_SCOPES del evento", "ansible.builtin.set_fact": {"kcl_scopes": (.. | select(type == "!!map" and has("name")) | select(.name == "Establecer la automatización y la forma del backend") | ."community.docker.docker_container_exec".env.KCL_SCOPES)}}]' \
+yq '(.. | select(type == "!!map" and has("name")) | select(.name == "Establecer la automatización y la forma del backend") | ."community.docker.docker_container_exec".env) as $e | [{"name": "KCL_SCOPES y KCL_ADMIN_API_* del evento", "ansible.builtin.set_fact": {"kcl_scopes": $e.KCL_SCOPES, "kcl_admin_api_scope": $e.KCL_ADMIN_API_SCOPE, "kcl_admin_api_grant": $e.KCL_ADMIN_API_GRANT, "kcl_admin_api_deny": $e.KCL_ADMIN_API_DENY}}]' \
   "${TASKS}/keycloak_bootstrap.yml" > "${TMP}/scope-event.yml"
 cat > "${TMP}/scope.yml" <<'EOF'
 - hosts: vps
@@ -338,18 +338,24 @@ cat > "${TMP}/scope.yml" <<'EOF'
   connection: local
   tasks:
     - ansible.builtin.include_tasks: "{{ tmp }}/scope-expected.yml"
-    - ansible.builtin.include_tasks: "{{ tmp }}/scope-event.yml"
     - ansible.builtin.set_fact:
         app_kc_db_probe:
           stdout_lines: >-
-            {{ ['schema=initialized', 'realm=master', 'realm=' ~ kc_realm, 'migration_version=26.8.1',
+            {{ ['schema=initialized', 'realm=master', 'realm=' ~ kc_realm, 'migration_version=' ~ (case_version | default('26.8.1')),
                 'client.automation=' ~ app_kc_expected.automation_shape, 'client.backend=' ~ app_kc_expected.backend_shape,
                 'roles.automation=' ~ (app_kc_expected.automation_roles | join(',')),
-                'roles.backend=' ~ (app_kc_expected.backend_roles | join(','))] + case_scope_lines }}
+                'roles.backend=' ~ (app_kc_expected.backend_roles | join(','))] + case_scope_lines
+               + (case_admin_api_lines | default([])) }}
     - ansible.builtin.include_tasks: "{{ tmp }}/scope-classify.yml"
+    # Después de clasificar: KCL_ADMIN_API_* dependen de la versión leída de la base
+    - ansible.builtin.include_tasks: "{{ tmp }}/scope-event.yml"
     - ansible.builtin.copy:
         dest: "{{ out_file }}"
-        content: "{{ {'blocking': app_kc_blocking, 'reasons': app_kc_reasons, 'kcl_scopes': kcl_scopes} | to_json }}"
+        content: >-
+          {{ {'blocking': app_kc_blocking, 'reasons': app_kc_reasons, 'kcl_scopes': kcl_scopes,
+              'admin_api_required': app_kc_admin_api_required | bool, 'admin_api': app_kc_observed.admin_api,
+              'kcl_admin_api_scope': kcl_admin_api_scope, 'kcl_admin_api_grant': kcl_admin_api_grant | trim,
+              'kcl_admin_api_deny': kcl_admin_api_deny | trim} | to_json }}
 EOF
 AUTO_T='piedrazul-realm:manage-clients,piedrazul-realm:manage-realm,piedrazul-realm:view-clients'
 BACK_T='realm-management:manage-users,realm-management:query-users,realm-management:view-events,realm-management:view-realm,realm-management:view-users'
@@ -387,6 +393,50 @@ jq '(.clients[] | select(.clientId == "piedrazul-backend") | .fullScopeAllowed) 
 scope_case realm-full '[]' -e "kc_realm_file=${TMP}/realm-full.json" && RC=0 || RC=$?
 check "alcance (Ansible): un realm del repositorio con Full Scope habilitado en el backend falla (rc=${RC})" \
   bash -c "test ${RC} -ne 0 && grep -q 'deben tener fullScopeAllowed=false' '${TMP}/scope-realm-full.log'"
+
+# ── 9b. Alcance de la API de administración (kc-admin-api, Keycloak >= 26.8.2) ──
+check "admin API: group_vars fija kc-admin-api desde 26.8.2" \
+  test "$(yq -r '[.kc_admin_api_scope, .kc_admin_api_scope_since] | join(" ")' "${GROUP_VARS}")" = "kc-admin-api 26.8.2"
+check "admin API: nunca se deshabilita la verificación de audiencia de Keycloak" \
+  bash -c "! grep -rEiq 'audience[-_]check|AUDIENCE_CHECK' '${ROOT}/infra' '${ROOT}/docker-compose.yml' '${ROOT}/.github' --exclude=keycloak-lifecycle-check.sh"
+check "admin API: el realm del repositorio no define ni referencia kc-admin-api (Keycloak lo crea después de importar los clientes e ignora la referencia)" \
+  bash -c "! grep -q 'kc-admin-api' '${REALM}'"
+check "admin API: solo establish lo asigna, después del alcance de roles y antes de verificar la automatización con una operación real" \
+  bash -c "s=\$(sed -n '/^establish()/,/^}/p' '${ADMIN_SH}'); a=\$(grep -n '^  scopes\$' <<< \"\$s\" | cut -d: -f1); b=\$(grep -n '^  admin_api\$' <<< \"\$s\" | cut -d: -f1); c=\$(grep -n 'echo \"automation.admin_api=ok\"' <<< \"\$s\" | cut -d: -f1); test -n \"\$a\" && test \"\$a\" -lt \"\$b\" && test \"\$b\" -lt \"\$c\" && ! sed -n '/^probe()/,/^}/p;/^reconcile()/,/^}/p;/^smtp()/,/^}/p;/^cleanup()/,/^}/p;/^platform_admin()/,/^}/p' '${ADMIN_SH}' | grep -Eq '^ +admin_api\$|admin_api_(list|has|scope_id)|KCL_ADMIN_API'"
+check "admin API: solo toca la asignación de ese scope (por defecto / opcional), nunca otros alcances ni roles" \
+  bash -c "s=\$(sed -n '/^admin_api_list()/,/^establish()/p' '${ADMIN_SH}'); ! grep -Eq 'add-roles|remove-roles|scope-mappings|fullScopeAllowed|client-scopes -r .* create' <<< \"\$s\" && test \"\$(grep -c -- '-client-scopes/\\\${sid}' <<< \"\$s\")\" = 3"
+check "admin API: KCL_ADMIN_API_* solo llegan al evento con autoridad temporal (nunca a P1)" \
+  test "$(grep -rl 'KCL_ADMIN_API_' "${TASKS}" | xargs -r -n1 basename | tr '\n' ' ')" = "keycloak_bootstrap.yml "
+check "admin API: el evento exige la operación real de la automatización" \
+  bash -c "grep -q \"'automation.admin_api=ok' in app_kc_establish.stdout_lines\" '${TASKS}/keycloak_bootstrap.yml'"
+check "admin API: keycloak-state.sql lee la asignación de kc-admin-api de los tres clientes propios" \
+  bash -c "grep -q \"'admin_api.' || t.label\" '${STATE_SQL}' && grep -q \"s.name = :'admin_api_scope'\" '${STATE_SQL}'"
+check "desarrollo: keycloak-dev-secret asigna kc-admin-api por defecto al backend" \
+  bash -c "yq -r '.services[\"keycloak-dev-secret\"].command[0]' '${ROOT}/docker-compose.yml' | grep -q 'default-client-scopes/\\\$\\\$SID'"
+
+TARGET_SCOPE_LINES="[\"scope.frontend=full:false;${FRONT_T}\", \"scope.automation=full:false;${AUTO_T}\", \"scope.backend=full:false;${BACK_T}\"]"
+scope_case aa-target "${TARGET_SCOPE_LINES}" -e case_version=26.8.2 \
+  -e '{"case_admin_api_lines": ["admin_api.automation=default", "admin_api.backend=default", "admin_api.frontend=none"]}' || true
+check "admin API (Ansible): 26.8.2 con kc-admin-api por defecto en automatización y backend y sin él en el frontend → sin divergencia" \
+  scope_has aa-target '' '.admin_api_required and .blocking == [] and .reasons == []'
+check "admin API (Ansible): el evento lo asigna a automatización (master) y backend y lo niega al frontend" \
+  scope_has aa-target '' '.kcl_admin_api_scope == "kc-admin-api" and .kcl_admin_api_grant == "master|piedrazul-keycloak-automation;piedrazul|piedrazul-backend" and .kcl_admin_api_deny == "piedrazul|piedrazul-frontend"'
+scope_case aa-drift "${TARGET_SCOPE_LINES}" -e case_version=26.8.2 \
+  -e '{"case_admin_api_lines": ["admin_api.automation=none", "admin_api.backend=optional", "admin_api.frontend=default+optional"]}' || true
+check "admin API (Ansible): ausente (automatización), solo opcional (backend) o presente en el frontend → P3 recuperable para cada uno, sin bloquear" \
+  scope_has aa-drift '' '.blocking == [] and .reasons == ["alcance kc-admin-api de piedrazul-keycloak-automation divergente: none (esperado: default)", "alcance kc-admin-api de piedrazul-backend divergente: optional (esperado: default)", "alcance kc-admin-api de piedrazul-frontend divergente: default+optional (esperado: none)"]'
+scope_case aa-upgraded "${TARGET_SCOPE_LINES}" -e case_version=26.8.2 \
+  -e '{"case_admin_api_lines": ["admin_api.automation=none", "admin_api.backend=none", "admin_api.frontend=none"]}' || true
+check "admin API (Ansible): base recién migrada a 26.8.2 (Keycloak solo lo asigna a sus clientes) → P3 recuperable de automatización y backend" \
+  scope_has aa-upgraded '' '.blocking == [] and (.reasons | length == 2) and all(.reasons[]; test("^alcance kc-admin-api de piedrazul-(keycloak-automation|backend) divergente: none "))'
+scope_case aa-before "${TARGET_SCOPE_LINES}" -e case_version=26.8.1 \
+  -e '{"case_admin_api_lines": ["admin_api.automation=none", "admin_api.backend=none", "admin_api.frontend=none"]}' || true
+check "admin API (Ansible): base anterior a 26.8.2 → no se exige ni se asigna (el scope no existe)" \
+  scope_has aa-before '' '(.admin_api_required | not) and .reasons == [] and .kcl_admin_api_grant == "" and .kcl_admin_api_deny == ""'
+scope_case aa-newer "${TARGET_SCOPE_LINES}" -e case_version=26.10.0 \
+  -e '{"case_admin_api_lines": ["admin_api.automation=default", "admin_api.backend=none", "admin_api.frontend=none"]}' || true
+check "admin API (Ansible): versiones posteriores también lo exigen (comparación de versión, no de texto)" \
+  scope_has aa-newer '' '.admin_api_required and .reasons == ["alcance kc-admin-api de piedrazul-backend divergente: none (esperado: default)"]'
 
 # ── 6. Desarrollo ────────────────────────────────────────────────────────────
 if docker compose --project-name piedrazul-kc-dev-contract --file "${ROOT}/docker-compose.yml" \

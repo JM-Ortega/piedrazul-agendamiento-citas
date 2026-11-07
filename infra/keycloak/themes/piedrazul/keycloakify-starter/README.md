@@ -117,7 +117,7 @@ Storybook es la forma principal de revisar las páginas y sus estados (errores, 
 
 | JAR                                            | Uso                                                                   |
 | ---------------------------------------------- | --------------------------------------------------------------------- |
-| `keycloak-theme-for-kc-all-other-versions.jar` | Keycloak 26 o posterior. **Es el que usa el stack** (Keycloak 26.8.1) |
+| `keycloak-theme-for-kc-all-other-versions.jar` | Keycloak 26 o posterior. **Es el que usa el stack** (Keycloak 26.8.2) |
 | `keycloak-theme-for-kc-22-to-25.jar`           | Keycloak 22 a 25. Se genera, pero el stack actual no lo monta         |
 
 Ambos JAR declaran un único tema de login llamado `keycloakify-starter`.
