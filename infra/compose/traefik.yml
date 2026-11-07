@@ -4,7 +4,7 @@ services:
     # hace legible y Ansible lo contrasta con la versión de la imagen). En producción prod.yml
     # la reemplaza por TRAEFIK_IMAGE de image.env: el manifiesto linux/amd64 exacto de este
     # índice, el mismo que se escaneó (ver ansible/roles/app/tasks/traefik_image.yml).
-    image: traefik:v3.7.14@sha256:575fa15b135078fe5e50aa847987d96dbddd7b093c172429618404df73f3fa7c
+    image: traefik:v3.7.17@sha256:f4bb143d1135a579b630ed491e17ec50f6f7c9c6a30585ff3d385471d2a86f5a
     container_name: traefik
     restart: unless-stopped
     command:
