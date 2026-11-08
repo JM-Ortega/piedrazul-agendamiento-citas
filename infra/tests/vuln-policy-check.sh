@@ -1176,7 +1176,9 @@ check "acción: Trivy fijado por versión y digest, sin socket de Docker" \
 check "acción: summary.json registra la fecha del escaneo y los CRITICAL" \
   bash -c "grep -q 'scanned_at: \$report\[0\].CreatedAt' '${ACTION}' && grep -q 'ids: (\[\$v\[\] | select(.Severity == \"CRITICAL\")' '${ACTION}'"
 check "workflow: ninguna evidencia de escaneo llega por actions/download-artifact (solo advierte ante un digest distinto)" \
-  bash -c "! grep -q 'actions/download-artifact' '${WORKFLOW}' && [ \"\$(grep -c 'current-scan-evidence.sh' '${WORKFLOW}')\" = 2 ]"
+  bash -c "! grep -q 'actions/download-artifact' '${WORKFLOW}' && [ \"\$(grep -c 'current-scan-evidence.sh' '${WORKFLOW}')\" = 3 ]"
+check "workflow: la evidencia del stack de observabilidad se descarga aparte (solo obs-*), en su job" \
+  bash -c "[ \"\$(yq -r '.jobs.observability.steps[] | select((.run // \"\") | test(\"current-scan-evidence.sh\")) | .env.SCAN_SURFACES' '${WORKFLOW}')\" = 'obs-prometheus|obs-grafana|obs-alloy|obs-loki|obs-alertmanager' ]"
 check "workflow: break-glass con run_terraform_apply se rechaza al clasificar" \
   bash -c "yq -r '.jobs.classify.steps[] | select(.id == \"intent\") | .run' '${WORKFLOW}' | grep -A2 'IN_TERRAFORM}\" != \"false\"' | grep -q 'exit 1'"
 check "workflow: ambas evaluaciones reciben la intención completa del run (OP_*)" \

@@ -9,6 +9,10 @@
 # Sin .env (primera instalación) se parte del estado inicial. Con .env, leerlo es obligatorio: un
 # fallo de lectura detiene el rol antes de cambiar nada, en vez de volver en silencio al estado
 # inicial (que desactivaría Access o Discord).
+# Listas de Grafana: obligatorias en cada run y nunca guardadas en el host (access_lists.yml)
+- name: Validar las listas de Grafana
+  ansible.builtin.include_tasks: access_lists.yml
+
 - name: Buscar el estado deseado guardado en el host
   ansible.builtin.stat:
     path: "{{ obs_dir }}/.env"
@@ -35,8 +39,7 @@
   ansible.builtin.set_fact:
     obs_s3_saved: >-
       {%- set keys = ['GRAFANA_ACCESS_ENABLED', 'GRAFANA_PUBLIC_DOMAIN', 'GRAFANA_ACCESS_TEAM_DOMAIN',
-                      'GRAFANA_ACCESS_AUD', 'GRAFANA_ACCESS_EDITORS', 'GRAFANA_ACCESS_VIEWERS',
-                      'OBS_ALERT_RECEIVER', 'OBS_ENVIRONMENT'] -%}
+                      'GRAFANA_ACCESS_AUD', 'OBS_ALERT_RECEIVER', 'OBS_ENVIRONMENT'] -%}
       {%- set d = {} -%}
       {%- if obs_env_stat.stat.exists -%}
         {%- for line in (obs_env_slurp.content | b64decode).splitlines() -%}
@@ -53,8 +56,6 @@
     obs_s3_public_domain: "{{ obs_grafana_public_domain if obs_grafana_public_domain is not none else obs_s3_saved.GRAFANA_PUBLIC_DOMAIN | default('') }}"
     obs_s3_team_domain: "{{ obs_grafana_access_team_domain if obs_grafana_access_team_domain is not none else obs_s3_saved.GRAFANA_ACCESS_TEAM_DOMAIN | default('') }}"
     obs_s3_aud: "{{ obs_grafana_access_aud if obs_grafana_access_aud is not none else obs_s3_saved.GRAFANA_ACCESS_AUD | default('') }}"
-    obs_s3_editors: "{{ obs_grafana_access_editors if obs_grafana_access_editors is not none else (obs_s3_saved.GRAFANA_ACCESS_EDITORS | default('')).split(',') | reject('equalto', '') | list }}"
-    obs_s3_viewers: "{{ obs_grafana_access_viewers if obs_grafana_access_viewers is not none else (obs_s3_saved.GRAFANA_ACCESS_VIEWERS | default('')).split(',') | reject('equalto', '') | list }}"
     obs_s3_receiver: "{{ obs_alert_receiver if obs_alert_receiver is not none else obs_s3_saved.OBS_ALERT_RECEIVER | default('none') }}"
     obs_s3_environment: "{{ obs_environment if obs_environment is not none else obs_s3_saved.OBS_ENVIRONMENT | default('') }}"
   vars:
@@ -66,17 +67,13 @@
     # (red de entrada compartida con Traefik).
     obs_compose_files: "{{ ['compose.yml'] + (['compose.access.yml'] if obs_grafana_access_on else []) }}"
 
-# Booleanos de Ansible (true/false, yes/no) para el interruptor; listas JSON para los correos
+# Booleanos de Ansible (true/false, yes/no) para el interruptor
 - name: Verificar los tipos del estado deseado
   ansible.builtin.assert:
     that:
       - obs_s3_enabled_raw | lower in ['true', 'false']
-      - obs_s3_editors | type_debug == 'list'
-      - obs_s3_viewers | type_debug == 'list'
     fail_msg: >-
-      ACCESO A GRAFANA: obs_grafana_access_enabled debe ser booleano y obs_grafana_access_editors /
-      obs_grafana_access_viewers listas (-e '{"obs_grafana_access_viewers": ["..."]}'). No se copió ni
-      levantó nada.
+      ACCESO A GRAFANA: obs_grafana_access_enabled debe ser booleano. No se copió ni levantó nada.
     quiet: true
 
 - name: Verificar la configuración de Cloudflare Access para Grafana
@@ -85,30 +82,21 @@
       - not obs_grafana_access_on or obs_s3_public_domain is match(_host_re)
       - not obs_grafana_access_on or obs_s3_team_domain is match(_team_re)
       - not obs_grafana_access_on or obs_s3_aud is match('^[0-9a-f]{64}\Z')
-      - not obs_grafana_access_on or (_emails | length > 0)
       # Guardados aunque el acceso esté deshabilitado: deben ser válidos igual
       - obs_s3_public_domain | length == 0 or obs_s3_public_domain is match(_host_re)
       - obs_s3_team_domain | length == 0 or obs_s3_team_domain is match(_team_re)
       - obs_s3_aud | length == 0 or obs_s3_aud is match('^[0-9a-f]{64}\Z')
-      # Correos en minúsculas, con dominio real: nunca .invalid (correo reservado del
-      # administrador local) ni nombres sin dominio (admin@localhost de una base antigua)
-      - _emails | reject('match', _email_re) | list | length == 0
-      - _emails | select('search', '\.invalid\Z') | list | length == 0
-      - _emails | unique | length == _emails | length
     fail_msg: >-
       ACCESO A GRAFANA: con el acceso habilitado hacen falta obs_grafana_public_domain (nombre DNS
-      en minúsculas), obs_grafana_access_team_domain (<equipo>.cloudflareaccess.com),
-      obs_grafana_access_aud (AUD de 64 hex) y al menos un correo en obs_grafana_access_editors u
-      obs_grafana_access_viewers (minúsculas, dominio real, sin .invalid, sin repetir entre listas).
-      Valores resueltos (dado > guardado en el host > inicial): enabled={{ obs_s3_enabled_raw }},
-      domain='{{ obs_s3_public_domain }}', team='{{ obs_s3_team_domain }}', correos={{ _emails | length }}.
-      No se copió ni levantó nada.
+      en minúsculas), obs_grafana_access_team_domain (<equipo>.cloudflareaccess.com) y
+      obs_grafana_access_aud (AUD de 64 hex). Las listas de correos son aparte (access_lists.yml) y
+      pueden estar vacías: nadie entra por JWT. Valores resueltos (dado > guardado en el host >
+      inicial): enabled={{ obs_s3_enabled_raw }}, domain='{{ obs_s3_public_domain }}',
+      team='{{ obs_s3_team_domain }}'. No se copió ni levantó nada.
     quiet: true
   vars:
     _host_re: '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\Z'
     _team_re: '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.cloudflareaccess\.com\Z'
-    _email_re: '^[a-z0-9._%+-]+@([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\Z'
-    _emails: "{{ obs_s3_editors + obs_s3_viewers }}"
 
 - name: Verificar el receptor de notificaciones
   ansible.builtin.assert:
@@ -133,10 +121,13 @@
   ansible.builtin.assert:
     that: >-
       obs_s3_receiver != 'discord' or obs_discord_webhook_url | length > 0
-      or (obs_discord_secret_stat.stat.exists and obs_discord_secret_stat.stat.size > 0)
+      or (not obs_require_authoritative_inputs | bool
+          and obs_discord_secret_stat.stat.exists and obs_discord_secret_stat.stat.size > 0)
     fail_msg: >-
-      NOTIFICACIONES: receptor discord sin webhook. Pasarlo una vez en OBS_DISCORD_WEBHOOK_URL
-      (entorno del controlador); después el host lo conserva. No se copió ni levantó nada.
+      NOTIFICACIONES: receptor discord sin webhook. {{ 'El workflow lo exige en cada run
+      (secreto OBS_DISCORD_WEBHOOK_URL del environment): nunca usa el que conserva el host.'
+      if obs_require_authoritative_inputs | bool else 'Pasarlo una vez en OBS_DISCORD_WEBHOOK_URL
+      (entorno del controlador); después el host lo conserva.' }} No se copió ni levantó nada.
     quiet: true
 
 # La red de entrada solo hace falta con el acceso público (compose.access.yml)

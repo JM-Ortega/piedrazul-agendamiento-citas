@@ -1,0 +1,151 @@
+# Evidencia de activación de una operación full, separada de la salud de los servicios:
+#   1. paridad: la configuración del host es la del repositorio (una copia en modo de comprobación
+#      no cambiaría nada y no queda ningún archivo retirado);
+#   2. activación: cada servicio corre un contenedor creado con el digest vigente de su
+#      configuración (etiqueta org.piedrazul.obs.config-digest = OBS_DIGEST_<SERVICIO>) y, con
+#      archivos secretos, ve su inodo vigente (activate_secrets.yml);
+#   3. imagen: cada contenedor corre la referencia fijada en compose.yml (<tag>@sha256:<índice OCI>)
+#      y la imagen local está registrada bajo ese índice.
+# No prueba que el proceso aceptó el contenido: eso lo comprueban verify.yml, verify_logs.yml y
+# verify_access_alerts.yml con lo que cada servicio informa haber cargado.
+
+- name: Comprobar que la configuración del host es la del repositorio
+  ansible.builtin.copy:
+    src: "{{ obs_src_dir }}/{{ item }}/"
+    dest: "{{ obs_dir }}/{{ item }}/"
+    owner: "{{ obs_owner }}"
+    group: "{{ obs_owner }}"
+    directory_mode: "0755"
+    mode: "0644"
+  loop: "{{ obs_managed_dirs }}"
+  check_mode: true
+  register: obs_parity
+
+- name: Listar la configuración del host tras la reconciliación
+  ansible.builtin.find:
+    paths: "{{ obs_dir }}/{{ item }}"
+    recurse: true
+    hidden: true
+    file_type: file
+  loop: "{{ obs_managed_dirs }}"
+  register: obs_host_files_after
+
+- name: Exigir paridad con el repositorio
+  ansible.builtin.assert:
+    that:
+      - obs_parity.results | selectattr('changed') | list | length == 0
+      - >-
+        (obs_host_files_after.results | map(attribute='files') | flatten | map(attribute='path')
+         | map('relpath', obs_dir) | list | sort)
+        == (obs_src_files.results | map(attribute='files') | flatten | map(attribute='path')
+            | map('relpath', obs_src_dir) | list | sort)
+    fail_msg: >-
+      Paridad: la configuración de {{ obs_dir }} no es la del repositorio
+      ({{ obs_parity.results | selectattr('changed') | map(attribute='item') | list }} difieren o
+      quedan archivos retirados).
+    quiet: true
+
+- name: Leer la definición de los servicios
+  ansible.builtin.command:
+    argv: "{{ ['docker', 'compose', '--project-name', obs_compose_project_name]
+              + (obs_compose_files | map('regex_replace', '^', '--file=') | list)
+              + ['config', '--format', 'json'] }}"
+    chdir: "{{ obs_dir }}"
+  register: obs_compose_json
+  changed_when: false
+  no_log: true
+
+- name: Leer los contenedores del stack
+  ansible.builtin.command:
+    argv: "{{ ['docker', 'inspect'] + obs_containers_after.stdout_lines }}"
+  register: obs_ctr_inspect
+  changed_when: false
+  failed_when: obs_ctr_inspect.rc != 0 or obs_containers_after.stdout_lines | length == 0
+  # Incluye el entorno de los contenedores (contraseña de Grafana)
+  no_log: true
+
+- name: Fijar los contenedores y las imágenes esperadas
+  ansible.builtin.set_fact:
+    obs_ctr: >-
+      {%- set out = [] -%}
+      {%- for k in obs_ctr_inspect.stdout | from_json -%}
+        {%- set _ = out.append({'service': k.Config.Labels['com.docker.compose.service'] | default(''),
+                                'running': k.State.Running,
+                                'config_image': k.Config.Image,
+                                'digest': k.Config.Labels['org.piedrazul.obs.config-digest'] | default('')}) -%}
+      {%- endfor -%}
+      {{ out }}
+    obs_expected_images: >-
+      {{ dict((obs_compose_json.stdout | from_json).services | dict2items
+              | map(attribute='key')
+              | zip((obs_compose_json.stdout | from_json).services | dict2items | map(attribute='value.image'))) }}
+  # La definición renderizada incluye el entorno (contraseña de Grafana)
+  no_log: true
+
+- name: Exigir cada servicio del stack en ejecución
+  ansible.builtin.assert:
+    that:
+      - (obs_ctr | map(attribute='service') | sort | list) == (obs_expected_images.keys() | sort | list)
+      - obs_ctr | rejectattr('running') | list | length == 0
+    fail_msg: >-
+      Activación: servicios que faltan o no corren:
+      {{ (obs_expected_images.keys() | list) | symmetric_difference(obs_ctr | map(attribute='service') | list)
+         + (obs_ctr | rejectattr('running') | map(attribute='service') | list) }}.
+    quiet: true
+
+- name: Comparar el digest de cada servicio con el suyo
+  ansible.builtin.set_fact:
+    obs_digest_mismatch: >-
+      {%- set out = [] -%}
+      {%- for c in obs_ctr -%}
+        {%- if c.service in obs_config_digests and c.digest != obs_config_digests[c.service] -%}
+          {%- set _ = out.append(c.service) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ out }}
+
+- name: Exigir el digest propio de cada servicio
+  ansible.builtin.assert:
+    that: obs_digest_mismatch | length == 0
+    fail_msg: "Activación: {{ obs_digest_mismatch | join(', ') }} corre con la configuración anterior."
+    quiet: true
+
+- name: Leer las imágenes locales de los servicios
+  ansible.builtin.command:
+    argv: [docker, image, inspect, --format, "{{ '{{' }}json .RepoDigests{{ '}}' }}", "{{ item.config_image }}"]
+  loop: "{{ obs_ctr }}"
+  loop_control:
+    label: "{{ item.service }}"
+  register: obs_image_digests
+  changed_when: false
+  failed_when: false
+
+- name: Comparar la imagen en ejecución con la fijada
+  ansible.builtin.set_fact:
+    obs_image_mismatch: >-
+      {%- set out = [] -%}
+      {%- for r in obs_image_digests.results -%}
+        {%- set pinned = obs_expected_images[r.item.service] | default('') -%}
+        {%- set repo = pinned.split('@')[0].rsplit(':', 1)[0] if '@' in pinned else '' -%}
+        {%- set index = pinned.split('@')[1] if '@' in pinned else '' -%}
+        {%- set digests = (r.stdout | from_json) if r.rc == 0 and r.stdout | length > 0 else [] -%}
+        {%- set names = digests | map('regex_replace', '^docker\.io/(library/)?', '') | list -%}
+        {%- if r.item.config_image != pinned or index == '' or (repo ~ '@' ~ index) not in names -%}
+          {%- set _ = out.append(r.item.service) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ out }}
+
+- name: Exigir las imágenes fijadas en ejecución
+  ansible.builtin.assert:
+    that: obs_image_mismatch | length == 0
+    fail_msg: >-
+      Imagen: {{ obs_image_mismatch | join(', ') }} no corre la referencia fijada en compose.yml
+      (<tag>@sha256:<índice>) o la imagen local no está registrada bajo ese índice.
+    quiet: true
+
+- name: Registrar lo que activó este run
+  ansible.builtin.set_fact:
+    obs_report:
+      new_containers: "{{ obs_containers_after.stdout_lines | difference(obs_containers_before.stdout_lines) | length }}"
+      secret_recreated: "{{ obs_secret_recreated | default([]) }}"

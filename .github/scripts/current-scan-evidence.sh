@@ -14,6 +14,10 @@
 #
 # Uso: current-scan-evidence.sh <dir_salida>
 # Entorno: GH_TOKEN (actions: read), GITHUB_REPOSITORY, GITHUB_RUN_ID
+#   SCAN_SURFACES  alternativa de imágenes cuya evidencia se descarga (por defecto las del núcleo:
+#                  backend|postgres|keycloak|traefik; el job observability usa las del stack,
+#                  obs-prometheus|obs-grafana|obs-alloy|obs-loki|obs-alertmanager). Cada
+#                  componente lee solo la suya.
 set -euo pipefail
 
 fail() {
@@ -25,6 +29,8 @@ fail() {
 OUT="$1"
 : "${GITHUB_REPOSITORY:?}" "${GITHUB_RUN_ID:?}"
 [[ "${GITHUB_RUN_ID}" =~ ^[1-9][0-9]*$ ]] || fail "GITHUB_RUN_ID inválido"
+SCAN_SURFACES="${SCAN_SURFACES:-backend|postgres|keycloak|traefik}"
+[[ "${SCAN_SURFACES}" =~ ^[a-z0-9-]+(\|[a-z0-9-]+)*$ ]] || fail "SCAN_SURFACES inválido"
 # shellcheck source=.github/scripts/scan-artifact-lib.sh
 . "$(cd "$(dirname "$0")" && pwd)/scan-artifact-lib.sh"
 
@@ -33,8 +39,8 @@ REPO_ID=$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.id') || fail "no se pudo le
 
 LIST=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" |
   jq -s '[.[].artifacts[]?]') || fail "no se pudieron listar los artifacts del run"
-SCANS=$(jq -c --arg run "${GITHUB_RUN_ID}" \
-  '[.[] | select(.name | test("^image-scan-selected-(backend|postgres|keycloak|traefik)-" + $run + "$"))]' <<< "${LIST}")
+SCANS=$(jq -c --arg run "${GITHUB_RUN_ID}" --arg s "${SCAN_SURFACES}" \
+  '[.[] | select(.name | test("^image-scan-selected-(" + $s + ")-" + $run + "$"))]' <<< "${LIST}")
 [ "$(jq '[.[].name] | length == (unique | length)' <<< "${SCANS}")" = true ] ||
   fail "hay artifacts de escaneo repetidos en el run (otro intento): evidencia ambigua"
 

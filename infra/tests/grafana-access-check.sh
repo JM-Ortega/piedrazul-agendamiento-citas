@@ -109,8 +109,7 @@ GRAFANA_ROOT_URL=https://${GHOST}/
 GRAFANA_ACCESS_ENABLED=true
 GRAFANA_ACCESS_TEAM_DOMAIN=${TEAM}
 GRAFANA_ACCESS_AUD=${AUD}
-GRAFANA_ACCESS_EDITORS=${EDITOR}
-GRAFANA_ACCESS_VIEWERS=${VIEWER},second.viewer@ops.example.org
+OBS_GRAFANA_ACCESS_FILE=${TMP}/secrets/grafana_access.ini
 OBS_DISCORD_WEBHOOK_FILE=${TMP}/secrets/discord_webhook_url
 OBS_ENVIRONMENT=access-check
 EOF
@@ -122,8 +121,10 @@ check "Grafana: JWT por Cf-Access-Jwt-Assertion con el JWKS del equipo" \
   bash -c "test '$(GENV GF_AUTH_JWT_ENABLED)' = true && test '$(GENV GF_AUTH_JWT_HEADER_NAME)' = Cf-Access-Jwt-Assertion && test '$(GENV GF_AUTH_JWT_JWK_SET_URL)' = 'https://${TEAM}/cdn-cgi/access/certs'"
 check "Grafana: exige iss del equipo, aud de la aplicación y type=app" \
   test "$(GENV GF_AUTH_JWT_EXPECT_CLAIMS | jq -cS .)" = "$(jq -cnS --arg i "https://${TEAM}" --arg a "${AUD}" '{iss:$i,aud:$a,type:"app"}')"
-check "Grafana: rol estricto por lista, sin Admin ni administrador del servidor, sin login por URL" \
-  bash -c "test '$(GENV GF_AUTH_JWT_ROLE_ATTRIBUTE_STRICT)' = true && test '$(GENV GF_AUTH_JWT_ALLOW_ASSIGN_GRAFANA_ADMIN)' = false && test '$(GENV GF_AUTH_JWT_SKIP_ORG_ROLE_SYNC)' = false && test '$(GENV GF_AUTH_JWT_URL_LOGIN)' = false && ! grep -q \"'Admin'\" <<< \"\$1\" && grep -q \"'Editor'\" <<< \"\$1\" && grep -q \"'Viewer'\" <<< \"\$1\"" _ "$(GENV GF_AUTH_JWT_ROLE_ATTRIBUTE_PATH)"
+check "Grafana: rol estricto, sin Admin ni administrador del servidor, sin login por URL" \
+  bash -c "test '$(GENV GF_AUTH_JWT_ROLE_ATTRIBUTE_STRICT)' = true && test '$(GENV GF_AUTH_JWT_ALLOW_ASSIGN_GRAFANA_ADMIN)' = false && test '$(GENV GF_AUTH_JWT_SKIP_ORG_ROLE_SYNC)' = false && test '$(GENV GF_AUTH_JWT_URL_LOGIN)' = false"
+check "Grafana: las listas no pasan por el entorno (archivo de configuración secreto, sin variable que lo anule)" \
+  bash -c "test -z '$(GENV GF_AUTH_JWT_ROLE_ATTRIBUTE_PATH)' && test '$(GENV GF_PATHS_CONFIG)' = /run/secrets/grafana_access && jq -e '[.services.grafana.secrets[].source] == [\"grafana_access\"]' '${C}' && ! jq -r '.services.grafana.environment | tostring' '${C}' | grep -q 'ops.example.org'"
 check "Grafana: JWKS en caché 5m (rotación y caída de Access acotadas)" test "$(GENV GF_AUTH_JWT_CACHE_TTL)" = 5m
 check "Grafana: cookies Secure y SameSite=strict; administrador local con correo .invalid" \
   bash -c "test '$(GENV GF_SECURITY_COOKIE_SECURE)' = true && test '$(GENV GF_SECURITY_COOKIE_SAMESITE)' = strict && test '$(GENV GF_SECURITY_ADMIN_EMAIL)' = '${ADMIN_EMAIL}'"
@@ -140,7 +141,7 @@ check "compose.access.yml: solo agrega la red de entrada (externa) a grafana" \
 check "traefik.yml: crea la red de entrada piedrazul_obs_edge interna y solo traefik se une" \
   bash -c "test \"\$(yq -r '.networks.obs_edge.name + \" \" + (.networks.obs_edge.internal | tostring)' '${COMPOSE_DIR}/traefik.yml')\" = 'piedrazul_obs_edge true' && test \"\$(yq -r '.services.traefik.networks | join(\",\")' '${COMPOSE_DIR}/traefik.yml')\" = piedrazul_net,obs_edge && test \"\$(grep -l 'obs_edge' '${COMPOSE_DIR}'/*.yml '${ROOT}/docker-compose.yml' | xargs -n1 basename | paste -sd,)\" = traefik.yml"
 check "Defaults: la red de entrada de Compose y del rol coinciden con traefik.yml" \
-  bash -c "test \"\$(yq -r '.obs_edge_network' '${ANSIBLE_DIR}/roles/observability/defaults/main.yml')\" = piedrazul_obs_edge && grep -q 'OBS_EDGE_NETWORK:-piedrazul_obs_edge' '${OBS}/compose.access.yml'"
+  bash -c "test \"\$(yq -r '.obs_edge_network' '${ANSIBLE_DIR}/roles/observability/defaults/main/stack.yml')\" = piedrazul_obs_edge && grep -q 'OBS_EDGE_NETWORK:-piedrazul_obs_edge' '${OBS}/compose.access.yml'"
 
 # ── 2. Ansible: rutas y entradas ─────────────────────────────────────────────
 printf 'all:\n  hosts:\n    vps:\n      ansible_host: 127.0.0.1\n' > "${TMP}/hosts.yml"
@@ -168,8 +169,8 @@ render_routes() { # <dir> [args...]
 render_routes "${TMP}/r-none" > "${TMP}/r-none.log" 2>&1
 check "rutas: sin grafana_public_domain no hay router, servicio ni middleware de grafana" \
   bash -c "test \"\$(yq -r '[.http.routers | keys | .[]] | join(\",\")' '${TMP}/r-none/traefik/dynamic/routes.yml')\" = backend,keycloak && test \"\$(yq -r '.http.middlewares // \"none\"' '${TMP}/r-none/traefik/dynamic/routes.yml')\" = none"
-check "rutas: el inventario de producción no publica Grafana todavía (grafana_public_domain vacío)" \
-  test "$(yq -r '.grafana_public_domain' "${ANSIBLE_DIR}/inventories/prod/group_vars/all.yml")" = ""
+check "rutas: el inventario de producción deriva el router de Grafana del dominio y del interruptor del stack (una sola fuente)" \
+  bash -c "test \"\$(yq -r '.grafana_public_domain' '${ANSIBLE_DIR}/inventories/prod/group_vars/all.yml')\" = \"{{ obs_grafana_public_domain if obs_grafana_access_enabled | bool else '' }}\" && test \"\$(yq -r '.obs_grafana_public_domain' '${ANSIBLE_DIR}/inventories/prod/group_vars/all.yml')\" = 'grafana.{{ base_domain }}'"
 render_routes "${TMP}/r-g" -e "grafana_public_domain=${GHOST}" > "${TMP}/r-g.log" 2>&1
 RG="${TMP}/r-g/traefik/dynamic/routes.yml"
 check "rutas: router grafana → Host(${GHOST}) sin /login, websecure, AOP + letsencrypt" \
@@ -196,10 +197,11 @@ cat > "${TMP}/preflight.yml" <<'EOF'
   tasks:
     - ansible.builtin.include_role: {name: observability, tasks_from: access_alerts_preflight.yml}
 EOF
-GOOD=(-e obs_grafana_access_enabled=true -e "obs_grafana_public_domain=${GHOST}" -e "obs_grafana_access_team_domain=${TEAM}" -e "obs_grafana_access_aud=${AUD}" -e "{\"obs_grafana_access_viewers\": [\"${VIEWER}\"]}")
+GOOD=(-e obs_grafana_access_enabled=true -e "obs_grafana_public_domain=${GHOST}" -e "obs_grafana_access_team_domain=${TEAM}" -e "obs_grafana_access_aud=${AUD}")
 WEBHOOK_SECRET="$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 FAKE_WEBHOOK="https://discord.com/api/webhooks/123456789012345678/${WEBHOOK_SECRET}${WEBHOOK_SECRET}"
-preflight() { OBS_DISCORD_WEBHOOK_URL="${PF_WEBHOOK:-}" ansible_local "${TMP}/preflight.yml" -e "obs_dir=${TMP}/pf-obs" -e "obs_edge_network=${PF_NET:-pzgac-no-such-net}" "$@"; }
+preflight() { OBS_DISCORD_WEBHOOK_URL="${PF_WEBHOOK:-}" GRAFANA_VIEWER_EMAILS="${PF_VIEW-${VIEWER}}" GRAFANA_EDITOR_EMAILS="${PF_EDIT-none}" \
+  ansible_local "${TMP}/preflight.yml" -e "obs_dir=${TMP}/pf-obs" -e "obs_edge_network=${PF_NET:-pzgac-no-such-net}" "$@"; }
 reject_pf() { # <descripción> <marca> [args...]
   local desc="$1" mark="$2" log; shift 2
   log="${TMP}/pf-$((RANDOM)).log"
@@ -209,6 +211,19 @@ reject_pf() { # <descripción> <marca> [args...]
     ko "rol rechaza sin escribir: ${desc}"; grep -E 'fatal|msg' "${log}" | head -3
   fi
 }
+# Archivo de acceso de Grafana con las tareas reales del rol (access_lists.yml + grafana_access_file.yml)
+cat > "${TMP}/access-file.yml" <<'EOF'
+- hosts: vps
+  gather_facts: false
+  connection: local
+  tasks:
+    - ansible.builtin.include_role: {name: observability, tasks_from: access_lists.yml}
+    - ansible.builtin.include_role: {name: observability, tasks_from: grafana_access_file.yml}
+EOF
+access_file() { # <viewers> <editors>
+  GRAFANA_VIEWER_EMAILS="$1" GRAFANA_EDITOR_EMAILS="$2" ansible_local "${TMP}/access-file.yml" -e "obs_secrets_dir=${TMP}/secrets" \
+    -e "obs_secrets_owner=$(id -un)" -e "obs_grafana_uid=$(id -u)" -e obs_secret_mode=0444 > "${TMP}/access-file.log" 2>&1
+}
 log="${TMP}/pf-good.log"
 if ! preflight "${GOOD[@]}" > "${log}" 2>&1 && grep -q 'No existe la red interna pzgac-no-such-net' "${log}"; then
   ok "rol: entradas válidas de Access pasan; sin la red de entrada falla antes de escribir"
@@ -216,12 +231,19 @@ else ko "rol: entradas válidas de Access pasan; sin la red de entrada falla"; f
 reject_pf "Access sin AUD" 'ACCESO A GRAFANA' "${GOOD[@]}" -e obs_grafana_access_aud=
 reject_pf "AUD que no es de 64 hex" 'ACCESO A GRAFANA' "${GOOD[@]}" -e obs_grafana_access_aud=ABC
 reject_pf "equipo fuera de cloudflareaccess.com" 'ACCESO A GRAFANA' "${GOOD[@]}" -e obs_grafana_access_team_domain=evil.example.org
-reject_pf "Access sin ningún correo autorizado" 'ACCESO A GRAFANA' "${GOOD[@]}" -e '{"obs_grafana_access_viewers": []}'
-reject_pf "correo en mayúsculas" 'ACCESO A GRAFANA' "${GOOD[@]}" -e '{"obs_grafana_access_viewers": ["Op@ops.example.org"]}'
-reject_pf "correo del administrador local (.invalid)" 'ACCESO A GRAFANA' "${GOOD[@]}" -e "{\"obs_grafana_access_editors\": [\"${ADMIN_EMAIL}\"]}"
-reject_pf "admin@localhost (correo de una base antigua)" 'ACCESO A GRAFANA' "${GOOD[@]}" -e '{"obs_grafana_access_viewers": ["admin@localhost"]}'
-reject_pf "correo con coma o comilla (inyección en la lista)" 'ACCESO A GRAFANA' "${GOOD[@]}" -e "{\"obs_grafana_access_viewers\": [\"a@b.org,c@d.org\", \"x'@y.org\"]}"
-reject_pf "correo repetido entre Editor y Viewer" 'ACCESO A GRAFANA' "${GOOD[@]}" -e "{\"obs_grafana_access_editors\": [\"${VIEWER}\"]}"
+# Listas vacías explícitas (none/none): válidas con Access habilitado (nadie entra por JWT; Access y
+# el modo no cambian): pasan las comprobaciones y fallan después, solo por la red de entrada
+log="${TMP}/pf-empty.log"
+if ! PF_VIEW=none PF_EDIT=none preflight "${GOOD[@]}" > "${log}" 2>&1 && grep -q 'No existe la red interna pzgac-no-such-net' "${log}"; then
+  ok "rol: listas none/none con Access habilitado aceptadas (sin desactivar Access)"
+else ko "rol: listas none/none con Access habilitado aceptadas"; fi
+PF_VIEW= reject_pf "lista Viewer ausente (sin conservar la anterior)" 'LISTAS DE GRAFANA' "${GOOD[@]}"
+PF_VIEW=Op@ops.example.org reject_pf "correo en mayúsculas" 'LISTAS DE GRAFANA' "${GOOD[@]}"
+PF_EDIT="${ADMIN_EMAIL}" reject_pf "correo del administrador local (.invalid)" 'LISTAS DE GRAFANA' "${GOOD[@]}"
+PF_VIEW=admin@localhost reject_pf "admin@localhost (correo de una base antigua)" 'LISTAS DE GRAFANA' "${GOOD[@]}"
+PF_VIEW="x'@y.org" reject_pf "correo con comilla (inyección en la expresión)" 'LISTAS DE GRAFANA' "${GOOD[@]}"
+PF_EDIT="${VIEWER}" reject_pf "correo repetido entre Editor y Viewer" 'LISTAS DE GRAFANA' "${GOOD[@]}"
+check "rol: los rechazos de las listas no muestran correos" bash -c "! grep -lE 'ops\\.example\\.org|Op@|admin@localhost' '${TMP}'/pf-*.log"
 reject_pf "enabled no booleano" 'ACCESO A GRAFANA' -e obs_grafana_access_enabled=maybe
 reject_pf "receptor desconocido" 'NOTIFICACIONES' -e obs_alert_receiver=slack
 reject_pf "discord sin entorno de origen" 'NOTIFICACIONES' -e obs_alert_receiver=discord
@@ -234,6 +256,11 @@ log="${TMP}/pf-wh.log"
 if PF_WEBHOOK="${FAKE_WEBHOOK}" preflight -e obs_alert_receiver=discord -e obs_environment=staging > "${log}" 2>&1 && ! grep -q "${WEBHOOK_SECRET}" "${log}" && [ ! -e "${TMP}/pf-obs" ]; then
   ok "rol: webhook bien formado aceptado sin mostrarse; modo privado sin red de entrada"
 else ko "rol: webhook bien formado aceptado sin mostrarse"; fi
+
+if access_file "${VIEWER},second.viewer@ops.example.org" "${EDITOR}"; then ok "rol: archivo de acceso de Grafana generado"; else ko "rol: archivo de acceso de Grafana"; fi
+check "archivo de acceso: Editor y Viewer por lista, nunca Admin" \
+  bash -c "grep -q \"^role_attribute_path = .*'Editor'.*'Viewer'\" '${TMP}/secrets/grafana_access.ini' && ! grep -q \"'Admin'\" '${TMP}/secrets/grafana_access.ini'"
+check "archivo de acceso: la generación no muestra correos" bash -c "! grep -q 'ops.example.org' '${TMP}/access-file.log'"
 
 if [ "${STATIC_ONLY:-0}" = 1 ]; then
   echo "runtime: omitido (STATIC_ONLY=1) — NO DEMOSTRADO"
@@ -506,15 +533,18 @@ cat > "${TMP}/verify.yml" <<'EOF'
   gather_facts: false
   connection: local
   tasks:
+    - ansible.builtin.include_role: {name: observability, tasks_from: access_lists.yml}
     - ansible.builtin.include_role: {name: observability, tasks_from: verify_access_alerts.yml}
 EOF
+export GRAFANA_VIEWER_EMAILS="${VIEWER},second.viewer@ops.example.org" GRAFANA_EDITOR_EMAILS="${EDITOR}"
 VERIFY_VARS=(-e "obs_dir=${TMP}/obsdir" -e "obs_compose_project_name=${PROJECT}" -e obs_s3_receiver=none
+             -e '{"obs_compose_files": ["compose.yml"]}'
              -e "obs_s3_public_domain=${GHOST}" -e "obs_s3_team_domain=${TEAM}" -e obs_s3_environment=access-check)
 if ansible_local "${TMP}/verify.yml" "${VERIFY_VARS[@]}" -e obs_grafana_access_on=true > "${TMP}/verify-ok.log" 2>&1; then
   ok "rol: verify_access_alerts.yml acepta el stack (Prometheus → Alertmanager, receptor none, Grafana con JWT)"
 else ko "rol: verify_access_alerts.yml acepta el stack"; grep -E 'fatal|msg' "${TMP}/verify-ok.log" | head -5; fi
 if ! ansible_local "${TMP}/verify.yml" "${VERIFY_VARS[@]}" -e obs_grafana_access_on=false > "${TMP}/verify-ng1.log" 2>&1 \
-   && grep -q 'Grafana no tiene el modo de acceso pedido' "${TMP}/verify-ng1.log"; then
+   && grep -q 'auth.jwt.enabled no es false' "${TMP}/verify-ng1.log"; then
   ok "rol: verify_access_alerts.yml detecta Grafana con JWT cuando se pidió sin Access"
 else ko "rol: verify_access_alerts.yml detecta el modo de acceso distinto"; fi
 if ! ansible_local "${TMP}/verify.yml" "${VERIFY_VARS[@]}" -e obs_grafana_access_on=true -e obs_s3_receiver=discord > "${TMP}/verify-ng2.log" 2>&1 \
@@ -525,17 +555,34 @@ if ! ansible_local "${TMP}/verify.yml" "${VERIFY_VARS[@]}" -e obs_grafana_access
    && grep -q 'external_labels.environment=produccion' "${TMP}/verify-ng3.log"; then
   ok "rol: verify_access_alerts.yml detecta una etiqueta de entorno distinta de la pedida"
 else ko "rol: verify_access_alerts.yml detecta una etiqueta de entorno distinta"; fi
+if ! GRAFANA_VIEWER_EMAILS="${VIEWER}" ansible_local "${TMP}/verify.yml" "${VERIFY_VARS[@]}" -e obs_grafana_access_on=true > "${TMP}/verify-ng4.log" 2>&1 \
+   && grep -q 'role_attribute_path cargado no es el del archivo de acceso vigente' "${TMP}/verify-ng4.log"; then
+  ok "rol: verify_grafana_auth.yml detecta listas cargadas distintas de las pedidas (sin mostrarlas)"
+else ko "rol: verify_grafana_auth.yml detecta listas distintas"; fi
+check "rol: la verificación no imprime correos" bash -c "! grep -q 'ops.example.org' '${TMP}/verify-ok.log' '${TMP}/verify-ng4.log'"
+unset GRAFANA_VIEWER_EMAILS GRAFANA_EDITOR_EMAILS
 check "rol: la verificación no imprime la contraseña local" \
   bash -c "! grep -qF -- '${ADMIN_PW}' '${TMP}/verify-ok.log' '${TMP}/verify-ng1.log' '${TMP}/verify-ng2.log'"
 
 # ── 6. Revocación, rotación de claves y JWKS caído ───────────────────────────
 # Quitar un correo de la lista y recrear Grafana (lo que hace el rol de Ansible) le quita el
 # acceso en la petición siguiente, también con un JWT que ya había usado
-sed -i "s/^GRAFANA_ACCESS_VIEWERS=.*/GRAFANA_ACCESS_VIEWERS=second.viewer@ops.example.org/" "${TMP}/obs.env"
-obs up -d --wait --wait-timeout 120 grafana >/dev/null 2>&1
+access_file second.viewer@ops.example.org "${EDITOR}" || ko "revocación: archivo de acceso"
+obs up -d --wait --wait-timeout 120 --force-recreate --no-deps grafana >/dev/null 2>&1
 check "revocación: Viewer quitado de la lista → su JWT ya usado da 403" test "$(http_status "$(gapi "${VT}" /api/user)")" = 403
 check "revocación: el resto de la lista sigue entrando" \
   test "$(http_status "$(gapi "$(tok "$(claims sub-viewer2 second.viewer@ops.example.org)")" /api/user)")" = 200
+check "revocación: el Editor conserva su rol" test "$(body "$(gapi "${ET}" /api/user/orgs)" | jq -r '[.[].role] | join(",")')" = Editor
+# Listas vacías explícitas: nadie entra por JWT; JWT sigue habilitado; el administrador local sí
+access_file none none || ko "listas vacías: archivo de acceso"
+obs up -d --wait --wait-timeout 120 --force-recreate --no-deps grafana >/dev/null 2>&1
+deny "listas vacías: Editor" "${ET}" "403"
+deny "listas vacías: Viewer restante" "$(tok "$(claims sub-viewer2 second.viewer@ops.example.org)")" "403"
+check "listas vacías: Grafana sigue con JWT habilitado y estricto (Access no se desactiva)" \
+  bash -c "curl -s -u 'admin:${ADMIN_PW}' '${G}/api/admin/settings' | jq -e '.\"auth.jwt\".enabled == \"true\" and .\"auth.jwt\".role_attribute_strict == \"true\"'"
+check "listas vacías: el administrador local por el loopback sigue entrando" admin_login_ok
+access_file second.viewer@ops.example.org "${EDITOR}" || ko "restaurar el archivo de acceso"
+obs up -d --wait --wait-timeout 120 --force-recreate --no-deps grafana >/dev/null 2>&1
 python3 -I "${JWT}" keygen "${TMP}/keys" k2
 NEWTOK="$(tok "$(claims sub-viewer2 second.viewer@ops.example.org)" k2)"
 deny "clave nueva aún no publicada en el JWKS" "${NEWTOK}" "401"

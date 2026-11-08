@@ -40,11 +40,25 @@ traefik_compose_file: "{{ compose_src_dir }}/traefik.yml"
 # Dominio base
 base_domain: piedrazul.org
 
-# Grafana detrás de Cloudflare Access (router de Traefik por la red piedrazul_obs_edge). Vacío:
-# sin router, Grafana solo por túnel SSH. Habilitarlo exige antes la aplicación de Access, el DNS
-# y el stack de observabilidad con obs_grafana_access_enabled (ver
-# docs/operations/runbooks/grafana-acceso.md, "Activación").
-grafana_public_domain: ""
+# ── Grafana detrás de Cloudflare Access ─────────────────────────────────────
+# Una sola fuente para los dos consumidores: el stack de observabilidad (rol observability: JWT
+# de Access en Grafana) y el router de Traefik de la aplicación (grafana_public_domain, por la red
+# piedrazul_obs_edge). La aplicación de Access, su política y el DNS los administra el operador
+# en Cloudflare, fuera del repositorio; estos son sus identificadores (no secretos). Las listas
+# de correos Viewer/Editor no van aquí: secretos del environment (grafana-acceso.md).
+obs_grafana_access_enabled: true
+obs_grafana_public_domain: "grafana.{{ base_domain }}"
+obs_grafana_access_team_domain: piedrazul.cloudflareaccess.com
+# Application Audience (AUD) Tag de la aplicación de Access de Grafana
+obs_grafana_access_aud: cbe625163be1c4f35c9d1b8c5a314665c07e0401c7f5ab6da5020caf41cd4984
+# Router de Traefik hacia Grafana: solo con el acceso habilitado (vacío: Grafana solo por túnel)
+grafana_public_domain: "{{ obs_grafana_public_domain if obs_grafana_access_enabled | bool else '' }}"
+
+# ── Notificaciones del stack de observabilidad ──────────────────────────────
+# Receptor de Alertmanager y entorno que encabeza cada mensaje. El webhook es el secreto
+# OBS_DISCORD_WEBHOOK_URL del environment (alertas.md).
+obs_alert_receiver: discord
+obs_environment: produccion
 
 # Spring / backend
 spring_profiles_active: prod

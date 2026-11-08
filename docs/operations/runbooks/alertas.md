@@ -105,9 +105,10 @@ El webhook de Discord es la única credencial de la entrega. Consumidores y luga
 | Dónde | Forma |
 |---|---|
 | 1Password | origen (item del webhook `Piedra Azul Monitoring`), custodiado por el operador |
-| Controlador de Ansible | variable de entorno `OBS_DISCORD_WEBHOOK_URL`, solo al instalar o rotar (`no_log`, nunca en `-e`, inventario ni repositorio) |
+| GitHub | secreto `OBS_DISCORD_WEBHOOK_URL` del environment `production-hetzner`, entregado solo al paso que aplica el stack (operación `full`); obligatorio con el receptor `discord`: la cadena nunca usa en su lugar el que conserva el host |
+| Controlador de Ansible | variable de entorno `OBS_DISCORD_WEBHOOK_URL` (`no_log`, nunca en `-e`, inventario ni repositorio) |
 | Host | `/opt/piedrazul-obs/secrets/discord_webhook_url`: directorio root 0700, archivo del UID 65534 0400 (ningún proceso sin privilegios del host lo lee; Alloy, que monta la raíz como `nobody`, tampoco atraviesa el directorio) |
-| Contenedor | secreto de Compose montado solo en `alertmanager` (`webhook_url_file`). Es un montaje de archivo: reemplazarlo en el host no llega al contenedor en marcha hasta recrearlo (el rol lo recrea cuando el webhook cambia) |
+| Contenedor | secreto de Compose montado solo en `alertmanager` (`webhook_url_file`). Es un montaje de archivo: reemplazarlo en el host no llega al contenedor en marcha hasta recrearlo: el rol lo recrea cuando el inodo que ve el contenedor no es el del archivo del host, también en un reintento tras una interrupción |
 
 No está en `.env`, en la configuración de Alertmanager (su estado muestra solo la ruta del
 archivo), en las variables de ningún contenedor ni en los logs (Alertmanager oculta la URL en sus
@@ -154,9 +155,17 @@ errores; probado con la red caída).
    Alertmanager, `discord.yml` y un receptor sintético: con la etiqueta, `[staging]`; sin ella,
    `[sin-entorno]`.
 
+En producción, el receptor (`discord`) y el entorno (`produccion`) están en el inventario y el
+webhook en el secreto del environment: Run I y cada operación `full` los aplican. Lo que la cadena
+verifica es configuración y estado local (receptor cargado, archivo presente con su dueño y modo,
+Alertmanager viendo el archivo vigente, Prometheus entregando a Alertmanager); **nunca la entrega
+a Discord**, que solo prueba el paso 3.
+
 ## Rotación y desactivación
 
-- **Rotar**: crear el webhook nuevo, repetir el paso 2 con él y borrar el anterior en Discord. El
+- **Rotar (producción)**: actualizar el secreto `OBS_DISCORD_WEBHOOK_URL` y correr el workflow con
+  `observability=full` (sin otros flags); después, el paso 3 y borrar el webhook anterior en Discord.
+- **Rotar (manual)**: crear el webhook nuevo, repetir el paso 2 con él y borrar el anterior en Discord. El
   rol reemplaza el archivo y recrea Alertmanager (unos segundos; las alertas que llegan mientras
   tanto las reintenta Prometheus). Su registro de notificaciones está en `alertmanager_data`:
   recrearlo no reenvía lo ya entregado (probado). Sin recrearlo, el contenedor sigue usando el

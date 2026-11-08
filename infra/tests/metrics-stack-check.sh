@@ -34,8 +34,8 @@
 #      servicio (receptor none por defecto, webhook solo por archivo secreto) y Grafana sin JWT por
 #      defecto; el acceso y la entrega los prueban grafana-access-check.sh y
 #      alert-delivery-check.sh.
-#   2. Ansible: playbook observability.yml sintácticamente válido y fuera del workflow de
-#      producción.
+#   2. Ansible: playbook observability.yml sintácticamente válido; el workflow de producción lo
+#      corre solo en su job observability, después del núcleo.
 #   3. Recolección: los cinco destinos up; muestras de cada productor; etiquetas acotadas
 #      (rutas por plantilla, sin etiquetas de usuario, URL ni host); host = el kernel que ve Alloy.
 #   4. Grafana: fuente de datos sana, dashboards de métricas, todas sus consultas sin error y con
@@ -88,8 +88,12 @@ promtool() { docker run --rm -v "${OBS}:/w:ro" --entrypoint promtool "${PROM_IMA
 # ── 1. Configuración ─────────────────────────────────────────────────────────
 # Webhook de Discord: archivo vacío (receptor none por defecto), como lo deja el rol sin webhook
 mkdir -p "${TMP}/secrets" && : > "${TMP}/secrets/discord_webhook_url" && chmod 644 "${TMP}/secrets/discord_webhook_url"
-printf 'GRAFANA_ADMIN_PASSWORD=%s\nOBS_APP_NETWORK=%s\nGRAFANA_LOCAL_PORT=%s\nOBS_DISCORD_WEBHOOK_FILE=%s\n' \
-  "$(openssl rand -hex 16)" "${APP_NET}" "${GPORT}" "${TMP}/secrets/discord_webhook_url" > "${TMP}/obs.env"
+# Archivo de acceso de Grafana (secreto grafana_access, GF_PATHS_CONFIG): vacío = nadie obtiene rol
+# por JWT. Siempre en ${TMP}: sin él, Compose usaría ./secrets/grafana_access.ini del checkout y
+# Docker crearía ahí un directorio (Grafana no arrancaría)
+: > "${TMP}/secrets/grafana_access.ini" && chmod 644 "${TMP}/secrets/grafana_access.ini"
+printf 'GRAFANA_ADMIN_PASSWORD=%s\nOBS_APP_NETWORK=%s\nGRAFANA_LOCAL_PORT=%s\nOBS_DISCORD_WEBHOOK_FILE=%s\nOBS_GRAFANA_ACCESS_FILE=%s\n' \
+  "$(openssl rand -hex 16)" "${APP_NET}" "${GPORT}" "${TMP}/secrets/discord_webhook_url" "${TMP}/secrets/grafana_access.ini" > "${TMP}/obs.env"
 chmod 600 "${TMP}/obs.env"
 obs() { (cd "${OBS}" && docker compose -p "${OBS_PROJECT}" --env-file "${TMP}/obs.env" "$@"); }
 
@@ -171,14 +175,16 @@ check "Grafana: dashboards de métricas JSON válidos, uid fijo y solo la fuente
 check "Grafana: fuente de datos provisionada con uid prometheus" \
   test "$(yq -r '.datasources[0].uid + " " + .datasources[0].url' "${OBS}/grafana/provisioning/datasources/prometheus.yml")" = "prometheus http://prometheus:9090"
 # S3: la única referencia permitida es la red de entrada de Grafana que crea traefik.yml
+# Sobre el contenido YAML sin comentarios (yq): un comentario que explica la relación con el stack
+# (p. ej. logging.yml: el journal que lee Alloy) no es una dependencia. Un archivo ilegible falla.
 check "Aplicación: infra/compose y docker-compose.yml no mencionan el stack salvo la red de entrada (traefik.yml)" \
-  bash -c "! grep -rqiE 'grafana|alloy|piedrazul-obs|obs_net' \$(ls '${COMPOSE_DIR}'/*.yml | grep -v '/traefik.yml\$') '${ROOT}/docker-compose.yml' && ! grep -vE '^\s*#' '${COMPOSE_DIR}/traefik.yml' | grep -qiE 'grafana|alloy|piedrazul-obs|obs_net'"
+  bash -c "for f in '${COMPOSE_DIR}'/*.yml '${ROOT}/docker-compose.yml'; do d=\$(yq '... comments=\"\"' \"\$f\") && [ -n \"\$d\" ] || exit 1; ! grep -qiE 'grafana|alloy|piedrazul-obs|obs_net' <<< \"\$d\" || { echo \"\$f\"; exit 1; }; done"
 
 # ── 2. Ansible ───────────────────────────────────────────────────────────────
 check "Ansible: playbooks/observability.yml sintácticamente válido" \
   bash -c "cd '${ANSIBLE_DIR}' && ANSIBLE_CONFIG=ansible.cfg ansible-playbook --syntax-check playbooks/observability.yml"
-check "Ansible: el workflow de producción no corre observability.yml" \
-  bash -c "! grep -rq 'observability' '${ROOT}/.github/workflows'"
+check "Ansible: el workflow de producción corre observability.yml solo en el job observability (después del núcleo)" \
+  bash -c "[ \"\$(yq -r '.jobs | to_entries[] | select((.value.steps // []) | map(.run // \"\") | join(\" \") | test(\"playbooks/observability.yml\")) | .key' '${ROOT}/.github/workflows/production-hetzner.yml')\" = observability ] && yq -r '.jobs.observability.needs[]' '${ROOT}/.github/workflows/production-hetzner.yml' | grep -qx conclude"
 check "Ansible: converge y deploy no incluyen el rol observability" \
   bash -c "! grep -q observability '${ANSIBLE_DIR}/playbooks/converge.yml' '${ANSIBLE_DIR}/playbooks/deploy.yml'"
 

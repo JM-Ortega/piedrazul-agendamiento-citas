@@ -197,7 +197,11 @@ check "regresión: Ansible exige la clave del host (workflow y ansible.cfg)" \
 check "regresión: el inventario de este run aplica el ssh_config verificado" \
   bash -c "yq -r '.jobs.production.steps[] | select(.id == \"access\") | .run' '${WORKFLOW}' | grep -qF 'ansible_ssh_common_args: \"-F %s\"' && [ \"\$(yq -r '.jobs.production.steps[] | select(.id == \"access\") | .env.SSH_CONFIG' '${WORKFLOW}')\" = '\${{ steps.host_trust.outputs.ssh_config }}' ]"
 check "regresión: todo paso de Ansible con host remoto usa ese inventario" \
-  bash -c "[ -z \"\$(yq -o=json '.jobs.production.steps' '${WORKFLOW}' | jq -r '.[] | select(.id != \"kc_admin_preflight\") | select((.run // \"\") | test(\"(^|\\\\s)ansible(-playbook)? \")) | select((.run | contains(\"hosts.runtime.yml\")) | not) | .name')\" ]"
+  bash -c "[ -z \"\$(yq -o=json '.jobs.production.steps + .jobs.observability.steps' '${WORKFLOW}' | jq -r '.[] | select(.id != \"kc_admin_preflight\" and .id != \"obs_preflight\" and .id != \"preflight\") | select((.run // \"\") | test(\"(^|\\\\s)ansible(-playbook)? \")) | select((.run | contains(\"hosts.runtime.yml\")) | not) | .name')\" ]"
+check "regresión: la comprobación previa del stack de observabilidad es local (sin SSH antes de la confianza)" \
+  bash -c "test \"\$(yq -r '.[0].connection + \" \" + .[0].hosts' '${ROOT}/infra/ansible/playbooks/observability-preflight.yml')\" = 'local localhost'"
+check "regresión: el job observability verifica la identidad antes de escribir la clave" \
+  bash -c "ids=\$(yq -r '.jobs.observability.steps[] | (.id // .name)' '${WORKFLOW}' | paste -sd'|'); [[ \"\$ids\" == *host_trust*'Preparar acceso SSH e inventario'* ]]"
 check "regresión: la verificación temprana de Keycloak es local (sin SSH antes de la confianza)" \
   test "$(yq -r '.[0].connection' "${ROOT}/infra/ansible/playbooks/keycloak-admin-preflight.yml")" = local
 check "regresión: la clave privada se escribe después de verificar la identidad" \

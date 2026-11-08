@@ -22,18 +22,39 @@
   register: obs_journald_conf
   when: obs_journald_manage
 
+# Activación del drop-in sin estado propio: journald lee su configuración al arrancar, así que se
+# reinicia si el drop-in cambió en este run o si es más nuevo que el arranque de journald (un run
+# anterior lo escribió y se interrumpió antes de reiniciar). Límite conocido: un reloj del host
+# que retrocede entre la escritura y el arranque puede ocultar un drop-in pendiente (los límites
+# de retención quedarían los anteriores) o forzar un reinicio extra; no afecta a los demás
+# servicios del stack.
+- name: Leer cuándo escribió el drop-in y cuándo arrancó journald
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail;
+      printf '%s %s\n' "$(stat -c %Y {{ obs_journald_dropin | quote }})"
+      "$(date -d "$(systemctl show systemd-journald --property=ActiveEnterTimestamp --value)" +%s)"
+    executable: /bin/bash
+  register: obs_journald_times
+  changed_when: false
+  failed_when: obs_journald_times.rc != 0 or obs_journald_times.stdout.split() | length != 2
+  when: obs_journald_manage
+
 # Con systemd 255 (Ubuntu 24.04) journald conserva los flujos de stdout de las unidades al
 # reiniciarse; los contenedores con driver journald escriben por la API nativa y reconectan.
 - name: Reiniciar journald con el drop-in nuevo
   ansible.builtin.systemd_service:
     name: systemd-journald
     state: restarted
-  when: obs_journald_manage and obs_journald_conf is changed
+  register: obs_journald_restart
+  when: >-
+    obs_journald_manage and (obs_journald_conf is changed
+    or (obs_journald_times.stdout.split()[0] | int) >= (obs_journald_times.stdout.split()[1] | int))
 
 - name: Pasar el journal volátil al persistente
   ansible.builtin.command:
     argv: [journalctl, --flush]
-  when: obs_journald_manage and obs_journald_conf is changed
+  when: obs_journald_manage and obs_journald_restart is changed
   changed_when: true
 
 - name: Leer el machine-id del host

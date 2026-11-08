@@ -91,6 +91,9 @@
   ansible.builtin.include_role:
     name: observability
     tasks_from: log_policy.yml
+    # Solo los defaults compartidos (la política de logs): converge no carga los del stack, así
+    # que un cambio solo del stack no afecta a converge (classify-production.sh lo sabe)
+    defaults_from: main/log_policy.yml
 
 # Compose files
 - name: Copiar archivos compose al servidor

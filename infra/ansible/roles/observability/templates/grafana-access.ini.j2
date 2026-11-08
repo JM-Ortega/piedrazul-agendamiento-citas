@@ -1,0 +1,10 @@
+# Generado por el rol observability (tasks/grafana_access_file.yml). No editar: el próximo run lo
+# reemplaza. Archivo de configuración de Grafana (GF_PATHS_CONFIG en compose.yml); el resto de la
+# configuración llega por variables GF_* del entorno, que tienen precedencia sobre este archivo.
+#
+# Autorización por JWT de Cloudflare Access: rol de organización solo por lista de correos. Editor
+# antes que Viewer; un correo fuera de ambas, con comas (no podría compararse contra la lista) o un
+# token sin exp no obtiene rol y, con role_attribute_strict, se rechaza (403). Nunca Admin. Con las
+# dos listas vacías nadie entra por JWT (el administrador local por túnel no depende de esto).
+[auth.jwt]
+role_attribute_path = exp && !contains(email, ',') && (contains(',{{ obs_grafana_editors | join(',') }},', join('', [',', lower(email), ','])) && 'Editor' || contains(',{{ obs_grafana_viewers | join(',') }},', join('', [',', lower(email), ','])) && 'Viewer') || ''

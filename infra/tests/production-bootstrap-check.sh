@@ -1025,14 +1025,14 @@ check "production: sin estado no hay deploy (outputs exige un state version)" \
   bash -c "${SDEF}; step tf_outputs .run | grep -q 'EXPECTED_STATE}\" = none'"
 check "production: environment, concurrencia y queue sin cambios" \
   test "$(yq -r '.jobs.production | .environment + "/" + .concurrency.group + "/" + (.concurrency."cancel-in-progress" | tostring) + "/" + .concurrency.queue' "${WORKFLOW}")" = "production-hetzner/piedrazul-production-hetzner/false/max"
-check "workflow: el token de HCP solo en terraform_plan y production" \
-  test "$(yq -r '.jobs | to_entries[] | select(.key != "production" and .key != "terraform_plan") | .value' "${WORKFLOW}" | grep -c 'secrets.TF_API_TOKEN' || true)" = 0
+check "workflow: el token de HCP solo en terraform_plan, production y observability (este, solo lectura del estado)" \
+  test "$(yq -r '.jobs | to_entries[] | select(.key != "production" and .key != "terraform_plan" and .key != "observability") | .value' "${WORKFLOW}" | grep -c 'secrets.TF_API_TOKEN' || true)" = 0
 check "terraform_plan: ningún otro secreto de producción (solo TF_API_TOKEN)" \
   test "$(yq -r '.jobs.terraform_plan' "${WORKFLOW}" | grep -o 'secrets\.[A-Z_]*' | sort -u | paste -sd,)" = "secrets.TF_API_TOKEN"
 check "workflow: el plazo del job production cubre el Apply y el deploy" \
   test "$(yq -r '.jobs.production."timeout-minutes"' "${WORKFLOW}")" -ge 100
-check "workflow: el dispatch completo sigue disponible sin diff (6 flags); stage es el único input nuevo" \
-  bash -c "[ \"\$(yq -r '.on.workflow_dispatch.inputs | keys | sort | join(\",\")' '${WORKFLOW}')\" = 'break_glass_authorization,break_glass_justification,image_tag,keycloak_recovery,run_app_deploy,run_build,run_build_postgres,run_frontend_publish,run_host_config,run_terraform_apply,stage' ]"
+check "workflow: el dispatch completo sigue disponible sin diff (6 flags); stage y observability son los inputs nuevos" \
+  bash -c "[ \"\$(yq -r '.on.workflow_dispatch.inputs | keys | sort | join(\",\")' '${WORKFLOW}')\" = 'break_glass_authorization,break_glass_justification,image_tag,keycloak_recovery,observability,run_app_deploy,run_build,run_build_postgres,run_frontend_publish,run_host_config,run_terraform_apply,stage' ]"
 PR_WORKFLOW="${ROOT}/.github/workflows/terraform-hetzner-plan.yml"
 check "PR: el plan de PR sigue siendo speculative, en su propio environment, sin saved plan, Apply ni production" \
   bash -c "[ \"\$(yq -r '.jobs[].steps[] | select(.with.speculative != null) | .with.speculative' '${PR_WORKFLOW}')\" = true ] && [ \"\$(yq -r '.jobs[].environment' '${PR_WORKFLOW}')\" = terraform-plan ] && ! grep -qE 'save-plan|actions/apply|apply-run|production-hetzner|hcp-state.sh' '${PR_WORKFLOW}'"
@@ -1255,6 +1255,19 @@ def conclude(results, outputs, cls):
            "PRODUCTION_STAGE": cls["stage"]}
     return subprocess.run(["bash", "-c", J["conclude"]], env=env, capture_output=True).returncode == 0
 
+# La validación del stack bloquea production solo en la instalación definitiva; en un run ordinario
+# su resultado (incluso fallido) no condiciona al núcleo
+for stage, vres in itertools.product(["ordinary", "provision", "install"], ["success", "failure", "skipped", "cancelled"]):
+    cls = {"stage": stage, "terraform_required": "false", "deploy_required": "true", "frontend_required": "false"}
+    r = {"classify": "success", "select_images": "success", "image_targets": "success", "image_scan": "success",
+         "image_policy": "success", "frontend_build": "skipped", "terraform_plan": "skipped", "observability_validate": vres}
+    if stage == "install":
+        continue  # install exige terraform_plan (plan sin cambios): cubierto por la matriz general
+    got = job_runs(J["prod"], r, {"classify": cls, "image_targets": {"targets": "[\"x\"]"}}, False)
+    want = stage == "ordinary" or vres == "success"
+    if got != want:
+        raise SystemExit(f"observability_validate={vres} en {stage}: production {'corre' if got else 'no corre'}")
+
 failures, cases, counts = [], 0, {"prod_runs": 0, "conclude_ok": 0}
 B = ["true", "false"]
 for stage, tf, dep, fe, plan_res, hc, prod_res, cancelled, fb in itertools.product(
@@ -1263,7 +1276,10 @@ for stage, tf, dep, fe, plan_res, hc, prod_res, cancelled, fb in itertools.produ
     cls = {"stage": stage, "terraform_required": tf, "deploy_required": dep, "frontend_required": fe}
     results = {"classify": "success", "select_images": "success", "image_targets": "success",
                "image_scan": "success", "image_policy": "success",
-               "frontend_build": fb if fe == "true" else "skipped"}
+               "frontend_build": fb if fe == "true" else "skipped",
+               # Instalación definitiva: la configuración del stack de observabilidad validó (un
+               # fallo suyo se prueba aparte, abajo); en un run ordinario no corre ni condiciona
+               "observability_validate": "success" if stage != "ordinary" else "skipped"}
     outputs = {"classify": cls, "image_targets": {"targets": "[\"x\"]"}}
     # terraform_plan: corre según su condición real; si corre, termina en plan_res.
     # forced_skip modela un terraform_plan saltado aunque su condición lo pediría (p. ej. un
@@ -1340,9 +1356,10 @@ def tr(e):
     e = re.sub(r"\bneeds\.([a-z_]+)\.result", r"N('\1')", e)
     e = e.replace("!=", " NE ").replace("&&", " and ").replace("||", " or ").replace("!cancelled()", " not CANCELLED ")
     return re.sub(r"!\s*\(", " not (", e).replace(" NE ", " != ")
-cls = {"terraform_required": tf, "deploy_required": dep, "frontend_required": fe}
+cls = {"terraform_required": tf, "deploy_required": dep, "frontend_required": fe, "stage": "ordinary"}
 res = {"classify": "success", "select_images": "success", "image_targets": "success", "image_scan": "success",
-       "image_policy": "success", "frontend_build": "success" if fe == "true" else "skipped"}
+       "image_policy": "success", "frontend_build": "success" if fe == "true" else "skipped",
+       "observability_validate": "skipped"}
 outs = {"classify": cls, "image_targets": {"targets": "[\"x\"]"}}
 ctx = lambda: {"N": lambda n: res[n], "NO": lambda n, k: outs.get(n, {}).get(k, ""), "CANCELLED": False}
 res["terraform_plan"] = plan_res if eval(tr(J["plan"]), {}, ctx()) else "skipped"

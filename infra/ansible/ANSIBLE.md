@@ -24,13 +24,14 @@ infra/ansible/
 │   ├── verify-release.yml               # Verifica identidad en ejecución o health (solo lectura)
 │   ├── record-release.yml               # Registra el último despliegue exitoso
 │   ├── keycloak-admin-preflight.yml     # Valida en el runner la contraseña inicial antes del Apply
-│   ├── observability.yml                # Stack privado de observabilidad piedrazul-obs (fuera del workflow)
+│   ├── observability.yml                # Stack de observabilidad piedrazul-obs (job observability del workflow)
+│   ├── observability-preflight.yml      # Comprobación previa del stack en el runner, sin red ni servidor
 │   └── observability-logs-rollback.yml  # Segundo paso de la retirada de logs (Loki, fuente de datos, drop-in)
 └── roles/
     ├── common/                          # Paquetes base y timezone
     ├── docker_host/                     # Instalación y configuración de Docker
     ├── hardening/                       # Hardening del servidor
-    ├── observability/                   # Prometheus, Grafana, Alloy y Loki en /opt/piedrazul-obs
+    ├── observability/                   # Prometheus, Grafana, Alloy, Loki y Alertmanager en /opt/piedrazul-obs
     └── app/                             # Gestión del stack de la aplicación
         ├── tasks/
         │   ├── main.yml                 # Punto de entrada (importa setup.yml)
@@ -131,6 +132,24 @@ kc_temp_admin_owned_regex: "^{{ kc_temp_admin_prefix }}-[0-9]{14}-[a-z0-9]{8}$"
 kc_realm_file: "{{ repo_root }}/infra/keycloak/realm/piedrazul-realm.json"
 ```
 
+Stack de observabilidad y Grafana (una sola fuente para el stack y para el router de Traefik):
+
+```yaml
+obs_log_services: [traefik]               # política de logs de producción (converge y Alloy)
+obs_log_privacy_controls_done: []         # ninguna fuente condicionada autorizada
+obs_grafana_access_enabled: true          # Grafana detrás de Cloudflare Access
+obs_grafana_public_domain: "grafana.{{ base_domain }}"
+obs_grafana_access_team_domain: piedrazul.cloudflareaccess.com
+obs_grafana_access_aud: <AUD Tag de la aplicación de Access, no secreto>
+grafana_public_domain: "{{ obs_grafana_public_domain if obs_grafana_access_enabled | bool else '' }}"
+obs_alert_receiver: discord
+obs_environment: produccion
+```
+
+Los identificadores de Access son los de la aplicación que administra el operador en Cloudflare;
+la cadena no la crea ni la cambia. Las listas de operadores de Grafana y el webhook de Discord no
+están en el inventario: son secretos del environment (abajo).
+
 `log_level_root`, `log_level_security`, `log_level_sql`, `log_level_sql_bind` y
 `log_level_modulith` producen las variables `LOG_LEVEL_*` del `.env`. `LOG_LEVEL_MODULITH` vale
 `WARN` si falta o está vacía en un `.env` anterior (`compose/backend.yml`): no llega vacía a
@@ -142,10 +161,14 @@ Spring, que dejaría ese logger heredando el nivel del root.
 kc_hostname: "auth.{{ base_domain }}"
 api_public_domain: "api.{{ base_domain }}"
 frontend_public_domain: "{{ base_domain }}"
-acme_email: jortegan@unicauca.edu.co
+acme_email: wpantoja@unicauca.edu.co
 
 cors_allowed_origins: "https://{{ frontend_public_domain }}"
 ```
+
+`acme_email` es el contacto administrativo de la cuenta ACME de Traefik (Let's Encrypt), no el
+dueño de los certificados; cambiarlo no los renueva ni toca `acme.json`. Es el inventario activo
+(Hetzner); `vps_oci.yml` es histórico (OCI inactivo) y no se usa.
 
 `frontend_public_domain` también llega a Keycloak: `env.j2` escribe `FRONTEND_PUBLIC_URL=https://<frontend_public_domain>`, que `compose/keycloak.yml` exige y el tema de login usa para los enlaces al frontend (ver el [README del tema](../keycloak/themes/piedrazul/keycloakify-starter/README.md)).
 
@@ -207,41 +230,65 @@ ansible-playbook \
 ### `observability.yml` — stack de métricas, logs y alertas
 
 Instala o actualiza el proyecto Compose `piedrazul-obs` (Prometheus, Grafana, Alloy, Loki,
-Alertmanager) en
-`/opt/piedrazul-obs` con el rol `observability`, con el mismo contrato de conexión que los demás
-playbooks (`ansible` + `become`). No lo corre el workflow de producción ni lo incluyen
-`converge.yml` o `deploy.yml`, y no modifica la aplicación.
+Alertmanager) en `/opt/piedrazul-obs` con el rol `observability`, con el mismo contrato de conexión
+que los demás playbooks (`ansible` + `become`). No lo incluyen `converge.yml` ni `deploy.yml` y no
+modifica la aplicación. En producción lo corre el job `observability` del workflow (abajo y
+[Métricas](../../docs/operations/runbooks/metricas.md#instalación-y-mantenimiento-github-actions));
+correrlo a mano es una recuperación excepcional.
 
-- Exige Docker con Compose y la red `piedrazul_net`; con el acceso público a Grafana habilitado,
-  también `piedrazul_obs_edge` (interna, la crea `compose/traefik.yml` de la aplicación desde S3).
-  Si falta alguna, falla sin copiar nada. Sin acceso público (modo privado) no la necesita.
-- Acceso a Grafana y notificaciones (S3): estado deseado **persistente** en `.env` (dado con `-e` >
-  guardado en el host > inicial; un run sin `-e` no cambia nada, desactivar es explícito). Antes de
-  copiar nada valida `obs_grafana_access_*` (dominio del equipo de Access, AUD de 64 hex, correos
-  en minúsculas sin `.invalid`), `obs_alert_receiver` (`none`/`discord`), `obs_environment`
-  (obligatorio con `discord`) y el webhook, que llega solo por la variable de entorno
-  `OBS_DISCORD_WEBHOOK_URL` del controlador y nunca se muestra. Elige los archivos de Compose
-  (`compose.access.yml` solo con el acceso público, también en `COMPOSE_FILE`). Mantiene el estado en `.env` y
-  escribe el webhook en `/opt/piedrazul-obs/secrets/discord_webhook_url` (directorio root 0700,
-  archivo del UID 65534 0400) y, si cambió, recrea Alertmanager (el montaje de archivo no ve el
-  reemplazo). Ver [Acceso a Grafana](../../docs/operations/runbooks/grafana-acceso.md)
-  y [Alertas](../../docs/operations/runbooks/alertas.md).
+Dos operaciones (`-e obs_operation=`):
+
+- **`full`** (por defecto): todo el stack, con verificación `-e obs_verify_scope=install |
+  integration | changed` (los destinos de la aplicación bloquean solo en `install` e
+  `integration`).
+- **`grafana-access`**: solo la autorización de Grafana. Escribe el archivo de acceso y recrea solo
+  Grafana (sin dependencias, con los archivos de Compose que ya tiene el host); verifica la
+  autorización efectiva sin consultar el resto del stack ni la aplicación. Exige el stack
+  instalado.
+
+Entradas del entorno del controlador: `GRAFANA_VIEWER_EMAILS` y `GRAFANA_EDITOR_EMAILS`
+(obligatorias en las dos operaciones; correos en minúsculas separados por comas o `none`;
+`tasks/access_lists.yml`) y `OBS_DISCORD_WEBHOOK_URL` (con el receptor `discord`; el workflow pasa
+`obs_require_authoritative_inputs=true`, que lo exige en cada run en lugar de conservar el del host).
+`playbooks/observability-preflight.yml` aplica las mismas reglas en el runner, sin red.
+
+Operación `full`:
+
+- Exige Docker con Compose y la red `piedrazul_net`; con el acceso público a Grafana, también
+  `piedrazul_obs_edge` (interna, la crea `compose/traefik.yml`). Si falta alguna, falla sin copiar
+  nada.
+- Antes de copiar nada valida las listas de Grafana, `obs_grafana_access_*` (dominio del equipo de
+  Access, AUD de 64 hex), `obs_alert_receiver` (`none`/`discord`), `obs_environment` (obligatorio con
+  `discord`), el webhook (nunca se muestra) y la política de logs. Estado no secreto en `.env`
+  (dado > guardado en el host > inicial); las listas no se guardan en `.env` (un `.env` anterior que
+  las tenga las pierde en el primer run).
 - Los directorios de configuración (`obs_managed_dirs`) quedan iguales al repositorio: copia y
-  borra lo retirado; reinicia el servicio cuyo directorio cambió (`obs_restart_on_change`).
+  borra lo retirado.
+- Archivos secretos en `/opt/piedrazul-obs/secrets` (directorio root 0700): el webhook (UID 65534,
+  0400) y el archivo de acceso de Grafana con `role_attribute_path` (UID 472, 0400), que Grafana
+  carga como su archivo de configuración (`GF_PATHS_CONFIG`): las listas no pasan por el entorno del
+  contenedor.
+- **Activación sin estado propio.** El digest de la configuración que cada servicio lee al arrancar
+  (archivos finales del host: ruta y contenido) va a `.env` (`OBS_DIGEST_<SERVICIO>`) y a la etiqueta
+  `org.piedrazul.obs.config-digest` del servicio: Compose recrea exactamente los servicios cuya
+  configuración cambió, también en un reintento tras una interrupción. Un archivo secreto se
+  reemplaza de forma atómica (inodo nuevo); si el contenedor sigue viendo el inodo anterior, se
+  recrea ese servicio. Un run sin cambios no recrea nada.
 - `.env` (root, 0600) se crea solo si no existe, con una contraseña de Grafana que genera el
-  controlador; no viene de GitHub ni se regenera en un run posterior.
-- Logs: antes de copiar nada comprueba la política de fuentes (`obs_log_services` frente a
-  admitidos, condicionados con `obs_log_privacy_controls_done` y excluidos) y que el GID 473 no
-  sea un grupo del host; escribe su drop-in de journald
+  controlador; no viene de GitHub ni se regenera.
+- Logs: política de fuentes (`obs_log_services` frente a admitidos, condicionados con
+  `obs_log_privacy_controls_done` y excluidos) y GID 473; drop-in de journald
   (`/etc/systemd/journald.conf.d/60-piedrazul-obs.conf`, todo el host: persistente, 2G, 128M,
-  7 días; `obs_journald_manage: false` lo omite) y reinicia journald solo si cambia; descubre el
-  grupo del journal y lo mantiene en `.env` (`OBS_JOURNAL_GID`) junto a la selección de fuentes.
-  No cambia `daemon.json` ni el driver de logs de ningún contenedor: eso lo hace converge con la
-  misma lista y la misma política (`tasks/log_policy.yml`, abajo).
-- Verifica que los ocho destinos se leen, que los dashboards están cargados, que Loki está listo,
-  que Alloy lee el journal, que Prometheus entrega a Alertmanager, que Alertmanager corre con el
-  receptor pedido, que Prometheus lleva la etiqueta del entorno y que Grafana tiene el modo de
-  acceso pedido. No envía ninguna notificación.
+  7 días; `obs_journald_manage: false` lo omite), reiniciado si cambió o si es más nuevo que el
+  arranque de journald; grupo del journal en `.env` (`OBS_JOURNAL_GID`) junto a la selección de
+  fuentes. No cambia el driver de logs de ningún contenedor: eso lo hace converge con la misma
+  lista y la misma política (`tasks/log_policy.yml`, abajo).
+- Verifica la activación (paridad con el repositorio, digest vigente en cada contenedor, inodo
+  vigente de cada archivo secreto, imagen fijada en ejecución) y lo que cada servicio cargó: los
+  ocho trabajos configurados (los destinos propios siempre leídos), las reglas del repositorio sin
+  errores, los dashboards, Loki y Alloy, Prometheus entregando a Alertmanager con el receptor y la
+  etiqueta de entorno pedidos, y Grafana con el modo de acceso y las listas pedidos (comparadas sin
+  mostrarlas). No envía ninguna notificación.
 
 `observability-logs-rollback.yml` es el segundo paso de la vuelta a métricas sin logs, después
 de repetir `observability.yml` desde una versión sin logs (si no, falla sin cambiar nada). Retira
@@ -332,7 +379,7 @@ Traefik enruta solo con el **file provider**: no tiene Docker provider ni socket
 |---|---|---|
 | `tls.yml` | opción TLS `cloudflare-aop` (certificado de cliente de Cloudflare obligatorio, CA en `traefik/certs/`) | `infra/traefik/dynamic/tls.yml`, copiado tal cual |
 | `routes.yml` | routers `backend` (`Host(api_public_domain)`) y `keycloak` (`Host(kc_hostname)`), entrypoint `websecure`, TLS `cloudflare-aop` + resolver `letsencrypt`; servicios `http://backend:<server_port>` y `http://keycloak:<kc_port>` | generado por `traefik_routes.yml` desde `templates/traefik-routes.yml.j2` con las mismas variables del inventario que `.env` |
-| `routes.yml` (opcional, S3) | con `grafana_public_domain` no vacío: router `grafana` (`Host(...) && !PathPrefix(/login)`, `websecure`, `cloudflare-aop` + `letsencrypt`) con el middleware `grafana-access-only` (quita `Authorization` y `Cookie`) y servicio `http://grafana:3000` por la red interna `piedrazul_obs_edge`. Vacío en `group_vars` hasta la activación ([Acceso a Grafana](../../docs/operations/runbooks/grafana-acceso.md)) | mismo template; el nombre se valida como los demás y distinto de ellos |
+| `routes.yml` (opcional, S3) | con `grafana_public_domain` no vacío: router `grafana` (`Host(...) && !PathPrefix(/login)`, `websecure`, `cloudflare-aop` + `letsencrypt`) con el middleware `grafana-access-only` (quita `Authorization` y `Cookie`) y servicio `http://grafana:3000` por la red interna `piedrazul_obs_edge`. En producción, derivado de `obs_grafana_public_domain` y `obs_grafana_access_enabled` (`group_vars`; [Acceso a Grafana](../../docs/operations/runbooks/grafana-acceso.md)) | mismo template; el nombre se valida como los demás y distinto de ellos |
 
 - Métricas Prometheus en el entrypoint `metrics` (`:8082`, flags en `infra/compose/traefik.yml`). No tiene puerto publicado ni router: los routers de `routes.yml` declaran solo `websecure`. Se alcanza en `/metrics`, puerto 8082 del contenedor `traefik`, desde `piedrazul_net`. La API y el dashboard siguen deshabilitados. Ver [Health y métricas](../../docs/architecture/overview.md#health-y-métricas).
 - Para cambiar un host o puerto se cambia el inventario (`host_vars`/`group_vars`) y se corre converge; `routes.yml` no se edita en el servidor (converge lo sobrescribe). Antes de escribirlo, `traefik_routes.yml` valida las entradas (nombres DNS en minúsculas, distintos; puertos numéricos) y el documento generado; si algo falla, converge se detiene sin tocar el archivo vigente. Traefik recarga el cambio sin reiniciarse.
@@ -530,7 +577,7 @@ El correo por SES llega al `.env` solo con `NOTIFICATIONS_SES_ENABLED=true` en e
 
 ## Secrets requeridos en GitHub
 
-Los siguientes secrets pertenecen al GitHub Environment `production-hetzner` (alcance declarado en `.github/scripts/audit-github-trust.sh`), no al repositorio. Solo el job `production` los lee:
+Los siguientes secrets pertenecen al GitHub Environment `production-hetzner` (alcance declarado en `.github/scripts/audit-github-trust.sh`), no al repositorio. Los de la aplicación solo los lee el job `production`:
 
 ```
 POSTGRES_PASSWORD            # Password del superusuario administrativo de postgres
@@ -550,6 +597,18 @@ IDENTITY_SEED_ADMIN_PASSWORD # Un solo uso: contraseña temporal del primer ADMI
 SES_SMTP_USERNAME            # Solo con la variable NOTIFICATIONS_SES_ENABLED=true. Los recibe el
 SES_SMTP_PASSWORD            # converge, nunca el deploy (docs/operations/runbooks/correo-ses.md)
 ```
+
+Los del stack de observabilidad los lee el job `observability` (y, solo para comprobar su forma
+sin red, el paso de entradas de `production` en Run P y Run I):
+
+```
+GRAFANA_VIEWER_EMAILS        # Lista Viewer de Grafana: correos en minúsculas separados por comas, o none
+GRAFANA_EDITOR_EMAILS        # Lista Editor de Grafana, mismo formato (secretos: el repositorio es público)
+OBS_DISCORD_WEBHOOK_URL      # Webhook de Alertmanager (receptor discord); solo con la operación full
+```
+
+`observability` también usa `TF_API_TOKEN` (solo lectura del estado actual para la dirección del
+servidor) y `ANSIBLE_SSH_KEY`; nunca los secretos de la base, Keycloak, Cloudflare, SES ni Pages.
 
 Qué exige la verificación de credenciales depende del modo del run: con configuración del
 servidor (`run_host_config`) exige las contraseñas de la base, `CLOUDFLARE_DNS_API_TOKEN`,
@@ -745,20 +804,21 @@ Last profile that met the validation criteria was 'production'.
 
 - **push a `main`**: todo push a `main` dispara el workflow (sin filtro de rutas). Con `vars.PRODUCTION_PUSH_DEPLOY` sin definir o en `deferred`, el push queda **diferido**: termina en `success` sin efectos y sin avanzar el rango. Con `enabled`, clasifica el rango desde el commit del último run *push* que lo procesó, es decir, con el job `range_processed` en `success` en su último intento, hasta el commit actual (`.github/scripts/production-range-base.sh` + `classify-production.sh`). Si no hay un run procesado previo, o su commit no es ancestro del actual, clasifica el árbol completo. Así un run fallido, cancelado o que quedó obsoleto porque otro commit (aunque no toque producción) avanzó `main` queda cubierto por el run de ese commit. Fallido, cancelado o reemplazado nunca avanza la base; un rango sin cambios de producción termina como no-op limpio.
 - La documentación (`*.md`) bajo `infra/ansible` e `infra/terraform` no cuenta como cambio de producción; tampoco `frontend/README.md`.
-- **workflow_dispatch**: intención explícita por inputs (`stage`, `run_terraform_apply`, builds, configuración, deploy, rollback, `run_frontend_publish`); no avanza el rango. `stage=provision` (Run P) y `stage=install` (Run I) son las etapas de un servidor nuevo o reemplazado ([instalacion-nueva.md](../../docs/operations/runbooks/instalacion-nueva.md), `production-stage.sh`): Run P exige la instalación completa y termina antes del servidor; Run I prohíbe `run_terraform_apply`, planifica igual y falla si el plan tiene cambios. Fuera de Run P, un plan que crea o reemplaza el servidor falla antes de la segunda aprobación, y Run P solo lo aplica con los push retenidos (`PRODUCTION_PUSH_DEPLOY` sin definir o en `deferred`, leída en `classify`). Un plan que destruye el servidor sin crear otro falla en todas las etapas. `run_frontend_publish` es `false` por defecto (un dispatch existente se comporta igual) y no se combina con un break-glass.
+- **Stack de observabilidad**: un componente aparte con su propio progreso (`observability_processed`, "Observabilidad procesada"). Un push lo pide cuando cambió lo que consume desde su último procesado (`infra/observability`, el rol `observability`, sus playbooks; con los archivos compartidos —política de logs (su tarea y `defaults/main/log_policy.yml`, lo único de los defaults del rol que carga converge; `defaults/main/stack.yml` es solo del stack), inventario, `ansible.cfg`, Compose de los productores— corren el converge y el stack). El núcleo avanza con `range_processed` aunque el stack falle, y al revés: la autoridad es el job de señal de cada componente en el último intento del run, no su conclusión. Un Run I exitoso también deja la señal del núcleo.
+- **workflow_dispatch**: intención explícita por inputs (`stage`, `run_terraform_apply`, builds, configuración, deploy, rollback, `run_frontend_publish`, `observability`); un dispatch ordinario no avanza el núcleo. `observability=full` (solo el stack, sin build, migración, deploy, Terraform ni Pages; avanza el stack) o `grafana-access` (solo las listas de Grafana; no avanza nada). `stage=provision` (Run P) y `stage=install` (Run I) son las etapas de un servidor nuevo o reemplazado ([instalacion-nueva.md](../../docs/operations/runbooks/instalacion-nueva.md), `production-stage.sh`): Run P exige la instalación completa (también `observability=full`, cuyas entradas comprueba sin red) y termina antes del servidor; Run I prohíbe `run_terraform_apply`, planifica igual y falla si el plan tiene cambios. Fuera de Run P, un plan que crea o reemplaza el servidor falla antes de la segunda aprobación, y Run P solo lo aplica con los push retenidos (`PRODUCTION_PUSH_DEPLOY` sin definir o en `deferred`, leída en `classify`). Un plan que destruye el servidor sin crear otro falla en todas las etapas. `run_frontend_publish` es `false` por defecto (un dispatch existente se comporta igual) y no se combina con un break-glass.
 - Dos conceptos independientes, `terraform_required` y `deploy_required`, dan cuatro clases: solo Terraform, solo Deploy, Terraform → Deploy, o no-op limpio (el run termina en éxito sin pasar por ningún gate). Con Terraform, el plan decide si hay Apply: un plan sin cambios no aplica nada.
 - Un tercero, `frontend_required` (cambios bajo `frontend/`), agrega la publicación en Pages al final de esa clase: `frontend_only`, `apply_then_frontend`, `deploy_then_frontend` o `apply_then_deploy_then_frontend`. Sin cambios del frontend las cuatro clases anteriores no cambian; un cambio solo del frontend no construye imágenes, no lee HCP ni toca el servidor, y no requiere `TF_API_TOKEN`.
 - Solo `main` puede iniciar producción.
 
 ### Autoridad
 
-Solo los jobs `terraform_plan` y `production` usan el environment `production-hetzner` y credenciales de producción: `terraform_plan` solo `TF_API_TOKEN`; `production` además SSH, secretos de la app y token de Pages. Clasificación, builds, selección y escaneo corren antes, solo con `GITHUB_TOKEN`. No hay acceso SSH ni lectura de HCP antes del primer gate.
+Solo los jobs `terraform_plan`, `production` y `observability` usan el environment `production-hetzner` y credenciales de producción: `terraform_plan` solo `TF_API_TOKEN`; `production` además SSH, secretos de la app y token de Pages; `observability` lectura del estado de HCP, SSH, las listas de Grafana y el webhook. `observability` corre después de `conclude` (núcleo terminado o no requerido), con su propia aprobación, la misma identidad del host (pin) y la frescura de `main` justo antes de mutar. Clasificación, builds, selección y escaneo corren antes, solo con `GITHUB_TOKEN`. No hay acceso SSH ni lectura de HCP antes del primer gate.
 
 Con Terraform hay **dos aprobaciones del mismo environment**, con propósitos distintos: la de `terraform_plan` autoriza usar las credenciales de HCP para planificar este commit; la de `production` se pide cuando el plan definitivo ya está revisado en el resumen del run y autoriza aplicar **ese** saved plan y seguir con el deploy y el frontend. Sin Terraform (solo deploy o solo frontend) `terraform_plan` se salta y hay una sola aprobación, la de `production`. Un plan sin cambios sin nada más que hacer no llega a `production`.
 
 `production` corre solo si: sin Terraform, `terraform_plan` quedó **saltado**; con Terraform, `terraform_plan` terminó en **éxito** con `has_changes` exactamente `true` (aplicar) o `false` (solo si además hay deploy o frontend). Un fallo, una cancelación o una salida vacía o inválida dejan `production` sin correr y `conclude` en fallo: un job saltado nunca cuenta como trabajo hecho.
 
-La concurrencia (`piedrazul-production-hetzner`, `cancel-in-progress: false`, `queue: max`) se aplica a ambos jobs: los pendientes esperan en cola en vez de reemplazarse. El orden de la cola no define la corrección; la frescura, la revalidación del saved plan y el rango acumulado sí.
+La concurrencia (`piedrazul-production-hetzner`, `cancel-in-progress: false`, `queue: max`) se aplica a los tres jobs: los pendientes esperan en cola en vez de reemplazarse. El orden de la cola no define la corrección; la frescura, la revalidación del saved plan y el rango acumulado sí.
 
 #### Plan de Terraform (`terraform_plan`)
 
@@ -786,7 +846,7 @@ Dentro de `production`, en orden:
 12. **Publicación del frontend** (si `frontend_required`, y solo con el preflight del paso 5 en éxito): con frescura justo antes si el run no hizo antes otra mutación de producción; `wrangler pages deploy` del artefacto validado y verificación del deployment creado por esa invocación. Si la preparación del paso 0 falla, el run no hace ninguna mutación de producción (ni plan, ni Apply, ni servidor, ni Pages), aunque los jobs previos sin privilegios del run pueden haber producido ya artefactos (imágenes en GHCR, el artifact del frontend, evidencia de escaneo). Ver [Publicación del frontend](../../docs/architecture/overview.md#publicación-del-frontend-cloudflare-pages).
 13. **Limpieza del run de Terraform** (`hcp_cleanup`, siempre que este intento intentó crear un run, también si el job falla, se cancela o vence): solo sobre runs con el mensaje de este intento; si GitHub no llegó a registrar el id (la creación falló o se cortó tras crearlo en HCP), lo busca por ese mensaje entre los 20 runs más recientes. Esperando confirmación → se descarta; planificando → se cancela; confirmado o aplicando → no se toca y se informa como Apply aceptado (cancelar el job no deshace un Apply que HCP ya aceptó; el siguiente run reconcilia el estado).
 
-El resumen del job muestra el plan (conteos, enlace y si requirió confirmación), qué pasó con el run de este intento, el state version consumido, las identidades (y las anteriores), el veredicto de la política por imagen y la primera etapa que falló: credenciales, preparación del frontend, frescura, HCP (workspace, plan, confirmación, estado), proyecto de Pages tras Terraform, acceso al servidor, selección, escaneo previo, política de vulnerabilidades, registro de break-glass, deploy, identidad en ejecución, health, registro o publicación en Pages. El job `conclude` hace que la conclusión del run sea success solo si producción terminó bien (incluida la publicación del frontend cuando hacía falta) o no hacía falta. La base del siguiente rango no es esa conclusión sino `range_processed`, que corre después solo en un push ordinario: un push diferido termina en success sin procesar nada.
+El resumen del job muestra el plan (conteos, enlace y si requirió confirmación), qué pasó con el run de este intento, el state version consumido, las identidades (y las anteriores), el veredicto de la política por imagen y la primera etapa que falló: credenciales, preparación del frontend, frescura, HCP (workspace, plan, confirmación, estado), proyecto de Pages tras Terraform, acceso al servidor, selección, escaneo previo, política de vulnerabilidades, registro de break-glass, deploy, identidad en ejecución, health, registro o publicación en Pages. El job `conclude` hace que la conclusión del run sea success solo si producción terminó bien (incluida la publicación del frontend cuando hacía falta) o no hacía falta. La base del siguiente rango no es esa conclusión sino `range_processed`, que corre después solo en un push ordinario o en un Run I: un push diferido termina en success sin procesar nada.
 
 ### Identidad inmutable
 

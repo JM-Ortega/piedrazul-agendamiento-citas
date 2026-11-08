@@ -39,6 +39,11 @@ networks:
 secrets:
   discord_webhook_url:
     file: ${OBS_DISCORD_WEBHOOK_FILE:-./secrets/discord_webhook_url}
+  # Archivo de configuración de Grafana con la autorización por correo (role_attribute_path). Lo
+  # genera el rol desde las listas de operadores (nunca en .env ni en el repositorio); debe existir
+  # aunque el acceso esté deshabilitado (vacío vale: nadie obtiene rol por JWT). Solo Grafana.
+  grafana_access:
+    file: ${OBS_GRAFANA_ACCESS_FILE:-./secrets/grafana_access.ini}
 
 volumes:
   prometheus_data:
@@ -70,6 +75,10 @@ services:
       - --storage.tsdb.wal-compression
       # Sin API de administración (borrado de series, snapshots) ni recepción remota
       - --web.listen-address=:9090
+    labels:
+      # Digest de la configuración que lee al arrancar (rol observability, OBS_DIGEST_*): si
+      # cambia, Compose recrea el servicio. Fuera de Ansible vale "unmanaged".
+      org.piedrazul.obs.config-digest: ${OBS_DIGEST_PROMETHEUS:-unmanaged}
     volumes:
       # Directorios, no archivos sueltos: una escritura atómica (Ansible, editores) cambia el
       # inodo y un montaje de archivo seguiría viendo el anterior
@@ -130,16 +139,13 @@ services:
       GF_AUTH_JWT_USERNAME_CLAIM: email
       GF_AUTH_JWT_AUTO_SIGN_UP: "true"
       GF_AUTH_JWT_URL_LOGIN: "false"
-      # Autorización: rol de organización solo por lista de correos (minúsculas, separados por
-      # comas). Editor antes que Viewer; un correo fuera de ambas, con comas (no podría
-      # compararse contra la lista) o un token sin exp no obtiene rol y, con strict, se rechaza
-      # (403). Nunca Admin ni administrador del servidor por JWT: la administración de Grafana es
-      # del administrador local (túnel).
-      GF_AUTH_JWT_ROLE_ATTRIBUTE_PATH: >-
-        exp && !contains(email, ',') && (
-        contains(',${GRAFANA_ACCESS_EDITORS:-},', join('', [',', lower(email), ','])) && 'Editor'
-        || contains(',${GRAFANA_ACCESS_VIEWERS:-},', join('', [',', lower(email), ','])) && 'Viewer'
-        ) || ''
+      # Autorización: rol de organización solo por lista de correos, en role_attribute_path del
+      # archivo de configuración (secreto grafana_access, GF_PATHS_CONFIG): las listas no pasan
+      # por el entorno del contenedor. Ninguna variable GF_AUTH_JWT_ROLE_ATTRIBUTE_PATH aquí: el
+      # entorno tiene precedencia sobre el archivo. Un correo fuera de las listas no obtiene rol
+      # y, con strict, se rechaza (403). Nunca Admin ni administrador del servidor por JWT: la
+      # administración de Grafana es del administrador local (túnel).
+      GF_PATHS_CONFIG: /run/secrets/grafana_access
       GF_AUTH_JWT_ROLE_ATTRIBUTE_STRICT: "true"
       GF_AUTH_JWT_SKIP_ORG_ROLE_SYNC: "false"
       GF_AUTH_JWT_ALLOW_ASSIGN_GRAFANA_ADMIN: "false"
@@ -159,6 +165,12 @@ services:
       # Grafana no gestiona reglas ni puntos de contacto.
       GF_UNIFIED_ALERTING_ENABLED: "false"
       GF_LOG_MODE: console
+    labels:
+      # Digest de grafana/provisioning (OBS_DIGEST_*): ver prometheus. Los dashboards no entran:
+      # Grafana los recarga solo; el archivo de acceso se activa por inodo (activate_secrets.yml)
+      org.piedrazul.obs.config-digest: ${OBS_DIGEST_GRAFANA:-unmanaged}
+    secrets:
+      - grafana_access
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana-dashboards:ro
@@ -223,6 +235,9 @@ services:
       OBS_LOG_SERVICES: ${OBS_LOG_SERVICES:-traefik}
       # El recolector de Go devuelve memoria antes de llegar al límite del contenedor
       GOMEMLIMIT: 200MiB
+    labels:
+      # Digest de la configuración que lee al arrancar (OBS_DIGEST_*): ver prometheus
+      org.piedrazul.obs.config-digest: ${OBS_DIGEST_ALLOY:-unmanaged}
     volumes:
       - ./alloy:/etc/alloy:ro
       - alloy_data:/var/lib/alloy/data
@@ -255,6 +270,9 @@ services:
     environment:
       # El recolector de Go devuelve memoria antes de llegar al límite del contenedor
       GOMEMLIMIT: 640MiB
+    labels:
+      # Digest de la configuración que lee al arrancar (OBS_DIGEST_*): ver prometheus
+      org.piedrazul.obs.config-digest: ${OBS_DIGEST_LOKI:-unmanaged}
     volumes:
       - ./loki:/etc/loki:ro
       - loki_data:/loki
@@ -292,6 +310,9 @@ services:
     # Usuario de la imagen (nobody, dueño de /alertmanager): el volumen nuevo hereda ese dueño.
     # El secreto del host debe ser legible por este UID (el rol de Ansible lo deja 0400 suyo).
     user: "65534:65534"
+    labels:
+      # Digest de la configuración que lee al arrancar (OBS_DIGEST_*): ver prometheus
+      org.piedrazul.obs.config-digest: ${OBS_DIGEST_ALERTMANAGER:-unmanaged}
     volumes:
       - ./alertmanager:/etc/alertmanager:ro
       - alertmanager_data:/alertmanager

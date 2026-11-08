@@ -13,8 +13,9 @@ humana), `historical-scan-evidence.sh` (evidencia histórica), `break-glass-reco
 
 ## Decisión
 
-Para cada imagen que el run aplica (backend, postgres, keycloak, traefik), sobre su manifiesto
-`linux/amd64` exacto:
+Para cada imagen que el run aplica (backend, postgres, keycloak, traefik y, aparte, las del stack de
+observabilidad: `obs-prometheus`, `obs-grafana`, `obs-alloy`, `obs-loki`, `obs-alertmanager`), sobre
+su manifiesto `linux/amd64` exacto:
 
 | Evidencia | Veredicto |
 |---|---|
@@ -50,6 +51,26 @@ evaluar.
 Converge y deploy exigen además la decisión en su condición, y un paso intermedio falla el job
 si la decisión falta. Un run bloqueado no registra último éxito y su conclusión no es
 `success`: la base del rango de push no avanza.
+
+3. **Stack de observabilidad** (job `observability`, aparte del núcleo): solo cuando una operación
+   `full` va a aplicar referencias fijadas (`<tag>@sha256:<índice OCI>` en
+   `infra/observability/compose.yml`) distintas de las de su último procesado, o en Run I, o sin un
+   procesado en la historia. `image_targets` resuelve cada índice a su manifiesto `linux/amd64`,
+   `observability_image_scan` lo escanea (mismo `trivy-scan`) y el job `observability` evalúa la
+   política autoritativa antes de la frescura y de cualquier escritura, con la evidencia de este run
+   (`current-scan-evidence.sh` con `SCAN_SURFACES` del stack; la del núcleo no la incluye). Las cinco
+   identidades se autorizan juntas. Un bloqueo deja el stack sin tocar y **no bloquea el núcleo**: ni
+   `image_policy` ni `production` dependen de este escaneo ni de esta política. Si no se pueden
+   reunir esas identidades (referencia mal fijada, índice ilegible), `image_targets` lo informa
+   (`observability_targets_status=error`) sin fallar, porque el núcleo depende de ese job, y el job
+   `observability` falla antes de conectarse al servidor. Sin break-glass para
+   estas imágenes: una referencia nueva que la política bloquea se corrige o se revierte con un
+   commit. `observability=grafana-access` nunca escanea (no cambia imágenes), y una operación `full`
+   sin cambio de referencias tampoco. Después de aplicar, el rol exige que cada contenedor corra la
+   referencia fijada y que la imagen local esté registrada bajo ese índice (Docker elige el
+   manifiesto de la plataforma de ese índice inmutable). **Riesgo residual aceptado:** una
+   vulnerabilidad nueva en una imagen del stack sin cambios no se detecta hasta el próximo cambio de
+   su referencia.
 
 Rollback y reuso no tienen excepciones implícitas: se escanea la identidad exacta en ese run y
 se evalúa igual que un build. Haber estado desplegada antes no autoriza una imagen.
@@ -340,6 +361,9 @@ huella de aprobadores y el orden de los pasos del workflow; ambas vías de acept
 (`independent_review` con aprobación previa al merge y `self_merge` con merge commit propio,
 solo de registros) y el rechazo de un id de break-glass consumido aunque se re-fusione o se
 borre y recree.
+
+Para el stack de observabilidad, `vuln-policy-check.sh` comprueba además que su evidencia se descarga
+aparte (solo `obs-*`) y en su job; el escaneo real de esas imágenes en un runner no se ha ejecutado.
 
 **Requiere una ejecución real en GitHub** (no verificado):
 - que las API devuelvan los campos con la forma modelada: revisiones de PR (`state`,

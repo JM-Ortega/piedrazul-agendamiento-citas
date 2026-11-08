@@ -1,0 +1,48 @@
+---
+# Comprobación previa del stack de observabilidad en el runner, sin red ni servidor. La corre el
+# workflow de producción antes de tocar nada: en Run P (antes del Apply) y en Run I, y en el job
+# observability antes de la conexión SSH. Mismas reglas que el rol (sin copia):
+# access_lists.yml para las listas de Grafana; el receptor, el entorno y el acceso a Grafana del
+# inventario; la forma del webhook. Nunca muestra un correo ni el webhook.
+#
+# Entradas por entorno: GRAFANA_VIEWER_EMAILS, GRAFANA_EDITOR_EMAILS, OBS_DISCORD_WEBHOOK_URL.
+# -e obs_preflight_webhook=false (operación grafana-access): no exige el webhook, que esa operación
+# no usa ni recibe.
+
+- name: Validar las entradas del stack de observabilidad
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+
+  tasks:
+    - name: Validar las listas de Grafana
+      ansible.builtin.include_role:
+        name: observability
+        tasks_from: access_lists.yml
+        public: true
+
+    - name: Validar el inventario y el webhook
+      ansible.builtin.assert:
+        that:
+          - obs_alert_receiver | default('none', true) in ['none', 'discord']
+          - obs_environment | default('', true) | length == 0 or obs_environment is match('^[a-z][a-z0-9-]{1,30}\Z')
+          - obs_alert_receiver | default('none', true) != 'discord' or obs_environment | default('', true) | length > 0
+          - not (obs_preflight_webhook | default(true) | bool) or obs_alert_receiver | default('none', true) != 'discord'
+            or obs_discord_webhook_url | length > 0
+          - obs_discord_webhook_url | length == 0 or obs_discord_webhook_url is match(obs_discord_webhook_re)
+          - not (obs_grafana_access_enabled | default(false, true) | bool) or (
+              obs_grafana_public_domain | default('', true) is match('^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\Z')
+              and obs_grafana_access_team_domain | default('', true) is match('^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.cloudflareaccess\.com\Z')
+              and obs_grafana_access_aud | default('', true) is match('^[0-9a-f]{64}\Z'))
+          - logs_lab_authorization is not defined
+        fail_msg: >-
+          OBSERVABILIDAD: entradas inválidas. Receptor '{{ obs_alert_receiver | default('none', true) }}'
+          (none|discord; discord exige obs_environment y OBS_DISCORD_WEBHOOK_URL con la forma
+          https://discord.com/api/webhooks/<id>/<token>, no se muestra); con el acceso a Grafana
+          habilitado, dominio, equipo de Access y AUD válidos en el inventario; sin
+          logs_lab_authorization (solo laboratorio). No se tocó nada.
+        success_msg: >-
+          Entradas de observabilidad válidas: Viewer={{ obs_grafana_list_counts.viewers }},
+          Editor={{ obs_grafana_list_counts.editors }}, receptor {{ obs_alert_receiver | default('none', true) }}
+          (webhook {{ 'presente' if obs_discord_webhook_url | length > 0 else 'ausente' }}, no se muestra).

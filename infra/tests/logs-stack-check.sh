@@ -162,8 +162,12 @@ promtool() { docker run --rm --network none -v "${OBS}:/w:ro" --entrypoint promt
 # ── 1. Configuración ─────────────────────────────────────────────────────────
 # S3 en modo privado (sin acceso público): sin red de entrada; webhook vacío (receptor none)
 mkdir -p "${TMP}/secrets" && : > "${TMP}/secrets/discord_webhook_url" && chmod 644 "${TMP}/secrets/discord_webhook_url"
-printf 'GRAFANA_ADMIN_PASSWORD=%s\nOBS_APP_NETWORK=%s\nGRAFANA_LOCAL_PORT=%s\nOBS_DISCORD_WEBHOOK_FILE=%s\n' \
-  "$(openssl rand -hex 16)" "${APP_NET}" "${GPORT}" "${TMP}/secrets/discord_webhook_url" > "${TMP}/obs.env"
+# Archivo de acceso de Grafana (secreto grafana_access, GF_PATHS_CONFIG): vacío = nadie obtiene rol
+# por JWT. Siempre en ${TMP}: sin él, Compose usaría ./secrets/grafana_access.ini del checkout y
+# Docker crearía ahí un directorio (Grafana no arrancaría)
+: > "${TMP}/secrets/grafana_access.ini" && chmod 644 "${TMP}/secrets/grafana_access.ini"
+printf 'GRAFANA_ADMIN_PASSWORD=%s\nOBS_APP_NETWORK=%s\nGRAFANA_LOCAL_PORT=%s\nOBS_DISCORD_WEBHOOK_FILE=%s\nOBS_GRAFANA_ACCESS_FILE=%s\n' \
+  "$(openssl rand -hex 16)" "${APP_NET}" "${GPORT}" "${TMP}/secrets/discord_webhook_url" "${TMP}/secrets/grafana_access.ini" > "${TMP}/obs.env"
 chmod 600 "${TMP}/obs.env"
 # Raíz sintética para Alloy: el journal sintético en lugar del de la máquina
 cat > "${TMP}/override.yml" <<EOF
@@ -275,8 +279,8 @@ for p in observability.yml observability-logs-rollback.yml; do
   check "Ansible: playbooks/${p} sintácticamente válido" \
     bash -c "cd '${ANSIBLE_DIR}' && ANSIBLE_CONFIG=ansible.cfg ansible-playbook --syntax-check playbooks/${p}"
 done
-check "Ansible: el workflow de producción no corre los playbooks de observabilidad" \
-  bash -c "! grep -rq 'observability' '${ROOT}/.github/workflows'"
+check "Ansible: el workflow de producción corre solo observability.yml (y su comprobación previa), nunca la retirada de logs ni el perfil de laboratorio" \
+  bash -c "! grep -rqE 'observability-logs-rollback|logs-lab-synthetic|logs_lab_authorization' '${ROOT}/.github/workflows' && [ \"\$(grep -ohE 'playbooks/observability[a-z-]*\\.yml' '${ROOT}/.github/workflows/production-hetzner.yml' | sort -u | paste -sd,)\" = 'playbooks/observability-preflight.yml,playbooks/observability.yml' ]"
 check "Ansible: converge y deploy no incluyen el rol observability" \
   bash -c "! grep -q observability '${ANSIBLE_DIR}/playbooks/converge.yml' '${ANSIBLE_DIR}/playbooks/deploy.yml'"
 # Política de fuentes: solo la tarea de cálculo y la aserción, en local, sin host
@@ -285,7 +289,7 @@ cat > "${TMP}/policy.yml" <<EOF
   gather_facts: false
   connection: local
   tasks:
-    - ansible.builtin.include_vars: ${ANSIBLE_DIR}/roles/observability/defaults/main.yml
+    - ansible.builtin.include_vars: ${ANSIBLE_DIR}/roles/observability/defaults/main/log_policy.yml
     - ansible.builtin.include_tasks: ${TMP}/policy-tasks.yml
 EOF
 cp "${ANSIBLE_DIR}/roles/observability/tasks/log_policy.yml" "${TMP}/policy-tasks.yml"
@@ -319,13 +323,14 @@ for svc in migrate grafana alloy loki prometheus; do
     rejected "{\"logs_lab_authorization\": \"synthetic-data-only\", \"obs_log_services\": [\"${svc}\"]}"
 done
 check "política: el perfil no toma la decisión de privacidad (ninguna por defecto ni en el perfil; sin autorización por defecto)" \
-  bash -c "test \"\$(yq -r '.obs_log_privacy_controls_done | length' '${ANSIBLE_DIR}/roles/observability/defaults/main.yml')\" = 0 && ! yq -e 'has(\"logs_lab_authorization\")' '${ANSIBLE_DIR}/roles/observability/defaults/main.yml' && ! yq -e 'has(\"obs_log_privacy_controls_done\")' '${ANSIBLE_DIR}/profiles/logs-lab-synthetic.yml'"
+  bash -c "test \"\$(yq -r '.obs_log_privacy_controls_done | length' '${ANSIBLE_DIR}/roles/observability/defaults/main/log_policy.yml')\" = 0 && ! yq ea -e 'has(\"logs_lab_authorization\")' '${ANSIBLE_DIR}/roles/observability/defaults/main/'*.yml && ! yq -e 'has(\"obs_log_privacy_controls_done\")' '${ANSIBLE_DIR}/profiles/logs-lab-synthetic.yml'"
 cat > "${TMP}/dropin.yml" <<EOF
 - hosts: localhost
   gather_facts: false
   connection: local
   tasks:
-    - ansible.builtin.include_vars: ${ANSIBLE_DIR}/roles/observability/defaults/main.yml
+    - ansible.builtin.include_vars:
+        dir: ${ANSIBLE_DIR}/roles/observability/defaults/main
     - ansible.builtin.template:
         src: ${ANSIBLE_DIR}/roles/observability/templates/journald-piedrazul-obs.conf.j2
         dest: ${TMP}/dropin.conf
@@ -335,7 +340,7 @@ ANSIBLE_CONFIG="${ANSIBLE_DIR}/ansible.cfg" ANSIBLE_BECOME=false ansible-playboo
 check "drop-in de journald: persistente, 2G, archivos de 128M, 7 días y nada más" \
   test "$(grep -vE '^\s*(#|$)' "${TMP}/dropin.conf" 2>/dev/null | tr '\n' ' ')" = "[Journal] Storage=persistent SystemMaxUse=2G SystemMaxFileSize=128M MaxRetentionSec=7day "
 check "drop-in de journald: ruta propia en journald.conf.d" \
-  test "$(yq -r '.obs_journald_dropin' "${ANSIBLE_DIR}/roles/observability/defaults/main.yml")" = /etc/systemd/journald.conf.d/60-piedrazul-obs.conf
+  test "$(yq -r '.obs_journald_dropin' "${ANSIBLE_DIR}/roles/observability/defaults/main/stack.yml")" = /etc/systemd/journald.conf.d/60-piedrazul-obs.conf
 check "Ansible: el rol no toca daemon.json ni otras unidades (solo systemd-journald)" \
   bash -c "! grep -rqE 'daemon\.json|log-driver' '${ANSIBLE_DIR}/roles/observability' && test \"\$(grep -rhE -A1 'ansible.builtin.(systemd_service|systemd|service):' '${ANSIBLE_DIR}/roles/observability/tasks' | grep -oE 'name: [a-z.-]+' | sort -u)\" = 'name: systemd-journald'"
 

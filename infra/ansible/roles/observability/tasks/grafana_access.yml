@@ -1,0 +1,100 @@
+# Operación grafana-access: reconcilia solo la autorización de Grafana (listas Viewer/Editor).
+# Escribe el archivo de acceso y, si el Grafana en marcha no lo ve, recrea solo Grafana, sin sus
+# dependencias (no espera a Prometheus) y con los archivos de Compose que ya tiene el host (los
+# que dejó la última operación full: imágenes ya autorizadas, sin copiar configuración del
+# repositorio). No consulta Prometheus, Loki, Alloy, Alertmanager ni la aplicación: una
+# revocación no depende de su salud. No cambia el modo de acceso (Access sigue habilitado o no
+# según el host) ni el administrador local.
+
+- name: Validar las listas de Grafana
+  ansible.builtin.include_tasks: access_lists.yml
+
+- name: Buscar la instalación del stack
+  ansible.builtin.stat:
+    path: "{{ obs_dir }}/{{ item }}"
+    get_checksum: false
+  loop: [.env, compose.yml]
+  register: obs_ga_installed
+
+- name: Exigir el stack instalado
+  ansible.builtin.assert:
+    that: obs_ga_installed.results | rejectattr('stat.exists') | list | length == 0
+    fail_msg: >-
+      grafana-access: {{ obs_dir }} no tiene el stack instalado (.env y compose.yml). Correr primero
+      la operación full. No se cambió nada.
+    quiet: true
+
+- name: Leer el estado del stack en el host
+  ansible.builtin.slurp:
+    src: "{{ obs_dir }}/.env"
+  register: obs_ga_env
+  # .env contiene la contraseña de Grafana: solo se extraen COMPOSE_FILE y el interruptor
+  no_log: true
+
+- name: Extraer los archivos de Compose y el modo de acceso
+  ansible.builtin.set_fact:
+    obs_ga_state: >-
+      {%- set d = {} -%}
+      {%- for line in (obs_ga_env.content | b64decode).splitlines() -%}
+        {%- set kv = line.split('=', 1) -%}
+        {%- if kv | length == 2 and kv[0] in ['COMPOSE_FILE', 'GRAFANA_ACCESS_ENABLED'] -%}
+          {%- set _ = d.update({kv[0]: kv[1]}) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ d }}
+  no_log: true
+
+- name: Fijar los archivos de Compose del host
+  ansible.builtin.set_fact:
+    obs_compose_files: "{{ (obs_ga_state.COMPOSE_FILE | default('')).split(':') | reject('equalto', '') | list }}"
+    obs_ga_access_enabled: "{{ obs_ga_state.GRAFANA_ACCESS_ENABLED | default('') | string | lower }}"
+
+- name: Exigir el estado del stack legible
+  ansible.builtin.assert:
+    that:
+      - obs_compose_files | length > 0
+      - obs_compose_files | reject('in', ['compose.yml', 'compose.access.yml']) | list | length == 0
+      - obs_ga_access_enabled | string | lower in ['true', 'false']
+    fail_msg: >-
+      grafana-access: el .env del host no tiene COMPOSE_FILE ni GRAFANA_ACCESS_ENABLED válidos (lo
+      escribe una operación full). No se cambió nada.
+    quiet: true
+
+- name: Escribir el archivo de acceso de Grafana
+  ansible.builtin.include_tasks: grafana_access_file.yml
+
+- name: Activar el archivo de acceso en Grafana
+  ansible.builtin.include_tasks: activate_secrets.yml
+  vars:
+    obs_activate_services: [grafana]
+
+- name: Esperar a Grafana
+  ansible.builtin.command:
+    argv: "{{ ['docker', 'compose', '--project-name', obs_compose_project_name]
+              + (obs_compose_files | map('regex_replace', '^', '--file=') | list)
+              + ['exec', '-T', 'grafana', 'wget', '-qO-', 'http://localhost:3000/api/health'] }}"
+    chdir: "{{ obs_dir }}"
+  register: obs_ga_health
+  changed_when: false
+  until: obs_ga_health.rc == 0
+  retries: 24
+  delay: 5
+  failed_when: false
+
+- name: Grafana responde
+  ansible.builtin.assert:
+    that: obs_ga_health.rc == 0
+    fail_msg: "grafana-access: Grafana no respondió en 2 minutos después de la activación."
+    quiet: true
+
+- name: Verificar la autorización efectiva de Grafana
+  ansible.builtin.include_tasks: verify_grafana_auth.yml
+  vars:
+    obs_expected_access_on: "{{ obs_ga_access_enabled | bool }}"
+
+- name: Informar la operación grafana-access (sin correos)
+  ansible.builtin.debug:
+    msg: >-
+      grafana-access: Viewer={{ obs_grafana_list_counts.viewers }}, Editor={{ obs_grafana_list_counts.editors }};
+      Grafana {{ 'recreado' if 'grafana' in obs_secret_recreated else 'sin cambios (ya veía el archivo vigente)' }};
+      acceso por JWT {{ 'habilitado' if obs_ga_access_enabled | bool else 'deshabilitado' }}.

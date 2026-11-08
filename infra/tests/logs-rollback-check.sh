@@ -89,6 +89,8 @@ printf 'GRAFANA_ADMIN_PASSWORD=%s\nOBS_APP_NETWORK=%s\nGRAFANA_LOCAL_PORT=%s\nOB
   "$(openssl rand -hex 16)" "${NET}" "${GPORT}" > "${H}/.env"
 chmod 600 "${H}/.env"
 mkdir -p "${H}/secrets" && : > "${H}/secrets/discord_webhook_url" && chmod 644 "${H}/secrets/discord_webhook_url"
+# Archivo de acceso de Grafana (secreto grafana_access): vacío = nadie obtiene rol por JWT
+: > "${H}/secrets/grafana_access.ini" && chmod 644 "${H}/secrets/grafana_access.ini"
 docker network create "${NET}" >/dev/null
 STARTED=true
 dc up -d --wait --wait-timeout 180 > "${TMP}/up.log" 2>&1 || { ko "con logs: stack levantado"; tail -20 "${TMP}/up.log" >&2; exit 1; }

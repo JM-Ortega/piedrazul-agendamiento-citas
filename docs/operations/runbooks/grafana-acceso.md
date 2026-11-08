@@ -7,19 +7,15 @@ validando el JWT de Access y autorizando por su propia lista, y conservar una re
 administrativa independiente de Cloudflare por túnel SSH y el administrador local.
 
 **Estado.** El repositorio implementa y prueba en local la configuración (Grafana, Traefik, rol de
-Ansible). Fuera del repositorio, el operador **preparó** (informado el 2026-11-04; no integrado ni
-verificado contra este stack):
-
-- aplicación de Access `grafana` para `grafana.piedrazul.org`, con la política
-  `Grafana Operators` (dos identidades individuales) y sesión de 24 h;
-- equipo de Zero Trust `piedrazul.cloudflareaccess.com` y el AUD Tag de la aplicación, que el
-  operador guarda (no está en el repositorio).
-
-**No existen todavía**: el registro DNS `grafana`, el router en el inventario
-(`grafana_public_domain: ""`), un despliegue con `obs_grafana_access_enabled` ni ninguna
-verificación en vivo. Hasta entonces Grafana se usa solo por túnel (modo privado, como S1/S2).
-Lo anterior es un registro de lo preparado, no una garantía del repositorio: antes de activar,
-confirmarlo en el panel de Cloudflare (paso 1 de [Activación](#activación)).
+Ansible, workflow). Fuera del repositorio, el operador administra en Cloudflare, y confirmó como
+valores operativos definitivos, la aplicación de Access `grafana` para `grafana.piedrazul.org` (política
+`Grafana Operators`, sesión de 24 h), el equipo `piedrazul.cloudflareaccess.com`, su emisor
+(`https://piedrazul.cloudflareaccess.com`), su JWKS (`/cdn-cgi/access/certs`), el AUD Tag de la
+aplicación y el DNS. La cadena no los crea ni los modifica: consume sus identificadores, que no son
+secretos, desde el inventario versionado (`group_vars/all.yml`: `obs_grafana_access_enabled`,
+`obs_grafana_public_domain`, `obs_grafana_access_team_domain`, `obs_grafana_access_aud`). El router
+de Traefik (`grafana_public_domain`) se deriva del mismo dominio y del mismo interruptor: una sola
+fuente para los dos consumidores. Falta la verificación en vivo (abajo).
 
 ## Modelo
 
@@ -62,7 +58,7 @@ Configuración en `infra/observability/compose.yml` (variables `GF_AUTH_JWT_*`):
 | `aud` | el AUD Tag de la aplicación de Access de Grafana | 401 |
 | `type` | `app` (un token de organización no sirve) | 401 |
 | `exp` | vigente; un token **sin** `exp` no obtiene rol (Grafana no lo exige por sí mismo) | 401 / 403 |
-| Autorización | `lower(email)` en `GRAFANA_ACCESS_EDITORS` → Editor; en `GRAFANA_ACCESS_VIEWERS` → Viewer; otro, con comas o sin correo → sin rol (`role_attribute_strict`) | 403 |
+| Autorización | `lower(email)` en la lista Editor → Editor; en la lista Viewer → Viewer; otro, con comas o sin correo → sin rol (`role_attribute_strict`) | 403 |
 
 Nunca se asigna `Admin` de organización ni administrador del servidor por JWT
 (`allow_assign_grafana_admin=false`, la expresión solo produce Editor o Viewer). El primer acceso
@@ -80,8 +76,8 @@ Snapshots y dashboards compartidos públicamente están deshabilitados (`GF_SNAP
 |---|---|---|---|
 | Plataforma | operador con SSH (`ansible` + sudo) | túnel, `docker compose`, Ansible | el host, el stack, `.env`, el webhook |
 | Administrador de Grafana | cuenta local `admin`, contraseña en `/opt/piedrazul-obs/.env` | solo por el túnel (la ruta pública no enruta `/login` ni deja pasar `Authorization`) | usuarios, fuentes de datos, configuración de Grafana |
-| Editor | correos de `obs_grafana_access_editors` | Access | dashboards (no fuentes de datos ni usuarios) |
-| Viewer | correos de `obs_grafana_access_viewers` | Access | lectura |
+| Editor | correos de `GRAFANA_EDITOR_EMAILS` | Access | dashboards (no fuentes de datos ni usuarios) |
+| Viewer | correos de `GRAFANA_VIEWER_EMAILS` | Access | lectura |
 
 El administrador local tiene el correo reservado `admin@piedrazul-obs.invalid` (aplicado al crear la
 base de Grafana). Grafana vincula un JWT a un usuario existente con el mismo correo; ninguna
@@ -128,18 +124,66 @@ a `/login` en el mismo origen, formulario, cookie `grafana_session` guardada (`S
 administración, navegación a un dashboard, recarga y logout. También por API: login con el JWKS
 inalcanzable y tras un intento de vincular el correo del administrador.
 
-**No probado aquí** (verificación en vivo, ver [Activación](#activación)): el transporte SSH real
+**No probado aquí** (verificación en vivo, ver [Activación y desactivación](#activación-y-desactivación)): el transporte SSH real
 (`ssh -L` desde la máquina del operador), el navegador de escritorio del operador (versión y
 extensiones propias) y Safari/WebKit.
 
+## Listas de operadores
+
+Las listas de autorización de Grafana son dos **secretos** del environment `production-hetzner`
+(no variables: el repositorio es público y los logs de Actions también):
+
+| secreto | rol en Grafana |
+|---|---|
+| `GRAFANA_VIEWER_EMAILS` | Viewer (lectura) |
+| `GRAFANA_EDITOR_EMAILS` | Editor (dashboards) |
+
+**Formato.** Correos separados por comas, con espacios alrededor permitidos, en minúsculas y con
+dominio real (sin `.invalid`), por ejemplo `persona.uno@unicauca.edu.co, persona.dos@unicauca.edu.co`;
+o exactamente `none` para una lista vacía (GitHub no guarda secretos vacíos). Se rechaza, antes de
+cualquier conexión al servidor y sin mostrar ningún correo: un secreto ausente, una entrada vacía
+(coma final), mayúsculas, un correo repetido, el mismo correo en las dos listas, más de 50 entradas
+o `none` mezclado con correos. Los secretos se escriben siempre completos: GitHub no los muestra
+después, así que el operador conserva la lista vigente fuera del repositorio.
+
+**Son autoritativas en cada run** que toca el stack: el rol nunca conserva una lista anterior del
+host, y sin uno de los secretos el run falla sin cambiar nada. Las listas llegan a Grafana en su
+archivo de configuración (`/opt/piedrazul-obs/secrets/grafana_access.ini`, del UID de Grafana, solo
+legible por él; `GF_PATHS_CONFIG`), no en el entorno del contenedor, en `.env` ni en etiquetas. El
+resumen del run solo muestra cuántas entradas tiene cada lista.
+
+**Aplicar un cambio de las listas** (no dispara ningún workflow por sí solo): Actions →
+*Producción — Hetzner* → *Run workflow* en `main`, con `observability=grafana-access` y todo lo demás
+en `false`/vacío. Esa operación, con la aprobación del environment, la identidad del host y la
+frescura de `main`:
+
+1. valida las listas sin red;
+2. escribe el archivo de acceso y recrea **solo Grafana** (sin dependencias: no espera a Prometheus)
+   con los archivos de Compose que ya tiene el host;
+3. verifica en Grafana el modo JWT, el rol estricto, la ausencia de administrador por JWT y que la
+   expresión cargada sea la de las listas pedidas (comparada sin mostrarla).
+
+No depende de la salud de Prometheus, Loki, Alloy, Alertmanager ni de la aplicación, no escanea
+imágenes y no avanza el progreso del stack. Exige el stack ya instalado por una operación `full`.
+Cualquier operación `full` aplica también las listas vigentes.
+
+**Revocación.** Quitar un correo y aplicar le quita el rol en la petición siguiente a la recreación
+de Grafana, también con un JWT de Access todavía vigente (probado). Con las dos listas en `none`,
+nadie entra por JWT; Cloudflare Access, el modo JWT de Grafana y el administrador local por túnel no
+cambian. Cambiar una lista **no** agrega ni quita a nadie de la política de Access: entrar por
+Access sigue siendo una operación aparte en Cloudflare, y una sesión de Access ya emitida sigue
+vigente hasta su vencimiento (hasta 24 h) aunque Grafana ya le niegue el rol.
+
+Los roles de cada persona los decide quien administra el servicio; el repositorio no los contiene.
+
 ## Estado deseado
 
-El estado deseado no secreto se guarda en `/opt/piedrazul-obs/.env` (root, 0600) y es
-**persistente**: las variables del rol valen `~` por defecto, que significa "conservar lo que el host
-ya tiene". Cada valor se resuelve así: dado en este run (`-e`, `host_vars`) > guardado en el host >
-inicial. Un run de mantenimiento de `observability.yml` sin `-e` no activa ni desactiva nada.
-Desactivar es explícito y conserva identificadores y listas; volver a habilitar solo necesita el
-interruptor. El webhook de Discord no es parte de este estado ([Alertas](alertas.md#credencial)).
+El resto del estado no secreto se guarda en `/opt/piedrazul-obs/.env` (root, 0600). En producción el
+inventario lo da siempre (`group_vars/all.yml`); en una ejecución manual sin inventario, las
+variables del rol valen `~` ("conservar lo que el host ya tiene"): dado en este run (`-e`,
+inventario) > guardado en el host > inicial. Desactivar es explícito y conserva los identificadores.
+El webhook de Discord y las listas de correos no son parte de este estado ([Alertas](alertas.md#credencial),
+[Listas de operadores](#listas-de-operadores)).
 
 | Variable del rol | `.env` | Inicial | Validación antes de tocar nada |
 |---|---|---|---|
@@ -147,69 +191,34 @@ interruptor. El webhook de Discord no es parte de este estado ([Alertas](alertas
 | `obs_grafana_public_domain` | `GRAFANA_PUBLIC_DOMAIN` (y `GRAFANA_ROOT_URL=https://<dominio>/` solo habilitado) | vacío | nombre DNS en minúsculas |
 | `obs_grafana_access_team_domain` | `GRAFANA_ACCESS_TEAM_DOMAIN` | vacío | `<equipo>.cloudflareaccess.com` |
 | `obs_grafana_access_aud` | `GRAFANA_ACCESS_AUD` | vacío | 64 hex |
-| `obs_grafana_access_editors`, `obs_grafana_access_viewers` | `GRAFANA_ACCESS_EDITORS`, `GRAFANA_ACCESS_VIEWERS` | vacías | listas; al menos un correo habilitado; minúsculas, dominio real, sin `.invalid`, sin repetir |
 | — (derivado) | `COMPOSE_FILE` | `compose.yml` | con el acceso: `compose.yml:compose.access.yml` |
 | `obs_edge_network` | `OBS_EDGE_NETWORK` | `piedrazul_obs_edge` | con el acceso: debe existir y ser interna |
 
-Los correos de los operadores son personales: se pasan una vez al activar (`-e`) y quedan solo en
-el `.env` del host, nunca en el repositorio ni en el inventario versionado. `COMPOSE_FILE` hace que
-un `docker compose` manual en `/opt/piedrazul-obs` use los mismos archivos que el rol.
+`COMPOSE_FILE` hace que un `docker compose` manual en `/opt/piedrazul-obs` use los mismos archivos
+que el rol. Una versión anterior guardaba las listas en `.env` (`GRAFANA_ACCESS_EDITORS`,
+`GRAFANA_ACCESS_VIEWERS`): el primer run las retira.
 
-**Modo privado** (acceso deshabilitado, por defecto): solo `compose.yml`; Grafana en `obs_net` y el
-loopback; no exige `piedrazul_obs_edge`. Es el modo de un host con S1/S2 sin la aplicación F2
-completa (el laboratorio `obs`). **Modo público**: además `compose.access.yml`, que une Grafana a
-la red interna que crea `compose/traefik.yml` de la aplicación; el rol falla sin cambiar nada si la
-red no existe.
+**Modo privado** (acceso deshabilitado): solo `compose.yml`; Grafana en `obs_net` y el loopback; no
+exige `piedrazul_obs_edge`. **Modo público** (el de producción): además `compose.access.yml`, que une
+Grafana a la red interna que crea `compose/traefik.yml` de la aplicación; el rol falla sin cambiar
+nada si la red no existe.
 
-El router de Traefik lo controla, aparte, `grafana_public_domain` en el inventario de la
-aplicación (`group_vars/all.yml`, vacío): con él vacío no hay router aunque Grafana acepte JWT; con
-el router y sin JWT habilitado, la ruta no tiene ninguna forma de autenticarse (falla cerrado).
+## Activación y desactivación
 
-## Activación
+En producción el acceso está habilitado en el inventario: Run I lo aplica en orden (el converge de
+la aplicación crea la red interna y el router; después el job *Observabilidad* configura Grafana con
+el JWT de Access). Cambiar el interruptor, el dominio o el AUD es un cambio del inventario, que un
+push aplica a los dos consumidores (converge y stack). Desactivar es
+`obs_grafana_access_enabled: false` en el inventario: sin router y Grafana sin JWT (solo túnel);
+identificadores guardados. Los usuarios creados por JWT quedan en la base de Grafana sin acceso;
+borrarlos desde el túnel si se quiere.
 
-Orden; cada paso externo pertenece a una unidad de trabajo autorizada aparte. Un host puede quedar
-en modo privado indefinidamente (pasos 2 y siguientes solo cuando se quiera el acceso público).
-
-1. **Cloudflare: verificar lo preparado, no recrearlo.** En Zero Trust → Access → Applications,
-   la aplicación `grafana` (dominio `grafana.piedrazul.org`, tipo *self-hosted*), su política
-   `Grafana Operators` (las dos identidades) y la duración de sesión (24 h); copiar el AUD Tag de
-   esa aplicación y confirmar el dominio del equipo (`piedrazul.cloudflareaccess.com`, en Settings
-   → Custom Pages / Team domain). Si algo difiere de lo informado, decidir antes de seguir; no
-   crear una segunda aplicación.
-2. **Aplicación** (converge/deploy de esta versión): `compose/traefik.yml` crea la red interna
-   `piedrazul_obs_edge` y une a Traefik. Sin router todavía.
-3. **Stack con Access** (una sola vez; queda guardado en el host):
-
-   ```bash
-   cd infra/ansible
-   ansible-playbook playbooks/observability.yml \
-     -e obs_grafana_access_enabled=true \
-     -e obs_grafana_public_domain=grafana.piedrazul.org \
-     -e obs_grafana_access_team_domain=piedrazul.cloudflareaccess.com \
-     -e obs_grafana_access_aud=<AUD Tag de la aplicación grafana> \
-     -e '{"obs_grafana_access_viewers": ["<correo 1>", "<correo 2>"], "obs_grafana_access_editors": []}'
-   ```
-
-   Las dos identidades de `Grafana Operators` van en Viewer o en Editor según el rol que deban
-   tener en Grafana (la política de Access no da roles). La verificación del rol comprueba en
-   Grafana el modo JWT, el JWKS, `role_attribute_strict`, la ausencia de administrador por JWT y la
-   `root_url`. Después, `observability.yml` sin `-e` lo conserva.
-4. **DNS (externo)**: registro `grafana` proxied hacia el servidor (AOP ya aplica a la zona).
-5. **Router**: `grafana_public_domain: grafana.piedrazul.org` en el inventario y converge.
-6. **Verificación en vivo** (pendiente, no hecha): con cada identidad de la lista → Grafana con su
-   rol; con una identidad que Access permite pero fuera de la lista → 403; sin sesión de Access →
-   pantalla de Access; `https://grafana.piedrazul.org/login` → 404; petición directa a la IP del
-   servidor con `Host: grafana.piedrazul.org` → sin handshake; **recuperación**: `ssh -L` real desde
-   la máquina del operador y login local en su navegador con el acceso público habilitado;
-   registrar el efecto de revocar una sesión en Access.
-
-## Desactivación
-
-Vaciar `grafana_public_domain` y converge (sin router), y repetir `observability.yml` con
-`-e obs_grafana_access_enabled=false` (Grafana sin JWT, modo privado; los runs siguientes sin `-e`
-lo mantienen). Identificadores y listas quedan guardados: volver a habilitar es
-`-e obs_grafana_access_enabled=true`. Los usuarios creados por JWT quedan en la base de Grafana sin
-acceso; borrarlos desde el túnel si se quiere. La red de entrada de la aplicación se conserva.
+**Verificación en vivo** (pendiente, no hecha): con cada identidad de las listas → Grafana con su rol;
+con una identidad que Access permite pero fuera de las listas → 403; sin sesión de Access → pantalla
+de Access; `https://grafana.piedrazul.org/login` → 404; petición directa a la IP del servidor con
+`Host: grafana.piedrazul.org` → sin handshake; **recuperación**: `ssh -L` real desde la máquina del
+operador y login local en su navegador con el acceso público habilitado; una operación
+`grafana-access` que quita una identidad; registrar el efecto de revocar una sesión en Access.
 
 ## Limitaciones
 
@@ -218,7 +227,7 @@ acceso; borrarlos desde el túnel si se quiere. La red de entrada de la aplicaci
   Access). Revocar en Access deja de entregar JWT nuevos en el borde; un JWT ya emitido sigue
   siendo válido para Grafana hasta su `exp` si llegara al origen (solo puede llegar por
   Cloudflare). Con la sesión de 24 h preparada, ese plazo es de hasta 24 h. Quitar un correo de la
-  lista y repetir el playbook (que recrea Grafana) le quita el acceso en la petición siguiente,
+  lista y aplicar `grafana-access` (que recrea Grafana) le quita el acceso en la petición siguiente,
   también con un JWT vigente (probado): es la revocación inmediata del lado de Grafana. Verificar
   en vivo la revocación en Access.
 - **Rotación de claves de Access.** Una clave nueva se acepta cuando vence la caché del JWKS
@@ -234,6 +243,10 @@ acceso; borrarlos desde el túnel si se quiere. La red de entrada de la aplicaci
 - **Bases antiguas.** `GF_SECURITY_ADMIN_EMAIL` solo se aplica al crear la base: un Grafana
   creado antes conserva `admin@localhost`, igual protegido porque el rol rechaza ese correo en las
   listas.
+- **Archivo de configuración de Grafana.** `GF_PATHS_CONFIG` apunta al archivo de acceso: la
+  configuración de la imagen (`/etc/grafana/grafana.ini`) no se carga. En Grafana 13.3.0 ese archivo
+  solo fija valores de alerting unificado y reglas de grabación, deshabilitados o por defecto aquí
+  (comprobado al fijar la versión); revisarlo al cambiar de imagen.
 
 ## Pruebas
 
@@ -256,7 +269,9 @@ modo privado sin red de entrada, rechazos sin escribir).
 | Síntoma | Causa probable | Acción |
 |---|---|---|
 | 403 `Invalid Role in claim` | correo fuera de las listas, en otra forma o con mayúsculas en la lista | comparar con el correo del JWT (`/cdn-cgi/access/get-identity` en el navegador) y repetir el playbook |
-| 401 `Failed to verify JWT` | AUD o equipo equivocados, JWT vencido, clave recién rotada | revisar `GRAFANA_ACCESS_AUD`/`TEAM_DOMAIN`; esperar ≤ 5 min tras una rotación |
+| 401 `Failed to verify JWT` | AUD o equipo equivocados, JWT vencido, clave recién rotada | revisar `obs_grafana_access_aud`/`obs_grafana_access_team_domain` del inventario; esperar ≤ 5 min tras una rotación |
+| 403 para un operador que debería entrar | su correo no está en `GRAFANA_VIEWER_EMAILS`/`GRAFANA_EDITOR_EMAILS` tal como lo entrega el proveedor de identidad, o el cambio no se aplicó | corregir el secreto y correr `observability=grafana-access` |
+| el run falla con `LISTAS DE GRAFANA` | secreto ausente o con formato inválido (el mensaje dice cuál y en qué posición, sin el correo) | corregir el secreto; el host no cambió |
 | 401 en todo con Access correcto | Grafana no alcanza el JWKS (salida de `obs_net`, DNS) y la caché venció | `docker compose logs grafana`; recuperar por túnel |
 | 404 en `grafana.piedrazul.org` | sin router (`grafana_public_domain` vacío) o `/login` | habilitar el router; el login local es solo por túnel |
 | 502 en `grafana.piedrazul.org` | Grafana caído o fuera de `piedrazul_obs_edge` | `docker compose ps` en `/opt/piedrazul-obs` |

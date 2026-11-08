@@ -190,6 +190,8 @@ put_secret() { # <contenido> → archivo del UID 65534, 0400, como lo deja el ro
 }
 chmod 0777 "${TMP}/secrets"   # el contenedor (65534) escribe aquí solo en la preparación
 put_secret "${URL_A}"
+# Archivo de acceso de Grafana (secreto grafana_access): vacío = nadie obtiene rol por JWT
+: > "${TMP}/secrets/grafana_access.ini" && chmod 644 "${TMP}/secrets/grafana_access.ini"
 chmod 0700 "${TMP}/secrets"
 cat > "${TMP}/obs.env" <<EOF
 GRAFANA_ADMIN_PASSWORD=unused-$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n')
@@ -198,6 +200,7 @@ OBS_EDGE_NETWORK=${EDGE_NET}
 OBS_ALERT_RECEIVER=none
 OBS_ENVIRONMENT=delivery-check
 OBS_DISCORD_WEBHOOK_FILE=${TMP}/secrets/discord_webhook_url
+OBS_GRAFANA_ACCESS_FILE=${TMP}/secrets/grafana_access.ini
 EOF
 check "secreto: archivo 0400 del UID 65534 dentro de un directorio 0700" \
   bash -c "test \"\$(docker run --rm -u 0 -v '${TMP}/secrets:/s:ro' --entrypoint stat '${AM_IMAGE}' -c '%a %u' /s/discord_webhook_url)\" = '400 65534' && test \"\$(stat -c %a '${TMP}/secrets')\" = 700"
@@ -245,7 +248,7 @@ obs config --format json > "${C}" 2>/dev/null
 check "Compose: alertmanager sin puertos, sin clúster, solo en obs_net, raíz de solo lectura y sin privilegios" \
   bash -c "jq -e '.services.alertmanager | ((.ports // []) | length == 0) and (.networks | keys == [\"obs_net\"]) and .read_only == true and .cap_drop == [\"ALL\"] and ((.security_opt // []) | index(\"no-new-privileges:true\")) and (.command | index(\"--cluster.listen-address=\")) and .user == \"65534:65534\"' '${C}'"
 check "Compose: el secreto del webhook solo lo monta alertmanager" \
-  test "$(jq -r '[.services | to_entries[] | select((.value.secrets // []) | length > 0) | .key] | join(",")' "${C}")" = alertmanager
+  test "$(jq -r '[.services | to_entries[] | select((.value.secrets // []) | map(.source // .) | index("discord_webhook_url") != null) | .key] | join(",")' "${C}")" = alertmanager
 check "Compose: la configuración renderizada no contiene el webhook" bash -c "! grep -qF '${TOKEN_A}' '${C}'"
 check "Compose: receptor none por defecto" \
   test "$(printf 'GRAFANA_ADMIN_PASSWORD=x\n' > "${TMP}/min.env"; docker compose -f "${OBS}/compose.yml" --env-file "${TMP}/min.env" config --format json 2>/dev/null | jq -r '.services.alertmanager.command[0]')" = "--config.file=/etc/alertmanager/none.yml"

@@ -1,0 +1,59 @@
+# Autorización efectiva de Grafana, leída de lo que Grafana cargó (/api/admin/settings, con el
+# administrador local desde dentro del contenedor): modo JWT pedido, rol estricto, nunca
+# administrador del servidor por JWT y role_attribute_path igual al del archivo de acceso
+# (comparado en memoria: la expresión contiene los correos y nunca se muestra).
+#
+# Entrada: obs_expected_access_on (bool); con el acceso habilitado y obs_s3_* definidos (operación
+# full), también el JWKS del equipo y la root_url.
+
+- name: Leer la configuración efectiva de autenticación de Grafana
+  ansible.builtin.command:
+    argv: "{{ ['docker', 'compose', '--project-name', obs_compose_project_name]
+              + (obs_compose_files | map('regex_replace', '^', '--file=') | list)
+              + ['exec', '-T', 'grafana', 'sh', '-c',
+                 'wget -qO- --header \"Authorization: Basic $(printf \"admin:%s\" \"$GF_SECURITY_ADMIN_PASSWORD\" | base64)\" \"http://localhost:3000/api/admin/settings\"'] }}"
+    chdir: "{{ obs_dir }}"
+  register: obs_grafana_settings
+  changed_when: false
+  failed_when: false
+  # La respuesta incluye role_attribute_path (los correos)
+  no_log: true
+
+- name: Comparar la autorización efectiva con la pedida (sin mostrar valores)
+  ansible.builtin.set_fact:
+    obs_grafana_auth_problems: >-
+      {%- set out = [] -%}
+      {%- if obs_grafana_settings.rc != 0 -%}
+        {%- set _ = out.append('Grafana no respondió a /api/admin/settings con el administrador local') -%}
+      {%- else -%}
+        {%- set st = obs_grafana_settings.stdout | from_json -%}
+        {%- set jwt = st['auth.jwt'] | default({}) -%}
+        {%- set expected = (lookup('ansible.builtin.template', 'grafana-access.ini.j2').splitlines()
+                            | select('match', '^role_attribute_path = ') | first | default(''))[22:] -%}
+        {%- if jwt.enabled | default('') != (obs_expected_access_on | bool | string | lower) -%}
+          {%- set _ = out.append('auth.jwt.enabled no es ' ~ (obs_expected_access_on | bool | string | lower)) -%}
+        {%- endif -%}
+        {%- if jwt.role_attribute_strict | default('') != 'true' -%}{%- set _ = out.append('role_attribute_strict no es true') -%}{%- endif -%}
+        {%- if jwt.allow_assign_grafana_admin | default('') != 'false' -%}{%- set _ = out.append('allow_assign_grafana_admin no es false') -%}{%- endif -%}
+        {%- if jwt.skip_org_role_sync | default('') != 'false' -%}{%- set _ = out.append('skip_org_role_sync no es false') -%}{%- endif -%}
+        {%- if jwt.header_name | default('') != 'Cf-Access-Jwt-Assertion' -%}{%- set _ = out.append('header_name inesperado') -%}{%- endif -%}
+        {%- if expected | length == 0 or jwt.role_attribute_path | default('') != expected -%}
+          {%- set _ = out.append('role_attribute_path cargado no es el del archivo de acceso vigente') -%}
+        {%- endif -%}
+        {%- if obs_expected_access_on | bool and obs_s3_team_domain is defined -%}
+          {%- if jwt.jwk_set_url | default('') != 'https://' ~ obs_s3_team_domain ~ '/cdn-cgi/access/certs' -%}
+            {%- set _ = out.append('jwk_set_url no es el del equipo de Access') -%}
+          {%- endif -%}
+          {%- if (st.server | default({})).root_url | default('') != 'https://' ~ obs_s3_public_domain ~ '/' -%}
+            {%- set _ = out.append('root_url no es https://' ~ obs_s3_public_domain ~ '/') -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+      {{ out }}
+  no_log: true
+
+- name: Grafana con la autorización pedida
+  ansible.builtin.assert:
+    that: obs_grafana_auth_problems | length == 0
+    fail_msg: "Grafana: {{ obs_grafana_auth_problems | join('; ') }}."
+    quiet: true

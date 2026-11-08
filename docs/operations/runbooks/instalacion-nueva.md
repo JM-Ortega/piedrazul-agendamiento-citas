@@ -8,9 +8,15 @@ confianza sigue con un solo run, sin pasos manuales.
 
 | etapa | qué hace | qué nunca hace |
 |---|---|---|
-| **Run P** (`stage=provision`) | comprobaciones previas de la instalación completa, plan revisado, Apply | SSH, configuración, deploy, publicación del frontend, último éxito |
+| **Run P** (`stage=provision`, `observability=full`) | comprobaciones previas de la instalación completa (también las del stack de observabilidad, sin red), plan revisado, Apply | SSH, configuración, deploy, observabilidad, publicación del frontend, último éxito |
 | **Fuera de banda** (operador) | autentica la clave del host por la consola de Hetzner y registra el pin | ningún workflow lo hace |
-| **Run I** (`stage=install`) | plan nuevo sin cambios, identidad verificada, converge, deploy, health, frontend | Terraform Apply |
+| **Run I** (`stage=install`, `observability=full`) | plan nuevo sin cambios, identidad verificada, converge, deploy, health, frontend y, después, el stack de observabilidad | Terraform Apply |
+
+El stack de observabilidad (Prometheus, Grafana, Loki, Alloy, Alertmanager) es parte obligatoria
+de la instalación: `stage=provision` e `install` exigen `observability=full` y no hay opción para
+omitirlo. Run P nunca lo instala (el servidor todavía no tiene la aplicación ni sus redes); Run I
+lo instala en su propio job, *Observabilidad*, después de la aplicación. Una aceptación
+excepcional sin él no es una opción de la cadena: es una decisión humana aparte.
 
 > **Estado de verificación.** El contrato está implementado y probado sin red
 > (`infra/tests/production-bootstrap-check.sh`, `infra/tests/pages-release-check.sh`,
@@ -68,6 +74,18 @@ entradas del primer administrador de negocio son la excepción a las comprobacio
 las recibe ni las exige, y con `IDENTITY_SEED_ENABLED=true` Run I falla si faltan, antes de tocar
 el servidor. Una instalación con el bootstrap en `false` o sin definir no las necesita.
 
+**Stack de observabilidad, en el mismo environment** (los consume solo el job *Observabilidad*;
+Run P y Run I comprueban su presencia y su forma sin red antes de mutar):
+
+- `GRAFANA_VIEWER_EMAILS` y `GRAFANA_EDITOR_EMAILS` (**secretos**, no variables: el repositorio
+  es público y los logs de Actions también): las listas de autorización de Grafana. Obligatorios;
+  `none` es una lista vacía. Formato y revocación: [grafana-acceso.md](grafana-acceso.md#listas-de-operadores).
+- `OBS_DISCORD_WEBHOOK_URL` (secreto): el webhook de Alertmanager para el receptor `discord` del
+  inventario ([alertas.md](alertas.md)).
+
+Los identificadores de Cloudflare Access de Grafana (dominio, equipo, AUD) no son secretos y
+están en el inventario versionado; la aplicación de Access y su DNS son del operador.
+
 **GitHub, variables:**
 
 - `PRODUCTION_SSH_HOST_PIN`, solo en el environment `production-hetzner`: la identidad autenticada
@@ -75,7 +93,8 @@ el servidor. Una instalación con el bootstrap en `false` o sin definir no las n
   (ver *Paso fuera de banda*). Una copia en el repositorio o la organización hace fallar la
   cadena: `vars` no distingue el origen y esa copia podría ocupar el lugar del pin protegido.
 - `PRODUCTION_PUSH_DEPLOY`, de repositorio: sin definir o `deferred` difiere los push; `enabled`
-  los procesa; otro valor hace fallar el push. Se habilita **después** de instalar, y Run P
+  los procesa; otro valor hace fallar el push. Se habilita **después** de instalar y solo por una
+  decisión humana explícita (ver *Después de instalar*: ningún resultado la concede), y Run P
   exige que esté retenida si el plan crea o reemplaza el servidor. No definirla en el environment:
   los push la leen sin environment y esa copia no cambiaría su decisión.
 
@@ -251,17 +270,33 @@ huella de un log de GitHub ni de `ssh-keyscan`: eso solo repite lo que dice quie
    contraseñas por SSH) → último éxito → imágenes, escaneo y política autoritativa, evaluados de
    nuevo → frescura → converge con Keycloak P2 → deploy con migración → identidad y health →
    registro del último éxito → publicación del frontend.
+6. **Stack de observabilidad** (job *Observabilidad*, tercera aprobación del mismo environment),
+   solo si el núcleo terminó bien: entradas sin red → estado actual de HCP e identidad del host
+   (el mismo pin) → política de las imágenes del stack (escaneadas antes del gate) → frescura →
+   `playbooks/observability.yml` con verificación `install` (también los destinos de la
+   aplicación). Después, *Estado de la instalación* informa el resultado de **este** Run I: READY,
+   INSTALADO / NOT READY o NO INSTALADO.
 
-Los datos que vencen no se heredan de Run P. Si algo falla después de la verificación, **se vuelve
-a lanzar Run I** sobre la misma instancia, sin otra autenticación fuera de banda: el pin sigue
-vigente.
+Los datos que vencen no se heredan de Run P. Si algo falla después de la verificación y antes de
+completar el núcleo, **se vuelve a lanzar Run I** sobre la misma instancia, sin otra autenticación
+fuera de banda: el pin sigue vigente. Si solo falló el stack de observabilidad, no hace falta
+repetir Run I: un dispatch `observability=full` lo completa. Ese dispatch informa el resultado de
+su propia operación (*APLICADO*); no reescribe el Run I, que sigue NOT READY, ni declara la
+instalación completa: lo que queda es evidencia de dos runs (el Run I y el dispatch posterior) que
+el operador revisa.
 
 ## Después de instalar: habilitar los push
 
-Cuando Run I termine bien, definir `PRODUCTION_PUSH_DEPLOY=enabled` en el repositorio. El primer
-push procesado cubre todo el rango pendiente: si no hay un rango procesado previo, clasifica el
-árbol completo (Terraform y deploy, con sus aprobaciones). Dispatches y pushes diferidos nunca
-avanzan el rango. Para detener de nuevo los push, volver a `deferred`.
+Habilitar los push es una **autorización humana aparte**, nunca una consecuencia automática de la
+instalación: ni un Run I en READY ni un dispatch `observability=full` aplicado la conceden ni cambian
+la variable. Requisitos previos: el núcleo instalado por un Run I y el stack aplicado después (en ese
+Run I o en un dispatch posterior), y la decisión explícita de quien responde por producción. Solo
+entonces se define `PRODUCTION_PUSH_DEPLOY=enabled` en el repositorio. Hasta esa decisión los push
+siguen diferidos. El primer push procesado cubre el rango pendiente desde el commit de Run I (núcleo) y desde el último
+stack de observabilidad aplicado: solo lo que cambió después. Sin una señal previa en la historia
+consultada, clasifica el árbol completo (Terraform y deploy, con sus aprobaciones). Los pushes
+diferidos y los dispatches ordinarios del núcleo nunca avanzan el núcleo; un dispatch
+`observability=full` avanza solo el stack. Para detener de nuevo los push, volver a `deferred`.
 
 ## Ciclo de vida de la identidad
 
@@ -360,23 +395,64 @@ cualquier deploy: una instalación nueva no tiene excepciones.
   3. Si ya está aplicando o aplicado: **no cancelarlo** (cancelar un Apply en curso puede dejar
      el estado a medias); dejarlo terminar. El siguiente run planifica sobre ese estado.
   4. Volver a lanzar el run de GitHub (re-run completo o el siguiente push).
-- **Concurrencia**: *Plan de Terraform* y *Producción* comparten el grupo
-  `piedrazul-production-hetzner`, y solo la punta de `main` puede iniciar una mutación. Si un
+- **Concurrencia**: *Plan de Terraform*, *Producción* y *Observabilidad* comparten el grupo
+  `piedrazul-production-hetzner`, y solo la punta de `main` puede iniciar una mutación
+  (*Observabilidad* lo comprueba justo antes de tocar el stack, también si el núcleo ya mutó en el
+  mismo run: si `main` avanzó queda **superado** y el run nuevo lo aplica). Si un
   commit nuevo planifica mientras un saved plan anterior espera la segunda aprobación, el
   anterior falla en la frescura al confirmar; si otro Apply cambia el estado, HCP descarta el
   saved plan y la revalidación lo detecta.
-- El rango de push solo avanza si el run es un push ordinario, termina en éxito y deja el job
-  *Rango procesado*. `success` no basta: un push diferido también termina así. Un fallo, una
-  cancelación, un run histórico sin ese job o un dispatch no lo avanzan; un primer push fallido
-  deja el siguiente también en modo árbol completo. Si GitHub no responde al leer los jobs, el
-  run falla: la falta de datos nunca se lee como rango procesado. Un job saltado nunca cuenta
-  como hecho: con Terraform, *Plan de Terraform* debe terminar bien con un resultado válido.
+- **Progreso por componente.** El núcleo (Terraform, servidor, aplicación, Pages) y el stack de
+  observabilidad avanzan por separado, cada uno con la señal de su último intento:
+  *Rango procesado* (núcleo: un push ordinario verificado por *Resultado de producción*, o un
+  Run I) y *Observabilidad procesada* (stack: una operación `full` aplicada y verificada, en un
+  push, un dispatch o Run I). La conclusión del run no cuenta: un run con el núcleo hecho y el
+  stack fallido termina en fallo, pero su núcleo queda procesado y el push siguiente no repite
+  build, migración ni Pages; solo el stack queda pendiente, y un dispatch `observability=full`
+  lo completa sin tocar el núcleo. Al revés, un núcleo fallido deja el stack sin ejecutar y
+  pendiente. Un push diferido, un fallo antes de la señal, una cancelación, un run histórico sin
+  ese job o un dispatch ordinario del núcleo no avanzan el núcleo; `grafana-access` no avanza el
+  stack. Si GitHub no responde al leer los jobs, el run falla: la falta de datos nunca se lee
+  como procesado; sin una señal en la historia consultada se reclasifica todo (más trabajo,
+  nunca menos). Un job saltado nunca cuenta como hecho: con Terraform, *Plan de Terraform* debe
+  terminar bien con un resultado válido.
+- **Stack con cambios de la aplicación que el núcleo aún no aplicó.** Un `observability=full`
+  aplica el stack de la punta de `main` y lo verifica contra la aplicación **desplegada**. Si
+  desde su última base cambiaron productores o configuración compartida (compose de la aplicación,
+  política de logs, inventario), la verificación es `integration` y exige los destinos de la
+  aplicación; si el núcleo todavía no aplicó esos cambios (push diferido, núcleo fallido o un
+  dispatch solo del stack), la verificación puede fallar. Es un fallo intencional y seguro: el
+  stack no avanza y la aplicación no cambia. Aplicar primero el núcleo (push procesado o Run I) y
+  después repetir `observability=full`. En un push con los dos componentes no ocurre: el stack
+  espera a que el núcleo termine bien.
+- **Stack de observabilidad fallido después del núcleo**: la identidad registrada de la
+  aplicación (último éxito) no cambia. El resumen de *Observabilidad* dice dónde falló (entradas,
+  política de imágenes, frescura, aplicación o verificación) y que el stack no avanzó. Seguir con
+  un dispatch `observability=full` (o *Re-run failed jobs*, que repite solo *Observabilidad*).
 
 ## Qué significa "instalado"
 
 Un Run P exitoso **no** es una instalación: ninguno de sus resultados dice que el servidor esté
-configurado. Después de Run I, el resumen separa cuatro resultados que no
-deben confundirse:
+configurado. Run I termina con el job *Estado de la instalación*:
+
+| resultado | significa | cómo seguir |
+|---|---|---|
+| **READY** | núcleo, frontend y stack de observabilidad instalados y verificados | lista para la verificación formal |
+| **INSTALADO / NOT READY** | la aplicación quedó instalada y su identidad registrada, pero el stack requerido no | dispatch `observability=full`; el Run I sigue rojo (no se reescribe) y ese dispatch informa solo su operación (*APLICADO* o el fallo), sin declarar la instalación completa |
+| **NO INSTALADO** | el núcleo no terminó | corregir y relanzar Run I |
+
+Ese resultado es **del run**, no del entorno: la cadena no reconstruye un estado global de la
+instalación a partir de la historia de runs ni guarda un estado propio. Un run posterior (un
+dispatch `observability=full`, un push) informa solo su propia operación; ninguno afirma que la
+instalación esté completa ni mide la salud actual del servidor. Un Run P posterior que reemplace el
+servidor deja, por definición, una instalación pendiente: el pin anterior queda obsoleto y nada toca
+el servidor nuevo hasta otro Run I (ver *Ciclo de vida de la identidad*). La salud vigente la dan
+las alertas y los dashboards del stack, y la aceptación, la verificación formal.
+
+El primer push ordinario después de un Run I exitoso parte de su commit (Run I deja la señal del
+núcleo): no repite build, migración ni Pages de lo ya instalado.
+
+Además, el resumen de Run I separa cuatro resultados que no deben confundirse:
 
 1. **Proyecto de Pages creado** (Terraform) y verificado por el preflight estricto.
 2. **Frontend publicado** y verificado por `*.pages.dev` (deployment de este intento,
@@ -399,10 +475,18 @@ desde la cadena) y vuelve a comprobar el estado en el siguiente run o en el dash
 ## Pendiente de verificación en vivo
 
 - Las etapas y el diferido no se han ejecutado en GitHub Actions: `run-name` con `vars`, el input
-  `stage` de tipo `choice` (11 inputs; el límite actual documentado es 25), el job *Rango
+  `stage` de tipo `choice` (12 inputs con `observability`; el límite actual documentado es 25), el job *Rango
   procesado* con dependencias saltadas, su nombre en `/actions/runs/<id>/jobs?filter=latest`, y que
   `vars` en `classify` no vea las variables del environment.
 - Que el primer push procesado después de la instalación cubra el rango y deje la señal.
+- Stack de observabilidad en GitHub Actions (probado sin red y con Docker local, no en vivo): la
+  aprobación por job del environment para *Observabilidad*; que *Re-run failed jobs* repita solo
+  ese job y que `/actions/runs/<id>/jobs?filter=latest` devuelva las señales de los jobs no
+  repetidos; el orden de la cola del grupo de concurrencia entre *Producción* y *Observabilidad* de
+  runs distintos; que los secretos `GRAFANA_*_EMAILS` no admitan valor vacío y se enmascaren en los
+  logs; el escaneo de las imágenes del stack en un runner real; el stack aplicado en el host real
+  (journald, Alloy con el journal persistente, Grafana por Access con un JWT real) y la entrega a
+  Discord, que la cadena nunca prueba.
 - En Hetzner: el acceso real a la consola, el acceso de `root` por consola en un servidor sin clave
   SSH asignada, `metadata/instance-id` y que la huella leída coincida con la que recibe el runner.
 - Que `ssh-keyscan` desde un runner de GitHub alcance el puerto 22 a través del firewall real, y

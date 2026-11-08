@@ -1,0 +1,71 @@
+# Listas de autorización de Grafana (Viewer y Editor), una sola definición para el rol y para la
+# comprobación previa sin red del workflow (playbooks/observability-preflight.yml). No escribe
+# nada. Las listas son datos personales y el repositorio es público: ningún mensaje, registro ni
+# salida incluye un correo ni un valor derivado; solo nombres de variable, posiciones y conteos.
+#
+# Entrada: obs_grafana_viewer_emails_raw y obs_grafana_editor_emails_raw (por defecto, las
+# variables de entorno GRAFANA_VIEWER_EMAILS y GRAFANA_EDITOR_EMAILS del controlador).
+# Formato de cada una: correos separados por comas, espacios alrededor ignorados, en minúsculas,
+# con dominio real (sin .invalid), sin entradas vacías ni repetidas; o exactamente `none` (lista
+# vacía). Un correo no puede estar en las dos listas. Las dos son obligatorias: sin una, el rol
+# falla antes de cambiar nada (nunca conserva una autorización anterior). Las dos en `none` es
+# válido: nadie entra por JWT; Access y el administrador local por túnel no cambian.
+#
+# Salida: obs_grafana_viewers, obs_grafana_editors (listas) y obs_grafana_list_counts.
+
+- name: Leer y validar las listas de Grafana (sin mostrar su contenido)
+  ansible.builtin.set_fact:
+    obs_access_lists_parsed: >-
+      {%- set email_re = '^[a-z0-9._%+-]+@([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$' -%}
+      {%- set out = {'errors': [], 'lists': {}} -%}
+      {%- for name, raw in [('GRAFANA_VIEWER_EMAILS', obs_grafana_viewer_emails_raw | default('', true) | string),
+                            ('GRAFANA_EDITOR_EMAILS', obs_grafana_editor_emails_raw | default('', true) | string)] -%}
+        {%- set value = raw | trim -%}
+        {%- if value | length == 0 -%}
+          {%- set _ = out.errors.append(name ~ ': no definida (obligatoria; `none` para una lista vacía)') -%}
+          {%- set _ = out.lists.update({name: []}) -%}
+        {%- elif value == 'none' -%}
+          {%- set _ = out.lists.update({name: []}) -%}
+        {%- else -%}
+          {%- set entries = value.split(',') | map('trim') | list -%}
+          {%- if entries | length > obs_grafana_list_max | int -%}
+            {%- set _ = out.errors.append(name ~ ': más de ' ~ obs_grafana_list_max ~ ' entradas') -%}
+          {%- endif -%}
+          {%- for e in entries -%}
+            {%- if e | length == 0 -%}
+              {%- set _ = out.errors.append(name ~ ': entrada ' ~ loop.index ~ ' vacía') -%}
+            {%- elif e is not match(email_re) or e is search('\.invalid$') -%}
+              {%- set _ = out.errors.append(name ~ ': entrada ' ~ loop.index ~ ' no es un correo válido en minúsculas') -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {%- if entries | unique | length != entries | length -%}
+            {%- set _ = out.errors.append(name ~ ': correos repetidos') -%}
+          {%- endif -%}
+          {%- set _ = out.lists.update({name: entries | unique | list}) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- if out.lists.GRAFANA_VIEWER_EMAILS | intersect(out.lists.GRAFANA_EDITOR_EMAILS) | length > 0 -%}
+        {%- set _ = out.errors.append('el mismo correo está en GRAFANA_VIEWER_EMAILS y GRAFANA_EDITOR_EMAILS') -%}
+      {%- endif -%}
+      {{ out }}
+  no_log: true
+
+- name: Publicar el resultado de la validación (solo errores sin valores y conteos)
+  ansible.builtin.set_fact:
+    obs_access_list_errors: "{{ obs_access_lists_parsed.errors }}"
+    obs_grafana_list_counts:
+      viewers: "{{ obs_access_lists_parsed.lists.GRAFANA_VIEWER_EMAILS | length }}"
+      editors: "{{ obs_access_lists_parsed.lists.GRAFANA_EDITOR_EMAILS | length }}"
+
+- name: Exigir listas de Grafana válidas
+  ansible.builtin.assert:
+    that: obs_access_list_errors | length == 0
+    fail_msg: >-
+      LISTAS DE GRAFANA: {{ obs_access_list_errors | join('; ') }}. No se cambió nada.
+    quiet: true
+
+- name: Fijar las listas de Grafana
+  ansible.builtin.set_fact:
+    obs_grafana_viewers: "{{ obs_access_lists_parsed.lists.GRAFANA_VIEWER_EMAILS }}"
+    obs_grafana_editors: "{{ obs_access_lists_parsed.lists.GRAFANA_EDITOR_EMAILS }}"
+  no_log: true

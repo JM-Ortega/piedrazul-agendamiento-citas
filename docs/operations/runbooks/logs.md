@@ -489,8 +489,12 @@ flujo y nivel.
 
 ## Instalación con Ansible
 
-`playbooks/observability.yml` instala métricas y logs juntos (ver
-[Instalación con Ansible](metricas.md#instalación-con-ansible) para la conexión y el inventario).
+`playbooks/observability.yml` instala métricas y logs juntos; en producción lo corre el job
+*Observabilidad* del workflow (ver [Instalación y mantenimiento](metricas.md#instalación-y-mantenimiento-github-actions)).
+Un cambio de `obs_log_services` u `obs_log_privacy_controls_done` en el inventario es compartido:
+el mismo push corre el converge de la aplicación (driver de cada contenedor) y la operación `full`
+del stack (selección de Alloy), y el stack queda pendiente mientras su parte no se aplique. El
+workflow nunca pasa el perfil de laboratorio (`logs_lab_authorization`).
 Requisitos adicionales para los logs:
 
 - systemd-journald con un grupo dueño de los archivos del journal (`systemd-journal` en Ubuntu,
@@ -503,18 +507,21 @@ Requisitos adicionales para los logs:
 Pasos que el rol agrega a los de métricas, en este orden:
 
 1. Comprueba la política de fuentes y el GID 473. Si falla, no cambia nada.
-2. Escribe el drop-in de journald; si cambió, reinicia `systemd-journald` y pasa el journal
-   volátil al persistente (`journalctl --flush`). En Ubuntu 24.04 journald conserva los flujos de
+2. Escribe el drop-in de journald; si cambió o es más nuevo que el arranque de journald (un run
+   anterior lo escribió y se interrumpió), reinicia `systemd-journald` y pasa el journal volátil al
+   persistente (`journalctl --flush`). En Ubuntu 24.04 journald conserva los flujos de
    stdout de las unidades al reiniciarse.
 3. Descubre el grupo del journal (`/var/log/journal/<machine-id>`) y exige que sus archivos sean
    legibles por ese grupo.
 4. Mantiene en `.env` `OBS_JOURNAL_GID`, `OBS_LOG_PROJECT` y `OBS_LOG_SERVICES` (`|` entre
    servicios). Un cambio recrea Alloy.
-5. Copia `loki/` con el resto de la configuración; un cambio reinicia Loki.
+5. Copia `loki/` con el resto de la configuración; un cambio recrea Loki (digest de su
+   configuración).
 6. Verifica: Loki `ready`, `loki.source.journal` sano, **Alloy leyó entradas del journal** y la
    fuente de datos Loki sana en Grafana. No exige que una fuente seleccionada haya escrito.
 
-Repetirlo sin cambios no cambia nada.
+Repetirlo sin cambios no cambia nada. La verificación de los logs no depende de la aplicación: el
+propio run escribe en el journal del host.
 
 ## Operación y diagnóstico
 
@@ -636,7 +643,7 @@ Lo que la retirada no deshace:
   "Reversión".
 - Alertmanager y el acceso a Grafana por Access (S3) no son parte de los logs: desde una versión
   con S3, la retirada de logs los deja en marcha. Su retirada está en [Alertas](alertas.md#retirada)
-  y [Acceso a Grafana](grafana-acceso.md#desactivación).
+  y [Acceso a Grafana](grafana-acceso.md#activación-y-desactivación).
 
 ## Verificación
 

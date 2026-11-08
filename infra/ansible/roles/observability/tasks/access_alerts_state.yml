@@ -1,5 +1,6 @@
 # Guarda el estado deseado de S3 ya resuelto y validado (access_alerts_preflight.yml) en el .env
 # del host, que es su única fuente persistente, y el webhook de Discord en su archivo secreto.
+# Las listas de Grafana no son estado del host (access_lists.yml, grafana_access_file.yml).
 #
 # Todas las claves se escriben en cada run, también con el acceso o el receptor deshabilitados:
 # deshabilitar no borra identificadores ni listas, y volver a habilitar solo necesita el
@@ -25,8 +26,9 @@
     - {key: GRAFANA_ROOT_URL, value: "https://{{ obs_s3_public_domain }}/", absent: "{{ not obs_grafana_access_on }}"}
     - {key: GRAFANA_ACCESS_TEAM_DOMAIN, value: "{{ obs_s3_team_domain }}"}
     - {key: GRAFANA_ACCESS_AUD, value: "{{ obs_s3_aud }}"}
-    - {key: GRAFANA_ACCESS_EDITORS, value: "{{ obs_s3_editors | join(',') }}"}
-    - {key: GRAFANA_ACCESS_VIEWERS, value: "{{ obs_s3_viewers | join(',') }}"}
+    # Las listas de correos ya no se guardan en .env (archivo de acceso de Grafana): se retiran
+    - {key: GRAFANA_ACCESS_EDITORS, value: "", absent: true}
+    - {key: GRAFANA_ACCESS_VIEWERS, value: "", absent: true}
   loop_control:
     label: "{{ item.key }}"
 
@@ -35,8 +37,9 @@
 # Alertmanager, que Compose monta como secreto. Siempre existe (Compose lo exige); vacío mientras
 # no haya webhook. Solo se reescribe si el controlador trae OBS_DISCORD_WEBHOOK_URL. La escritura
 # es atómica (archivo nuevo): el contenedor, que monta el archivo, sigue viendo el anterior, así
-# que un cambio recrea Alertmanager (main.yml). Recrear, no reiniciar: con Docker Desktop un
-# reinicio sobre el archivo reemplazado ni siquiera arranca.
+# que activate_secrets.yml recrea Alertmanager cuando el inodo que ve no es el del host (también
+# en un reintento). Recrear, no reiniciar: con Docker Desktop un reinicio sobre el archivo
+# reemplazado ni siquiera arranca.
 - name: Crear el directorio de secretos del stack
   ansible.builtin.file:
     path: "{{ obs_secrets_dir }}"
@@ -51,10 +54,9 @@
     content: "{{ obs_discord_webhook_url }}"
     owner: "{{ obs_alertmanager_uid }}"
     group: "{{ obs_alertmanager_uid }}"
-    mode: "0400"
+    mode: "{{ obs_secret_mode }}"
   no_log: true
   diff: false
-  register: obs_discord_secret_write
   when: obs_discord_webhook_url | length > 0
 
 - name: Asegurar el archivo del webhook (vacío si no hay)
@@ -64,7 +66,7 @@
     force: false
     owner: "{{ obs_alertmanager_uid }}"
     group: "{{ obs_alertmanager_uid }}"
-    mode: "0400"
+    mode: "{{ obs_secret_mode }}"
   no_log: true
   diff: false
   when: obs_discord_webhook_url | length == 0
@@ -75,8 +77,4 @@
     state: file
     owner: "{{ obs_alertmanager_uid }}"
     group: "{{ obs_alertmanager_uid }}"
-    mode: "0400"
-
-- name: Decidir si Alertmanager debe recrearse por el webhook
-  ansible.builtin.set_fact:
-    obs_alertmanager_recreate: "{{ obs_discord_secret_write is changed }}"
+    mode: "{{ obs_secret_mode }}"

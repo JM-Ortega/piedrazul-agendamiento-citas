@@ -1,6 +1,6 @@
 # Comprueba desde dentro de los contenedores que Prometheus entrega a Alertmanager, que
-# Alertmanager corre con el receptor pedido y que Grafana tiene el modo de acceso pedido. No envía
-# ninguna notificación ni valida un JWT real: eso se comprueba en vivo (runbooks de alertas y de
+# Alertmanager corre con el receptor pedido y que Grafana tiene el modo de acceso y las listas
+# pedidos (verify_grafana_auth.yml). No envía ninguna notificación ni valida un JWT real: eso se comprueba en vivo (runbooks de alertas y de
 # acceso a Grafana). Nombres absolutos (alertmanager.) por la misma razón que verify_logs.yml.
 
 - name: Esperar a que Prometheus descubra Alertmanager
@@ -67,30 +67,7 @@
     fail_msg: "Alertmanager no responde o no corre con el receptor {{ obs_s3_receiver }}."
     quiet: true
 
-- name: Leer la configuración efectiva de autenticación de Grafana
-  ansible.builtin.command:
-    argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
-           exec, -T, grafana, sh, -c,
-           'wget -qO- --header "Authorization: Basic $(printf "admin:%s" "$GF_SECURITY_ADMIN_PASSWORD" | base64)" "http://localhost:3000/api/admin/settings"']
-    chdir: "{{ obs_dir }}"
-  register: obs_grafana_settings
-  changed_when: false
-  failed_when: false
-
-- name: Grafana con el modo de acceso pedido
-  ansible.builtin.assert:
-    that:
-      - obs_grafana_settings.rc == 0
-      - _jwt.enabled == (obs_grafana_access_on | string | lower)
-      - _jwt.allow_assign_grafana_admin == 'false'
-      - _jwt.role_attribute_strict == 'true'
-      - _jwt.header_name == 'Cf-Access-Jwt-Assertion'
-      - not obs_grafana_access_on or _jwt.jwk_set_url == 'https://' ~ obs_s3_team_domain ~ '/cdn-cgi/access/certs'
-      - not obs_grafana_access_on or (_settings.server.root_url == 'https://' ~ obs_s3_public_domain ~ '/')
-    fail_msg: >-
-      Grafana no tiene el modo de acceso pedido (enabled={{ obs_grafana_access_on }}):
-      auth.jwt={{ _jwt | default({}) }}.
-    quiet: true
+- name: Verificar la autorización efectiva de Grafana
+  ansible.builtin.include_tasks: verify_grafana_auth.yml
   vars:
-    _settings: "{{ obs_grafana_settings.stdout | default('{}', true) | from_json }}"
-    _jwt: "{{ _settings['auth.jwt'] | default({}) }}"
+    obs_expected_access_on: "{{ obs_grafana_access_on }}"

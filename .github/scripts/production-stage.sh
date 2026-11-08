@@ -17,8 +17,9 @@
 #              health y frontend contra el host verificado.
 #
 # validate: combinación de flags del dispatch. provision e install declaran toda la
-#   instalación (los flags son los que usan las comprobaciones previas de Run P y lo que
-#   ejecuta Run I); install además prohíbe pedir Apply. Rollback, recuperación de Keycloak y
+#   instalación, incluido el stack de observabilidad (observability=full: Run P solo comprueba sus
+#   entradas sin red, Run I lo instala después de la aplicación; los flags son los que usan las
+#   comprobaciones previas de Run P y lo que ejecuta Run I); install además prohíbe pedir Apply. Rollback, recuperación de Keycloak y
 #   break-glass son operaciones de otro tipo y van en un dispatch ordinary.
 #
 # plan-gate: decide, con la acción OBSERVADA sobre el servidor en el plan revisado, si la
@@ -47,12 +48,21 @@ fail() {
 }
 
 cmd_validate() {
-  local stage="${IN_STAGE:-ordinary}" name flag
+  local stage="${IN_STAGE:-ordinary}" name flag obs="${IN_OBSERVABILITY:-none}"
+  case "${obs}" in
+    none | full | grafana-access) ;;
+    *) fail "observability '${obs}' no es none, full ni grafana-access" ;;
+  esac
   case "${stage}" in
     ordinary) return 0 ;;
     provision | install) ;;
     *) fail "stage '${stage}' no es ordinary, provision ni install" ;;
   esac
+
+  # La observabilidad es parte obligatoria de la instalación definitiva: Run P la declara (sus
+  # entradas se comprueban sin red antes del Apply, sin instalarla: el servidor aún no tiene la
+  # aplicación) y Run I la instala después de la aplicación. No hay instalación sin ella.
+  [ "${obs}" = full ] || fail "stage=${stage} declara la instalación completa: requiere observability=full (grafana-access y none no instalan el stack)"
 
   for flag in IN_HOST_CONFIG IN_BUILD IN_BUILD_POSTGRES IN_APP_DEPLOY IN_FRONTEND; do
     name="${flag#IN_}"

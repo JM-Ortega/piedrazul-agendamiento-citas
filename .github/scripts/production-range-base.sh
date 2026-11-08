@@ -1,35 +1,41 @@
 #!/usr/bin/env bash
-# Determina la base del rango de producción: el commit del último run push de main que
-# PROCESÓ su rango.
+# Determina la base del rango de un componente de producción: el commit del último run de main
+# que PROCESÓ el rango de ese componente.
 #
 # Uso: production-range-base.sh <workflow_path> <head_sha> <run_id_actual> < runs.json
-#   runs.json: respuesta de GET /repos/{repo}/actions/workflows/{archivo}/runs
-#              (más reciente primero).
+#   runs.json: respuesta de GET /repos/{repo}/actions/workflows/{archivo}/runs?branch=main&
+#              status=completed (más reciente primero; cualquier conclusión).
 # Entorno: GITHUB_REPOSITORY y las credenciales de `gh`. RANGE_MAX_LOOKUPS (por defecto 50)
 #   limita cuántos runs candidatos se consultan.
+#   SIGNAL_JOB    job cuya conclusión success en el último intento del run es la señal
+#                 (por defecto "Rango procesado", el núcleo; "Observabilidad procesada" para el
+#                 stack de observabilidad).
+#   RANGE_EVENTS  eventos admitidos, separados por espacios (por defecto "push"). La autoridad no
+#                 es el evento sino el job de señal: solo corre cuando su componente se aplicó y
+#                 verificó (en un push ordinario, o en un dispatch cuyas condiciones lo prueban:
+#                 Run I para el núcleo, una operación full para el stack).
 #
-# Solo cuentan los runs push porque solo ellos procesan un rango completo; un dispatch
-# manual ejecuta una intención parcial y explícita, así que no avanza el rango (el
-# siguiente push vuelve a cubrir esos cambios, lo que es seguro).
-#
-# La conclusión success no basta: un push diferido termina en success sin procesar nada. La
-# señal positiva es que el job "Rango procesado" del último intento de ese run terminó en
-# success. Ese job solo corre en un push ordinario después de que conclude verificó la
-# cadena; fallido, cancelado, reemplazado, diferido o anterior a ese job nunca avanza la
-# base. Si GitHub no responde o responde algo ilegible, el script falla: la ausencia de
-# datos no se lee como "procesado" ni como "no procesado".
+# La conclusión del run no cuenta: un push diferido termina en success sin procesar nada, y un
+# run con el núcleo aplicado y el stack fallido termina en failure aunque el núcleo esté hecho.
+# La señal positiva es el job de señal del ÚLTIMO intento del run en success. Fallido,
+# cancelado, saltado, reemplazado o anterior a ese job nunca avanza la base. Si GitHub no
+# responde o responde algo ilegible, el script falla: la ausencia de datos no se lee como
+# "procesado" ni como "no procesado".
 #
 # Salida: el SHA base, o vacío si no hay un rango confiable (sin runs procesados entre los
 # candidatos, o el más reciente no es ancestro de head, p. ej. historia reescrita). Vacío
 # significa "clasificar el árbol completo", nunca "no hay cambios".
 set -euo pipefail
 
-SIGNAL_JOB="Rango procesado"
+SIGNAL_JOB="${SIGNAL_JOB:-Rango procesado}"
+RANGE_EVENTS="${RANGE_EVENTS:-push}"
 
 fail() {
   echo "Error: $*" >&2
   exit 1
 }
+
+[[ "${RANGE_EVENTS}" =~ ^(push|workflow_dispatch)( (push|workflow_dispatch))*$ ]] || fail "RANGE_EVENTS inválido"
 
 [ "$#" -eq 3 ] || fail "uso: $0 <workflow_path> <head_sha> <run_id_actual> < runs.json"
 WORKFLOW_PATH="$1"
@@ -42,13 +48,14 @@ RUNS="$(cat)"
 jq -e '.workflow_runs | type == "array"' <<< "${RUNS}" > /dev/null ||
   fail "respuesta de runs inválida"
 
-mapfile -t CANDIDATES < <(jq -r --arg path "${WORKFLOW_PATH}" --arg current "${CURRENT_RUN_ID}" '
-  [ .workflow_runs[]
+mapfile -t CANDIDATES < <(jq -r --arg path "${WORKFLOW_PATH}" --arg current "${CURRENT_RUN_ID}" \
+  --arg events "${RANGE_EVENTS}" '
+  ($events | split(" ")) as $ev
+  | [ .workflow_runs[]
     | select(.path == $path
-             and .event == "push"
+             and (.event as $e | $ev | index($e)) != null
              and .head_branch == "main"
              and .status == "completed"
-             and .conclusion == "success"
              and (.id | tostring) != $current) ]
   | sort_by(.created_at) | reverse | .[] | "\(.id) \(.head_sha)"
 ' <<< "${RUNS}")
@@ -79,11 +86,11 @@ for candidate in "${CANDIDATES[@]}"; do
     LATEST="${SHA}"
     break
   fi
-  echo "El run ${RUN_ID} terminó en success sin procesar su rango (diferido o sin la señal): no avanza la base" >&2
+  echo "El run ${RUN_ID} no tiene la señal \"${SIGNAL_JOB}\" en success: no avanza la base" >&2
 done
 
 if [ -z "${LATEST}" ]; then
-  echo "Sin run push que haya procesado su rango: se clasifica el árbol completo" >&2
+  echo "Sin run con la señal \"${SIGNAL_JOB}\": se clasifica el árbol completo" >&2
   exit 0
 fi
 

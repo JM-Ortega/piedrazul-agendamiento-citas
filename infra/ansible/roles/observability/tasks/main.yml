@@ -1,17 +1,43 @@
 # Instala o actualiza el stack de observabilidad (métricas, logs, notificaciones y acceso a
 # Grafana) en el host. No toca el proyecto de la aplicación (piedrazul): solo exige que sus redes
 # existan y se une a ellas (Prometheus a la de la aplicación, Grafana a la de entrada de
-# Traefik). Idempotente: un segundo run no cambia nada salvo que cambien los archivos del
-# repositorio o las variables del rol.
+# Traefik). Idempotente: un segundo run no cambia ni recrea nada salvo que cambien los archivos
+# del repositorio, las variables del rol o las entradas del controlador.
+#
+# Operaciones (obs_operation): full (todo, abajo) y grafana-access (solo la autorización de
+# Grafana, grafana_access.yml).
 #
 # Los directorios de configuración (obs_managed_dirs) son del repositorio: el rol copia sus
 # archivos y borra en el host los que el repositorio ya no tiene. Los volúmenes no se tocan; de
-# .env solo se mantienen las variables de logs (journal y fuentes), de acceso a Grafana y del
-# receptor de notificaciones; la contraseña de Grafana no se reescribe. El webhook de Discord es un
-# archivo aparte (obs_secrets_dir), no una variable de .env.
+# .env solo se mantienen las variables de logs, de acceso a Grafana, del receptor y los digests
+# de configuración; la contraseña de Grafana no se reescribe. El webhook de Discord y el archivo
+# de acceso de Grafana (listas de correos) son archivos secretos aparte (obs_secrets_dir).
+#
+# Activación sin estado propio: cada servicio lleva como etiqueta el digest de la configuración
+# que lee al arrancar (config_digest.yml), así que Compose recrea lo que cambió, también en un
+# reintento tras una interrupción; los archivos secretos se activan por inodo
+# (activate_secrets.yml). verify_activation.yml exige paridad, digests, inodos e imágenes antes de
+# las comprobaciones de lo que cada servicio cargó.
 #
 # Fuera de /opt/piedrazul-obs el rol solo escribe el drop-in de journald (obs_journald_dropin) y
-# reinicia journald cuando ese archivo cambia.
+# reinicia journald cuando ese archivo es más nuevo que su arranque.
+
+- name: Validar la operación pedida
+  ansible.builtin.assert:
+    that:
+      - obs_operation in ['full', 'grafana-access']
+      - obs_verify_scope in ['install', 'integration', 'changed']
+    fail_msg: "obs_operation debe ser full o grafana-access y obs_verify_scope install, integration o changed."
+    quiet: true
+
+# grafana-access: solo la autorización de Grafana (listas), sin tocar el resto del stack
+- name: Reconciliar solo el acceso a Grafana
+  ansible.builtin.include_tasks: grafana_access.yml
+  when: obs_operation == 'grafana-access'
+
+- name: Terminar la operación grafana-access
+  ansible.builtin.meta: end_host
+  when: obs_operation == 'grafana-access'
 
 - name: Exigir Docker con el plugin Compose
   ansible.builtin.command:
@@ -164,6 +190,14 @@
 - name: Guardar el estado deseado de S3 y el webhook
   ansible.builtin.include_tasks: access_alerts_state.yml
 
+# Listas de Grafana (validadas en access_alerts_preflight.yml) en su archivo
+- name: Escribir el archivo de acceso de Grafana
+  ansible.builtin.include_tasks: grafana_access_file.yml
+
+# Después de copiar y retirar: digest de lo que cada servicio leerá (etiqueta de Compose)
+- name: Calcular el digest de la configuración
+  ansible.builtin.include_tasks: config_digest.yml
+
 - name: Validar la configuración de Compose
   ansible.builtin.command:
     argv: "{{ ['docker', 'compose', '--project-name', obs_compose_project_name]
@@ -171,6 +205,18 @@
     chdir: "{{ obs_dir }}"
   changed_when: false
 
+- name: Leer los contenedores antes de levantar
+  ansible.builtin.command:
+    argv: "{{ ['docker', 'compose', '--project-name', obs_compose_project_name]
+              + (obs_compose_files | map('regex_replace', '^', '--file=') | list) + ['ps', '-aq'] }}"
+    chdir: "{{ obs_dir }}"
+  register: obs_containers_before
+  changed_when: false
+
+# Compose recrea un servicio cuando cambia su definición: imagen, entorno (.env), compose.yml o
+# la etiqueta del digest de su configuración. Así, un reintento tras una interrupción recrea lo
+# que quedó pendiente aunque los archivos ya estuvieran escritos, y un run sin cambios no
+# recrea nada. Los dashboards los recarga Grafana solo (≤ 60 s), incluido su retiro.
 - name: Levantar el stack de métricas
   community.docker.docker_compose_v2:
     project_src: "{{ obs_dir }}"
@@ -181,47 +227,29 @@
     wait: true
     wait_timeout: 180
 
-# Compose no detecta cambios dentro de un directorio montado. Prometheus, Alloy, Loki y el
-# provisioning de Grafana (fuentes de datos, proveedor de dashboards) se leen solo al arrancar;
-# los dashboards los recarga Grafana por sí mismo, incluido su retiro. Un compose.yml cambiado
-# ya recreó lo que corresponde en el paso anterior.
-- name: Reiniciar los servicios cuya configuración cambió
-  community.docker.docker_compose_v2:
-    project_src: "{{ obs_dir }}"
-    project_name: "{{ obs_compose_project_name }}"
-    files: "{{ obs_compose_files }}"
-    services: "{{ obs_restart }}"
-    state: restarted
-    wait: true
-    wait_timeout: 180
-  when: obs_restart | length > 0
+# Archivos secretos (webhook, acceso de Grafana): por inodo, sin derivar nada de su contenido
+- name: Activar los archivos secretos
+  ansible.builtin.include_tasks: activate_secrets.yml
   vars:
-    obs_changed_dirs: >-
-      {{ (obs_config_copy.results | selectattr('changed') | map(attribute='item') | list)
-         + (obs_retired | map(attribute='dir') | list) }}
-    obs_restart: >-
-      {{ obs_changed_dirs | map('extract', obs_restart_on_change) | reject('equalto', '')
-         | unique | list }}
+    obs_activate_services: [alertmanager, grafana]
 
-# Webhook rotado: contenedor nuevo de Alertmanager para que monte el archivo nuevo. Silencios y
-# registro de notificaciones siguen en alertmanager_data: no reenvía lo ya entregado.
-- name: Recrear Alertmanager con el webhook nuevo
-  community.docker.docker_compose_v2:
-    project_src: "{{ obs_dir }}"
-    project_name: "{{ obs_compose_project_name }}"
-    files: "{{ obs_compose_files }}"
-    services: [alertmanager]
-    state: present
-    recreate: always
-    wait: true
-    wait_timeout: 120
-  when: obs_alertmanager_recreate | bool
+- name: Leer los contenedores después de activar
+  ansible.builtin.command:
+    argv: "{{ ['docker', 'compose', '--project-name', obs_compose_project_name]
+              + (obs_compose_files | map('regex_replace', '^', '--file=') | list) + ['ps', '-aq'] }}"
+    chdir: "{{ obs_dir }}"
+  register: obs_containers_after
+  changed_when: false
+
+- name: Verificar la activación (digests, archivos e imágenes en ejecución)
+  ansible.builtin.include_tasks: verify_activation.yml
 
 - name: Verificar la recolección y los dashboards
   ansible.builtin.include_tasks: verify.yml
 
 - name: Verificar la canalización de logs
   ansible.builtin.include_tasks: verify_logs.yml
+  when: obs_verify_logs_pipeline | bool
 
 - name: Verificar las notificaciones y el acceso a Grafana
   ansible.builtin.include_tasks: verify_access_alerts.yml

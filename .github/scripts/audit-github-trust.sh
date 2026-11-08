@@ -69,6 +69,11 @@ declare -A AUTH=(
   [APP_DB_PASSWORD]="production-hetzner"
   [MIGRATION_DB_PASSWORD]="production-hetzner"
   [KC_DB_PASSWORD]="production-hetzner"
+  # Stack de observabilidad (job observability): listas de Grafana (secretos porque el
+  # repositorio es público) y webhook de Alertmanager
+  [GRAFANA_VIEWER_EMAILS]="production-hetzner"
+  [GRAFANA_EDITOR_EMAILS]="production-hetzner"
+  [OBS_DISCORD_WEBHOOK_URL]="production-hetzner"
 )
 # Mecanismos de GitHub que se leen como secrets.* pero no son secretos del repositorio
 # (GitHub no permite crear secretos con prefijo GITHUB_).

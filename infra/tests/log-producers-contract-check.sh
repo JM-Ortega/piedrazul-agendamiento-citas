@@ -37,7 +37,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ANSIBLE_DIR="${ROOT}/infra/ansible"
 GROUP_VARS="${ANSIBLE_DIR}/inventories/prod/group_vars/all.yml"
-OBS_DEFAULTS="${ANSIBLE_DIR}/roles/observability/defaults/main.yml"
+OBS_DEFAULTS="${ANSIBLE_DIR}/roles/observability/defaults/main/log_policy.yml"
 PROFILE="${ANSIBLE_DIR}/profiles/logs-lab-synthetic.yml"
 SERVICES=(traefik keycloak backend postgres)
 

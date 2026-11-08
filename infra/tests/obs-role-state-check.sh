@@ -7,8 +7,11 @@
 # Contrato verificado (docs/operations/runbooks/grafana-acceso.md, "Estado deseado"):
 #   dado (-e) > guardado en .env del host > inicial. Un run sin -e no cambia nada; desactivar es
 #   explícito y conserva identificadores y listas; volver a habilitar solo necesita el interruptor.
-#   El webhook es aparte: se conserva sin la variable, se rota con ella y su cambio pide recrear
-#   Alertmanager. Modo privado (acceso deshabilitado) sin la red de entrada.
+#   El webhook es aparte: se conserva sin la variable y se rota con ella (archivo nuevo: inodo
+#   nuevo, que activate_secrets.yml detecta para recrear Alertmanager; aquí, sin contenedores, se
+#   comprueba el inodo). Las listas de Grafana no son estado del host: llegan en cada run
+#   (GRAFANA_VIEWER_EMAILS / GRAFANA_EDITOR_EMAILS), son obligatorias y no van a .env.
+#   Modo privado (acceso deshabilitado) sin la red de entrada.
 #
 # Uso: infra/tests/obs-role-state-check.sh
 # Requiere: ansible-playbook, docker (solo para crear e inspeccionar una red), jq.
@@ -52,13 +55,15 @@ cat > "${TMP}/state.yml" <<EOF
     - ansible.builtin.copy:
         dest: "${TMP}/facts.json"
         content: "{{ {'access_on': obs_grafana_access_on, 'files': obs_compose_files, 'receiver': obs_s3_receiver,
-                      'environment': obs_s3_environment, 'recreate': obs_alertmanager_recreate} | to_json }}"
+                      'environment': obs_s3_environment, 'viewers': obs_grafana_list_counts.viewers | int,
+                      'editors': obs_grafana_list_counts.editors | int} | to_json }}"
 EOF
 run() { # <etiqueta> [args...] → 0/1; log en TMP/<etiqueta>.log
   local tag="$1"; shift
   rm -f "${TMP}/facts.json"
   ANSIBLE_CONFIG="${ANSIBLE_DIR}/ansible.cfg" ANSIBLE_BECOME=false ANSIBLE_NOCOLOR=1 ANSIBLE_ROLES_PATH="${ANSIBLE_DIR}/roles" \
-    OBS_DISCORD_WEBHOOK_URL="${HOOK:-}" ansible-playbook -i "${TMP}/hosts.yml" "${TMP}/state.yml" \
+    OBS_DISCORD_WEBHOOK_URL="${HOOK:-}" GRAFANA_VIEWER_EMAILS="${VIEW-viewer.one@ops.example.org,viewer.two@ops.example.org}" \
+    GRAFANA_EDITOR_EMAILS="${EDIT-none}" ansible-playbook -i "${TMP}/hosts.yml" "${TMP}/state.yml" \
       -e "obs_dir=${H}" -e "obs_env_owner=$(id -un)" -e "obs_secrets_owner=$(id -un)" \
       -e "obs_alertmanager_uid=$(id -u)" -e "obs_edge_network=${EDGE}" "$@" </dev/null > "${TMP}/${tag}.log" 2>&1
 }
@@ -68,10 +73,10 @@ envv() { sed -n "s/^$1=//p" "${H}/.env"; }
 fact() { jq -r "$1" "${TMP}/facts.json"; }
 secret() { cat "${H}/secrets/discord_webhook_url"; }
 pw_intact() { test "$(envv GRAFANA_ADMIN_PASSWORD)" = "${PASSWORD}"; }
-no_leak() { ! grep -qE "${SECRET_A}|${SECRET_B}|${PASSWORD}" "${TMP}/$1.log"; }
+no_leak() { ! grep -qE "${SECRET_A}|${SECRET_B}|${PASSWORD}|ops\.example\.org" "${TMP}/$1.log"; }
+inode() { stat -c %i "${H}/secrets/discord_webhook_url"; }
 ACCESS=(-e obs_grafana_access_enabled=true -e obs_grafana_public_domain=grafana.piedrazul.org
-        -e "obs_grafana_access_team_domain=${TEAM}" -e "obs_grafana_access_aud=${AUD}"
-        -e '{"obs_grafana_access_viewers": ["viewer.one@ops.example.org", "viewer.two@ops.example.org"], "obs_grafana_access_editors": []}')
+        -e "obs_grafana_access_team_domain=${TEAM}" -e "obs_grafana_access_aud=${AUD}")
 
 # ── 1. Instalación inicial (sin variables de S3), sin la red de entrada ─────────
 if run init; then ok "inicial: termina sin la red de entrada (modo privado)"; else ko "inicial: termina"; tail -5 "${TMP}/init.log"; fi
@@ -92,36 +97,40 @@ docker network create --internal "${EDGE}" >/dev/null
 if HOOK="${HOOK_A}" run activate "${ACCESS[@]}" -e obs_alert_receiver=discord -e obs_environment=staging; then
   ok "activación: termina (changed=$(changed activate))"; else ko "activación"; tail -5 "${TMP}/activate.log"; fi
 check "activación: .env con el estado deseado" \
-  test "$(envv GRAFANA_ACCESS_ENABLED)|$(envv GRAFANA_PUBLIC_DOMAIN)|$(envv GRAFANA_ROOT_URL)|$(envv GRAFANA_ACCESS_TEAM_DOMAIN)|$(envv GRAFANA_ACCESS_AUD)|$(envv GRAFANA_ACCESS_VIEWERS)|$(envv GRAFANA_ACCESS_EDITORS)|$(envv OBS_ALERT_RECEIVER)|$(envv OBS_ENVIRONMENT)|$(envv COMPOSE_FILE)" \
-       = "true|grafana.piedrazul.org|https://grafana.piedrazul.org/|${TEAM}|${AUD}|viewer.one@ops.example.org,viewer.two@ops.example.org||discord|staging|compose.yml:compose.access.yml"
-check "activación: webhook escrito y Alertmanager a recrear" bash -c "test \"\$(cat '${H}/secrets/discord_webhook_url')\" = '${HOOK_A}' && test \"\$(jq -r .recreate '${TMP}/facts.json')\" = true"
+  test "$(envv GRAFANA_ACCESS_ENABLED)|$(envv GRAFANA_PUBLIC_DOMAIN)|$(envv GRAFANA_ROOT_URL)|$(envv GRAFANA_ACCESS_TEAM_DOMAIN)|$(envv GRAFANA_ACCESS_AUD)|$(envv OBS_ALERT_RECEIVER)|$(envv OBS_ENVIRONMENT)|$(envv COMPOSE_FILE)" \
+       = "true|grafana.piedrazul.org|https://grafana.piedrazul.org/|${TEAM}|${AUD}|discord|staging|compose.yml:compose.access.yml"
+check "activación: las listas de Grafana no van a .env (validadas: 2 Viewer, 0 Editor)" \
+  bash -c "! grep -qE '^GRAFANA_ACCESS_(VIEWERS|EDITORS)=|ops\\.example\\.org' '${H}/.env' && test \"\$(jq -r '\"\(.viewers) \(.editors)\"' '${TMP}/facts.json')\" = '2 0'"
+check "activación: webhook escrito" bash -c "test \"\$(cat '${H}/secrets/discord_webhook_url')\" = '${HOOK_A}'"
 check "activación: sin el webhook ni la contraseña en la salida" no_leak activate
 check "activación: la contraseña de Grafana intacta" pw_intact
 
 # ── 3. Mantenimiento sin -e ni webhook ──────────────────────────────────────
 cp "${H}/.env" "${TMP}/env.after-activate"
+INODE_A="$(inode)"
 if run rerun; then ok "mantenimiento: termina sin -e"; else ko "mantenimiento: termina"; tail -5 "${TMP}/rerun.log"; fi
 check "mantenimiento: nada cambia (changed=$(changed rerun)) y .env idéntico" \
   bash -c "test '$(changed rerun)' = 0 && cmp -s '${TMP}/env.after-activate' '${H}/.env'"
-check "mantenimiento: sigue con Access y discord; webhook conservado; sin recrear" \
-  test "$(fact .access_on) $(fact .receiver) $(fact .files[1]) $(secret | sha256sum | cut -c1-12) $(fact .recreate)" = "true discord compose.access.yml $(printf '%s' "${HOOK_A}" | sha256sum | cut -c1-12) false"
+check "mantenimiento: sigue con Access y discord; webhook conservado (mismo archivo: nada que activar)" \
+  test "$(fact .access_on) $(fact .receiver) $(fact .files[1]) $(secret | sha256sum | cut -c1-12) $(inode)" = "true discord compose.access.yml $(printf '%s' "${HOOK_A}" | sha256sum | cut -c1-12) ${INODE_A}"
 
 # ── 4. Rotación del webhook ─────────────────────────────────────────────────
 if HOOK="${HOOK_B}" run rotate; then ok "rotación: termina"; else ko "rotación"; fi
-check "rotación: webhook nuevo, Alertmanager a recrear, .env sin cambios" \
-  bash -c "test \"\$(cat '${H}/secrets/discord_webhook_url')\" = '${HOOK_B}' && test \"\$(jq -r .recreate '${TMP}/facts.json')\" = true && cmp -s '${TMP}/env.after-activate' '${H}/.env'"
+check "rotación: webhook nuevo en un archivo nuevo (inodo nuevo: Alertmanager se recrea al activar), .env sin cambios" \
+  bash -c "test \"\$(cat '${H}/secrets/discord_webhook_url')\" = '${HOOK_B}' && test \"\$(stat -c %i '${H}/secrets/discord_webhook_url')\" != '${INODE_A}' && cmp -s '${TMP}/env.after-activate' '${H}/.env'"
 check "rotación: sin el webhook en la salida" no_leak rotate
+INODE_B="$(inode)"
 HOOK="${HOOK_B}" run rotate-same
-check "rotación: repetir con el mismo webhook no recrea (changed=$(changed rotate-same))" \
-  test "$(changed rotate-same) $(fact .recreate)" = "0 false"
+check "rotación: repetir con el mismo webhook no cambia nada (changed=$(changed rotate-same), mismo archivo)" \
+  test "$(changed rotate-same) $(inode)" = "0 ${INODE_B}"
 
 # ── 5. Desactivación explícita ──────────────────────────────────────────────
 if run disable -e obs_grafana_access_enabled=false -e obs_alert_receiver=none; then ok "desactivación: termina"; else ko "desactivación"; fi
 check "desactivación: acceso false, sin root_url pública, solo compose.yml, receptor none" \
   bash -c "test \"$(envv GRAFANA_ACCESS_ENABLED) $(envv COMPOSE_FILE) $(envv OBS_ALERT_RECEIVER)\" = 'false compose.yml none' && ! grep -q '^GRAFANA_ROOT_URL=' '${H}/.env'"
-check "desactivación: conserva identificadores, listas, entorno y webhook" \
-  test "$(envv GRAFANA_ACCESS_TEAM_DOMAIN)|$(envv GRAFANA_ACCESS_AUD)|$(envv GRAFANA_ACCESS_VIEWERS)|$(envv OBS_ENVIRONMENT)|$(secret)" \
-       = "${TEAM}|${AUD}|viewer.one@ops.example.org,viewer.two@ops.example.org|staging|${HOOK_B}"
+check "desactivación: conserva identificadores, entorno y webhook" \
+  test "$(envv GRAFANA_ACCESS_TEAM_DOMAIN)|$(envv GRAFANA_ACCESS_AUD)|$(envv OBS_ENVIRONMENT)|$(secret)" \
+       = "${TEAM}|${AUD}|staging|${HOOK_B}"
 docker network rm "${EDGE}" >/dev/null
 if run disabled-rerun; then ok "desactivado: un run sin -e termina sin la red de entrada"; else ko "desactivado: run sin -e"; fi
 check "desactivado: sigue desactivado y nada cambia (changed=$(changed disabled-rerun))" \
@@ -142,7 +151,18 @@ reject() { # <etiqueta> <marca> [args...]
 reject discord-sin-entorno NOTIFICACIONES -e obs_environment=
 reject entorno-invalido NOTIFICACIONES -e 'obs_environment=Staging Prod'
 reject habilitado-no-booleano ACCESO -e obs_grafana_access_enabled=maybe
-reject lista-no-lista ACCESO -e obs_grafana_access_viewers=viewer.one@ops.example.org
+VIEW= reject lista-viewer-ausente 'LISTAS DE GRAFANA'
+EDIT= reject lista-editor-ausente 'LISTAS DE GRAFANA'
+VIEW='Viewer.One@ops.example.org' reject lista-mayusculas 'LISTAS DE GRAFANA'
+EDIT='viewer.one@ops.example.org' reject lista-mismo-correo-en-ambas 'LISTAS DE GRAFANA'
+# Listas vacías explícitas con Access habilitado: válidas (nadie entra por JWT; Access no cambia)
+if VIEW=none EDIT=none run empty-lists && test "$(fact .access_on) $(fact .viewers) $(fact .editors)" = "true 0 0"; then
+  ok "listas none/none con Access habilitado: aceptadas sin desactivar Access"
+else ko "listas none/none con Access habilitado"; fi
+# Un .env de una versión anterior con listas: el run las retira
+printf 'GRAFANA_ACCESS_VIEWERS=old.viewer@ops.example.org\nGRAFANA_ACCESS_EDITORS=old.editor@ops.example.org\n' >> "${H}/.env"
+run purge-legacy
+check "listas de una versión anterior en .env: retiradas" bash -c "! grep -qE '^GRAFANA_ACCESS_(VIEWERS|EDITORS)=' '${H}/.env'"
 # .env existente pero ilegible: el rol falla antes de cambiar nada (no vuelve al estado inicial)
 cp "${H}/.env" "${TMP}/env.before-unreadable"; SECRET_BEFORE="$(secret | sha256sum)"
 chmod 000 "${H}/.env"

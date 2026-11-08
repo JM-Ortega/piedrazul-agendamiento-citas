@@ -125,39 +125,65 @@ proyecto y red únicos y los elimina al terminar):
 infra/tests/metrics-stack-check.sh
 ```
 
-## Instalación con Ansible
+## Instalación y mantenimiento (GitHub Actions)
 
-`playbooks/observability.yml` instala o actualiza el stack en `/opt/piedrazul-obs`. No forma parte
-del workflow de producción ni de `converge.yml`/`deploy.yml`, y no modifica la aplicación.
+El stack se instala y se mantiene desde el workflow de producción
+(`.github/workflows/production-hetzner.yml`), job **Observabilidad**, con el mismo environment
+(`production-hetzner`), la misma identidad verificada del host y el mismo grupo de concurrencia que
+la aplicación. No hace falta Ansible, una copia del repositorio ni una configuración SSH locales.
 
-Desde la raíz del repositorio, con la misma convención que el workflow de producción: `ANSIBLE_CONFIG`
-apunta a `infra/ansible/ansible.cfg` (sin él, desde la raíz no se carga y se pierden
-`remote_user = ansible`, `become` y la verificación de la clave del host), las colecciones de
-`requirements.yml` en `infra/ansible/collections` y un inventario de ejecución que solo da la
-dirección del host `vps`:
+| cuándo | qué corre | verificación |
+|---|---|---|
+| **Run I** (instalación) | `observability=full`, obligatorio, después de la aplicación | `install`: todo el stack y los destinos de la aplicación |
+| **push** a `main` que cambia lo que el stack consume (`infra/observability`, el rol `observability`, sus playbooks) | operación `full` | `changed`: el stack; los destinos de la aplicación se informan sin bloquear |
+| **push** que cambia algo compartido (política de logs, inventario, `ansible.cfg`, Compose de los productores) | converge de la aplicación **y** operación `full` | `integration`: también los destinos de la aplicación |
+| **dispatch** `observability=full` (sin otros flags) | solo el stack: sin Terraform, build, migración, deploy ni Pages | `changed`, o `install` si no hay un stack procesado en la historia |
+| **dispatch** `observability=grafana-access` | solo las listas de Grafana ([Acceso a Grafana](grafana-acceso.md#listas-de-operadores)) | autorización efectiva de Grafana |
+
+El job corre solo cuando el núcleo terminó bien o no era requerido, y comprueba que el commit siga
+siendo la punta de `main` justo antes de tocar el stack. Su resumen dice el resultado (aplicado,
+superado por un commit nuevo, bloqueado por la política de imágenes, rechazado en las entradas o
+fallido) y si el progreso del stack avanzó. Un fallo del stack no cambia la identidad registrada de
+la aplicación (último éxito) ni obliga a repetir el núcleo.
+
+Antes de la aprobación, el job *Validar configuración del stack de observabilidad* comprueba sin red
+ni secretos, con las herramientas de las mismas imágenes fijadas: `promtool check config` y
+`test rules` (las pruebas de `infra/observability/tests`), `amtool check-config`, Loki
+`-verify-config`, la sintaxis de Alloy y Compose (`.github/scripts/observability-validate.sh`, que
+también se puede correr en local). Una configuración inválida no llega al servidor.
+
+**Imágenes del stack.** Cuando una operación `full` va a aplicar referencias fijadas
+(`<tag>@sha256:<índice OCI>`) distintas de las del último stack procesado, o en Run I, cada una se
+resuelve a su manifiesto `linux/amd64`, se escanea con la misma acción de Trivy y la política de
+vulnerabilidades la autoriza dentro del job, antes de mutar (escaneo y política aparte de los del
+núcleo: un bloqueo aquí no bloquea la aplicación). Sin break-glass: una referencia que la política
+bloquea se corrige o se revierte con un commit. `grafana-access` nunca escanea. Riesgo residual: una
+vulnerabilidad nueva en una imagen sin cambios no se detecta hasta el próximo cambio de referencia.
+Después de aplicar, el rol exige que cada contenedor corra la referencia fijada y que la imagen
+local esté registrada bajo ese índice (el manifiesto de la plataforma lo elige Docker de ese índice
+inmutable; el escaneado es el mismo).
+
+**Ejecución manual (recuperación excepcional).** Con acceso SSH de `ansible` y la clave del host en
+`known_hosts`, desde la raíz del repositorio:
 
 ```bash
 export ANSIBLE_CONFIG=infra/ansible/ansible.cfg
 ansible-galaxy collection install -r infra/ansible/requirements.yml -p infra/ansible/collections
 printf 'all:\n  hosts:\n    vps:\n      ansible_host: %s\n' '<IP del servidor>' > /tmp/hosts.runtime.yml
-ansible-playbook \
+GRAFANA_VIEWER_EMAILS='…' GRAFANA_EDITOR_EMAILS='…' OBS_DISCORD_WEBHOOK_URL='…' ansible-playbook \
   -i infra/ansible/inventories/prod \
   -i /tmp/hosts.runtime.yml \
   infra/ansible/playbooks/observability.yml
 ```
 
-Requisitos: la clave SSH del usuario `ansible` y la clave del host ya confiada en `known_hosts`
-(`host_key_checking = True`); Docker con el plugin Compose y la aplicación instalada (red
-`piedrazul_net`). Si falta Docker o la red, el rol falla sin copiar ni levantar nada.
-
-Las imágenes del stack no pasan por el escaneo ni la política de vulnerabilidades de la cadena de
-producción. Antes de instalar o de cambiar una de ellas, escanear su manifiesto `linux/amd64` con
-el mismo Trivy y las mismas opciones que `.github/actions/trivy-scan` y decidir con los criterios de
-[la política de vulnerabilidades](politica-vulnerabilidades-imagenes.md).
+Las listas son obligatorias también aquí. No correrlo mientras haya un run de producción en cola o en
+curso: fuera del workflow no hay grupo de concurrencia. Lo que aplica no avanza el progreso del stack
+en GitHub: el siguiente run `full` lo vuelve a reconciliar.
 
 El rol:
 
-1. Comprueba Docker y la red de la aplicación.
+1. Comprueba Docker, la red de la aplicación, las entradas (listas de Grafana, acceso, receptor,
+   webhook) y la política de logs, antes de escribir nada.
 2. Copia `compose.yml` y los directorios de configuración (`prometheus/`, `alloy/`, `loki/`,
    `grafana/provisioning/`, `grafana/dashboards/`), del usuario `ansible`, legibles por los
    contenedores; no contienen secretos. Antes prepara el journal del host para los logs (ver
@@ -166,15 +192,31 @@ El rol:
    [Cambios y retiro de configuración](#cambios-y-retiro-de-configuración)).
 4. Crea `/opt/piedrazul-obs/.env` **solo si no existe** (root, 0600), con la contraseña del
    administrador de Grafana: 32 caracteres alfanuméricos aleatorios que genera el controlador de
-   Ansible (el runner o el equipo del operador). Allí solo existe durante la tarea (Ansible la
-   escribe en un archivo temporal que borra al terminar); viaja al host por la conexión SSH solo
+   Ansible (el runner). Allí solo existe durante la tarea; viaja al host por la conexión SSH solo
    cuando `.env` no existe y no aparece en la salida (`no_log`). Un run posterior no la regenera
-   ni la reescribe.
-5. Valida y levanta el proyecto, reinicia los servicios cuya configuración cambió y verifica que los
-   siete destinos se leen (los cinco de métricas, `alloy` y `loki`), que los tres dashboards están
-   cargados y la canalización de logs.
+   ni la reescribe (ver [Acceso a Grafana](#acceso-a-grafana) para su custodia).
+5. Escribe los archivos secretos (webhook de Discord y archivo de acceso de Grafana con las listas)
+   y el **digest** de la configuración que lee cada servicio al arrancar (`OBS_DIGEST_<SERVICIO>` en
+   `.env`, etiqueta `org.piedrazul.obs.config-digest` del servicio).
+6. Levanta el proyecto: Compose recrea exactamente los servicios cuya definición cambió (imagen,
+   entorno, `compose.yml` o el digest de su configuración); un servicio cuyo archivo secreto se
+   reemplazó se recrea al detectar que su contenedor ve el inodo anterior.
+7. Verifica la activación (paridad de la configuración con el repositorio, digest vigente en cada
+   contenedor, inodo vigente de cada archivo secreto, imagen fijada en ejecución) y después lo que
+   cada servicio cargó: los ocho trabajos de recolección, las reglas (mismos grupos y cantidad que
+   el repositorio, ninguna con error), los tres dashboards, Loki y Alloy, Alertmanager con el
+   receptor pedido y Grafana con el modo de acceso y las listas pedidos.
 
-Repetirlo sin cambios en el repositorio no cambia nada.
+Repetirlo sin cambios no cambia ni recrea nada.
+
+**Reintento tras una interrupción.** El estado que decide qué activar está en el propio host y en
+los contenedores (digest de la configuración en `.env` frente a la etiqueta del contenedor, inodo
+del archivo secreto frente al que ve el contenedor), no en lo que cambió durante un run. Si un run
+escribió configuración y se interrumpió (cancelado, runner perdido, fallo) antes de activarla, el
+siguiente run recrea lo pendiente aunque ya no tenga nada que copiar, y no informa éxito mientras un
+servicio corra la configuración anterior. El drop-in de journald se reinicia si es más nuevo que el
+arranque de journald (límite conocido: un reloj del host que retrocede puede ocultarlo o forzar un
+reinicio de más).
 
 ### Cambios y retiro de configuración
 
@@ -184,10 +226,11 @@ propios. `.env`, `compose.yml` y los volúmenes no entran en esa reconciliación
 
 | Cambio en el repositorio | Efecto al repetir el playbook |
 |---|---|
-| regla en `prometheus/rules/` agregada, cambiada o borrada; `prometheus.yml` | reinicio de Prometheus; una regla borrada deja de evaluarse |
-| `alloy/config.alloy` | reinicio de Alloy |
-| `loki/config.yaml` | reinicio de Loki |
-| `grafana/provisioning/` (fuente de datos, proveedor) | reinicio de Grafana |
+| regla en `prometheus/rules/` agregada, cambiada o borrada; `prometheus.yml` | Prometheus recreado (digest nuevo); una regla borrada deja de evaluarse |
+| `alloy/config.alloy` | Alloy recreado |
+| `loki/config.yaml` | Loki recreado |
+| `alertmanager/` | Alertmanager recreado |
+| `grafana/provisioning/` (fuente de datos, proveedor) | Grafana recreado |
 | dashboard en `grafana/dashboards/` agregado, cambiado o borrado | sin reinicio: Grafana lo recarga en ≤ 60 s y un archivo borrado retira su dashboard |
 | `compose.yml` | Compose recrea los servicios afectados |
 
@@ -200,24 +243,27 @@ correspondiente (`docker compose restart prometheus`, `alloy` o `grafana`).
 
 ### Acceso a Grafana
 
-Grafana escucha en `127.0.0.1:3000` del host. El acceso diario previsto es por
-`grafana.piedrazul.org` con Cloudflare Access, todavía no activado
-([Acceso a Grafana](grafana-acceso.md)); el túnel SSH sigue siendo el acceso del administrador local
-y la recuperación:
+Grafana escucha en `127.0.0.1:3000` del host. El acceso diario es por `grafana.piedrazul.org`
+con Cloudflare Access ([Acceso a Grafana](grafana-acceso.md)); el túnel SSH es el acceso del
+administrador local y la recuperación:
 
 ```bash
 ssh -L 3000:127.0.0.1:3000 ansible@<host>
 ```
 
-La contraseña está en `/opt/piedrazul-obs/.env` (`sudo`). Grafana la aplica solo al crear su base;
-para cambiarla después:
+**Custodia de la credencial del administrador local.** La contraseña solo existe en
+`/opt/piedrazul-obs/.env` del host (root, 0600): nunca en GitHub, en el repositorio ni en la salida de
+un run. Quien custodia el acceso de recuperación al host (usuario `ops` o `ansible` por SSH)
+custodia esta credencial; se lee con `sudo` cuando hace falta. El valor de `.env` es el único válido:
+las verificaciones del rol entran con él, así que si se cambia en Grafana hay que dejar `.env` igual
+(o primero cambiar `.env` y después aplicar ese mismo valor):
 
 ```bash
 cd /opt/piedrazul-obs
-sudo docker compose exec grafana grafana cli admin reset-admin-password '<nueva>'
+sudo docker compose exec grafana grafana cli admin reset-admin-password "$(sudo sed -n 's/^GRAFANA_ADMIN_PASSWORD=//p' .env)"
 ```
 
-y reflejarla en `.env`.
+Grafana la aplica solo al crear su base: en un servidor reemplazado, el rol genera una nueva.
 
 ## Dashboards
 
@@ -307,7 +353,7 @@ transición real a `pending` (y a `firing` con `ALERT_FIRING=1`) y su resolució
 | Retirar conservando datos | `docker compose down` | ninguno; volúmenes intactos |
 | Volver a levantar | `docker compose up -d --wait` | ninguno; TSDB y Grafana conservan su estado |
 | Borrar todo el estado | `docker compose down -v` | ninguno; se pierden el histórico, los logs de Loki, las posiciones de Alloy y la base de Grafana (en el host, `.env` sigue y la contraseña se reaplica al recrear la base) |
-| Volver a una versión anterior | checkout de la versión y repetir el playbook | ninguno; la configuración queda igual a esa versión |
+| Volver a una versión anterior | revertir en `main` y dejar que el push (o un dispatch `observability=full`) lo aplique | ninguno; la configuración queda igual a esa versión |
 
 La aplicación no depende del stack: detenerlo o borrarlo no cambia su health ni sus rutas.
 Prometheus solo se une a `piedrazul_net`; no crea ni modifica la red.
