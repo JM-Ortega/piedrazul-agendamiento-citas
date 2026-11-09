@@ -4229,10 +4229,10 @@ jsonfile@^6.0.1:
     object.assign "^4.1.4"
     object.values "^1.1.6"
 
-keycloakify@^11.15.0:
-  version "11.15.0"
-  resolved "https://registry.npmjs.org/keycloakify/-/keycloakify-11.15.0.tgz"
-  integrity sha512-e44auIvwV3dgxGpwDuxYkFf3x+c2mxz6b4Uz8OelhCqR1FgxC9zprKnXjw1ZB80vX1546hDL99Or3PRbXXGujQ==
+keycloakify@^11.16.4:
+  version "11.16.4"
+  resolved "https://registry.npmjs.org/keycloakify/-/keycloakify-11.16.4.tgz"
+  integrity sha512-WZbV+U0Ai4hrftPCuSy2y4YpQ9G755fSQS8ibakCdQFedY7BLFCyvzXxaKfzti5Gj754WJrG8rbS1gK15yhnCg==
   dependencies:
     tsafe "^1.8.5"
 

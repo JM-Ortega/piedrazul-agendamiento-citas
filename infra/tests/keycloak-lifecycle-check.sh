@@ -5,14 +5,16 @@
 # La prueba ejecutable de P1/P2/P3/recuperación es keycloak-lifecycle-harness.sh.
 #
 # Uso: infra/tests/keycloak-lifecycle-check.sh
-# Requiere: docker compose, ansible-playbook, jq, yq (mikefarah v4).
+# Requiere: docker compose, ansible-playbook, jq, yq (mikefarah v4), python3.
 #
 # Verifica:
 #   1. El realm del repositorio no trae ningún secreto de cliente ni material de claves; el
 #      backend es confidencial con service account y roles exactos; el frontend solo admite
 #      Authorization Code con PKCE S256 desde producción y desarrollo local; guarda los eventos
 #      de la auditoría de inicios de sesión. (En 5: nace con la política de contraseñas aprobada,
-#      alineada con los límites del backend, y su admin-cli sin password grant.)
+#      alineada con los límites del backend, y su admin-cli sin password grant.) La política
+#      WebAuthn sin contraseña exige clave residente con residentKey (sin el requireResidentKey
+#      obsoleto) y el JAR del tema que monta Compose la entrega al registro.
 #   2. .env producido: sin credenciales de administración de Keycloak, de automatización ni la
 #      contraseña inicial del administrador humano;
 #      KC_BACKEND_CLIENT_SECRET llega literal al backend aunque tenga ' " $ \ # o espacios
@@ -55,7 +57,7 @@ TASKS="${ANSIBLE_DIR}/roles/app/tasks"
 WORKFLOW="${ROOT}/.github/workflows/production-hetzner.yml"
 REALM="${ROOT}/infra/keycloak/realm/piedrazul-realm.json"
 
-for bin in docker ansible-playbook jq yq; do
+for bin in docker ansible-playbook jq yq python3; do
   command -v "$bin" >/dev/null || { echo "falta $bin" >&2; exit 2; }
 done
 for key in KC_BACKEND_CLIENT_SECRET KC_AUTOMATION_CLIENT_SECRET KC_PLATFORM_ADMIN_INITIAL_PASSWORD KC_BOOTSTRAP_ADMIN_PASSWORD KC_ADMIN_PASSWORD; do
@@ -94,6 +96,19 @@ check "realm: guarda LOGIN y LOGIN_ERROR para la auditoría de inicios de sesió
   jq -e '.eventsEnabled and (.enabledEventTypes | sort) == ["LOGIN", "LOGIN_ERROR"]' "${REALM}"
 check "realm: claves generadas por Keycloak, sin material en el repositorio" \
   jq -e '[.components["org.keycloak.keys.KeyProvider"][].config | keys[] | select(. != "priority" and . != "algorithm")] | length == 0' "${REALM}"
+# Keycloak 26 avisa que requireResidentKey (Yes/No) está obsoleto; residentKey es el valor vigente.
+# El JAR trae su propia copia de webauthnRegister.js: si el tema no entrega residentKey, el
+# registro sin contraseña aceptaría una credencial no residente.
+check "realm: WebAuthn sin contraseña exige clave residente con residentKey, sin requireResidentKey obsoleto" \
+  jq -e '.webAuthnPolicyPasswordlessResidentKey == "required" and ([.webAuthnPolicyRequireResidentKey, .webAuthnPolicyPasswordlessRequireResidentKey] | all(. == null or . == "not specified"))' "${REALM}"
+THEME_JAR="${COMPOSE_DIR}/$(yq -r '.services.keycloak.volumes[] | select(test(":/opt/keycloak/providers/keycloak-theme.jar$")) | sub(":/opt/keycloak/providers/keycloak-theme.jar$"; "")' "${COMPOSE_DIR}/keycloak.yml")"
+check "tema: el JAR montado entrega residentKey al registro WebAuthn y su script lo aplica" \
+  python3 -I -c 'import re, sys, zipfile
+z = zipfile.ZipFile(sys.argv[1]); base = "theme/keycloakify-starter/login/resources/"
+js = z.read(base + "js/webauthnRegister.js")
+chunks = [n for n in z.namelist() if re.fullmatch(re.escape(base) + r"dist/assets/WebauthnRegister-[^/]+\.js", n)]
+sys.exit(0 if b"authenticatorSelection.residentKey = input.residentKey" in js and chunks
+         and all(re.search(rb"residentKey : \$\{JSON\.stringify\(", z.read(n)) for n in chunks) else 1)' "${THEME_JAR}"
 
 # ── 2. .env producido ────────────────────────────────────────────────────────
 cat > "${TMP}/render.yml" <<'EOF'
