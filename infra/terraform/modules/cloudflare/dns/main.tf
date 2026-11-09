@@ -27,3 +27,13 @@ resource "cloudflare_dns_record" "auth" {
   proxied = var.proxied_backend
   comment = "Autenticación"
 }
+
+resource "cloudflare_dns_record" "grafana" {
+  zone_id = var.zone_id
+  name    = "grafana.${var.base_domain}"
+  content = var.server_ip
+  type    = "A"
+  ttl     = var.proxied_backend ? 1 : 300
+  proxied = var.proxied_backend
+  comment = "Grafana"
+}
