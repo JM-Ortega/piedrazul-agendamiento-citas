@@ -95,8 +95,8 @@ public class DoctorDataInitializer implements ApplicationRunner {
                         )
                 ),
                 null,
-                List.of(Role.DOCTOR)
-        ));
+                List.of(Role.DOCTOR))
+        );
 
         userProvisioningApi.createUser(new CreateSystemUserPayload(
                 new CreateSystemUserRequest(
@@ -123,8 +123,8 @@ public class DoctorDataInitializer implements ApplicationRunner {
                         )
                 ),
                 null,
-                List.of(Role.DOCTOR, Role.SCHEDULER, Role.ADMIN)
-        ));
+                List.of(Role.DOCTOR, Role.SCHEDULER, Role.ADMIN))
+        );
 
         userProvisioningApi.createUser(new CreateSystemUserPayload(
                 new CreateSystemUserRequest(
@@ -149,8 +149,161 @@ public class DoctorDataInitializer implements ApplicationRunner {
                         )
                 ),
                 null,
-                List.of(Role.DOCTOR)
-        ));
+                List.of(Role.DOCTOR))
+        );
+
+
+        userProvisioningApi.createUser(new CreateSystemUserPayload(
+                        new CreateSystemUserRequest(
+                                "34548670",
+                                IdentificationType.CEDULA,
+                                "Clara Inés",
+                                "Cordoba Llanos",
+                                "cicordob@unicauca.edu.co",
+                                "3164023931",
+                                "Doctor123!"
+                        ), new CreateDoctorRequest(
+                        List.of(SpecialtyCode.TERAPIA_NEURAL),
+                        LocalDate.of(2026, 1, 1),
+                        LocalDate.of(2026, 12, 31),
+                        10,
+                        4,
+                        List.of(
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.MARTES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.MIERCOLES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.JUEVES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.VIERNES)
+                        )
+                ),
+                        null,
+                        List.of(Role.DOCTOR, Role.SCHEDULER, Role.ADMIN, Role.AUDITOR))
+        );
+
+        userProvisioningApi.createUser(new CreateSystemUserPayload(
+                new CreateSystemUserRequest(
+                        "32637103",
+                        IdentificationType.CEDULA,
+                        "Ibis Ester",
+                        "Gonzalez Guerrero",
+                        "ibisegg1959@gmail.com",
+                        "3008220652",
+                        "Doctor123!"
+                ),
+                new CreateDoctorRequest(
+                        List.of(SpecialtyCode.TERAPIA_NEURAL),
+                        LocalDate.of(2026, 1, 1),
+                        LocalDate.of(2026, 12,31),
+                        10,
+                        4,
+                        List.of(
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.MARTES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.MIERCOLES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.JUEVES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.VIERNES)
+                        )
+                ),
+                null,
+                List.of(Role.DOCTOR, Role.SCHEDULER, Role.ADMIN, Role.AUDITOR))
+        );
+
+        userProvisioningApi.createUser(new CreateSystemUserPayload(
+                new CreateSystemUserRequest(
+                        "3744582",
+                        IdentificationType.CEDULA,
+                        "José Ignacio",
+                        "Garcia Mayorca Ariza",
+                        "joseignaciogar59@gmail.com",
+                        "3154708512",
+                        "Doctor123!"
+                ),
+                new CreateDoctorRequest(
+                        List.of(SpecialtyCode.TERAPIA_NEURAL),
+                        LocalDate.of(2026, 1, 1),
+                        LocalDate.of(2026, 12, 31),
+                        10,
+                        4,
+                        List.of(
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(9, 0, 0), Workday.MARTES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.MIERCOLES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(12, 0, 0), Workday.JUEVES),
+                                new ScheduleRequest(LocalTime.of(7, 0, 0), LocalTime.of(10, 0, 0), Workday.VIERNES)
+                        )
+                ),
+                null,
+                List.of(Role.DOCTOR))
+        );
+
+        userProvisioningApi.createUser(new CreateSystemUserPayload(
+                new CreateSystemUserRequest(
+                        "9084472",
+                        IdentificationType.CEDULA,
+                        "Armando",
+                        "Peña Sarria",
+                        "apenas3@gmail.com",
+                        "3208035945",
+                        "Doctor123!"
+                ),
+                new CreateDoctorRequest(
+                        List.of(SpecialtyCode.QUIROPRAXIA),
+                        LocalDate.of(2026, 1, 1),
+                        LocalDate.of(2026, 12, 31),
+                        20,
+                        4,
+                        List.of(
+                                new ScheduleRequest(LocalTime.of(6, 0, 0), LocalTime.of(12, 0, 0), Workday.MARTES)
+                        )
+                ),
+                null,
+                List.of(Role.DOCTOR))
+        );
+
+        userProvisioningApi.createUser(new CreateSystemUserPayload(
+                new CreateSystemUserRequest(
+                        "10545433",
+                        IdentificationType.CEDULA,
+                        "Christian Adolfo",
+                        "González López",
+                        "chgl10@gmail.com",
+                        "3014520826",
+                        "Doctor123!"
+                ),
+                new CreateDoctorRequest(
+                        List.of(SpecialtyCode.TERAPIA_NEURAL),
+                        LocalDate.of(2026, 1, 1),
+                        LocalDate.of(2026, 12, 31),
+                        15,
+                        4,
+                        List.of(
+                                new ScheduleRequest(LocalTime.of(8, 0, 0), LocalTime.of(12, 0, 0), Workday.VIERNES)
+                        )
+                ),
+                null,
+                List.of(Role.DOCTOR))
+        );
+
+        userProvisioningApi.createUser(new CreateSystemUserPayload(
+                new CreateSystemUserRequest(
+                        "25284880",
+                        IdentificationType.CEDULA,
+                        "Zarama",
+                        "Velasco Serna",
+                        "zaves9272@gmail.com",
+                        "3136566950",
+                        "Doctor123!"
+                ),
+                new CreateDoctorRequest(
+                        List.of(SpecialtyCode.FISIOTERAPIA),
+                        LocalDate.of(2026, 1, 1),
+                        LocalDate.of(2026, 12, 31),
+                        20,
+                        4,
+                        List.of(
+                                new ScheduleRequest(LocalTime.of(8, 0, 0), LocalTime.of(11, 0, 0), Workday.MIERCOLES)
+                        )
+                ),
+                null,
+                List.of(Role.DOCTOR))
+        );
 
         System.out.println("✔ Médicos de prueba insertados");
     }
