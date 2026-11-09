@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.appointment.domain.model;
 
+import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentStateConflictException;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.AppointmentSchedulingRequest;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.junit.jupiter.api.Nested;
@@ -243,6 +244,24 @@ class AppointmentTest {
 
             assertThatThrownBy(() -> appointment.changeState(AppointmentState.ATENDIDA))
                     .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        void aRejectedCancellationIsATypedConflictWithItsExplanation() {
+            Appointment appointment = buildWithState(AppointmentState.ATENDIDA);
+
+            assertThatThrownBy(appointment::cancel)
+                    .isInstanceOf(AppointmentStateConflictException.class)
+                    .hasMessage("Solo las citas AGENDADAS pueden cancelarse. Estado actual: ATENDIDA");
+        }
+
+        @Test
+        void aRejectedStateChangeIsATypedConflictWithItsExplanation() {
+            Appointment appointment = buildWithState(AppointmentState.CANCELADA);
+
+            assertThatThrownBy(() -> appointment.changeState(AppointmentState.ATENDIDA))
+                    .isInstanceOf(AppointmentStateConflictException.class)
+                    .hasMessage("Solo se puede cambiar el estado de citas agendadas");
         }
     }
 }

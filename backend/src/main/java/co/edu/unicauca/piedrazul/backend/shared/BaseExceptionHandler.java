@@ -1,10 +1,14 @@
 package co.edu.unicauca.piedrazul.backend.shared;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.servlet.HandlerMapping;
 
 import java.net.URI;
 import java.time.Instant;
@@ -13,6 +17,48 @@ import java.util.stream.Collectors;
 
 // ProblemDetail, estándar definido en RFC 9457
 public abstract class BaseExceptionHandler {
+
+    private static final String UNEXPECTED_DETAIL = "Ocurrió un error inesperado en el servidor.";
+
+    /**
+     * Respuesta y registro de una RuntimeException que no es de negocio. Su mensaje no llega al
+     * cliente ni al log. Un cuerpo o un parámetro mal formado es un rechazo de la petición y no un
+     * fallo del servidor, así que queda como aviso aunque su estado siga siendo 500.
+     */
+    protected ProblemDetail buildUnexpectedProblem(
+            Logger log,
+            RuntimeException ex,
+            String module,
+            HttpServletRequest request
+    ) {
+        if (ex instanceof HttpMessageNotReadableException || ex instanceof TypeMismatchException) {
+            log.warn("Entrada rechazada en el módulo {} [{}]", module, ex.getClass().getSimpleName());
+        } else {
+            logUnexpected(log, "Excepción no controlada en el módulo " + module, ex, request);
+        }
+
+        return buildProblem(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                spanishTitle(HttpStatus.INTERNAL_SERVER_ERROR),
+                UNEXPECTED_DETAIL,
+                module,
+                "INTERNAL_ERROR",
+                request
+        );
+    }
+
+    /** Registra un fallo inesperado con su ruta declarada, nunca la URI con sus valores. */
+    protected void logUnexpected(Logger log, String event, Exception ex, HttpServletRequest request) {
+        Object route = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+
+        log.error(
+                "{} [{} {}]",
+                event,
+                request.getMethod(),
+                route != null ? route : "sin ruta",
+                SanitizedThrowable.of(ex)
+        );
+    }
 
     protected ProblemDetail buildProblem(
             HttpStatus status,

@@ -35,7 +35,7 @@ validate() { # <stage> <terraform> <host> <build> <build_pg> <deploy> <frontend>
   local s="$1" t="$2" h="$3" b="$4" p="$5" d="$6" f="$7"
   shift 7
   env IN_STAGE="$s" IN_TERRAFORM="$t" IN_HOST_CONFIG="$h" IN_BUILD="$b" IN_BUILD_POSTGRES="$p" \
-    IN_APP_DEPLOY="$d" IN_FRONTEND="$f" IN_IMAGE_TAG= IN_KEYCLOAK_RECOVERY=false IN_BREAK_GLASS= "$@" "${STAGE}" validate
+    IN_APP_DEPLOY="$d" IN_FRONTEND="$f" IN_IMAGE_TAG= IN_KEYCLOAK_RECOVERY=false IN_BREAK_GLASS= IN_OBSERVABILITY=full "$@" "${STAGE}" validate
 }
 check "validate: ordinary no restringe los flags" validate ordinary false false false false true false
 check "validate: stage omitido equivale a ordinary" env -u IN_STAGE "${STAGE}" validate
@@ -58,6 +58,18 @@ for s in provision install; do
   fails "validate: ${s} no admite recuperación de Keycloak" validate "$s" "$t" true true true true true IN_KEYCLOAK_RECOVERY=true
   fails "validate: ${s} no admite break-glass" validate "$s" "$t" true true true true true IN_BREAK_GLASS=BG-2026-001
 done
+# El stack de observabilidad es obligatorio en la instalación definitiva (Run P lo declara, Run I
+# lo instala); grafana-access o none no lo instalan
+for s in provision install; do
+  t="$([ "$s" = provision ] && echo true || echo false)"
+  fails "validate: ${s} sin observability (none)" validate "$s" "$t" true true true true true IN_OBSERVABILITY=none
+  fails "validate: ${s} con observability=grafana-access" validate "$s" "$t" true true true true true IN_OBSERVABILITY=grafana-access
+  fails "validate: ${s} sin el input observability" env -u IN_OBSERVABILITY IN_STAGE="$s" IN_TERRAFORM="$t" IN_HOST_CONFIG=true IN_BUILD=true \
+    IN_BUILD_POSTGRES=true IN_APP_DEPLOY=true IN_FRONTEND=true "${STAGE}" validate
+done
+check "validate: ordinary admite observability=full solo" validate ordinary false false false false false false
+check "validate: ordinary admite observability=grafana-access solo" validate ordinary false false false false false false IN_OBSERVABILITY=grafana-access
+fails "validate: observability con un valor desconocido" validate ordinary false false false false false false IN_OBSERVABILITY=partial
 validate provision false true true true true true > "${TMP}/v.out" 2>&1 || true
 check "validate: el rechazo es un error visible que nombra el flag" grep -q '::error title=Etapa de producción::.*run_terraform_apply' "${TMP}/v.out"
 
@@ -124,6 +136,9 @@ mkdir -p "${TMP}/bin" "${TMP}/gh"
 cat > "${TMP}/bin/gh" << 'EOF'
 #!/usr/bin/env bash
 [ "$1" = api ] || exit 2
+shift
+[ "$1" = --paginate ] && shift
+set -- api "$@"
 printf '%s\n' "$2" >> "${FAKE_GH_LOG}"
 for f in "${FAKE_GH_DIR}"/*; do
   [ -e "$f" ] || continue
@@ -182,9 +197,40 @@ reset_gh; jobs_file 12 '{"jobs":[{"name":"Rango procesado","status":"in_progress
 range_is "señal sin terminar no cuenta" "" "$(run_row 12 "${B}" success | runs)"
 reset_gh; jobs_file 12 '{"jobs":[{"name":"Rango procesado","status":"completed","conclusion":"success"},{"name":"Rango procesado","status":"completed","conclusion":"skipped"}]}'
 range_is "señal ambigua (repetida) no cuenta" "" "$(run_row 12 "${B}" success | runs)"
-reset_gh; signal 12; signal 13; signal 14; signal 15
-range_is "fallido, cancelado o dispatch no avanzan aunque traigan el job" "${A}" \
-  "$({ run_row 15 "${C}" failure; run_row 14 "${C}" cancelled push 1; run_row 13 "${C}" success workflow_dispatch 2; run_row 12 "${A}" success push 3; } | runs)"
+reset_gh; signal 13; signal 12
+range_is "un dispatch con el job no avanza el núcleo con los eventos por defecto (solo push)" "${A}" \
+  "$({ run_row 13 "${C}" success workflow_dispatch 1; run_row 12 "${A}" success push 3; } | runs)"
+reset_gh; signal 13; signal 12
+range_is "con RANGE_EVENTS=push workflow_dispatch, un dispatch con la señal avanza (Run I)" "${C}" \
+  "$({ run_row 13 "${C}" success workflow_dispatch 1; run_row 12 "${A}" success push 3; } | runs)" RANGE_EVENTS="push workflow_dispatch"
+# La autoridad es la señal del componente, no la conclusión del run: un run con el núcleo hecho y
+# la observabilidad fallida termina en failure y su núcleo cuenta igual
+reset_gh; signal 15; signal 12
+range_is "run fallido (otro componente) con la señal en success avanza" "${C}" \
+  "$({ run_row 15 "${C}" failure; run_row 12 "${A}" success push 3; } | runs)"
+reset_gh; signal 14; signal 12
+range_is "run cancelado después de su señal avanza" "${C}" \
+  "$({ run_row 14 "${C}" cancelled; run_row 12 "${A}" success push 3; } | runs)"
+reset_gh; no_signal 15; signal 12
+range_is "run fallido sin la señal no avanza" "${A}" \
+  "$({ run_row 15 "${C}" failure; run_row 12 "${A}" success push 3; } | runs)"
+# Señal del stack de observabilidad: su propio job; la del núcleo no cuenta para él ni al revés
+obs_signal() { jobs_file "$1" '{"jobs":[{"name":"Rango procesado","status":"completed","conclusion":"skipped"},{"name":"Observabilidad procesada","status":"completed","conclusion":"success"}]}'; }
+core_only() { jobs_file "$1" '{"jobs":[{"name":"Rango procesado","status":"completed","conclusion":"success"},{"name":"Observabilidad procesada","status":"completed","conclusion":"failure"}]}'; }
+reset_gh; core_only 13; obs_signal 12
+range_is "observabilidad: núcleo hecho y stack fallido → la base del stack sigue en su último procesado" "${A}" \
+  "$({ run_row 13 "${C}" failure; run_row 12 "${A}" success push 3; } | runs)" SIGNAL_JOB="Observabilidad procesada" RANGE_EVENTS="push workflow_dispatch"
+reset_gh; core_only 13; obs_signal 12
+range_is "núcleo: el mismo run fallido por el stack avanza el núcleo" "${C}" \
+  "$({ run_row 13 "${C}" failure; run_row 12 "${A}" success push 3; } | runs)"
+reset_gh; obs_signal 14; core_only 12
+range_is "observabilidad: un dispatch full de recuperación avanza el stack" "${C}" \
+  "$({ run_row 14 "${C}" success workflow_dispatch 1; run_row 12 "${A}" failure push 3; } | runs)" SIGNAL_JOB="Observabilidad procesada" RANGE_EVENTS="push workflow_dispatch"
+reset_gh; obs_signal 14; core_only 12
+range_is "núcleo: el dispatch del stack no avanza el núcleo" "${A}" \
+  "$({ run_row 14 "${C}" success workflow_dispatch 1; run_row 12 "${A}" failure push 3; } | runs)" RANGE_EVENTS="push workflow_dispatch"
+reset_gh; obs_signal 12
+fails "rango: RANGE_EVENTS inválido falla" bash -c "$(declare -f base); TMP='${TMP}' REPO='${REPO}' RANGE='${RANGE}' WF_PATH='${WF_PATH}' HEAD_SHA='${HEAD_SHA}' base RANGE_EVENTS=schedule <<< '{\"workflow_runs\":[]}'"
 reset_gh; signal 999
 range_is "el run actual no se toma a sí mismo como base" "" "$(run_row 999 "${C}" success | runs)"
 check "rango: el run actual ni siquiera se consulta" test ! -s "${FAKE_GH_LOG}"
@@ -216,7 +262,7 @@ classify() { # <EVENT_NAME> [VAR=valor...] → salida; el directorio queda en ${
     "$@" bash -c "${INTENT_RUN}") > "${TMP}/c.log" 2>&1
 }
 out_is() { grep -qx "$1" "${TMP}/c/out"; }
-all_flags=(IN_HOST_CONFIG=true IN_BUILD=true IN_BUILD_POSTGRES=true IN_APP_DEPLOY=true IN_FRONTEND=true)
+all_flags=(IN_HOST_CONFIG=true IN_BUILD=true IN_BUILD_POSTGRES=true IN_APP_DEPLOY=true IN_FRONTEND=true IN_OBSERVABILITY=full)
 
 reset_gh
 check "classify: push con la variable sin definir queda diferido" classify push PUSH_DEPLOY_SETTING=
@@ -236,7 +282,11 @@ check "classify enabled: etapa ordinaria y modo full, con el modo enabled" bash 
 reset_gh
 fails "classify: push con enabled y API caída falla (no se inventa un rango)" classify push PUSH_DEPLOY_SETTING=enabled
 
+printf '{"workflow_runs":[]}' > "${FAKE_GH_DIR}/workflows#production-hetzner.yml#runs"
 check "classify: Run P se acepta" classify workflow_dispatch IN_STAGE=provision IN_TERRAFORM=true "${all_flags[@]}"
+for o in observability_operation=full observability_execute=false observability_scope=install; do
+  check "classify Run P: ${o} (declara el stack sin ejecutarlo: el servidor aún no tiene la aplicación)" out_is "${o}"
+done
 for o in stage=provision intent=provision terraform_required=true deploy_required=true run_host_config=true run_app_deploy=true frontend_required=true range_mode=manual; do
   check "classify Run P: ${o} (la intención completa alimenta las comprobaciones previas)" out_is "${o}"
 done
@@ -246,9 +296,23 @@ check "classify Run P: sin definir queda retenido" bash -c "$(declare -f classif
 check "classify Run P: un valor inválido no bloquea la recuperación, pero no retiene" bash -c "$(declare -f classify); $(printf 'TMP=%q FAKE_GH_DIR=%q FAKE_GH_LOG=%q ROOT=%q ROOT_HEAD=%q WF_PATH=%q INTENT_RUN=%q' "${TMP}" "${FAKE_GH_DIR}" "${FAKE_GH_LOG}" "${ROOT}" "${ROOT_HEAD}" "${WF_PATH}" "${INTENT_RUN}"); classify workflow_dispatch IN_STAGE=provision IN_TERRAFORM=true ${all_flags[*]} PUSH_DEPLOY_SETTING=on && grep -qx push_mode=invalid '${TMP}/c/out' && grep -q '::warning title=Etapa' '${TMP}/c.log'"
 check "classify: un dispatch ordinario no depende de la variable de push" classify workflow_dispatch IN_STAGE=ordinary IN_APP_DEPLOY=true PUSH_DEPLOY_SETTING=on
 check "classify: Run I se acepta" classify workflow_dispatch IN_STAGE=install "${all_flags[@]}"
-for o in stage=install intent=install terraform_required=true deploy_required=true run_host_config=true range_mode=manual; do
+for o in stage=install intent=install terraform_required=true deploy_required=true run_host_config=true range_mode=manual \
+  observability_operation=full observability_execute=true observability_scope=install observability_images_changed=true; do
   check "classify Run I: ${o}" out_is "${o}"
 done
+fails "classify: Run I sin el stack de observabilidad se rechaza" classify workflow_dispatch IN_STAGE=install IN_HOST_CONFIG=true IN_BUILD=true \
+  IN_BUILD_POSTGRES=true IN_APP_DEPLOY=true IN_FRONTEND=true IN_OBSERVABILITY=none
+check "classify: dispatch solo del stack (full) se acepta sin flags del núcleo" classify workflow_dispatch IN_STAGE=ordinary IN_OBSERVABILITY=full
+for o in observability_operation=full observability_execute=true deploy_required=false terraform_required=false frontend_required=false run_build=false; do
+  check "classify dispatch full: ${o} (ni build, ni deploy, ni Pages, ni Terraform)" out_is "${o}"
+done
+check "classify: dispatch grafana-access se acepta sin flags del núcleo" classify workflow_dispatch IN_STAGE=ordinary IN_OBSERVABILITY=grafana-access
+for o in observability_operation=grafana-access observability_execute=true observability_images_changed=false deploy_required=false; do
+  check "classify dispatch grafana-access: ${o}" out_is "${o}"
+done
+fails "classify: break-glass con el stack se rechaza" classify workflow_dispatch IN_STAGE=ordinary IN_APP_DEPLOY=true IN_OBSERVABILITY=full \
+  IN_BREAK_GLASS=BG-2026-001 IN_BREAK_GLASS_JUSTIFICATION=justificacion-suficientemente-larga
+fails "classify: dispatch con todo en false y sin stack se rechaza" classify workflow_dispatch IN_STAGE=ordinary IN_OBSERVABILITY=none
 fails "classify: Run I que pide Apply se rechaza antes de cualquier job" classify workflow_dispatch IN_STAGE=install IN_TERRAFORM=true "${all_flags[@]}"
 fails "classify: Run P parcial se rechaza" classify workflow_dispatch IN_STAGE=provision IN_TERRAFORM=true IN_HOST_CONFIG=true
 check "classify: dispatch ordinario conserva su intención" classify workflow_dispatch IN_STAGE=ordinary IN_APP_DEPLOY=true
@@ -284,7 +348,7 @@ J = json.load(open(sys.argv[1]))
 e = " ".join(J["if"].split())
 assert "!cancelled()" in e, "sin función de estado explícita el success() implícito salta el job"
 def runs(event, classify, conclude, stage, cancelled):
-    x = e.replace("!cancelled()", "(not CANCELLED)").replace("&&", " and ")
+    x = e.replace("!cancelled()", "(not CANCELLED)").replace("&&", " and ").replace("||", " or ")
     x = re.sub(r"github\.event_name", "EVENT", x)
     x = x.replace("needs.classify.result", "CLASSIFY").replace("needs.conclude.result", "CONCLUDE")
     x = x.replace("needs.classify.outputs.stage", "STAGE")
@@ -292,7 +356,8 @@ def runs(event, classify, conclude, stage, cancelled):
 bad = []
 for ev, cl, co, st, ca in itertools.product(["push", "workflow_dispatch"], ["success", "failure", "skipped"],
         ["success", "failure", "cancelled", "skipped"], ["ordinary", "deferred", "provision", "install", ""], [False, True]):
-    want = ev == "push" and cl == "success" and co == "success" and st == "ordinary" and not ca
+    want = cl == "success" and co == "success" and not ca and (
+        (ev == "push" and st == "ordinary") or (ev == "workflow_dispatch" and st == "install"))
     if runs(ev, cl, co, st, ca) != want:
         bad.append((ev, cl, co, st, ca))
 assert not bad, bad[:5]
@@ -300,9 +365,11 @@ assert J["needs"] == ["classify", "conclude"]
 assert J.get("permissions") == {}
 assert "environment" not in J and "secrets." not in json.dumps(J)
 EOF
-check "range_processed: solo un push ordinario verificado por conclude deja la señal (matriz completa)" python3 "${TMP}/range-job.py" "${TMP}/range-job.json"
+check "range_processed: solo un push ordinario o un Run I verificados por conclude dejan la señal (matriz completa)" python3 "${TMP}/range-job.py" "${TMP}/range-job.json"
 check "rango: el nombre de la señal coincide entre el workflow y production-range-base.sh" \
-  bash -c "n=\$(yq -r '.jobs.range_processed.name' '${WORKFLOW}'); grep -qx \"SIGNAL_JOB=\\\"\${n}\\\"\" '${RANGE}'"
+  bash -c "n=\$(yq -r '.jobs.range_processed.name' '${WORKFLOW}'); grep -qx \"SIGNAL_JOB=\\\"\\\${SIGNAL_JOB:-\${n}}\\\"\" '${RANGE}'"
+check "rango: la señal del stack coincide entre el workflow y classify" \
+  bash -c "n=\$(yq -r '.jobs.observability_processed.name' '${WORKFLOW}'); yq -r '.jobs.classify.steps[] | select(.id == \"intent\") | .run' '${WORKFLOW}' | grep -qF \"SIGNAL_JOB=\\\"\${n}\\\"\""
 
 # ── 8. Bloque real del resumen: Run P nunca se informa como instalación ─────
 cat > "${TMP}/summary.py" << 'EOF'
@@ -363,8 +430,8 @@ check "resumen Run I completo: sin PROVISIONED" bash -c "grep -q 'último éxito
 
 # ── 9. Contratos del workflow que no deben relajarse ────────────────────────
 wf() { yq -r "$1" "${WORKFLOW}"; }
-check "workflow: solo terraform_plan y production usan un environment" \
-  test "$(wf '.jobs | to_entries | map(select(.value.environment != null) | .key) | sort | join(",")')" = "production,terraform_plan"
+check "workflow: solo terraform_plan, production y observability usan un environment" \
+  test "$(wf '.jobs | to_entries | map(select(.value.environment != null) | .key) | sort | join(",")')" = "observability,production,terraform_plan"
 check "workflow: el stage es una elección cerrada con ordinary por defecto" \
   test "$(wf '.on.workflow_dispatch.inputs.stage | .type + "/" + .default + "/" + (.options | join(","))')" = "choice/ordinary/ordinary,provision,install"
 check "workflow: no se agregó statuses: write fuera de production" \
@@ -387,14 +454,240 @@ check "workflow: la variable de push se lee solo para el título, classify y la 
   bash -c "jobs=''; for j in \$(yq -r '.jobs | keys | .[]' '${WORKFLOW}'); do yq -r \".jobs.\$j\" '${WORKFLOW}' | grep -qF '\${{ vars.PRODUCTION_PUSH_DEPLOY' && jobs=\"\$jobs\$j,\"; done; [ \"\$jobs\" = classify,production, ] && [ \"\$(yq -r '.jobs.production.steps[] | select(.env.PUSH_DEPLOY_NOW != null) | .id' '${WORKFLOW}' | paste -sd,)\" = kc_admin_preflight ]"
 check "workflow: la retención solo lee: ningún paso escribe variables ni usa un secreto nuevo para ella" \
   bash -c "! yq -r '.jobs[].steps[].run // \"\"' '${WORKFLOW}' | grep -Eq 'gh variable|actions/variables' && [ \"\$(yq -r '.jobs.terraform_plan' '${WORKFLOW}' | grep -o 'secrets\.[A-Z_]*' | sort -u | paste -sd,)\" = secrets.TF_API_TOKEN ] && [ \"\$(yq -r '.jobs.classify' '${WORKFLOW}' | grep -c 'secrets\.' || true)\" = 0 ]"
-check "workflow: el pin solo se lee en classify (existencia) y en los dos pasos de production" \
-  bash -c "[ \"\$(grep -c 'vars.PRODUCTION_SSH_HOST_PIN' '${WORKFLOW}')\" = 3 ] && [ \"\$(yq -r '.jobs.production.steps[] | select(.env.EXPECTED_HOST_PIN != null) | .id' '${WORKFLOW}' | paste -sd,)\" = pin_preflight,host_trust ] && [ \"\$(yq -r '.jobs.classify.steps[] | select(.id == \"intent\") | .env.PIN_OUTSIDE_ENVIRONMENT' '${WORKFLOW}')\" = \"\\\${{ vars.PRODUCTION_SSH_HOST_PIN != '' }}\" ]"
+check "workflow: el pin solo se lee en classify (existencia), en los dos pasos de production y en host_trust de observability" \
+  bash -c "[ \"\$(grep -c 'vars.PRODUCTION_SSH_HOST_PIN' '${WORKFLOW}')\" = 4 ] && [ \"\$(yq -r '.jobs.observability.steps[] | select(.env.EXPECTED_HOST_PIN != null) | .id' '${WORKFLOW}')\" = host_trust ] && [ \"\$(yq -r '.jobs.production.steps[] | select(.env.EXPECTED_HOST_PIN != null) | .id' '${WORKFLOW}' | paste -sd,)\" = pin_preflight,host_trust ] && [ \"\$(yq -r '.jobs.classify.steps[] | select(.id == \"intent\") | .env.PIN_OUTSIDE_ENVIRONMENT' '${WORKFLOW}')\" = \"\\\${{ vars.PRODUCTION_SSH_HOST_PIN != '' }}\" ]"
 check "workflow: el pin no tiene alternativa (sin || en su lectura) y classify no tiene environment" \
   bash -c "! grep -E 'PRODUCTION_SSH_HOST_PIN *\\|\\||\\|\\| *vars\\.PRODUCTION_SSH_HOST_PIN|PRODUCTION_SSH_HOST_PIN_' '${WORKFLOW}' && [ \"\$(yq -r '.jobs.classify.environment // \"none\"' '${WORKFLOW}')\" = none ]"
 check "workflow: ningún workflow ni script escribe variables de GitHub" \
   bash -c "! grep -rEq 'gh variable|actions/variables|/variables/' '${ROOT}/.github/workflows' '${ROOT}/.github/scripts/host-trust.sh' '${ROOT}/.github/scripts/production-stage.sh' '${ROOT}/.github/scripts/production-range-base.sh'"
 check "workflow: un push ordinario no expone el input de etapa (solo dispatch lo lee)" \
   bash -c "yq -r '.jobs.classify.steps[] | select(.id == \"intent\") | .run' '${WORKFLOW}' | grep -q 'STAGE=\"\${IN_STAGE:-ordinary}\"' && yq -r '.jobs.classify.steps[] | select(.id == \"intent\") | .run' '${WORKFLOW}' | grep -qx ' *echo \"stage=ordinary\"'"
+
+# ── 10. Stack de observabilidad: condiciones reales de sus jobs ─────────────
+# Evalúa las expresiones `if:` del workflow (no copias) con todas las combinaciones de resultados
+# de sus dependencias, incluidos saltados y cancelados: sin función de estado explícita, el
+# success() implícito saltaría el job en cuanto una dependencia se salta.
+for j in observability observability_processed installation_status observability_validate; do
+  yq -o=json ".jobs.${j}" "${WORKFLOW}" > "${TMP}/job-${j}.json"
+done
+cat > "${TMP}/jobs-f4.py" << 'EOF'
+import itertools, json, re, sys
+d = sys.argv[1]
+def load(n): return json.load(open(f"{d}/job-{n}.json"))
+def ev(expr, R, O, EVENT, CANCELLED):
+    x = " ".join(expr.split())
+    x = x.replace("!cancelled()", "(not CANCELLED)").replace("always()", "True")
+    x = x.replace("&&", " and ").replace("||", " or ")
+    x = re.sub(r"needs\.(\w+)\.result", lambda m: f"R[{m.group(1)!r}]", x)
+    x = re.sub(r"needs\.(\w+)\.outputs\.(\w+)", lambda m: f"O[{m.group(1)!r}].get({m.group(2)!r}, '')", x)
+    x = x.replace("github.event_name", "EVENT")
+    assert "!" not in x.replace("!=", ""), x
+    return bool(eval(x, {"R": R, "O": O, "EVENT": EVENT, "CANCELLED": CANCELLED}))
+RES = ["success", "failure", "cancelled", "skipped"]
+errors = []
+
+# observability: solo con classify bien, ejecución pedida, núcleo concluido (o no requerido) y,
+# para full, configuración validada e identidades reunidas; nunca si el escaneo del stack se canceló
+J = load("observability")
+assert set(J["needs"]) == {"classify", "image_targets", "observability_image_scan", "observability_validate", "conclude"}, J["needs"]
+assert "!cancelled()" in J["if"]
+assert J["environment"] == "production-hetzner"
+assert J["concurrency"]["group"] == "piedrazul-production-hetzner" and J["concurrency"]["cancel-in-progress"] is False
+for cl, co, va, it, sc, op, ex, ca in itertools.product(["success", "failure"], RES, RES, RES, RES,
+        ["full", "grafana-access", "none"], ["true", "false"], [False, True]):
+    R = {"classify": cl, "conclude": co, "observability_validate": va, "image_targets": it, "observability_image_scan": sc}
+    O = {"classify": {"observability_execute": ex, "observability_operation": op}}
+    want = (not ca and cl == "success" and ex == "true" and co == "success" and sc != "cancelled"
+            and (op == "grafana-access" or (va == "success" and it == "success")))
+    if ev(J["if"], R, O, "push", ca) != want:
+        errors.append(("observability", R, op, ex, ca))
+
+# observability_processed: solo con observability en success, operación full, en un push
+# ordinario, un dispatch ordinario o Run I; nunca grafana-access, Run P ni push diferido
+J = load("observability_processed")
+assert set(J["needs"]) == {"classify", "observability"} and J.get("permissions") == {}
+assert "environment" not in J and "secrets." not in json.dumps(J)
+for ob, op, st, e, ca in itertools.product(RES, ["full", "grafana-access", "none"],
+        ["ordinary", "install", "provision", "deferred"], ["push", "workflow_dispatch"], [False, True]):
+    R = {"observability": ob, "classify": "success"}
+    O = {"classify": {"observability_operation": op, "stage": st}}
+    want = (not ca and ob == "success" and op == "full" and
+            ((e == "push" and st == "ordinary") or (e == "workflow_dispatch" and st in ("ordinary", "install"))))
+    if ev(J["if"], R, O, e, ca) != want:
+        errors.append(("observability_processed", ob, op, st, e, ca))
+
+# installation_status: corre siempre en Run I (también con dependencias fallidas o saltadas) y
+# solo ahí
+J = load("installation_status")
+assert set(J["needs"]) == {"classify", "conclude", "observability"}
+for cl, st, co, ob in itertools.product(["success", "failure"], ["install", "provision", "ordinary"], RES, RES):
+    R = {"classify": cl, "conclude": co, "observability": ob}
+    O = {"classify": {"stage": st}}
+    if ev(J["if"], R, O, "workflow_dispatch", False) != (cl == "success" and st == "install"):
+        errors.append(("installation_status", cl, st, co, ob))
+
+# observability_validate: solo con operación full (también Run P), sin privilegios
+J = load("observability_validate")
+assert "environment" not in J and "secrets." not in json.dumps(J)
+for op in ["full", "grafana-access", "none"]:
+    if ev(J["if"], {"classify": "success"}, {"classify": {"observability_operation": op}}, "push", False) != (op == "full"):
+        errors.append(("observability_validate", op))
+assert not errors, errors[:6]
+EOF
+check "observability, observability_processed, installation_status y observability_validate: condiciones reales en todas las combinaciones" \
+  python3 "${TMP}/jobs-f4.py" "${TMP}"
+
+# Resultado de la instalación: el bloque real de installation_status
+STATUS_RUN="$(yq -r '.jobs.installation_status.steps[0].run' "${WORKFLOW}")"
+status_is() { # <CORE> <OBS> <rc esperado> <texto esperado>
+  : > "${TMP}/status-sum"
+  (env CORE="$1" OBS="$2" GITHUB_STEP_SUMMARY="${TMP}/status-sum" bash -c "${STATUS_RUN}") > /dev/null 2>&1
+  local rc=$?
+  [ "${rc}" = "$3" ] && grep -q "$4" "${TMP}/status-sum"
+}
+check "installation_status: núcleo y stack bien → READY (termina bien)" status_is success success 0 'Instalación: READY'
+check "installation_status: núcleo bien y stack fallido → INSTALADO / NOT READY (falla)" status_is success failure 1 'INSTALADO / NOT READY'
+check "installation_status: núcleo bien y stack saltado → INSTALADO / NOT READY (falla)" status_is success skipped 1 'INSTALADO / NOT READY'
+check "installation_status: núcleo fallido → NO INSTALADO (falla)" status_is failure skipped 1 'NO INSTALADO'
+check "installation_status: con el stack fallido no afirma READY y remite al dispatch del stack sin reescribir el run" \
+  bash -c "! (env CORE=success OBS=failure GITHUB_STEP_SUMMARY=/dev/null bash -c \"\$(yq -r '.jobs.installation_status.steps[0].run' '${WORKFLOW}')\" | grep -q 'Instalación: READY') && yq -r '.jobs.installation_status.steps[0].run' '${WORKFLOW}' | grep -q 'este run sigue NOT READY'"
+
+# Contrato de informes sin historia: el resumen del stack informa SU operación (nunca un READY
+# global reconstruido de runs anteriores) y distingue la operación de la salud del entorno
+OSUM_RUN="$(yq -r '.jobs.observability.steps[] | select(.name == "Resumen de observabilidad") | .run' "${WORKFLOW}")"
+osum() { # <STAGE> <APPLY> <FRESH> → resumen en ${TMP}/osum
+  : > "${TMP}/osum"
+  env STAGE="$1" APPLY="$2" FRESH="$3" PREFLIGHT=success TRUST=success POLICY=skipped OBS_OPERATION=full OBS_SCOPE=changed \
+    OBS_TARGETS='[]' GITHUB_SHA=abc GITHUB_STEP_SUMMARY="${TMP}/osum" bash -c "${OSUM_RUN}" > /dev/null 2>&1
+}
+check "resumen del stack: recuperación solo del stack aplicada → APLICADO, avanza el stack, sin READY de la instalación" \
+  bash -c "$(declare -f osum); TMP='${TMP}' OSUM_RUN=\"\$1\"; osum ordinary success success; grep -q 'APLICADO' '${TMP}/osum' && grep -q 'avanza a este commit' '${TMP}/osum' && grep -q 'no evalúa la salud actual del entorno' '${TMP}/osum' && ! grep -q 'READY' '${TMP}/osum'" _ "${OSUM_RUN}"
+check "resumen del stack en Run I: remite el veredicto a Estado de la instalación" \
+  bash -c "$(declare -f osum); TMP='${TMP}' OSUM_RUN=\"\$1\"; osum install success success; grep -q 'Estado de la instalación' '${TMP}/osum' && ! grep -q 'READY' '${TMP}/osum'" _ "${OSUM_RUN}"
+check "resumen del stack: aplicación fallida → FALLIDO y el stack no avanza" \
+  bash -c "$(declare -f osum); TMP='${TMP}' OSUM_RUN=\"\$1\"; osum ordinary failure success; grep -q 'FALLIDO' '${TMP}/osum' && grep -q 'progreso del stack | no avanza' '${TMP}/osum'" _ "${OSUM_RUN}"
+check "resumen del stack: main avanzó → SUPERADO y el stack no avanza" \
+  bash -c "$(declare -f osum); TMP='${TMP}' OSUM_RUN=\"\$1\"; osum ordinary skipped failure; grep -q 'SUPERADO' '${TMP}/osum' && grep -q 'progreso del stack | no avanza' '${TMP}/osum'" _ "${OSUM_RUN}"
+check "sin historia de la instalación: ni script, ni paso de classify, ni señales de Run P, ni salidas de production" \
+  bash -c "[ ! -e '${ROOT}/.github/scripts/installation-readiness.sh' ] && ! grep -qE 'installation-readiness|server_mutation|server_replaced|server_unchanged|server_replacement_uncertain|READINESS_BEFORE|install_sha' '${WORKFLOW}' && [ \"\$(yq -r '.jobs.production.outputs // \"none\"' '${WORKFLOW}')\" = none ] && [ \"\$(yq -r '.jobs.classify.outputs | has(\"readiness\")' '${WORKFLOW}')\" = false ]"
+
+# Contratos del job observability
+check "observability: secretos solo de su consumo (SSH, HCP, listas, webhook); ninguno de la base, Keycloak, Cloudflare, SES ni Pages" \
+  bash -c "[ \"\$(yq -r '.jobs.observability' '${WORKFLOW}' | grep -o 'secrets\.[A-Z_]*' | sort -u | paste -sd,)\" = secrets.ANSIBLE_SSH_KEY,secrets.GRAFANA_EDITOR_EMAILS,secrets.GRAFANA_VIEWER_EMAILS,secrets.OBS_DISCORD_WEBHOOK_URL,secrets.TF_API_TOKEN ]"
+check "observability: las listas de Grafana son secretos (repositorio público), nunca vars" \
+  bash -c "! grep -qE 'vars\\.GRAFANA_(VIEWER|EDITOR)_EMAILS' '${WORKFLOW}' && [ \"\$(grep -c 'secrets.GRAFANA_VIEWER_EMAILS' '${WORKFLOW}')\" = 3 ]"
+check "observability: frescura justo antes de aplicar, después de la política" \
+  bash -c "[ \"\$(yq -r '.jobs.observability.steps[].id // \"\"' '${WORKFLOW}' | grep -E '^(policy|fresh|apply)$' | paste -sd,)\" = policy,fresh,apply ]"
+check "observability: lee el estado actual de HCP sin Apply y verifica el pin antes de SSH" \
+  bash -c "yq -r '.jobs.observability.steps[].run // \"\"' '${WORKFLOW}' | grep -q 'hcp-state.sh workspace read' && ! yq -r '.jobs.observability.steps[].run // \"\"' '${WORKFLOW}' | grep -qE 'hcp-state.sh (apply|confirm)|workspace apply' && yq -r '.jobs.observability.steps[].run // \"\"' '${WORKFLOW}' | grep -q 'host-trust.sh verify'"
+check "observability: el webhook solo llega con la operación full" \
+  bash -c "[ \"\$(yq -r '.jobs.observability.steps[].env.OBS_DISCORD_WEBHOOK_URL // \"\"' '${WORKFLOW}' | grep -c \"observability_operation == 'full' && secrets.OBS_DISCORD_WEBHOOK_URL\")\" = 2 ]"
+check "observability: entradas autoritativas del workflow (sin webhook ni listas conservados del host)" \
+  bash -c "yq -r '.jobs.observability.steps[] | select(.id == \"apply\") | .run' '${WORKFLOW}' | grep -q 'obs_require_authoritative_inputs\": true'"
+check "observability: nunca el perfil de laboratorio de logs" \
+  bash -c "! grep -qE 'logs-lab-synthetic|logs_lab_authorization' '${WORKFLOW}'"
+check "observability: sin break-glass (la política del stack recibe BREAK_GLASS_ID vacío)" \
+  bash -c "[ \"\$(yq -r '.jobs.observability.steps[] | select(.id == \"policy\") | .env.BREAK_GLASS_ID' '${WORKFLOW}')\" = '' ] && ! yq -r '.jobs.observability' '${WORKFLOW}' | grep -q 'break_glass_authorization'"
+check "núcleo: production no depende del escaneo ni de la política del stack" \
+  bash -c "! yq -r '.jobs.production.needs[]' '${WORKFLOW}' | grep -qE 'observability_image_scan|observability\$' && ! yq -r '.jobs.image_policy.needs[]' '${WORKFLOW}' | grep -q observability"
+check "núcleo: production solo exige la validación del stack en la instalación (provision/install)" \
+  bash -c "yq -r '.jobs.production.if' '${WORKFLOW}' | tr -s ' \n' ' ' | grep -qF \"(needs.classify.outputs.stage == 'ordinary' || needs.observability_validate.result == 'success')\""
+check "núcleo: la evidencia de escaneo del núcleo no incluye la del stack (y al revés)" \
+  bash -c "grep -q 'SCAN_SURFACES:-backend|postgres|keycloak|traefik' '${ROOT}/.github/scripts/current-scan-evidence.sh' && [ \"\$(yq -r '.jobs.observability.steps[].env.SCAN_SURFACES // \"\"' '${WORKFLOW}' | grep -v '^\$')\" = 'obs-prometheus|obs-grafana|obs-alloy|obs-loki|obs-alertmanager' ]"
+
+# ── 11. Clasificación por componente (classify-production.sh en un repositorio sintético) ─────
+CR="${TMP}/crepo"
+git init -q -b main "${CR}"
+git -C "${CR}" config user.email t@t; git -C "${CR}" config user.name t; git -C "${CR}" config commit.gpgsign false
+# Árbol de trabajo (versionados y nuevos sin ignorar; los borrados no): el estado que se revisa
+(cd "${ROOT}" && git ls-files -z -co --exclude-standard -- infra/observability infra/ansible infra/compose infra/terraform/live/prod backend/pom.xml frontend/package.json infra/postgres |
+  while IFS= read -r -d '' f; do [ -e "${f}" ] && printf '%s\0' "${f}"; done) |
+  (cd "${ROOT}" && xargs -0 tar -cf - --) | tar -xf - -C "${CR}"
+git -C "${CR}" add -A && git -C "${CR}" commit -q -m base
+CB="$(git -C "${CR}" rev-parse HEAD)"
+edit() { # <ruta> → commit con un cambio en esa ruta (en el repositorio sintético)
+  git -C "${CR}" checkout -q "${CB}" 2>/dev/null
+  mkdir -p "${CR}/$(dirname "$1")"; printf '\n# cambio\n' >> "${CR}/$1"
+  git -C "${CR}" add -A && git -C "${CR}" commit -q -m "cambio $1" && git -C "${CR}" rev-parse HEAD
+}
+cls() { (cd "${CR}" && "${ROOT}/.github/scripts/classify-production.sh" "$@"); }
+classified() { # <ruta> <salidas esperadas...>
+  local p="$1" h o; shift
+  h="$(edit "${p}")"; cls "${CB}" "${h}" "${CB}" > "${TMP}/cls.out" 2>&1 || return 1
+  for o in "$@"; do grep -qx "${o}" "${TMP}/cls.out" || return 1; done
+}
+check "clasificación: regla del stack → solo el stack (sin converge, deploy, Terraform ni Pages)" \
+  classified infra/observability/prometheus/rules/alerts.yml observability_required=true observability_scope=changed intent=noop run_host_config=false run_app_deploy=false
+check "clasificación: dashboard del stack → solo el stack" \
+  classified infra/observability/grafana/dashboards/logs.json observability_required=true intent=noop
+check "clasificación: tarea del rol observability → solo el stack (ya no un converge de la aplicación)" \
+  classified infra/ansible/roles/observability/tasks/verify.yml observability_required=true intent=noop run_host_config=false
+check "clasificación: política de logs (compartida) → converge y stack con verificación de integración" \
+  classified infra/ansible/roles/observability/tasks/log_policy.yml run_host_config=true observability_required=true observability_scope=integration
+check "clasificación: defaults solo del stack (defaults/main/stack.yml) → solo el stack, sin converge" \
+  classified infra/ansible/roles/observability/defaults/main/stack.yml observability_required=true observability_scope=changed intent=noop run_host_config=false run_app_deploy=false deploy_required=false
+check "clasificación: defaults de la política de logs (compartidos) → converge y stack (integración)" \
+  classified infra/ansible/roles/observability/defaults/main/log_policy.yml run_host_config=true observability_required=true observability_scope=integration
+check "clasificación: playbook del stack → solo el stack" \
+  classified infra/ansible/playbooks/observability.yml observability_required=true intent=noop run_host_config=false
+# La frontera compartido/solo del stack depende de lo que converge carga: si cambia, este contrato
+# (y SHARED en classify-production.sh) debe cambiar con él
+check "defaults: converge carga solo los defaults compartidos (defaults_from: main/log_policy.yml)" \
+  bash -c "[ \"\$(yq -r '.[] | select(.\"ansible.builtin.include_role\".tasks_from == \"log_policy.yml\") | .\"ansible.builtin.include_role\".defaults_from' '${ROOT}/infra/ansible/roles/app/tasks/setup.yml')\" = main/log_policy.yml ] && [ ! -e '${ROOT}/infra/ansible/roles/observability/defaults/main.yml' ]"
+check "defaults: todo obs_* que lee tasks/log_policy.yml está en defaults/main/log_policy.yml (o lo calcula la tarea)" \
+  bash -c "D='${ROOT}/infra/ansible/roles/observability'; for v in \$(grep -oE '\\bobs_[a-z0-9_]+' \"\$D/tasks/log_policy.yml\" | sort -u); do yq -e \"has(\\\"\$v\\\")\" \"\$D/defaults/main/log_policy.yml\" >/dev/null 2>&1 || yq -e \".[0].\\\"ansible.builtin.set_fact\\\" | has(\\\"\$v\\\")\" \"\$D/tasks/log_policy.yml\" >/dev/null 2>&1 || { echo \"\$v\"; exit 1; }; done"
+check "defaults: ninguna clave repetida entre log_policy.yml y stack.yml (una sola fuente)" \
+  bash -c "[ -z \"\$(comm -12 <(yq -r 'keys|.[]' '${ROOT}/infra/ansible/roles/observability/defaults/main/log_policy.yml' | sort) <(yq -r 'keys|.[]' '${ROOT}/infra/ansible/roles/observability/defaults/main/stack.yml' | sort))\" ]"
+check "clasificación: inventario (compartido) → converge y stack (integración)" \
+  classified infra/ansible/inventories/prod/group_vars/all.yml run_host_config=true observability_required=true observability_scope=integration
+check "clasificación: Traefik (productor) → converge + deploy y verificación de integración del stack" \
+  classified infra/compose/traefik.yml run_host_config=true run_app_deploy=true observability_required=true observability_scope=integration
+check "clasificación: rol de la aplicación → converge sin el stack" \
+  classified infra/ansible/roles/app/tasks/setup.yml run_host_config=true observability_required=false
+check "clasificación: backend → build y deploy sin el stack ni Pages" \
+  classified backend/pom.xml run_build=true run_app_deploy=true observability_required=false frontend_required=false
+check "clasificación: frontend → solo Pages" \
+  classified frontend/package.json frontend_required=true deploy_required=false observability_required=false
+check "clasificación: pruebas del stack (no desplegadas) → nada" \
+  classified infra/observability/tests/alerts.test.yml observability_required=false intent=noop
+check "clasificación: sin cambio de imágenes del stack → sin escaneo" \
+  classified infra/observability/prometheus/prometheus.yml observability_images_changed=false
+IMG_H="$(git -C "${CR}" checkout -q "${CB}" && yq -i '.services.loki.image = "grafana/loki:9.9.9@sha256:0000000000000000000000000000000000000000000000000000000000000000"' "${CR}/infra/observability/compose.yml" && git -C "${CR}" commit -qam img && git -C "${CR}" rev-parse HEAD)"
+check "clasificación: referencia fijada de una imagen del stack cambiada → escaneo" \
+  bash -c "cd '${CR}' && '${ROOT}/.github/scripts/classify-production.sh' '${CB}' '${IMG_H}' '${CB}' | grep -qx observability_images_changed=true"
+check "clasificación: núcleo y stack con bases distintas (stack pendiente, núcleo al día)" \
+  bash -c "cd '${CR}' && h=\$(git rev-parse HEAD) && o=\$('${ROOT}/.github/scripts/classify-production.sh' \"\$h\" \"\$h\" '${CB}') && grep -qx intent=noop <<< \"\$o\" && grep -qx observability_required=true <<< \"\$o\""
+check "clasificación: sin base del stack → instalación completa del stack (nunca 'sin cambios')" \
+  bash -c "cd '${CR}' && h=\$(git rev-parse HEAD) && o=\$('${ROOT}/.github/scripts/classify-production.sh' \"\$h\" \"\$h\" '') && grep -qx observability_required=true <<< \"\$o\" && grep -qx observability_scope=install <<< \"\$o\" && grep -qx observability_images_changed=true <<< \"\$o\""
+fails "clasificación: base del stack que no es ancestro → falla" \
+  bash -c "cd '${CR}' && '${ROOT}/.github/scripts/classify-production.sh' '${CB}' '${CB}' '${IMG_H}'"
+
+# ── 13. Identidades del stack: aisladas del núcleo y exigidas por el stack ──────────────────
+TGT_RUN="$(yq -r '.jobs.image_targets.steps[] | select(.id == "targets") | .run' "${WORKFLOW}")"
+targets_run() { # <fail|ok> → salida del bloque real de image_targets con un resolvedor falso
+  local d="${TMP}/it-$1" v=() k
+  rm -rf "${d}"; mkdir -p "${d}/.github/scripts" "${d}/infra/observability"
+  cp "${ROOT}/infra/observability/compose.yml" "${d}/infra/observability/"
+  if [ "$1" = fail ]; then printf '#!/usr/bin/env bash\nexit 1\n' > "${d}/.github/scripts/resolve-amd64-image.sh"
+  else printf '#!/usr/bin/env bash\ni="${1#*@}"; r="${1%%%%:*}"; printf "image_index_digest=%%s\\nimage_amd64_digest=sha256:%%064d\\nimage_ref=%%s@sha256:%%064d\\n" "$i" 1 "$r" 1\n' > "${d}/.github/scripts/resolve-amd64-image.sh"; fi
+  chmod +x "${d}/.github/scripts/resolve-amd64-image.sh"
+  for k in BACKEND_SOURCE BACKEND_TAG BACKEND_INDEX_DIGEST BACKEND_IMAGE_REF BUILT_BACKEND_TAG BUILT_BACKEND_INDEX_DIGEST BUILT_BACKEND_IMAGE_REF \
+    POSTGRES_SOURCE POSTGRES_TAG POSTGRES_INDEX_DIGEST POSTGRES_IMAGE_REF BUILT_POSTGRES_TAG BUILT_POSTGRES_INDEX_DIGEST BUILT_POSTGRES_IMAGE_REF; do v+=("${k}="); done
+  (cd "${d}" && env -i PATH="${PATH}" "${v[@]}" RUN_HOST_CONFIG=false RUN_APP_DEPLOY=false OBS_OPERATION=full OBS_EXECUTE=true \
+    OBS_IMAGES_CHANGED=true GITHUB_OUTPUT="${d}/out" GITHUB_STEP_SUMMARY="${d}/sum" bash -c "${TGT_RUN}") > "${d}.log" 2>&1
+}
+check "image_targets: un fallo al resolver una imagen del stack no hace fallar el job del que depende el núcleo" targets_run fail
+check "image_targets: con ese fallo, el núcleo conserva sus objetivos y el stack queda en error sin identidades" \
+  bash -c "grep -q '^targets=\\[' '${TMP}/it-fail/out' && grep -qx 'observability_targets_status=error' '${TMP}/it-fail/out' && grep -qx 'observability_targets=\\[\\]' '${TMP}/it-fail/out' && grep -q '::error title=Identidad del stack' '${TMP}/it-fail.log'"
+check "image_targets: con el resolvedor bien, las cinco imágenes del stack como obs-* (estado ok)" \
+  bash -c "targets_ok() { :; }; $(declare -f targets_run); TMP='${TMP}' ROOT='${ROOT}' TGT_RUN=\"\$1\" targets_run ok && grep -qx 'observability_targets_status=ok' '${TMP}/it-ok/out' && [ \"\$(sed -n 's/^observability_targets=//p' '${TMP}/it-ok/out' | jq -r '[.[].surface] | join(\",\")')\" = obs-prometheus,obs-grafana,obs-alloy,obs-loki,obs-alertmanager ]" _ "${TGT_RUN}"
+GUARD="$(yq -r '.jobs.observability.steps[] | select(.name == "Exigir las identidades del stack que se van a autorizar") | .run' "${WORKFLOW}")"
+guard() { env STATUS="$1" OBS_TARGETS="$2" bash -c "${GUARD}" > /dev/null 2>&1; }
+fails "observability: identidades en error → falla antes de conectarse (no aplica imágenes sin autorizar)" guard error '[]'
+fails "observability: estado ok pero sin las cinco identidades → falla" guard ok '[{"surface":"obs-loki"}]'
+check "observability: estado ok y cinco identidades → sigue" guard ok '[1,2,3,4,5]'
+check "observability: la exigencia corre en toda operación full con imágenes nuevas" \
+  bash -c "[ \"\$(yq -r '.jobs.observability.steps[] | select(.name == \"Exigir las identidades del stack que se van a autorizar\") | .if' '${WORKFLOW}')\" = \"needs.classify.outputs.observability_operation == 'full' && needs.classify.outputs.observability_images_changed == 'true'\" ]"
 
 echo
 if [ "${FAILS}" -ne 0 ]; then

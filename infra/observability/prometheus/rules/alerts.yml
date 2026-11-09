@@ -1,0 +1,135 @@
+# Reglas de alerta de Prometheus sobre las métricas que publican backend, Keycloak, Traefik y el
+# host. Prometheus las evalúa; no hay Alertmanager ni ningún destino de notificación: el estado
+# se ve en el dashboard Plataforma y en la serie ALERTS. Pruebas:
+# infra/observability/tests/alerts.test.yml (promtool test rules).
+#
+# Ausencia de datos: un productor caído deja up == 0 (los destinos son estáticos, la serie
+# existe aunque el nombre no resuelva) y dispara PiedrazulTargetDown. Las reglas de host y de
+# HTTP no se evalúan sin series: su ausencia queda cubierta por esa regla (y la de la raíz por
+# PiedrazulHostRootFilesystemMissing), no por un valor "sano". Con Prometheus detenido no se
+# evalúa nada.
+groups:
+  - name: piedrazul-disponibilidad
+    rules:
+      # Cada productor de la aplicación y el exportador del host (Alloy). 5 m: diez lecturas
+      # seguidas fallidas, más que un reinicio normal de backend o Keycloak.
+      - alert: PiedrazulTargetDown
+        expr: up{job=~"backend|keycloak|traefik|host"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus no puede leer las métricas de {{ $labels.job }}"
+          description: >-
+            {{ $labels.instance }} no responde a la lectura de métricas desde hace 5 minutos:
+            el servicio está caído, reiniciándose en bucle o fuera de la red de la aplicación.
+            Con job=host, es Alloy (sin él no se evalúan las alertas de disco ni de memoria).
+
+      # Respuestas 5xx que Traefik entrega por servicio, incluidos los 502 de un upstream que no
+      # responde. Umbral del 5 % sostenido 10 m y piso de tráfico de 0,02 req/s (6 peticiones en
+      # 5 m) para que una sola petición fallida con tráfico casi nulo no dispare.
+      # En Grafana los 501 no cuentan en ninguna parte (ni 5xx, ni total, ni piso): su interfaz
+      # consulta APIs que esta instalación no implementa (p. ej. cuotas) y recibe 501 en uso
+      # normal; contarlos en el total diluiría sus 5xx reales y podría superar el piso solo con ellos.
+      # Sus 500, 502, 503 y 504 sí cuentan (Grafana o sus fuentes de datos fallando). Sin la ruta en
+      # las métricas, un 501 genuino de Grafana tampoco cuenta. Los 501 siguen en
+      # traefik_service_requests_total.
+      - alert: PiedrazulHttp5xxRatioHigh
+        expr: |
+          (
+            sum by (service) (
+              rate(traefik_service_requests_total{code=~"5..", service!~"grafana@.*"}[5m])
+                or
+              rate(traefik_service_requests_total{code=~"5..", code!="501", service=~"grafana@.*"}[5m])
+            )
+              /
+            sum by (service) (
+              rate(traefik_service_requests_total{service!~"grafana@.*"}[5m])
+                or
+              rate(traefik_service_requests_total{code!="501", service=~"grafana@.*"}[5m])
+            )
+          ) > 0.05
+          and
+          sum by (service) (
+            rate(traefik_service_requests_total{service!~"grafana@.*"}[5m])
+              or
+            rate(traefik_service_requests_total{code!="501", service=~"grafana@.*"}[5m])
+          ) > 0.02
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Más del 5 % de respuestas 5xx en {{ $labels.service }}"
+          description: >-
+            {{ $value | humanizePercentage }} de las respuestas de {{ $labels.service }} vistas
+            por Traefik son 5xx desde hace 10 minutos.
+
+  - name: piedrazul-host
+    rules:
+      # Sistema de archivos raíz del host (mountpoint "/", donde viven Docker, sus volúmenes y
+      # los logs): libre por debajo de max(15 % de la capacidad, 10 GiB) durante 15 m. El piso
+      # absoluto domina en discos de hasta ~67 GiB; el porcentaje, en los mayores.
+      - alert: PiedrazulHostRootFilesystemLow
+        expr: |
+          node_filesystem_avail_bytes{job="host", mountpoint="/"}
+            < clamp_min(node_filesystem_size_bytes{job="host", mountpoint="/"} * 0.15, 10 * 1024 * 1024 * 1024)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Poco espacio libre en el sistema de archivos raíz del host"
+          description: >-
+            / ({{ $labels.device }}) tiene {{ $value | humanize1024 }}B libres desde hace 15
+            minutos, por debajo de max(15 % de su capacidad, 10 GiB).
+
+      # Alloy responde pero no reporta la raíz (montaje de / ausente o excluido): sin esto la
+      # regla anterior no tendría serie y nunca dispararía.
+      - alert: PiedrazulHostRootFilesystemMissing
+        expr: |
+          up{job="host"} == 1
+          unless on (instance) node_filesystem_size_bytes{job="host", mountpoint="/"}
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alloy no reporta el sistema de archivos raíz del host"
+          description: >-
+            {{ $labels.instance }} responde pero sin node_filesystem_* para "/": la alerta de
+            espacio en la raíz no puede evaluarse. Revisar el montaje de / en Alloy.
+
+      # Memoria disponible (MemAvailable, incluye caché recuperable) bajo el 10 % durante 10 m:
+      # antesala del OOM killer sobre backend, Keycloak o PostgreSQL.
+      - alert: PiedrazulHostMemoryLow
+        expr: node_memory_MemAvailable_bytes{job="host"} / node_memory_MemTotal_bytes{job="host"} < 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memoria disponible del host bajo el 10 %"
+          description: >-
+            Disponible: {{ $value | humanizePercentage }} de la memoria total desde hace
+            10 minutos.
+
+  - name: piedrazul-prometheus
+    rules:
+      # Una regla que no se puede evaluar no dispara nunca: esto evita que parezca sana
+      - alert: PiedrazulRuleEvaluationFailing
+        expr: increase(prometheus_rule_evaluation_failures_total{job="prometheus"}[10m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Fallan evaluaciones de reglas en {{ $labels.rule_group }}"
+          description: >-
+            Prometheus no pudo evaluar reglas del grupo {{ $labels.rule_group }} en los
+            últimos 10 minutos: sus alertas no reflejan el estado real.
+
+      # Una recarga fallida deja en vigor la configuración anterior sin otro aviso
+      - alert: PiedrazulPrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful{job="prometheus"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus no pudo cargar su configuración"
+          description: >-
+            La última recarga de la configuración falló; sigue en vigor la anterior.

@@ -1,0 +1,7 @@
+# Alertmanager sin destino (OBS_ALERT_RECEIVER=none, por defecto): recibe y agrupa las alertas
+# de Prometheus pero no las envía a nadie. Es el estado antes de activar Discord
+# (docs/operations/runbooks/alertas.md): las alertas se ven en Prometheus y Grafana como antes.
+route:
+  receiver: none
+receivers:
+  - name: none

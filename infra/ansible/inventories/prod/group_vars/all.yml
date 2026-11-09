@@ -40,6 +40,26 @@ traefik_compose_file: "{{ compose_src_dir }}/traefik.yml"
 # Dominio base
 base_domain: piedrazul.org
 
+# ── Grafana detrás de Cloudflare Access ─────────────────────────────────────
+# Una sola fuente para los dos consumidores: el stack de observabilidad (rol observability: JWT
+# de Access en Grafana) y el router de Traefik de la aplicación (grafana_public_domain, por la red
+# piedrazul_obs_edge). La aplicación de Access, su política y el DNS los administra el operador
+# en Cloudflare, fuera del repositorio; estos son sus identificadores (no secretos). Las listas
+# de correos Viewer/Editor no van aquí: secretos del environment (grafana-acceso.md).
+obs_grafana_access_enabled: true
+obs_grafana_public_domain: "grafana.{{ base_domain }}"
+obs_grafana_access_team_domain: piedrazul.cloudflareaccess.com
+# Application Audience (AUD) Tag de la aplicación de Access de Grafana
+obs_grafana_access_aud: cbe625163be1c4f35c9d1b8c5a314665c07e0401c7f5ab6da5020caf41cd4984
+# Router de Traefik hacia Grafana: solo con el acceso habilitado (vacío: Grafana solo por túnel)
+grafana_public_domain: "{{ obs_grafana_public_domain if obs_grafana_access_enabled | bool else '' }}"
+
+# ── Notificaciones del stack de observabilidad ──────────────────────────────
+# Receptor de Alertmanager y entorno que encabeza cada mensaje. El webhook es el secreto
+# OBS_DISCORD_WEBHOOK_URL del environment (alertas.md).
+obs_alert_receiver: discord
+obs_environment: produccion
+
 # Spring / backend
 spring_profiles_active: prod
 server_port: 8080
@@ -75,8 +95,11 @@ max_file_size: 10MB
 max_request_size: 10MB
 
 # Actuator
-management_exposed_endpoints: health,info
+# Listener privado de gestión: métricas Prometheus, solo dentro de la red de contenedores.
+# /actuator/health sigue también en server_port (HEALTHCHECK de la imagen y health público).
+management_exposed_endpoints: health,info,prometheus
 management_health_details: when-authorized
+management_server_port: 8081
 
 # Logging
 log_level_root: INFO
@@ -85,10 +108,23 @@ log_level_sql: WARN
 log_level_sql_bind: WARN
 log_level_modulith: WARN
 
+# Logs centralizados: una sola lista para los dos lados de la canalización. converge escribe
+# <SERVICIO>_LOGGING=journald en .env para estos servicios (prod.yml extiende logging.yml: driver
+# journald al journal del host) y default para el resto (sin configuración propia: el driver y la
+# rotación de daemon.json, como antes); observability.yml selecciona los mismos en Alloy. La
+# política (roles/observability/tasks/log_policy.yml) rechaza en los dos playbooks lo no admitido:
+# backend, keycloak y postgres exigen obs_log_privacy_controls_done (decisión de privacidad para
+# datos reales) o, solo con datos sintéticos, el perfil profiles/logs-lab-synthetic.yml.
+# Ver docs/operations/runbooks/logs.md.
+obs_log_services: [traefik]
+obs_log_privacy_controls_done: []
+
 # Keycloak
 kc_realm: piedrazul
 kc_port: 8180
 kc_backend_client_id: piedrazul-backend
+# Cliente público del frontend: su alcance de roles (los roles de negocio) lo declara el realm
+kc_frontend_client_id: piedrazul-frontend
 # Autoridad de reconciliación (service account en master, secreto solo en el runner).
 # Roles exactos: solo del realm de la aplicación, nada en master. manage-realm lo exige el
 # correo nativo (keycloak_smtp.yml): la API solo admite escribir SMTP con ese rol.
@@ -97,6 +133,14 @@ kc_automation_roles:
   - "{{ kc_realm }}-realm:manage-clients"
   - "{{ kc_realm }}-realm:manage-realm"
   - "{{ kc_realm }}-realm:view-clients"
+# API de administración (Keycloak >= 26.8.2, CVE-2026-19688): solo acepta tokens con la
+# audiencia y el alcance del client scope incorporado kc-admin-api. Keycloak lo crea en cada
+# realm y lo asigna solo a admin-cli y security-admin-console: la automatización y el backend lo
+# reciben como alcance por defecto en el evento con autoridad temporal (keycloak-admin.sh
+# establish); el frontend nunca. No agrega roles: la autoridad sigue siendo la de sus roles.
+# Desde kc_admin_api_scope_since (versión que migró la base) su ausencia es P3 recuperable.
+kc_admin_api_scope: kc-admin-api
+kc_admin_api_scope_since: "26.8.2"
 # Autoridad temporal de un evento (P2 o recuperación P3): kc.sh bootstrap-admin service con
 # este prefijo + sufijo aleatorio y secreto aleatorio generado en el runner. Se elimina al
 # terminar el evento. Ver app/tasks/keycloak_lifecycle.yml.

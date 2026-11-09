@@ -15,14 +15,25 @@ Uso: python -I keycloak-browser-login.py <modo>
   direct-grant password grant del cliente admin-cli: sin OTP y, si hay KBL_OTP_FILE, con OTP
   realm-first-login  en el realm de la aplicación (tema React): contraseña temporal →
                UPDATE_PASSWORD (KBL_NEW_PASSWORD) → código, como el primer administrador de negocio
+  realm-login        en el realm de la aplicación: un intento con KBL_PASSWORD, sin completar
+               acciones requeridas: authenticated | required_action:<página> |
+               invalid_credentials | unrecognized:<página> (ver realm_login)
   reset-request      en el realm de la aplicación: ¿la página de login ofrece recuperar la
                contraseña? Pide la recuperación de KBL_USER, si Keycloak la admite. No sigue el
                enlace del correo
+  realm-token        en el realm de la aplicación, como keycloak-js: login con PKCE S256 y canje
+               del código; informa los roles del access token (realm_access, resource_access) y
+               que el canje sin code_verifier se rechaza. Guarda el refresh token en
+               KBL_TOKEN_FILE (0600) para realm-refresh
+  realm-refresh      renueva con el refresh token de KBL_TOKEN_FILE e informa los mismos roles
+  realm-logout       cierra la sesión del refresh token de KBL_TOKEN_FILE (endpoint de logout del
+               realm) y comprueba que ese refresh token ya no renueva
+  client-roles       client credentials de KBL_CLIENT con KBL_SECRET: roles de su access token
 
 Entorno: KBL_BASE (p. ej. http://keycloak:8180), KBL_REALM, KBL_CLIENT, KBL_REDIRECT (por
 defecto, la consola de administración según el issuer del realm), KBL_USER, KBL_PASSWORD,
-KBL_NEW_PASSWORD, KBL_OTP_FILE.
-Salida: líneas clave=valor, nunca contraseñas, semillas ni códigos. Código 0 si el modo
+KBL_NEW_PASSWORD, KBL_OTP_FILE, KBL_TOKEN_FILE, KBL_SECRET.
+Salida: líneas clave=valor, nunca contraseñas, semillas, códigos ni tokens (solo sus roles). Código 0 si el modo
 llegó a un resultado observable (que la salida describe); 1 si el flujo no fue reconocible.
 """
 
@@ -185,16 +196,18 @@ def discover_redirect():
     return issuer.rsplit("/realms/", 1)[0] + f"/admin/{REALM}/console/"
 
 
-def authorize():
+def authorize(**extra):
     global REDIRECT
     REDIRECT = REDIRECT or discover_redirect()
     verifier = secrets.token_urlsafe(48)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
-    url = f"{BASE}/realms/{REALM}/protocol/openid-connect/auth?" + urllib.parse.urlencode({
+    url = f"{BASE}/realms/{REALM}/protocol/openid-connect/auth?" + urllib.parse.urlencode(dict({
         "client_id": CLIENT, "redirect_uri": REDIRECT, "response_type": "code", "scope": "openid",
         "state": secrets.token_hex(8), "nonce": secrets.token_hex(8),
-        "code_challenge": challenge, "code_challenge_method": "S256"})
-    _, status, page = follow(url)
+        "code_challenge": challenge, "code_challenge_method": "S256"}, **extra))
+    code, status, page = follow(url)
+    if code:  # solo con una sesión previa (prompt=none): el código cuenta, no la página
+        return verifier, status, "code"
     return verifier, status, page
 
 
@@ -339,6 +352,42 @@ def realm_first_login():
     finish(code, verifier)
 
 
+def realm_login():
+    """Un intento independiente (proceso nuevo: sin cookies, código ni sesión previos) con
+    KBL_PASSWORD en el realm de la aplicación, sin completar ninguna acción requerida. El
+    resultado distingue lo que el password grant ya no puede (admin-cli sin direct grants):
+      authenticated            código canjeado por un token de KBL_USER
+      required_action:<page>   Keycloak exige una acción antes de autenticar (no la completa)
+      invalid_credentials      vuelve el formulario de login con un error (el motivo exacto
+                               lo confirma el harness en el registro de eventos)
+      unrecognized:<page>      cualquier otra cosa: nunca cuenta como rechazo
+    Un fallo del sondeo (red, cliente, redirect_uri) termina en error=… con código 1."""
+    verifier, _, page = authorize()
+    if context(page, "pageId") != "login":
+        raise Unrecognized("no_login_page:" + context(page, "pageId"))
+    code, _, page = follow(context(page, "loginAction"), {
+        "username": ENV["KBL_USER"], "password": ENV["KBL_PASSWORD"], "credentialId": ""})
+    if code:
+        token = exchange(code, verifier)
+        outcome = "authenticated" if token == "ok" else "unrecognized:token_" + token
+    else:
+        page_id = context(page, "pageId")
+        if "/login-actions/required-action" in context(page, "loginAction"):
+            outcome = "required_action:" + page_id
+        elif page_id == "login" and re.search(r'"type"\s*:\s*"error"', page):
+            outcome = "invalid_credentials"
+        else:
+            outcome = "unrecognized:" + page_id
+    out("realm_login.outcome", outcome)
+    # Sin autenticación no hay sesión de usuario: ni cookie de identidad ni reautorización
+    # silenciosa (prompt=none) en este mismo navegador
+    if outcome != "authenticated":
+        out("realm_login.identity_cookie", "present" if "KEYCLOAK_IDENTITY" in COOKIES else "absent")
+        _, _, err = authorize(prompt="none")
+        out("realm_login.silent_reauth", err.removeprefix("error=") if err.startswith("error=") else
+            ("code" if err == "code" else "page"))
+
+
 def reset_request():
     _, _, page = authorize()
     out("reset.advertised", context(page, "resetPasswordAllowed"))
@@ -349,8 +398,81 @@ def reset_request():
         out("reset.submitted", status)
 
 
+def token_roles(prefix, text):
+    """Solo los roles y el cliente del access token (nunca el token). Guarda el refresh token
+    para realm-refresh."""
+    tokens = json.loads(text)
+    claims = json.loads(base64.urlsafe_b64decode(tokens["access_token"].split(".")[1] + "=="))
+    out(f"{prefix}.azp", claims.get("azp"))
+    out(f"{prefix}.realm_roles", ",".join(sorted(claims.get("realm_access", {}).get("roles", []))) or "none")
+    out(f"{prefix}.resource_access", ",".join(sorted(
+        f"{c}:{r}" for c, v in claims.get("resource_access", {}).items() for r in v.get("roles", []))) or "none")
+    # API de administración (Keycloak >= 26.8.2): alcance kc-admin-api y audiencias
+    # <url>/admin/realms/<realm> (solo el sufijo admin/realms/<realm>)
+    out(f"{prefix}.admin_api_scope", "yes" if "kc-admin-api" in (claims.get("scope") or "").split() else "no")
+    aud = claims.get("aud") or []
+    aud = [aud] if isinstance(aud, str) else aud
+    out(f"{prefix}.admin_api_aud", ",".join(sorted(
+        a[a.index("/admin/realms/") + 1:] for a in aud if "/admin/realms/" in a)) or "none")
+    if tokens.get("refresh_token") and ENV.get("KBL_TOKEN_FILE"):
+        with open(os.open(ENV["KBL_TOKEN_FILE"], os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
+            f.write(tokens["refresh_token"])
+
+
+def realm_logout():
+    with open(ENV["KBL_TOKEN_FILE"]) as f:
+        refresh = f.read().strip()
+    status, _, _ = request(f"{BASE}/realms/{REALM}/protocol/openid-connect/logout", {
+        "client_id": CLIENT, "refresh_token": refresh})
+    out("logout.status", status)
+    status, _, text = request(f"{BASE}/realms/{REALM}/protocol/openid-connect/token", {
+        "grant_type": "refresh_token", "client_id": CLIENT, "refresh_token": refresh})
+    out("logout.refresh_after", "rejected" if status == 400 and '"invalid_grant"' in text else f"status_{status}")
+
+
+def client_roles():
+    """Client credentials de un cliente confidencial (secreto en KBL_SECRET): roles de su token."""
+    status, _, text = request(f"{BASE}/realms/{REALM}/protocol/openid-connect/token", {
+        "grant_type": "client_credentials", "client_id": CLIENT, "client_secret": ENV["KBL_SECRET"]})
+    out("client.status", status)
+    if status == 200:
+        token_roles("client", text)
+
+
+def realm_token():
+    verifier, _, page = authorize()
+    code, _, page = follow(context(page, "loginAction"), {
+        "username": ENV["KBL_USER"], "password": ENV["KBL_PASSWORD"], "credentialId": ""})
+    if not code:
+        raise Unrecognized("no_code:" + context(page, "pageId"))
+    token_url = f"{BASE}/realms/{REALM}/protocol/openid-connect/token"
+    status, _, text = request(token_url, {"grant_type": "authorization_code", "client_id": CLIENT, "code": code,
+                                          "redirect_uri": REDIRECT, "code_verifier": verifier})
+    out("token.status", status)
+    if status != 200:
+        return
+    token_roles("token", text)
+    # PKCE exigido: con la misma sesión SSO, una autorización sin code_challenge no entrega código
+    code, _, page = follow(f"{BASE}/realms/{REALM}/protocol/openid-connect/auth?" + urllib.parse.urlencode({
+        "client_id": CLIENT, "redirect_uri": REDIRECT, "response_type": "code", "scope": "openid",
+        "prompt": "none", "state": secrets.token_hex(8), "nonce": secrets.token_hex(8)}))
+    out("token.authorize_without_pkce", "code_issued" if code else "refused")
+
+
+def realm_refresh():
+    with open(ENV["KBL_TOKEN_FILE"]) as f:
+        refresh = f.read().strip()
+    status, _, text = request(f"{BASE}/realms/{REALM}/protocol/openid-connect/token", {
+        "grant_type": "refresh_token", "client_id": CLIENT, "refresh_token": refresh})
+    out("refresh.status", status)
+    if status == 200:
+        token_roles("refresh", text)
+
+
 MODES = {"first-login": first_login, "login": login, "password": password_only, "direct-grant": direct_grant,
-         "realm-first-login": realm_first_login, "reset-request": reset_request}
+         "realm-first-login": realm_first_login, "realm-login": realm_login, "reset-request": reset_request,
+         "realm-token": realm_token, "realm-refresh": realm_refresh,
+         "realm-logout": realm_logout, "client-roles": client_roles}
 
 if __name__ == "__main__":
     try:

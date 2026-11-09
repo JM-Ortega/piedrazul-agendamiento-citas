@@ -6,6 +6,8 @@
 --   app_realm          realm de la aplicación
 --   automation_client  clientId de la automatización en master
 --   backend_client     clientId del backend en app_realm
+--   frontend_client    clientId del frontend en app_realm
+--   admin_api_scope    client scope incorporado de la API de administración (kc-admin-api)
 --   owned_temp_regex   forma exacta del clientId de una autoridad temporal propia
 --   platform_admin_username, platform_admin_role   administrador humano permanente
 --
@@ -117,6 +119,39 @@ SELECT 'roles.' || t.label || '='
   LEFT JOIN keycloak_role k ON k.id = m.role_id
   LEFT JOIN client rc ON rc.id = k.client
  GROUP BY t.label
+ ORDER BY t.label;
+
+-- Alcance de roles de los clientes propios: Full Scope Allowed y las asignaciones directas de
+-- su alcance (scope_mapping: realm:<rol> o <clientId>:<rol>, sin expandir roles compuestos).
+-- Sin línea si el cliente no existe.
+SELECT 'scope.' || t.label || '=full:' || c.full_scope_allowed || ';'
+       || coalesce((SELECT string_agg(CASE WHEN k.client_role THEN rc.client_id ELSE 'realm' END || ':' || k.name, ','
+                                      ORDER BY CASE WHEN k.client_role THEN rc.client_id ELSE 'realm' END, k.name)
+                      FROM scope_mapping s
+                      JOIN keycloak_role k ON k.id = s.role_id
+                      LEFT JOIN client rc ON rc.id = k.client
+                     WHERE s.client_id = c.id), '')
+  FROM (VALUES ('automation', 'master', :'automation_client'),
+               ('backend', :'app_realm', :'backend_client'),
+               ('frontend', :'app_realm', :'frontend_client')) AS t(label, realm_name, client_id)
+  JOIN realm r ON r.name = t.realm_name
+  JOIN client c ON c.realm_id = r.id AND c.client_id = t.client_id
+ ORDER BY t.label;
+
+-- Alcance incorporado de la API de administración (admin_api_scope, kc-admin-api desde
+-- Keycloak 26.8.2) en cada cliente propio presente: default, optional, default+optional o
+-- none. Solo la asignación de ese scope del mismo realm; los demás alcances no se leen.
+SELECT 'admin_api.' || t.label || '='
+       || coalesce((SELECT string_agg(CASE WHEN csc.default_scope THEN 'default' ELSE 'optional' END, '+'
+                                      ORDER BY csc.default_scope DESC)
+                      FROM client_scope_client csc
+                      JOIN client_scope s ON s.id = csc.scope_id AND s.realm_id = r.id
+                     WHERE csc.client_id = c.id AND s.name = :'admin_api_scope'), 'none')
+  FROM (VALUES ('automation', 'master', :'automation_client'),
+               ('backend', :'app_realm', :'backend_client'),
+               ('frontend', :'app_realm', :'frontend_client')) AS t(label, realm_name, client_id)
+  JOIN realm r ON r.name = t.realm_name
+  JOIN client c ON c.realm_id = r.id AND c.client_id = t.client_id
  ORDER BY t.label;
 
 -- Solo informativo y solo un conteo: usuarios humanos de master con el rol admin asignado

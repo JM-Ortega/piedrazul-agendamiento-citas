@@ -1,0 +1,22 @@
+# Archivo de acceso de Grafana (role_attribute_path con las listas validadas por
+# access_lists.yml). Escritura atómica: un archivo nuevo (inodo nuevo) que el Grafana en marcha no
+# ve hasta recrearlo; activate_secrets.yml lo detecta y lo recrea. Siempre existe (Compose lo monta
+# como secreto), también con el acceso deshabilitado.
+
+- name: Crear el directorio de secretos del stack
+  ansible.builtin.file:
+    path: "{{ obs_secrets_dir }}"
+    state: directory
+    owner: "{{ obs_secrets_owner | default('root') }}"
+    group: "{{ obs_secrets_owner | default('root') }}"
+    mode: "0700"
+
+- name: Escribir el archivo de acceso de Grafana
+  ansible.builtin.template:
+    src: grafana-access.ini.j2
+    dest: "{{ obs_grafana_access_file }}"
+    owner: "{{ obs_grafana_uid }}"
+    group: "{{ obs_grafana_uid }}"
+    mode: "{{ obs_secret_mode }}"
+  no_log: true
+  diff: false

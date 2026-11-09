@@ -1,0 +1,27 @@
+# Perfil de laboratorio de logs: los cuatro servicios principales (traefik, keycloak, backend,
+# postgres) escriben en el journal del host y Alloy los envía a Loki con su diagnóstico completo
+# (mensajes, trazas, SQLSTATE, DETAIL y sentencia de PostgreSQL, eventos LOGIN_ERROR de Keycloak).
+#
+# Valida con datos sintéticos la misma configuración que adoptará la operación (misma lista,
+# mismas bases de compose/logging.yml, misma canalización); la operación no usa este perfil sino
+# obs_log_services y obs_log_privacy_controls_done en el inventario (logs.md, "Adopción en
+# operación").
+#
+# SOLO para un host de laboratorio desechable con identidades y datos sintéticos. Sus logs pueden
+# llevar identificadores de personas, valores de error y cuerpos de respuesta de Keycloak: con
+# datos clínicos reales este perfil no se usa. No marca ningún control de privacidad como
+# completo (obs_log_privacy_controls_done no cambia) ni se guarda en el host: cada run de
+# converge y observability debe recibirlo. Sin él, cada playbook vuelve al inventario solo en su
+# lado: observability deja de seleccionar en Alloy (los contenedores siguen escribiendo en el
+# journal); converge devuelve los productores a default (recrea postgres y keycloak; el backend,
+# al recrearse en deploy o refresh_backend). deploy usa el .env de converge; se le pasa igual
+# para no depender del orden.
+#
+# Uso (los tres playbooks, siempre con el mismo perfil):
+#   ansible-playbook -i <inventario> -e @profiles/logs-lab-synthetic.yml playbooks/converge.yml
+#   ansible-playbook -i <inventario> -e @profiles/logs-lab-synthetic.yml playbooks/deploy.yml ...
+#   ansible-playbook -i <inventario> -e @profiles/logs-lab-synthetic.yml playbooks/observability.yml
+# Ver docs/operations/runbooks/logs.md, "Perfil de laboratorio".
+logs_lab_authorization: synthetic-data-only
+# Activación (converge → .env → prod.yml) y selección en Alloy (observability → OBS_LOG_SERVICES)
+obs_log_services: [traefik, keycloak, backend, postgres]

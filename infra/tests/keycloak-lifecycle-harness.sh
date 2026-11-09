@@ -41,7 +41,14 @@
 #           vuelta es compatible; rechazar ese digest es de la política de vulnerabilidades)
 #   P2      base nueva → evento → P1; ninguna credencial del repositorio válida en ningún
 #           momento (sondeo continuo durante el evento); sin autoridad temporal al final
-#   P1      dos convergencias más: sin evento, idempotentes, sin recrear el realm
+#   P1      dos convergencias más: sin evento, idempotentes, sin recrear el realm ni escribir
+#           el alcance de roles
+#   SCOPE   alcance de roles explícito de automatización, backend y frontend (Full Scope Allowed
+#           deshabilitado) tras P2; tokens reales: frontend con PKCE por rol de negocio, varios
+#           roles, sin roles técnicos, renovación al otorgar y quitar un rol, cierre de sesión;
+#           backend y automatización con exactamente su autoridad (API permitida y denegada);
+#           sin aviso de Full Scope de Keycloak para esos clientes. Divergencia del alcance en
+#           los tres clientes → P3 recuperable sin mutar → recuperación existente → P1
 #   ROT-B   rotación de KC_BACKEND_CLIENT_SECRET por convergencia normal
 #   P3-*    estados divergentes: la convergencia normal falla cerrada, sin mutar
 #   REC     recuperación autorizada (incluida la rotación de KC_AUTOMATION_CLIENT_SECRET)
@@ -253,16 +260,9 @@ kc_client_auth() {
     elif grep -qiE "invalid client|unauthorized_client|401" <<<"$out"; then echo rejected
     else echo unavailable; fi' "$1" "$2" 2>/dev/null || echo unavailable
 }
-kc_user_state() { # <realm> <user> <password> → ok|not_set_up|rejected|unavailable
-  docker exec -e "S=$3" keycloak bash -c '
-    c="$(mktemp -u /dev/shm/h.XXXXXX)"; trap "rm -f $c" EXIT
-    if out="$(KC_CLI_PASSWORD="$S" /opt/keycloak/bin/kcadm.sh config credentials --config "$c" \
-        --server http://localhost:8180 --realm "$0" --user "$1" 2>&1)"; then echo ok
-    elif grep -qi "not fully set up" <<<"$out"; then echo not_set_up
-    elif grep -qiE "invalid user|invalid_grant|401" <<<"$out"; then echo rejected
-    else echo unavailable; fi' "$1" "$2" 2>/dev/null || echo unavailable
-}
-kc_user_auth() { # <realm> <user> <password>
+# kc_user_auth <realm> <user> <password>: password grant de admin-cli, solo para master (el
+# admin-cli de piedrazul no lo tiene: ahí se usa realm_login, por el flujo browser)
+kc_user_auth() {
   docker exec -e "S=$3" keycloak bash -c '
     c="$(mktemp -u /dev/shm/h.XXXXXX)"; trap "rm -f $c" EXIT
     if out="$(KC_CLI_PASSWORD="$S" /opt/keycloak/bin/kcadm.sh config credentials --config "$c" \
@@ -315,9 +315,45 @@ browser() {
     "${PY_IMAGE}" python -I /kbl.py "${mode}" > "${LOGS}/browser-${outf}.txt" 2>&1
 }
 browser_has() { grep -qxF -- "$2" "${LOGS}/browser-$1.txt"; }
+browser_all() { local f="$1" l; shift; for l in "$@"; do browser_has "${f}" "${l}" || return 1; done; }
+# realm_login <salida> <usuario> <contraseña> [cliente]: un intento independiente (proceso
+# nuevo, sin cookies ni sesión previas) en el realm de la aplicación por el flujo browser del
+# frontend: su admin-cli no tiene password grant, así que kcadm no puede probar contraseñas ahí
+realm_login() {
+  KBL_REALM=piedrazul KBL_CLIENT="${4:-piedrazul-frontend}" KBL_REDIRECT=http://localhost:4200/ \
+    KBL_USER="$2" KBL_PASSWORD="$3" browser realm-login "$1" KBL_REALM KBL_CLIENT KBL_REDIRECT KBL_USER KBL_PASSWORD
+}
+# login_error_counts <id> → "<invalid_user_credentials> <otros motivos>" en el registro de
+# eventos del realm (el backend tiene view-events); vacío si no se pudo leer
+login_error_counts() {
+  kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul get events -r piedrazul -q "user=$1" -q type=LOGIN_ERROR -q max=1000 --fields error 2>/dev/null \
+    | jq -r '"\([.[] | select(.error == "invalid_user_credentials")] | length) \([.[] | select(.error != "invalid_user_credentials")] | length)"'
+}
+# realm_rejected <salida> <usuario> <id> <contraseña>: realm_login y anota en su salida el
+# motivo que registró Keycloak. La página de un rechazo por contraseña y la de una cuenta
+# bloqueada son iguales a propósito: solo el evento distingue
+# event.login_error=invalid_user_credentials (exactamente un fallo nuevo, de ese motivo).
+realm_rejected() {
+  local before after i o
+  # Más que quickLoginCheckMilliSeconds (1 s): dos fallos más seguidos bloquean la cuenta
+  sleep 2
+  before="$(login_error_counts "$3")"
+  realm_login "$1" "$2" "$4"
+  after="$(login_error_counts "$3")"
+  read -r i o <<< "${before:-x x}"
+  if [ -n "${before}" ] && [ "${after}" = "$((i + 1)) ${o}" ]; then
+    echo event.login_error=invalid_user_credentials >> "${LOGS}/browser-$1.txt"
+  else
+    echo "event.login_error=unexpected:${before:-?}->${after:-?}" >> "${LOGS}/browser-$1.txt"
+  fi
+}
+# Una contraseña que Keycloak no acepta todavía por una acción requerida: ni código, ni cookie
+# de identidad, ni reautorización silenciosa en el mismo navegador
+REALM_PENDING_SETUP=('realm_login.outcome=required_action:login-update-password' 'realm_login.identity_cookie=absent' 'realm_login.silent_reauth=login_required')
+REALM_REJECTED=('realm_login.outcome=invalid_credentials' 'realm_login.identity_cookie=absent' 'realm_login.silent_reauth=login_required' 'event.login_error=invalid_user_credentials')
 # check usa bash -c: las comprobaciones necesitan estas funciones en el subshell
 export -f sql temp_count realm_id realms sa_roles users_in_realm kc_env_keys kc_client_auth kc_user_auth log_has task_ran
-export -f kc_db_version kc_image_version kc_container kc_user_state
+export -f kc_db_version kc_image_version kc_container
 export -f platform_row platform_facts platform_count platform_status browser_has
 export LOGS PLATFORM_USER
 
@@ -425,23 +461,37 @@ check "sentinela de negocio creado por el backend" bash -c "users_in_realm | gre
 # Correo: el primer administrador de negocio no depende de él. La cuenta se crea como el
 # bootstrap: contraseña temporal + UPDATE_PASSWORD, correo sin verificar
 first_admin_expect() { # <etiqueta>
-  local user="harness-admin-$1" pw new id
-  pw="$(synthetic firstadmin)"; new="$(synthetic firstadminnew)"; SECRETS_SEEN+=("${pw}" "${new}")
+  local user="harness-admin-$1" tag="first-admin-$1" pw new bad id
+  pw="$(synthetic firstadmin)"; new="$(synthetic firstadminnew)"; bad="$(synthetic firstadminwrong)"
+  SECRETS_SEEN+=("${pw}" "${new}" "${bad}")
   kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul create users -r piedrazul -s "username=${user}" -s enabled=true \
     -s firstName=Primer -s lastName=Administrador -s "email=${user}@harness.test" -s emailVerified=false \
     -s 'requiredActions=["UPDATE_PASSWORD"]' >/dev/null 2>&1
   id="$(kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q "username=${user}" -q exact=true --fields id --format csv --noquotes 2>/dev/null)"
   jq -cn --arg p "${pw}" '{type: "password", value: $p, temporary: true}' \
     | kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul update "users/${id}/reset-password" -r piedrazul -f - -n >/dev/null 2>&1
+  # Cada sondeo, por el flujo browser del frontend (realm_login), es un intento independiente
+  realm_login "first-admin-$1-temp" "${user}" "${pw}"
   check "$1: administrador inicial: la contraseña temporal sola no da acceso" \
-    test "$(kc_user_state piedrazul "${user}" "${pw}")" = not_set_up
+    browser_all "first-admin-$1-temp" "${REALM_PENDING_SETUP[@]}"
+  realm_login "first-admin-$1-probe" "${user}" "${pw}" admin-cli
+  check "$1: control: un sondeo inutilizable (cliente sin flujo browser) es un error del sondeo, no un resultado" \
+    bash -c "! grep -q '^realm_login.outcome=' '${LOGS}/browser-first-admin-$1-probe.txt' && grep -q '^error=Unrecognized:' '${LOGS}/browser-first-admin-$1-probe.txt'"
+  realm_rejected "first-admin-$1-wrong-before" "${user}" "${id}" "${bad}"
+  check "$1: administrador inicial: antes del cambio, una contraseña incorrecta se rechaza por credenciales" \
+    browser_all "first-admin-$1-wrong-before" "${REALM_REJECTED[@]}"
   KBL_REALM=piedrazul KBL_CLIENT=piedrazul-frontend KBL_REDIRECT=http://localhost:4200/ \
     KBL_USER="${user}" KBL_PASSWORD="${pw}" KBL_NEW_PASSWORD="${new}" \
     browser realm-first-login "first-admin-$1" KBL_REALM KBL_CLIENT KBL_REDIRECT KBL_USER KBL_PASSWORD KBL_NEW_PASSWORD
   check "$1: administrador inicial: UPDATE_PASSWORD por el tema real y entra, sin correo" \
     bash -c "browser_has 'first-admin-$1' 'realm_first_login.page=login-update-password' && browser_has 'first-admin-$1' 'browser.token=ok'"
+  realm_login "first-admin-$1-new" "${user}" "${new}"
+  realm_rejected "first-admin-$1-old" "${user}" "${id}" "${pw}"
   check "$1: administrador inicial: su contraseña elegida autentica y la temporal ya no" \
-    bash -c "test '$(kc_user_auth piedrazul "${user}" "${new}")' = ok && test '$(kc_user_auth piedrazul "${user}" "${pw}")' = rejected"
+    eval 'browser_has "${tag}-new" realm_login.outcome=authenticated && browser_all "${tag}-old" "${REALM_REJECTED[@]}"'
+  realm_rejected "first-admin-$1-wrong" "${user}" "${id}" "${bad}"
+  check "$1: administrador inicial: una contraseña incorrecta se rechaza por credenciales (no por cliente, bloqueo ni sondeo)" \
+    browser_all "first-admin-$1-wrong" "${REALM_REJECTED[@]}"
 }
 smtp_rows() { sql "select count(*) from keycloak.realm_smtp_config c join keycloak.realm r on r.id=c.realm_id where r.name='piedrazul'"; }
 reset_allowed() { sql "select reset_password_allowed from keycloak.realm where name='piedrazul'"; }
@@ -461,6 +511,186 @@ check "P2: la base quedó en la versión de la imagen ($(kc_image_version "${KC_
 check "P2: converge informó base nueva y verificó identidad en ejecución y versión de la base" \
   bash -c "log_has p2 'base nueva; la inicializa' && log_has p2 'en ejecución (${KC_REF}); base en'"
 PLATFORM_STATUS_P1='CREADA, primer login pendiente'
+
+# ══ SCOPE: alcance de roles explícito de los clientes propios ═════════════════
+SCOPE_AUTO='piedrazul-realm:manage-clients,piedrazul-realm:manage-realm,piedrazul-realm:view-clients'
+SCOPE_BACK='realm-management:manage-users,realm-management:query-users,realm-management:view-events,realm-management:view-realm,realm-management:view-users'
+SCOPE_FRONT='realm:ADMIN,realm:AUDITOR,realm:DOCTOR,realm:PATIENT,realm:SCHEDULER'
+SCOPE_TARGET="piedrazul-backend=full:false;${SCOPE_BACK} piedrazul-frontend=full:false;${SCOPE_FRONT} piedrazul-keycloak-automation=full:false;${SCOPE_AUTO}"
+# <clientId>=full:<b>;<asignaciones directas ordenadas>, de los tres clientes, leído de la base
+scope_row() {
+  sql "select string_agg(c.client_id||'=full:'||c.full_scope_allowed||';'||coalesce((select string_agg(case when k.client_role then rc.client_id else 'realm' end||':'||k.name, ',' order by case when k.client_role then rc.client_id else 'realm' end, k.name) from keycloak.scope_mapping s join keycloak.keycloak_role k on k.id=s.role_id left join keycloak.client rc on rc.id=k.client where s.client_id=c.id),''), ' ' order by c.client_id) from keycloak.client c where c.client_id in ('piedrazul-backend','piedrazul-frontend','piedrazul-keycloak-automation')"
+}
+# Avisos de Full Scope de Keycloak para los tres clientes propios desde <instante RFC 3339>
+fullscope_warnings() {
+  docker logs --since "$1" keycloak 2>&1 | grep -cE "Client '(piedrazul-backend|piedrazul-frontend|piedrazul-keycloak-automation)' in the realm '[^']+' has 'Full scope allowed'"
+}
+# kc_try <clientId> <secreto> <realm de autenticación> <args kcadm...> → ok | forbidden | error
+kc_try() {
+  local o
+  if o="$(kc_as "$@" 2>&1)"; then echo ok; elif grep -qiE '403|forbidden' <<< "${o}"; then echo forbidden; else echo error; fi
+}
+export -f scope_row fullscope_warnings
+export SCOPE_TARGET
+# API de administración (Keycloak >= kc_admin_api_scope_since): asignación del client scope
+# incorporado kc-admin-api en los tres clientes, leída de la base: <clientId>=default|optional|
+# default+optional|none
+admin_api_row() {
+  sql "select string_agg(c.client_id||'='||coalesce((select string_agg(case when csc.default_scope then 'default' else 'optional' end, '+' order by csc.default_scope desc) from keycloak.client_scope_client csc join keycloak.client_scope s on s.id=csc.scope_id and s.realm_id=c.realm_id where csc.client_id=c.id and s.name='kc-admin-api'),'none'), ' ' order by c.client_id) from keycloak.client c where c.client_id in ('piedrazul-backend','piedrazul-frontend','piedrazul-keycloak-automation')"
+}
+ADMIN_API_TARGET='piedrazul-backend=default piedrazul-frontend=none piedrazul-keycloak-automation=default'
+ADMIN_API_SINCE="$(yq -r '.kc_admin_api_scope_since' "${ANSIBLE_DIR}/inventories/prod/group_vars/all.yml")"
+ver_ge() { [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -1)" = "$2" ]; } # <a> <b>: a >= b
+# ¿La base (versión que la migró) exige kc-admin-api?
+admin_api_on() { ver_ge "$(kc_db_version)" "${ADMIN_API_SINCE}"; }
+# kc_api <clientId> <secreto> <realm de autenticación> <args kcadm...> → ok | unauthorized |
+# forbidden | error. unauthorized (401) = la API rechaza el token (p. ej. sin kc-admin-api);
+# forbidden (403) = el token vale pero sin autoridad para esa operación
+kc_api() {
+  local o
+  if o="$(kc_as "$@" 2>&1)"; then echo ok
+  elif grep -q 'HTTP 401' <<< "${o}"; then echo unauthorized
+  elif grep -qiE '403|forbidden' <<< "${o}"; then echo forbidden
+  else echo error; fi
+}
+export -f admin_api_row ver_ge admin_api_on kc_api
+export ADMIN_API_TARGET ADMIN_API_SINCE
+
+section "SCOPE — alcance de roles explícito establecido en P2"
+check "SCOPE-P2: los tres clientes propios con Full Scope deshabilitado y exactamente su alcance aprobado" \
+  test "$(scope_row)" = "${SCOPE_TARGET}"
+check "SCOPE-P2: el evento estableció la automatización; backend y frontend ya venían del realm importado" \
+  bash -c "log_has p2 'scope.piedrazul-keycloak-automation=updated' && log_has p2 'scope.piedrazul-backend=unchanged' && log_has p2 'scope.piedrazul-frontend=unchanged'"
+check "SCOPE-P2: clientes integrados sin cambios (admin-cli y security-admin-console con Full Scope en ambos realms)" \
+  test "$(sql "select string_agg(r.name||'/'||c.client_id||':'||c.full_scope_allowed, ',' order by r.name, c.client_id) from keycloak.client c join keycloak.realm r on r.id=c.realm_id where c.client_id in ('admin-cli','security-admin-console')")" \
+    = "master/admin-cli:true,master/security-admin-console:true,piedrazul/admin-cli:true,piedrazul/security-admin-console:true"
+check "SCOPE-P2: ninguna política de cliente full-scope-disabled en la base" \
+  test "$(sql "select count(*) from keycloak.realm_attribute where value like '%full-scope-disabled%'")" = 0
+
+if [ -z "${TARGET}" ]; then
+section "SCOPE — tokens y autoridad reales de los tres clientes"
+SCOPE_T0="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+declare -A FE_PW
+fe_user() { # <usuario> <roles de realm, por comas> [rol técnico <clientId>:<rol>]: lo crea el backend (su autoridad real)
+  local u="$1" pw id r
+  pw="$(synthetic fe)"; SECRETS_SEEN+=("${pw}"); FE_PW["${u}"]="${pw}"
+  kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul create users -r piedrazul -s "username=${u}" -s enabled=true \
+    -s firstName=Sintetico -s lastName=Harness -s "email=${u}@harness.test" -s emailVerified=true >/dev/null 2>&1
+  id="$(kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q "username=${u}" -q exact=true --fields id --format csv --noquotes 2>/dev/null)"
+  jq -cn --arg p "${pw}" '{type: "password", value: $p, temporary: false}' \
+    | kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul update "users/${id}/reset-password" -r piedrazul -f - -n >/dev/null 2>&1
+  for r in ${2//,/ }; do
+    kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul add-roles -r piedrazul --uusername "${u}" --rolename "${r}" >/dev/null 2>&1
+  done
+  # Rol de cliente: por role-mappings del usuario (el backend no tiene view-clients para buscar
+  # el cliente por nombre, y no lo necesita)
+  if [ -n "${3:-}" ]; then
+    local rc
+    rc="$(sql "select c.id from keycloak.client c join keycloak.realm r on r.id=c.realm_id and r.name='piedrazul' where c.client_id='${3%%:*}'")"
+    kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul get "users/${id}/role-mappings/clients/${rc}/available" -r piedrazul 2>/dev/null \
+      | jq -c --arg n "${3#*:}" '[.[] | select(.name == $n)]' \
+      | kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul create "users/${id}/role-mappings/clients/${rc}" -r piedrazul -f - >/dev/null 2>&1
+  fi
+}
+fe_token() { # <salida> <usuario> [realm-token|realm-refresh|realm-logout]: como keycloak-js, por el flujo browser del frontend
+  KBL_REALM=piedrazul KBL_CLIENT=piedrazul-frontend KBL_REDIRECT=http://localhost:4200/ KBL_USER="$2" \
+    KBL_PASSWORD="${FE_PW[$2]}" KBL_TOKEN_FILE=/otp/fe-refresh \
+    browser "${3:-realm-token}" "$1" KBL_REALM KBL_CLIENT KBL_REDIRECT KBL_USER KBL_PASSWORD KBL_TOKEN_FILE
+}
+for role in ADMIN SCHEDULER DOCTOR PATIENT AUDITOR; do
+  u="harness-fe-${role,,}"; fe_user "${u}" "${role}"; fe_token "fe-${role,,}" "${u}"
+  check "SCOPE-FE ${role}: login PKCE S256 del frontend; el token lleva solo ${role}, ningún rol de cliente" \
+    browser_all "fe-${role,,}" token.status=200 token.azp=piedrazul-frontend "token.realm_roles=${role}" token.resource_access=none
+done
+check "SCOPE-FE: PKCE sigue exigido (autorización sin code_challenge rechazada)" \
+  bash -c "for r in admin scheduler doctor patient auditor; do browser_has fe-\$r token.authorize_without_pkce=refused || exit 1; done"
+fe_user harness-fe-multi DOCTOR,SCHEDULER,AUDITOR,PATIENT; fe_token fe-multi harness-fe-multi
+check "SCOPE-FE: varios roles de negocio llegan todos al token" \
+  browser_all fe-multi token.status=200 token.realm_roles=AUDITOR,DOCTOR,PATIENT,SCHEDULER token.resource_access=none
+fe_user harness-fe-tech PATIENT realm-management:view-users; fe_token fe-tech harness-fe-tech
+check "SCOPE-FE: preparación: el usuario tiene asignado un rol técnico (realm-management:view-users)" \
+  test "$(sql "select count(*) from keycloak.user_role_mapping m join keycloak.user_entity u on u.id=m.user_id join keycloak.keycloak_role k on k.id=m.role_id where u.username='harness-fe-tech' and k.name='view-users'")" = 1
+check "SCOPE-FE: ese rol técnico no llega al token del frontend" \
+  browser_all fe-tech token.status=200 token.realm_roles=PATIENT token.resource_access=none
+check "SCOPE-FE: los roles del token son exactamente los que Spring convierte (enum Role); default-roles, offline_access y uma_authorization ya no viajan" \
+  bash -c "! grep -hE '^token[.]realm_roles=' '${LOGS}'/browser-fe-*.txt | grep -Eq 'default-roles|offline_access|uma_authorization'"
+# Renovación tras otorgar y quitar un rol de negocio (lo que hace el frontend con updateToken)
+fe_token fe-refresh-login harness-fe-doctor
+kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul add-roles -r piedrazul --uusername harness-fe-doctor --rolename SCHEDULER >/dev/null 2>&1
+fe_token fe-refresh-granted harness-fe-doctor realm-refresh
+kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul remove-roles -r piedrazul --uusername harness-fe-doctor --rolename SCHEDULER >/dev/null 2>&1
+fe_token fe-refresh-revoked harness-fe-doctor realm-refresh
+check "SCOPE-FE: renovar tras otorgar SCHEDULER lo agrega al token" browser_all fe-refresh-granted refresh.status=200 refresh.realm_roles=DOCTOR,SCHEDULER
+check "SCOPE-FE: renovar tras quitarlo lo retira del token" browser_all fe-refresh-revoked refresh.status=200 refresh.realm_roles=DOCTOR
+fe_token fe-logout harness-fe-doctor realm-logout
+check "SCOPE-FE: cerrar sesión invalida la renovación" browser_all fe-logout logout.status=204 logout.refresh_after=rejected
+rm -f "${W}/otp/fe-refresh"
+# Backend y automatización: roles efectivos de su token (con la expansión de compuestos de Keycloak)
+KBL_REALM=piedrazul KBL_CLIENT=piedrazul-backend KBL_SECRET="${BACKEND_SECRET}" browser client-roles scope-backend KBL_REALM KBL_CLIENT KBL_SECRET
+KBL_REALM=master KBL_CLIENT=piedrazul-keycloak-automation KBL_SECRET="${AUTOMATION_SECRET}" browser client-roles scope-automation KBL_REALM KBL_CLIENT KBL_SECRET
+check "SCOPE-BACK: el token lleva exactamente sus cinco roles (+ query-groups, compuesto de view-users), ningún rol de realm" \
+  browser_all scope-backend client.status=200 client.realm_roles=none \
+    client.resource_access=realm-management:manage-users,realm-management:query-groups,realm-management:query-users,realm-management:view-events,realm-management:view-realm,realm-management:view-users
+check "SCOPE-AUTO: el token lleva exactamente sus tres roles (+ query-clients, compuesto de view-clients), nada en master" \
+  browser_all scope-automation client.status=200 client.realm_roles=none \
+    client.resource_access=piedrazul-realm:manage-clients,piedrazul-realm:manage-realm,piedrazul-realm:query-clients,piedrazul-realm:view-clients
+B=(piedrazul-backend "${BACKEND_SECRET}" piedrazul)
+check "SCOPE-BACK: gestión de usuarios, lectura del realm y eventos de login permitidos" \
+  test "$(kc_try "${B[@]}" get users -r piedrazul -q max=1)|$(kc_try "${B[@]}" get "realms/piedrazul" --fields realm)|$(kc_try "${B[@]}" get events -r piedrazul -q type=LOGIN -q max=1)" = "ok|ok|ok"
+check "SCOPE-BACK: fuera de su autoridad, denegado (escribir el realm, crear clientes, roles de realm, master)" \
+  test "$(kc_try "${B[@]}" update realms/piedrazul -s enabled=true)|$(kc_try "${B[@]}" create clients -r piedrazul -s clientId=harness-denied)|$(kc_try "${B[@]}" create roles -r piedrazul -s name=HARNESS_DENIED)|$(kc_try "${B[@]}" get users -r master -q max=1)" \
+    = "forbidden|forbidden|forbidden|forbidden"
+A=(piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master)
+check "SCOPE-AUTO: ve los clientes de la aplicación (lo que usan probe y reconcile)" \
+  test "$(kc_try "${A[@]}" get clients -r piedrazul -q clientId=piedrazul-backend --fields id)" = ok
+check "SCOPE-AUTO: sin autoridad sobre usuarios ni sobre master" \
+  test "$(kc_try "${A[@]}" get users -r piedrazul -q max=1)|$(kc_try "${A[@]}" get users -r master -q max=1)|$(kc_try "${A[@]}" get clients -r master -q max=1)" = "forbidden|forbidden|forbidden"
+# kc-admin-api: con una base >= kc_admin_api_scope_since las operaciones permitidas de arriba ya
+# son la prueba real de que la API acepta los tokens de backend y automatización
+if admin_api_on; then
+section "ADMIN-API — kc-admin-api establecido en P2 ($(kc_db_version))"
+check "ADMIN-API-P2: automatización y backend con kc-admin-api por defecto, frontend sin él" \
+  test "$(admin_api_row)" = "${ADMIN_API_TARGET}"
+check "ADMIN-API-P2: el evento lo asignó a los dos clientes (Keycloak no lo hace con el realm importado ni con un cliente creado por la API)" \
+  bash -c "log_has p2 'admin_api.piedrazul-keycloak-automation=updated' && log_has p2 'admin_api.piedrazul-backend=updated' && log_has p2 'admin_api.piedrazul-frontend=absent' && log_has p2 'automation.admin_api=ok'"
+check "ADMIN-API-P2: Keycloak no lo agregó a los alcances por defecto del realm (un cliente nuevo no lo recibe)" \
+  test "$(sql "select count(*) from keycloak.default_client_scope d join keycloak.client_scope s on s.id=d.scope_id join keycloak.realm r on r.id=d.realm_id where s.name='kc-admin-api'")" = 0
+check "ADMIN-API-P2: el scope no trae roles (no amplía la autoridad de nadie)" \
+  test "$(sql "select count(*) from keycloak.client_scope_role_mapping m join keycloak.client_scope s on s.id=m.scope_id where s.name='kc-admin-api'")" = 0
+check "ADMIN-API-P2: token del backend con kc-admin-api y audiencia de la API de su realm" \
+  browser_all scope-backend client.admin_api_scope=yes client.admin_api_aud=admin/realms/piedrazul
+check "ADMIN-API-P2: token de la automatización con kc-admin-api y audiencia de la API de master" \
+  browser_all scope-automation client.admin_api_scope=yes client.admin_api_aud=admin/realms/master
+check "ADMIN-API-P2: tokens de usuario del frontend (todos los roles de negocio) sin kc-admin-api ni audiencia de la API" \
+  bash -c "for f in admin scheduler doctor patient auditor multi tech; do browser_has fe-\$f token.admin_api_scope=no && browser_has fe-\$f token.admin_api_aud=none || exit 1; done"
+# Un cliente nuevo del realm no recibe kc-admin-api (no está entre los alcances por defecto del
+# realm): su token es rechazado con 401 antes de evaluar su autoridad (no 403). Lo crea y lo borra
+# la automatización (manage-clients); secreto sintético
+admin_api_new_client_rejected() {
+  local s id
+  s="$(synthetic noadminapi)"; SECRETS_SEEN+=("${s}")
+  kc_as piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master create clients -r piedrazul -s clientId=harness-noadminapi \
+    -s publicClient=false -s serviceAccountsEnabled=true -s standardFlowEnabled=false -s "secret=${s}" >/dev/null 2>&1 || return 1
+  id="$(kc_as piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master get clients -r piedrazul -q clientId=harness-noadminapi --fields id --format csv --noquotes)"
+  local auth="$(kc_client_auth piedrazul harness-noadminapi "${s}")" r1 r2
+  r1="$(kc_api harness-noadminapi "${s}" piedrazul get users -r piedrazul -q max=1)"
+  r2="$(kc_api harness-noadminapi "${s}" piedrazul get "realms/piedrazul" --fields realm)"
+  kc_as piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master delete "clients/${id}" -r piedrazul >/dev/null 2>&1
+  [ -n "${id}" ] && [ "${auth}" = ok ] && [ "${r1}|${r2}" = "unauthorized|unauthorized" ] \
+    && [ -z "$(kc_as piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master get clients -r piedrazul -q clientId=harness-noadminapi --fields id --format csv --noquotes)" ]
+}
+check "ADMIN-API-P2: un cliente nuevo del realm autentica pero la API rechaza su token (401, no 403); se retira" \
+  admin_api_new_client_rejected
+fi
+sleep 2
+check "SCOPE: tras emitir tokens reales de los tres clientes, Keycloak no avisa Full Scope para ninguno" \
+  test "$(fullscope_warnings "${SCOPE_T0}")" = 0
+for u in harness-fe-admin harness-fe-scheduler harness-fe-doctor harness-fe-patient harness-fe-auditor harness-fe-multi harness-fe-tech; do
+  id="$(kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q "username=${u}" -q exact=true --fields id --format csv --noquotes 2>/dev/null)"
+  [ -z "${id}" ] || kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul delete "users/${id}" -r piedrazul >/dev/null 2>&1
+done
+check "SCOPE-FE: usuarios sintéticos retirados" bash -c "! users_in_realm | grep -q harness-fe-"
+fi
 
 # ══ UPG: actualización de Keycloak sobre una base existente ══════════════════
 if [ "${TARGET}" = upgrade ]; then
@@ -482,8 +712,9 @@ kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul create users -r piedrazul 
 PENDING_ID="$(kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q username=harness-pending -q exact=true --fields id --format csv --noquotes 2>/dev/null)"
 jq -cn --arg p "${PENDING_PW}" '{type: "password", value: $p, temporary: true}' \
   | kc_as piedrazul-backend "${BACKEND_SECRET}" piedrazul update "users/${PENDING_ID}/reset-password" -r piedrazul -f - -n >/dev/null 2>&1
+realm_login pending-before harness-pending "${PENDING_PW}"
 check "previo: identidad de negocio pendiente: la contraseña temporal sola no da acceso" \
-  test "$(kc_user_state piedrazul harness-pending "${PENDING_PW}")" = not_set_up
+  browser_all pending-before "${REALM_PENDING_SETUP[@]}"
 pending_row() {
   sql "select u.id||'|'||u.enabled||'|'||coalesce((select string_agg(required_action,'+' order by required_action) from keycloak.user_required_action where user_id=u.id),'')
          ||'|'||coalesce((select string_agg(c.id||':'||c.type||':'||md5(coalesce(c.secret_data,'')||coalesce(c.credential_data,'')),',' order by c.id) from keycloak.credential c where c.user_id=u.id),'')
@@ -500,7 +731,31 @@ section "UPG — actualización por convergencia normal a ${KC_TO_DECLARED}"
 use_keycloak "${KC_TO_DECLARED}"
 TO_VERSION="$(docker pull -q --platform linux/amd64 "${KC_REF}" >/dev/null; kc_image_version "${KC_REF}")"
 converge upgrade false; RC=$?
+# Cruzar kc_admin_api_scope_since: Keycloak crea kc-admin-api al migrar pero solo lo asigna a
+# admin-cli y security-admin-console. La automatización no puede asignárselo (la API ya rechaza su
+# token): la convergencia normal falla cerrada como P3 recuperable y la recuperación autorizada
+# existente lo establece. No hay migración propia ni se deshabilita la verificación.
+ADMIN_API_CROSS=false
+if ! ver_ge "${FROM_VERSION}" "${ADMIN_API_SINCE}" && ver_ge "${TO_VERSION}" "${ADMIN_API_SINCE}"; then ADMIN_API_CROSS=true; fi
+UPG_LOG=upgrade
+if [ "${ADMIN_API_CROSS}" = true ]; then
+check "UPG ${FROM_VERSION} → ${TO_VERSION}: la convergencia normal falla cerrada como P3 recuperable: kc-admin-api falta en automatización y backend (rc=${RC})" \
+  bash -c "test ${RC} -ne 0 && log_has upgrade 'KEYCLOAK P3 (desconocido/divergente)' && log_has upgrade 'alcance kc-admin-api de piedrazul-keycloak-automation divergente: none (esperado: default)' && log_has upgrade 'alcance kc-admin-api de piedrazul-backend divergente: none (esperado: default)' && ! log_has upgrade 'piedrazul-frontend divergente'"
+check "UPG: sin evento ni autoridad temporal, base ya migrada a ${TO_VERSION}" \
+  bash -c "! log_has upgrade 'Crear la autoridad temporal' && test \$(temp_count) = 0 && test \"\$(kc_db_version)\" = '${TO_VERSION}'"
+check "UPG: Keycloak creó kc-admin-api al migrar, sin asignarlo a los clientes propios" \
+  test "$(admin_api_row)" = 'piedrazul-backend=none piedrazul-frontend=none piedrazul-keycloak-automation=none'
+check "UPG: incompatibilidad acotada: backend y automatización autentican pero la API los rechaza (401) hasta la recuperación" \
+  test "$(kc_api piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q max=1)|$(kc_api piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master get clients -r piedrazul -q clientId=piedrazul-backend --fields id)" = "unauthorized|unauthorized"
+converge upgrade-recovery true; RC=$?
+UPG_LOG=upgrade-recovery
+check "UPG: la recuperación autorizada lo establece y deja P1 (rc=${RC})" \
+  bash -c "test ${RC} -eq 0 && log_has upgrade-recovery 'KEYCLOAK: estado P1 después del evento' && log_has upgrade-recovery 'admin_api.piedrazul-keycloak-automation=updated' && log_has upgrade-recovery 'admin_api.piedrazul-backend=updated' && log_has upgrade-recovery 'admin_api.piedrazul-frontend=absent' && test \"\$(admin_api_row)\" = \"\${ADMIN_API_TARGET}\" && test \$(temp_count) = 0"
+check "UPG: la recuperación no recrea el realm ni crea el administrador humano" \
+  bash -c "! task_ran upgrade-recovery 'Importar el realm de la aplicación' && ! task_ran upgrade-recovery 'Crear el administrador humano' && test '$(realm_id)' = '${REALM_ID}'"
+else
 check "UPG: la convergencia normal termina bien (rc=${RC})" test "${RC}" -eq 0
+fi
 if [ "${FROM_VERSION}" != "${TO_VERSION}" ]; then
 check "UPG: informa la migración hacia adelante ${FROM_VERSION} → ${TO_VERSION} antes de arrancar" \
   bash -c "log_has upgrade 'base migrada por ${FROM_VERSION}, arrancar ${TO_VERSION} la migra hacia adelante (sin vuelta atrás)'"
@@ -509,14 +764,16 @@ else
 check "UPG: misma versión ${TO_VERSION}, otro digest: informa que no hay migración" \
   log_has upgrade "base migrada por ${FROM_VERSION}, misma versión que la imagen: sin migración (imagen ${KC_REF}"
 fi
+if [ "${ADMIN_API_CROSS}" != true ]; then
 check "UPG: P1 sin evento ni autoridad temporal (la actualización no es un evento de identidad)" \
   bash -c "log_has upgrade 'KEYCLOAK: estado P1' && ! log_has upgrade 'Crear la autoridad temporal' && test \$(temp_count) = 0"
+fi
 check "UPG: Keycloak recreado con la identidad exacta nueva" \
   bash -c "c=\"\$(kc_container)\"; test \"\${c%%|*}\" != '${CONTAINER_BEFORE%%|*}' && test \"\${c##*|}\" = '${KC_REF}'"
 check "UPG: la base quedó migrada a ${TO_VERSION} (y conserva el registro de ${FROM_VERSION})" \
   bash -c "test \"\$(kc_db_version)\" = '${TO_VERSION}' && test \"\$(sql \"select count(*) from keycloak.migration_model where version='${FROM_VERSION}'\")\" = 1"
 check "UPG: converge verificó identidad en ejecución y versión de la base" \
-  log_has upgrade "KEYCLOAK ${TO_VERSION} en ejecución (${KC_REF}); base en ${TO_VERSION}"
+  log_has "${UPG_LOG}" "KEYCLOAK ${TO_VERSION} en ejecución (${KC_REF}); base en ${TO_VERSION}"
 check "UPG: mismo realm, mismas identidades de negocio" \
   bash -c "test '$(realm_id)' = '${REALM_ID}' && test \"\$(users_in_realm)\" = '${USERS_SNAP}'"
 check "UPG: clientes técnicos con el mismo secreto (hash), forma y roles" test "$(technical_row)" = "${TECH_SNAP}"
@@ -527,8 +784,9 @@ check "UPG: administrador humano intacto (id, estado, acciones, roles, atributos
 check "UPG: informa la preparación humana: CONFIGURADA" platform_status upgrade 'CONFIGURADA'
 check "UPG: identidad de negocio pendiente intacta (acción UPDATE_PASSWORD y contraseña temporal)" \
   test "$(pending_row)" = "${PENDING_SNAP}"
+realm_login pending-after harness-pending "${PENDING_PW}"
 check "UPG: su contraseña temporal sigue sin dar acceso sola (Keycloak exige la acción)" \
-  test "$(kc_user_state piedrazul harness-pending "${PENDING_PW}")" = not_set_up
+  browser_all pending-after "${REALM_PENDING_SETUP[@]}"
 KBL_PASSWORD="${PLATFORM_NEW_PW}" browser login upg-login KBL_PASSWORD
 check "UPG: login del administrador humano en ${TO_VERSION}: pide OTP, rechaza uno incorrecto, entra con el correcto" \
   bash -c "browser_has upg-login 'browser.otp_challenge=yes' && browser_has upg-login 'browser.wrong_otp=rejected' && browser_has upg-login 'browser.token=ok'"
@@ -676,6 +934,8 @@ for n in 1 2; do
   check "P1#${n}: mismo realm (no recreado)" test "$(realm_id)" = "${REALM_ID}"
   check "P1#${n}: sentinela de negocio intacto" bash -c "users_in_realm | grep -q harness-sentinel"
   check "P1#${n}: sin autoridad temporal en la base" test "$(temp_count)" = 0
+  check "P1#${n}: alcance de roles intacto y sin escribirlo (no corre establish)" \
+    bash -c "test \"\$(scope_row)\" = \"\${SCOPE_TARGET}\" && ! task_ran p1-${n} 'Establecer la automatización'"
   check "P1#${n}: no exige KC_PLATFORM_ADMIN_INITIAL_PASSWORD (ausente) y no toca al administrador humano" \
     bash -c "test '$(platform_row)' = '${PLATFORM_SNAP}' && ! task_ran p1-${n} 'Crear el administrador humano'"
   check "P1#${n}: informa la preparación humana aparte: ${PLATFORM_STATUS_P1}" platform_status "p1-${n}" "${PLATFORM_STATUS_P1}"
@@ -907,6 +1167,74 @@ check "REC-escalada: siguiente convergencia P1 (roles y forma exactos) (rc=${RC}
   bash -c "test ${RC} -eq 0 && log_has rec-escalation-then-p1 'KEYCLOAK: estado P1'"
 check "REC-escalada: el usuario humano admin de master no se tocó" \
   test "$(sql "select count(*) from keycloak.user_entity where username='${HUMAN_ADMIN}'")" = 1
+
+section "P3/REC — alcance de roles divergente en los tres clientes"
+SCOPE_T1="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+# Estado inconsistente: automatización con Full Scope y sin manage-realm; backend sin ninguna
+# asignación (Full Scope deshabilitado: el orden equivocado); frontend con Full Scope y un rol de
+# más. En la base y con reinicio (la caché de Keycloak no ve cambios de SQL).
+sql "update keycloak.client set full_scope_allowed=true where client_id in ('piedrazul-keycloak-automation','piedrazul-frontend');
+     delete from keycloak.scope_mapping s using keycloak.client c, keycloak.keycloak_role k where s.client_id=c.id and s.role_id=k.id and c.client_id='piedrazul-keycloak-automation' and k.name='manage-realm';
+     delete from keycloak.scope_mapping s using keycloak.client c where s.client_id=c.id and c.client_id='piedrazul-backend';
+     insert into keycloak.scope_mapping(client_id, role_id) select c.id, k.id from keycloak.client c join keycloak.realm r on r.id=c.realm_id and r.name='piedrazul' join keycloak.keycloak_role k on k.realm_id=r.id and not k.client_role and k.name='offline_access' where c.client_id='piedrazul-frontend'" >/dev/null
+compose restart keycloak >/dev/null 2>&1; compose up -d --wait keycloak >/dev/null 2>&1
+SCOPE_DRIFT="$(scope_row)"
+check "P3-alcance: preparación: los tres clientes divergen" bash -c "test '${SCOPE_DRIFT}' != \"\${SCOPE_TARGET}\""
+check "P3-alcance: un backend sin asignaciones queda sin autoridad en la API (403): el orden importa" \
+  test "$(kc_try piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q max=1)" = forbidden
+kc_client_auth master piedrazul-keycloak-automation "${AUTOMATION_SECRET}" >/dev/null; sleep 2
+check "P3-alcance: control: con Full Scope habilitado Keycloak sí avisa al emitir el token" \
+  test "$(fullscope_warnings "${SCOPE_T1}")" -ge 1
+p3_expect p3-scope 'alcance de roles de piedrazul-keycloak-automation divergente: Full Scope Allowed habilitado; faltan piedrazul-realm:manage-realm'
+check "P3-alcance: también informa el backend sin sus roles" \
+  log_has p3-scope "alcance de roles de piedrazul-backend divergente: faltan ${SCOPE_BACK}"
+check "P3-alcance: también informa el frontend con Full Scope y un rol de más" \
+  log_has p3-scope 'alcance de roles de piedrazul-frontend divergente: Full Scope Allowed habilitado; sobran realm:offline_access'
+check "P3-alcance: la convergencia normal no tocó el alcance" test "$(scope_row)" = "${SCOPE_DRIFT}"
+recover_expect rec-scope
+check "REC-alcance: la recuperación existente (establish) restablece los tres" \
+  bash -c "test \"\$(scope_row)\" = \"\${SCOPE_TARGET}\" && log_has rec-scope 'scope.piedrazul-keycloak-automation=updated' && log_has rec-scope 'scope.piedrazul-backend=updated' && log_has rec-scope 'scope.piedrazul-frontend=updated'"
+check "REC-alcance: el backend recupera su autoridad en la API" \
+  test "$(kc_try piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q max=1)" = ok
+converge rec-scope-again true; RC=$?
+check "REC-alcance: pedir otra recuperación ya en P1 no crea autoridad temporal ni toca el alcance (rc=${RC})" \
+  bash -c "test ${RC} -eq 0 && log_has rec-scope-again 'se pidió recuperación pero el estado es P1' && ! log_has rec-scope-again 'Crear la autoridad temporal' && test \"\$(scope_row)\" = \"\${SCOPE_TARGET}\""
+compose restart keycloak >/dev/null 2>&1; compose up -d --wait keycloak >/dev/null 2>&1
+converge rec-scope-then-p1 false; RC=$?
+check "REC-alcance: tras reiniciar Keycloak, la convergencia normal es P1 sin evento y la automatización reconcilia (rc=${RC})" \
+  bash -c "test ${RC} -eq 0 && log_has rec-scope-then-p1 'KEYCLOAK: estado P1' && ! log_has rec-scope-then-p1 'Crear la autoridad temporal' && log_has rec-scope-then-p1 'el backend autentica con él' && test \"\$(scope_row)\" = \"\${SCOPE_TARGET}\""
+
+if admin_api_on; then
+section "P3/REC — kc-admin-api divergente en los tres clientes"
+# Automatización sin él, backend solo opcional (kcadm y el backend no piden alcances) y frontend
+# con él por defecto. En la base y con reinicio (la caché de Keycloak no ve cambios de SQL).
+sql "delete from keycloak.client_scope_client csc using keycloak.client c, keycloak.client_scope s where csc.client_id=c.id and csc.scope_id=s.id and s.name='kc-admin-api' and c.client_id='piedrazul-keycloak-automation';
+     update keycloak.client_scope_client csc set default_scope=false from keycloak.client c, keycloak.client_scope s where csc.client_id=c.id and csc.scope_id=s.id and s.name='kc-admin-api' and c.client_id='piedrazul-backend';
+     insert into keycloak.client_scope_client(client_id, scope_id, default_scope) select c.id, s.id, true from keycloak.client c join keycloak.client_scope s on s.realm_id=c.realm_id and s.name='kc-admin-api' where c.client_id='piedrazul-frontend'" >/dev/null
+compose restart keycloak >/dev/null 2>&1; compose up -d --wait keycloak >/dev/null 2>&1
+ADMIN_API_DRIFT="$(admin_api_row)"
+SCOPE_BEFORE_AA="$(scope_row)"
+check "P3-admin-api: preparación: los tres clientes divergen" \
+  test "${ADMIN_API_DRIFT}" = 'piedrazul-backend=optional piedrazul-frontend=default piedrazul-keycloak-automation=none'
+check "P3-admin-api: backend y automatización autentican pero la API rechaza sus tokens (401): la verificación de audiencia sigue activa" \
+  test "$(kc_client_auth piedrazul piedrazul-backend "${BACKEND_SECRET}")|$(kc_api piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q max=1)|$(kc_client_auth master piedrazul-keycloak-automation "${AUTOMATION_SECRET}")|$(kc_api piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master get clients -r piedrazul -q clientId=piedrazul-backend --fields id)" \
+    = "ok|unauthorized|ok|unauthorized"
+p3_expect p3-admin-api 'alcance kc-admin-api de piedrazul-keycloak-automation divergente: none (esperado: default)'
+check "P3-admin-api: también informa el backend solo opcional y el frontend con él" \
+  bash -c "log_has p3-admin-api 'alcance kc-admin-api de piedrazul-backend divergente: optional (esperado: default)' && log_has p3-admin-api 'alcance kc-admin-api de piedrazul-frontend divergente: default (esperado: none)'"
+check "P3-admin-api: la convergencia normal no lo tocó (ni el alcance de roles)" \
+  bash -c "test \"\$(admin_api_row)\" = '${ADMIN_API_DRIFT}' && test \"\$(scope_row)\" = '${SCOPE_BEFORE_AA}'"
+recover_expect rec-admin-api
+check "REC-admin-api: la recuperación existente (establish) lo restablece: por defecto en automatización y backend, retirado del frontend" \
+  bash -c "test \"\$(admin_api_row)\" = \"\${ADMIN_API_TARGET}\" && log_has rec-admin-api 'admin_api.piedrazul-keycloak-automation=updated' && log_has rec-admin-api 'admin_api.piedrazul-backend=updated' && log_has rec-admin-api 'admin_api.piedrazul-frontend=removed' && log_has rec-admin-api 'automation.admin_api=ok'"
+check "REC-admin-api: sin tocar el alcance de roles ni Full Scope" test "$(scope_row)" = "${SCOPE_TARGET}"
+check "REC-admin-api: backend y automatización vuelven a operar en la API con la misma autoridad (permitido ok, fuera de ella 403)" \
+  test "$(kc_api piedrazul-backend "${BACKEND_SECRET}" piedrazul get users -r piedrazul -q max=1)|$(kc_api piedrazul-backend "${BACKEND_SECRET}" piedrazul create roles -r piedrazul -s name=HARNESS_DENIED)|$(kc_api piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master get clients -r piedrazul -q clientId=piedrazul-backend --fields id)|$(kc_api piedrazul-keycloak-automation "${AUTOMATION_SECRET}" master get users -r master -q max=1)" \
+    = "ok|forbidden|ok|forbidden"
+converge rec-admin-api-then-p1 false; RC=$?
+check "REC-admin-api: la convergencia siguiente es P1 sin evento ni escritura (rc=${RC})" \
+  bash -c "test ${RC} -eq 0 && log_has rec-admin-api-then-p1 'KEYCLOAK: estado P1' && ! log_has rec-admin-api-then-p1 'Crear la autoridad temporal' && ! log_has rec-admin-api-then-p1 'admin_api.piedrazul' && test \"\$(admin_api_row)\" = \"\${ADMIN_API_TARGET}\""
+fi
 
 # ══ INT: recuperación interrumpida ═══════════════════════════════════════════
 section "INT — recuperación interrumpida antes de limpiar (huérfana propia)"

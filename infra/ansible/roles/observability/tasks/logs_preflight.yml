@@ -1,0 +1,21 @@
+# Comprobaciones de los logs antes de copiar o levantar nada: política de fuentes y GID del
+# volumen de Alloy. Un fallo aquí no cambia nada en el host.
+
+- name: Comprobar la política de fuentes de logs
+  ansible.builtin.include_tasks: log_policy.yml
+
+- name: Buscar el GID del volumen de Alloy en el host
+  ansible.builtin.command:
+    argv: [getent, group, "{{ obs_alloy_data_gid }}"]
+  register: obs_alloy_gid_host
+  changed_when: false
+  failed_when: obs_alloy_gid_host.rc not in [0, 2]
+
+- name: Verificar que el GID del volumen de Alloy no es un grupo del host
+  ansible.builtin.assert:
+    that: obs_alloy_gid_host.rc == 2
+    fail_msg: >-
+      El GID {{ obs_alloy_data_gid }} es el grupo {{ obs_alloy_gid_host.stdout.split(':')[0] }}
+      del host: Alloy lo recibe como grupo suplementario (dueño de su volumen de estado) y
+      tendría sus permisos sobre la raíz montada. No se copió ni levantó nada.
+    quiet: true

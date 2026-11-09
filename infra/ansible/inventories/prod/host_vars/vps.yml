@@ -2,6 +2,6 @@
 kc_hostname: "auth.{{ base_domain }}"
 api_public_domain: "api.{{ base_domain }}"
 frontend_public_domain: "{{ base_domain }}"
-acme_email: jortegan@unicauca.edu.co
+acme_email: wpantoja@unicauca.edu.co
 
 cors_allowed_origins: "https://{{ frontend_public_domain }}"

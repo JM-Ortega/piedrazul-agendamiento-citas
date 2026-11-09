@@ -1,0 +1,18 @@
+# Dashboards versionados en infra/observability/grafana/dashboards. Solo lectura en Grafana: un
+# cambio se hace en el repositorio (los guardados desde la interfaz no se permiten). Un archivo
+# retirado del directorio retira su dashboard (disableDeletion: false); la interfaz no puede
+# borrar un dashboard provisionado en ningún caso.
+apiVersion: 1
+
+providers:
+  - name: piedrazul
+    orgId: 1
+    folder: Piedra Azul
+    folderUid: piedrazul
+    type: file
+    disableDeletion: false
+    allowUiUpdates: false
+    updateIntervalSeconds: 60
+    options:
+      path: /var/lib/grafana-dashboards
+      foldersFromFilesStructure: false

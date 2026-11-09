@@ -112,6 +112,9 @@ entorno confirmó, no suponerse por ser un entorno de pruebas. Pase `PZ_TARGET_R
 la identidad desplegada (p. ej. el digest de la
 imagen del backend): `/actuator/info` exige rol y el arnés no puede leerla.
 
+Resultados e interpretación de la corrida contra staging del 2026-11-08:
+[Evaluación de carga S1 en staging](../docs/evaluations/carga-s1-staging-2026-11-08.md).
+
 ## Resultados
 
 Cada corrida crea `loadtests/results/<UTC>-<perfil>/`:

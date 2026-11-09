@@ -1,0 +1,9 @@
+# {{ ansible_managed | default('Gestionado por Ansible') }} (rol observability de Piedra Azul).
+# Journal persistente y acotado: lo lee Alloy (stack piedrazul-obs) para enviar los logs
+# seleccionados a Loki. Afecta a TODO el journal del host, no solo a Piedra Azul. Retiro:
+# playbooks/observability-logs-rollback.yml (docs/operations/runbooks/logs.md).
+[Journal]
+Storage=persistent
+SystemMaxUse={{ obs_journald_system_max_use }}
+SystemMaxFileSize={{ obs_journald_system_max_file_size }}
+MaxRetentionSec={{ obs_journald_max_retention }}

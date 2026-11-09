@@ -25,15 +25,15 @@ public class ReportExceptionHandler extends BaseExceptionHandler {
         if (ex instanceof AuthorizationDeniedException e) throw e;
         if (ex instanceof AccessDeniedException e) throw e;
 
-        String errorCode = (ex instanceof BusinessException be) ? be.getErrorCode() : "INTERNAL_ERROR";
-        HttpStatus status = (ex instanceof BusinessException be) ? be.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
-        String module = (ex instanceof BusinessException be) ? be.getModule() : "Report";
+        if (!(ex instanceof BusinessException be)) {
+            return buildUnexpectedProblem(log, ex, "Report", request);
+        }
 
         log.warn("Error de negocio en el módulo Report [{}]: {}",
                 ex.getClass().getSimpleName(), ex.getMessage());
 
-        return buildProblem(status, spanishTitle(status), ex.getMessage(),
-                module, errorCode, request);
+        return buildProblem(be.getStatus(), spanishTitle(be.getStatus()), ex.getMessage(),
+                be.getModule(), be.getErrorCode(), request);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -52,7 +52,7 @@ public class ReportExceptionHandler extends BaseExceptionHandler {
         if (ex instanceof AuthorizationDeniedException e) throw e;
         if (ex instanceof AccessDeniedException e) throw e;
 
-        log.error("Excepción no controlada en el módulo Report", ex);
+        logUnexpected(log, "Excepción no controlada en el módulo Report", ex, request);
 
         return buildProblem(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor",
                 "Ocurrió un error inesperado en el servidor.", "Report",

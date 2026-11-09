@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -64,5 +65,22 @@ class UpdateExpiredAppointmentsUseCaseImplTest {
         assertThat(second.getAppointmentState()).isEqualTo(AppointmentState.NO_ASISTIO);
         verify(appointmentRepository).save(first);
         verify(appointmentRepository).save(second);
+    }
+
+    @Test
+    void anAppointmentThatLeftItsStateStopsTheBatchWithAnIllegalState() {
+        Appointment closed = Appointment.reconstruct(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), SpecialtyCode.FISIOTERAPIA,
+                AppointmentState.CANCELADA, LocalDate.now().minusDays(2), new AppointmentTime(LocalTime.of(9, 0)),
+                SchedulingOrigin.MANUAL);
+        Appointment next = buildScheduledAppointment(LocalDate.now().minusDays(1));
+        when(appointmentRepository.findScheduledAppointmentsBefore(LocalDate.now()))
+                .thenReturn(List.of(closed, next));
+
+        assertThatThrownBy(() -> useCase.updateExpiredAppointments())
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(next.getAppointmentState()).isEqualTo(AppointmentState.AGENDADA);
+        verify(appointmentRepository, never()).save(any());
     }
 }

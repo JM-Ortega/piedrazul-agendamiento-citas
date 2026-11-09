@@ -161,12 +161,26 @@ class PatientGlobalExceptionHandlerTest {
 
         assertThat(result.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
         assertThat(result.getTitle()).isEqualTo("Error interno del servidor");
-        assertThat(result.getDetail()).isEqualTo("Unexpected error");
+        assertThat(result.getDetail()).isEqualTo("Ocurrió un error inesperado en el servidor.");
         assertThat(result.getType().toString()).isEqualTo("https://piedrazul/errors/patients/internal-error");
         assertThat(result.getInstance().toString()).isEqualTo("/api/patients");
         assertThat(result.getProperties()).containsEntry("errorCode", "INTERNAL_ERROR");
         assertThat(result.getProperties()).containsEntry("module", "patients");
         assertThat(result.getProperties()).containsKey("timestamp");
+    }
+
+    @Test
+    void aBusinessRejectionIsLoggedByItsCodeAndNotByItsMessage() {
+        handler.handleRuntime(
+                new TestPatientBusinessRuntimeException("Documento SYN0000001"), buildRequest("/api/patients"));
+
+        assertThat(appender.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getThrowableProxy()).isNull();
+            assertThat(event.getFormattedMessage())
+                    .contains("PATIENT_NOT_FOUND")
+                    .doesNotContain("SYN0000001");
+        });
     }
 
     private HttpServletRequest buildRequest(String uri) {

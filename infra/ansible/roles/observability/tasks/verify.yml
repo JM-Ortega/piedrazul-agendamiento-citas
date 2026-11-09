@@ -1,0 +1,124 @@
+# Comprueba desde dentro de los contenedores (ningún puerto de Prometheus está publicado) lo que
+# Prometheus y Grafana cargaron: los ocho trabajos de recolección configurados, las reglas de
+# prometheus/rules (mismos grupos y cantidad, ninguna con error de evaluación), la fuente de datos
+# y los dashboards. Es la verificación de la instalación, no una prueba de alertas ni de
+# notificaciones.
+#
+# Destinos: los del propio stack (obs_self_jobs) deben leerse siempre. Los de la aplicación
+# (obs_app_jobs) deben leerse con obs_verify_scope install o integration (instalación, cambios
+# compartidos con la aplicación); con changed se informan sin bloquear: un stack sano debe poder
+# mostrar una caída del backend sin que eso falle su propio mantenimiento.
+
+- name: Esperar la primera lectura de los destinos que deben leerse
+  ansible.builtin.command:
+    argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
+           exec, -T, prometheus, wget, -qO-, "http://localhost:9090/api/v1/targets?state=active"]
+    chdir: "{{ obs_dir }}"
+  register: obs_targets
+  changed_when: false
+  until: >-
+    obs_targets.rc == 0 and
+    (_required | difference((obs_targets.stdout | from_json).data.activeTargets
+       | selectattr('health', 'equalto', 'up') | map(attribute='labels.job') | unique | list)) | length == 0
+  retries: 12
+  delay: 10
+  failed_when: false
+  vars:
+    _required: "{{ obs_self_jobs + (obs_app_jobs if obs_verify_scope in ['install', 'integration'] else []) }}"
+
+- name: Clasificar los destinos
+  ansible.builtin.set_fact:
+    obs_targets_configured: "{{ _active | map(attribute='labels.job') | unique | sort }}"
+    obs_targets_down: "{{ _active | rejectattr('health', 'equalto', 'up') | map(attribute='labels.job') | unique | sort }}"
+  vars:
+    _active: "{{ ((obs_targets.stdout or '{}') | from_json).get('data', {}).get('activeTargets', []) }}"
+
+- name: Destinos configurados y leídos
+  ansible.builtin.assert:
+    that:
+      - obs_targets.rc == 0
+      - obs_targets_configured == (obs_expected_jobs | sort)
+      - obs_self_jobs | intersect(obs_targets_down) | length == 0
+      - obs_verify_scope == 'changed' or obs_app_jobs | intersect(obs_targets_down) | length == 0
+    fail_msg: >-
+      Destinos: configurados {{ obs_targets_configured }} (se esperaban {{ obs_expected_jobs | sort }});
+      sin leer {{ obs_targets_down }} (alcance {{ obs_verify_scope }}: el stack siempre; la aplicación
+      {{ 'solo se informa' if obs_verify_scope == 'changed' else 'también' }}). El stack quedó levantado;
+      la aplicación no se tocó.
+    quiet: true
+
+- name: Informar destinos de la aplicación sin leer (no bloquea en este alcance)
+  ansible.builtin.debug:
+    msg: >-
+      Diagnóstico: destinos de la aplicación sin leer {{ obs_app_jobs | intersect(obs_targets_down) }}.
+      El stack funciona y lo está informando; no es un fallo de esta operación.
+  when: obs_verify_scope == 'changed' and obs_app_jobs | intersect(obs_targets_down) | length > 0
+
+- name: Leer las reglas del repositorio
+  ansible.builtin.find:
+    paths: "{{ obs_src_dir }}/prometheus/rules"
+    patterns: ["*.yml", "*.yaml"]
+  register: obs_rule_files
+  delegate_to: localhost
+  become: false
+
+- name: Fijar las reglas esperadas
+  ansible.builtin.set_fact:
+    obs_expected_rule_groups: >-
+      {%- set out = {} -%}
+      {%- for f in obs_rule_files.files -%}
+        {%- for g in (lookup('ansible.builtin.file', f.path) | from_yaml).groups | default([]) -%}
+          {%- set _ = out.update({g.name: g.rules | length}) -%}
+        {%- endfor -%}
+      {%- endfor -%}
+      {{ out }}
+
+- name: Leer las reglas cargadas por Prometheus
+  ansible.builtin.command:
+    argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
+           exec, -T, prometheus, wget, -qO-, "http://localhost:9090/api/v1/rules"]
+    chdir: "{{ obs_dir }}"
+  register: obs_rules_loaded
+  changed_when: false
+  failed_when: false
+
+- name: Reglas cargadas = reglas del repositorio
+  ansible.builtin.assert:
+    that:
+      - obs_rules_loaded.rc == 0
+      - _loaded == obs_expected_rule_groups
+      - _errors | length == 0
+    fail_msg: >-
+      Reglas: Prometheus cargó {{ _loaded }} (grupo: cantidad) y el repositorio tiene
+      {{ obs_expected_rule_groups }}; con error de evaluación: {{ _errors }}.
+    quiet: true
+  vars:
+    _groups: "{{ ((obs_rules_loaded.stdout or '{}') | from_json).get('data', {}).get('groups', []) }}"
+    _loaded: "{{ dict(_groups | map(attribute='name') | zip(_groups | map(attribute='rules') | map('length'))) }}"
+    _errors: "{{ _groups | map(attribute='rules') | flatten | selectattr('health', 'equalto', 'err') | map(attribute='name') | list }}"
+
+- name: Leer los dashboards provisionados
+  ansible.builtin.command:
+    argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
+           exec, -T, grafana, sh, -c,
+           'wget -qO- --header "Authorization: Basic $(printf "admin:%s" "$GF_SECURITY_ADMIN_PASSWORD" | base64)" "http://localhost:3000/api/search?type=dash-db"']
+    chdir: "{{ obs_dir }}"
+  register: obs_dashboards
+  changed_when: false
+  # Grafana recién reiniciado tarda unos segundos en atender
+  until: >-
+    obs_dashboards.rc == 0 and
+    (obs_expected_dashboards | difference(obs_dashboards.stdout | from_json | map(attribute='uid') | list)) | length == 0
+  retries: 12
+  delay: 5
+  failed_when: false
+
+- name: Dashboards provisionados
+  ansible.builtin.assert:
+    that:
+      - obs_dashboards.rc == 0
+      - (obs_expected_dashboards | difference(obs_dashboards.stdout | from_json | map(attribute='uid') | list)) | length == 0
+    fail_msg: >-
+      Grafana no respondió o faltan dashboards:
+      {{ obs_expected_dashboards | difference((obs_dashboards.stdout or '[]') | from_json | map(attribute='uid') | list) }}
+    quiet: true

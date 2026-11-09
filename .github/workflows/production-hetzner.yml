@@ -25,8 +25,13 @@ run-name: >-
 #                            aplicar. Crear o reemplazar exige Run P con los push retenidos
 #                            (vars.PRODUCTION_PUSH_DEPLOY sin definir o en deferred).
 # production-stage.sh decide qué combina cada etapa; host-trust.sh, la identidad SSH.
+# El stack de observabilidad (Prometheus, Grafana, Loki, Alloy, Alertmanager) es parte obligatoria
+# de la instalación: Run P comprueba sus entradas sin red, Run I lo instala después de la
+# aplicación (job observability) y solo con él la instalación queda READY (installation_status).
+# Fuera de la instalación es un componente aparte, con su propio resultado y su propio progreso.
 # Un push se difiere (sin efectos y sin avanzar el rango) salvo con
-# vars.PRODUCTION_PUSH_DEPLOY=enabled, que se habilita después de instalar.
+# vars.PRODUCTION_PUSH_DEPLOY=enabled, que una persona habilita después de instalar (ningún
+# resultado de la cadena la cambia ni la autoriza).
 #
 #   classify ─┬─ resolve_rollback ─┐
 #             ├─ app_build ────────┼─ select_images ─ image_targets ─ image_scan ─ image_policy ─┐
@@ -35,10 +40,18 @@ run-name: >-
 #                 terraform_plan (gate production-hetzner; solo con Terraform) ◄─────────────────┤
 #                   └─ production (gate production-hetzner) ◄────────────────────────────────────┘
 #                        └─ conclude ─ range_processed
+#                             └─ observability (gate production-hetzner) ─ observability_processed
+#   classify ─ observability_validate ─┘   (y observability_image_scan, desde image_targets)
+#   installation_status (solo Run I: resultado de ese run, núcleo + stack)
 #
-# Solo `terraform_plan` y `production` usan el environment production-hetzner y credenciales
-# de producción (terraform_plan: solo HCP Terraform; production: HCP Terraform, SSH,
-# secretos de la app, token de Pages). Clasificación, builds, selección y escaneo de
+# Progreso independiente por componente: el núcleo avanza con "Rango procesado" (push ordinario
+# o Run I verificados); el stack, con "Observabilidad procesada" (operación full aplicada y
+# verificada, también en un dispatch). Un fallo de uno no obliga a repetir el otro.
+#
+# Solo `terraform_plan`, `production` y `observability` usan el environment production-hetzner y
+# credenciales de producción (terraform_plan: solo HCP Terraform; production: HCP Terraform, SSH,
+# secretos de la app, token de Pages; observability: lectura del estado de HCP, SSH, listas de
+# Grafana y webhook de Discord). Clasificación, builds, selección y escaneo de
 # identidades conocidas corren antes de los gates y solo con GITHUB_TOKEN.
 #
 # Con Terraform hay dos aprobaciones del mismo environment, con propósitos distintos: la de
@@ -104,6 +117,11 @@ on:
         description: "Construir el frontend de este commit y publicarlo en Cloudflare Pages (producción)"
         type: boolean
         default: false
+      observability:
+        description: "Stack de observabilidad: none, full (todo el stack; obligatorio con provision/install) o grafana-access (solo las listas Viewer/Editor de Grafana). metricas.md y grafana-acceso.md"
+        type: choice
+        options: [none, full, grafana-access]
+        default: none
       image_tag:
         description: "Tag específico del backend para rollback (vacío = construir nueva o reusar)"
         type: string
@@ -163,6 +181,13 @@ jobs:
       image_tag: ${{ steps.intent.outputs.image_tag }}
       keycloak_recovery: ${{ steps.intent.outputs.keycloak_recovery }}
       break_glass_authorization: ${{ steps.intent.outputs.break_glass_authorization }}
+      # Stack de observabilidad: operación pedida (intención, también en Run P) y si este run la
+      # ejecuta (nunca en Run P ni en un push diferido); alcance de su verificación; si sus
+      # imágenes fijadas cambiaron desde su último procesado (escanear antes de aplicar)
+      observability_operation: ${{ steps.intent.outputs.observability_operation }}
+      observability_execute: ${{ steps.intent.outputs.observability_execute }}
+      observability_scope: ${{ steps.intent.outputs.observability_scope }}
+      observability_images_changed: ${{ steps.intent.outputs.observability_images_changed }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -189,6 +214,7 @@ jobs:
           IN_BUILD_POSTGRES: ${{ inputs.run_build_postgres }}
           IN_APP_DEPLOY: ${{ inputs.run_app_deploy }}
           IN_FRONTEND: ${{ inputs.run_frontend_publish }}
+          IN_OBSERVABILITY: ${{ inputs.observability }}
           IN_IMAGE_TAG: ${{ inputs.image_tag }}
           IN_KEYCLOAK_RECOVERY: ${{ inputs.keycloak_recovery }}
           IN_BREAK_GLASS: ${{ inputs.break_glass_authorization }}
@@ -202,6 +228,20 @@ jobs:
           fi
 
           OUT="${RUNNER_TEMP}/intent.env"
+          # Runs completados de este workflow en main (cualquier conclusión): la autoridad de cada
+          # progreso es su job de señal, no la conclusión del run
+          runs_json() {
+            [ -s "${RUNNER_TEMP}/runs.json" ] ||
+              gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/$(basename "${WORKFLOW_PATH}")/runs?branch=main&status=completed&per_page=100" \
+                > "${RUNNER_TEMP}/runs.json"
+          }
+          # Base del stack de observabilidad: pushes y dispatches con la señal "Observabilidad
+          # procesada" (solo una operación full aplicada y verificada la emite)
+          obs_base() {
+            SIGNAL_JOB="Observabilidad procesada" RANGE_EVENTS="push workflow_dispatch" \
+              .github/scripts/production-range-base.sh "${WORKFLOW_PATH}" "${GITHUB_SHA}" "${GITHUB_RUN_ID}" \
+              < "${RUNNER_TEMP}/runs.json"
+          }
 
           # En un push, un valor inválido falla. En un dispatch no bloquea por sí mismo: la
           # retención la decide stage_gate, y solo si el plan crea o reemplaza el servidor
@@ -225,17 +265,25 @@ jobs:
               echo "run_host_config=false"
               echo "run_app_deploy=false"
               echo "frontend_required=false"
+              echo "observability_operation=none"
+              echo "observability_required=false"
+              echo "observability_scope=changed"
+              echo "observability_images_changed=false"
               echo "intent=deferred"
               echo "image_tag="
               echo "keycloak_recovery=false"
               echo "break_glass_authorization="
             } > "${OUT}"
           elif [ "${EVENT_NAME}" = "push" ]; then
-            gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/$(basename "${WORKFLOW_PATH}")/runs?branch=main&event=push&status=success&per_page=50" \
-              > "${RUNNER_TEMP}/runs.json"
-            BASE=$(.github/scripts/production-range-base.sh "${WORKFLOW_PATH}" "${GITHUB_SHA}" "${GITHUB_RUN_ID}" \
+            runs_json
+            # Progreso independiente por componente (señal de cada uno en el último intento)
+            BASE=$(RANGE_EVENTS="push workflow_dispatch" \
+              .github/scripts/production-range-base.sh "${WORKFLOW_PATH}" "${GITHUB_SHA}" "${GITHUB_RUN_ID}" \
               < "${RUNNER_TEMP}/runs.json")
-            .github/scripts/classify-production.sh "${BASE}" "${GITHUB_SHA}" > "${OUT}"
+            OBS_BASE=$(obs_base)
+            .github/scripts/classify-production.sh "${BASE}" "${GITHUB_SHA}" "${OBS_BASE}" > "${OUT}"
+            OBS_REQ="$(sed -n 's/^observability_required=//p' "${OUT}")"
+            echo "observability_operation=$([ "${OBS_REQ}" = true ] && echo full || echo none)" >> "${OUT}"
             {
               echo "stage=ordinary"
               echo "image_tag="
@@ -247,7 +295,8 @@ jobs:
             .github/scripts/production-stage.sh validate
             if [ "${IN_TERRAFORM}" = "false" ] && [ "${IN_HOST_CONFIG}" = "false" ] && \
                [ "${IN_BUILD}" = "false" ] && [ "${IN_BUILD_POSTGRES}" = "false" ] && \
-               [ "${IN_APP_DEPLOY}" = "false" ] && [ "${IN_FRONTEND}" = "false" ]; then
+               [ "${IN_APP_DEPLOY}" = "false" ] && [ "${IN_FRONTEND}" = "false" ] && \
+               [ "${IN_OBSERVABILITY:-none}" = "none" ]; then
               echo "::error title=Intención de producción::Todos los flags están en false; no hay nada que hacer"
               exit 1
             fi
@@ -283,6 +332,12 @@ jobs:
               fi
               if [ "${IN_HOST_CONFIG}" != "true" ] && [ "${IN_APP_DEPLOY}" != "true" ]; then
                 echo "::error title=Intención de producción::break_glass_authorization solo tiene efecto con configuración del servidor o deploy de aplicación"
+                exit 1
+              fi
+              # Sin break-glass para el stack de observabilidad: una referencia suya que la
+              # política bloquea se corrige o revierte; va en otro dispatch
+              if [ "${IN_OBSERVABILITY:-none}" != "none" ]; then
+                echo "::error title=Intención de producción::break_glass_authorization no admite observability: el stack va en otro dispatch, sin break-glass"
                 exit 1
               fi
               # La autorización liga una operación sobre imágenes; publicar el frontend es
@@ -329,7 +384,23 @@ jobs:
             if [ "${STAGE}" = "provision" ] && [ "${PUSH_MODE}" != "deferred" ]; then
               echo "::warning title=Etapa de producción::Run P sin push retenidos (modo: ${PUSH_MODE}): si el plan crea o reemplaza el servidor se rechazará antes de la segunda aprobación; una recuperación que no lo hace sigue. Definir vars.PRODUCTION_PUSH_DEPLOY=deferred (instalacion-nueva.md)"
             fi
+            # Stack de observabilidad en un dispatch: la operación es explícita; su base solo sirve
+            # para el alcance de la verificación y para saber si sus imágenes cambiaron
+            OBS_SCOPE=changed
+            OBS_IMAGES=false
+            if [ "${IN_OBSERVABILITY:-none}" = full ]; then
+              runs_json
+              OBS_BASE=$(obs_base)
+              .github/scripts/classify-production.sh "" "${GITHUB_SHA}" "${OBS_BASE}" > "${RUNNER_TEMP}/obs-intent.env"
+              OBS_SCOPE="$(sed -n 's/^observability_scope=//p' "${RUNNER_TEMP}/obs-intent.env")"
+              OBS_IMAGES="$(sed -n 's/^observability_images_changed=//p' "${RUNNER_TEMP}/obs-intent.env")"
+              # Run I instala: verificación completa e imágenes autorizadas siempre
+              if [ "${STAGE}" != ordinary ]; then OBS_SCOPE=install; OBS_IMAGES=true; fi
+            fi
             {
+              echo "observability_operation=${IN_OBSERVABILITY:-none}"
+              echo "observability_scope=${OBS_SCOPE}"
+              echo "observability_images_changed=${OBS_IMAGES}"
               echo "stage=${STAGE}"
               echo "range_mode=manual"
               echo "range_base="
@@ -347,6 +418,15 @@ jobs:
             } > "${OUT}"
           fi
 
+          # Ejecutar la operación del stack: nunca en Run P (el servidor aún no tiene la
+          # aplicación ni sus redes: solo se comprueban sus entradas) ni en un push diferido
+          OBS_OP="$(sed -n 's/^observability_operation=//p' "${OUT}")"
+          OBS_STAGE="$(sed -n 's/^stage=//p' "${OUT}")"
+          if [ "${OBS_OP:-none}" != none ] && [ "${OBS_STAGE}" != provision ] && [ "${OBS_STAGE}" != deferred ]; then
+            echo "observability_execute=true" >> "${OUT}"
+          else
+            echo "observability_execute=false" >> "${OUT}"
+          fi
           echo "pin_outside_environment=${PIN_OUTSIDE_ENVIRONMENT:-}" >> "${OUT}"
           echo "ses_vars_outside_environment=${SES_VARS_OUTSIDE_ENVIRONMENT:-}" >> "${OUT}"
           echo "push_mode=${PUSH_MODE}" >> "${OUT}"
@@ -382,6 +462,12 @@ jobs:
             echo "| configuración del servidor | $(get run_host_config) |"
             echo "| deploy de aplicación | $(get run_app_deploy) |"
             echo "| publicación del frontend (Pages) | $(get frontend_required) |"
+            case "$(get observability_operation)/$(get observability_execute)" in
+              none/*) echo "| stack de observabilidad | no requerido |" ;;
+              */false) echo "| stack de observabilidad | \`$(get observability_operation)\` declarado; no se ejecuta en esta etapa (solo comprobación de entradas) |" ;;
+              full/true) echo "| stack de observabilidad | \`full\` (verificación \`$(get observability_scope)\`; imágenes a autorizar: $(get observability_images_changed)) |" ;;
+              *) echo "| stack de observabilidad | \`$(get observability_operation)\` (solo las listas de Grafana) |" ;;
+            esac
             if [ -n "$(get image_tag)" ]; then
               echo "| rollback backend | \`$(get image_tag)\` |"
             fi
@@ -766,6 +852,12 @@ jobs:
       traefik_label: ${{ steps.targets.outputs.traefik_label }}
       traefik_index_digest: ${{ steps.targets.outputs.traefik_index_digest }}
       traefik_image_ref: ${{ steps.targets.outputs.traefik_image_ref }}
+      # Stack de observabilidad (solo si una operación full aplica imágenes que cambiaron o
+      # instala): mismas identidades que la política autoriza dentro del job observability
+      observability_targets: ${{ steps.targets.outputs.observability_targets }}
+      # ok | error: un fallo al reunir las identidades del stack no hace fallar este job (el
+      # núcleo depende de él); el job observability lo exige y falla cerrado
+      observability_targets_status: ${{ steps.targets.outputs.observability_targets_status }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -791,6 +883,9 @@ jobs:
           BUILT_POSTGRES_TAG: ${{ needs.postgres_build.outputs.image_tag }}
           BUILT_POSTGRES_INDEX_DIGEST: ${{ needs.postgres_build.outputs.image_index_digest }}
           BUILT_POSTGRES_IMAGE_REF: ${{ needs.postgres_build.outputs.image_ref }}
+          OBS_OPERATION: ${{ needs.classify.outputs.observability_operation }}
+          OBS_EXECUTE: ${{ needs.classify.outputs.observability_execute }}
+          OBS_IMAGES_CHANGED: ${{ needs.classify.outputs.observability_images_changed }}
         run: |
           set -euo pipefail
 
@@ -905,6 +1000,43 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
           echo "targets=${TARGETS}" >> "$GITHUB_OUTPUT"
+
+          # ── Stack de observabilidad: aparte del núcleo (su escaneo y su política no bloquean
+          # el núcleo ni al revés). Solo una operación full que instala o cuyas referencias
+          # fijadas cambiaron desde su último procesado; grafana-access nunca escanea.
+          OBS_TARGETS='[]'
+          OBS_STATUS=ok
+          obs_error() { echo "::error title=Identidad del stack de observabilidad::$* (el núcleo sigue; el stack no se aplica)"; OBS_STATUS=error; }
+          if [ "${OBS_OPERATION}" = full ] && [ "${OBS_EXECUTE}" = true ] && [ "${OBS_IMAGES_CHANGED}" = true ]; then
+            for SVC in prometheus grafana alloy loki alertmanager; do
+              LABEL=$(yq -r ".services.${SVC}.image" infra/observability/compose.yml)
+              if ! [[ "${LABEL}" =~ ^[a-z0-9./_-]+:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}@sha256:[0-9a-f]{64}$ ]]; then
+                obs_error "${SVC} debe fijarse como <repositorio>:<tag>@sha256:<índice OCI> (tiene '${LABEL}')"; break
+              fi
+              if ! IDENTITY=$(.github/scripts/resolve-amd64-image.sh "${LABEL}"); then
+                obs_error "No se pudo resolver ${LABEL} a un manifiesto linux/amd64 único"; break
+              fi
+              INDEX=$(sed -n 's/^image_index_digest=//p' <<< "${IDENTITY}")
+              REF=$(sed -n 's/^image_ref=//p' <<< "${IDENTITY}")
+              if [ "${INDEX}" != "${LABEL#*@}" ]; then obs_error "${SVC}: el índice resuelto (${INDEX}) no es el declarado"; break; fi
+              OBS_TARGETS=$(jq -c --arg surface "obs-${SVC}" --arg label "${LABEL}" --arg index "${INDEX}" --arg ref "${REF}" \
+                '. + [{surface: $surface, source: "compose (fijada)", label: $label, image_index_digest: $index, image_ref: $ref, applied: true}]' \
+                <<< "${OBS_TARGETS}")
+            done
+            [ "${OBS_STATUS}" = ok ] || OBS_TARGETS='[]'
+          fi
+          echo "observability_targets_status=${OBS_STATUS}" >> "$GITHUB_OUTPUT"
+          echo "observability_targets=${OBS_TARGETS}" >> "$GITHUB_OUTPUT"
+          if [ "$(jq 'length' <<< "${OBS_TARGETS}")" -gt 0 ]; then
+            {
+              echo
+              echo "### Stack de observabilidad: identidades a escanear y autorizar"
+              echo
+              echo "| imagen | referencia fijada | índice OCI | escaneada (linux/amd64) |"
+              echo "|---|---|---|---|"
+              jq -r '.[] | "| \(.surface) | `\(.label)` | `\(.image_index_digest)` | `\(.image_ref)` |"' <<< "${OBS_TARGETS}"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
           {
             echo "## Identidades de imagen a escanear"
@@ -1382,8 +1514,10 @@ jobs:
   production:
     name: Producción
     runs-on: ubuntu-latest
-    needs: [classify, select_images, image_targets, image_scan, image_policy, frontend_build, terraform_plan]
+    needs: [classify, select_images, image_targets, image_scan, image_policy, frontend_build, terraform_plan, observability_validate]
     # Con frontend, espera a que frontend_build haya construido y validado el artefacto.
+    # Instalación definitiva (provision/install): la configuración del stack de observabilidad
+    # debe validar antes (observability_validate); en un run ordinario el núcleo no depende de él.
     # Con deploy, espera a que el escaneo de las identidades conocidas antes del gate haya
     # terminado en success (todos los intentos completados con evidencia; fallido o
     # cancelado = cadena no verificable; sin objetivos, image_scan se salta y la lista debe
@@ -1411,7 +1545,8 @@ jobs:
           (needs.terraform_plan.outputs.has_changes == 'true' ||
             (needs.terraform_plan.outputs.has_changes == 'false' &&
               (needs.classify.outputs.deploy_required == 'true' || needs.classify.outputs.frontend_required == 'true'))))) &&
-      (needs.classify.outputs.stage != 'install' || needs.terraform_plan.outputs.has_changes == 'false')
+      (needs.classify.outputs.stage != 'install' || needs.terraform_plan.outputs.has_changes == 'false') &&
+      (needs.classify.outputs.stage == 'ordinary' || needs.observability_validate.result == 'success')
     # Incluye el Apply (hasta 15 min de seguimiento) y el deploy completo
     timeout-minutes: 120
     environment: production-hetzner
@@ -1570,6 +1705,21 @@ jobs:
           set -euo pipefail
           .github/scripts/ses-config.sh preflight | tee "${RUNNER_TEMP}/ses-preflight.env"
           grep '^ses_' "${RUNNER_TEMP}/ses-preflight.env" >> "$GITHUB_OUTPUT"
+
+      # Instalación definitiva (Run P y Run I): el stack de observabilidad es obligatorio. Sus
+      # entradas (listas de Grafana, webhook, inventario) se comprueban aquí, sin red, antes del
+      # Apply y de cualquier conexión; Run P nunca lo instala (el servidor aún no tiene la
+      # aplicación) y Run I lo instala en el job observability, después de la aplicación.
+      - name: Verificar las entradas del stack de observabilidad (sin red)
+        id: obs_preflight
+        if: env.PRODUCTION_STAGE == 'provision' || env.PRODUCTION_STAGE == 'install'
+        env:
+          GRAFANA_VIEWER_EMAILS: ${{ secrets.GRAFANA_VIEWER_EMAILS }}
+          GRAFANA_EDITOR_EMAILS: ${{ secrets.GRAFANA_EDITOR_EMAILS }}
+          OBS_DISCORD_WEBHOOK_URL: ${{ secrets.OBS_DISCORD_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          ansible-playbook -i infra/ansible/inventories/prod infra/ansible/playbooks/observability-preflight.yml
 
       # Sin red y antes de cualquier mutación: un run que va a tocar el servidor no aplica nada
       # si ni siquiera tiene un pin utilizable. Run P no lo lee: su servidor aún no tiene pin.
@@ -2737,22 +2887,415 @@ jobs:
             fi
           fi
 
+  # ── Stack de observabilidad ────────────────────────────────────────────────
+  # Componente aparte del núcleo, con su propio resultado y su propio progreso ("Observabilidad
+  # procesada"). Operaciones (classify: observability_operation):
+  #   full            todo el stack (playbooks/observability.yml): configuración, estado deseado,
+  #                   activación (digest de configuración por servicio y archivos secretos por
+  #                   inodo) y verificación según el alcance (install | integration | changed)
+  #   grafana-access  solo las listas Viewer/Editor de Grafana, sin depender del resto del stack
+  # Un push la pide cuando cambió lo que el stack consume desde su último procesado; un dispatch,
+  # explícitamente; Run I siempre (full). Run P nunca la ejecuta: solo comprueba sus entradas.
+  #
+  #   observability_validate (sin privilegios) ─┐
+  #   image_targets ─ observability_image_scan ─┼─ observability (gate production-hetzner) ─ observability_processed
+  #   conclude (núcleo terminado o no requerido) ┘                                         └ installation_status (Run I)
+
+  # Configuración del stack, sin red ni secretos, con las herramientas de sus imágenes fijadas.
+  # También en Run P: una configuración inválida no llega al Apply de una instalación.
+  observability_validate:
+    name: Validar configuración del stack de observabilidad
+    runs-on: ubuntu-latest
+    needs: classify
+    if: needs.classify.result == 'success' && needs.classify.outputs.observability_operation == 'full'
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Validar
+        run: .github/scripts/observability-validate.sh infra/observability
+
+  # Imágenes del stack que una operación full va a aplicar con una identidad nueva (o en una
+  # instalación). Separado de image_scan: un fallo aquí no bloquea el núcleo.
+  observability_image_scan:
+    name: Escanear ${{ matrix.surface }}
+    runs-on: ubuntu-latest
+    needs: image_targets
+    if: |
+      !cancelled() &&
+      needs.image_targets.outputs.observability_targets != '' &&
+      needs.image_targets.outputs.observability_targets != '[]'
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.image_targets.outputs.observability_targets) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Escanear
+        uses: ./.github/actions/trivy-scan
+        with:
+          surface: ${{ matrix.surface }}
+          source: ${{ matrix.source }}
+          label: ${{ matrix.label }}
+          image_index_digest: ${{ matrix.image_index_digest }}
+          image_ref: ${{ matrix.image_ref }}
+          phase: selected
+
+  # Mismo environment, la misma concurrencia y la misma confianza en el host que production:
+  # nunca corre a la vez que otra mutación. Solo después de que el núcleo terminó (o no era
+  # requerido): un núcleo fallido deja el stack pendiente (sin señal), y un dispatch solo del
+  # stack lo aplica sin repetir el núcleo. Frescura justo antes de mutar, también si el núcleo
+  # ya mutó en este run: un run viejo nunca deja el stack en una versión anterior.
+  observability:
+    name: Observabilidad
+    runs-on: ubuntu-latest
+    needs: [classify, image_targets, observability_image_scan, observability_validate, conclude]
+    if: |
+      !cancelled() &&
+      needs.classify.result == 'success' &&
+      needs.classify.outputs.observability_execute == 'true' &&
+      needs.conclude.result == 'success' &&
+      (needs.classify.outputs.observability_operation == 'grafana-access' ||
+        (needs.observability_validate.result == 'success' && needs.image_targets.result == 'success')) &&
+      needs.observability_image_scan.result != 'cancelled'
+    timeout-minutes: 45
+    environment: production-hetzner
+    concurrency:
+      group: piedrazul-production-hetzner
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      # Política: procedencia de disposiciones (PR y revisiones) y evidencia de este run
+      actions: read
+      pull-requests: read
+    env:
+      ANSIBLE_CONFIG: infra/ansible/ansible.cfg
+      ANSIBLE_HOST_KEY_CHECKING: "True"
+      ANSIBLE_HOST: vps
+      TF_CLOUD_ORGANIZATION: Piedrazul
+      TF_WORKSPACE: piedrazul-hetzner
+      HCP_WORKSPACE_ID: ${{ vars.TF_WORKSPACE_HETZNER_ID }}
+      OBS_OPERATION: ${{ needs.classify.outputs.observability_operation }}
+      OBS_SCOPE: ${{ needs.classify.outputs.observability_scope }}
+      OBS_TARGETS: ${{ needs.image_targets.outputs.observability_targets }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Historia completa: la procedencia de una disposición se busca en main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verificar credenciales del stack
+        id: credentials
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          ANSIBLE_SSH_KEY: ${{ secrets.ANSIBLE_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          MISSING=()
+          [ -n "${TF_API_TOKEN:-}" ] || MISSING+=(TF_API_TOKEN)
+          [ -n "${ANSIBLE_SSH_KEY:-}" ] || MISSING+=(ANSIBLE_SSH_KEY)
+          [[ "${HCP_WORKSPACE_ID}" =~ ^ws-[A-Za-z0-9]+$ ]] || MISSING+=("vars.TF_WORKSPACE_HETZNER_ID")
+          if [ "${#MISSING[@]}" -gt 0 ]; then
+            echo "::error title=Observabilidad::Faltan credenciales o variables: ${MISSING[*]}"
+            exit 1
+          fi
+
+      # Una operación full con imágenes nuevas (o instalación) necesita sus cinco identidades
+      # escaneables; sin ellas no hay autorización posible y el job falla antes de conectarse
+      - name: Exigir las identidades del stack que se van a autorizar
+        if: needs.classify.outputs.observability_operation == 'full' && needs.classify.outputs.observability_images_changed == 'true'
+        env:
+          STATUS: ${{ needs.image_targets.outputs.observability_targets_status }}
+        run: |
+          set -euo pipefail
+          if [ "${STATUS}" != ok ] || [ "$(jq 'length' <<< "${OBS_TARGETS:-[]}")" != 5 ]; then
+            echo "::error title=Observabilidad::Las identidades de las imágenes del stack no se reunieron (estado '${STATUS}'): no se pueden autorizar; el stack no se toca"
+            exit 1
+          fi
+
+      # Listas de Grafana (secretos: el repositorio es público; nunca se muestran), webhook e
+      # inventario, con las mismas reglas que el rol. Antes de cualquier conexión.
+      - name: Verificar las entradas del stack (sin red)
+        id: preflight
+        env:
+          GRAFANA_VIEWER_EMAILS: ${{ secrets.GRAFANA_VIEWER_EMAILS }}
+          GRAFANA_EDITOR_EMAILS: ${{ secrets.GRAFANA_EDITOR_EMAILS }}
+          OBS_DISCORD_WEBHOOK_URL: ${{ needs.classify.outputs.observability_operation == 'full' && secrets.OBS_DISCORD_WEBHOOK_URL || '' }}
+        run: |
+          set -euo pipefail
+          ansible-playbook -i infra/ansible/inventories/prod infra/ansible/playbooks/observability-preflight.yml \
+            -e "obs_preflight_webhook=$([ "${OBS_OPERATION}" = full ] && echo true || echo false)"
+
+      # Dirección e identidad del servidor: el estado actual de HCP (este job nunca aplica) y el
+      # pin del environment, como production
+      - name: Verificar workspace de HCP Terraform
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: .github/scripts/hcp-state.sh workspace read
+
+      - name: Esperar a que HCP Terraform esté libre
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: .github/scripts/hcp-state.sh wait-idle
+
+      - name: Leer outputs del state version actual
+        id: tf_outputs
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          SV=$(.github/scripts/hcp-state.sh current)
+          if [ "${SV}" = none ]; then
+            echo "::error title=Observabilidad::El workspace no tiene estado: no hay servidor. Una instalación nueva empieza con stage=provision"
+            exit 1
+          fi
+          .github/scripts/hcp-state.sh outputs "${SV}" > "${RUNNER_TEMP}/tf-outputs.env"
+          cat "${RUNNER_TEMP}/tf-outputs.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/tf-outputs.env"
+
+      - name: Verificar la identidad SSH del host
+        id: host_trust
+        timeout-minutes: 7
+        env:
+          EXPECTED_HOST_PIN: ${{ vars.PRODUCTION_SSH_HOST_PIN }}
+          PIN_OUTSIDE_ENVIRONMENT: ${{ needs.classify.outputs.pin_outside_environment }}
+          SERVER_ID: ${{ steps.tf_outputs.outputs.server_id }}
+          SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
+        run: |
+          set -euo pipefail
+          .github/scripts/host-trust.sh verify "${SERVER_ID}" "${SERVER_IP}" > "${RUNNER_TEMP}/host-trust.env"
+          cat "${RUNNER_TEMP}/host-trust.env" >> "$GITHUB_OUTPUT"
+          cat "${RUNNER_TEMP}/host-trust.env"
+
+      - name: Preparar acceso SSH e inventario
+        env:
+          ANSIBLE_SSH_KEY: ${{ secrets.ANSIBLE_SSH_KEY }}
+          SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
+          SSH_CONFIG: ${{ steps.host_trust.outputs.ssh_config }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${ANSIBLE_SSH_KEY}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf 'all:\n  hosts:\n    %s:\n      ansible_host: %s\n      ansible_ssh_common_args: "-F %s"\n' \
+            "${ANSIBLE_HOST}" "${SERVER_IP}" "${SSH_CONFIG}" > "${RUNNER_TEMP}/hosts.runtime.yml"
+          cat "${RUNNER_TEMP}/hosts.runtime.yml"
+
+      - name: Esperar SSH en el servidor
+        timeout-minutes: 6
+        env:
+          SERVER_IP: ${{ steps.tf_outputs.outputs.server_ip }}
+        run: .github/scripts/host-trust.sh wait-ssh "${SERVER_IP}"
+
+      - name: Instalar colecciones de Ansible
+        run: |
+          set -euo pipefail
+          ansible-galaxy collection install \
+            -r infra/ansible/requirements.yml \
+            -p infra/ansible/collections
+
+      # Imágenes del stack con identidad nueva (o instalación): escaneo fresco de este run y
+      # política autoritativa antes de mutar. Sin break-glass: una referencia bloqueada se
+      # corrige o revierte. grafana-access nunca llega aquí con imágenes (no las cambia).
+      - name: Descargar y verificar evidencia de escaneo del stack
+        if: env.OBS_TARGETS != '' && env.OBS_TARGETS != '[]'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCAN_SURFACES: obs-prometheus|obs-grafana|obs-alloy|obs-loki|obs-alertmanager
+        run: .github/scripts/current-scan-evidence.sh "${RUNNER_TEMP}/obs-scan-evidence"
+
+      - name: Autorizar imágenes del stack (política de vulnerabilidades)
+        id: policy
+        if: env.OBS_TARGETS != '' && env.OBS_TARGETS != '[]'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVIDENCE_DIR: ${{ runner.temp }}/obs-scan-evidence
+          POLICY_PHASE: autoritativa
+          RESULT_FILE: ${{ runner.temp }}/obs-policy-result.json
+          RISK_APPROVERS: ${{ vars.VULNERABILITY_RISK_APPROVERS }}
+          BREAK_GLASS_ID: ""
+          EVENT_NAME: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          OP_RUN_TERRAFORM_APPLY: "false"
+          OP_RUN_HOST_CONFIG: "false"
+          OP_RUN_APP_DEPLOY: "false"
+          OP_RUN_BUILD: "false"
+          OP_RUN_BUILD_POSTGRES: "false"
+          OP_IMAGE_TAG: ""
+          OP_KEYCLOAK_RECOVERY: "false"
+        run: |
+          set -euo pipefail
+          POLICY_INPUT=$(jq -c --arg d "${EVIDENCE_DIR}" --arg run "${GITHUB_RUN_ID}" \
+            '[.[] | {surface, image_ref, dir: "\($d)/image-scan-selected-\(.surface)-\($run)"}]' <<< "${OBS_TARGETS}")
+          export POLICY_INPUT
+          set +e
+          .github/scripts/vuln-policy.sh > "${RUNNER_TEMP}/obs-policy.env"
+          RC=$?
+          set -e
+          cat "${RUNNER_TEMP}/obs-policy.env" >> "$GITHUB_OUTPUT"
+          if [ "${RC}" -ne 0 ] || [ "$(sed -n 's/^decision=//p' "${RUNNER_TEMP}/obs-policy.env")" != authorized ]; then
+            echo "::error title=Observabilidad: imágenes no autorizadas::$(jq -r '[.global_errors[]?, (.surfaces[]? | select(.verdict == "blocked") | "\(.surface): \(.reason_code)")] | join("; ")' "${RESULT_FILE}" 2>/dev/null || echo "evidencia o política inválida") — el stack no se tocó; corregir o revertir la referencia fijada"
+            exit 1
+          fi
+
+      - name: Verificar frescura antes de mutar el stack
+        id: fresh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/verify-main-tip.sh
+
+      - name: Aplicar el stack de observabilidad
+        id: apply
+        env:
+          GRAFANA_VIEWER_EMAILS: ${{ secrets.GRAFANA_VIEWER_EMAILS }}
+          GRAFANA_EDITOR_EMAILS: ${{ secrets.GRAFANA_EDITOR_EMAILS }}
+          OBS_DISCORD_WEBHOOK_URL: ${{ needs.classify.outputs.observability_operation == 'full' && secrets.OBS_DISCORD_WEBHOOK_URL || '' }}
+        run: |
+          set -euo pipefail
+          ansible-playbook \
+            -i infra/ansible/inventories/prod \
+            -i "${RUNNER_TEMP}/hosts.runtime.yml" \
+            -e "obs_operation=${OBS_OPERATION}" \
+            -e "obs_verify_scope=${OBS_SCOPE}" \
+            -e '{"obs_require_authoritative_inputs": true}' \
+            infra/ansible/playbooks/observability.yml
+
+      - name: Resumen de observabilidad
+        if: always()
+        env:
+          STAGE: ${{ needs.classify.outputs.stage }}
+          PREFLIGHT: ${{ steps.preflight.outcome }}
+          TRUST: ${{ steps.host_trust.outcome }}
+          POLICY: ${{ steps.policy.outcome }}
+          FRESH: ${{ steps.fresh.outcome }}
+          APPLY: ${{ steps.apply.outcome }}
+        run: |
+          set -uo pipefail
+          if [ "${APPLY}" = success ]; then
+            RESULT="APLICADO"
+          elif [ "${FRESH}" = failure ]; then
+            RESULT="SUPERADO (main avanzó; el stack no se tocó y queda pendiente para el run nuevo)"
+          elif [ "${APPLY}" = failure ]; then
+            RESULT="FALLIDO al aplicar o verificar (ver el paso; el núcleo no cambia)"
+          elif [ "${POLICY}" = failure ]; then
+            RESULT="BLOQUEADO por la política de imágenes (el stack no se tocó)"
+          elif [ "${PREFLIGHT}" = failure ]; then
+            RESULT="RECHAZADO en la comprobación de entradas (el stack no se tocó)"
+          else
+            RESULT="NO APLICADO (falló un paso previo; el stack no se tocó)"
+          fi
+          {
+            echo "## Observabilidad: \`${OBS_OPERATION}\` — ${RESULT}"
+            echo
+            echo "| campo | valor |"
+            echo "|---|---|"
+            echo "| commit | \`${GITHUB_SHA}\` |"
+            if [ "${OBS_OPERATION}" = full ]; then
+              echo "| verificación | \`${OBS_SCOPE}\` (install/integration: también los destinos de la aplicación; changed: se informan sin bloquear) |"
+              echo "| imágenes con identidad nueva | $([ "${OBS_TARGETS:-[]}" = '[]' ] && echo 'ninguna (sin escaneo)' || echo "escaneadas y autorizadas: ${POLICY}") |"
+              echo "| notificaciones | receptor y archivo del webhook verificados en Alertmanager; **entrega a Discord no probada** por este run |"
+            fi
+            echo "| listas de Grafana | aplicadas desde los secretos del environment (sin mostrar correos); el acceso de Cloudflare no cambia |"
+            echo "| progreso del stack | $([ "${APPLY}" = success ] && [ "${OBS_OPERATION}" = full ] && echo 'avanza a este commit (señal Observabilidad procesada)' || echo 'no avanza') |"
+            # Resultado de ESTA operación, no la salud actual del entorno ni un estado global de
+            # la instalación (no se reconstruye de la historia de runs): en Run I lo informa
+            # installation_status; fuera de Run I no hay veredicto de instalación
+            if [ "${STAGE}" = install ]; then
+              echo "| alcance | resultado de la operación del stack en este Run I; el veredicto de la instalación es *Estado de la instalación* |"
+            else
+              echo "| alcance | resultado de esta operación del stack; no evalúa la salud actual del entorno ni declara la instalación completa (un Run I anterior conserva su resultado) |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Señal del progreso del stack: solo una operación full aplicada y verificada en este commit
+  # (push ordinario, dispatch ordinario o Run I). grafana-access no la emite: no procesa los
+  # cambios del repositorio. Sin ella el próximo push vuelve a considerar pendiente el stack.
+  observability_processed:
+    name: Observabilidad procesada
+    runs-on: ubuntu-latest
+    needs: [classify, observability]
+    if: |
+      !cancelled() &&
+      needs.observability.result == 'success' &&
+      needs.classify.outputs.observability_operation == 'full' &&
+      ((github.event_name == 'push' && needs.classify.outputs.stage == 'ordinary') ||
+        (github.event_name == 'workflow_dispatch' &&
+          (needs.classify.outputs.stage == 'ordinary' || needs.classify.outputs.stage == 'install')))
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Registrar observabilidad procesada
+        run: echo "Stack de observabilidad aplicado y verificado en ${GITHUB_SHA}"
+
+  # Resultado de ESTE Run I (no de la historia ni de la salud actual del entorno): READY solo con
+  # el núcleo y el stack de observabilidad completos en este run. Con el núcleo bien y el stack
+  # fallido: INSTALADO / NOT READY (la identidad de la aplicación registrada no cambia); el stack
+  # se completa con un dispatch observability=full, que informa el resultado de esa operación sin
+  # reescribir este run ni declarar la instalación completa.
+  installation_status:
+    name: Estado de la instalación
+    runs-on: ubuntu-latest
+    needs: [classify, conclude, observability]
+    if: always() && needs.classify.result == 'success' && needs.classify.outputs.stage == 'install'
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Evaluar la instalación
+        env:
+          CORE: ${{ needs.conclude.result }}
+          OBS: ${{ needs.observability.result }}
+        run: |
+          set -uo pipefail
+          if [ "${CORE}" = success ] && [ "${OBS}" = success ]; then
+            STATUS="READY"; DETAIL="núcleo, frontend y observabilidad instalados y verificados: lista para la verificación formal"
+          elif [ "${CORE}" = success ]; then
+            STATUS="INSTALADO / NOT READY"; DETAIL="la aplicación quedó instalada y registrada, pero el stack de observabilidad requerido no (resultado: ${OBS}); completar el stack con un dispatch observability=full (su resumen informa esa operación; este run sigue NOT READY)"
+          else
+            STATUS="NO INSTALADO"; DETAIL="el núcleo no terminó (resultado: ${CORE}); repetir Run I"
+          fi
+          {
+            echo "## Instalación: ${STATUS}"
+            echo
+            echo "${DETAIL}."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Instalación: ${STATUS} — ${DETAIL}"
+          [ "${STATUS}" = READY ]
+
   # ── Rango procesado ───────────────────────────────────────────────────────
   # Señal positiva que production-range-base.sh exige para avanzar la base: este push
-  # ordinario recorrió la cadena y conclude la verificó. Solo existe si corrió; un diferido,
-  # un dispatch o un fallo no la dejan. Sin secretos ni permisos. La condición es explícita
+  # ordinario (o un Run I) recorrió la cadena y conclude la verificó. Solo existe si corrió; un
+  # diferido, otro dispatch o un fallo no la dejan. Sin secretos ni permisos. La condición es explícita
   # porque el success() implícito de GitHub salta el job si cualquier dependencia transitiva
   # se saltó, y en un push normal siempre hay jobs saltados.
   range_processed:
     name: Rango procesado
     runs-on: ubuntu-latest
     needs: [classify, conclude]
+    # Un Run I exitoso también procesa el núcleo en su commit: instala todo (production-stage.sh
+    # validate lo exige), con un plan sin cambios y la frescura verificada antes de mutar. Así el
+    # primer push posterior no repite build, migración ni Pages. Ningún otro dispatch lo emite.
     if: |
       !cancelled() &&
-      github.event_name == 'push' &&
       needs.classify.result == 'success' &&
       needs.conclude.result == 'success' &&
-      needs.classify.outputs.stage == 'ordinary'
+      ((github.event_name == 'push' && needs.classify.outputs.stage == 'ordinary') ||
+        (github.event_name == 'workflow_dispatch' && needs.classify.outputs.stage == 'install'))
     timeout-minutes: 2
     permissions: {}
     steps:

@@ -47,6 +47,10 @@ Piedra Azul es una clínica cuyo proceso de agendamiento de citas se ha basado h
 4. Si nadie la captura, un manejador global de respaldo la registra y responde con `500 Internal Server Error` genérico.
 5. El cliente siempre recibe un error con estructura consistente, sin importar su origen.
 
+**Mensajes y registro.** El `detail` de una excepción de negocio es texto redactado para el usuario y llega tal cual. En appointment, medicalCheckup, report y patients, una `RuntimeException` inesperada, sin manejador propio en el módulo, pasa por `buildUnexpectedProblem` y responde `Ocurrió un error inesperado en el servidor.`, sin el texto de la excepción. Los manejadores de esos módulos, el de statistics y el global registran los fallos inesperados en `ERROR` con el id de correlación, el método, la ruta declarada, y la clase y los marcos de cada causa, sin mensajes ni excepciones suprimidas: esos textos pueden traer valores de la petición o de la base de datos. En appointment, medicalCheckup, report y patients, un cuerpo o un parámetro mal formado queda como aviso, sin traza, aunque responda 500.
+
+Los avisos de 404 y 405 solo registran el método, porque la ruta puede traer el documento de un paciente; el aviso de negocio 4xx de patients registra la clase y el `errorCode`, no el mensaje. Una excepción de negocio 5xx de patients conserva en el registro su excepción original, y los demás avisos de excepciones esperadas conservan su texto. La protección se limita a los registros descritos aquí. Otros emisores (Hibernate, Tomcat, tareas programadas, integraciones) y la ruta `/error` de Spring Boot siguen su propia configuración.
+
 ### Despacho de notificaciones
 
 `DueNotificationJob` reclama los schedules vencidos (`FOR UPDATE SKIP LOCKED`, `PENDING` →
@@ -281,6 +285,47 @@ incluida la recuperación, mientras dure.
 - La autenticación y la administración de identidades están delegadas en Keycloak.
 - El backend no almacena ni gestiona contraseñas de los usuarios.
 - Las autorizaciones se aplican en el backend según los roles incluidos en el JWT emitido por Keycloak (ADR-001).
+
+### Correlación de peticiones HTTP
+
+`CorrelationIdFilter` está registrado con prioridad propia, después de `ForwardedHeaderFilter` y antes de Spring Security, así que también cubre sus 401 y 403:
+
+- Un `X-Correlation-Id` entrante solo se conserva si es un UUID canónico (36 caracteres, hexadecimal en minúsculas). Si falta o tiene cualquier otra forma se reemplaza por un UUID nuevo, sin rechazar la petición y sin escribir el valor recibido en ningún lado. El header no admite otros formatos.
+- El id elegido vuelve en el header `X-Correlation-Id` de la respuesta y queda en el MDC (`correlationId`) durante la petición, incluido el despacho a `/error`. El MDC se limpia al terminar, también si la petición falla.
+- Las líneas del log incluyen el id en `logging.pattern.correlation`; fuera de una petición HTTP (tareas programadas, listeners asíncronos) muestran `[-]`.
+- Los registros de auditoría que publican un evento de dominio guardan ese id en `correlation_id`. Los inicios de sesión usan claves propias (`keycloak-session:*`, `keycloak-event:*`) para no guardarse dos veces, y como el filtro solo admite UUID un cliente no puede ocupar esas claves. Fuera de los inicios de sesión el id no se usa para deduplicar ni es único: dos registros pueden compartirlo. Los registros de `@Auditable` no llevan id de correlación.
+- Una petición que `ForwardedHeaderFilter` rechaza por un header `X-Forwarded-*` inválido responde 400 sin este header, porque ese filtro corre primero.
+
+El header no se expone por CORS: un frontend en otro origen no puede leerlo.
+
+### Health y métricas
+
+El health de la aplicación es público y las métricas son privadas. Cada servicio publica sus métricas en un listener propio que no está enrutado por Traefik ni publicado en el host. Un consumidor solo las alcanza desde un contenedor conectado a `piedrazul_net`, por el nombre del contenedor:
+
+| Servicio | Health (contrato del despliegue) | Métricas (formato Prometheus, sin credenciales) | Configuración |
+|---|---|---|---|
+| backend | `:8080/actuator/health`, también público por Traefik (`https://<api>/actuator/health`) | `backend:8081/actuator/prometheus` | `MANAGEMENT_SERVER_PORT` (8081), `MANAGEMENT_EXPOSED_ENDPOINTS` (`health,info,prometheus`) |
+| keycloak | `:9000/health/ready` (healthcheck de Compose) | `keycloak:9000/metrics` | `KC_METRICS_ENABLED`, `KC_HEALTH_ENABLED` |
+| traefik | — | `traefik:8082/metrics` (entrypoint `metrics`) | flags `--metrics.prometheus.*` de `infra/compose/traefik.yml` |
+
+- **Backend.** El Actuator corre en el puerto de gestión (`management.server.port`). `/actuator/health` también se sirve en el puerto de la aplicación (`ApplicationHealthEndpointConfig`): es el mismo endpoint de Spring Boot, con el mismo estado y el mismo 503, y sin detalles para un anónimo (`MANAGEMENT_HEALTH_DETAILS=when-authorized`). Lo consultan el `HEALTHCHECK` de la imagen y la verificación pública de la cadena de producción. En el puerto de la aplicación, `/actuator/prometheus` no existe y su ruta exige `ADMIN` igual que el resto de `/actuator/**`. `SecurityConfig` solo admite Prometheus sin credenciales cuando la petición llega por el listener de gestión. Si los dos puertos llegan a coincidir, las métricas siguen exigiendo `ADMIN`. Los demás endpoints del Actuator (`info`) exigen `ADMIN` en cualquier listener.
+- **Etiquetas.** Las peticiones HTTP se miden por la plantilla de la ruta (`/api/patients/document/{documentNumber}/public`) y nunca por la URL concreta. Una petición rechazada antes de llegar a un controlador queda como `UNKNOWN`. La latencia usa buckets fijos (`management.metrics.distribution.slo`) en lugar del histograma completo. Traefik etiqueta por entrypoint y servicio, no por router. Keycloak no publica métricas de eventos de usuario.
+- **Independencia.** Ningún servicio depende de un recolector de métricas para arrancar ni para quedar healthy. Con la base de datos caída, el health responde 503 y las métricas siguen respondiendo. El puerto de gestión del backend sí debe estar libre: si no puede abrirlo, el backend no arranca.
+
+- **Consumidor.** El stack privado de observabilidad (`infra/observability/`, proyecto Compose `piedrazul-obs`) lee estos tres listeners y el host: Prometheus es su único servicio en `piedrazul_net`. Grafana escucha en loopback del host (túnel SSH); solo con el acceso público habilitado comparte con Traefik la red interna `piedrazul_obs_edge` (la crea `compose/traefik.yml`), por la que Traefik la enruta en `grafana.<dominio>` detrás de Cloudflare Access cuando el inventario lo habilita; Grafana valida el JWT de Access y autoriza por lista. Prometheus evalúa las reglas de alerta y Alertmanager las entrega a Discord cuando se activa (receptor `none` por defecto), con el entorno de origen en cada mensaje. Ver [Métricas](../operations/runbooks/metricas.md), [Acceso a Grafana](../operations/runbooks/grafana-acceso.md) y [Alertas](../operations/runbooks/alertas.md). El monitoreo externo de API, Keycloak y frontend (UptimeRobot) está especificado y no activado: [Monitoreo externo](../operations/runbooks/monitoreo-externo.md).
+
+Verificación local de los contratos: `ManagementListenerBoundaryTest` (los dos listeners sobre Tomcat real), `infra/tests/traefik-config-check.sh` (flags, rutas y, con Docker, el entrypoint de métricas en ejecución) e `infra/tests/metrics-stack-check.sh` (el stack de métricas contra los tres productores reales).
+
+### Logs centralizados
+
+Los logs de los servicios admitidos se centralizan sin tocar la aplicación en ejecución: el servicio escribe en stdout/stderr como siempre, el driver `journald` de Docker (elegido por servicio en `.env` desde la lista `obs_log_services` del inventario y aplicado por `prod.yml` con la base `journald` de `compose/logging.yml`, en modo `non-blocking`; el resto sigue con la configuración del daemon, sin cambios) los deja en el journal persistente del host y Alloy, en el stack privado `piedrazul-obs`, envía a Loki solo los del proyecto y los servicios seleccionados. Loki no está publicado ni en `piedrazul_net`; Grafana lo consulta por la red del stack.
+
+- **Selección.** Una fuente se envía solo si escribe en el journal y está seleccionada, y solo se aceptan entradas que journald atribuye a dockerd (campos `_SYSTEMD_UNIT`, `_COMM`, `_UID`, que un cliente no puede fijar); los campos de Compose de una entrada no prueban por sí solos su origen. Una sola política, aplicada al activar (converge) y al seleccionar (observability): Traefik está admitido y activado por defecto; backend, Keycloak y PostgreSQL quedan condicionados a una decisión de privacidad por servicio (`obs_log_privacy_controls_done`), que es lo único que falta para adoptarlos en operación; las migraciones y el propio stack, excluidos. Un perfil de laboratorio explícito (`logs_lab_authorization=synthetic-data-only`, solo con datos sintéticos) valida esa misma configuración con los cuatro sin tomar la decisión: no es otra arquitectura ni una certificación de privacidad. El filtro de Alloy no limpia el journal: lo escrito queda en el host hasta su rotación.
+- **Etiquetas.** `source`, `service`, `stream` y `level` (solo donde el formato lo expone). Alloy une en una entrada las líneas de continuación (trazas de Java, `DETAIL`/`STATEMENT` de PostgreSQL). El id de correlación del backend (`[<uuid>]`) y el del contenedor van como metadatos, no como etiquetas.
+- **Entrega.** De mejor esfuerzo: puede perderse o repetirse una línea (posiciones de lectura, reintentos acotados, buffer del driver). Retención de 14 días en Loki y de 2 GiB / 7 días en el journal de todo el host; ninguna es un tope del disco.
+- **Independencia.** Ningún servicio de la aplicación depende de Loki ni de Alloy; con Loki caído el driver sigue escribiendo en el journal.
+
+Operación, política de fuentes, límites y retirada: [Logs](../operations/runbooks/logs.md).
 
 ## Despliegue
 

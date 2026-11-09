@@ -1,6 +1,9 @@
 package co.edu.unicauca.piedrazul.backend.config.security;
 
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.boot.actuate.endpoint.web.WebServerNamespace;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -10,6 +13,9 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.AndRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.web.context.support.WebApplicationContextUtils;
 
 @Configuration
 @EnableMethodSecurity
@@ -29,6 +35,7 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(prometheusOnManagementListener()).permitAll()
                         .requestMatchers("/actuator/health", "/error").permitAll()
                         .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
@@ -50,5 +57,17 @@ public class SecurityConfig {
                 );
 
         return http.build();
+    }
+
+    /**
+     * Prometheus raspa sin credenciales porque el listener de gestión no sale de la red privada. El
+     * listener se comprueba aparte: {@code EndpointRequest} también coincidiría en el puerto público
+     * si ambos llegaran a compartirlo, y entonces las métricas quedarían abiertas.
+     */
+    private static RequestMatcher prometheusOnManagementListener() {
+        RequestMatcher managementListener = request -> WebServerApplicationContext.hasServerNamespace(
+                WebApplicationContextUtils.findWebApplicationContext(request.getServletContext()),
+                WebServerNamespace.MANAGEMENT.getValue());
+        return new AndRequestMatcher(managementListener, EndpointRequest.to("prometheus"));
     }
 }

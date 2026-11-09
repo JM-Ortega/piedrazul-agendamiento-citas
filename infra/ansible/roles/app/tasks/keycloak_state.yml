@@ -19,7 +19,10 @@
 #
 #   P2  el schema de Keycloak existe (P-1) y está vacío: Keycloak nunca escribió en él.
 #   P1  base inicializada, sin autoridad temporal, principales técnicos con la forma y los
-#       roles exactos, y la automatización autentica con el secreto deseado y ve el backend.
+#       roles exactos, automatización, backend y frontend con Full Scope Allowed deshabilitado
+#       y exactamente su alcance de roles esperado, con una base >= kc_admin_api_scope_since
+#       el alcance kc-admin-api por defecto en automatización y backend y ausente en el
+#       frontend, y la automatización autentica con el secreto deseado y ve el backend.
 #   P3  cualquier otra cosa observada: desconocido o divergente.
 #   unavailable  Keycloak no respondió a la prueba: falla transitoria, no P3.
 
@@ -47,6 +50,8 @@
       - --set=app_realm={{ kc_realm }}
       - --set=automation_client={{ kc_automation_client_id }}
       - --set=backend_client={{ kc_backend_client_id }}
+      - --set=frontend_client={{ kc_frontend_client_id }}
+      - --set=admin_api_scope={{ kc_admin_api_scope }}
       - --set=owned_temp_regex={{ kc_temp_admin_owned_regex }}
       - --set=platform_admin_username={{ kc_platform_admin_username }}
       - --set=platform_admin_role={{ kc_platform_admin_role }}
@@ -72,6 +77,12 @@
       backend_shape: "{{ _lines | select('match', '^client[.]backend=') | map('regex_replace', '^[^=]+=', '') | first | default('') }}"
       automation_roles: "{{ (_lines | select('match', '^roles[.]automation=') | map('regex_replace', '^[^=]+=', '') | first | default('')).split(',') | reject('equalto', '') | reject('match', '^realm:default-roles-') | sort }}"
       backend_roles: "{{ (_lines | select('match', '^roles[.]backend=') | map('regex_replace', '^[^=]+=', '') | first | default('')).split(',') | reject('equalto', '') | reject('match', '^realm:default-roles-') | sort }}"
+      # Alcance de roles por cliente propio presente: full:<true|false>;<rol>,<rol> (asignaciones
+      # directas). Un cliente ausente no tiene entrada.
+      scopes: "{{ dict(_scope | map('regex_replace', '^scope[.]([a-z]+)=.*$', '\\1') | zip(_scope | map('regex_replace', '^[^=]+=', ''))) }}"
+      # Asignación de kc_admin_api_scope por cliente propio presente: default | optional |
+      # default+optional | none
+      admin_api: "{{ dict(_admin_api | map('regex_replace', '^admin_api[.]([a-z]+)=.*$', '\\1') | zip(_admin_api | map('regex_replace', '^[^=]+=', ''))) }}"
       master_admin_users: "{{ _lines | select('match', '^master_admin_users=') | map('regex_replace', '^[^=]+=', '') | first | default('0') | int }}"
       # absent | enabled:<b>,local:<b>,temporary:<b>,role:<b>,actions:<a+b>,password:<n>,otp:<n>
       platform_admin: "{{ _lines | select('match', '^platform_admin=') | map('regex_replace', '^[^=]+=', '') | first | default('') }}"
@@ -83,6 +94,18 @@
       smtp_settings: "{{ _lines | select('match', '^smtp[.]') | sort }}"
   vars:
     _lines: "{{ app_kc_db_probe.stdout_lines }}"
+    _scope: "{{ _lines | select('match', '^scope[.](automation|backend|frontend)=full:(true|false);') | list }}"
+    _admin_api: "{{ _lines | select('match', '^admin_api[.](automation|backend|frontend)=') | list }}"
+
+# La API de administración exige kc_admin_api_scope desde kc_admin_api_scope_since: el requisito
+# sigue a la versión que migró la base (una base que todavía no migró no lo tiene). Con una
+# versión desconocida keycloak_lifecycle.yml ya falla cerrado.
+- name: Decidir si se exige el alcance de la API de administración
+  ansible.builtin.set_fact:
+    app_kc_admin_api_required: >-
+      {{ app_kc_observed.schema == 'initialized'
+         and app_kc_observed.migration_version is match('^[0-9]+\.[0-9]+\.[0-9]+\Z')
+         and app_kc_observed.migration_version is version(kc_admin_api_scope_since, '>=') }}
 
 - name: Verificar que la lectura de la base fue concluyente
   ansible.builtin.assert:
@@ -160,6 +183,8 @@
          + (['falta el realm ' ~ kc_realm] if o.schema == 'initialized' and kc_realm not in o.realms else [])
          + (['falta el cliente ' ~ kc_backend_client_id ~ ' en ' ~ kc_realm]
               if o.schema == 'initialized' and kc_realm in o.realms and not o.backend_shape else [])
+         + (['falta el cliente ' ~ kc_frontend_client_id ~ ' en ' ~ kc_realm]
+              if o.schema == 'initialized' and kc_realm in o.realms and 'frontend' not in o.scopes else [])
          + (['autoridad temporal ajena o ambigua presente (' ~ o.temporary_foreign | length ~ '): '
               ~ (o.temporary_foreign | map('regex_replace', ':[^:]+$', '') | join(', '))] if o.temporary_foreign else []) }}
   vars:
@@ -180,10 +205,41 @@
          + (['forma del cliente ' ~ kc_backend_client_id ~ ' divergente: ' ~ o.backend_shape]
               if o.backend_shape and o.backend_shape != e.backend_shape else [])
          + (['roles del service account de ' ~ kc_backend_client_id ~ ' divergentes: ' ~ (o.backend_roles | join(',') or 'ninguno')]
-              if o.backend_shape and o.backend_roles != e.backend_roles else []) }}
+              if o.backend_shape and o.backend_roles != e.backend_roles else [])
+         + _scope_reasons + _admin_api_reasons }}
   vars:
     o: "{{ app_kc_observed }}"
     e: "{{ app_kc_expected }}"
+    # Desde kc_admin_api_scope_since: automatización y backend con kc_admin_api_scope por
+    # defecto (sin él la API los rechaza con 401), frontend sin él (ni por defecto ni opcional)
+    _admin_api_reasons: >-
+      {%- set out = [] -%}
+      {%- if app_kc_admin_api_required | bool -%}
+        {%- for label, client, want, present in [['automation', kc_automation_client_id, 'default', o.automation_shape | length > 0],
+                                                 ['backend', kc_backend_client_id, 'default', o.backend_shape | length > 0],
+                                                 ['frontend', kc_frontend_client_id, 'none', 'frontend' in o.scopes]] if present -%}
+          {%- set have = o.admin_api[label] | default('?') -%}
+          {%- if have != want -%}
+            {%- set _ = out.append('alcance ' ~ kc_admin_api_scope ~ ' de ' ~ client ~ ' divergente: ' ~ have ~ ' (esperado: ' ~ want ~ ')') -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endif -%}
+      {{ out }}
+    # Alcance de roles de cada cliente propio presente: Full Scope Allowed habilitado, roles que
+    # faltan o sobran respecto del esperado. Conjuntos ordenados: el orden no es divergencia.
+    _scope_reasons: >-
+      {%- set out = [] -%}
+      {%- for label, client in [['automation', kc_automation_client_id], ['backend', kc_backend_client_id], ['frontend', kc_frontend_client_id]] if label in o.scopes -%}
+        {%- set raw = o.scopes[label] -%}
+        {%- set have = raw.split(';', 1)[1].split(',') | reject('equalto', '') | unique | sort -%}
+        {%- set want = e['scope_' ~ label] -%}
+        {%- set d = [] -%}
+        {%- if raw.split(';', 1)[0] != 'full:false' -%}{%- set _ = d.append('Full Scope Allowed habilitado') -%}{%- endif -%}
+        {%- if want | difference(have) -%}{%- set _ = d.append('faltan ' ~ (want | difference(have) | sort | join(','))) -%}{%- endif -%}
+        {%- if have | difference(want) -%}{%- set _ = d.append('sobran ' ~ (have | difference(want) | sort | join(','))) -%}{%- endif -%}
+        {%- if d -%}{%- set _ = out.append('alcance de roles de ' ~ client ~ ' divergente: ' ~ (d | join('; '))) -%}{%- endif -%}
+      {%- endfor -%}
+      {{ out }}
 
 # Solo si la estructura ya es la esperada: la credencial deseada decide entre P1 y P3
 - name: Probar la credencial de automatización

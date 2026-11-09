@@ -1,0 +1,34 @@
+{{/*
+  Mensajes de Discord. El título empieza por el entorno de origen (etiqueta externa environment de
+  Prometheus, OBS_ENVIRONMENT): varios entornos pueden compartir un webhook. Solo usan además el
+  nombre de la alerta, su severidad y las anotaciones summary y
+  description de prometheus/rules: etiquetas acotadas, sin datos de pacientes ni de usuarios. El
+  enlace no se incluye: Grafana y Prometheus no son públicos (o están tras Access).
+*/}}
+{{/*
+  Severidad: critical 🔴 y warning 🟠 son incidentes ([FIRING]); info 🔵 es informativa ([INFO]:
+  ninguna regla la usa hoy; p. ej. una prueba manual con amtool) y no pide acción. Una alerta sin
+  severidad o con otra se trata como incidente (🔴). Al resolverse, un incidente lleva ✅; una
+  informativa, ⚪ y su descripción, que dice qué significa que deje de estar activa.
+  El color del embed lo fija Alertmanager (rojo en firing, verde resuelta) y no es configurable.
+*/}}
+{{ define "piedrazul.discord.title" -}}
+[{{ with .CommonLabels.environment }}{{ . }}{{ else }}sin-entorno{{ end }}] [{{ if eq .Status "firing" }}{{ if eq .CommonLabels.severity "info" }}INFO{{ else }}FIRING{{ end }}{{ else }}RESUELTA{{ end }}{{ if gt (len .Alerts.Firing) 1 }} ×{{ len .Alerts.Firing }}{{ end }}] {{ .CommonLabels.alertname }}{{ with .CommonLabels.severity }} ({{ . }}){{ end }}
+{{- end }}
+
+{{ define "piedrazul.discord.message" -}}
+{{ range .Alerts.Firing -}}
+{{ if eq .Labels.severity "info" }}🔵{{ else if eq .Labels.severity "warning" }}🟠{{ else }}🔴{{ end }} {{ .Annotations.summary }}
+{{ .Annotations.description }}
+Desde: {{ .StartsAt.Format "2006-01-02 15:04 MST" }}
+{{ end -}}
+{{ range .Alerts.Resolved -}}
+{{ if eq .Labels.severity "info" -}}
+⚪ {{ .Annotations.summary }}: ya no está activa
+{{ .Annotations.description }}
+{{ else -}}
+✅ {{ .Annotations.summary }}
+{{ end -}}
+Resuelta: {{ .EndsAt.Format "2006-01-02 15:04 MST" }}
+{{ end -}}
+{{- end }}

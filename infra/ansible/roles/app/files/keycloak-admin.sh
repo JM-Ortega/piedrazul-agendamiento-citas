@@ -7,8 +7,10 @@
 #   probe      automatización: ¿autentica y ve el cliente backend? (clasificación P1/P3)
 #   reconcile  automatización: secreto del backend = deseado; verifica que el backend autentica
 #              con él y llega a la API de administración (su consumidor real)
-#   establish  autoridad temporal: principal de automatización (forma, secreto, roles) y forma
-#              y roles del backend
+#   establish  autoridad temporal: principal de automatización (forma, secreto, roles), forma
+#              y roles del backend, alcance de roles explícito de los clientes propios y el
+#              alcance kc-admin-api de la API de administración (Keycloak >= 26.8.2); termina
+#              con una operación real de la API como automatización
 #   cleanup    autoridad temporal: elimina toda autoridad temporal listada (la propia al final)
 #              y verifica que la propia ya no autentica
 #   platform-admin  autoridad temporal, solo P2: crea el administrador humano permanente de
@@ -35,7 +37,13 @@
 #   KCL_AUTOMATION_ROLES_ADD/_REMOVE,
 #   KCL_BACKEND_ROLES_ADD/_REMOVE             establish: <clientId>:<rol> o realm:<rol>, por comas
 #   KCL_BACKEND_SHAPE                         establish: JSON con las banderas del backend
-#   KCL_TEMPORARY_PRINCIPALS                  cleanup: <client|user>:<nombre>:<uuid>, por comas
+#   KCL_SCOPES                                establish: alcance de roles deseado por cliente,
+#                                             <realm>|<clientId>|<rol>,<rol>;… (<rol> como arriba)
+#   KCL_ADMIN_API_SCOPE                       establish: client scope incorporado (kc-admin-api)
+#   KCL_ADMIN_API_GRANT, KCL_ADMIN_API_DENY   establish: <realm>|<clientId>;… que lo llevan como
+#                                             alcance por defecto / que nunca lo llevan. Vacíos
+#                                             (Keycloak anterior a 26.8.2): no se toca
+#   KCL_TEMPORARY_PRINCIPALS                 cleanup: <client|user>:<nombre>:<uuid>, por comas
 #   KCL_TEMP_CLIENT_ID, KCL_TEMP_SECRET,
 #   KCL_PLATFORM_ADMIN_USERNAME, KCL_PLATFORM_ADMIN_ROLE,
 #   KCL_PLATFORM_ADMIN_PASSWORD, KCL_PLATFORM_ADMIN_CREDENTIAL_JSON_B64,
@@ -137,6 +145,151 @@ smtp() {
   echo "smtp.update=applied"
 }
 
+# Alcance de roles explícito (Full Scope Allowed deshabilitado) de los clientes propios. Solo con
+# la autoridad temporal, dentro de establish: la convergencia P1 nunca lo escribe.
+#
+# scope_mapped <uuid del cliente> <realm> → realm:<rol> y <clientId>:<rol>, uno por línea.
+# Son las asignaciones directas (sin expandir compuestos). Sin jq: no está en la imagen.
+scope_mapped() {
+  local raw names c cid
+  names="$(as temp get "clients/$1/scope-mappings/realm" -r "$2" --fields name --format csv --noquotes)" || return 1
+  [ -z "${names}" ] || sed 's/^/realm:/' <<< "${names}"
+  raw="$(as temp get "clients/$1/scope-mappings" -r "$2")" || return 1
+  for c in $(grep -o '"client" *: *"[^"]*"' <<< "${raw}" | sed 's/.*"\([^"]*\)"$/\1/'); do
+    cid="$(client_uuid temp "$2" "${c}")" && [ -n "${cid}" ] || return 1
+    names="$(as temp get "clients/$1/scope-mappings/clients/${cid}" -r "$2" --fields name --format csv --noquotes)" || return 1
+    [ -z "${names}" ] || sed "s/^/${c}:/" <<< "${names}"
+  done
+}
+
+# scope_role <add|remove> <realm> <uuid del cliente> <rol>
+scope_role() {
+  local owner="${4%%:*}" role="${4#*:}" path body oid
+  if [ "${owner}" = realm ]; then
+    path=realm
+    body="$(as temp get "roles/${role}" -r "$2")" || die "scope_role:$4"
+  else
+    oid="$(client_uuid temp "$2" "${owner}")" && [ -n "${oid}" ] || die "scope_role_client:$4"
+    path="clients/${oid}"
+    body="$(as temp get "clients/${oid}/roles/${role}" -r "$2")" || die "scope_role:$4"
+  fi
+  printf '[%s]' "${body}" | as temp "$([ "$1" = add ] && echo create || echo delete)" \
+    "clients/$3/scope-mappings/${path}" -r "$2" -f - || die "scope_$1:$4"
+}
+
+# Orden seguro por cliente: agregar lo que falta → deshabilitar Full Scope Allowed → quitar lo que
+# sobra → releer. Este orden no introduce por sí mismo un estado con Full Scope deshabilitado y
+# roles faltantes: si el cliente partía con su autoridad completa (Full Scope habilitado o su
+# alcance completo), una interrupción lo deja con al menos esa autoridad. Un cliente que ya
+# partía de un estado defectuoso (p. ej. Full Scope deshabilitado sin sus roles) puede seguir
+# sin la autoridad necesaria hasta que un evento termine. Repetirlo parte del estado leído,
+# completa lo pendiente y no cambia lo que ya es correcto.
+# Por eso fullScopeAllowed nunca va en la forma (KCL_BACKEND_SHAPE ni la de la automatización):
+# esa escritura ocurre antes de que existan los roles.
+scopes() {
+  local entry realm client want id have full changed spec
+  IFS=';' read -ra entries <<< "${KCL_SCOPES:-}"
+  for entry in "${entries[@]}"; do
+    [ -n "${entry}" ] || continue
+    IFS='|' read -r realm client want <<< "${entry}"
+    id="$(client_uuid temp "${realm}" "${client}")" || die "scope_lookup:${client}"
+    [ -n "${id}" ] || die "scope_client_absent:${client}"
+    want="$(tr ',' '\n' <<< "${want}" | sed '/^$/d' | LC_ALL=C sort -u)"
+    have="$(scope_mapped "${id}" "${realm}")" || die "scope_read:${client}"
+    have="$(sed '/^$/d' <<< "${have}" | LC_ALL=C sort -u)"
+    changed=no
+    for spec in $(LC_ALL=C comm -23 <(echo "${want}") <(echo "${have}")); do
+      scope_role add "${realm}" "${id}" "${spec}"; changed=yes
+    done
+    full="$(as temp get "clients/${id}" -r "${realm}" --fields fullScopeAllowed --format csv --noquotes)" || die "scope_read:${client}"
+    if [ "${full}" != false ]; then
+      as temp update "clients/${id}" -r "${realm}" -s fullScopeAllowed=false || die "scope_full:${client}"; changed=yes
+    fi
+    for spec in $(LC_ALL=C comm -13 <(echo "${want}") <(echo "${have}")); do
+      scope_role remove "${realm}" "${id}" "${spec}"; changed=yes
+    done
+    have="$(scope_mapped "${id}" "${realm}")" || die "scope_read:${client}"
+    [ "$(sed '/^$/d' <<< "${have}" | LC_ALL=C sort -u)" = "${want}" ] || die "scope_readback:${client}"
+    full="$(as temp get "clients/${id}" -r "${realm}" --fields fullScopeAllowed --format csv --noquotes)" || die "scope_read:${client}"
+    [ "${full}" = false ] || die "scope_readback_full:${client}"
+    echo "scope.${client}=$([ "${changed}" = yes ] && echo updated || echo unchanged)"
+  done
+}
+
+# Alcance de la API de administración (Keycloak >= 26.8.2): la API exige que el token traiga la
+# audiencia y el alcance del client scope incorporado kc-admin-api. Keycloak lo crea en cada
+# realm (también en uno importado, después de importar sus clientes: una referencia en el JSON
+# del realm se ignora) y solo lo asigna a admin-cli, security-admin-console y la autoridad
+# temporal de bootstrap-admin. Se usa ese scope tal cual (nunca uno propio con la misma
+# audiencia, que Keycloak rechaza) y solo se toca su asignación en los clientes listados: los
+# demás alcances de cada cliente no se leen ni cambian. Por defecto y no opcional: kcadm y el
+# cliente de administración del backend no piden alcances. No agrega roles.
+#
+# admin_api_list <realm> <uuid del cliente> <default|optional> → nombres de sus alcances
+admin_api_list() { as temp get "clients/$2/$3-client-scopes" -r "$1" --fields name --format csv --noquotes; }
+
+# admin_api_has <lista> → 0 si el alcance está en la lista
+admin_api_has() { grep -qxF "${KCL_ADMIN_API_SCOPE}" <<< "$1"; }
+
+# admin_api_scope_id <realm> → id del único client scope con ese nombre en el realm
+admin_api_scope_id() {
+  local rows sid name found=""
+  rows="$(as temp get client-scopes -r "$1" --fields id,name --format csv --noquotes)" || return 1
+  # Sin awk (no está en la imagen): nombre exacto, un único scope
+  while IFS=, read -r sid name; do
+    [ "${name}" = "${KCL_ADMIN_API_SCOPE}" ] || continue
+    [ -z "${found}" ] || return 1
+    found="${sid}"
+  done <<< "${rows}"
+  [ -n "${found}" ] || return 1
+  echo "${found}"
+}
+
+admin_api() {
+  [ -n "${KCL_ADMIN_API_GRANT:-}${KCL_ADMIN_API_DENY:-}" ] || return 0
+  : "${KCL_ADMIN_API_SCOPE:?}"
+  local entry realm client id sid def opt changed kind
+  IFS=';' read -ra entries <<< "${KCL_ADMIN_API_GRANT:-}"
+  for entry in "${entries[@]}"; do
+    [ -n "${entry}" ] || continue
+    IFS='|' read -r realm client <<< "${entry}"
+    sid="$(admin_api_scope_id "${realm}")" || die "admin_api_scope_absent:${realm}"
+    id="$(client_uuid temp "${realm}" "${client}")" || die "admin_api_lookup:${client}"
+    [ -n "${id}" ] || die "admin_api_client_absent:${client}"
+    changed=no
+    opt="$(admin_api_list "${realm}" "${id}" optional)" || die "admin_api_read:${client}"
+    if admin_api_has "${opt}"; then
+      as temp delete "clients/${id}/optional-client-scopes/${sid}" -r "${realm}" || die "admin_api_optional:${client}"; changed=yes
+    fi
+    def="$(admin_api_list "${realm}" "${id}" default)" || die "admin_api_read:${client}"
+    if ! admin_api_has "${def}"; then
+      as temp update "clients/${id}/default-client-scopes/${sid}" -r "${realm}" || die "admin_api_add:${client}"; changed=yes
+    fi
+    def="$(admin_api_list "${realm}" "${id}" default)" && opt="$(admin_api_list "${realm}" "${id}" optional)" \
+      || die "admin_api_read:${client}"
+    admin_api_has "${def}" && ! admin_api_has "${opt}" || die "admin_api_readback:${client}"
+    echo "admin_api.${client}=$([ "${changed}" = yes ] && echo updated || echo unchanged)"
+  done
+  IFS=';' read -ra entries <<< "${KCL_ADMIN_API_DENY:-}"
+  for entry in "${entries[@]}"; do
+    [ -n "${entry}" ] || continue
+    IFS='|' read -r realm client <<< "${entry}"
+    id="$(client_uuid temp "${realm}" "${client}")" || die "admin_api_lookup:${client}"
+    [ -n "${id}" ] || die "admin_api_client_absent:${client}"
+    changed=no
+    for kind in default optional; do
+      def="$(admin_api_list "${realm}" "${id}" "${kind}")" || die "admin_api_read:${client}"
+      if admin_api_has "${def}"; then
+        sid="$(admin_api_scope_id "${realm}")" || die "admin_api_scope_absent:${realm}"
+        as temp delete "clients/${id}/${kind}-client-scopes/${sid}" -r "${realm}" || die "admin_api_remove:${client}"; changed=yes
+      fi
+      def="$(admin_api_list "${realm}" "${id}" "${kind}")" || die "admin_api_read:${client}"
+      ! admin_api_has "${def}" || die "admin_api_readback:${client}"
+    done
+    echo "admin_api.${client}=$([ "${changed}" = yes ] && echo removed || echo absent)"
+  done
+}
+
 establish() {
   : "${KCL_TEMP_CLIENT_ID:?}" "${KCL_AUTOMATION_SECRET:?}" "${KCL_AUTOMATION_SECRET_JSON_B64:?}" "${KCL_BACKEND_SHAPE:?}"
   login temp master "${KCL_TEMP_CLIENT_ID}" KCL_TEMP_SECRET || die temp_login
@@ -168,8 +321,15 @@ establish() {
   roles temp remove-roles "${KCL_REALM}" "service-account-${KCL_BACKEND_CLIENT_ID}" "${KCL_BACKEND_ROLES_REMOVE:-}"
   roles temp add-roles "${KCL_REALM}" "service-account-${KCL_BACKEND_CLIENT_ID}" "${KCL_BACKEND_ROLES_ADD:-}"
 
-  # La automatización queda operativa antes de retirar la autoridad temporal
+  # Después de los roles asignados (ver el orden seguro en scopes)
+  scopes
+  admin_api
+  # La automatización queda operativa antes de retirar la autoridad temporal: autentica y la
+  # API de administración acepta su token (con 26.8.2+, solo con kc-admin-api)
   login automation master "${KCL_AUTOMATION_CLIENT_ID}" KCL_AUTOMATION_SECRET || die automation_login
+  id="$(client_uuid automation "${KCL_REALM}" "${KCL_BACKEND_CLIENT_ID}")" || die automation_admin_api
+  [ -n "${id}" ] || die automation_admin_api_backend_absent
+  echo "automation.admin_api=ok"
 }
 
 cleanup() {

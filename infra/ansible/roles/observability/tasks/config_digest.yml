@@ -1,0 +1,44 @@
+# Digest de la configuración que cada servicio lee al arrancar, calculado sobre los archivos
+# finales del HOST (después de copiar y de retirar lo que el repositorio ya no tiene): ruta
+# relativa y contenido de cada archivo, en orden fijo. Va a .env como OBS_DIGEST_<SERVICIO> y
+# compose.yml lo pone como etiqueta del servicio, así que `up` recrea exactamente los servicios
+# cuya configuración cambió, también en un reintento: si un run anterior escribió los archivos y
+# se interrumpió antes de recrear, el digest del host ya no es el de la etiqueta del contenedor.
+# Solo configuración no secreta y pública (del repositorio); los secretos se activan por inodo
+# (activate_secrets.yml), sin derivar nada de su contenido.
+
+- name: Calcular el digest de la configuración en el host
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail;
+      cd {{ obs_dir | quote }} &&
+      find {{ item.value | map('quote') | join(' ') }} -type f -print0
+      | LC_ALL=C sort -z | xargs -0 -r sha256sum | sha256sum | cut -d' ' -f1
+    executable: /bin/bash
+  loop: "{{ obs_config_digest_dirs | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  register: obs_digest_cmd
+  changed_when: false
+
+- name: Fijar los digests de la configuración
+  ansible.builtin.set_fact:
+    obs_config_digests: "{{ dict(obs_digest_cmd.results | map(attribute='item.key') | zip(obs_digest_cmd.results | map(attribute='stdout'))) }}"
+
+- name: Exigir digests válidos
+  ansible.builtin.assert:
+    that: obs_config_digests.values() | reject('match', '^[0-9a-f]{64}$') | list | length == 0
+    fail_msg: "No se pudo calcular el digest de la configuración de {{ obs_config_digests }}."
+    quiet: true
+
+- name: Mantener los digests en .env
+  ansible.builtin.lineinfile:
+    path: "{{ obs_dir }}/.env"
+    regexp: "^OBS_DIGEST_{{ item.key | upper }}="
+    line: "OBS_DIGEST_{{ item.key | upper }}={{ item.value }}"
+    owner: "{{ obs_env_owner }}"
+    group: "{{ obs_env_owner }}"
+    mode: "0600"
+  loop: "{{ obs_config_digests | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"

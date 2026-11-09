@@ -1,0 +1,17 @@
+---
+# Segundo paso de la retirada de los logs del stack piedrazul-obs, después de repetir
+# observability.yml desde la versión sin logs (si no, falla sin cambiar nada): retira la fuente
+# de datos Loki de Grafana, Loki y su configuración, las variables de logs de .env y el drop-in
+# de journald (que reinicia journald). Con -e obs_logs_purge=true borra además los volúmenes de
+# Loki y Alloy. No modifica la aplicación ni los volúmenes de Prometheus y Grafana.
+# Procedimiento: docs/operations/runbooks/logs.md, "Retirada".
+
+- name: Retirada de los logs
+  hosts: vps
+  gather_facts: false
+
+  tasks:
+    - name: Retirar Loki y el drop-in de journald
+      ansible.builtin.include_role:
+        name: observability
+        tasks_from: rollback_logs.yml

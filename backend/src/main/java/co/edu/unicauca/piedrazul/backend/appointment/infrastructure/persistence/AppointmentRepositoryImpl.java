@@ -25,6 +25,9 @@ import java.util.UUID;
 
 public class AppointmentRepositoryImpl implements AppointmentRepository {
 
+    /** Propiedad única de la entidad: último criterio de orden para que la paginación sea estable. */
+    private static final String ID_PROPERTY = "idAppointment";
+
     private final AppointmentJpaRepository jpaRepository;
     private final AppointmentMapper mapper;
 
@@ -131,12 +134,16 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
 
     private Sort buildDeterministicSort(PageQuery pageQuery) {
         Sort.Direction direction = pageQuery.ascending() ? Sort.Direction.ASC : Sort.Direction.DESC;
-        Sort primary = Sort.by(direction, pageQuery.sortBy());
+        String sortBy = pageQuery.sortBy();
+        Sort sort = Sort.by(direction, sortBy);
 
-        if ("date".equals(pageQuery.sortBy())) {
-            return primary.and(Sort.by(Sort.Direction.ASC, "startTime"));
+        // Desempates fijos (ASC); se omiten los que ya son el criterio principal para no repetir propiedades.
+        for (String tieBreaker : List.of("date", "startTime", ID_PROPERTY)) {
+            if (!tieBreaker.equals(sortBy)) {
+                sort = sort.and(Sort.by(Sort.Direction.ASC, tieBreaker));
+            }
         }
-        return primary.and(Sort.by(Sort.Direction.ASC, "date")).and(Sort.by(Sort.Direction.ASC, "startTime"));
+        return sort;
     }
 
     @Override
@@ -191,7 +198,7 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
                     .when(cb.equal(root.get("appointmentState"), AppointmentState.CANCELADA), 4)
                     .otherwise(5);
 
-            query.orderBy(cb.asc(priority), cb.asc(root.get("startTime")));
+            query.orderBy(cb.asc(priority), cb.asc(root.get("startTime")), cb.asc(root.get(ID_PROPERTY)));
             return cb.conjunction();
         };
     }

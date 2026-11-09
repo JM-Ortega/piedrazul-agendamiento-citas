@@ -1,0 +1,115 @@
+# Comprueba la canalización de logs desde dentro de los contenedores (Loki y Alloy no están
+# publicados): Loki listo, Alloy leyendo el journal y Grafana con la fuente de datos de Loki. No
+# exige que una fuente seleccionada haya escrito (puede estar callada ni que el driver journald
+# esté activado en ella): eso lo prueba infra/tests/logs-e2e-lab.sh.
+#
+# Loki y Alloy se piden por nombre absoluto (loki., alloy.): el wget de busybox de la imagen de
+# Prometheus no resuelve un nombre corto si el resolv.conf del contenedor trae "search .", que
+# Docker copia del host con systemd-resolved sin dominios de búsqueda (Ubuntu 24.04 en Hetzner).
+# El DNS interno de Docker responde igual el nombre absoluto. Prometheus (resolución de Go) lee
+# esos destinos con nombre corto sin problema: afecta solo a estas sondas.
+
+- name: Esperar a que Loki esté listo
+  ansible.builtin.command:
+    argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
+           exec, -T, prometheus, wget, -qO-, "http://loki.:3100/ready"]
+    chdir: "{{ obs_dir }}"
+  register: obs_loki_ready
+  changed_when: false
+  # Arranque con reproducción del WAL incluida
+  until: obs_loki_ready.rc == 0 and obs_loki_ready.stdout | trim == 'ready'
+  retries: 24
+  delay: 5
+  failed_when: false
+
+- name: Loki listo
+  ansible.builtin.assert:
+    that: obs_loki_ready.rc == 0 and obs_loki_ready.stdout | trim == 'ready'
+    fail_msg: >-
+      Loki no respondió ready en 2 minutos ({{ obs_loki_ready.stdout | default('') | trim }}).
+      Diagnóstico: docker compose logs loki (en {{ obs_dir }}). El resto del stack quedó
+      levantado; la aplicación no se tocó.
+    quiet: true
+
+# El propio run genera entradas en el journal (sesión SSH, sudo): con la lectura funcionando el
+# contador pasa de 0 en segundos. Un componente sano no basta: con los archivos ilegibles sigue
+# sano y no lee nada.
+- name: Leer el estado de la lectura del journal en Alloy
+  ansible.builtin.command:
+    argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
+           exec, -T, prometheus, wget, -qO-, "http://alloy.:12345/api/v0/web/components"]
+    chdir: "{{ obs_dir }}"
+  register: obs_alloy_components
+  changed_when: false
+  until: >-
+    obs_alloy_components.rc == 0 and
+    (obs_alloy_components.stdout | from_json | selectattr('localID', 'equalto', 'loki.source.journal.host')
+     | map(attribute='health.state') | list) == ['healthy']
+  retries: 12
+  delay: 5
+  failed_when: false
+
+- name: Alloy lee el journal
+  ansible.builtin.assert:
+    that:
+      - obs_alloy_components.rc == 0
+      - >-
+        (obs_alloy_components.stdout | from_json | selectattr('localID', 'equalto', 'loki.source.journal.host')
+         | map(attribute='health.state') | list) == ['healthy']
+    fail_msg: >-
+      loki.source.journal no está sano:
+      {{ ((obs_alloy_components.stdout or '[]') | from_json
+          | selectattr('localID', 'equalto', 'loki.source.journal.host')
+          | map(attribute='health') | list) }}.
+      Revisar OBS_JOURNAL_GID en {{ obs_dir }}/.env (GID {{ obs_journal_gid }}) y el journal
+      persistente. Las métricas del host siguen funcionando.
+    quiet: true
+
+- name: Leer las entradas leídas del journal
+  ansible.builtin.command:
+    argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
+           exec, -T, prometheus, wget, -qO-, "http://alloy.:12345/metrics"]
+    chdir: "{{ obs_dir }}"
+  register: obs_alloy_metrics
+  changed_when: false
+  until: >-
+    obs_alloy_metrics.rc == 0 and
+    (obs_alloy_metrics.stdout_lines | select('match', '^loki_source_journal_target_lines_total\{')
+     | map('split', ' ') | map('last') | map('float') | sum) > 0
+  retries: 12
+  delay: 5
+  failed_when: false
+
+- name: Alloy leyó entradas del journal
+  ansible.builtin.assert:
+    that:
+      - obs_alloy_metrics.rc == 0
+      - >-
+        (obs_alloy_metrics.stdout_lines | select('match', '^loki_source_journal_target_lines_total\{')
+         | map('split', ' ') | map('last') | map('float') | sum) > 0
+    fail_msg: >-
+      Alloy no leyó ninguna entrada del journal en 1 minuto con el componente sano: casi
+      siempre, archivos del journal ilegibles para Alloy (sd-journal los omite sin error).
+      Revisar OBS_JOURNAL_GID={{ obs_journal_gid }} en {{ obs_dir }}/.env frente al grupo de
+      los archivos (ls -ln {{ obs_journal_stat.stat.path }}) y que el journal reciba entradas
+      (journalctl -n 5).
+    quiet: true
+
+- name: Leer la salud de la fuente de datos Loki en Grafana
+  ansible.builtin.command:
+    argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
+           exec, -T, grafana, sh, -c,
+           'wget -qO- --header "Authorization: Basic $(printf "admin:%s" "$GF_SECURITY_ADMIN_PASSWORD" | base64)" "http://localhost:3000/api/datasources/uid/loki/health"']
+    chdir: "{{ obs_dir }}"
+  register: obs_loki_ds
+  changed_when: false
+  until: obs_loki_ds.rc == 0 and (obs_loki_ds.stdout | from_json).status | default('') == 'OK'
+  retries: 12
+  delay: 5
+  failed_when: false
+
+- name: Fuente de datos Loki sana en Grafana
+  ansible.builtin.assert:
+    that: obs_loki_ds.rc == 0 and (obs_loki_ds.stdout | from_json).status | default('') == 'OK'
+    fail_msg: "Grafana no alcanza Loki: {{ obs_loki_ds.stdout | default('') }}"
+    quiet: true

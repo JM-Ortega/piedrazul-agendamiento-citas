@@ -478,7 +478,8 @@
   "webAuthnPolicyPasswordlessRpId": "",
   "webAuthnPolicyPasswordlessAttestationConveyancePreference": "not specified",
   "webAuthnPolicyPasswordlessAuthenticatorAttachment": "not specified",
-  "webAuthnPolicyPasswordlessRequireResidentKey": "Yes",
+  "webAuthnPolicyPasswordlessRequireResidentKey": "not specified",
+  "webAuthnPolicyPasswordlessResidentKey": "required",
   "webAuthnPolicyPasswordlessUserVerificationRequirement": "required",
   "webAuthnPolicyPasswordlessCreateTimeout": 0,
   "webAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister": false,
@@ -513,6 +514,10 @@
     {
       "clientScope": "offline_access",
       "roles": ["offline_access"]
+    },
+    {
+      "client": "piedrazul-frontend",
+      "roles": ["ADMIN", "SCHEDULER", "DOCTOR", "PATIENT", "AUDITOR"]
     }
   ],
   "clientScopeMappings": {
@@ -520,6 +525,12 @@
       {
         "client": "account-console",
         "roles": ["manage-account", "view-groups"]
+      }
+    ],
+    "realm-management": [
+      {
+        "client": "piedrazul-backend",
+        "roles": ["view-realm", "view-users", "query-users", "manage-users", "view-events"]
       }
     ]
   },
@@ -747,7 +758,7 @@
         "dpop.bound.access.tokens": "false"
       },
       "authenticationFlowBindingOverrides": {},
-      "fullScopeAllowed": true,
+      "fullScopeAllowed": false,
       "nodeReRegistrationTimeout": -1,
       "defaultClientScopes": [
         "service_account",
@@ -811,7 +822,7 @@
         "dpop.bound.access.tokens": "false"
       },
       "authenticationFlowBindingOverrides": {},
-      "fullScopeAllowed": true,
+      "fullScopeAllowed": false,
       "nodeReRegistrationTimeout": -1,
       "defaultClientScopes": [
         "web-origins",

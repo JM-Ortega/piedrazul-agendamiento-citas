@@ -1,0 +1,110 @@
+# Journal persistente del host para Alloy: drop-in propio de journald (alcance: todo el host) y
+# descubrimiento del grupo dueño de los archivos del journal, que Alloy recibe como grupo
+# suplementario (OBS_JOURNAL_GID en .env). No cambia la configuración del daemon de Docker ni
+# otras unidades.
+
+- name: Crear el directorio de drop-ins de journald
+  ansible.builtin.file:
+    path: "{{ obs_journald_dropin | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: obs_journald_manage
+
+- name: Escribir el drop-in de journald
+  ansible.builtin.template:
+    src: journald-piedrazul-obs.conf.j2
+    dest: "{{ obs_journald_dropin }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: obs_journald_conf
+  when: obs_journald_manage
+
+# Activación del drop-in sin estado propio: journald lee su configuración al arrancar, así que se
+# reinicia si el drop-in cambió en este run o si es más nuevo que el arranque de journald (un run
+# anterior lo escribió y se interrumpió antes de reiniciar). Límite conocido: un reloj del host
+# que retrocede entre la escritura y el arranque puede ocultar un drop-in pendiente (los límites
+# de retención quedarían los anteriores) o forzar un reinicio extra; no afecta a los demás
+# servicios del stack.
+- name: Leer cuándo escribió el drop-in y cuándo arrancó journald
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail;
+      printf '%s %s\n' "$(stat -c %Y {{ obs_journald_dropin | quote }})"
+      "$(date -d "$(systemctl show systemd-journald --property=ActiveEnterTimestamp --value)" +%s)"
+    executable: /bin/bash
+  register: obs_journald_times
+  changed_when: false
+  failed_when: obs_journald_times.rc != 0 or obs_journald_times.stdout.split() | length != 2
+  when: obs_journald_manage
+
+# Con systemd 255 (Ubuntu 24.04) journald conserva los flujos de stdout de las unidades al
+# reiniciarse; los contenedores con driver journald escriben por la API nativa y reconectan.
+- name: Reiniciar journald con el drop-in nuevo
+  ansible.builtin.systemd_service:
+    name: systemd-journald
+    state: restarted
+  register: obs_journald_restart
+  when: >-
+    obs_journald_manage and (obs_journald_conf is changed
+    or (obs_journald_times.stdout.split()[0] | int) >= (obs_journald_times.stdout.split()[1] | int))
+
+- name: Pasar el journal volátil al persistente
+  ansible.builtin.command:
+    argv: [journalctl, --flush]
+  when: obs_journald_manage and obs_journald_restart is changed
+  changed_when: true
+
+- name: Leer el machine-id del host
+  ansible.builtin.slurp:
+    src: /etc/machine-id
+  register: obs_machine_id_raw
+
+- name: Inspeccionar el directorio del journal persistente
+  ansible.builtin.stat:
+    path: "{{ obs_journal_dir }}/{{ obs_machine_id_raw.content | b64decode | trim }}"
+  register: obs_journal_stat
+
+- name: Verificar el journal persistente y su grupo
+  ansible.builtin.assert:
+    that:
+      - obs_journal_stat.stat.exists
+      - obs_journal_stat.stat.isdir
+      - obs_journal_stat.stat.gr_name == obs_journal_group
+      - obs_journal_stat.stat.gid | int != 0
+      - obs_journal_stat.stat.rgrp and obs_journal_stat.stat.xgrp
+    fail_msg: >-
+      {{ obs_journal_stat.stat.path | default(obs_journal_dir) }} no existe o no es del grupo
+      {{ obs_journal_group }} con lectura de grupo
+      (grupo {{ obs_journal_stat.stat.gr_name | default('-') }}, modo
+      {{ obs_journal_stat.stat.mode | default('-') }}). Alloy no podría leer el journal. Con
+      obs_journald_manage: false el journal persistente debe existir de antemano.
+    quiet: true
+
+- name: Listar los archivos del journal persistente
+  ansible.builtin.find:
+    paths: "{{ obs_journal_stat.stat.path }}"
+    patterns: ["*.journal"]
+    file_type: file
+  register: obs_journal_files
+
+# Alloy los lee como grupo, no como dueño ni como "otros"
+- name: Verificar que el grupo del journal puede leer sus archivos
+  ansible.builtin.assert:
+    that:
+      - obs_journal_files.files | length > 0
+      - obs_journal_files.files | rejectattr('rgrp') | list | length == 0
+      - obs_journal_files.files | map(attribute='gid') | unique | list == [obs_journal_stat.stat.gid]
+    fail_msg: >-
+      Archivos del journal sin lectura para el grupo {{ obs_journal_group }} o de otro grupo:
+      {{ ((obs_journal_files.files | rejectattr('rgrp') | map(attribute='path') | list
+          + obs_journal_files.files | rejectattr('gid', 'equalto', obs_journal_stat.stat.gid)
+            | map(attribute='path') | list) | unique | list)[:5] }}
+      (ninguno listado: el directorio no tiene archivos .journal).
+    quiet: true
+
+- name: Registrar el GID del journal
+  ansible.builtin.set_fact:
+    obs_journal_gid: "{{ obs_journal_stat.stat.gid }}"

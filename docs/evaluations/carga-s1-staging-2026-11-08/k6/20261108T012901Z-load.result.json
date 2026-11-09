@@ -1,0 +1,46 @@
+{
+  "status": "passed",
+  "timestamp": "2026-11-08T01:32:03.457Z",
+  "profile": "load",
+  "scenario": "S1 GET /api/doctor/{id}/available-slots",
+  "target": "https://api.piedrazul.org",
+  "target_revision": "backend@sha256:4474be53ac80d87909d2ae823636b5f4520a5cff45ef071ef4510d1933daa124",
+  "test_revision": "59ce3e92",
+  "k6_image": "grafana/k6:2.2.0@sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2aa8881df3798c196564d6ace6",
+  "dataset": {
+    "declared": "obs staging, operator-attested synthetic fixture (2026-11-08): 1 doctor (TERAPIA_NEURAL+), Mon/Tue 06:10-07:00 every 20 min, 3 discovered dates; via Cloudflare edge",
+    "scheduling_origin": "MANUAL",
+    "pairs": 3,
+    "doctors_discovered": 1
+  },
+  "requested": {
+    "executor": "constant-arrival-rate",
+    "rate_per_s": 10,
+    "duration_s": 180,
+    "pre_vus": 20,
+    "max_vus": 50,
+    "expected_iterations": 1800
+  },
+  "generated": {
+    "s1_requests": 1801,
+    "s1_rate_per_s": 10.01,
+    "dropped_iterations": 0,
+    "max_vus_active": 7
+  },
+  "latency_ms": {
+    "avg": 212.91,
+    "min": 201.78,
+    "med": 208.91,
+    "p(90)": 222.08,
+    "p(95)": 228.81,
+    "p(99)": 240.93,
+    "max": 695.73
+  },
+  "errors": {
+    "http_failed_rate": 0,
+    "functional_errors": 0,
+    "functional_ok_rate": 1
+  },
+  "thresholds_passed": true,
+  "test_run_duration_s": 181.89
+}

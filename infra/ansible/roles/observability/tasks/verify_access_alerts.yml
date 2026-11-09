@@ -1,0 +1,73 @@
+# Comprueba desde dentro de los contenedores que Prometheus entrega a Alertmanager, que
+# Alertmanager corre con el receptor pedido y que Grafana tiene el modo de acceso y las listas
+# pedidos (verify_grafana_auth.yml). No envía ninguna notificación ni valida un JWT real: eso se comprueba en vivo (runbooks de alertas y de
+# acceso a Grafana). Nombres absolutos (alertmanager.) por la misma razón que verify_logs.yml.
+
+- name: Esperar a que Prometheus descubra Alertmanager
+  ansible.builtin.command:
+    argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
+           exec, -T, prometheus, wget, -qO-, "http://localhost:9090/api/v1/alertmanagers"]
+    chdir: "{{ obs_dir }}"
+  register: obs_alertmanagers
+  changed_when: false
+  until: >-
+    obs_alertmanagers.rc == 0 and
+    (obs_alertmanagers.stdout | from_json).data.activeAlertmanagers | length == 1
+  retries: 12
+  delay: 5
+  failed_when: false
+
+- name: Prometheus entrega a Alertmanager
+  ansible.builtin.assert:
+    that:
+      - obs_alertmanagers.rc == 0
+      - (obs_alertmanagers.stdout | from_json).data.activeAlertmanagers | map(attribute='url') | list
+        == ['http://alertmanager:9093/api/v2/alerts']
+    fail_msg: "Prometheus no tiene a Alertmanager como destino activo: las alertas no se notifican."
+    quiet: true
+
+- name: Leer la etiqueta de entorno de Prometheus
+  ansible.builtin.command:
+    argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
+           exec, -T, prometheus, wget, -qO-, "http://localhost:9090/api/v1/status/config"]
+    chdir: "{{ obs_dir }}"
+  register: obs_prom_config
+  changed_when: false
+  failed_when: false
+
+- name: Prometheus identifica el entorno en las alertas
+  ansible.builtin.assert:
+    that:
+      - obs_prom_config.rc == 0
+      - ((obs_prom_config.stdout | from_json).data.yaml | from_yaml).global.external_labels.environment
+        == (obs_s3_environment if obs_s3_environment | length > 0 else 'sin-definir')
+    fail_msg: "Prometheus no tiene external_labels.environment={{ obs_s3_environment | default('', true) or 'sin-definir' }}."
+    quiet: true
+
+- name: Leer el estado de Alertmanager
+  ansible.builtin.command:
+    argv: [docker, compose, --project-name, "{{ obs_compose_project_name }}", --file, compose.yml,
+           exec, -T, prometheus, wget, -qO-, "http://alertmanager.:9093/api/v2/status"]
+    chdir: "{{ obs_dir }}"
+  register: obs_am_status
+  changed_when: false
+  # El estado incluye la configuración: la URL del webhook va por archivo y no aparece en ella
+  no_log: true
+  until: obs_am_status.rc == 0
+  retries: 12
+  delay: 5
+  failed_when: false
+
+- name: Alertmanager con el receptor pedido
+  ansible.builtin.assert:
+    that:
+      - obs_am_status.rc == 0
+      - ((obs_am_status.stdout | from_json).config.original | from_yaml).receivers | map(attribute='name') | list
+        == [obs_s3_receiver]
+    fail_msg: "Alertmanager no responde o no corre con el receptor {{ obs_s3_receiver }}."
+    quiet: true
+
+- name: Verificar la autorización efectiva de Grafana
+  ansible.builtin.include_tasks: verify_grafana_auth.yml
+  vars:
+    obs_expected_access_on: "{{ obs_grafana_access_on }}"

@@ -7,6 +7,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrig
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.ClinicalHistoryPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentStateConflictException;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -14,6 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
+import org.springframework.transaction.interceptor.TransactionAttribute;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -48,6 +51,16 @@ class UpdateAppointmentStatusUseCaseImplTest {
                 UUID.randomUUID(), idDoctor, idPatient, SpecialtyCode.FISIOTERAPIA,
                 AppointmentState.AGENDADA, LocalDate.now().plusDays(1),
                 new AppointmentTime(LocalTime.of(9, 0)), SchedulingOrigin.MANUAL);
+    }
+
+    @Test
+    void aStateConflictRollsBackTheStatusTransaction() throws Exception {
+        TransactionAttribute transaction = new AnnotationTransactionAttributeSource().getTransactionAttribute(
+                UpdateAppointmentStatusUseCaseImpl.class.getMethod("markAsAttended", UUID.class, String.class),
+                UpdateAppointmentStatusUseCaseImpl.class);
+
+        assertThat(transaction).isNotNull();
+        assertThat(transaction.rollbackOn(new AppointmentStateConflictException("conflicto"))).isTrue();
     }
 
     @Nested

@@ -1,0 +1,126 @@
+# Pruebas unitarias de prometheus/rules/notifications.yml con series sintéticas:
+#   docker run --rm -v "$PWD/infra/observability:/w:ro" --entrypoint promtool \
+#     prom/prometheus:<ref de compose.yml> test rules /w/tests/notifications-alerts.test.yml
+# Cada regla con su caso normal, de falla y sin datos. Prueban las
+# expresiones; la entrega real a un receptor la prueba infra/tests/alert-delivery-check.sh.
+rule_files:
+  - ../prometheus/rules/notifications.yml
+
+evaluation_interval: 1m
+
+tests:
+  # ── PiedrazulAlertmanagerDown ───────────────────────────────────────────────
+  - name: Alertmanager caído 5 m dispara y se recupera
+    interval: 1m
+    input_series:
+      - series: 'up{job="alertmanager", instance="alertmanager:9093"}'
+        values: '1 1 0 0 0 0 0 0 0 1 1'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: PiedrazulAlertmanagerDown
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: PiedrazulAlertmanagerDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: alertmanager, instance: "alertmanager:9093"}
+            exp_annotations:
+              summary: "Alertmanager no responde: las alertas no se notifican"
+              description: "alertmanager:9093 no responde desde hace 5 minutos. Las alertas siguen evaluándose en Prometheus pero no llegan a Discord."
+      - eval_time: 10m
+        alertname: PiedrazulAlertmanagerDown
+        exp_alerts: []
+
+  - name: Alertmanager sano o sin serie no dispara
+    interval: 1m
+    input_series:
+      - series: 'up{job="alertmanager", instance="alertmanager:9093"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: PiedrazulAlertmanagerDown
+        exp_alerts: []
+
+  # ── PiedrazulPrometheusNotificationsFailing ─────────────────────────────────
+  - name: errores de envío a Alertmanager disparan y se apagan pasada la ventana
+    interval: 1m
+    input_series:
+      - series: 'prometheus_notifications_errors_total{job="prometheus", instance="localhost:9090", alertmanager="http://alertmanager:9093/api/v2/alerts"}'
+        values: '0 0 0 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3'
+      - series: 'prometheus_notifications_dropped_total{job="prometheus", instance="localhost:9090"}'
+        values: '0x24'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: PiedrazulPrometheusNotificationsFailing
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: PiedrazulPrometheusNotificationsFailing
+        exp_alerts:
+          - exp_labels: {severity: warning, instance: "localhost:9090"}
+            exp_annotations:
+              summary: "Prometheus no pudo entregar alertas a Alertmanager"
+              description: "En los últimos 15 minutos Prometheus registró errores o descartes al enviar alertas a Alertmanager: alguna notificación pudo perderse."
+      - eval_time: 24m
+        alertname: PiedrazulPrometheusNotificationsFailing
+        exp_alerts: []
+
+  - name: descartes en la cola de Prometheus disparan
+    interval: 1m
+    input_series:
+      - series: 'prometheus_notifications_errors_total{job="prometheus", instance="localhost:9090", alertmanager="http://alertmanager:9093/api/v2/alerts"}'
+        values: '0x10'
+      - series: 'prometheus_notifications_dropped_total{job="prometheus", instance="localhost:9090"}'
+        values: '0 0 0 0 5 5 5 5 5 5 5'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: PiedrazulPrometheusNotificationsFailing
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: PiedrazulPrometheusNotificationsFailing
+        exp_alerts:
+          - exp_labels: {severity: warning, instance: "localhost:9090"}
+            exp_annotations:
+              summary: "Prometheus no pudo entregar alertas a Alertmanager"
+              description: "En los últimos 15 minutos Prometheus registró errores o descartes al enviar alertas a Alertmanager: alguna notificación pudo perderse."
+
+  - name: sin errores ni descartes, o sin series, no dispara
+    interval: 1m
+    input_series:
+      - series: 'prometheus_notifications_errors_total{job="prometheus", instance="localhost:9090", alertmanager="http://alertmanager:9093/api/v2/alerts"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: PiedrazulPrometheusNotificationsFailing
+        exp_alerts: []
+
+  # ── PiedrazulAlertNotificationsFailing ──────────────────────────────────────
+  - name: envíos fallidos a Discord disparan por integración y se apagan
+    interval: 1m
+    input_series:
+      - series: 'alertmanager_notifications_failed_total{job="alertmanager", instance="alertmanager:9093", integration="discord", reason="serverError"}'
+        values: '0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1'
+      - series: 'alertmanager_notifications_failed_total{job="alertmanager", instance="alertmanager:9093", integration="webhook", reason="other"}'
+        values: '0x24'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: PiedrazulAlertNotificationsFailing
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: PiedrazulAlertNotificationsFailing
+        exp_alerts:
+          - exp_labels: {severity: critical, integration: discord}
+            exp_annotations:
+              summary: "Fallan las notificaciones a discord"
+              description: "1 envíos a discord fallaron en los últimos 15 minutos tras sus reintentos: esas alertas no llegaron. Revisar el webhook y los logs de Alertmanager."
+      - eval_time: 24m
+        alertname: PiedrazulAlertNotificationsFailing
+        exp_alerts: []
+
+  - name: envíos sin fallas o sin series no disparan
+    interval: 1m
+    input_series:
+      - series: 'alertmanager_notifications_failed_total{job="alertmanager", instance="alertmanager:9093", integration="discord", reason="serverError"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: PiedrazulAlertNotificationsFailing
+        exp_alerts: []

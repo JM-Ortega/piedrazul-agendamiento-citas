@@ -1,0 +1,21 @@
+---
+# Stack privado de observabilidad: Prometheus, Grafana, Alloy, Loki y Alertmanager en el proyecto
+# Compose piedrazul-obs. Lo corre el workflow de producción (job observability) después de la
+# aplicación; también se puede correr a mano como recuperación excepcional. No modifica la
+# aplicación. Requiere la aplicación instalada (red piedrazul_net). Fuera de /opt/piedrazul-obs
+# solo escribe el drop-in de journald del rol (todo el host).
+#
+#   -e obs_operation=full            (por defecto) todo el stack: configuración, estado deseado,
+#                                     activación y verificación (-e obs_verify_scope=...)
+#   -e obs_operation=grafana-access  solo la autorización de Grafana (listas Viewer/Editor)
+#
+# Entradas del entorno del controlador: GRAFANA_VIEWER_EMAILS y GRAFANA_EDITOR_EMAILS (siempre),
+# OBS_DISCORD_WEBHOOK_URL (receptor discord). Ver docs/operations/runbooks/metricas.md,
+# logs.md, alertas.md y grafana-acceso.md.
+
+- name: Stack de observabilidad
+  hosts: vps
+  gather_facts: false
+
+  roles:
+    - role: observability

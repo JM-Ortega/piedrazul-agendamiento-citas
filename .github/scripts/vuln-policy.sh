@@ -75,7 +75,9 @@ MAX_DB_AGE_HOURS=48            # DB de vulnerabilidades: antigüedad máxima al 
 MAX_DISPOSITION_DAYS=90        # vigencia máxima de una disposición CRITICAL
 MAX_BREAK_GLASS_HOURS=72       # vigencia máxima de una autorización de break-glass (una operación)
 CLOCK_SKEW_SECONDS=300
-SURFACES_RE='^(backend|postgres|keycloak|traefik)$'
+# Imágenes del núcleo y del stack de observabilidad (obs-*). El break-glass sigue solo para el
+# núcleo: una referencia nueva del stack que la política bloquea se corrige o revierte.
+SURFACES_RE='^(backend|postgres|keycloak|traefik|obs-prometheus|obs-grafana|obs-alloy|obs-loki|obs-alertmanager)$'
 REF_RE='^[a-z0-9][a-z0-9./:_-]*@sha256:[0-9a-f]{64}$'
 LOGIN_RE='^[A-Za-z0-9](-?[A-Za-z0-9]){0,38}$'
 ISO_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,9})?Z$'
@@ -169,7 +171,7 @@ if [ -d "${DISPOSITIONS_DIR}" ]; then
         (keys == ["approver","effective","expires","id","justification","package","residual_risk","schema","scope","surface","vulnerability"])
         and .schema == "piedrazul.vulnerability-disposition/v1"
         and .id == $id and (.id | test("^VD-[0-9]{4}-[0-9]{3}$"))
-        and (.surface | type == "string" and test("^(backend|postgres|keycloak|traefik)$"))
+        and (.surface | type == "string" and test("^(backend|postgres|keycloak|traefik|obs-prometheus|obs-grafana|obs-alloy|obs-loki|obs-alertmanager)$"))
         and (.vulnerability | type == "string" and test("^(CVE-[0-9]{4}-[0-9]{4,}|GHSA(-[23456789cfghjmpqrvwx]{4}){3})$"))
         and (.package | type == "string" and length > 0 and length <= 214)
         and (.scope | type == "object" and keys == ["image_refs"]

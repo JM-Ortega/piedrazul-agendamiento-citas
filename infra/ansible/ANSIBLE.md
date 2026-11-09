@@ -23,11 +23,15 @@ infra/ansible/
 │   ├── deploy.yml                       # Rollout de backend y postgres por identidad exacta
 │   ├── verify-release.yml               # Verifica identidad en ejecución o health (solo lectura)
 │   ├── record-release.yml               # Registra el último despliegue exitoso
-│   └── keycloak-admin-preflight.yml     # Valida en el runner la contraseña inicial antes del Apply
+│   ├── keycloak-admin-preflight.yml     # Valida en el runner la contraseña inicial antes del Apply
+│   ├── observability.yml                # Stack de observabilidad piedrazul-obs (job observability del workflow)
+│   ├── observability-preflight.yml      # Comprobación previa del stack en el runner, sin red ni servidor
+│   └── observability-logs-rollback.yml  # Segundo paso de la retirada de logs (Loki, fuente de datos, drop-in)
 └── roles/
     ├── common/                          # Paquetes base y timezone
     ├── docker_host/                     # Instalación y configuración de Docker
     ├── hardening/                       # Hardening del servidor
+    ├── observability/                   # Prometheus, Grafana, Alloy, Loki y Alertmanager en /opt/piedrazul-obs
     └── app/                             # Gestión del stack de la aplicación
         ├── tasks/
         │   ├── main.yml                 # Punto de entrada (importa setup.yml)
@@ -118,12 +122,33 @@ release_state_file: "{{ app_dir }}/last-success.env"
 kc_realm: piedrazul
 kc_port: 8180
 kc_backend_client_id: piedrazul-backend
+kc_frontend_client_id: piedrazul-frontend
 kc_automation_client_id: piedrazul-keycloak-automation
 kc_automation_roles: [piedrazul-realm:manage-clients, piedrazul-realm:manage-realm, piedrazul-realm:view-clients]
+kc_admin_api_scope: kc-admin-api
+kc_admin_api_scope_since: "26.8.2"
 kc_temp_admin_prefix: piedrazul-tmp-admin
 kc_temp_admin_owned_regex: "^{{ kc_temp_admin_prefix }}-[0-9]{14}-[a-z0-9]{8}$"
 kc_realm_file: "{{ repo_root }}/infra/keycloak/realm/piedrazul-realm.json"
 ```
+
+Stack de observabilidad y Grafana (una sola fuente para el stack y para el router de Traefik):
+
+```yaml
+obs_log_services: [traefik]               # política de logs de producción (converge y Alloy)
+obs_log_privacy_controls_done: []         # ninguna fuente condicionada autorizada
+obs_grafana_access_enabled: true          # Grafana detrás de Cloudflare Access
+obs_grafana_public_domain: "grafana.{{ base_domain }}"
+obs_grafana_access_team_domain: piedrazul.cloudflareaccess.com
+obs_grafana_access_aud: <AUD Tag de la aplicación de Access, no secreto>
+grafana_public_domain: "{{ obs_grafana_public_domain if obs_grafana_access_enabled | bool else '' }}"
+obs_alert_receiver: discord
+obs_environment: produccion
+```
+
+Los identificadores de Access son los de la aplicación que administra el operador en Cloudflare;
+la cadena no la crea ni la cambia. Las listas de operadores de Grafana y el webhook de Discord no
+están en el inventario: son secretos del environment (abajo).
 
 `log_level_root`, `log_level_security`, `log_level_sql`, `log_level_sql_bind` y
 `log_level_modulith` producen las variables `LOG_LEVEL_*` del `.env`. `LOG_LEVEL_MODULITH` vale
@@ -136,10 +161,14 @@ Spring, que dejaría ese logger heredando el nivel del root.
 kc_hostname: "auth.{{ base_domain }}"
 api_public_domain: "api.{{ base_domain }}"
 frontend_public_domain: "{{ base_domain }}"
-acme_email: jortegan@unicauca.edu.co
+acme_email: wpantoja@unicauca.edu.co
 
 cors_allowed_origins: "https://{{ frontend_public_domain }}"
 ```
+
+`acme_email` es el contacto administrativo de la cuenta ACME de Traefik (Let's Encrypt), no el
+dueño de los certificados; cambiarlo no los renueva ni toca `acme.json`. Es el inventario activo
+(Hetzner); `vps_oci.yml` es histórico (OCI inactivo) y no se usa.
 
 `frontend_public_domain` también llega a Keycloak: `env.j2` escribe `FRONTEND_PUBLIC_URL=https://<frontend_public_domain>`, que `compose/keycloak.yml` exige y el tema de login usa para los enlaces al frontend (ver el [README del tema](../keycloak/themes/piedrazul/keycloakify-starter/README.md)).
 
@@ -198,6 +227,104 @@ ansible-playbook \
 
 `verify-release.yml` no modifica nada: con `release_check=identity` comprueba que los contenedores corren la identidad exacta esperada; con `release_check=health`, que quedaron `healthy`. `record-release.yml` escribe el último despliegue exitoso (ver abajo). El workflow los corre como pasos separados para que un fallo de identidad, de health o de registro se vea como tal.
 
+### `observability.yml` — stack de métricas, logs y alertas
+
+Instala o actualiza el proyecto Compose `piedrazul-obs` (Prometheus, Grafana, Alloy, Loki,
+Alertmanager) en `/opt/piedrazul-obs` con el rol `observability`, con el mismo contrato de conexión
+que los demás playbooks (`ansible` + `become`). No lo incluyen `converge.yml` ni `deploy.yml` y no
+modifica la aplicación. En producción lo corre el job `observability` del workflow (abajo y
+[Métricas](../../docs/operations/runbooks/metricas.md#instalación-y-mantenimiento-github-actions));
+correrlo a mano es una recuperación excepcional.
+
+Dos operaciones (`-e obs_operation=`):
+
+- **`full`** (por defecto): todo el stack, con verificación `-e obs_verify_scope=install |
+  integration | changed` (los destinos de la aplicación bloquean solo en `install` e
+  `integration`).
+- **`grafana-access`**: solo la autorización de Grafana. Escribe el archivo de acceso y recrea solo
+  Grafana (sin dependencias, con los archivos de Compose que ya tiene el host); verifica la
+  autorización efectiva sin consultar el resto del stack ni la aplicación. Exige el stack
+  instalado.
+
+Entradas del entorno del controlador: `GRAFANA_VIEWER_EMAILS` y `GRAFANA_EDITOR_EMAILS`
+(obligatorias en las dos operaciones; correos en minúsculas separados por comas o `none`;
+`tasks/access_lists.yml`) y `OBS_DISCORD_WEBHOOK_URL` (con el receptor `discord`; el workflow pasa
+`obs_require_authoritative_inputs=true`, que lo exige en cada run en lugar de conservar el del host).
+`playbooks/observability-preflight.yml` aplica las mismas reglas en el runner, sin red.
+
+Operación `full`:
+
+- Exige Docker con Compose y la red `piedrazul_net`; con el acceso público a Grafana, también
+  `piedrazul_obs_edge` (interna, la crea `compose/traefik.yml`). Si falta alguna, falla sin copiar
+  nada.
+- Antes de copiar nada valida las listas de Grafana, `obs_grafana_access_*` (dominio del equipo de
+  Access, AUD de 64 hex), `obs_alert_receiver` (`none`/`discord`), `obs_environment` (obligatorio con
+  `discord`), el webhook (nunca se muestra) y la política de logs. Estado no secreto en `.env`
+  (dado > guardado en el host > inicial); las listas no se guardan en `.env` (un `.env` anterior que
+  las tenga las pierde en el primer run).
+- Los directorios de configuración (`obs_managed_dirs`) quedan iguales al repositorio: copia y
+  borra lo retirado.
+- Archivos secretos en `/opt/piedrazul-obs/secrets` (directorio root 0700): el webhook (UID 65534,
+  0400) y el archivo de acceso de Grafana con `role_attribute_path` (UID 472, 0400), que Grafana
+  carga como su archivo de configuración (`GF_PATHS_CONFIG`): las listas no pasan por el entorno del
+  contenedor.
+- **Activación sin estado propio.** El digest de la configuración que cada servicio lee al arrancar
+  (archivos finales del host: ruta y contenido) va a `.env` (`OBS_DIGEST_<SERVICIO>`) y a la etiqueta
+  `org.piedrazul.obs.config-digest` del servicio: Compose recrea exactamente los servicios cuya
+  configuración cambió, también en un reintento tras una interrupción. Un archivo secreto se
+  reemplaza de forma atómica (inodo nuevo); si el contenedor sigue viendo el inodo anterior, se
+  recrea ese servicio. Un run sin cambios no recrea nada.
+- `.env` (root, 0600) se crea solo si no existe, con una contraseña de Grafana que genera el
+  controlador; no viene de GitHub ni se regenera.
+- Logs: política de fuentes (`obs_log_services` frente a admitidos, condicionados con
+  `obs_log_privacy_controls_done` y excluidos) y GID 473; drop-in de journald
+  (`/etc/systemd/journald.conf.d/60-piedrazul-obs.conf`, todo el host: persistente, 2G, 128M,
+  7 días; `obs_journald_manage: false` lo omite), reiniciado si cambió o si es más nuevo que el
+  arranque de journald; grupo del journal en `.env` (`OBS_JOURNAL_GID`) junto a la selección de
+  fuentes. No cambia el driver de logs de ningún contenedor: eso lo hace converge con la misma
+  lista y la misma política (`tasks/log_policy.yml`, abajo).
+- Verifica la activación (paridad con el repositorio, digest vigente en cada contenedor, inodo
+  vigente de cada archivo secreto, imagen fijada en ejecución) y lo que cada servicio cargó: los
+  ocho trabajos configurados (los destinos propios siempre leídos), las reglas del repositorio sin
+  errores, los dashboards, Loki y Alloy, Prometheus entregando a Alertmanager con el receptor y la
+  etiqueta de entorno pedidos, y Grafana con el modo de acceso y las listas pedidos (comparadas sin
+  mostrarlas). No envía ninguna notificación.
+
+`observability-logs-rollback.yml` es el segundo paso de la vuelta a métricas sin logs, después
+de repetir `observability.yml` desde una versión sin logs (si no, falla sin cambiar nada). Retira
+la fuente de datos Loki de Grafana, el contenedor y la configuración de Loki, las variables de
+logs de `.env` y el drop-in de journald (reinicia journald); con `-e obs_logs_purge=true` borra
+además los volúmenes de logs. No toca los volúmenes de Prometheus y Grafana ni la aplicación.
+
+Procedimiento, semántica de cambios y retiro: [Métricas](../../docs/operations/runbooks/metricas.md)
+y [Logs](../../docs/operations/runbooks/logs.md).
+
+### Logs de los servicios (`obs_log_services`)
+
+converge (`roles/app/tasks/setup.yml`) escribe en `.env` `TRAEFIK_LOGGING`, `KEYCLOAK_LOGGING`,
+`BACKEND_LOGGING` y `POSTGRES_LOGGING`: `journald` para los servicios de `obs_log_services`
+(group_vars, por defecto `[traefik]`) y `default` para el resto. `prod.yml` hace que cada uno
+extienda esa base de `compose/logging.yml`: `journald` (non-blocking, 4 MiB, etiquetas de Compose,
+`tag`) o `default` (sin configuración propia: la del daemon, como antes). Antes de copiar Compose o
+escribir `.env` aplica la política de logs del rol observability (`include_role`,
+`tasks_from: log_policy.yml`), la misma que usa `observability.yml` para la selección: backend,
+keycloak y postgres exigen `obs_log_privacy_controls_done` o, solo con datos sintéticos,
+`logs_lab_authorization=synthetic-data-only`. Cambiar el modo recrea el contenedor en su siguiente
+arranque; un run repetido no recrea nada.
+
+Adopción en operación: `obs_log_services` y `obs_log_privacy_controls_done` en group_vars, sin
+perfil. Validación con datos sintéticos: el perfil, pasado igual a converge, deploy y observability
+(deploy usa el `.env` de converge); no se guarda en el host. Sin él, observability solo cambia la
+selección de Alloy (los contenedores siguen en `journald`); devolver los productores a `default`
+es converge sin el perfil más la recreación del backend (deploy o `refresh_backend.yml`). Ver
+[Logs, "Reversión"](../../docs/operations/runbooks/logs.md#perfil-de-laboratorio-sintético):
+
+```bash
+ansible-playbook -i <inventario> -e @profiles/logs-lab-synthetic.yml playbooks/converge.yml
+```
+
+Ver [Logs, "Perfil de laboratorio sintético"](../../docs/operations/runbooks/logs.md#perfil-de-laboratorio-sintético).
+
 ---
 
 ## Roles
@@ -252,7 +379,9 @@ Traefik enruta solo con el **file provider**: no tiene Docker provider ni socket
 |---|---|---|
 | `tls.yml` | opción TLS `cloudflare-aop` (certificado de cliente de Cloudflare obligatorio, CA en `traefik/certs/`) | `infra/traefik/dynamic/tls.yml`, copiado tal cual |
 | `routes.yml` | routers `backend` (`Host(api_public_domain)`) y `keycloak` (`Host(kc_hostname)`), entrypoint `websecure`, TLS `cloudflare-aop` + resolver `letsencrypt`; servicios `http://backend:<server_port>` y `http://keycloak:<kc_port>` | generado por `traefik_routes.yml` desde `templates/traefik-routes.yml.j2` con las mismas variables del inventario que `.env` |
+| `routes.yml` (opcional, S3) | con `grafana_public_domain` no vacío: router `grafana` (`Host(...) && !PathPrefix(/login)`, `websecure`, `cloudflare-aop` + `letsencrypt`) con el middleware `grafana-access-only` (quita `Authorization` y `Cookie`) y servicio `http://grafana:3000` por la red interna `piedrazul_obs_edge`. En producción, derivado de `obs_grafana_public_domain` y `obs_grafana_access_enabled` (`group_vars`; [Acceso a Grafana](../../docs/operations/runbooks/grafana-acceso.md)) | mismo template; el nombre se valida como los demás y distinto de ellos |
 
+- Métricas Prometheus en el entrypoint `metrics` (`:8082`, flags en `infra/compose/traefik.yml`). No tiene puerto publicado ni router: los routers de `routes.yml` declaran solo `websecure`. Se alcanza en `/metrics`, puerto 8082 del contenedor `traefik`, desde `piedrazul_net`. La API y el dashboard siguen deshabilitados. Ver [Health y métricas](../../docs/architecture/overview.md#health-y-métricas).
 - Para cambiar un host o puerto se cambia el inventario (`host_vars`/`group_vars`) y se corre converge; `routes.yml` no se edita en el servidor (converge lo sobrescribe). Antes de escribirlo, `traefik_routes.yml` valida las entradas (nombres DNS en minúsculas, distintos; puertos numéricos) y el documento generado; si algo falla, converge se detiene sin tocar el archivo vigente. Traefik recarga el cambio sin reiniciarse.
 - Los servicios apuntan al nombre del contenedor en `piedrazul_net`; Traefik lo resuelve en cada conexión nueva, así que recrear o reiniciar backend o Keycloak no deja rutas obsoletas ni necesita la API de Docker. Mientras un upstream no existe o no responde, su host devuelve `502` (antes, con el Docker provider, `404`); un host sin ruta devuelve `404`.
 - `--core.strictTLSOptions=true`: si dos routers del mismo host pidieran opciones TLS distintas, Traefik desactiva esos routers en vez de servirlos con las opciones por defecto (sin certificado de cliente de AOP).
@@ -284,7 +413,7 @@ Si cualquier paso falla o el run se cancela antes del registro, `last-success.en
 
 #### Identidad de Keycloak (`keycloak_image.yml`)
 
-Keycloak es un tercero fijado: `infra/compose/keycloak.yml` declara `quay.io/keycloak/keycloak:<versión>@sha256:<índice OCI>` (hoy `26.8.1@sha256:a78d6b79…`). El digest del índice es la identidad; el tag solo la hace legible. Desarrollo (`docker-compose.yml`, también `keycloak-dev-secret`) usa esa referencia tal cual y Docker elige el hijo de su plataforma. Producción nunca despliega el índice ni un tag: `prod.yml` reemplaza la imagen por `${KEYCLOAK_IMAGE:?}` de `image.env`, el manifiesto `linux/amd64` exacto de ese índice.
+Keycloak es un tercero fijado: `infra/compose/keycloak.yml` declara `quay.io/keycloak/keycloak:<versión>@sha256:<índice OCI>` (hoy `26.8.2@sha256:3879c623…`). El digest del índice es la identidad; el tag solo la hace legible. Desarrollo (`docker-compose.yml`, también `keycloak-dev-secret`) usa esa referencia tal cual y Docker elige el hijo de su plataforma. Producción nunca despliega el índice ni un tag: `prod.yml` reemplaza la imagen por `${KEYCLOAK_IMAGE:?}` de `image.env`, el manifiesto `linux/amd64` exacto de ese índice.
 
 - El workflow (`image_targets`, sin credenciales de producción) lee la referencia declarada, exige el formato fijado, la resuelve **una vez y por digest** con `resolve-amd64-image.sh` (el tag nunca se consulta en el registry) y pasa `keycloak_image_ref` (`quay.io/keycloak/keycloak@sha256:<linux/amd64>`) y `keycloak_image_index_digest`. Esa misma referencia se escanea y la recibe converge. Sin referencia fijada o sin identidad resoluble el job falla y producción no empieza.
 - `keycloak_image.yml` (desde `setup.yml`, antes de escribir `image.env`): el índice recibido debe ser el declarado en el `keycloak.yml` que este converge copia, la referencia debe ser un manifiesto (no el índice), se descarga por digest para `linux/amd64` y la etiqueta `org.opencontainers.image.version` de la imagen descargada debe coincidir con el tag declarado. Cualquier diferencia falla antes de tocar `image.env`.
@@ -299,15 +428,15 @@ Corre en cada `converge`, después de `setup.yml` (base reconciliada, `.env` vig
 
 **Clasificación** (`keycloak_state.yml`):
 
-1. Lee la base de Keycloak por el socket local de postgres (`files/keycloak-state.sql`, solo lectura, nunca columnas con secretos ni nombres de usuarios humanos): estado del schema `keycloak` (ausente, **vacío** —como lo deja `01-init-databases.sh`: cero tablas, secuencias, funciones y tipos—, **parcial** —objetos sin tabla `realm`— o inicializado), los realms `master` y `piedrazul`, autoridades temporales (`is_temporary_admin=true`, la marca de Keycloak para lo creado por `bootstrap-admin` o `KC_BOOTSTRAP_ADMIN_*`) clasificadas como **propias** (cliente con clientId exacto `kc_temp_admin_owned_regex` y solo los roles que da bootstrap-admin) o **ajenas** (todo lo demás), forma (banderas) y roles directos de los service accounts de `piedrazul-keycloak-automation` y `piedrazul-backend`, y el **número** de usuarios humanos con rol `admin` en `master`.
+1. Lee la base de Keycloak por el socket local de postgres (`files/keycloak-state.sql`, solo lectura, nunca columnas con secretos ni nombres de usuarios humanos): estado del schema `keycloak` (ausente, **vacío** —como lo deja `01-init-databases.sh`: cero tablas, secuencias, funciones y tipos—, **parcial** —objetos sin tabla `realm`— o inicializado), los realms `master` y `piedrazul`, autoridades temporales (`is_temporary_admin=true`, la marca de Keycloak para lo creado por `bootstrap-admin` o `KC_BOOTSTRAP_ADMIN_*`) clasificadas como **propias** (cliente con clientId exacto `kc_temp_admin_owned_regex` y solo los roles que da bootstrap-admin) o **ajenas** (todo lo demás), forma (banderas) y roles directos de los service accounts de `piedrazul-keycloak-automation` y `piedrazul-backend`, *Full Scope Allowed* y las asignaciones directas del alcance de roles de esos dos clientes y de `piedrazul-frontend`, y el **número** de usuarios humanos con rol `admin` en `master`.
 2. Si no hay divergencias, prueba la credencial deseada de automatización contra la API (`files/keycloak-admin.sh probe`).
 
 | Estado | Condición | Resultado |
 |--------|-----------|-----------|
 | **P2** nuevo | el schema `keycloak` existe y está vacío | evento con autoridad temporal (con importación del realm y creación del administrador humano permanente) → reclasifica (debe ser P1) → reconciliación P1 |
-| **P1** conocido/reconciliado | sin autoridad temporal; automatización y backend con la forma y los roles exactos (backend: los del realm del repositorio; automatización: `kc_automation_roles`); la automatización autentica con `KC_AUTOMATION_CLIENT_SECRET` y ve el backend | reconciliación P1, sin autoridad temporal |
-| **P3 bloqueante** | schema ausente o parcial; falta `master`, `piedrazul` o el cliente `piedrazul-backend`; autoridad temporal ajena | **falla cerrado antes de arrancar Keycloak**, también con `keycloak_recovery=true`: puede implicar pérdida de identidad o autoridad desconocida → escalar |
-| **P3 recuperable** | credencial de automatización rechazada; falta la automatización; forma o roles técnicos distintos; autoridad temporal propia huérfana | **falla cerrado** con los motivos; no adopta, reinicia ni borra nada. Solo la recuperación autorizada lo corrige |
+| **P1** conocido/reconciliado | sin autoridad temporal; automatización y backend con la forma y los roles exactos (backend: los del realm del repositorio; automatización: `kc_automation_roles`); automatización, backend y frontend con *Full Scope Allowed* deshabilitado y exactamente su alcance de roles (backend y frontend: los del realm del repositorio; automatización: `kc_automation_roles`); con una base `>= kc_admin_api_scope_since`, `kc-admin-api` por defecto en automatización y backend y ausente en el frontend; la automatización autentica con `KC_AUTOMATION_CLIENT_SECRET` y ve el backend | reconciliación P1, sin autoridad temporal |
+| **P3 bloqueante** | schema ausente o parcial; falta `master`, `piedrazul` o el cliente `piedrazul-backend` o `piedrazul-frontend`; autoridad temporal ajena | **falla cerrado antes de arrancar Keycloak**, también con `keycloak_recovery=true`: puede implicar pérdida de identidad o autoridad desconocida → escalar |
+| **P3 recuperable** | credencial de automatización rechazada; falta la automatización; forma, roles técnicos, alcance de roles o asignación de `kc-admin-api` distintos (también tras actualizar a 26.8.2 una base anterior); autoridad temporal propia huérfana | **falla cerrado** con los motivos; no adopta, reinicia ni borra nada. Solo la recuperación autorizada lo corrige |
 | sin respuesta | Keycloak no respondió a la prueba | falla como transitoria (no es P3); reintentar |
 
 Si el schema está vacío pero el contenedor `keycloak` corre (p. ej. reiniciando sin conectar), se detiene antes del evento y se vuelve a leer; si entre tanto escribió en la base, ya no es P2.
@@ -332,7 +461,7 @@ Keycloak de producción arranca con `start`, **sin `--import-realm`**: un reinic
 2. `docker compose run --rm --no-deps keycloak bootstrap-admin service` con la configuración del servicio: cliente admin temporal en `master` con id `piedrazul-tmp-admin-<fecha>-<aleatorio>` y secreto aleatorio generado en el runner. No se persiste en el host ni va en argv: viaja por entorno, en tránsito, al contenedor de un solo uso (`--rm`) y al exec de kcadm (sesión en `/dev/shm`, borrada al terminar). En una base nueva el mismo comando crea el esquema y el realm `master`.
 3. Solo P2: `docker compose run --rm --no-deps keycloak import --dir … --override false` importa el realm del repositorio (el cliente backend no trae secreto y Keycloak genera uno aleatorio). Una recuperación nunca importa ni recrea `master`, `piedrazul` ni `piedrazul-backend`; sí puede crear o corregir el cliente técnico `piedrazul-keycloak-automation` (paso 5).
 4. Arranca Keycloak (`start`).
-5. Con la autoridad temporal (`keycloak-admin.sh establish`): crea o corrige `piedrazul-keycloak-automation` (confidencial, solo service account, secreto `KC_AUTOMATION_CLIENT_SECRET`, roles exactos: agrega los que faltan y quita los demás), y forma y roles exactos de `piedrazul-backend`. Comprueba que la automatización autentica. Si falla, el mensaje muestra el avance (`automation.*`, `backend.*`, `role.*`) y el error.
+5. Con la autoridad temporal (`keycloak-admin.sh establish`): crea o corrige `piedrazul-keycloak-automation` (confidencial, solo service account, secreto `KC_AUTOMATION_CLIENT_SECRET`, roles exactos: agrega los que faltan y quita los demás), y forma y roles exactos de `piedrazul-backend`; después, el alcance de roles explícito de los tres clientes propios (por cliente: agrega lo que falta → deshabilita *Full Scope Allowed* → quita lo que sobra → relee; `fullScopeAllowed` nunca va en la forma, que se escribe antes que los roles). Con una base `>= kc_admin_api_scope_since`, asigna el client scope incorporado `kc-admin-api` por defecto a automatización y backend y lo retira del frontend (solo esa asignación; la API de administración de Keycloak 26.8.2 rechaza con 401 los tokens sin él; nunca se deshabilita esa verificación). Comprueba que la automatización autentica y hace una operación real de la API. Si falla, el mensaje muestra el avance (`automation.*`, `backend.*`, `role.*`, `scope.*`, `admin_api.*`) y el error. El alcance se declara en el realm del repositorio y en `kc_automation_roles` (ver `docs/operations/runbooks/recuperar-keycloak.md`, *Alcance de roles de los clientes propios*).
    Solo P2, a continuación (`keycloak-admin.sh platform-admin`): crea el administrador humano permanente de `master` (ver [Administrador humano permanente](#administrador-humano-permanente)). Si falla, el evento falla con el avance (`platform_admin.*`) y el error; el estado técnico ya quedó establecido y el paso 6 se ejecuta igual.
 6. Siempre, también si 1-5 fallaron (`always`): elimina la autoridad temporal **propia** —la del evento, al final, y huérfanas propias de eventos interrumpidos—, verifica que Keycloak rechaza la del evento y que la base no tiene ninguna propia. Nunca toca una autoridad temporal ajena (de todos modos bloquea antes del evento). Después la clasificación debe dar P1 y sigue la reconciliación P1.
 
@@ -448,7 +577,7 @@ El correo por SES llega al `.env` solo con `NOTIFICATIONS_SES_ENABLED=true` en e
 
 ## Secrets requeridos en GitHub
 
-Los siguientes secrets pertenecen al GitHub Environment `production-hetzner` (alcance declarado en `.github/scripts/audit-github-trust.sh`), no al repositorio. Solo el job `production` los lee:
+Los siguientes secrets pertenecen al GitHub Environment `production-hetzner` (alcance declarado en `.github/scripts/audit-github-trust.sh`), no al repositorio. Los de la aplicación solo los lee el job `production`:
 
 ```
 POSTGRES_PASSWORD            # Password del superusuario administrativo de postgres
@@ -468,6 +597,18 @@ IDENTITY_SEED_ADMIN_PASSWORD # Un solo uso: contraseña temporal del primer ADMI
 SES_SMTP_USERNAME            # Solo con la variable NOTIFICATIONS_SES_ENABLED=true. Los recibe el
 SES_SMTP_PASSWORD            # converge, nunca el deploy (docs/operations/runbooks/correo-ses.md)
 ```
+
+Los del stack de observabilidad los lee el job `observability` (y, solo para comprobar su forma
+sin red, el paso de entradas de `production` en Run P y Run I):
+
+```
+GRAFANA_VIEWER_EMAILS        # Lista Viewer de Grafana: correos en minúsculas separados por comas, o none
+GRAFANA_EDITOR_EMAILS        # Lista Editor de Grafana, mismo formato (secretos: el repositorio es público)
+OBS_DISCORD_WEBHOOK_URL      # Webhook de Alertmanager (receptor discord); solo con la operación full
+```
+
+`observability` también usa `TF_API_TOKEN` (solo lectura del estado actual para la dirección del
+servidor) y `ANSIBLE_SSH_KEY`; nunca los secretos de la base, Keycloak, Cloudflare, SES ni Pages.
 
 Qué exige la verificación de credenciales depende del modo del run: con configuración del
 servidor (`run_host_config`) exige las contraseñas de la base, `CLOUDFLARE_DNS_API_TOKEN`,
@@ -663,20 +804,21 @@ Last profile that met the validation criteria was 'production'.
 
 - **push a `main`**: todo push a `main` dispara el workflow (sin filtro de rutas). Con `vars.PRODUCTION_PUSH_DEPLOY` sin definir o en `deferred`, el push queda **diferido**: termina en `success` sin efectos y sin avanzar el rango. Con `enabled`, clasifica el rango desde el commit del último run *push* que lo procesó, es decir, con el job `range_processed` en `success` en su último intento, hasta el commit actual (`.github/scripts/production-range-base.sh` + `classify-production.sh`). Si no hay un run procesado previo, o su commit no es ancestro del actual, clasifica el árbol completo. Así un run fallido, cancelado o que quedó obsoleto porque otro commit (aunque no toque producción) avanzó `main` queda cubierto por el run de ese commit. Fallido, cancelado o reemplazado nunca avanza la base; un rango sin cambios de producción termina como no-op limpio.
 - La documentación (`*.md`) bajo `infra/ansible` e `infra/terraform` no cuenta como cambio de producción; tampoco `frontend/README.md`.
-- **workflow_dispatch**: intención explícita por inputs (`stage`, `run_terraform_apply`, builds, configuración, deploy, rollback, `run_frontend_publish`); no avanza el rango. `stage=provision` (Run P) y `stage=install` (Run I) son las etapas de un servidor nuevo o reemplazado ([instalacion-nueva.md](../../docs/operations/runbooks/instalacion-nueva.md), `production-stage.sh`): Run P exige la instalación completa y termina antes del servidor; Run I prohíbe `run_terraform_apply`, planifica igual y falla si el plan tiene cambios. Fuera de Run P, un plan que crea o reemplaza el servidor falla antes de la segunda aprobación, y Run P solo lo aplica con los push retenidos (`PRODUCTION_PUSH_DEPLOY` sin definir o en `deferred`, leída en `classify`). Un plan que destruye el servidor sin crear otro falla en todas las etapas. `run_frontend_publish` es `false` por defecto (un dispatch existente se comporta igual) y no se combina con un break-glass.
+- **Stack de observabilidad**: un componente aparte con su propio progreso (`observability_processed`, "Observabilidad procesada"). Un push lo pide cuando cambió lo que consume desde su último procesado (`infra/observability`, el rol `observability`, sus playbooks; con los archivos compartidos —política de logs (su tarea y `defaults/main/log_policy.yml`, lo único de los defaults del rol que carga converge; `defaults/main/stack.yml` es solo del stack), inventario, `ansible.cfg`, Compose de los productores— corren el converge y el stack). El núcleo avanza con `range_processed` aunque el stack falle, y al revés: la autoridad es el job de señal de cada componente en el último intento del run, no su conclusión. Un Run I exitoso también deja la señal del núcleo.
+- **workflow_dispatch**: intención explícita por inputs (`stage`, `run_terraform_apply`, builds, configuración, deploy, rollback, `run_frontend_publish`, `observability`); un dispatch ordinario no avanza el núcleo. `observability=full` (solo el stack, sin build, migración, deploy, Terraform ni Pages; avanza el stack) o `grafana-access` (solo las listas de Grafana; no avanza nada). `stage=provision` (Run P) y `stage=install` (Run I) son las etapas de un servidor nuevo o reemplazado ([instalacion-nueva.md](../../docs/operations/runbooks/instalacion-nueva.md), `production-stage.sh`): Run P exige la instalación completa (también `observability=full`, cuyas entradas comprueba sin red) y termina antes del servidor; Run I prohíbe `run_terraform_apply`, planifica igual y falla si el plan tiene cambios. Fuera de Run P, un plan que crea o reemplaza el servidor falla antes de la segunda aprobación, y Run P solo lo aplica con los push retenidos (`PRODUCTION_PUSH_DEPLOY` sin definir o en `deferred`, leída en `classify`). Un plan que destruye el servidor sin crear otro falla en todas las etapas. `run_frontend_publish` es `false` por defecto (un dispatch existente se comporta igual) y no se combina con un break-glass.
 - Dos conceptos independientes, `terraform_required` y `deploy_required`, dan cuatro clases: solo Terraform, solo Deploy, Terraform → Deploy, o no-op limpio (el run termina en éxito sin pasar por ningún gate). Con Terraform, el plan decide si hay Apply: un plan sin cambios no aplica nada.
 - Un tercero, `frontend_required` (cambios bajo `frontend/`), agrega la publicación en Pages al final de esa clase: `frontend_only`, `apply_then_frontend`, `deploy_then_frontend` o `apply_then_deploy_then_frontend`. Sin cambios del frontend las cuatro clases anteriores no cambian; un cambio solo del frontend no construye imágenes, no lee HCP ni toca el servidor, y no requiere `TF_API_TOKEN`.
 - Solo `main` puede iniciar producción.
 
 ### Autoridad
 
-Solo los jobs `terraform_plan` y `production` usan el environment `production-hetzner` y credenciales de producción: `terraform_plan` solo `TF_API_TOKEN`; `production` además SSH, secretos de la app y token de Pages. Clasificación, builds, selección y escaneo corren antes, solo con `GITHUB_TOKEN`. No hay acceso SSH ni lectura de HCP antes del primer gate.
+Solo los jobs `terraform_plan`, `production` y `observability` usan el environment `production-hetzner` y credenciales de producción: `terraform_plan` solo `TF_API_TOKEN`; `production` además SSH, secretos de la app y token de Pages; `observability` lectura del estado de HCP, SSH, las listas de Grafana y el webhook. `observability` corre después de `conclude` (núcleo terminado o no requerido), con su propia aprobación, la misma identidad del host (pin) y la frescura de `main` justo antes de mutar. Clasificación, builds, selección y escaneo corren antes, solo con `GITHUB_TOKEN`. No hay acceso SSH ni lectura de HCP antes del primer gate.
 
 Con Terraform hay **dos aprobaciones del mismo environment**, con propósitos distintos: la de `terraform_plan` autoriza usar las credenciales de HCP para planificar este commit; la de `production` se pide cuando el plan definitivo ya está revisado en el resumen del run y autoriza aplicar **ese** saved plan y seguir con el deploy y el frontend. Sin Terraform (solo deploy o solo frontend) `terraform_plan` se salta y hay una sola aprobación, la de `production`. Un plan sin cambios sin nada más que hacer no llega a `production`.
 
 `production` corre solo si: sin Terraform, `terraform_plan` quedó **saltado**; con Terraform, `terraform_plan` terminó en **éxito** con `has_changes` exactamente `true` (aplicar) o `false` (solo si además hay deploy o frontend). Un fallo, una cancelación o una salida vacía o inválida dejan `production` sin correr y `conclude` en fallo: un job saltado nunca cuenta como trabajo hecho.
 
-La concurrencia (`piedrazul-production-hetzner`, `cancel-in-progress: false`, `queue: max`) se aplica a ambos jobs: los pendientes esperan en cola en vez de reemplazarse. El orden de la cola no define la corrección; la frescura, la revalidación del saved plan y el rango acumulado sí.
+La concurrencia (`piedrazul-production-hetzner`, `cancel-in-progress: false`, `queue: max`) se aplica a los tres jobs: los pendientes esperan en cola en vez de reemplazarse. El orden de la cola no define la corrección; la frescura, la revalidación del saved plan y el rango acumulado sí.
 
 #### Plan de Terraform (`terraform_plan`)
 
@@ -704,7 +846,7 @@ Dentro de `production`, en orden:
 12. **Publicación del frontend** (si `frontend_required`, y solo con el preflight del paso 5 en éxito): con frescura justo antes si el run no hizo antes otra mutación de producción; `wrangler pages deploy` del artefacto validado y verificación del deployment creado por esa invocación. Si la preparación del paso 0 falla, el run no hace ninguna mutación de producción (ni plan, ni Apply, ni servidor, ni Pages), aunque los jobs previos sin privilegios del run pueden haber producido ya artefactos (imágenes en GHCR, el artifact del frontend, evidencia de escaneo). Ver [Publicación del frontend](../../docs/architecture/overview.md#publicación-del-frontend-cloudflare-pages).
 13. **Limpieza del run de Terraform** (`hcp_cleanup`, siempre que este intento intentó crear un run, también si el job falla, se cancela o vence): solo sobre runs con el mensaje de este intento; si GitHub no llegó a registrar el id (la creación falló o se cortó tras crearlo en HCP), lo busca por ese mensaje entre los 20 runs más recientes. Esperando confirmación → se descarta; planificando → se cancela; confirmado o aplicando → no se toca y se informa como Apply aceptado (cancelar el job no deshace un Apply que HCP ya aceptó; el siguiente run reconcilia el estado).
 
-El resumen del job muestra el plan (conteos, enlace y si requirió confirmación), qué pasó con el run de este intento, el state version consumido, las identidades (y las anteriores), el veredicto de la política por imagen y la primera etapa que falló: credenciales, preparación del frontend, frescura, HCP (workspace, plan, confirmación, estado), proyecto de Pages tras Terraform, acceso al servidor, selección, escaneo previo, política de vulnerabilidades, registro de break-glass, deploy, identidad en ejecución, health, registro o publicación en Pages. El job `conclude` hace que la conclusión del run sea success solo si producción terminó bien (incluida la publicación del frontend cuando hacía falta) o no hacía falta. La base del siguiente rango no es esa conclusión sino `range_processed`, que corre después solo en un push ordinario: un push diferido termina en success sin procesar nada.
+El resumen del job muestra el plan (conteos, enlace y si requirió confirmación), qué pasó con el run de este intento, el state version consumido, las identidades (y las anteriores), el veredicto de la política por imagen y la primera etapa que falló: credenciales, preparación del frontend, frescura, HCP (workspace, plan, confirmación, estado), proyecto de Pages tras Terraform, acceso al servidor, selección, escaneo previo, política de vulnerabilidades, registro de break-glass, deploy, identidad en ejecución, health, registro o publicación en Pages. El job `conclude` hace que la conclusión del run sea success solo si producción terminó bien (incluida la publicación del frontend cuando hacía falta) o no hacía falta. La base del siguiente rango no es esa conclusión sino `range_processed`, que corre después solo en un push ordinario o en un Run I: un push diferido termina en success sin procesar nada.
 
 ### Identidad inmutable
 
