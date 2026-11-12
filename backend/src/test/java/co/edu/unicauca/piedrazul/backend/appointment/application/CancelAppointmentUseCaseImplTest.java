@@ -49,7 +49,7 @@ class CancelAppointmentUseCaseImplTest {
         UUID appointmentId = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
         Appointment appointment = buildAppointment(idPatient, LocalDate.now().plusDays(1));
-        when(appointmentRepository.findById(appointmentId)).thenReturn(appointment);
+        when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(appointment);
 
         useCase.cancel(appointmentId, idPatient);
 
@@ -61,7 +61,7 @@ class CancelAppointmentUseCaseImplTest {
     void shouldCancelWhenPatientIdIsNullBecauseStaffCancels() {
         UUID appointmentId = UUID.randomUUID();
         Appointment appointment = buildAppointment(UUID.randomUUID(), LocalDate.now().plusDays(1));
-        when(appointmentRepository.findById(appointmentId)).thenReturn(appointment);
+        when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(appointment);
 
         useCase.cancel(appointmentId, null);
 
@@ -73,7 +73,7 @@ class CancelAppointmentUseCaseImplTest {
     void shouldThrowWhenPatientIdDoesNotMatchAppointmentOwner() {
         UUID appointmentId = UUID.randomUUID();
         Appointment appointment = buildAppointment(UUID.randomUUID(), LocalDate.now().plusDays(1));
-        when(appointmentRepository.findById(appointmentId)).thenReturn(appointment);
+        when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(appointment);
 
         assertThatThrownBy(() -> useCase.cancel(appointmentId, UUID.randomUUID()))
                 .isInstanceOf(AppointmentAccessDeniedException.class);
@@ -86,7 +86,7 @@ class CancelAppointmentUseCaseImplTest {
         UUID appointmentId = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
         Appointment appointment = buildAppointment(idPatient, LocalDate.now().minusDays(1));
-        when(appointmentRepository.findById(appointmentId)).thenReturn(appointment);
+        when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(appointment);
 
         assertThatThrownBy(() -> useCase.cancel(appointmentId, idPatient))
                 .isInstanceOf(CancelAppointmentNotAllowedException.class);

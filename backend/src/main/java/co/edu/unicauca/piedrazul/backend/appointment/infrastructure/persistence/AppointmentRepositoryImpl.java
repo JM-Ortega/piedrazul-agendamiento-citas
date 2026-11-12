@@ -28,6 +28,10 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     /** Propiedad única de la entidad: último criterio de orden para que la paginación sea estable. */
     private static final String ID_PROPERTY = "idAppointment";
 
+    /** Espacios de nombres de los bloqueos advisory de agendamiento (ver docs de concurrencia). */
+    static final String DOCTOR_LOCK_NAMESPACE = "piedrazul:appointment:doctor:";
+    static final String PATIENT_LOCK_NAMESPACE = "piedrazul:appointment:patient:";
+
     private final AppointmentJpaRepository jpaRepository;
     private final AppointmentMapper mapper;
 
@@ -101,6 +105,37 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
         return jpaRepository.findById(appointmentId)
                 .map(mapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Cita con ID: " + appointmentId + "no encontrada"));
+    }
+
+    @org.springframework.transaction.annotation.Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    @Override
+    public Appointment findByIdForUpdate(UUID appointmentId) {
+        // Mismo mensaje (incluido el texto exacto) que findById: contrato HTTP 400 existente.
+        return jpaRepository.findByIdForUpdate(appointmentId)
+                .map(mapper::toDomain)
+                .orElseThrow(() -> new IllegalArgumentException("Cita con ID: " + appointmentId + "no encontrada"));
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    @Override
+    public boolean markUnassistedIfScheduled(UUID appointmentId) {
+        return jpaRepository.updateStateIfCurrent(
+                appointmentId, AppointmentState.AGENDADA, AppointmentState.NO_ASISTIO) > 0;
+    }
+
+    @org.springframework.transaction.annotation.Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    @Override
+    public void lockDoctorSchedule(UUID idDoctor) {
+        jpaRepository.acquireTransactionAdvisoryLock(DOCTOR_LOCK_NAMESPACE + idDoctor);
+    }
+
+    @org.springframework.transaction.annotation.Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    @Override
+    public void lockPatientSchedule(UUID idPatient) {
+        jpaRepository.acquireTransactionAdvisoryLock(PATIENT_LOCK_NAMESPACE + idPatient);
     }
 
     @Override

@@ -4,7 +4,10 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.entity.AppointmentEntity;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,9 +15,32 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface AppointmentJpaRepository extends JpaRepository<AppointmentEntity, UUID>, JpaSpecificationExecutor<AppointmentEntity> {
+
+    /** SELECT ... FOR UPDATE: serializa las transiciones de estado de una misma cita. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from AppointmentEntity a where a.idAppointment = :id")
+    Optional<AppointmentEntity> findByIdForUpdate(@Param("id") UUID id);
+
+    /** Actualización condicional atómica: solo cambia la fila si el estado persistido sigue siendo {@code expected}. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update AppointmentEntity a set a.appointmentState = :target "
+            + "where a.idAppointment = :id and a.appointmentState = :expected")
+    int updateStateIfCurrent(@Param("id") UUID id,
+                             @Param("expected") AppointmentState expected,
+                             @Param("target") AppointmentState target);
+
+    /**
+     * Toma un bloqueo advisory a nivel de transacción. La función de PostgreSQL devuelve
+     * {@code void}, que Hibernate no sabe mapear: se convierte a texto para poder ejecutarla
+     * como consulta. La clave es el hash de 64 bits (en el servidor) de un nombre con espacio de
+     * nombres, p. ej. {@code piedrazul:appointment:doctor:<uuid>}.
+     */
+    @Query(value = "select cast(pg_advisory_xact_lock(hashtextextended(:lockName, 0)) as text)", nativeQuery = true)
+    String acquireTransactionAdvisoryLock(@Param("lockName") String lockName);
 
     List<AppointmentEntity> findByIdPatient(UUID idPatient);
 

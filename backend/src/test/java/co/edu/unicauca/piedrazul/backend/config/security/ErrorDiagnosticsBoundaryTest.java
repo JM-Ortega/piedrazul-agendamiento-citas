@@ -430,7 +430,7 @@ class ErrorDiagnosticsBoundaryTest {
 
     private UUID appointmentIn(AppointmentState state) {
         UUID id = UUID.randomUUID();
-        when(appointmentRepository.findById(id)).thenReturn(Appointment.reconstruct(
+        when(appointmentRepository.findByIdForUpdate(id)).thenReturn(Appointment.reconstruct(
                 id, UUID.randomUUID(), UUID.randomUUID(), SpecialtyCode.FISIOTERAPIA, state,
                 LocalDate.now().plusDays(1), new AppointmentTime(LocalTime.of(9, 0)), SchedulingOrigin.MANUAL));
         return id;

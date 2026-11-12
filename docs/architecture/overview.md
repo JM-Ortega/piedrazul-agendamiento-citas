@@ -280,6 +280,18 @@ incluida la recuperación, mientras dure.
 - Integración mediante Spring Data JPA como capa de persistencia.
 - Migraciones de esquema versionadas mediante Flyway (ADR-002).
 
+### Concurrencia en citas
+
+PostgreSQL trabaja en `READ COMMITTED`: dos reservas que leen a la vez la agenda de un doctor pueden aprobar el mismo hueco. Por eso el módulo appointment serializa con bloqueos de PostgreSQL, sin cambios de esquema:
+
+- **Reservas (`MANUAL` y `AUTONOMO`).** `AppointmentSchedulingService.schedule` toma, dentro de su transacción, `pg_advisory_xact_lock` del doctor antes de leer sus citas y, ya resuelto el paciente, el del paciente antes de evaluar las reglas que dependen de él. **Orden fijo: doctor y luego paciente** (así dos reservas cruzadas no se bloquean entre sí). Los locks duran hasta el commit o rollback; quien pierde espera, ve lo confirmado y recibe el mismo rechazo de dominio que en secuencia.
+- **Claves.** Hash de 64 bits, calculado en PostgreSQL (`hashtextextended`), de `piedrazul:appointment:doctor:<uuid>` y `piedrazul:appointment:patient:<uuid>`. El espacio de nombres evita colisiones entre ambos tipos. `AppointmentRepository.lockDoctorSchedule` y `lockPatientSchedule` exigen una transacción activa (`MANDATORY`).
+- **Transiciones de estado.** Cancelar, marcar atendida y marcar no asistida cargan la cita con `findByIdForUpdate` (`SELECT … FOR UPDATE`) dentro de una sola transacción; la transición perdedora lanza `AppointmentStateConflictException` (HTTP 500, contrato sin cambios). Una cita inexistente conserva su mensaje y el HTTP 400.
+- **Cierre nocturno.** `markUnassistedIfScheduled` es un `UPDATE … WHERE state_code = 'AGENDADA'`: si otra operación ya movió la cita, afecta 0 filas y no se sobrescribe nada.
+- **Convención para futuros caminos de escritura.** Cualquier código que cree o reprograme citas de un doctor o paciente debe seguir este protocolo (mismas claves, mismo orden, dentro de una transacción); un camino que no lo haga reabre la carrera. Fuera de este protocolo siguen reservas contra descansos o cambios de intervalo del doctor y los registros `SIN_CITA`.
+
+Verificación: `AppointmentConcurrencyIT` y `AppointmentLockProtocolIT` (PostgreSQL real, pausas deterministas observadas en `pg_stat_activity`).
+
 ## Seguridad
 
 - La autenticación y la administración de identidades están delegadas en Keycloak.
