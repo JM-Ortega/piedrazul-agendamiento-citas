@@ -39,6 +39,11 @@ services:
       MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE}
 
       APP_TIMEZONE: ${APP_TIMEZONE}
+      # Zona por defecto de la JVM = zona de negocio. La imagen corre en UTC y el código usa
+      # LocalDate.now()/LocalTime.now() y @Scheduled(cron) sin zona explícita; sin TZ, entre las
+      # 19:00 y las 23:59 de Bogotá la fecha es la del día siguiente y el cron de las 01:00
+      # corre a las 20:00. La zona del host no se hereda al contenedor.
+      TZ: ${APP_TIMEZONE}
 
       MANAGEMENT_EXPOSED_ENDPOINTS: ${MANAGEMENT_EXPOSED_ENDPOINTS}
       MANAGEMENT_HEALTH_DETAILS: ${MANAGEMENT_HEALTH_DETAILS}
