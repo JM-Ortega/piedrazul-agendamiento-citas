@@ -51,6 +51,9 @@
 #   subida directa. El estado del dominio propio (activación/certificado) se informa y no
 #   bloquea: pendiente no prueba ni activación ni fallo permanente (p. ej. Cloudflare Access
 #   o la emisión del certificado), y la publicación no se verifica por el dominio propio.
+#   Si rechaza por dominio no asociado, antes del error informa por stderr (solo
+#   informativo, saneado, sin cambiar el resultado) cómo vino `domains` y, con una lectura
+#   del endpoint del dominio, su HTTP y estado puntuales; no esperan ni reintentan.
 #   Salida: project_state=present, pages_source=direct_upload, previous_deployment_id
 #   (vacío en un proyecto sin publicaciones), previous_deployment_commit, production_url
 #   (alias *.pages.dev de producción), custom_domain_status.
@@ -229,10 +232,46 @@ is_complete() {
   jq -e --arg d "${PAGES_DOMAIN}" '(.domains // []) | (type == "array") and (index($d) != null)' <<< "$1" > /dev/null
 }
 
+# domain_diagnostics <proyecto JSON>: evidencia para el rechazo por dominio no asociado.
+# Solo informa (stderr); nunca decide ni cambia el resultado. Usa el proyecto ya leído (sin
+# otra lectura) y, como mucho, un GET informativo del endpoint dedicado del dominio. Solo
+# imprime valores saneados (hostnames válidos acotados, códigos y estados en lista blanca):
+# nunca cuerpos, cabeceras, token ni texto de error del proveedor.
+domain_diagnostics() {
+  local shown body code st
+  shown=$(jq -r '
+    def host: type == "string" and test("\\A[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?\\z");
+    if has("domains") | not then "ausente"
+    elif .domains == null then "null"
+    elif (.domains | type) != "array" then "tipo inesperado (\(.domains | type))"
+    elif (.domains | length) == 0 then "lista vacía"
+    else
+      [.domains[] | select(host)] as $ok
+      | "lista de \(.domains | length) entradas: [\($ok[:10] | join(", "))]"
+        + (if ($ok | length) > 10 then ", \(($ok | length) - 10) válidas omitidas" else "" end)
+        + (if (.domains | length) > ($ok | length) then ", \((.domains | length) - ($ok | length)) no válidas" else "" end)
+    end' <<< "$1" 2> /dev/null) || shown="ilegible"
+  body=$(mktemp) || return 0
+  code=$(cf_status "/accounts/${PAGES_ACCOUNT_ID}/pages/projects/${PAGES_PROJECT}/domains/${PAGES_DOMAIN}" "${body}") || code=000
+  [[ "${code}" =~ ^[0-9]{3}$ ]] || code=000
+  st=unreadable
+  if [ "${code}" = 200 ]; then
+    st=$(jq -r 'if .success == true and ((.result.status // "") | type == "string" and test("\\A[a-z_]{1,32}\\z")) then .result.status else "unreadable" end' "${body}" 2> /dev/null) || st=unreadable
+  fi
+  {
+    echo "Diagnóstico Pages: dominios del proyecto: ${shown}"
+    echo "Diagnóstico Pages: endpoint del dominio ${PAGES_DOMAIN}: HTTP ${code}, estado ${st} (observación puntual e informativa; no decide ni prueba la causa)"
+  } >&2
+  rm -f -- "${body}"
+}
+
 # validate_project <proyecto JSON>: identidad y completitud (preflight estricto)
 validate_project() {
   validate_identity "$1"
-  is_complete "$1" || fail "${PAGES_PROJECT} no tiene asociado el dominio declarado ${PAGES_DOMAIN}"
+  if ! is_complete "$1"; then
+    domain_diagnostics "$1" || true
+    fail "${PAGES_PROJECT} no tiene asociado el dominio declarado ${PAGES_DOMAIN}"
+  fi
 }
 
 emit_present() { # <proyecto JSON>
