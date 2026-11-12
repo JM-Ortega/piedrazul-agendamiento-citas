@@ -255,7 +255,40 @@ check "Terraform: sin variables de integración Git (github_*, build_command, ou
 check "Terraform: cuenta y zona dedicadas declaradas" \
   bash -c "grep -qx 'cloudflare_account_id = \"ab4f90b9b70538731273c3fdf9548f07\"' '${TF}/piedrazul.auto.tfvars' && grep -qx 'cloudflare_zone_id = \"b663ee4c0c9adb151120634cb7b84e7b\"' '${TF}/piedrazul.auto.tfvars' && grep -qx 'base_domain = \"piedrazul.org\"' '${TF}/piedrazul.auto.tfvars' && grep -qx 'project = \"piedrazul\"' '${TF}/piedrazul.auto.tfvars'"
 check "Terraform: orden proyecto → CNAME (módulo dns) → asociación del dominio, un solo dueño del registro" \
-  bash -c "$(declare -f tf_code); sed -n '/^module \"pages\"/,/^}/p' '${TF}/main.tf' | grep -qE 'custom_domain_dns_record_id[[:space:]]*=[[:space:]]*module\\.dns\\.frontend_record_id' && sed -n '/resource \"cloudflare_pages_domain\"/,/^}/p' '${PAGES_MOD}/main.tf' | grep -q 'var.custom_domain_dns_record_id' && grep -q 'cloudflare_dns_record.frontend.id' '${ROOT}/infra/terraform/modules/cloudflare/dns/outputs.tf' && sed -n '/^module \"dns\"/,/^}/p' '${TF}/main.tf' | grep -qE 'pages_hostname[[:space:]]*=[[:space:]]*module\\.pages\\.pages_hostname' && [ \"\$(tf_code '${ROOT}'/infra/terraform/modules/*/*/*.tf | grep -c 'resource \"cloudflare_dns_record\"')\" = 3 ] && ! tf_code '${PAGES_MOD}'/*.tf | grep -q cloudflare_dns_record"
+  bash -c "$(declare -f tf_code); sed -n '/^module \"pages\"/,/^}/p' '${TF}/main.tf' | grep -qE 'custom_domain_dns_record_id[[:space:]]*=[[:space:]]*module\\.dns\\.frontend_record_id' && sed -n '/resource \"cloudflare_pages_domain\"/,/^}/p' '${PAGES_MOD}/main.tf' | grep -q 'var.custom_domain_dns_record_id' && grep -q 'cloudflare_dns_record.frontend.id' '${ROOT}/infra/terraform/modules/cloudflare/dns/outputs.tf' && sed -n '/^module \"dns\"/,/^}/p' '${TF}/main.tf' | grep -qE 'pages_hostname[[:space:]]*=[[:space:]]*module\\.pages\\.pages_hostname' && ! tf_code '${PAGES_MOD}'/*.tf | grep -q cloudflare_dns_record"
+
+# Propietario del registro DNS: el conjunto exacto de recursos cloudflare_dns_record de todo
+# infra/terraform es {api, auth, frontend, grafana} y todos viven en el módulo dns (un quinto
+# registro, o uno declarado en otro módulo o en live/, rompe la propiedad a propósito)
+dns_resources() { # <raíz terraform> → "<ruta relativa del directorio>:<recurso>" por cada cloudflare_dns_record, ordenado
+  local f dir
+  find "$1" -name '*.tf' -not -path '*/.terraform/*' | while read -r f; do
+    dir=$(dirname "${f#"$1"/}")
+    tf_code "${f}" | sed -nE "s|^[[:space:]]*resource[[:space:]]+\"cloudflare_dns_record\"[[:space:]]+\"([^\"]+)\".*|${dir}:\1|p"
+  done | sort
+}
+DNS_DIR=modules/cloudflare/dns
+DNS_EXPECTED="${DNS_DIR}:api"$'\n'"${DNS_DIR}:auth"$'\n'"${DNS_DIR}:frontend"$'\n'"${DNS_DIR}:grafana"
+check "Terraform: los registros DNS de Cloudflare son exactamente api, auth, frontend y grafana, todos en modules/cloudflare/dns" \
+  test "$(dns_resources "${ROOT}/infra/terraform")" = "${DNS_EXPECTED}"
+# Negativo en una copia desechable: un registro fuera del módulo autorizado debe violar la propiedad
+mkdir -p "${TMP}/tf-neg"
+cp -r "${ROOT}/infra/terraform/." "${TMP}/tf-neg/"
+printf 'resource "cloudflare_dns_record" "stray" {}\n' > "${TMP}/tf-neg/modules/cloudflare/pages/stray.tf"
+fails "Terraform (negativo, copia temporal): un registro DNS declarado fuera del módulo dns viola la propiedad" \
+  test "$(dns_resources "${TMP}/tf-neg")" = "${DNS_EXPECTED}"
+rm -f "${TMP}/tf-neg/modules/cloudflare/pages/stray.tf"
+printf 'resource "cloudflare_dns_record" "quinto" {}\n' > "${TMP}/tf-neg/modules/cloudflare/dns/quinto.tf"
+fails "Terraform (negativo, copia temporal): un quinto registro en el módulo dns exige actualizar el conjunto esperado" \
+  test "$(dns_resources "${TMP}/tf-neg")" = "${DNS_EXPECTED}"
+# El módulo movido a otro directorio que también se llama dns no pasa: cuenta la ruta, no el nombre
+rm -rf "${TMP}/tf-neg"
+mkdir -p "${TMP}/tf-neg"
+cp -r "${ROOT}/infra/terraform/." "${TMP}/tf-neg/"
+mkdir -p "${TMP}/tf-neg/modules/otro"
+mv "${TMP}/tf-neg/modules/cloudflare/dns" "${TMP}/tf-neg/modules/otro/dns"
+fails "Terraform (negativo, copia temporal): los mismos recursos en otro directorio llamado dns no cumplen la ruta autorizada" \
+  test "$(dns_resources "${TMP}/tf-neg")" = "${DNS_EXPECTED}"
 
 # ── curl y wrangler falsos ──
 # curl: sirve, por URL, una secuencia de respuestas (<clave>.1, .2, …; la última se repite)
@@ -406,6 +439,59 @@ cf_seq "${PROJ_URL}" "$(project_json "${PREV}" direct develop)"
 fails "preflight: rama de producción distinta de main" bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight"
 cf_seq "${PROJ_URL}" "$(project_json "${PREV}" direct main '["otro.org"]')"
 fails "preflight: el proyecto no tiene asociado el dominio declarado" bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight"
+# Diagnóstico del rechazo por dominio no asociado: solo stderr, informativo; el resultado, el
+# código de salida y stdout no cambian, no hay reintentos del proyecto y a lo sumo una lectura
+# del endpoint del dominio
+diag_case() { # <descripción> <proyecto JSON> <respuesta del dominio | -> <texto esperado en stderr>
+  local rc=0
+  : > "${FAKE_CF_LOG}"
+  cf_seq "${PROJ_URL}" "$2"
+  if [ "$3" = - ]; then cf_clear "${DOMAIN_URL}"; else cf_seq "${DOMAIN_URL}" "$3"; fi
+  bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight" > "${TMP}/dg.out" 2> "${TMP}/dg.err" || rc=$?
+  if [ "${rc}" -eq 1 ] && [ ! -s "${TMP}/dg.out" ] &&
+     grep -qx 'Error: piedrazul no tiene asociado el dominio declarado piedrazul.org' "${TMP}/dg.err" &&
+     grep -qF -- "$4" "${TMP}/dg.err" &&
+     [ "$(grep -cF "${PROJ_URL}|" "${FAKE_CF_LOG}")" = 1 ] && [ "$(grep -cF "${DOMAIN_URL}|" "${FAKE_CF_LOG}")" = 1 ] &&
+     ! grep -qE 'SECRET|Authorization|"success"|"result"' "${TMP}/dg.err"; then
+    ok "preflight (diagnóstico): $1"
+  else
+    ko "preflight (diagnóstico): $1 (rc=${rc}; stdout=$(wc -c < "${TMP}/dg.out")B; $(paste -sd'|' "${TMP}/dg.err" | cut -c1-300))"
+  fi
+}
+OTRO_PROJECT="$(project_json "${PREV}" direct main '["otro.org"]')"
+diag_case "dominio ausente de la lista, endpoint activo → mismo fallo; informa la lista y el estado" "${OTRO_PROJECT}" "$(domain_json active)" \
+  'dominios del proyecto: lista de 1 entradas: [otro.org]'
+diag_case "estado del endpoint pendiente se informa tal cual (observación puntual)" "${OTRO_PROJECT}" "$(domain_json pending)" 'HTTP 200, estado pending'
+diag_case "endpoint 404 → HTTP 404" "${OTRO_PROJECT}" "$(cf_error 404 7003)" 'HTTP 404, estado unreadable'
+diag_case "endpoint 500 → HTTP 500" "${OTRO_PROJECT}" "$(cf_error 500 1)" 'HTTP 500, estado unreadable'
+diag_case "endpoint sin respuesta (red) → HTTP 000; el fallo original no cambia" "${OTRO_PROJECT}" - 'HTTP 000, estado unreadable'
+diag_case "endpoint 200 con cuerpo ilegible → unreadable" "${OTRO_PROJECT}" '<html>no es json</html>' 'HTTP 200, estado unreadable'
+diag_case "estado del endpoint hostil (mayúsculas, salto de línea, ::) → unreadable" "${OTRO_PROJECT}" \
+  "$(jq -cn '{success: true, result: {name: "piedrazul.org", status: "active\n::error::x"}}')" 'HTTP 200, estado unreadable'
+diag_case "domains ausente" "$(project_json "${PREV}" | jq -c 'del(.result.domains)')" "$(domain_json active)" 'dominios del proyecto: ausente'
+diag_case "domains null" "$(project_json "${PREV}" | jq -c '.result.domains = null')" "$(domain_json active)" 'dominios del proyecto: null'
+diag_case "domains lista vacía" "$(project_json "${PREV}" direct main '[]')" "$(domain_json active)" 'dominios del proyecto: lista vacía'
+diag_case "domains no es una lista (string)" "$(project_json "${PREV}" direct main '"piedrazul.org"')" "$(domain_json active)" 'tipo inesperado (string)'
+diag_case "domains no es una lista (objeto)" "$(project_json "${PREV}" direct main '{"a":1}')" "$(domain_json active)" 'tipo inesperado (object)'
+# Valores hostiles y volumen: solo hostnames válidos, acotados, sin control ni comandos de workflow
+HOSTILE=$(jq -cn '["piedrazul.pages.dev", "::error::boom", "evil.com\n::warning::x", "\u001b[31mrojo", 5, null, "MAYUS.com", ("x" * 300)]
+  + [range(0; 12) | "h\(.).example.com"]')
+diag_case "domains hostiles/numerosos: válidos acotados, el resto solo contado" "$(project_json "${PREV}" direct main "${HOSTILE}")" "$(domain_json active)" \
+  '3 válidas omitidas, 7 no válidas'
+check "preflight (diagnóstico): sin comandos de workflow, secuencias de control ni valores hostiles en stderr" \
+  bash -c "! grep -q '^::' '${TMP}/dg.err' && ! grep -qP '[\\x00-\\x08\\x0b-\\x1f\\x7f]' '${TMP}/dg.err' && ! grep -qE 'boom|warning|evil|MAYUS' '${TMP}/dg.err'"
+cf_seq "${DOMAIN_URL}" "$(domain_json pending)"
+# Rutas que no deben diagnosticar ni leer el endpoint del dominio: identidad incorrecta y éxito
+: > "${FAKE_CF_LOG}"
+cf_seq "${PROJ_URL}" "$(project_json "${PREV}" direct develop '["otro.org"]')"
+bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight" > /dev/null 2> "${TMP}/dg.err" || true
+check "preflight: con identidad incorrecta falla antes de la completitud, sin diagnóstico ni lectura del dominio" \
+  bash -c "! grep -q 'Diagnóstico Pages' '${TMP}/dg.err' && ! grep -qF '${DOMAIN_URL}|' '${FAKE_CF_LOG}'"
+: > "${FAKE_CF_LOG}"
+cf_seq "${PROJ_URL}" "$(project_json "${PREV}")"
+bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight" > /dev/null 2> "${TMP}/dg.err" || true
+check "preflight: el éxito no emite diagnóstico y lee el dominio una sola vez (estado informativo, como antes)" \
+  bash -c "! grep -q 'Diagnóstico Pages' '${TMP}/dg.err' && [ \"\$(grep -cF '${DOMAIN_URL}|' '${FAKE_CF_LOG}')\" = 1 ]"
 cf_seq "${PROJ_URL}" "$(project_json "${PREV}" | jq -c '.result.name = "otro"')"
 fails "preflight: el proyecto leído no es el declarado" bash -c "${PAGES_DEF}; pages_env '${PAGES}' preflight"
 cf_seq "${PROJ_URL}" "$(project_json "${PREV}" | jq -c '.result.subdomain = "piedrazul.example.com"')"

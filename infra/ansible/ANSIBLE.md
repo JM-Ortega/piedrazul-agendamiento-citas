@@ -333,7 +333,7 @@ Ver [Logs, "Perfil de laboratorio sintético"](../../docs/operations/runbooks/lo
 
 - Actualiza cache de apt (`cache_valid_time: 3600`)
 - Instala `curl`, `gnupg`, `ca-certificates`, `lsb-release`
-- Configura timezone a `America/Bogota`
+- Configura timezone a `America/Bogota`. Esto solo fija la zona del host: los contenedores no la heredan. La zona de negocio del backend la entrega `app_timezone` (`APP_TIMEZONE` en `.env`, vía `env.j2`) y `infra/compose/backend.yml` mapea ese mismo valor a `TZ`, que es la zona por defecto de la JVM
 
 ### `docker_host`
 

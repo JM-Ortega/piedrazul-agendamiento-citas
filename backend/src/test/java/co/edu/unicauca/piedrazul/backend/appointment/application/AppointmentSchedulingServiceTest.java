@@ -348,8 +348,10 @@ class AppointmentSchedulingServiceTest {
                     appointmentService);
             order.verify(doctorConfigConsultPort).getIntervalMinutesByDoctor(idDoctor);
             order.verify(doctorConfigConsultPort).getDoctorName(idDoctor);
+            order.verify(appointmentRepository).lockDoctorSchedule(idDoctor);
             order.verify(appointmentRepository).findByDoctorIdAndDate(idDoctor, date);
             order.verify(patientResolutionStrategy).resolve(any());
+            order.verify(appointmentRepository).lockPatientSchedule(idPatient);
             order.verify(appointmentRepository).findByPatientIdAndDate(idPatient, date);
             order.verify(appointmentService).scheduleManual(request, 30, List.of());
             order.verify(appointmentRepository).save(returned);

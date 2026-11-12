@@ -5,6 +5,8 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.CancelApp
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.*;
 
+import jakarta.transaction.Transactional;
+
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -17,9 +19,11 @@ public class CancelAppointmentUseCaseImpl implements CancelAppointmentUseCase {
     }
 
     @Override
+    @Transactional
     public void cancel(UUID  appointmentId, UUID patientId) {
 
-        Appointment appointment = appointmentRepository.findById(appointmentId);
+        // Carga con bloqueo de fila: cargar, validar y guardar son una sola unidad transaccional
+        Appointment appointment = appointmentRepository.findByIdForUpdate(appointmentId);
 
         if(patientId != null && !patientId.equals(appointment.getIdPatient())) {
             throw new AppointmentAccessDeniedException(

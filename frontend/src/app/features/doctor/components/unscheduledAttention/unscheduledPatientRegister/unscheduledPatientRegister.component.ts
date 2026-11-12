@@ -6,6 +6,7 @@ import {
   inject,
   output,
   signal,
+  OnInit,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
@@ -52,7 +53,7 @@ const OBSERVATION_MAX_LENGTH = 300;
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './unscheduledPatientRegister.component.html',
 })
-export class UnscheduledPatientRegisterComponent {
+export class UnscheduledPatientRegisterComponent implements OnInit {
   private doctorService = inject(DoctorService);
 
   @Input() set prefillDocument(value: string) {
@@ -81,6 +82,10 @@ export class UnscheduledPatientRegisterComponent {
   readonly remainingObservationChars = computed(
     () => this.observationMaxLength - this.observation().length
   );
+
+  ngOnInit(): void {
+    this.selectedSpecialty.set(this.specialtyOptions[0]?.value ?? '');
+  }
 
   onPatientFormChange(value: PatientFormData): void {
     this.patientFormValue.set(value);

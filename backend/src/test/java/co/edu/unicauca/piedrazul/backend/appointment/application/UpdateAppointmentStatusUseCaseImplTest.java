@@ -70,7 +70,7 @@ class UpdateAppointmentStatusUseCaseImplTest {
         void shouldChangeStateToAtendidaAndSkipClinicalHistoryWhenDescriptionIsBlank() {
             UUID appointmentId = UUID.randomUUID();
             Appointment appointment = buildScheduledAppointment(UUID.randomUUID(), UUID.randomUUID());
-            when(appointmentRepository.findById(appointmentId)).thenReturn(appointment);
+            when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(appointment);
 
             useCase.markAsAttended(appointmentId, "   ");
 
@@ -85,7 +85,7 @@ class UpdateAppointmentStatusUseCaseImplTest {
             UUID idDoctor = UUID.randomUUID();
             UUID idPatient = UUID.randomUUID();
             Appointment appointment = buildScheduledAppointment(idDoctor, idPatient);
-            when(appointmentRepository.findById(appointmentId)).thenReturn(appointment);
+            when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(appointment);
             when(doctorConfigConsultPort.getDoctorName(idDoctor)).thenReturn("Dra. Prueba");
 
             useCase.markAsAttended(appointmentId, "Paciente estable");
@@ -101,7 +101,7 @@ class UpdateAppointmentStatusUseCaseImplTest {
                     UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), SpecialtyCode.FISIOTERAPIA,
                     AppointmentState.CANCELADA, LocalDate.now().plusDays(1),
                     new AppointmentTime(LocalTime.of(9, 0)), SchedulingOrigin.MANUAL);
-            when(appointmentRepository.findById(appointmentId)).thenReturn(appointment);
+            when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(appointment);
 
             assertThatThrownBy(() -> useCase.markAsAttended(appointmentId, null))
                     .isInstanceOf(IllegalStateException.class);
@@ -117,7 +117,7 @@ class UpdateAppointmentStatusUseCaseImplTest {
         void shouldChangeStateToNoAsistioAndNeverTouchClinicalHistory() {
             UUID appointmentId = UUID.randomUUID();
             Appointment appointment = buildScheduledAppointment(UUID.randomUUID(), UUID.randomUUID());
-            when(appointmentRepository.findById(appointmentId)).thenReturn(appointment);
+            when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(appointment);
 
             useCase.markAsUnassisted(appointmentId);
 

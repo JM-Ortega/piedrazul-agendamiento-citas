@@ -26,7 +26,7 @@ public class UpdateAppointmentStatusUseCaseImpl implements UpdateAppointmentStat
     @Transactional
     public void markAsAttended(UUID appointmentId, String clinicalHistoryDescription) {
         // Obtener la cita por ID
-        Appointment appointment = appointmentRepository.findById(appointmentId);
+        Appointment appointment = appointmentRepository.findByIdForUpdate(appointmentId);
 
         // Actualizar el estado a ATENDIDA
         appointment.changeState(AppointmentState.ATENDIDA);
@@ -45,7 +45,7 @@ public class UpdateAppointmentStatusUseCaseImpl implements UpdateAppointmentStat
     @Transactional
     public void markAsUnassisted(UUID appointmentId) {
         // Obtener la cita por ID
-        Appointment appointment = appointmentRepository.findById(appointmentId);
+        Appointment appointment = appointmentRepository.findByIdForUpdate(appointmentId);
 
         // Actualizar el estado a NO ASISTIDA
         appointment.changeState(AppointmentState.NO_ASISTIO);

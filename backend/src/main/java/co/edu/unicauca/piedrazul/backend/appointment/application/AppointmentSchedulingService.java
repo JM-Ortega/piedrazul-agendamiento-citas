@@ -100,10 +100,17 @@ public class AppointmentSchedulingService {
 
         int intervalMinutes = doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor);
         String doctorName = doctorConfigConsultPort.getDoctorName(idDoctor);
+
+        // Serializa los agendamientos del mismo doctor: el lock se toma ANTES de leer sus citas y
+        // se retiene hasta el commit/rollback. Orden de bloqueo: doctor -> paciente.
+        appointmentRepository.lockDoctorSchedule(idDoctor);
         List<Appointment> existingAppointments = appointmentRepository.findByDoctorIdAndDate(idDoctor, date);
 
         // Srategy para manejar el paciente dependiendo del tipo de agendamiento
         ResolvedPatient resolvedPatient = patientResolutionStrategy.resolve(patientContext);
+
+        // Serializa los agendamientos del mismo paciente antes de evaluar las reglas que dependen de él
+        appointmentRepository.lockPatientSchedule(resolvedPatient.idPatient());
 
         // Valida que si el paciente es nuevo su cita sea con Terapia Neural
         validateNewPatientFirstAppointmentSpecialty(resolvedPatient.idPatient(), specialty);

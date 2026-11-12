@@ -35,6 +35,37 @@ public interface AppointmentRepository {
     boolean existsByIdAndState(UUID appointmentId, AppointmentState state);
 
     Appointment findById(UUID appointmentId);
+
+    /**
+     * Igual que {@link #findById(UUID)} (misma excepción si no existe), pero toma un bloqueo de
+     * escritura sobre la fila hasta el fin de la transacción. Las transiciones de estado lo usan
+     * para que dos operaciones concurrentes sobre la misma cita no puedan ganar ambas.
+     * Exige una transacción activa.
+     */
+    Appointment findByIdForUpdate(UUID appointmentId);
+
+    /**
+     * Pasa la cita a NO_ASISTIO solo si en base de datos sigue AGENDADA al momento de la
+     * actualización (una única sentencia atómica).
+     *
+     * @return {@code true} si la fila cambió; {@code false} si otra transición ya la había
+     *         movido de estado (no se sobrescribe nada)
+     */
+    boolean markUnassistedIfScheduled(UUID appointmentId);
+
+    /**
+     * Bloqueo consultivo (advisory) de la agenda del doctor, retenido hasta el commit/rollback de
+     * la transacción actual. Debe tomarse antes de leer las citas del doctor. Exige una
+     * transacción activa. Orden obligatorio: doctor y luego paciente.
+     */
+    void lockDoctorSchedule(UUID idDoctor);
+
+    /**
+     * Bloqueo consultivo (advisory) del paciente, retenido hasta el commit/rollback de la
+     * transacción actual. Debe tomarse antes de evaluar las reglas que dependen del paciente.
+     * Exige una transacción activa. Orden obligatorio: doctor y luego paciente.
+     */
+    void lockPatientSchedule(UUID idPatient);
   
     List<Appointment> findAllByDate(LocalDate date);
 

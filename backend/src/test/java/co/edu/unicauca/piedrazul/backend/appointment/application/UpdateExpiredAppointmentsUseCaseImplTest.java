@@ -49,7 +49,7 @@ class UpdateExpiredAppointmentsUseCaseImplTest {
 
         useCase.updateExpiredAppointments();
 
-        verify(appointmentRepository, never()).save(any());
+        verify(appointmentRepository, never()).markUnassistedIfScheduled(any());
     }
 
     @Test
@@ -58,13 +58,31 @@ class UpdateExpiredAppointmentsUseCaseImplTest {
         Appointment second = buildScheduledAppointment(LocalDate.now().minusDays(1));
         when(appointmentRepository.findScheduledAppointmentsBefore(LocalDate.now()))
                 .thenReturn(List.of(first, second));
+        when(appointmentRepository.markUnassistedIfScheduled(any())).thenReturn(true);
 
         useCase.updateExpiredAppointments();
 
         assertThat(first.getAppointmentState()).isEqualTo(AppointmentState.NO_ASISTIO);
         assertThat(second.getAppointmentState()).isEqualTo(AppointmentState.NO_ASISTIO);
-        verify(appointmentRepository).save(first);
-        verify(appointmentRepository).save(second);
+        verify(appointmentRepository).markUnassistedIfScheduled(first.getIdAppointment());
+        verify(appointmentRepository).markUnassistedIfScheduled(second.getIdAppointment());
+        verify(appointmentRepository, never()).save(any());
+    }
+
+    @Test
+    void aZeroRowConditionalUpdateIsSkippedAndTheBatchContinues() {
+        Appointment changedConcurrently = buildScheduledAppointment(LocalDate.now().minusDays(2));
+        Appointment next = buildScheduledAppointment(LocalDate.now().minusDays(1));
+        when(appointmentRepository.findScheduledAppointmentsBefore(LocalDate.now()))
+                .thenReturn(List.of(changedConcurrently, next));
+        when(appointmentRepository.markUnassistedIfScheduled(changedConcurrently.getIdAppointment())).thenReturn(false);
+        when(appointmentRepository.markUnassistedIfScheduled(next.getIdAppointment())).thenReturn(true);
+
+        useCase.updateExpiredAppointments();
+
+        verify(appointmentRepository).markUnassistedIfScheduled(changedConcurrently.getIdAppointment());
+        verify(appointmentRepository).markUnassistedIfScheduled(next.getIdAppointment());
+        verify(appointmentRepository, never()).save(any());
     }
 
     @Test
@@ -81,6 +99,7 @@ class UpdateExpiredAppointmentsUseCaseImplTest {
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(next.getAppointmentState()).isEqualTo(AppointmentState.AGENDADA);
+        verify(appointmentRepository, never()).markUnassistedIfScheduled(any());
         verify(appointmentRepository, never()).save(any());
     }
 }
