@@ -1,0 +1,79 @@
+---
+# Precondición de deploy sobre Keycloak: ya convergido con la identidad esperada y healthy.
+# Solo lee: deploy nunca lo arranca, recrea, reconfigura ni repara (eso es de converge).
+#
+# Un Keycloak que converge dejó healthy puede estar `starting` aquí sin ser un fallo: lo reinicia
+# el daemon (un reinicio de Docker, la política `unless-stopped` tras una caída del host) y su
+# healthcheck vuelve a empezar (start_period 40 s). Esa transición se espera, acotada:
+#
+#   espera (no avanza)  mientras el contenedor existe, corre, se creó desde la identidad esperada,
+#                       no está reiniciándose y su health es `starting`
+#   deja de esperar     ante cualquier otra cosa: `healthy` (pasa), `unhealthy`, sin healthcheck,
+#                       ausente, detenido, en reinicio continuo o con otra identidad
+#   agotado el plazo    queda `starting` y el assert falla: no es un caso especial
+#
+# La decisión es siempre del assert de abajo, el mismo de antes: healthy y la identidad exacta.
+# Sin esperas fijas: el plazo es el máximo de reintentos sobre el estado observado, el mismo
+# que verify_health.yml (36 x 10 s = 6 min; el healthcheck de Compose declara 40 s + 30 x 10 s).
+#
+# Variables:
+#   app_deploy_keycloak_image[0]   identidad exacta esperada (de image.env; la define deploy.yml)
+#   app_keycloak_ready_container   contenedor (por defecto keycloak)
+#   app_keycloak_ready_retries     reintentos (por defecto 36)
+#   app_keycloak_ready_delay       segundos entre reintentos (por defecto 10)
+# Resultado: app_deploy_keycloak_before (id, started_at, running, health, config_image), que
+# deploy.yml compara después de desplegar para probar que no tocó Keycloak.
+
+# El resultado de docker_container_info trae el entorno del contenedor (secretos): nunca se
+# muestra; solo se usa el resumen
+- name: Esperar a que Keycloak deje de estar en arranque (solo lectura)
+  community.docker.docker_container_info:
+    name: "{{ app_keycloak_ready_container | default('keycloak') }}"
+  register: app_deploy_keycloak_before_info
+  until: >-
+    not (app_deploy_keycloak_before_info.exists | default(false))
+    or not ((app_deploy_keycloak_before_info.container.State | default({}, true)).Running | default(false))
+    or (app_deploy_keycloak_before_info.container.State | default({}, true)).Restarting | default(false)
+    or (app_deploy_keycloak_before_info.container.Config | default({}, true)).Image | default('') != app_deploy_keycloak_image[0]
+    or ((app_deploy_keycloak_before_info.container.State | default({}, true)).Health | default({}, true)).Status | default('none') != 'starting'
+  retries: "{{ app_keycloak_ready_retries | default(36) }}"
+  delay: "{{ app_keycloak_ready_delay | default(10) }}"
+  # Un contenedor ausente o en mal estado lo decide el assert de abajo (exists=false no es un error
+  # del módulo). Un error del propio módulo (el daemon no responde) sí falla aquí, sin reintentos
+  # y sin disfrazarse de "ausente".
+  failed_when: "'exists' not in app_deploy_keycloak_before_info"
+  no_log: true
+
+- name: Resumir el contenedor keycloak (antes de desplegar)
+  ansible.builtin.set_fact:
+    app_deploy_keycloak_before: "{{ _summary }}"
+  vars:
+    _k: "{{ app_deploy_keycloak_before_info.container | default({}, true) }}"
+    _summary:
+      exists: "{{ app_deploy_keycloak_before_info.exists | default(false) }}"
+      id: "{{ _k.Id | default('') }}"
+      started_at: "{{ (_k.State | default({}, true)).StartedAt | default('') }}"
+      running: "{{ (_k.State | default({}, true)).Running | default(false) }}"
+      health: "{{ ((_k.State | default({}, true)).Health | default({}, true)).Status | default('sin healthcheck') }}"
+      config_image: "{{ (_k.Config | default({}, true)).Image | default('') }}"
+  no_log: true
+
+# healthy con esa referencia = converge ya lo arrancó con esa imagen y Keycloak terminó su
+# migración (no informa listo antes). Cualquier otro estado lo resuelve converge, no deploy.
+- name: Verificar que Keycloak ya está convergido con esa identidad
+  ansible.builtin.assert:
+    that:
+      - app_deploy_keycloak_before.exists | bool
+      - app_deploy_keycloak_before.running | bool
+      - app_deploy_keycloak_before.health == 'healthy'
+      - app_deploy_keycloak_before.config_image == app_deploy_keycloak_image[0]
+    fail_msg: >-
+      KEYCLOAK: deploy no arranca, recrea ni actualiza Keycloak. image.env pide
+      {{ app_deploy_keycloak_image[0] }}; el contenedor keycloak está
+      {{ 'ausente' if not (app_deploy_keycloak_before.exists | bool)
+         else ('en ejecución' if app_deploy_keycloak_before.running | bool else 'detenido')
+              ~ ', health ' ~ app_deploy_keycloak_before.health
+              ~ ', creado desde ' ~ (app_deploy_keycloak_before.config_image or '?') }}.
+      {{ 'Se esperó a que dejara de estar en arranque y el plazo se agotó. ' if app_deploy_keycloak_before.health == 'starting' else '' }}No se tocó nada: corre converge (run_host_config=true), que arranca o actualiza Keycloak
+      con su ciclo (keycloak_lifecycle.yml).
+    success_msg: "keycloak convergido: {{ app_deploy_keycloak_image[0] }} healthy"

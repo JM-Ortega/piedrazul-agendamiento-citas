@@ -358,6 +358,8 @@ cualquier deploy: una instalación nueva no tiene excepciones.
 | confirmación fuera de GitHub | Apply aceptado por HCP (observado hasta terminar); servidor y Pages sin cambios | revisar ese Apply; re-run completo |
 | Apply terminado con error | estado parcial según el error de HCP | revisar el error; corregir y re-run completo (el plan nuevo parte de ese estado) |
 | Apply parcial (p. ej. creó el proyecto de Pages y falló antes del CNAME o de la asociación del dominio) | proyecto con la identidad correcta pero incompleto | re-run completo con Terraform: el sondeo lo admite como `incomplete`, el plan debe mostrar la creación de la asociación, y el preflight estricto exige el proyecto completo antes de publicar. Un run sin Terraform (solo frontend o deploy) falla ante un proyecto incompleto |
+| converge termina bien y el deploy falla porque Keycloak está `starting` (p. ej. el daemon de Docker se reinició después de crearlo) | contenedores correctos, backend sin desplegar | ya no ocurre por este motivo: el deploy espera, solo leyendo y hasta 6 min, a que un Keycloak con la identidad esperada deje de estar `starting`. Si aun así falla con `starting` tras el plazo, o con `unhealthy`, detenido o ausente, es un fallo real: `docker logs keycloak` y relanzar Run I (su converge lo reconcilia con su ciclo) |
+| converge o deploy fallan con `LOGS: <servicio> usa …` | contenedores correctos pero creados antes de que el daemon corriera con `daemon.json` (sin la rotación de logs) | [reconciliar-logs-contenedores.md](reconciliar-logs-contenedores.md): `check`, y `apply` solo con autorización explícita; después relanzar Run I. Ningún run lo recrea |
 | cloud-init falló, quedó degradado (errores recuperables), sigue corriendo, no se pudo leer (salida ilegible, forma inesperada o ssh/comando remoto con código distinto de 0) o venció el plazo | servidor creado, sin configurar (el diagnóstico dice cuál de los casos) | revisar `cloud-init status --long` con el usuario `ops`; corregir y re-run (en un servidor nuevo, recrearlo es también válido) |
 | Run P: Apply interrumpido o ya completado (incluido el preflight de Pages que falla con «no tiene asociado el dominio declarado» después de un Apply exitoso) | según lo que HCP haya aplicado; un Apply exitoso no se revierte porque el preflight falle después | leer en el step las líneas `Diagnóstico Pages:` (cómo vino `domains` en el proyecto y el HTTP/estado del endpoint del dominio: informativos y puntuales, no prueban la causa del desfase) y volver a lanzar Run P revisando el estado actual de HCP y el plan nuevo: sin cambios, el preflight se evalúa contra el estado actual e informa la identidad; con cambios inesperados o deriva, no aprobar otro Apply y escalar. Si el dominio sigue sin aparecer en `domains`, no asumir un retraso transitorio |
 | el plan de Run I tiene cambios | sin Apply; el saved plan se descarta | revisar el plan; si corresponde, Run P y después Run I |
@@ -368,6 +370,10 @@ cualquier deploy: una instalación nueva no tiene excepciones.
 | después de la identidad (`sshd`, SSH, converge, deploy, health) | infraestructura creada; servidor sin último éxito o con el anterior; Pages sin cambios | corregir y relanzar Run I: el pin sigue vigente |
 | publicación de Pages | release parcial: servidor registrado, frontend anterior (o ninguno) | re-run; republicar el mismo contenido es inocuo |
 
+- **Horas en el host.** El servidor está en `America/Bogota` (`-05:00`) y los logs de GitHub están en
+  UTC. Al consultar el journal por hora se pasa la zona explícita
+  (`journalctl -u docker --since "2026-11-12 18:40:00 UTC"`); sin ella la hora se interpreta como local
+  y la consulta puede no devolver nada.
 - **Re-run de solo los jobs fallidos**: si *Producción* falló antes de confirmar por una causa
   transitoria y su limpieza no descartó el saved plan, un *Re-run failed jobs* reutiliza el
   plan revisado (mismo mensaje del run de HCP) siempre que siga vigente (sin cambios de
@@ -487,6 +493,11 @@ desde la cadena) y vuelve a comprobar el estado en el siguiente run o en el dash
   logs; el escaneo de las imágenes del stack en un runner real; el stack aplicado en el host real
   (journald, Alloy con el journal persistente, Grafana por Access con un JWT real) y la entrega a
   Discord, que la cadena nunca prueba.
+- Que el role `docker_host` reinicie el daemon antes de crear contenedores en un servidor limpio
+  (`flush_handlers` y la espera por `docker info`), que un converge sin cambios no lo reinicie, y que
+  la verificación de logs efectivos pase en una instalación completa. La secuencia está probada con
+  Ansible real sin Docker (`infra/tests/docker-host-ordering-check.sh`); apt, systemd y el daemon
+  real no.
 - En Hetzner: el acceso real a la consola, el acceso de `root` por consola en un servidor sin clave
   SSH asignada, `metadata/instance-id` y que la huella leída coincida con la que recibe el runner.
 - Que `ssh-keyscan` desde un runner de GitHub alcance el puerto 22 a través del firewall real, y

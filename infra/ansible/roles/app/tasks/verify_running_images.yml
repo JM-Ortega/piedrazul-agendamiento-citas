@@ -17,6 +17,9 @@
 # Docker abrevia las imágenes oficiales de Docker Hub (docker.io/library/traefik → traefik)
 # en RepoDigests: las comparaciones quitan ese prefijo de ambos lados (misma referencia; no
 # cambia las de ghcr.io ni quay.io).
+#
+# Con app_verify_log_config=true (producción, inventories/prod/group_vars/all.yml) comprueba además
+# la configuración de logs efectiva de esos mismos contenedores (verify_log_config.yml).
 
 - name: Validar servicios a verificar
   ansible.builtin.assert:
@@ -62,7 +65,9 @@
         {%- set _ = r.update({c.item: {'exists': c.exists | default(false),
                                        'running': (k.State | default({}, true)).Running | default(false),
                                        'config_image': (k.Config | default({}, true)).Image | default(''),
-                                       'image': k.Image | default('')}}) -%}
+                                       'image': k.Image | default(''),
+                                       'log_type': ((k.HostConfig | default({}, true)).LogConfig | default({}, true)).Type | default(''),
+                                       'log_opts': ((k.HostConfig | default({}, true)).LogConfig | default({}, true)).Config | default({}, true)}}) -%}
       {%- endfor -%}
       {{ r }}
   no_log: true
@@ -96,3 +101,9 @@
     _hub: '^docker\.io/library/'
     _expected: "{{ app_release_expected[item] | regex_replace(_hub, '') }}"
     _i: "{{ (app_release_images.results | selectattr('item', 'equalto', item) | first).images | default([], true) }}"
+
+# Logs efectivos del contenedor (solo producción: app_verify_log_config). Va después de la
+# identidad: un contenedor ausente o detenido ya falló arriba y aquí solo se juzga lo que corre.
+- name: Verificar la configuración de logs efectiva
+  ansible.builtin.include_tasks: verify_log_config.yml
+  when: app_verify_log_config | default(false) | bool

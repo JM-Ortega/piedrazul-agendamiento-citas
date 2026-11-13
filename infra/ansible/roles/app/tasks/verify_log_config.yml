@@ -1,0 +1,94 @@
+---
+# Configuración de logs EFECTIVA de los contenedores en ejecución contra la política de producción.
+# La incluye verify_running_images.yml con app_verify_log_config=true (solo producción); desarrollo,
+# harnesses y laboratorios no la activan y no heredan los valores por defecto de un daemon.json
+# que no tienen.
+#
+# Autoridad de cada servicio (la misma lista que escribe <SERVICIO>_LOGGING en .env, env.j2):
+#   en obs_log_services → driver journald (logging.yml, base journald)
+#   el resto            → los valores por defecto de /etc/docker/daemon.json: su driver json-file y
+#                         cada una de sus log-opts (rotación max-size / max-file). Compose no los
+#                         repite (logging.yml, base default): los hereda el contenedor al crearse.
+#
+# Por qué se verifica: un contenedor toma su LogConfig AL CREARSE. Uno creado antes de que el
+# daemon corra con daemon.json conserva la configuración anterior (sin rotación) por mucho que
+# después se corrija el daemon, y Compose no lo recrea (su hash no cambió). Esto lo hace visible.
+# Solo juzga los servicios de app_release_services, los mismos que la identidad ya probó que
+# existen y corren: un servicio que todavía no se espera no produce un falso fallo, y uno
+# esperado no se escapa.
+#
+# Variables:
+#   app_release_services          servicios a verificar
+#   app_release_running           resumen por servicio (verify_running_images.yml: log_type, log_opts)
+#   obs_log_services              servicios con journald (inventario)
+#   app_docker_daemon_json        ruta de daemon.json (por defecto /etc/docker/daemon.json)
+#
+# Corrección de un contenedor no conforme: docs/operations/runbooks/reconciliar-logs-contenedores.md.
+# Ningún converge ni deploy recrea contenedores para corregirlo.
+
+- name: Leer la configuración por defecto del daemon de Docker
+  ansible.builtin.slurp:
+    src: "{{ app_docker_daemon_json | default('/etc/docker/daemon.json') }}"
+  register: app_log_daemon_raw
+  # Con failed_when: false no queda `failed`: la señal de un archivo ilegible o ausente es no tener `content`
+  failed_when: false
+
+- name: Interpretar la configuración por defecto del daemon de Docker
+  block:
+    - name: Leer los valores por defecto de logs
+      ansible.builtin.set_fact:
+        app_log_daemon: "{{ app_log_daemon_raw.content | b64decode | from_json }}"
+      when: app_log_daemon_raw.content is defined
+  rescue:
+    - name: Fallar por un daemon.json ilegible
+      ansible.builtin.fail:
+        msg: >-
+          LOGS: {{ app_docker_daemon_json | default('/etc/docker/daemon.json') }} no es un JSON válido. No se
+          puede juzgar la rotación efectiva de los contenedores; no se registra como éxito.
+
+- name: Verificar que daemon.json declara la rotación de logs requerida
+  ansible.builtin.assert:
+    that:
+      - app_log_daemon_raw.content is defined
+      - app_log_daemon is mapping
+      - app_log_daemon['log-driver'] | default('') == 'json-file'
+      - app_log_daemon['log-opts'] | default({}, true) is mapping
+      - (app_log_daemon['log-opts'] | default({}, true))['max-size'] | default('') | string | length > 0
+      - (app_log_daemon['log-opts'] | default({}, true))['max-file'] | default('') | string | length > 0
+    fail_msg: >-
+      LOGS: {{ app_docker_daemon_json | default('/etc/docker/daemon.json') }}
+      {{ 'no se pudo leer' if app_log_daemon_raw.content is not defined
+         else 'no declara log-driver json-file con log-opts max-size y max-file' }}.
+      La rotación de los contenedores sin driver propio depende de él; no se registra como éxito.
+      Lo aplica el role docker_host (converge).
+    quiet: true
+
+- name: Verificar la configuración de logs efectiva de los contenedores
+  ansible.builtin.assert:
+    that:
+      - _c.log_type == _expected_type
+      - _bad_opts | length == 0
+    fail_msg: >-
+      LOGS: {{ item }} usa {{ _actual }}; la política de producción exige {{ _required }}
+      {{ '(opciones que difieren: ' ~ (_bad_opts | join(', ')) ~ ')' if _bad_opts else '' }}.
+      Un contenedor toma su configuración de logs al crearse; uno creado antes de que daemon.json
+      estuviera en vigor no la hereda después. Este converge/deploy no lo recrea: ver
+      docs/operations/runbooks/reconciliar-logs-contenedores.md. No se registra como éxito.
+    success_msg: "{{ item }}: logs {{ _required }}"
+  loop: "{{ app_release_services }}"
+  vars:
+    _c: "{{ app_release_running[item] }}"
+    _expected_type: "{{ 'journald' if item in (obs_log_services | default([])) else (app_log_daemon['log-driver'] | default('json-file')) }}"
+    _daemon_opts: "{{ (app_log_daemon['log-opts'] | default({}, true)) if _expected_type == 'json-file' else {} }}"
+    _actual: >-
+      {{ _c.log_type or 'un driver desconocido' }}{{ (' ' ~ (_c.log_opts | default({}, true) | to_json)) if _c.log_type == 'json-file' else '' }}
+    _required: >-
+      {{ _expected_type }}{{ (' ' ~ (_daemon_opts | to_json)) if _expected_type == 'json-file' else '' }}
+    _bad_opts: >-
+      {%- set bad = [] -%}
+      {%- for k, v in _daemon_opts.items() -%}
+        {%- if ((_c.log_opts | default({}, true))[k] | default('')) | string != v | string -%}
+          {%- set _ = bad.append(k) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ bad }}
