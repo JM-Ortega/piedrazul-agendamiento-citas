@@ -100,7 +100,9 @@ public class PatientGlobalExceptionHandler extends BaseExceptionHandler {
             // ni aviso repetido por cada solicitud. Cualquier otro 503 sigue como error.
             log.debug("Solicitud de código rechazada en patients [{}]", errorCode);
         } else if (status.is5xxServerError()) {
-            log.error("Error no controlado en patients", ex);
+            // Misma protección que el 500 inesperado: clase, marcos y SQLState de cada causa, sin
+            // mensajes (pueden traer el DETAIL de la base de datos o datos de la persona).
+            logUnexpected(log, "Error no controlado en patients [" + errorCode + "]", ex, request);
         } else {
             // Sin el mensaje: el de negocio puede traer el documento o el correo de la persona
             log.warn("Error de negocio en patients [{}]: {}", ex.getClass().getSimpleName(), errorCode);

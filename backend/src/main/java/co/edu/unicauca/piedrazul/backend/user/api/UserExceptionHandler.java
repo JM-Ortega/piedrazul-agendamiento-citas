@@ -81,10 +81,12 @@ public class UserExceptionHandler extends BaseExceptionHandler {
             HttpServletRequest request
     ) {
 
+        // Por código y no por mensaje: el de negocio puede traer el usuario, el correo o la
+        // identificación de la persona (la respuesta HTTP no cambia).
         log.warn(
                 "Error de negocio en user [{}]: {}",
                 ex.getClass().getSimpleName(),
-                ex.getMessage()
+                ex.getErrorCode()
         );
 
         return buildProblem(

@@ -9,6 +9,8 @@ import co.edu.unicauca.piedrazul.backend.user.events.UserRoleAssignedEvent;
 import co.edu.unicauca.piedrazul.backend.user.events.UserRoleRevokedEvent;
 import co.edu.unicauca.piedrazul.backend.user.exception.IdentityProviderException;
 import co.edu.unicauca.piedrazul.backend.user.exception.InvalidUserDataException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
 import co.edu.unicauca.piedrazul.backend.user.exception.UserAlreadyExistsException;
@@ -91,13 +93,13 @@ public class KeycloakUserClient {
 
             if (status == Response.Status.BAD_REQUEST.getStatusCode()) {
                 String errorBody = response.hasEntity() ? response.readEntity(String.class) : "";
-                log.warn("Datos inválidos en Keycloak: {}", errorBody);
+                log.warn("Datos inválidos en Keycloak: {}", describeError(errorBody));
                 throw new InvalidUserDataException("Datos inválidos para crear el usuario");
             }
 
             if (status != Response.Status.CREATED.getStatusCode()) {
                 String errorBody = response.hasEntity() ? response.readEntity(String.class) : "";
-                log.error("Error Keycloak: {}", errorBody);
+                log.error("Error Keycloak (HTTP {}): {}", status, describeError(errorBody));
                 throw new IdentityProviderException("No se pudo crear el usuario");
             }
 
@@ -446,6 +448,35 @@ public class KeycloakUserClient {
         user.setEmail(email != null ? email : "");
     }
 
+    /**
+     * Resume el cuerpo de error de Keycloak para el log: {@code field}, {@code error} y
+     * {@code errorMessage} (claves como {@code error-user-attribute-read-only}) y nada más. Los
+     * {@code params} y cualquier otro campo pueden repetir los valores enviados (usuario, correo,
+     * nombres); un cuerpo que no es JSON solo deja su tamaño.
+     */
+    private String describeError(String body) {
+        if (body == null || body.isBlank()) {
+            return "sin cuerpo";
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            List<String> parts = new ArrayList<>();
+
+            for (String key : List.of("field", "error", "errorMessage")) {
+                JsonNode value = root.get(key);
+
+                if (value != null && value.isTextual()) {
+                    parts.add(key + "=" + value.asText());
+                }
+            }
+
+            return parts.isEmpty() ? "JSON sin campos de diagnóstico (" + body.length() + " caracteres)" : String.join(", ", parts);
+        } catch (JsonProcessingException | RuntimeException e) {
+            return "cuerpo no interpretable (" + body.length() + " caracteres)";
+        }
+    }
+
     private static String readBody(WebApplicationException ex) {
         try {
             return ex.getResponse().hasEntity() ? ex.getResponse().readEntity(String.class) : "";
@@ -477,7 +508,7 @@ public class KeycloakUserClient {
                                 + "habilite la edición de username en el realm");
             }
 
-            log.warn("Datos inválidos en Keycloak al actualizar usuario: {}", body);
+            log.warn("Datos inválidos en Keycloak al actualizar usuario: {}", describeError(body));
             return new InvalidUserDataException("Datos inválidos para actualizar el usuario");
         }
 
