@@ -73,9 +73,9 @@ db_host: postgres
 db_port: 5432
 db_name: piedrazul_db
 db_schema: piedrazul
-postgres_user: postgres                     # superusuario administrativo (POSTGRES_*)
-app_db_username: piedrazul_app              # backend en ejecución (APP_DB_*)
-migration_db_username: piedrazul_migration  # servicio migrate (MIGRATION_DB_*)
+postgres_user: postgres # superusuario administrativo (POSTGRES_*)
+app_db_username: piedrazul_app # backend en ejecución (APP_DB_*)
+migration_db_username: piedrazul_migration # servicio migrate (MIGRATION_DB_*)
 
 # Exclusividad del host para mutaciones de la base (reconciliación de roles y migración):
 # flock sobre este archivo, con espera acotada.
@@ -116,8 +116,8 @@ log_level_modulith: WARN
 # backend, keycloak y postgres exigen obs_log_privacy_controls_done (decisión de privacidad para
 # datos reales) o, solo con datos sintéticos, el perfil profiles/logs-lab-synthetic.yml.
 # Ver docs/operations/runbooks/logs.md.
-obs_log_services: [traefik]
-obs_log_privacy_controls_done: []
+obs_log_services: [traefik, keycloak, backend, postgres]
+obs_log_privacy_controls_done: [keycloak, backend, postgres]
 
 # Verificación de la configuración de logs EFECTIVA de los contenedores (verify_log_config.yml):
 # journald para obs_log_services y, para el resto, los valores por defecto de /etc/docker/daemon.json

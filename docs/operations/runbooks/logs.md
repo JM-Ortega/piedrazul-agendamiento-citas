@@ -163,7 +163,7 @@ Con la configuración por defecto solo Traefik va al journal y a Loki.
 
 Para un host de laboratorio desechable con **identidades y datos sintéticos** el perfil
 `infra/ansible/profiles/logs-lab-synthetic.yml` lleva al journal y a Loki los cuatro servicios
-principales con su diagnóstico completo, sin recortar mensajes:
+principales con el diagnóstico que deja cada productor:
 
 | Servicio | Qué llega | Qué no se activa |
 |---|---|---|
@@ -176,7 +176,7 @@ El perfil valida, con datos sintéticos, la misma configuración que usará la o
 lista, las mismas bases de `logging.yml`, la misma canalización. No es otra arquitectura. Lo que
 **no** es: no toma la decisión de privacidad (`obs_log_privacy_controls_done` no cambia), no
 admite backend, keycloak ni postgres para datos clínicos reales y no se guarda en el host. Sus logs pueden llevar identificadores de personas
-(sintéticas), valores de error (`Key (document_number)=(…)`), cuerpos de error de Keycloak y
+(sintéticas), valores de error (`Key (document_number)=(…)`) y
 nombres de usuario de intentos de inicio de sesión. Con datos reales no se usa.
 
 **Autorización.** `logs_lab_authorization: synthetic-data-only` (valor exacto) en el mismo run.
@@ -382,17 +382,63 @@ Añadir un servicio a `obs_log_privacy_controls_done` es la decisión, por servi
 logs son aceptables con datos reales en el journal del host (7 días) y en Loki (14 días), con el
 acceso a Grafana como única vía de lectura. El acceso restringido no autoriza a guardar
 credenciales; la decisión se toma con la evidencia del laboratorio (sección
-[Verificación en el host de laboratorio](#verificación-en-el-host-de-laboratorio)) y estas
-preguntas abiertas:
+[Verificación en el host de laboratorio](#verificación-en-el-host-de-laboratorio)) y con lo que
+sigue. El journal lo leen además root y el grupo del journal: esa vía es aparte del acceso a Grafana.
 
-| Servicio | Pendiente de decidir |
-|---|---|
-| backend | si los valores de la petición en mensajes de excepción, los cuerpos de error de Keycloak y la excepción completa del 5xx de pacientes se aceptan, se recortan en el productor (sin perder clase, causa, SQLState ni `correlation_id`) o se mueven a DEBUG |
-| keycloak | si `LOGIN_ERROR` en consola (usuario intentado, IP) se acepta o se deja solo en el almacén de eventos (`KC_LOG_LEVEL=…,org.keycloak.events:error`, sin tocar `LoginAuditJob`) |
-| postgres | si el `DETAIL` con valores de clave se acepta (diagnóstico más útil) o se reduce (`log_error_verbosity=terse`, que también quita `HINT` y `CONTEXT`) |
+| Servicio | Estado del productor | Qué queda registrado y se acepta al aprobar |
+|---|---|---|
+| backend | cerrado en el código | Clase, trazas completas, SQLState, `correlation_id` y, en los errores de negocio de `user` y `patients`, el código de error. **Ya no** se registran: el mensaje de los errores de negocio de `user` (puede traer usuario, correo o identificación), los cuerpos de error de Keycloak (solo `field`, `error` y `errorMessage`, sin `params`) ni los mensajes de las causas de un 5xx de pacientes (clase, marcos y SQLState sí). Los mensajes de `ex.getMessage()` de los demás manejadores (`doctors`, `appointment`, `statistics`, `audit`, `IllegalArgument`/`EntityNotFound` de `user`) se conservan: son textos de negocio sin datos de personas conocidos, y pueden repetir un valor enviado en la petición (p. ej. un UUID mal formado) |
+| keycloak | sin cambios | `LOGIN_ERROR` en consola (WARN: usuario intentado, IP, cliente, error). El realm solo emite `LOGIN` y `LOGIN_ERROR`; los eventos de administración están apagados; ninguno lleva contraseñas ni tokens. No se baja `KC_LOG_LEVEL` |
+| postgres | sin cambios | `DETAIL` de las violaciones de restricción con el valor de la clave (`Key (document_number)=(…)`), sentencia con `$n` sin valores de parámetros y esperas de lock. Es la exposición que se acepta al aprobar; los clientes locales del contenedor no registran sentencias (ver [Ajustes de PostgreSQL](#ajustes-de-postgresql)). No se usa `log_error_verbosity=terse` |
 
 Hasta esa decisión la lista por defecto es `[traefik]` y backend, keycloak y postgres siguen en
 `default` (sus logs en `json-file` del host, como siempre).
+
+### Activación en producción (sin ejecutar hasta la aprobación)
+
+Es **un solo run** del workflow *Producción*, lanzado a mano (`workflow_dispatch` sobre `main`; el
+push sigue diferido mientras `PRODUCTION_PUSH_DEPLOY` no lo active), después de aprobar y mergear
+el cambio de inventario. Entradas: `run_host_config=true`, `run_build=true`,
+`run_app_deploy=true`, `observability=full`. No requiere SSH ni scripts manuales: las listas
+viajan en el inventario (`group_vars/all.yml`) a los tres playbooks, y la política de fuentes
+(`log_policy.yml`) las valida en cada uno antes de cambiar nada.
+
+Orden dentro del run (cada paso solo corre si el anterior terminó bien):
+
+1. **converge** escribe `.env` (`<SERVICIO>_LOGGING=journald`) y recrea **postgres** (corte breve de
+   la base; espera su health check) y **Keycloak** (sin inicio de sesión hasta su readiness).
+   Backend y Keycloak no se recrean por la recreación de postgres (cada servicio se levanta por
+   separado); sus conexiones se cortan y dependen de la reconexión del pool. Después verifica
+   la identidad en ejecución de postgres, Keycloak y Traefik, incluido el **driver efectivo**
+   (`verify_log_config.yml`: `journald` para `obs_log_services`).
+2. **deploy** migra (sin cambios de esquema pendientes no hace nada) y recrea el **backend** con la
+   imagen construida en este mismo run y `journald`; verifica su identidad y driver efectivo y el
+   health. Por eso `run_build=true` es parte de la activación.
+3. **observability** (`full`) corre solo cuando el núcleo terminó bien y cambia la selección de
+   Alloy (recrea Alloy). Hasta ese paso nada se envía a Loki, de modo que los logs del backend
+   se centralizan solo cuando ya corre el código aprobado.
+
+Se conserva: el volumen `pgdata` y, con él, la base de Keycloak (identidades y realm), los datos
+de la aplicación, `alloy_data`/`loki_data` y las credenciales. Se pierde: el historial `json-file`
+de los contenedores recreados (el contenido nuevo queda en el journal y `docker logs` lo lee de
+allí).
+
+**Reintento.** Repetir el mismo dispatch: los playbooks son idempotentes y solo recrean lo que
+aún no tiene el driver pedido. **Fallo parcial.** Si falla tras converge, postgres y Keycloak ya
+escriben en el journal (7 días, solo root y el grupo del journal) pero nada llega a Loki porque
+el stack no corre tras un núcleo fallido; se repite el run. **Reversión.** Revertir el cambio de
+inventario y repetir el mismo run (`run_host_config`, `run_app_deploy`, `observability=full`): converge
+vuelve a `default` y recrea postgres y Keycloak, deploy recrea el backend y observability quita
+la selección. Lo ya escrito queda en el journal hasta su rotación y en Loki hasta su retención.
+
+**Límite.** Nada impide un run posterior con `image_tag` (rollback a una imagen antigua) o
+`run_build=false` mientras el backend sigue seleccionado: esa imagen enviaría a Loki los
+mensajes que el código aprobado ya no registra. Si hace falta, quitar `backend` de las listas en
+el mismo run.
+
+Comprobación posterior: `docker inspect` (driver `journald` en los cuatro, ver
+[Verificación en el host de laboratorio](#verificación-en-el-host-de-laboratorio), puntos 1-3),
+health público y una consulta por `service` en Grafana.
 
 ## Etiquetas y campos
 

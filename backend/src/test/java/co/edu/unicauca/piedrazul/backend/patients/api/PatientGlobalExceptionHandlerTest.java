@@ -183,6 +183,29 @@ class PatientGlobalExceptionHandlerTest {
         });
     }
 
+    @Test
+    void aBusiness5xxKeepsItsStackTraceAndSqlStateButNotTheMessagesOfItsCauses() {
+        java.sql.SQLException dbError = new java.sql.SQLException(
+                "ERROR: duplicate key (document_number)=(SYN0000001)", "23505");
+
+        ProblemDetail response = handler.handleRuntime(
+                new TestBusinessException("Fallo", "SYNTHETIC_DEPENDENCY_DOWN", HttpStatus.SERVICE_UNAVAILABLE, dbError),
+                buildRequest("/api/patients"));
+
+        // La respuesta que ve el frontend no depende de cómo se registra el fallo.
+        assertThat(response.getStatus()).isEqualTo(503);
+        assertThat(response.getDetail()).isEqualTo("Fallo");
+        assertThat(response.getProperties()).containsEntry("errorCode", "SYNTHETIC_DEPENDENCY_DOWN");
+
+        assertThat(appender.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+            assertThat(event.getFormattedMessage()).contains("SYNTHETIC_DEPENDENCY_DOWN");
+            assertThat(event.getThrowableProxy()).isNotNull();
+            assertThat(event.getThrowableProxy().getCause().getMessage()).contains("23505").doesNotContain("SYN0000001");
+            assertThat(event.getThrowableProxy().getCause().getStackTraceElementProxyArray()).isNotEmpty();
+        });
+    }
+
     private HttpServletRequest buildRequest(String uri) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI(uri);
@@ -215,6 +238,12 @@ class PatientGlobalExceptionHandlerTest {
 
         private final String errorCode;
         private final HttpStatus status;
+
+        TestBusinessException(String message, String errorCode, HttpStatus status, Throwable cause) {
+            super(message, cause);
+            this.errorCode = errorCode;
+            this.status = status;
+        }
 
         TestBusinessException(String message, String errorCode, HttpStatus status) {
             super(message);
