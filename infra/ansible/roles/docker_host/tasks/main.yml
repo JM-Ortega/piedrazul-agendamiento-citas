@@ -96,3 +96,39 @@
       }
     mode: "0644"
   notify: Restart Docker daemon
+
+# El reinicio del daemon va ahora, antes de que exista cualquier contenedor, y no al final del play
+# (donde Ansible vacía los handlers por defecto): reiniciar con contenedores ya creados los
+# detiene a todos —live-restore solo protege si el daemon que se detiene ya lo tenía— y deja
+# invalidadas las verificaciones de readiness hechas antes. Además, los valores por defecto de
+# daemon.json (rotación de logs, ulimits) solo los heredan los contenedores creados después.
+# Este role tiene un único handler (Restart Docker daemon); si se agrega otro, también se vacía
+# aquí. Un handler que falla detiene el play. Sin cambios en este converge no hay notificación
+# y no se reinicia nada.
+- name: Aplicar la configuración de Docker antes de crear contenedores
+  ansible.builtin.meta: flush_handlers
+
+# Acotado y por estado (no una espera fija): el reinicio vuelve antes de que el socket responda
+- name: Esperar a que el daemon de Docker responda con la configuración vigente
+  ansible.builtin.command:
+    argv:
+      - docker
+      - info
+      - --format
+      - "{% raw %}{{.LiveRestoreEnabled}} {{.LoggingDriver}}{% endraw %}"
+  register: docker_host_info
+  until: docker_host_info.rc == 0
+  retries: 15
+  delay: 2
+  changed_when: false
+
+# Si el daemon respondió pero no con lo que declara daemon.json, el reinicio no se aplicó
+- name: Verificar que el daemon corre con la configuración de daemon.json
+  ansible.builtin.assert:
+    that:
+      - docker_host_info.stdout | trim == 'true json-file'
+    fail_msg: >-
+      DOCKER: el daemon responde pero no corre con /etc/docker/daemon.json
+      (live-restore y driver json-file esperados; informado: '{{ docker_host_info.stdout | trim }}').
+      No se creó ningún contenedor.
+    quiet: true

@@ -3,9 +3,11 @@
 # (keycloak_lifecycle.yml): deploy nunca lo arranca, recrea, actualiza ni migra su base.
 #   - Antes de cualquier mutación exige que image.env tenga exactamente una KEYCLOAK_IMAGE
 #     exacta y que el contenedor keycloak exista, corra healthy y haya sido creado desde esa
-#     misma referencia. Si no (falta, duplicada, malformada, anterior a este contrato, keycloak
-#     ausente o detenido, o un converge interrumpido dejó en image.env otra identidad que la
-#     que corre), falla sin escribir image.env ni tocar servicios: corre converge.
+#     misma referencia. Un keycloak con esa identidad que está `starting` (p. ej. el daemon lo
+#     reinició) se espera, solo leyendo y con plazo acotado (keycloak_ready.yml). Si no (falta,
+#     duplicada, malformada, anterior a este contrato, keycloak ausente, detenido o unhealthy, un
+#     converge interrumpido dejó en image.env otra identidad que la que corre, o se agotó el
+#     plazo), falla sin escribir image.env ni tocar servicios: corre converge.
 #   - Conserva la TRAEFIK_IMAGE exacta de image.env (también la escribe solo converge); si
 #     falta o está malformada, falla igual, antes de mutar.
 #   - Compose levanta postgres y backend sin dependencias: depends_on del backend no puede
@@ -139,47 +141,11 @@
       (run_host_config=true).
     quiet: true
 
-# El resultado de docker_container_info trae el entorno del contenedor (secretos): solo se
-# usa el resumen
-- name: Leer el contenedor keycloak (antes de desplegar)
-  community.docker.docker_container_info:
-    name: keycloak
-  register: app_deploy_keycloak_before_info
-  no_log: true
-
-- name: Resumir el contenedor keycloak (antes de desplegar)
-  ansible.builtin.set_fact:
-    app_deploy_keycloak_before: "{{ _summary }}"
-  vars:
-    _k: "{{ app_deploy_keycloak_before_info.container | default({}, true) }}"
-    _summary:
-      exists: "{{ app_deploy_keycloak_before_info.exists | default(false) }}"
-      id: "{{ _k.Id | default('') }}"
-      started_at: "{{ (_k.State | default({}, true)).StartedAt | default('') }}"
-      running: "{{ (_k.State | default({}, true)).Running | default(false) }}"
-      health: "{{ ((_k.State | default({}, true)).Health | default({}, true)).Status | default('sin healthcheck') }}"
-      config_image: "{{ (_k.Config | default({}, true)).Image | default('') }}"
-  no_log: true
-
-# healthy con esa referencia = converge ya lo arrancó con esa imagen y Keycloak terminó su
-# migración (no informa listo antes). Cualquier otro estado lo resuelve converge, no deploy.
+# Keycloak ya convergido, con la identidad de image.env y healthy. Si está `starting` (p. ej. el
+# daemon lo reinició) se espera, acotado y sin tocarlo; cualquier otro estado, o agotar el plazo,
+# falla antes de mutar nada (keycloak_ready.yml)
 - name: Verificar que Keycloak ya está convergido con esa identidad
-  ansible.builtin.assert:
-    that:
-      - app_deploy_keycloak_before.exists | bool
-      - app_deploy_keycloak_before.running | bool
-      - app_deploy_keycloak_before.health == 'healthy'
-      - app_deploy_keycloak_before.config_image == app_deploy_keycloak_image[0]
-    fail_msg: >-
-      KEYCLOAK: deploy no arranca, recrea ni actualiza Keycloak. image.env pide
-      {{ app_deploy_keycloak_image[0] }}; el contenedor keycloak está
-      {{ 'ausente' if not (app_deploy_keycloak_before.exists | bool)
-         else ('en ejecución' if app_deploy_keycloak_before.running | bool else 'detenido')
-              ~ ', health ' ~ app_deploy_keycloak_before.health
-              ~ ', creado desde ' ~ (app_deploy_keycloak_before.config_image or '?') }}.
-      No se tocó nada: corre converge (run_host_config=true), que arranca o actualiza Keycloak
-      con su ciclo (keycloak_lifecycle.yml).
-    success_msg: "keycloak convergido: {{ app_deploy_keycloak_image[0] }} healthy"
+  ansible.builtin.include_tasks: keycloak_ready.yml
 
 # Identidades exactas de las imágenes propias
 - name: Validar y descargar imágenes propias
