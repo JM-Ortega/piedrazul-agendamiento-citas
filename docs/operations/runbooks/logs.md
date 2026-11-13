@@ -137,6 +137,13 @@ journal no lo envía si no está seleccionado. Activar una fuente requiere las d
      non-blocking ni buffer. Es también lo que da un `.env` sin la variable (desarrollo,
      harnesses, `.env` anteriores). Un valor desconocido hace fallar Compose.
 
+     Esos valores los toma el contenedor **al crearse** (`HostConfig.LogConfig`). El role
+     `docker_host` deja el daemon reiniciado y con `daemon.json` en vigor antes de crear ninguno, y
+     en producción la identidad en ejecución verifica la configuración efectiva (`journald` para
+     `obs_log_services`; para el resto, el driver y las `log-opts` de `daemon.json`, sin repetirlas
+     en Compose). Un contenedor creado antes no la hereda ni Compose lo recrea: se corrige una vez,
+     con autorización, según [reconciliar-logs-contenedores.md](reconciliar-logs-contenedores.md).
+
    `env.j2` escribe `journald` para los servicios de `obs_log_services` (inventario; por defecto
    `[traefik]`) y `default` para el resto. Todas las llamadas de Compose del rol `app` usan
    `prod.yml` con el mismo `.env`, así que todas ven la misma configuración: un run repetido no

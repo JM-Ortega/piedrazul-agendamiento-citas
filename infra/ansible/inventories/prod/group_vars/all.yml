@@ -119,6 +119,11 @@ log_level_modulith: WARN
 obs_log_services: [traefik]
 obs_log_privacy_controls_done: []
 
+# Verificación de la configuración de logs EFECTIVA de los contenedores (verify_log_config.yml):
+# journald para obs_log_services y, para el resto, los valores por defecto de /etc/docker/daemon.json
+# (json-file y su rotación). Solo producción: desarrollo, harnesses y laboratorios no la activan.
+app_verify_log_config: true
+
 # Keycloak
 kc_realm: piedrazul
 kc_port: 8180

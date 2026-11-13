@@ -208,6 +208,9 @@ cat > "${W}/verify.yml" <<'EOF'
       vars: {app_release_services: [keycloak]}
 EOF
 
+# app_verify_log_config=false: el inventario de producción verifica la rotación de logs efectiva
+# contra /etc/docker/daemon.json (verify_log_config.yml); el daemon de quien corre esto no es el
+# del servidor y no tiene esos valores por defecto.
 ansible_run() { # <log> <playbook> [extra args...]
   local log="$1" pb="$2"; shift 2
   env POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" APP_DB_PASSWORD="${APP_DB_PASSWORD}" \
@@ -220,6 +223,7 @@ ansible_run() { # <log> <playbook> [extra args...]
       ANSIBLE_BECOME=false ANSIBLE_NOCOLOR=1 \
     ansible-playbook -i "${ANSIBLE_DIR}/inventories/prod" -i "${W}/hosts.yml" "${W}/${pb}" \
       -e "app_dir=${W}" -e "compose_project_name=${PROJECT}" -e "db_lock_file=${W}/db.lock" \
+      -e "app_verify_log_config=false" \
       -e "repo_root=${ROOT}" -e "keycloak_compose_file=${W}/declared/keycloak.yml" \
       -e "keycloak_image_ref=${KC_REF}" -e "keycloak_image_index_digest=${KC_INDEX}" \
       "${SES_ARGS[@]}" "$@" </dev/null > "${LOGS}/${log}.log" 2>&1
