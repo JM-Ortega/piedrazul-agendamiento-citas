@@ -131,6 +131,9 @@ duración: use una terminal para cada uno.
    siguiente exporta cada línea `CLAVE=valor` sin interpretar el valor. Con
    `SPRING_PROFILES_ACTIVE=dev` y `APP_DEMO_SEED_ENABLED=true` (los valores de la plantilla) se crean
    datos ficticios de demostración, y Flyway aplica las migraciones al arrancar.
+   Con ese perfil también se publican Swagger UI (`/swagger-ui.html`) y la especificación OpenAPI
+   (`/v3/api-docs`, `/v3/api-docs.yaml`) sin autenticación; con `prod` activo (solo o junto a `dev`),
+   sin perfil o con otro perfil no existen. Ver `application.yaml` (`springdoc`).
 
    ```bash
    while IFS='=' read -r key value; do export "$key=$value"; done < <(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env)

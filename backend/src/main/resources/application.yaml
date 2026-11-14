@@ -190,3 +190,28 @@ logging:
     # (el código de verificación). Mantener en WARN donde haya códigos reales.
     org.hibernate.orm.jdbc.bind: ${LOG_LEVEL_SQL_BIND:WARN}
     org.springframework.modulith: ${LOG_LEVEL_MODULITH:WARN}
+
+# Documentación de la API (Springdoc): apagada por defecto, para que producción, un perfil
+# desconocido o la ausencia de perfil nunca la publiquen. Con ambas propiedades en false no se
+# registran ni la especificación (/v3/api-docs, /v3/api-docs.yaml, swagger-config) ni la interfaz
+# (/swagger-ui.html, /swagger-ui/**).
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+---
+# Solo desarrollo: la expresión "dev & !prod" deja la documentación apagada si prod está activo,
+# aunque también lo esté dev (prod,dev o dev,prod). No usar un application-dev.yaml con true: ese
+# archivo se aplicaría con prod,dev y reabriría la documentación en producción.
+spring:
+  config:
+    activate:
+      on-profile: "dev & !prod"
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
