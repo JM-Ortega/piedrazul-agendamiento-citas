@@ -59,7 +59,7 @@ export class DoctorMedicalHistoryComponent
 
   // ── Constantes ────────────────────────────────────────────────────────────
   /** Longitud máxima permitida para la observación de la historia clínica. */
-  readonly OBSERVATION_MAX_LENGTH = 300;
+  readonly OBSERVATION_MAX_LENGTH = 700;
   private readonly UNSCHEDULED_CONTEXT_KEY =
     'doctor-unscheduled-attention-context';
 
