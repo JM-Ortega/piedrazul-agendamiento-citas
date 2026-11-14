@@ -38,7 +38,11 @@ public class SecurityConfig {
                         .requestMatchers(prometheusOnManagementListener()).permitAll()
                         .requestMatchers("/actuator/health", "/error").permitAll()
                         .requestMatchers("/actuator/**").hasRole("ADMIN")
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                        // Solo tienen efecto con Springdoc activo (perfil dev, application.yaml); sin él no hay
+                        // manejador y estas rutas no existen. Los dos literales cubren la especificación
+                        // YAML y la redirección de la interfaz, que los patrones /** no alcanzan.
+                        .requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml",
+                                "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/patients/document/*/public").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/patients/with-user").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/patients/link-user-account/request-code").permitAll()
