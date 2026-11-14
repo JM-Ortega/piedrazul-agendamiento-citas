@@ -30,7 +30,7 @@ public class MedicalCheckup {
     @Column(name = "doctor_name", nullable = false, updatable = false, length = 200)
     private String doctor_name;
 
-    @Column(name = "description", nullable = false, length = 500)
+    @Column(name = "description", nullable = false, length = 700)
     private String description;
 
     public MedicalCheckup(UUID idPatient, UUID idAppointment, LocalDate attendedAt, String doctor_name, String description) {
