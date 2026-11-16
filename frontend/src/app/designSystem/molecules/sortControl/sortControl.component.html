@@ -3,13 +3,14 @@
     <!-- Selector de atributo -->
     <div class="relative">
       <select
-        [value]="field()"
         [disabled]="disabled()"
         (change)="onFieldChange($any($event.target).value)"
         class="appearance-none pl-3 pr-8 py-1.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#215c98]/30 focus:border-[#215c98] cursor-pointer hover:border-gray-300 transition-colors disabled:opacity-50"
       >
         @for (opt of options(); track opt.value) {
-          <option [value]="opt.value">{{ opt.label }}</option>
+          <option [value]="opt.value" [selected]="opt.value === field()">
+            {{ opt.label }}
+          </option>
         }
       </select>
       <svg
