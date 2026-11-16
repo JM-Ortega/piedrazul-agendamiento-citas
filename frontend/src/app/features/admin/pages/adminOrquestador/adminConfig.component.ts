@@ -13,9 +13,9 @@ import {
   LucideCheck,
   LucideDynamicIcon,
   LucidePencil,
+  LucideRefreshCw,
   LucideSettings,
   LucideX,
-  LucideRefreshCw,
 } from '@lucide/angular';
 import { catchError, finalize, forkJoin, Observable, of } from 'rxjs';
 import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
@@ -42,11 +42,11 @@ import { DaySchedule } from '../../../../shared/models/interfaces/daySchedule.mo
 import { Doctor } from '../../../../shared/models/interfaces/doctor.model';
 import { AdminStatisticsComponent } from '../../components/adminStatistics/adminStatistics.component';
 import { DoctorCardComponent } from '../../components/doctorCard/doctorCard.component';
-import { DoctorTimeOffDrawerComponent } from '../../components/doctorTimeOffDrawer/doctorTimeOffDrawer.component';
 import {
   DoctorEditFormComponent,
   DoctorSaveEvent,
 } from '../../components/doctorEditForm/doctorEditForm.component';
+import { DoctorTimeOffDrawerComponent } from '../../components/doctorTimeOffDrawer/doctorTimeOffDrawer.component';
 import { AdminModalsComponent } from '../../components/modals/modalHorarios/adminModals.component';
 import { dtoSchedule } from '../../models/dtos/schedule.dto';
 import { TimeOffDto } from '../../models/dtos/timeOff.dto';
@@ -128,7 +128,7 @@ export class AdminConfigComponent implements OnInit {
   autonomousBookingEnabled = signal(true);
   showAutonomousBookingModal = signal(false);
   // ── Ordenamiento ──────────────────────────────────────────────────────────
-  sortField = signal('appointmentInterval');
+  sortField = signal('name');
   sortDirection = signal<SortDirection>('asc');
 
   readonly sortOptions: SortOption[] = [
