@@ -9,5 +9,5 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 public interface ListAppointmentsUseCase {
-    PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery);
+    PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, LocalDate dateTo, AppointmentState state, PageQuery pageQuery);
 }

@@ -21,7 +21,7 @@ public class ListAppointmentsUseCaseImpl implements ListAppointmentsUseCase {
     }
 
     @Override
-    public PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery) {
-        return appointmentRepository.listBy(idDoctor, idPatient, date, state, pageQuery);
+    public PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, LocalDate dateTo, AppointmentState state, PageQuery pageQuery) {
+        return appointmentRepository.listBy(idDoctor, idPatient, date, dateTo, state, pageQuery);
     }
 }
