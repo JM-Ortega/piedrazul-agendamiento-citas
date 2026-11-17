@@ -152,7 +152,6 @@ public class DoctorDataInitializer implements ApplicationRunner {
                 List.of(Role.DOCTOR))
         );
 
-
         userProvisioningApi.createUser(new CreateSystemUserPayload(
                         new CreateSystemUserRequest(
                                 "34548670",
