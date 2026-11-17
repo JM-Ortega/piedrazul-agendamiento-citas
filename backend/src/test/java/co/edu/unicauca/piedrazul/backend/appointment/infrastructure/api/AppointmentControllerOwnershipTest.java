@@ -77,7 +77,7 @@ class AppointmentControllerOwnershipTest {
         when(patientConsultPort.findByUserId(PATIENT_USER_ID))
                 .thenReturn(Optional.of(new PatientSnapshot(OWN_PATIENT_ID, null)));
         when(doctorConfigConsultPort.findByUserId(DOCTOR_USER_ID)).thenReturn(Optional.of(OWN_DOCTOR_ID));
-        when(listAppointmentsUseCase.listBy(any(), any(), any(), any(), any()))
+        when(listAppointmentsUseCase.listBy(any(), any(), any(), any(), any(), any()))
                 .thenReturn(new PagedResult<>(List.of(), 0, 5, 0, 0));
 
         controller = new AppointmentController(
@@ -110,7 +110,7 @@ class AppointmentControllerOwnershipTest {
 
         controller.list(filters, jwt, authentication(jwt));
 
-        verify(listAppointmentsUseCase).listBy(any(), eq(OWN_PATIENT_ID), any(), any(), any());
+        verify(listAppointmentsUseCase).listBy(any(), eq(OWN_PATIENT_ID), any(), any(), any(), any());
     }
 
     @Test
@@ -121,7 +121,7 @@ class AppointmentControllerOwnershipTest {
 
         controller.list(filters, jwt, authentication(jwt));
 
-        verify(listAppointmentsUseCase).listBy(eq(OWN_DOCTOR_ID), any(), any(), any(), any());
+        verify(listAppointmentsUseCase).listBy(eq(OWN_DOCTOR_ID), any(), any(), any(), any(), any());
     }
 
     // ---- cancelación ----

@@ -127,7 +127,7 @@ class AppointmentRepositoryQueryIT extends PostgresIntegrationSupport {
                     SpecialtyCode.FISIOTERAPIA);
 
             PagedResult<Appointment> result = appointmentRepository.listBy(
-                    doctorA, null, null, null, new PageQuery(0, 10, "date", true));
+                    doctorA, null, null, null, null, new PageQuery(0, 10, "date", true));
 
             assertThat(result.content()).hasSize(1);
             assertThat(result.content().getFirst().getIdDoctor()).isEqualTo(doctorA);
@@ -148,7 +148,7 @@ class AppointmentRepositoryQueryIT extends PostgresIntegrationSupport {
                     SpecialtyCode.FISIOTERAPIA);
 
             PagedResult<Appointment> result = appointmentRepository.listBy(
-                    null, patient, date, AppointmentState.AGENDADA, new PageQuery(0, 10, "date", true));
+                    null, patient, date, null, AppointmentState.AGENDADA, new PageQuery(0, 10, "date", true));
 
             assertThat(result.content()).extracting(Appointment::getIdAppointment)
                     .containsExactly(target.getIdAppointment());
@@ -157,7 +157,7 @@ class AppointmentRepositoryQueryIT extends PostgresIntegrationSupport {
         @Test
         void shouldReturnEmptyPageWhenNoAppointmentMatchesFilters() {
             PagedResult<Appointment> result = appointmentRepository.listBy(
-                    UUID.randomUUID(), null, null, null, new PageQuery(0, 10, "date", true));
+                    UUID.randomUUID(), null, null, null, null, new PageQuery(0, 10, "date", true));
 
             assertThat(result.content()).isEmpty();
             assertThat(result.totalElements()).isZero();
@@ -174,7 +174,7 @@ class AppointmentRepositoryQueryIT extends PostgresIntegrationSupport {
                     SpecialtyCode.FISIOTERAPIA);
 
             PagedResult<Appointment> result = appointmentRepository.listBy(
-                    doctor, null, null, null, new PageQuery(0, 10, "date", true));
+                    doctor, null, null, null, null, new PageQuery(0, 10, "date", true));
 
             assertThat(result.content()).extracting(Appointment::getIdAppointment)
                     .containsExactly(earlier.getIdAppointment(), later.getIdAppointment());
@@ -190,7 +190,7 @@ class AppointmentRepositoryQueryIT extends PostgresIntegrationSupport {
             }
 
             PagedResult<Appointment> result = appointmentRepository.listBy(
-                    doctor, null, null, null, new PageQuery(0, 2, "date", true));
+                    doctor, null, null, null, null, new PageQuery(0, 2, "date", true));
 
             assertThat(result.content()).hasSize(2);
             assertThat(result.totalElements()).isEqualTo(3);
@@ -496,11 +496,11 @@ class AppointmentRepositoryQueryIT extends PostgresIntegrationSupport {
             for (String sortBy : SORT_FIELDS) {
                 for (boolean ascending : new boolean[]{true, false}) {
                     List<Appointment> fullOrder = appointmentRepository.listBy(
-                            idDoctor, null, date, null, new PageQuery(0, expected.size() + 10, sortBy, ascending)).content();
+                            idDoctor, null, date, null, null, new PageQuery(0, expected.size() + 10, sortBy, ascending)).content();
                     for (int size : PAGE_SIZES) {
                         String combo = "sortBy=" + sortBy + " asc=" + ascending + " size=" + size;
                         List<Appointment> walked = walkAllPages(
-                                q -> appointmentRepository.listBy(idDoctor, null, date, null, q), sortBy, ascending, size);
+                                q -> appointmentRepository.listBy(idDoctor, null, date, null, null, q), sortBy, ascending, size);
                         List<UUID> walkedIds = walked.stream().map(Appointment::getIdAppointment).toList();
                         Set<UUID> distinct = new HashSet<>(walkedIds);
                         if (distinct.size() != walkedIds.size()) {

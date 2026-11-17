@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.inp
 
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PageQuery;
+import io.swagger.v3.oas.annotations.Parameter;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -15,6 +16,8 @@ public class ListAppointmentFiltersRequest {
     private UUID idDoctor;
     private UUID idPatient;
     private LocalDate date;
+    @Parameter(description = "Fecha máxima inclusive (yyyy-MM-dd). Si se omite no hay límite superior.")
+    private LocalDate dateTo;
     private AppointmentState state;
     private int page = 0;      // Valor por defecto
     private int size = 5;     // Valor por defecto

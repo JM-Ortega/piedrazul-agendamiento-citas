@@ -135,7 +135,11 @@ public class AppointmentController {
     @Operation(summary = "Listar y filtrar citas",
             description = "Lista citas del sistema filtrando por doctor, paciente, fecha o estado." +
                     " Ajusta los permisos de filtrado dinámicamente según el rol (el paciente solo ve las suyas," +
-                    " el doctor solo las suyas, el scheduler ve todas).")
+                    " el doctor solo las suyas, el scheduler ve todas)." +
+                    " `dateTo` (yyyy-MM-dd, opcional) es la fecha máxima inclusive: devuelve las citas de ese día y anteriores;" +
+                    " si se omite no hay límite superior, y se combina con `date` y el resto de filtros (AND)." +
+                    " Sin `sortDirection` el orden por defecto es ascendente (más antiguas primero);" +
+                    " con `sortDirection=DESC` los días van de más nuevo a más viejo y, dentro de cada día, por hora ascendente.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Citas obtenidas correctamente"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),
@@ -170,7 +174,7 @@ public class AppointmentController {
 
         PageQuery pageQuery = request.toPageQuery();
         PagedResult<Appointment> appointmentPage = listAppointmentsUseCase.listBy(
-                request.getIdDoctor(), request.getIdPatient(), request.getDate(), request.getState(), pageQuery);
+                request.getIdDoctor(), request.getIdPatient(), request.getDate(), request.getDateTo(), request.getState(), pageQuery);
 
         List<AppointmentResponse> content = citaDtoMapper.toResponseList(appointmentPage.content());
         return ResponseEntity.ok(PageResponse.from(appointmentPage, content));
