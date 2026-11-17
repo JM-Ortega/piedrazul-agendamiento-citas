@@ -198,6 +198,136 @@ class AppointmentRepositoryQueryIT extends PostgresIntegrationSupport {
         }
     }
 
+    /**
+     * Filtro opcional {@code dateTo} (fecha máxima inclusive). Año lejano (2043) y siempre acotado por
+     * médico o paciente de este test para no chocar con otras IT.
+     */
+    @Nested
+    class DateToFilterTests {
+
+        private static final LocalDate D = LocalDate.of(2043, 9, 15);
+        private static final PageQuery ALL = new PageQuery(0, 50, "date", true);
+
+        private UUID doctor;
+        private UUID otherDoctor;
+        private UUID patient1;
+        private UUID patient2;
+        private Appointment dayBefore;
+        private Appointment dayAtEight;
+        private Appointment dayAtNine;
+        private Appointment dayAtTen;
+        private Appointment dayAfter;
+        private Appointment otherDoctorBefore;
+
+        @BeforeEach
+        void seed() {
+            doctor = newDoctor();
+            otherDoctor = newDoctor();
+            patient1 = newPatient();
+            patient2 = newPatient();
+            dayBefore = save(doctor, patient1, D.minusDays(1), LocalTime.of(10, 0), AppointmentState.AGENDADA,
+                    SpecialtyCode.FISIOTERAPIA);
+            dayAtEight = save(doctor, patient1, D, LocalTime.of(8, 0), AppointmentState.ATENDIDA,
+                    SpecialtyCode.FISIOTERAPIA);
+            dayAtNine = save(doctor, patient2, D, LocalTime.of(9, 0), AppointmentState.CANCELADA,
+                    SpecialtyCode.FISIOTERAPIA);
+            dayAtTen = save(doctor, patient2, D, LocalTime.of(10, 0), AppointmentState.AGENDADA,
+                    SpecialtyCode.FISIOTERAPIA);
+            dayAfter = save(doctor, patient1, D.plusDays(1), LocalTime.of(8, 0), AppointmentState.AGENDADA,
+                    SpecialtyCode.FISIOTERAPIA);
+            otherDoctorBefore = save(otherDoctor, patient1, D.minusDays(1), LocalTime.of(8, 0),
+                    AppointmentState.AGENDADA, SpecialtyCode.FISIOTERAPIA);
+        }
+
+        private List<UUID> ids(PagedResult<Appointment> result) {
+            return result.content().stream().map(Appointment::getIdAppointment).toList();
+        }
+
+        private List<UUID> ids(Appointment... appointments) {
+            return java.util.Arrays.stream(appointments).map(Appointment::getIdAppointment).toList();
+        }
+
+        @Test
+        void shouldIncludeTheLimitDayAndEarlierAndExcludeLaterDays() {
+            PagedResult<Appointment> result = appointmentRepository.listBy(doctor, null, null, D, null, ALL);
+
+            assertThat(ids(result)).containsExactlyElementsOf(ids(dayBefore, dayAtEight, dayAtNine, dayAtTen));
+            assertThat(result.totalElements()).isEqualTo(4);
+        }
+
+        @Test
+        void shouldExcludeTheLimitDayWhenDateToIsTheDayBefore() {
+            PagedResult<Appointment> result = appointmentRepository.listBy(
+                    doctor, null, null, D.minusDays(1), null, ALL);
+
+            assertThat(ids(result)).containsExactly(dayBefore.getIdAppointment());
+        }
+
+        @Test
+        void shouldIncludeEverythingWhenDateToIsTheDayAfter() {
+            PagedResult<Appointment> result = appointmentRepository.listBy(
+                    doctor, null, null, D.plusDays(1), null, ALL);
+
+            assertThat(ids(result)).containsExactlyElementsOf(
+                    ids(dayBefore, dayAtEight, dayAtNine, dayAtTen, dayAfter));
+        }
+
+        @Test
+        void withoutDateToTheResultShouldBeTheSameAsBefore() {
+            PagedResult<Appointment> result = appointmentRepository.listBy(doctor, null, null, null, null, ALL);
+
+            assertThat(ids(result)).containsExactlyElementsOf(
+                    ids(dayBefore, dayAtEight, dayAtNine, dayAtTen, dayAfter));
+            assertThat(result.totalElements()).isEqualTo(5);
+        }
+
+        @Test
+        void shouldCombineWithDoctor() {
+            PagedResult<Appointment> result = appointmentRepository.listBy(
+                    otherDoctor, null, null, D, null, ALL);
+
+            assertThat(ids(result)).containsExactly(otherDoctorBefore.getIdAppointment());
+        }
+
+        @Test
+        void shouldCombineWithState() {
+            PagedResult<Appointment> result = appointmentRepository.listBy(
+                    doctor, null, null, D, AppointmentState.AGENDADA, ALL);
+
+            assertThat(ids(result)).containsExactlyElementsOf(ids(dayBefore, dayAtTen));
+        }
+
+        @Test
+        void shouldCombineWithPatient() {
+            PagedResult<Appointment> result = appointmentRepository.listBy(
+                    null, patient2, null, D, null, ALL);
+
+            assertThat(ids(result)).containsExactlyElementsOf(ids(dayAtNine, dayAtTen));
+        }
+
+        @Test
+        void shouldCombineWithExactDateAsAnd() {
+            // date = D y dateTo = D: los tres del día D
+            assertThat(ids(appointmentRepository.listBy(doctor, null, D, D, null, ALL)))
+                    .containsExactlyElementsOf(ids(dayAtEight, dayAtNine, dayAtTen));
+            // date = D y dateTo anterior a D: la intersección es vacía
+            PagedResult<Appointment> empty = appointmentRepository.listBy(doctor, null, D, D.minusDays(1), null, ALL);
+            assertThat(empty.content()).isEmpty();
+            assertThat(empty.totalElements()).isZero();
+            // date = D+1 y dateTo = D: tampoco hay intersección
+            assertThat(appointmentRepository.listBy(doctor, null, D.plusDays(1), D, null, ALL).content()).isEmpty();
+        }
+
+        @Test
+        void sortedByDateDescShouldListNewestDaysFirstWithAscendingTimeWithinEachDay() {
+            PagedResult<Appointment> result = appointmentRepository.listBy(
+                    doctor, null, null, D, null, new PageQuery(0, 50, "date", false));
+
+            assertThat(ids(result)).containsExactlyElementsOf(
+                    ids(dayAtEight, dayAtNine, dayAtTen, dayBefore));
+        }
+    }
+
     @Nested
     class ListDoctorDailyAgendaTests {
 
@@ -555,6 +685,61 @@ class AppointmentRepositoryQueryIT extends PostgresIntegrationSupport {
             Set<UUID> expected = seed(doctors, total, date, 1, SEEDED_STATES);
 
             assertThat(checkListBy(expected, null, date)).isEmpty();
+        }
+
+        /**
+         * Con dateTo, totalElements/totalPages se calculan sobre el conjunto filtrado y recorrer todas las
+         * páginas no repite ni pierde citas. El conjunto esperado sale del listado SIN dateTo filtrado en Java.
+         */
+        @ParameterizedTest(name = "listBy con dateTo sobre {0} citas empatadas")
+        @ValueSource(ints = {25, 300})
+        void listByWithDateToShouldPaginateTheFilteredSetWithoutDuplicatesOrGaps(int total) {
+            UUID doctor = newDoctor();
+            LocalDate firstDate = LocalDate.of(2043, 9, 1);
+            seed(List.of(doctor), total, firstDate, 10, SEEDED_STATES);
+            LocalDate dateTo = firstDate.plusDays(4);
+            Set<UUID> expected = new HashSet<>();
+            for (Appointment a : appointmentRepository.listBy(
+                    doctor, null, null, null, null, new PageQuery(0, total + 10, "date", true)).content()) {
+                if (!a.getDate().isAfter(dateTo)) {
+                    expected.add(a.getIdAppointment());
+                }
+            }
+            assertThat(expected).isNotEmpty().hasSizeLessThan(total);
+
+            List<String> problems = new ArrayList<>();
+            for (String sortBy : SORT_FIELDS) {
+                for (boolean ascending : new boolean[]{true, false}) {
+                    List<UUID> fullOrder = appointmentRepository.listBy(doctor, null, null, dateTo, null,
+                            new PageQuery(0, total + 10, sortBy, ascending)).content()
+                            .stream().map(Appointment::getIdAppointment).toList();
+                    for (int size : PAGE_SIZES) {
+                        String combo = "sortBy=" + sortBy + " asc=" + ascending + " size=" + size;
+                        PagedResult<Appointment> first = appointmentRepository.listBy(doctor, null, null, dateTo, null,
+                                new PageQuery(0, size, sortBy, ascending));
+                        if (first.totalElements() != expected.size()) {
+                            problems.add(combo + ": totalElements=" + first.totalElements());
+                        }
+                        if (first.totalPages() != (int) Math.ceil(expected.size() / (double) size)) {
+                            problems.add(combo + ": totalPages=" + first.totalPages());
+                        }
+                        List<UUID> walkedIds = walkAllPages(
+                                q -> appointmentRepository.listBy(doctor, null, null, dateTo, null, q),
+                                sortBy, ascending, size).stream().map(Appointment::getIdAppointment).toList();
+                        Set<UUID> distinct = new HashSet<>(walkedIds);
+                        if (distinct.size() != walkedIds.size()) {
+                            problems.add(combo + ": " + (walkedIds.size() - distinct.size()) + " repetidas");
+                        }
+                        if (!distinct.equals(expected)) {
+                            problems.add(combo + ": el conjunto paginado no coincide con el esperado");
+                        }
+                        if (!walkedIds.equals(fullOrder)) {
+                            problems.add(combo + ": el orden paginado difiere del orden completo");
+                        }
+                    }
+                }
+            }
+            assertThat(problems).isEmpty();
         }
 
         @ParameterizedTest(name = "agenda diaria con {0} citas empatadas")
