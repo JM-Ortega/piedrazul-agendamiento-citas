@@ -5,8 +5,10 @@ import {
   inject,
   OnInit,
   signal,
+  viewChild,
 } from '@angular/core';
 import { LucideCalendar, LucideDownload, LucideX } from '@lucide/angular';
+import { DoctorService } from '../../../../core/services/doctor.service';
 import { PatientAppointmentService } from '../../../../core/services/patient.service';
 import { SchedulerService } from '../../../../core/services/scheduler.service';
 import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
@@ -21,7 +23,9 @@ import { toIsoDateString } from '../../../../shared/helpers/transformDateLocal';
 import { dtoDoctor } from '../../../../shared/models/dtos/doctor.dto';
 import { PatientQuickResult } from '../../../../shared/models/dtos/patientQuickResult.dto';
 import { AppError } from '../../../../shared/models/interfaces/apiError.model';
+import { Patient } from '../../../../shared/models/interfaces/patient.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
+import { PatientInfoCardComponent } from '../../../doctor/components/patientInfoCard/patientInfoCard.component';
 import { SchedulerExportModalComponent } from '../../components/exportModal/exportModal.component';
 import { FiltersPanelComponent } from '../../components/filtersPanel/filtersPanel.component';
 import { AppointmentTableComponent } from '../../components/table/table.component';
@@ -43,12 +47,17 @@ const PAGE_SIZE = 5;
     ButtonComponent,
     PaginationComponent,
     PatientQuickSearchComponent,
+    PatientInfoCardComponent,
   ],
   templateUrl: './schedulerHistory.component.html',
 })
 export class SchedulerHistoryComponent implements OnInit {
   private schedulerService = inject(SchedulerService);
   private patientAppointmentService = inject(PatientAppointmentService);
+  private doctorService = inject(DoctorService);
+
+  /** Tarjeta del paciente (para saber si se está editando). */
+  private readonly infoCard = viewChild(PatientInfoCardComponent);
 
   doctors = signal<dtoDoctor[]>([]);
   states = signal<string[]>([]);
@@ -121,8 +130,17 @@ export class SchedulerHistoryComponent implements OnInit {
 
   selectedPatient = signal<PatientQuickResult | null>(null);
 
+  /** Datos completos del paciente seleccionado (para la tarjeta editable). */
+  readonly patient = signal<Patient | null>(null);
+
+  /** True mientras la tarjeta del paciente está en modo edición. */
+  readonly isEditingPatient = computed(
+    () => this.infoCard()?.isEditingPatient() ?? false
+  );
+
   onPatientSelected(patient: PatientQuickResult): void {
     this.selectedPatient.set(patient);
+    this.loadPatient(patient.id);
     this.pageNumber.set(0);
     this.loadAppointments(
       patient.id,
@@ -134,7 +152,9 @@ export class SchedulerHistoryComponent implements OnInit {
   }
 
   onClearPatientFilter(): void {
+    if (this.isEditingPatient()) return;
     this.selectedPatient.set(null);
+    this.patient.set(null);
     this.pageNumber.set(0);
     this.loadAppointments(
       null,
@@ -142,6 +162,46 @@ export class SchedulerHistoryComponent implements OnInit {
       this.filterDate(),
       this.filterStatus(),
       0
+    );
+  }
+
+  /**
+   * Trae los datos completos del paciente seleccionado. Si mientras tanto el
+   * usuario cambió o quitó el paciente, descarta la respuesta.
+   */
+  private loadPatient(patientId: string): void {
+    this.patient.set(null);
+    this.doctorService.getPatientById(patientId).subscribe({
+      next: (patient) => {
+        if (this.selectedPatient()?.id === patient.id) this.patient.set(patient);
+      },
+      error: (err: AppError) =>
+        this.showToast(
+          'No se pudo cargar la información del paciente: ' + err.message,
+          'error'
+        ),
+    });
+  }
+
+  /**
+   * Recibe el paciente ya actualizado por el backend: refresca la tarjeta y el
+   * chip del buscador, y recarga la tabla porque el nombre aparece en cada fila.
+   */
+  onPatientSaved(updated: Patient): void {
+    this.patient.set(updated);
+    this.selectedPatient.set({
+      id: updated.id,
+      identification: updated.identification,
+      firstName: updated.firstName,
+      lastName: updated.lastName,
+    });
+    this.showToast('Datos del paciente actualizados correctamente.', 'success');
+    this.loadAppointments(
+      updated.id,
+      this.filterDoctor(),
+      this.filterDate(),
+      this.filterStatus(),
+      this.pageNumber()
     );
   }
 
