@@ -17,6 +17,7 @@ import { ConfirmModalComponent } from '../../../../designSystem/organisms/confir
 import { FilterValues } from '../../../../designSystem/organisms/filters/filters.component';
 import { PatientQuickSearchComponent } from '../../../../designSystem/organisms/patientQuickSearch/patientQuickSearch.component';
 import { formatLongDateEs } from '../../../../shared/helpers/dateFormat';
+import { toIsoDateString } from '../../../../shared/helpers/transformDateLocal';
 import { dtoDoctor } from '../../../../shared/models/dtos/doctor.dto';
 import { PatientQuickResult } from '../../../../shared/models/dtos/patientQuickResult.dto';
 import { AppError } from '../../../../shared/models/interfaces/apiError.model';
@@ -227,9 +228,17 @@ export class SchedulerHistoryComponent implements OnInit {
         idPatient: patientId || undefined,
         idDoctor: doctorId || undefined,
         date: date || undefined,
+        // Listado por defecto: hasta hoy inclusive (fecha local, no UTC). Si hay
+        // algún filtro (médico, fecha, estado) o búsqueda de paciente, no se
+        // limita por hoy para que también aparezcan las citas futuras.
+        dateTo:
+          patientId || doctorId || date || status
+            ? undefined
+            : toIsoDateString(new Date()),
         state: status || undefined,
         pageNumber,
         pageSize: PAGE_SIZE,
+        sortDirection: 'desc',
       })
       .subscribe({
         next: () => {
