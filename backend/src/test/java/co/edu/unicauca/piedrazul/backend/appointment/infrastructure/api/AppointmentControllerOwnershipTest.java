@@ -63,6 +63,7 @@ class AppointmentControllerOwnershipTest {
     private AppointmentSchedulingService appointmentSchedulingService;
     private PatientConsultPort patientConsultPort;
     private DoctorConfigConsultPort doctorConfigConsultPort;
+    private RescheduleAppointmentUseCase rescheduleAppointmentUseCase;
 
     private AppointmentController controller;
 
@@ -73,6 +74,7 @@ class AppointmentControllerOwnershipTest {
         appointmentSchedulingService = mock(AppointmentSchedulingService.class);
         patientConsultPort = mock(PatientConsultPort.class);
         doctorConfigConsultPort = mock(DoctorConfigConsultPort.class);
+        rescheduleAppointmentUseCase = mock(RescheduleAppointmentUseCase.class);
 
         when(patientConsultPort.findByUserId(PATIENT_USER_ID))
                 .thenReturn(Optional.of(new PatientSnapshot(OWN_PATIENT_ID, null)));
@@ -97,7 +99,8 @@ class AppointmentControllerOwnershipTest {
                 mock(ManualPatientResolutionStrategy.class),
                 mock(AutonomousPatientResolutionStrategy.class),
                 patientConsultPort,
-                doctorConfigConsultPort);
+                doctorConfigConsultPort,
+                rescheduleAppointmentUseCase);
     }
 
     // ---- listado ----
