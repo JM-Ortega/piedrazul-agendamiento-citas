@@ -112,8 +112,11 @@ public class AppointmentSchedulingService {
         // Serializa los agendamientos del mismo paciente antes de evaluar las reglas que dependen de él
         appointmentRepository.lockPatientSchedule(resolvedPatient.idPatient());
 
-        // Valida que si el paciente es nuevo su cita sea con Terapia Neural
-        validateNewPatientFirstAppointmentSpecialty(resolvedPatient.idPatient(), specialty);
+        // Valida que si el paciente es nuevo su cita sea con Terapia Neural (solo agendamiento autónomo:
+        // en el manual el personal de la clínica puede agendar cualquier especialidad)
+        if(!manualFlow){
+            validateNewPatientFirstAppointmentSpecialty(resolvedPatient.idPatient(), specialty);
+        }
 
         // Valida que no tenga más de una cita para esa misma especialidad
         if(!manualFlow){

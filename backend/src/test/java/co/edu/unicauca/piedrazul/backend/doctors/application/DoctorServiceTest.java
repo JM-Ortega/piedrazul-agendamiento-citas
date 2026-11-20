@@ -375,7 +375,6 @@ class DoctorServiceTest {
                         LocalDate availableDate = LocalDate.now().plusDays(1);
 
                         when(doctorRepository.findByStatusTrue()).thenReturn(List.of(doctor));
-                        when(appointmentExternalService.isNewPatient(personId)).thenReturn(false);
                         when(appointmentExternalService.calculateDoctorsAvailability(anyList()))
                                         .thenReturn(Set.of(personId));
                         when(personExternalService.getPersonNames(List.of(personId)))
@@ -391,6 +390,80 @@ class DoctorServiceTest {
                         assertThat(result.getFirst().name()).isEqualTo("Dr. Gomez");
                         assertThat(result.getFirst().availableDates()).containsExactly(availableDate);
                         verify(appointmentExternalService).getAvailableDates(personId);
+                }
+
+                /**
+                 * El agendamiento manual ofrece todas las especialidades aunque el paciente sea nuevo:
+                 * ya no se consulta si el paciente es nuevo.
+                 */
+                @Test
+                void manualSchedulingShouldOfferAllSpecialtiesEvenForANewPatient() {
+                        Doctor doctor = doctorWithNeuralAndChiropractic();
+                        stubAvailability(doctor);
+
+                        List<DoctorAvailableResponse> result = doctorService
+                                        .getSpecialtiesWithActiveDoctors(null, SchedulingOrigin.MANUAL);
+
+                        assertThat(result).hasSize(1);
+                        assertThat(result.getFirst().specialty())
+                                        .containsExactlyInAnyOrder("TERAPIA_NEURAL", "QUIROPRAXIA");
+                        verify(appointmentExternalService, never()).isNewPatient(any());
+                }
+
+                @Test
+                void manualSchedulingShouldIncludeDoctorsWithoutNeuralTherapy() {
+                        Doctor doctor = new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(1), 4, true, 30);
+                        doctor.addSpecialty(buildSpecialty(SpecialtyCode.QUIROPRAXIA));
+                        stubAvailability(doctor);
+
+                        List<DoctorAvailableResponse> result = doctorService
+                                        .getSpecialtiesWithActiveDoctors(UUID.randomUUID(), SchedulingOrigin.MANUAL);
+
+                        assertThat(result).hasSize(1);
+                        assertThat(result.getFirst().specialty()).containsExactly("QUIROPRAXIA");
+                }
+
+                /** El autónomo conserva su restricción: solo terapia neural, sea o no paciente nuevo. */
+                @Test
+                void autonomousSchedulingShouldOfferOnlyNeuralTherapy() {
+                        Doctor doctor = doctorWithNeuralAndChiropractic();
+                        stubAvailability(doctor);
+
+                        List<DoctorAvailableResponse> result = doctorService
+                                        .getSpecialtiesWithActiveDoctors(personId, SchedulingOrigin.AUTONOMO);
+
+                        assertThat(result).hasSize(1);
+                        assertThat(result.getFirst().specialty()).containsExactly("TERAPIA_NEURAL");
+                }
+
+                /** Sin origen no se relaja la restricción: se trata como el autónomo. */
+                @Test
+                void missingSchedulingOriginShouldBeRestrictedToNeuralTherapy() {
+                        Doctor doctor = doctorWithNeuralAndChiropractic();
+                        stubAvailability(doctor);
+
+                        List<DoctorAvailableResponse> result = doctorService
+                                        .getSpecialtiesWithActiveDoctors(null, null);
+
+                        assertThat(result).hasSize(1);
+                        assertThat(result.getFirst().specialty()).containsExactly("TERAPIA_NEURAL");
+                }
+
+                private Doctor doctorWithNeuralAndChiropractic() {
+                        Doctor doctor = new Doctor(personId, LocalDate.now(), LocalDate.now().plusMonths(1), 4, true, 30);
+                        doctor.addSpecialty(buildSpecialty(SpecialtyCode.TERAPIA_NEURAL));
+                        doctor.addSpecialty(buildSpecialty(SpecialtyCode.QUIROPRAXIA));
+                        return doctor;
+                }
+
+                private void stubAvailability(Doctor doctor) {
+                        when(doctorRepository.findByStatusTrue()).thenReturn(List.of(doctor));
+                        when(appointmentExternalService.calculateDoctorsAvailability(anyList()))
+                                        .thenReturn(Set.of(personId));
+                        when(personExternalService.getPersonNames(List.of(personId)))
+                                        .thenReturn(Map.of(personId, "Dr. Gomez"));
+                        when(appointmentExternalService.getAvailableDates(personId))
+                                        .thenReturn(List.of(LocalDate.now().plusDays(1)));
                 }
 
                 @Test

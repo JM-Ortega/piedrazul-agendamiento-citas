@@ -163,8 +163,6 @@ class AppointmentSchedulingHappyPathIT extends PostgresIntegrationSupport {
         LocalDate date = LocalDate.now().plusDays(1);
         AppointmentTime startTime = new AppointmentTime(LocalTime.of(9, 0));
 
-        // Paciente nuevo => debe ser TERAPIA_NEURAL para no disparar
-        // FirstAppointmentMustBeNeuralTerapyException.
         schedulingService.scheduleManual(manualContext(), doctorId, SpecialtyCode.TERAPIA_NEURAL, date, startTime,
                 performedBy, manualStrategy);
 
