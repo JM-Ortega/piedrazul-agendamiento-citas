@@ -53,7 +53,7 @@ public class AppointmentSchedulingService {
     }
 
     @Transactional
-    public void scheduleManual(
+    public Appointment scheduleManual(
             PatientSchedulingContext patientContext,
             UUID idDoctor,
             SpecialtyCode specialty,
@@ -61,11 +61,11 @@ public class AppointmentSchedulingService {
             AppointmentTime startTime,
             UUID performedBy,
             PatientResolutionStrategy patientResolutionStrategy) {
-        schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, true);
+        return schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, true);
     }
 
     @Transactional
-    public void scheduleAutonomous(
+    public Appointment scheduleAutonomous(
             PatientSchedulingContext patientContext,
             UUID idDoctor,
             SpecialtyCode specialty,
@@ -74,7 +74,7 @@ public class AppointmentSchedulingService {
             UUID performedBy,
             PatientResolutionStrategy patientResolutionStrategy) {
         validateAutonomousSchedulingEnabled();
-        schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, false);
+        return schedule(patientContext, idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy, false);
     }
 
     private void validateAutonomousSchedulingEnabled() {
@@ -112,8 +112,11 @@ public class AppointmentSchedulingService {
         // Serializa los agendamientos del mismo paciente antes de evaluar las reglas que dependen de él
         appointmentRepository.lockPatientSchedule(resolvedPatient.idPatient());
 
-        // Valida que si el paciente es nuevo su cita sea con Terapia Neural
-        validateNewPatientFirstAppointmentSpecialty(resolvedPatient.idPatient(), specialty);
+        // Valida que si el paciente es nuevo su cita sea con Terapia Neural (solo agendamiento autónomo:
+        // en el manual el personal de la clínica puede agendar cualquier especialidad)
+        if(!manualFlow){
+            validateNewPatientFirstAppointmentSpecialty(resolvedPatient.idPatient(), specialty);
+        }
 
         // Valida que no tenga más de una cita para esa misma especialidad
         if(!manualFlow){

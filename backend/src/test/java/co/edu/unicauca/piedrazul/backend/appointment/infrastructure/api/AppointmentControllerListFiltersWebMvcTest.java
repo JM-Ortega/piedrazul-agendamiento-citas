@@ -75,7 +75,8 @@ class AppointmentControllerListFiltersWebMvcTest {
                 mock(ManualPatientResolutionStrategy.class),
                 mock(AutonomousPatientResolutionStrategy.class),
                 mock(PatientConsultPort.class),
-                mock(DoctorConfigConsultPort.class));
+                mock(DoctorConfigConsultPort.class),
+                mock(RescheduleAppointmentUseCase.class));
 
         Jwt jwt = Jwt.withTokenValue("token")
                 .header("alg", "none")

@@ -14,6 +14,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientC
 import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentAccessDeniedException;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.ListAppointmentFiltersRequest;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.RescheduleAppointmentRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.CitaDtoMapper;
 import co.edu.unicauca.piedrazul.backend.config.security.JwtAuthConverter;
@@ -63,6 +64,7 @@ class AppointmentControllerOwnershipTest {
     private AppointmentSchedulingService appointmentSchedulingService;
     private PatientConsultPort patientConsultPort;
     private DoctorConfigConsultPort doctorConfigConsultPort;
+    private RescheduleAppointmentUseCase rescheduleAppointmentUseCase;
 
     private AppointmentController controller;
 
@@ -73,6 +75,7 @@ class AppointmentControllerOwnershipTest {
         appointmentSchedulingService = mock(AppointmentSchedulingService.class);
         patientConsultPort = mock(PatientConsultPort.class);
         doctorConfigConsultPort = mock(DoctorConfigConsultPort.class);
+        rescheduleAppointmentUseCase = mock(RescheduleAppointmentUseCase.class);
 
         when(patientConsultPort.findByUserId(PATIENT_USER_ID))
                 .thenReturn(Optional.of(new PatientSnapshot(OWN_PATIENT_ID, null)));
@@ -97,7 +100,8 @@ class AppointmentControllerOwnershipTest {
                 mock(ManualPatientResolutionStrategy.class),
                 mock(AutonomousPatientResolutionStrategy.class),
                 patientConsultPort,
-                doctorConfigConsultPort);
+                doctorConfigConsultPort,
+                rescheduleAppointmentUseCase);
     }
 
     // ---- listado ----
@@ -217,6 +221,60 @@ class AppointmentControllerOwnershipTest {
         ArgumentCaptor<PatientSchedulingContext> context = ArgumentCaptor.forClass(PatientSchedulingContext.class);
         verify(appointmentSchedulingService).scheduleAutonomous(context.capture(), any(), any(), any(), any(), any(), any());
         assertThat(context.getValue().idPatient()).isEqualTo(OWN_PATIENT_ID);
+    }
+
+    // ---- reagendamiento ----
+
+    @Test
+    void aSchedulerReschedulesWithoutDoctorOwnershipRestriction() {
+        Jwt jwt = jwt(UUID.randomUUID(), "SCHEDULER");
+
+        controller.rescheduleAppointment(APPOINTMENT_ID, reschedule(), jwt, authentication(jwt));
+
+        verify(rescheduleAppointmentUseCase).reschedule(eq(APPOINTMENT_ID), eq(null), eq(OTHER_DOCTOR_ID),
+                any(), any(), any(), any());
+    }
+
+    /** El médico se identifica por su token: solo podrá reagendar las citas de ese médico. */
+    @Test
+    void aDoctorReschedulingIsCheckedAgainstTheirOwnDoctorId() {
+        Jwt jwt = jwt(DOCTOR_USER_ID, "DOCTOR");
+
+        controller.rescheduleAppointment(APPOINTMENT_ID, reschedule(), jwt, authentication(jwt));
+
+        verify(rescheduleAppointmentUseCase).reschedule(eq(APPOINTMENT_ID), eq(OWN_DOCTOR_ID), eq(OTHER_DOCTOR_ID),
+                any(), any(), any(), any());
+    }
+
+    /** Un token con rol de paciente y de personal se trata como personal. */
+    @Test
+    void aTokenWithPatientAndSchedulerRolesReschedulesAsScheduler() {
+        Jwt jwt = jwt(PATIENT_USER_ID, "PATIENT", "SCHEDULER");
+
+        controller.rescheduleAppointment(APPOINTMENT_ID, reschedule(), jwt, authentication(jwt));
+
+        verify(rescheduleAppointmentUseCase).reschedule(eq(APPOINTMENT_ID), eq(null), any(), any(), any(), any(), any());
+        verify(patientConsultPort, never()).findByUserId(any());
+    }
+
+    @Test
+    void aTokenWithPatientAndDoctorRolesReschedulesAsDoctor() {
+        Jwt jwt = jwt(DOCTOR_USER_ID, "PATIENT", "DOCTOR");
+
+        controller.rescheduleAppointment(APPOINTMENT_ID, reschedule(), jwt, authentication(jwt));
+
+        verify(rescheduleAppointmentUseCase).reschedule(eq(APPOINTMENT_ID), eq(OWN_DOCTOR_ID), any(), any(), any(),
+                any(), any());
+        verify(patientConsultPort, never()).findByUserId(any());
+    }
+
+    private static RescheduleAppointmentRequest reschedule() {
+        RescheduleAppointmentRequest request = new RescheduleAppointmentRequest();
+        request.setDoctorId(OTHER_DOCTOR_ID);
+        request.setSpecialty(SpecialtyCode.QUIROPRAXIA);
+        request.setDate(LocalDate.now().plusDays(7));
+        request.setStartTime(LocalTime.of(9, 0));
+        return request;
     }
 
     // ---- utilidades ----

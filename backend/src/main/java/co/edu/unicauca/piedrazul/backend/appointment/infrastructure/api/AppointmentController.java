@@ -14,9 +14,11 @@ import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.inpu
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.ClinicalHistoryDescription;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.ListAppointmentFiltersRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.RegisterUnscheduledAttentionRequest;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.RescheduleAppointmentRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.AppointmentResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.PageResponse;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.output.RescheduleAppointmentResponse;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.CitaDtoMapper;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -64,6 +66,7 @@ public class AppointmentController {
     private final AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy;
     private final PatientConsultPort patientConsultPort;
     private final DoctorConfigConsultPort doctorConfigConsultPort;
+    private final RescheduleAppointmentUseCase rescheduleAppointmentUseCase;
 
     public AppointmentController(
             ListAppointmentsUseCase listAppointmentsUseCase,
@@ -82,7 +85,8 @@ public class AppointmentController {
             ManualPatientResolutionStrategy manualPatientResolutionStrategy,
             AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy,
             PatientConsultPort patientConsultPort,
-            DoctorConfigConsultPort doctorConfigConsultPort) {
+            DoctorConfigConsultPort doctorConfigConsultPort,
+            RescheduleAppointmentUseCase rescheduleAppointmentUseCase) {
         this.listAppointmentsUseCase = listAppointmentsUseCase;
         this.citaDtoMapper = citaDtoMapper;
         this.isNewPatientUseCase = isNewPatientUseCase;
@@ -100,6 +104,7 @@ public class AppointmentController {
         this.autonomousPatientResolutionStrategy = autonomousPatientResolutionStrategy;
         this.patientConsultPort = patientConsultPort;
         this.doctorConfigConsultPort = doctorConfigConsultPort;
+        this.rescheduleAppointmentUseCase = rescheduleAppointmentUseCase;
     }
 
     @PutMapping("/config/autonomous-scheduling")
@@ -389,6 +394,51 @@ public class AppointmentController {
 
         cancelAppointmentUseCase.cancel(appointmentId, patientId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{appointmentId}/reschedule")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR')")
+    @Auditable(action = AuditAction.CITA_AGENDADA, targetEntityType = AuditTargetType.CITA, targetIdExpression = "#appointmentId", onlyDenied = true)
+    @Operation(summary = "Reagendar una cita",
+            description = "Cancela la cita indicada y agenda una nueva (origen MANUAL) para el mismo paciente," +
+                    " en una sola operación: si la nueva no se puede agendar, la original no se cancela." +
+                    " Un médico solo puede reagendar sus propias citas; el agendador, cualquiera.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Cita reagendada correctamente"),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos o cita original inexistente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "No tiene permisos para reagendar la cita"),
+            @ApiResponse(responseCode = "409", description = "La cita original no se puede cancelar o el nuevo horario no está disponible")
+    })
+    public ResponseEntity<RescheduleAppointmentResponse> rescheduleAppointment(
+            @Parameter(description = "Identificador único (UUID) de la cita a reagendar")
+            @PathVariable UUID appointmentId,
+            @Parameter(description = "Datos de la nueva cita")
+            @RequestBody @Valid RescheduleAppointmentRequest request,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication) {
+
+        UUID performedBy = resolvePerformedBy(jwt);
+
+        // El agendador no tiene restricción; un médico (sin rol de agendador) solo reagenda sus citas
+        UUID requesterDoctorId = null;
+        if (!hasRole(authentication, "SCHEDULER")) {
+            requesterDoctorId = doctorConfigConsultPort.findByUserId(performedBy)
+                    .orElseThrow(() -> new DoctorConfigInconsistentException(
+                            "Doctor no encontrado para el userId: " + performedBy));
+        }
+
+        Appointment newAppointment = rescheduleAppointmentUseCase.reschedule(
+                appointmentId,
+                requesterDoctorId,
+                request.getDoctorId(),
+                request.getSpecialty(),
+                request.getDate(),
+                new AppointmentTime(request.getStartTime()),
+                performedBy);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                new RescheduleAppointmentResponse(appointmentId, citaDtoMapper.toResponse(newAppointment)));
     }
 
     @GetMapping("/list-all-states")
