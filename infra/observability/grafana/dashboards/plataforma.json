@@ -1007,7 +1007,7 @@
     {
       "type": "timeseries",
       "title": "Proporción de respuestas 5xx por servicio",
-      "description": "Fracción de respuestas 5xx por servicio en ventanas de 5 m: exactamente lo que evalúa PiedrazulHttp5xxRatioHigh. Línea roja punteada: umbral de la alerta (5 %), que además exige > 0,02 req/s de ese mismo total durante 10 m. Sin tráfico no hay línea; 0 significa tráfico sin 5xx. Incluye los 502 de un upstream que no responde. En grafana sus 501 (APIs de la interfaz no implementadas en esta instalación) no cuentan ni como 5xx ni en el total; se ven en Respuestas por código.",
+      "description": "Fracción de respuestas 5xx por servicio en ventanas de 5 m: exactamente lo que evalúa PiedrazulHttp5xxRatioHigh. Línea roja punteada: umbral de la alerta (5 %), que además exige > 0,02 req/s de ese mismo total durante 10 m. Sin tráfico no hay línea; 0 significa tráfico sin 5xx. El eje llega al menos a 10 % para ver el umbral y se amplía solo si la proporción real es mayor. Incluye los 502 de un upstream que no responde. En grafana sus 501 (APIs de la interfaz no implementadas en esta instalación) no cuentan ni como 5xx ni en el total; se ven en Respuestas por código.",
       "targets": [
         {
           "datasource": {
@@ -1030,6 +1030,7 @@
             "fillOpacity": 10,
             "showPoints": "never",
             "spanNulls": false,
+            "axisSoftMax": 0.1,
             "stacking": {
               "mode": "none"
             },
@@ -1142,7 +1143,7 @@
     {
       "type": "timeseries",
       "title": "Respuestas por código (websecure)",
-      "description": "Todas las respuestas del entrypoint público HTTPS, apiladas por código. Color por clase: 2xx verde, 3xx azul, 4xx amarillo (errores del cliente: sin sesión, credenciales rechazadas, rutas inexistentes; por sí solos no son incidentes), 5xx rojo. En gris: 0 (conexión actualizada a WebSocket, sin código final) y 501 (aquí los genera la interfaz de Grafana con APIs no implementadas; un 501 de otro servicio sí cuenta en Proporción de respuestas 5xx). 499: el cliente cerró la petición antes de la respuesta.",
+      "description": "Todas las respuestas del entrypoint público HTTPS, una línea por código. Color por clase: 2xx verde, 3xx azul, 4xx amarillo (errores del cliente: sin sesión, credenciales rechazadas, rutas inexistentes; por sí solos no son incidentes), 5xx rojo. En gris: 0 (conexión actualizada a WebSocket, sin código final) y 501 (aquí los genera la interfaz de Grafana con APIs no implementadas; un 501 de otro servicio sí cuenta en Proporción de respuestas 5xx). 499: el cliente cerró la petición antes de la respuesta.",
       "targets": [
         {
           "datasource": {
@@ -1166,7 +1167,7 @@
             "showPoints": "never",
             "spanNulls": false,
             "stacking": {
-              "mode": "normal"
+              "mode": "none"
             }
           },
           "color": {
@@ -1364,7 +1365,7 @@
     {
       "type": "timeseries",
       "title": "Backend: peticiones por estado",
-      "description": "Peticiones por segundo atendidas por Spring en el backend, apiladas por código de estado (mismos colores que Respuestas por código). Incluye las de monitoreo a /actuator, como el healthcheck de Docker en /actuator/health cada 30 s: con poco tráfico real, buena parte de lo que se ve es ese tráfico. Detalle por ruta en el dashboard Backend.",
+      "description": "Peticiones por segundo atendidas por Spring en el backend, una línea por código de estado (mismos colores que Respuestas por código). Incluye las de monitoreo a /actuator, como el healthcheck de Docker en /actuator/health cada 30 s: con poco tráfico real, buena parte de lo que se ve es ese tráfico. Detalle por ruta en el dashboard Backend.",
       "targets": [
         {
           "datasource": {
@@ -1388,7 +1389,7 @@
             "showPoints": "never",
             "spanNulls": false,
             "stacking": {
-              "mode": "normal"
+              "mode": "none"
             }
           },
           "color": {
@@ -1558,7 +1559,7 @@
     {
       "type": "timeseries",
       "title": "Keycloak: peticiones por resultado",
-      "description": "Peticiones por segundo atendidas por Keycloak (sin las de métricas y health), apiladas por resultado: SUCCESS (2xx), REDIRECTION (3xx, normales en el flujo de inicio de sesión), CLIENT_ERROR (4xx: incluye credenciales rechazadas y sesiones vencidas; no son por sí incidentes) y SERVER_ERROR (5xx, en rojo).",
+      "description": "Peticiones por segundo atendidas por Keycloak (sin las de métricas y health), una línea por resultado: SUCCESS (2xx), REDIRECTION (3xx, normales en el flujo de inicio de sesión), CLIENT_ERROR (4xx: incluye credenciales rechazadas y sesiones vencidas; no son por sí incidentes) y SERVER_ERROR (5xx, en rojo).",
       "targets": [
         {
           "datasource": {
@@ -1582,7 +1583,7 @@
             "showPoints": "never",
             "spanNulls": false,
             "stacking": {
-              "mode": "normal"
+              "mode": "none"
             }
           },
           "color": {

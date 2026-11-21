@@ -1111,8 +1111,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Heap por región (apilado) y máximo",
-      "description": "Heap ocupado por cada región del colector G1, apilado: la altura total es el heap usado. Eden: objetos nuevos (se vacía en cada GC joven); Survivor: objetos que sobrevivieron a algún GC; Old Gen: objetos de larga vida, que G1 libera en ciclos menos frecuentes. Línea gris punteada: máximo del heap. Lo normal es una sierra. Un Old Gen que crece durante mucho tiempo sin bajar puede ser retención de memoria; confírmalo con Heap de larga vida tras GC.",
+      "title": "Heap por región (apilado); máximo en leyenda",
+      "description": "Heap ocupado por cada región del colector G1, apilado: la altura total es el heap usado. Eden: objetos nuevos (se vacía en cada GC joven); Survivor: objetos que sobrevivieron a algún GC; Old Gen: objetos de larga vida, que G1 libera en ciclos menos frecuentes. El máximo del heap (valor configurado) no se dibuja, para que no aplaste la escala del uso real: consúltalo en la leyenda (columna Último); el tooltip solo muestra las regiones dibujadas. Lo normal es una sierra. Un Old Gen que crece durante mucho tiempo sin bajar puede ser retención de memoria; confírmalo con Heap de larga vida tras GC.",
       "targets": [
         {
           "datasource": {
@@ -1188,6 +1188,14 @@
                 "value": {
                   "mode": "none"
                 }
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "viz": true,
+                  "legend": false,
+                  "tooltip": false
+                }
               }
             ]
           }
@@ -1195,9 +1203,12 @@
       },
       "options": {
         "legend": {
-          "displayMode": "list",
+          "displayMode": "table",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull"
+          ]
         },
         "tooltip": {
           "mode": "multi",
@@ -1250,7 +1261,7 @@
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,
-            "fillOpacity": 10,
+            "fillOpacity": 0,
             "showPoints": "never",
             "spanNulls": false,
             "stacking": {
@@ -1261,7 +1272,23 @@
             "mode": "palette-classic"
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Metaspace"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8e8e8e"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
