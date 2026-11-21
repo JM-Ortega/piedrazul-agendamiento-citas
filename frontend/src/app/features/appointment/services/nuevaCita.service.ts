@@ -5,6 +5,7 @@ import { environment } from '../../../../environments/environment';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { NewAppointment } from '../models/dtos/newAppointment.dto';
 import { PatientSuggestion } from '../models/dtos/patientSuggestion.dto';
+import { RescheduleAppointment } from '../models/dtos/rescheduleAppointment.dto';
 import { SpecialtyDoctor } from '../models/dtos/specialtyDoctor.dto';
 import { SchedulingOrigin } from '../models/types/schedulingOrigin.type';
 
@@ -53,6 +54,21 @@ export class NuevaCitaService {
 
   addAppointment(data: NewAppointment): Observable<void> {
     return this.http.post<void>(`${this.apiUrl}/appointments`, data);
+  }
+
+  /**
+   * Reagenda una cita existente.
+   * @param appointmentId Id de la cita a reagendar.
+   * @param data Datos de la nueva cita (doctor, especialidad, fecha y hora).
+   */
+  rescheduleAppointment(
+    appointmentId: string,
+    data: RescheduleAppointment
+  ): Observable<void> {
+    return this.http.post<void>(
+      `${this.apiUrl}/appointments/${appointmentId}/reschedule`,
+      data
+    );
   }
 
   addPatient(patient: Omit<Patient, 'id'>): Observable<string> {
