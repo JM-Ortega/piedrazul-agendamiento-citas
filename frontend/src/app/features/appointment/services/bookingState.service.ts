@@ -7,6 +7,7 @@ import { BookingContext } from '../models/types/bookingContext.type';
 import { toIsoDateString } from '../../../shared/helpers/transformDateLocal';
 import { formatLongDateEs } from '../../../shared/helpers/dateFormat';
 import { SchedulingOrigin } from '../models/types/schedulingOrigin.type';
+import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 
 /** Especialidad fija con la que se agenda cuando el contexto es `patient`. */
 export const PATIENT_DEFAULT_SPECIALTY = 'TERAPIA_NEURAL';
@@ -80,6 +81,10 @@ export class BookingStateService {
   foundPatient = signal<Patient | null>(null);
   notFound = signal<boolean>(false);
   patientId = signal<string | null>(null);
+  foundPatientAppointments = signal<AppointmentsPatient[]>([]);
+  foundPatientAppointmentsTotal = signal<number>(0);
+  foundPatientAppointmentsLoading = signal<boolean>(false);
+  foundPatientAppointmentsError = signal<string>('');
 
   lastSearchedDocument = signal<string>('');
   searchQuery = signal<string>('');
@@ -200,6 +205,17 @@ export class BookingStateService {
     () => !!this.selectedDate() && !!this.selectedTime()
   );
 
+  /**
+   * Limpia las citas agendadas del paciente encontrado y sus estados
+   * de carga y error.
+   */
+  resetFoundPatientAppointments(): void {
+    this.foundPatientAppointments.set([]);
+    this.foundPatientAppointmentsTotal.set(0);
+    this.foundPatientAppointmentsLoading.set(false);
+    this.foundPatientAppointmentsError.set('');
+  }
+
   formatLocalDate(date: Date): string {
     return toIsoDateString(date);
   }
@@ -267,6 +283,7 @@ export class BookingStateService {
     this.notFound.set(false);
     this.patientId.set(null);
     this.lastSearchedDocument.set('');
+    this.resetFoundPatientAppointments();
   }
 
   /** Limpia toda la selección de médico/especialidad/horario (usado al volver a buscar paciente). */
