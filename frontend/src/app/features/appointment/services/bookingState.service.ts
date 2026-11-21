@@ -216,10 +216,21 @@ export class BookingStateService {
     this.foundPatientAppointmentsError.set('');
   }
 
+  /**
+   * Convierte una fecha a texto `yyyy-MM-dd` usando la hora local, que es
+   * el formato que espera el backend.
+   * @param date Fecha a convertir.
+   * @returns La fecha en formato `yyyy-MM-dd`.
+   */
   formatLocalDate(date: Date): string {
     return toIsoDateString(date);
   }
 
+  /**
+   * Arma el body de `/appointments/{id}/reschedule` con el médico,
+   * la especialidad, la fecha y la hora seleccionados en el flujo.
+   * @returns Datos de la nueva cita; la hora va en formato `HH:mm`.
+   */
   buildReschedulePayload(): RescheduleAppointment {
     const date = this.selectedDate();
     return {
@@ -230,6 +241,11 @@ export class BookingStateService {
     };
   }
 
+  /**
+   * Obtiene el id del paciente según el contexto: en `scheduler` y `doctor`
+   * es el paciente buscado; en `patient`, el paciente en sesión.
+   * @returns El id del paciente, o cadena vacía si aún no se conoce.
+   */
   resolvePatientId(): string {
     if (this.isSchedulerContext() || this.isDoctorContext())
       return this.patientId() ?? '';
@@ -274,6 +290,10 @@ export class BookingStateService {
     this.availableSlots.set([]);
   }
 
+  /**
+   * Limpia todo el estado de la búsqueda de paciente: consulta, sugerencias,
+   * paciente encontrado y sus citas agendadas.
+   */
   resetSearchState(): void {
     this.searchQuery.set('');
     this.searchSuggestions.set([]);
@@ -299,12 +319,14 @@ export class BookingStateService {
     this.resetScheduleState();
   }
 
+  /** Limpia la fecha, la hora y los horarios disponibles seleccionados. */
   resetScheduleState(): void {
     this.selectedDate.set(null);
     this.selectedTime.set('');
     this.availableSlots.set([]);
   }
 
+  /** Deja vacío el formulario de registro de paciente nuevo. */
   resetPatientForm(): void {
     this.patientForm.set({
       identification: '',
