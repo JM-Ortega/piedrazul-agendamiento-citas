@@ -1,11 +1,13 @@
 import { computed, Injectable, signal } from '@angular/core';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { PatientSuggestion } from '../models/dtos/patientSuggestion.dto';
+import { RescheduleAppointment } from '../models/dtos/rescheduleAppointment.dto';
 import { SpecialtyDoctor } from '../models/dtos/specialtyDoctor.dto';
 import { BookingContext } from '../models/types/bookingContext.type';
 import { toIsoDateString } from '../../../shared/helpers/transformDateLocal';
 import { formatLongDateEs } from '../../../shared/helpers/dateFormat';
 import { SchedulingOrigin } from '../models/types/schedulingOrigin.type';
+import { AppointmentsPatient } from '../../../shared/models/dtos/appointments.dto';
 
 /** Especialidad fija con la que se agenda cuando el contexto es `patient`. */
 export const PATIENT_DEFAULT_SPECIALTY = 'TERAPIA_NEURAL';
@@ -30,21 +32,43 @@ export class BookingStateService {
     this.isPatientContext() ? 'AUTONOMO' : 'MANUAL'
   );
 
+  /**
+   * Id de la cita que se está reagendando. Si tiene valor, el flujo está en
+   * modo reagendamiento: el paciente ya es conocido (no hay paso de
+   * búsqueda) y al confirmar se llama al endpoint de reschedule en vez de
+   * crear una cita nueva.
+   */
+  rescheduleAppointmentId = signal<string | null>(null);
+  readonly isReschedule = computed(() => !!this.rescheduleAppointmentId());
+
+  /** Solo el agendador busca/registra paciente, y nunca al reagendar. */
+  readonly hasPatientLookupStep = computed(
+    () => this.isSchedulerContext() && !this.isReschedule()
+  );
+
   step = signal<number>(1);
 
   readonly patientLookupStep = computed(() =>
-    this.isSchedulerContext() ? 1 : null
+    this.hasPatientLookupStep() ? 1 : null
   );
-  readonly schedulingStep = computed(() => (this.isSchedulerContext() ? 2 : 1));
-  readonly confirmStep = computed(() => (this.isSchedulerContext() ? 3 : 2));
+  readonly schedulingStep = computed(() =>
+    this.hasPatientLookupStep() ? 2 : 1
+  );
+  readonly confirmStep = computed(() => (this.hasPatientLookupStep() ? 3 : 2));
 
   readonly stepLabels = computed(() => {
-    if (this.isSchedulerContext())
+    if (this.hasPatientLookupStep())
       return ['1. Paciente', '2. Agendamiento', '3. Confirmar'];
+    if (this.isReschedule()) return ['1. Reagendamiento', '2. Confirmar'];
     return ['1. Agendamiento', '2. Confirmar'];
   });
 
+  readonly successTitle = computed(() =>
+    this.isReschedule() ? '¡Cita Reagendada!' : '¡Cita Agendada!'
+  );
+
   readonly successMessage = computed(() => {
+    if (this.isReschedule()) return 'La cita fue reagendada exitosamente.';
     if (this.isSchedulerContext() || this.isDoctorContext())
       return 'La cita fue registrada exitosamente.';
     return 'Su cita fue registrada exitosamente.';
@@ -57,6 +81,10 @@ export class BookingStateService {
   foundPatient = signal<Patient | null>(null);
   notFound = signal<boolean>(false);
   patientId = signal<string | null>(null);
+  foundPatientAppointments = signal<AppointmentsPatient[]>([]);
+  foundPatientAppointmentsTotal = signal<number>(0);
+  foundPatientAppointmentsLoading = signal<boolean>(false);
+  foundPatientAppointmentsError = signal<string>('');
 
   lastSearchedDocument = signal<string>('');
   searchQuery = signal<string>('');
@@ -177,10 +205,47 @@ export class BookingStateService {
     () => !!this.selectedDate() && !!this.selectedTime()
   );
 
+  /**
+   * Limpia las citas agendadas del paciente encontrado y sus estados
+   * de carga y error.
+   */
+  resetFoundPatientAppointments(): void {
+    this.foundPatientAppointments.set([]);
+    this.foundPatientAppointmentsTotal.set(0);
+    this.foundPatientAppointmentsLoading.set(false);
+    this.foundPatientAppointmentsError.set('');
+  }
+
+  /**
+   * Convierte una fecha a texto `yyyy-MM-dd` usando la hora local, que es
+   * el formato que espera el backend.
+   * @param date Fecha a convertir.
+   * @returns La fecha en formato `yyyy-MM-dd`.
+   */
   formatLocalDate(date: Date): string {
     return toIsoDateString(date);
   }
 
+  /**
+   * Arma el body de `/appointments/{id}/reschedule` con el médico,
+   * la especialidad, la fecha y la hora seleccionados en el flujo.
+   * @returns Datos de la nueva cita; la hora va en formato `HH:mm`.
+   */
+  buildReschedulePayload(): RescheduleAppointment {
+    const date = this.selectedDate();
+    return {
+      doctorId: this.selectedDoctorId(),
+      specialty: this.selectedSpecialty(),
+      date: date ? this.formatLocalDate(date) : '',
+      startTime: this.selectedTime().slice(0, 5),
+    };
+  }
+
+  /**
+   * Obtiene el id del paciente según el contexto: en `scheduler` y `doctor`
+   * es el paciente buscado; en `patient`, el paciente en sesión.
+   * @returns El id del paciente, o cadena vacía si aún no se conoce.
+   */
   resolvePatientId(): string {
     if (this.isSchedulerContext() || this.isDoctorContext())
       return this.patientId() ?? '';
@@ -225,6 +290,10 @@ export class BookingStateService {
     this.availableSlots.set([]);
   }
 
+  /**
+   * Limpia todo el estado de la búsqueda de paciente: consulta, sugerencias,
+   * paciente encontrado y sus citas agendadas.
+   */
   resetSearchState(): void {
     this.searchQuery.set('');
     this.searchSuggestions.set([]);
@@ -234,6 +303,7 @@ export class BookingStateService {
     this.notFound.set(false);
     this.patientId.set(null);
     this.lastSearchedDocument.set('');
+    this.resetFoundPatientAppointments();
   }
 
   /** Limpia toda la selección de médico/especialidad/horario (usado al volver a buscar paciente). */
@@ -249,12 +319,14 @@ export class BookingStateService {
     this.resetScheduleState();
   }
 
+  /** Limpia la fecha, la hora y los horarios disponibles seleccionados. */
   resetScheduleState(): void {
     this.selectedDate.set(null);
     this.selectedTime.set('');
     this.availableSlots.set([]);
   }
 
+  /** Deja vacío el formulario de registro de paciente nuevo. */
   resetPatientForm(): void {
     this.patientForm.set({
       identification: '',

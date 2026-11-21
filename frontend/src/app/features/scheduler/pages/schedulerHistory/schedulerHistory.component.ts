@@ -6,6 +6,7 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
+import { Router } from '@angular/router';
 import { LucideCalendar, LucideDownload, LucideX } from '@lucide/angular';
 import { PatientAppointmentService } from '../../../../core/services/patient.service';
 import { SchedulerService } from '../../../../core/services/scheduler.service';
@@ -24,6 +25,11 @@ import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 import { SchedulerExportModalComponent } from '../../components/exportModal/exportModal.component';
 import { FiltersPanelComponent } from '../../components/filtersPanel/filtersPanel.component';
 import { AppointmentTableComponent } from '../../components/table/table.component';
+import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
+import {
+  buildRescheduleNavigation,
+  SCHEDULER_NEW_APPOINTMENT_ROUTE,
+} from '../../../appointment/models/types/rescheduleNavigation.type';
 const PAGE_SIZE = 5;
 
 @Component({
@@ -48,6 +54,7 @@ const PAGE_SIZE = 5;
 export class SchedulerHistoryComponent implements OnInit {
   private schedulerService = inject(SchedulerService);
   private patientAppointmentService = inject(PatientAppointmentService);
+  private router = inject(Router);
 
   doctors = signal<dtoDoctor[]>([]);
   states = signal<string[]>([]);
@@ -247,6 +254,17 @@ export class SchedulerHistoryComponent implements OnInit {
   requestCancelAppointment(appointmentId: string): void {
     this.pendingCancelId.set(appointmentId);
     this.showCancelModal.set(true);
+  }
+
+  /**
+   * Abre el flujo de agendamiento en modo reagendamiento con los datos de
+   * la cita original.
+   */
+  requestRescheduleAppointment(apt: AppointmentsPatient): void {
+    this.router.navigate(
+      [SCHEDULER_NEW_APPOINTMENT_ROUTE],
+      buildRescheduleNavigation(apt, '/agendador/historial-citas')
+    );
   }
 
   confirmCancelAppointment(): void {

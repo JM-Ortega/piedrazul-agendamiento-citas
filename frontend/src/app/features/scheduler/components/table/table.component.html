@@ -37,7 +37,7 @@
             Estado
           </th>
           <th class="text-left px-4 py-1 text-[#163c63] text-base rounded-r-xl">
-            Cancelar
+            Acciones
           </th>
         </tr>
       </thead>
@@ -103,16 +103,59 @@
                 {{ statusLabel(apt.appointmentState) }}
               </span>
             </td>
-            <td class="px-4 py-1 rounded-lg text-sm font-medium">
+            <td class="px-4 py-1 text-sm font-medium">
               <div class="px-3 py-1.5">
                 @if (apt.appointmentState === 'AGENDADA') {
-                  <app-button
-                    variant="danger"
-                    size="sm"
-                    (buttonClick)="onCancel(apt.idAppointment)"
-                  >
-                    <svg lucideX [size]="16"></svg> Cancelar
-                  </app-button>
+                  <div #trigger class="inline-block" data-appointment-actions>
+                    <app-button
+                      variant="success"
+                      size="sm"
+                      (buttonClick)="toggleActions(apt.idAppointment, trigger)"
+                    >
+                      <svg lucideClipboardList [size]="16"></svg>
+                      <span>Acciones</span>
+                      <svg
+                        lucideChevronDown
+                        [size]="14"
+                        class="transition-transform"
+                        [style.transform]="
+                          openActionsId() === apt.idAppointment
+                            ? 'rotate(180deg)'
+                            : 'rotate(0deg)'
+                        "
+                      ></svg>
+                    </app-button>
+                  </div>
+
+                  @if (openActionsId() === apt.idAppointment) {
+                    <div
+                      data-appointment-actions
+                      class="fixed w-44 bg-white border-2 border-blue-100 rounded-xl shadow-xl z-50 overflow-hidden"
+                      [style.left.px]="menuPosition().left"
+                      [style.top.px]="menuPosition().top"
+                      [style.bottom.px]="menuPosition().bottom"
+                    >
+                      <button
+                        type="button"
+                        (click)="selectAction(apt, 'REAGENDAR')"
+                        class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-emerald-50 text-emerald-700 transition-colors"
+                      >
+                        <svg lucideCalendarSync [size]="16"></svg>
+                        Reagendar
+                      </button>
+
+                      <div class="border-t border-gray-100"></div>
+
+                      <button
+                        type="button"
+                        (click)="selectAction(apt, 'CANCELAR')"
+                        class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-red-50 text-red-600 transition-colors"
+                      >
+                        <svg lucideX [size]="16"></svg>
+                        Cancelar
+                      </button>
+                    </div>
+                  }
                 } @else {
                   <span class="text-gray-400">—</span>
                 }

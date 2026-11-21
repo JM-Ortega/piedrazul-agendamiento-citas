@@ -6,6 +6,7 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
+import { Router } from '@angular/router';
 import { LucideX } from '@lucide/angular';
 import { SchedulerService } from '../../../../core/services/scheduler.service';
 import { PatientAppointmentService } from '../../../../core/services/patient.service';
@@ -18,6 +19,11 @@ import { FilterValues } from '../../../../designSystem/organisms/filters/filters
 import { FiltersPanelComponent } from '../../components/filtersPanel/filtersPanel.component';
 import { FilterFieldConfig } from '../../../../designSystem/molecules/filterField/filterField.model';
 import { AppointmentTableComponent } from '../../components/table/table.component';
+import { AppointmentsPatient } from '../../../../shared/models/dtos/appointments.dto';
+import {
+  buildRescheduleNavigation,
+  SCHEDULER_NEW_APPOINTMENT_ROUTE,
+} from '../../../appointment/models/types/rescheduleNavigation.type';
 import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 import { FormatoPipe } from '../../../../shared/pipes/formatoPipe';
 
@@ -40,6 +46,7 @@ const PAGE_SIZE = 6;
 export class SchedulerDashboardComponent implements OnInit {
   private schedulerService = inject(SchedulerService);
   private patientAppointmentService = inject(PatientAppointmentService);
+  private router = inject(Router);
   private formatoPipe = new FormatoPipe();
 
   readonly today = (() => {
@@ -156,6 +163,16 @@ export class SchedulerDashboardComponent implements OnInit {
   requestCancelAppointment(appointmentId: string): void {
     this.pendingCancelId.set(appointmentId);
     this.showCancelModal.set(true);
+  }
+
+  /** Abre el flujo de agendamiento en modo reagendamiento con los datos de
+   * la cita original.
+   */
+  requestRescheduleAppointment(apt: AppointmentsPatient): void {
+    this.router.navigate(
+      [SCHEDULER_NEW_APPOINTMENT_ROUTE],
+      buildRescheduleNavigation(apt, '/agendador')
+    );
   }
 
   confirmCancelAppointment(): void {

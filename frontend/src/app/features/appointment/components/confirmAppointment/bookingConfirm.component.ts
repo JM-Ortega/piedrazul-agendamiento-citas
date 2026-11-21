@@ -52,20 +52,28 @@ export class BookingConfirmComponent implements OnInit {
   }
 
   /**
-   * Envía la cita al backend. Todos los errores muestran
-   * el mensaje que resuelve el interceptor.
+   * Envía la cita al backend.
+   * En modo reagendamiento llama a /appointments/{id}/reschedule;
+   * si no, registra una cita nueva.
    */
   confirm(): void {
     const date = this.state.selectedDate();
     if (!date || !this.state.selectedTime() || !this.state.selectedDoctorId())
       return;
+    if (this.state.isLoading()) return;
 
     this.state.isLoading.set(true);
     this.state.errorMessage.set('');
 
-    const data = this.buildPayload(date);
+    const rescheduleId = this.state.rescheduleAppointmentId();
+    const request$ = rescheduleId
+      ? this.citaService.rescheduleAppointment(
+          rescheduleId,
+          this.state.buildReschedulePayload()
+        )
+      : this.citaService.addAppointment(this.buildPayload(date));
 
-    this.citaService.addAppointment(data).subscribe({
+    request$.subscribe({
       next: () => {
         this.state.isLoading.set(false);
         this.state.success.set(true);
