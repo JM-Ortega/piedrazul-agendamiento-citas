@@ -62,7 +62,19 @@ export class AppointmentBookingComponent implements OnInit {
     this.state.isNewPatient.set(value);
   }
 
-  /** Documento precargado al entrar desde el contexto `doctor`. */
+  /**
+   * Activa el modo reagendamiento con el id de la cita original. Se usa en
+   * contexto `scheduler`: se salta la búsqueda de paciente y al confirmar
+   * se llama al endpoint de reschedule.
+   */
+  @Input() set rescheduleAppointmentId(value: string) {
+    this.state.rescheduleAppointmentId.set(value || null);
+  }
+
+  /**
+   * Documento del paciente precargado: al entrar desde el contexto `doctor`
+   * o al reagendar.
+   */
   @Input() set documentNumber(value: string) {
     if (value) {
       this.pendingDocumentNumber = value;
@@ -71,12 +83,14 @@ export class AppointmentBookingComponent implements OnInit {
   private pendingDocumentNumber = '';
 
   /**
-   * Especialidad e id del médico a preseleccionar en contexto `doctor`
-   * (tanto para el médico en sesión por defecto como al reagendar desde
-   * una cita previa). El usuario puede cambiar ambos libremente.
+   * Especialidad y médico a preseleccionar en contexto `doctor` o al
+   * reagendar. El médico se busca por id y, si no llega id, por nombre
+   * (la tabla de citas del agendador solo trae `doctorName`).
+   * El usuario puede cambiar ambos libremente.
    */
   @Input() prefillSpecialty = '';
   @Input() prefillDoctorId = '';
+  @Input() prefillDoctorName = '';
 
   goBack = output<void>();
 
@@ -84,15 +98,20 @@ export class AppointmentBookingComponent implements OnInit {
 
   get isPatientStep(): boolean {
     return (
-      this.state.isSchedulerContext() &&
+      this.state.hasPatientLookupStep() &&
       this.state.step() === this.state.patientLookupStep()
     );
   }
 
+  /** Médico/especialidad se precargan al agendar como médico o al reagendar. */
+  private get shouldApplyDoctorPrefill(): boolean {
+    return this.state.isDoctorContext() || this.state.isReschedule();
+  }
+
   ngOnInit(): void {
     this.state.initContext(this.context);
-    if (this.state.isDoctorContext()) {
-      this.initDoctorContext();
+    if (this.state.isDoctorContext() || this.state.isReschedule()) {
+      this.initWithKnownPatient();
     } else if (this.state.isPatientContext()) {
       this.initPatientContext();
     }
@@ -104,11 +123,13 @@ export class AppointmentBookingComponent implements OnInit {
   }
 
   /**
-   * Inicializa el flujo cuando un médico agenda una cita. Si llega
-   * `documentNumber`, primero busca al paciente para tener su id
-   * disponible (por si afecta la disponibilidad de médicos).
+   * Inicializa el flujo cuando el paciente ya es conocido: un médico que
+   * agenda, o el agendador que reagenda. Arranca directo en el paso de
+   * agendamiento y, si llega `documentNumber`, primero busca al paciente
+   * para tener su id disponible (afecta la disponibilidad de médicos y
+   * alimenta el resumen de confirmación).
    */
-  private initDoctorContext(): void {
+  private initWithKnownPatient(): void {
     this.state.step.set(this.state.schedulingStep());
 
     if (!this.pendingDocumentNumber) {
@@ -191,13 +212,13 @@ export class AppointmentBookingComponent implements OnInit {
   }
 
   onSchedulingBack(): void {
-    if (this.state.isSchedulerContext()) {
+    if (this.state.hasPatientLookupStep()) {
       this.state.resetDoctorState();
       this.patientSubStep = this.state.notFound() ? 'register' : 'search';
       this.state.step.set(this.state.patientLookupStep()!);
       return;
     }
-    // doctor / patient: no hay paso previo dentro del flujo, se sale de él
+    // doctor / patient / reagendamiento: no hay paso previo, se sale del flujo
     this.goBack.emit();
   }
 
@@ -228,7 +249,7 @@ export class AppointmentBookingComponent implements OnInit {
       .subscribe({
         next: (docs) => {
           this.state.doctors.set(docs);
-          if (this.state.isDoctorContext()) {
+          if (this.shouldApplyDoctorPrefill) {
             this.applyDoctorPrefill(docs);
           }
         },
@@ -247,16 +268,22 @@ export class AppointmentBookingComponent implements OnInit {
   }
 
   /**
-   * Preselecciona médico y especialidad en contexto `doctor` a partir de
-   * `prefillDoctorId`/`prefillSpecialty`, sin restringir el resto de
-   * médicos/especialidades ya cargados: el usuario puede cambiar ambos.
+   * Preselecciona médico y especialidad (contexto `doctor` o reagendamiento)
+   * a partir de `prefillDoctorId` —o `prefillDoctorName` si no hay id— y
+   * `prefillSpecialty`, sin restringir el resto de médicos/especialidades
+   * ya cargados: el usuario puede cambiar ambos.
    *
    * @param docs - Lista de médicos ya cargada.
    */
   private applyDoctorPrefill(docs: SpecialtyDoctor[]): void {
-    if (!this.prefillDoctorId) return;
+    if (!this.prefillDoctorId && !this.prefillDoctorName) return;
 
-    const match = docs.find((d) => d.id === this.prefillDoctorId);
+    const normalize = (s: string) => s.trim().toLocaleLowerCase('es');
+    const match = this.prefillDoctorId
+      ? docs.find((d) => d.id === this.prefillDoctorId)
+      : docs.find(
+          (d) => normalize(d.name) === normalize(this.prefillDoctorName)
+        );
     if (!match) {
       this.state.errorMessageDoctors.set(
         'El médico de la cita anterior ya no está disponible. Seleccione uno nuevo.'

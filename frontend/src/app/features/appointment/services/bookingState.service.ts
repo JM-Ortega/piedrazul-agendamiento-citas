@@ -1,6 +1,7 @@
 import { computed, Injectable, signal } from '@angular/core';
 import { Patient } from '../../../shared/models/interfaces/patient.model';
 import { PatientSuggestion } from '../models/dtos/patientSuggestion.dto';
+import { RescheduleAppointment } from '../models/dtos/rescheduleAppointment.dto';
 import { SpecialtyDoctor } from '../models/dtos/specialtyDoctor.dto';
 import { BookingContext } from '../models/types/bookingContext.type';
 import { toIsoDateString } from '../../../shared/helpers/transformDateLocal';
@@ -30,21 +31,43 @@ export class BookingStateService {
     this.isPatientContext() ? 'AUTONOMO' : 'MANUAL'
   );
 
+  /**
+   * Id de la cita que se está reagendando. Si tiene valor, el flujo está en
+   * modo reagendamiento: el paciente ya es conocido (no hay paso de
+   * búsqueda) y al confirmar se llama al endpoint de reschedule en vez de
+   * crear una cita nueva.
+   */
+  rescheduleAppointmentId = signal<string | null>(null);
+  readonly isReschedule = computed(() => !!this.rescheduleAppointmentId());
+
+  /** Solo el agendador busca/registra paciente, y nunca al reagendar. */
+  readonly hasPatientLookupStep = computed(
+    () => this.isSchedulerContext() && !this.isReschedule()
+  );
+
   step = signal<number>(1);
 
   readonly patientLookupStep = computed(() =>
-    this.isSchedulerContext() ? 1 : null
+    this.hasPatientLookupStep() ? 1 : null
   );
-  readonly schedulingStep = computed(() => (this.isSchedulerContext() ? 2 : 1));
-  readonly confirmStep = computed(() => (this.isSchedulerContext() ? 3 : 2));
+  readonly schedulingStep = computed(() =>
+    this.hasPatientLookupStep() ? 2 : 1
+  );
+  readonly confirmStep = computed(() => (this.hasPatientLookupStep() ? 3 : 2));
 
   readonly stepLabels = computed(() => {
-    if (this.isSchedulerContext())
+    if (this.hasPatientLookupStep())
       return ['1. Paciente', '2. Agendamiento', '3. Confirmar'];
+    if (this.isReschedule()) return ['1. Reagendamiento', '2. Confirmar'];
     return ['1. Agendamiento', '2. Confirmar'];
   });
 
+  readonly successTitle = computed(() =>
+    this.isReschedule() ? '¡Cita Reagendada!' : '¡Cita Agendada!'
+  );
+
   readonly successMessage = computed(() => {
+    if (this.isReschedule()) return 'La cita fue reagendada exitosamente.';
     if (this.isSchedulerContext() || this.isDoctorContext())
       return 'La cita fue registrada exitosamente.';
     return 'Su cita fue registrada exitosamente.';
@@ -179,6 +202,16 @@ export class BookingStateService {
 
   formatLocalDate(date: Date): string {
     return toIsoDateString(date);
+  }
+
+  buildReschedulePayload(): RescheduleAppointment {
+    const date = this.selectedDate();
+    return {
+      doctorId: this.selectedDoctorId(),
+      specialty: this.selectedSpecialty(),
+      date: date ? this.formatLocalDate(date) : '',
+      startTime: this.selectedTime().slice(0, 5),
+    };
   }
 
   resolvePatientId(): string {

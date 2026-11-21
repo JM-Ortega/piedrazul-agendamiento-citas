@@ -1,5 +1,16 @@
 <div>
-  <h2 class="text-[#163c63] text-xl mb-4">Confirmar Cita</h2>
+  <h2 class="text-[#163c63] text-xl mb-4">
+    {{ state.isReschedule() ? 'Confirmar Reagendamiento' : 'Confirmar Cita' }}
+  </h2>
+
+  @if (state.isReschedule()) {
+    <div
+      class="mb-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm"
+    >
+      Al confirmar, la cita anterior se cancelará y se registrará esta nueva
+      cita.
+    </div>
+  }
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-10 w-full">
     <div class="bg-blue-50 rounded-xl p-5">
@@ -82,7 +93,10 @@
       [fullWidth]="true"
       class="flex-1"
     >
-      <svg lucideCheckCircle [size]="22"></svg> Confirmar y Registrar
+      <svg lucideCheckCircle [size]="22"></svg>
+      {{
+        state.isReschedule() ? 'Confirmar y Reagendar' : 'Confirmar y Registrar'
+      }}
     </app-button>
   </div>
 </div>
