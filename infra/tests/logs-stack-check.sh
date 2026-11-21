@@ -378,11 +378,16 @@ OBS_LOG_PROJECT=${LOG_PROJECT}
 OBS_LOG_SERVICES=traefik|backend
 EOF
 CID="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+# AGG: aggregateId de negocio (no es un id de petición). Una línea de notificación sin petición
+# ([-]) y otra dentro de la petición CID lo mencionan; solo la segunda tiene correlation_id
+AGG="$(python3 -c 'import uuid; print(uuid.uuid4())')"
 synj_write pre \
   "$(docker_rec "${LOG_PROJECT}" traefik 6 "2026-11-03T10:00:00Z ERR ${RUN}-traefik-error")" \
   "$(docker_rec "${LOG_PROJECT}" traefik 3 "2026-11-03T10:00:01Z WRN ${RUN}-traefik-stderr")" \
   "$(docker_rec "${LOG_PROJECT}" backend 6 "2026-11-03T10:00:02.000Z  INFO 1 --- [piedrazul] [nio-8080-exec-1] [${CID}] c.e.u.p.Api : ${RUN}-backend-request")" \
   "$(docker_rec "${LOG_PROJECT}" backend 6 "	at co.edu.unicauca.Example(${RUN}-backend-continuation)")" \
+  "$(docker_rec "${LOG_PROJECT}" backend 6 "2026-11-03T10:00:02.500Z  INFO 1 --- [piedrazul] [nio-8080-exec-1] [${CID}] c.e.u.p.Api : ${RUN}-backend-request-agg aggregateId=${AGG}")" \
+  "$(docker_rec "${LOG_PROJECT}" backend 6 "2026-11-03T10:00:02.700Z  INFO 1 --- [piedrazul] [scheduling-1] [-] c.e.u.n.Notif : ${RUN}-backend-notification aggregateId=${AGG}")" \
   "$(docker_rec "${LOG_PROJECT}" postgres 6 "${RUN}-postgres-excluded")" \
   "$(docker_rec "${LOG_PROJECT}" keycloak 6 "2026-11-03 10:00:03,000 INFO  [org.keycloak.events] (executor) ${RUN}-SENSITIVE-PRE type=LOGIN userId=synthetic")" \
   "$(docker_rec "otro-proyecto" traefik 6 "${RUN}-other-project")" \
@@ -446,10 +451,12 @@ check "ingesta: traefik ERR → source=docker, service=traefik, stream=stdout, l
   test "$(lq "{service=\"traefik\"} |= \"${RUN}-traefik-error\"" | jq -c '.data.result[0].stream | {source, service, stream, level}')" = '{"source":"docker","service":"traefik","stream":"stdout","level":"error"}'
 check "ingesta: PRIORITY 3 → stream=stderr; WRN → level=warn" \
   test "$(lq "{service=\"traefik\"} |= \"${RUN}-traefik-stderr\"" | jq -c '.data.result[0].stream | {stream, level}')" = '{"stream":"stderr","level":"warn"}'
-check "ingesta: backend INFO con correlation_id como metadato estructurado" \
-  test "$(lcount "{service=\"backend\", level=\"info\"} | correlation_id=\"${CID}\"")" = 1
+check "ingesta: backend INFO con correlation_id como metadato estructurado (2 líneas de la petición)" \
+  test "$(lcount "{service=\"backend\", level=\"info\"} | correlation_id=\"${CID}\"")" = 2
+check "ingesta: la línea del backend fuera de petición ([-]) que menciona el aggregateId no tiene correlation_id" \
+  test "$(lcount "{service=\"backend\"} |= \"${RUN}-backend-notification\" | correlation_id=\"\"")" = 1
 check "ingesta: container_id como metadato estructurado, no etiqueta" \
-  test "$(lcount "{service=\"backend\"} | container_id=\"$(printf '%s' "${LOG_PROJECT}backend" | sha256sum | cut -c1-12)\"")" = 1
+  test "$(lcount "{service=\"backend\"} | container_id=\"$(printf '%s' "${LOG_PROJECT}backend" | sha256sum | cut -c1-12)\"")" = 3
 check "multilínea: la línea de continuación se une a su entrada (una entrada, con la severidad de la cabecera)" \
   test "$(lq "{service=\"backend\"} |= \"${RUN}-backend-continuation\"" | jq -r '[.data.result[] | .stream.level as $l | .values[] | select(.[1] | contains("'"${RUN}"'-backend-request")) | $l] | join(",")')" = info
 check "ingesta: aviso de journald de docker.service → service=journald" \
@@ -471,7 +478,7 @@ check "etiquetas: solo source, service, stream y level" \
 READ="$(alloy_metric loki_source_journal_target_lines_total)"
 SELECTED="$(pexec wget -qO- http://alloy:12345/metrics 2>/dev/null | awk '/^loki_relabel_entries_written\{component_id="loki.relabel.select"/ {print $NF}')"
 echo "      Alloy: leídas ${READ}, seleccionadas ${SELECTED}"
-check "ingesta: Alloy cuenta todo lo leído (16) antes de la selección (5: traefik 2, backend 2, aviso de docker.service 1)" test "${READ%.*}/${SELECTED%.*}" = 16/5
+check "ingesta: Alloy cuenta todo lo leído (18) antes de la selección (7: traefik 2, backend 4, aviso de docker.service 1)" test "${READ%.*}/${SELECTED%.*}" = 18/7
 
 # ── 4. Grafana ───────────────────────────────────────────────────────────────
 GRAFANA_AUTH="admin:$(sed -n 's/^GRAFANA_ADMIN_PASSWORD=//p' "${TMP}/obs.env")"
@@ -485,16 +492,18 @@ check "Grafana: tres dashboards en la carpeta Piedra Azul (plataforma, backend-j
   bash -c "test \"\$(curl -sf -u \"\${GRAFANA_AUTH}\" '${G}/api/search?type=dash-db' | jq -r '[.[] | select(.folderTitle == \"Piedra Azul\") | .uid] | sort | join(\",\")')\" = piedrazul-backend-jvm,piedrazul-logs,piedrazul-plataforma"
 cat > "${TMP}/panels.py" <<'EOF'
 import base64, json, os, sys, urllib.request, urllib.error
-base, cid = sys.argv[1], sys.argv[2]
+base, cid, agg = sys.argv[1], sys.argv[2], sys.argv[3]
 auth = "Basic " + base64.b64encode(os.environ["GRAFANA_AUTH"].encode()).decode()
 def call(path, body=None):
     req = urllib.request.Request(base + path, data=json.dumps(body).encode() if body else None,
                                  headers={"Authorization": auth, "Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)
-def subst(expr, cid_value):
-    return (expr.replace("$service", ".+").replace("$level", ".*").replace("$correlation_id", cid_value)
-                .replace("$search", "").replace("$__auto", "1m").replace("$__rate_interval", "2m"))
+def subst(expr, cid_value, search=""):
+    # Formatos explícitos de las consultas (${correlation_id:raw}, ${search:raw}): sin escape
+    return (expr.replace("${correlation_id:raw}", cid_value).replace("${search:raw}", search)
+                .replace("$service", ".+").replace("$level", ".*").replace("$correlation_id", cid_value)
+                .replace("$search", search).replace("$__auto", "1m").replace("$__rate_interval", "2m"))
 d = call("/api/dashboards/uid/piedrazul-logs")["dashboard"]
 errors, rows = [], {}
 for p in d["panels"]:
@@ -506,9 +515,9 @@ for p in d["panels"]:
             errors.append(f"{p['title']}/{t['refId']}: HTTP {e.code} {e.read()[:200]!r}"); continue
         if r.get("error"):
             errors.append(f"{p['title']}/{t['refId']}: {r['error']}")
-def run(panel_prefix, cid_value):
+def run(panel_prefix, cid_value, search=""):
     t = next(p for p in d["panels"] if p.get("targets") and (p["title"] == panel_prefix or p["title"].startswith(panel_prefix + " ")))["targets"][0]
-    r = call("/api/ds/query", {"from": "now-1h", "to": "now", "queries": [dict(t, expr=subst(t["expr"], cid_value), maxLines=100)]})["results"][t["refId"]]
+    r = call("/api/ds/query", {"from": "now-1h", "to": "now", "queries": [dict(t, expr=subst(t["expr"], cid_value, search), maxLines=100)]})["results"][t["refId"]]
     def col(f, *names):
         fs = f["schema"]["fields"]
         return next((f["data"]["values"][i] for i, x in enumerate(fs) if x["name"] in names), [])
@@ -517,20 +526,49 @@ def run(panel_prefix, cid_value):
     return lines, labels
 # Búsqueda por id de correlación con la consulta del panel; sin id no devuelve nada (la vista
 # general es el panel Logs, que sí lista todo y con el servicio de cada línea)
-lines, labels = run("Líneas con el id de correlación", cid)
-empty_lines, _ = run("Líneas con el id de correlación", "")
+lines, labels = run("Líneas de la petición", cid)
+empty_lines, _ = run("Líneas de la petición", "")
 all_lines, all_labels = run("Logs", "")
+# Id de petición exacto vs aggregateId: el id retiene solo las líneas de su petición (la de la
+# notificación, que menciona el aggregateId sin petición, no entra); el aggregateId pegado como id
+# de petición no encuentra nada, y como búsqueda encuentra las líneas que lo mencionan
+cid_all, cid_all_labels = run("Logs", cid)
+agg_as_cid, _ = run("Líneas de la petición", agg)
+agg_as_cid_general, _ = run("Logs", agg)
+agg_search, _ = run("Logs", "", agg)
+agg_search_in_cid, _ = run("Logs", cid, agg)
+# Entradas con comillas, barras o corchetes en las variables: no deben invalidar la consulta
+odd = []
+for v in ['a"b', "a\\b", "a'b", "[x]{2}"]:
+    for panel in ("Logs", "Líneas de la petición"):
+        try:
+            run(panel, v); run(panel, "", v)
+        except urllib.error.HTTPError as e:
+            odd.append(f"{panel}/{v!r}: HTTP {e.code}")
+try:
+    run("Logs", "", "{{ x }}")
+except urllib.error.HTTPError as e:
+    odd.append(f"Logs/búsqueda con llaves: HTTP {e.code}")
 print(json.dumps({"errors": errors, "cid_lines": len(lines), "cid_match": all(cid in l for l in lines),
                   "cid_service": all("service" in (l if isinstance(l, dict) else json.loads(l)) for l in labels) and len(labels) == len(lines),
                   "cid_has_correlation_query": any("correlation_query" in (l if isinstance(l, dict) else json.loads(l)) for l in labels),
                   "empty_cid_lines": len(empty_lines), "general_lines": len(all_lines),
+                  "cid_general_lines": len(cid_all), "cid_general_match": all(cid in l for l in cid_all),
+                  "agg_as_cid_lines": len(agg_as_cid), "agg_as_cid_general_lines": len(agg_as_cid_general),
+                  "agg_search_lines": len(agg_search), "agg_search_match": all(agg in l for l in agg_search),
+                  "agg_search_in_cid": len(agg_search_in_cid), "odd_inputs": odd,
                   "general_service": len(all_labels) > 0 and all("service" in (l if isinstance(l, dict) else json.loads(l)) for l in all_labels)},
                  ensure_ascii=False))
 EOF
-python3 -I "${TMP}/panels.py" "${G}" "${CID}" > "${TMP}/panels.json" 2>"${TMP}/panels.err" || cat "${TMP}/panels.err" >&2
+python3 -I "${TMP}/panels.py" "${G}" "${CID}" "${AGG}" > "${TMP}/panels.json" 2>"${TMP}/panels.err" || cat "${TMP}/panels.err" >&2
 check "Grafana: todas las consultas del dashboard de logs sin error" jq -e '.errors == []' "${TMP}/panels.json"
 jq -r '.errors[]?' "${TMP}/panels.json" | sed 's/^/      error: /'
-check "Grafana: el panel de correlación devuelve la línea de la petición (y solo esa)" jq -e '.cid_lines == 1 and .cid_match' "${TMP}/panels.json"
+check "Grafana: el panel de correlación devuelve las 2 líneas de la petición (y solo esas, sin la de la notificación)" jq -e '.cid_lines == 2 and .cid_match' "${TMP}/panels.json"
+check "Grafana: Logs filtrados con id de petición devuelve las mismas 2 líneas" jq -e '.cid_general_lines == 2 and .cid_general_match' "${TMP}/panels.json"
+check "Grafana: un aggregateId como id de petición no devuelve líneas (no es correlación)" jq -e '.agg_as_cid_lines == 0 and .agg_as_cid_general_lines == 0' "${TMP}/panels.json"
+check "Grafana: el aggregateId como búsqueda encuentra las 2 líneas que lo mencionan (con y sin petición)" jq -e '.agg_search_lines == 2 and .agg_search_match' "${TMP}/panels.json"
+check "Grafana: id de petición + búsqueda del aggregateId: solo la línea de la petición que lo menciona" jq -e '.agg_search_in_cid == 1' "${TMP}/panels.json"
+check "Grafana: comillas, barras y llaves en las variables no invalidan las consultas" jq -e '.odd_inputs == []' "${TMP}/panels.json"
 check "Grafana: el panel de correlación conserva las etiquetas (service) y no agrega la auxiliar" \
   jq -e '.cid_service and (.cid_has_correlation_query | not)' "${TMP}/panels.json"
 check "Grafana: sin id el panel de correlación no muestra líneas" jq -e '.empty_cid_lines == 0' "${TMP}/panels.json"

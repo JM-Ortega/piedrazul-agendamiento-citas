@@ -90,7 +90,7 @@
       },
       {
         "name": "correlation_id",
-        "label": "Id de correlación",
+        "label": "Id de petición (correlation_id)",
         "type": "textbox",
         "query": "",
         "current": {
@@ -98,11 +98,12 @@
           "value": ""
         },
         "hide": 0,
-        "options": []
+        "options": [],
+        "description": "UUID de la petición HTTP del backend (cabecera X-Correlation-Id). Coincidencia exacta con el campo correlation_id; no es un aggregateId de negocio ni de una notificación (para ese, usar Buscar)."
       },
       {
         "name": "search",
-        "label": "Buscar (regex)",
+        "label": "Buscar texto (regex; p. ej. aggregateId)",
         "type": "textbox",
         "query": "",
         "current": {
@@ -110,7 +111,8 @@
           "value": ""
         },
         "hide": 0,
-        "options": []
+        "options": [],
+        "description": "Expresión regular sin distinguir mayúsculas sobre el texto de la línea. Para un aggregateId (identifica un agregado de negocio, no una petición), pegar su valor: encuentra las líneas que lo mencionan, sin implicar que sean de la misma petición."
       }
     ]
   },
@@ -508,7 +510,7 @@
     {
       "type": "timeseries",
       "title": "Líneas por servicio",
-      "description": "Líneas de log guardadas en Loki por servicio, con todos los filtros del dashboard (servicio, severidad, id de correlación y búsqueda). Cada barra cuenta las líneas de su intervalo, que cambia con el rango elegido. Un servicio sin líneas puede estar simplemente callado: si la recolección funciona lo dice Estado de la recolección, arriba.",
+      "description": "Líneas de log guardadas en Loki por servicio, con todos los filtros del dashboard (servicio, severidad, id de petición y búsqueda). Cada barra cuenta las líneas de su intervalo, que cambia con el rango elegido. Un servicio sin líneas puede estar simplemente callado: si la recolección funciona lo dice Estado de la recolección, arriba.",
       "id": 2,
       "datasource": {
         "type": "loki",
@@ -526,7 +528,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "sum by (service) (count_over_time({service=~\"$service\", level=~\"$level\"} |= \"$correlation_id\" |~ \"(?i)$search\" [$__auto]))",
+          "expr": "sum by (service) (count_over_time({service=~\"$service\", level=~\"$level\"} |= `${correlation_id:raw}` |~ `(?i)${search:raw}` | label_format cid_in=`${correlation_id:raw}` | label_format correlation_match=`{{ if or (eq .cid_in \"\") (eq .correlation_id .cid_in) }}1{{ end }}` | correlation_match=\"1\" | drop cid_in, correlation_match [$__auto]))",
           "refId": "A",
           "queryType": "range",
           "editorMode": "code",
@@ -655,7 +657,7 @@
     {
       "type": "logs",
       "title": "Logs filtrados",
-      "description": "Líneas de los servicios seleccionados, la más reciente primero, con el servicio y la severidad de cada una. Aplica todos los filtros: servicio, severidad (Todas incluye las líneas sin severidad), id de correlación (vacío: sin filtrar) y búsqueda (expresión regular, sin distinguir mayúsculas). El detalle de cada línea muestra sus etiquetas, container_id y, en el backend, correlation_id.",
+      "description": "Líneas de los servicios seleccionados, la más reciente primero, con el servicio y la severidad de cada una. Aplica todos los filtros: servicio, severidad (Todas incluye las líneas sin severidad), id de petición (vacío: sin filtrar; con valor, solo las líneas con ese correlation_id exacto) y búsqueda (expresión regular sobre el texto, sin distinguir mayúsculas: sirve para un aggregateId, que encuentra las líneas que lo mencionan sin probar que sean de una misma petición). Una línea sin correlation_id no es «actividad del sistema»: es una línea sin contexto de petición HTTP (tarea programada, otro servicio, continuación de traza…). El detalle de cada línea muestra sus etiquetas, container_id y, en el backend, correlation_id. «No hay logs» con la recolección en OK solo dice que ningún servicio escribió líneas que cumplan los filtros en el rango; si la recolección falla lo dice Estado de la recolección.",
       "id": 4,
       "datasource": {
         "type": "loki",
@@ -673,7 +675,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service=~\"$service\", level=~\"$level\"} |= \"$correlation_id\" |~ \"(?i)$search\"",
+          "expr": "{service=~\"$service\", level=~\"$level\"} |= `${correlation_id:raw}` |~ `(?i)${search:raw}` | label_format cid_in=`${correlation_id:raw}` | label_format correlation_match=`{{ if or (eq .cid_in \"\") (eq .correlation_id .cid_in) }}1{{ end }}` | correlation_match=\"1\" | drop cid_in, correlation_match",
           "refId": "A",
           "queryType": "range",
           "editorMode": "code"
@@ -705,8 +707,8 @@
     },
     {
       "type": "logs",
-      "title": "Líneas con el id de correlación (todos los servicios)",
-      "description": "Con un id en la variable Id de correlación (UUID de la cabecera X-Correlation-Id): todas las líneas que lo contienen, de cualquier servicio y severidad, sin los demás filtros. Sin id no muestra nada (la vista general es Logs filtrados). Que un servicio no muestre el id no prueba que no participó: solo el backend lo escribe en sus líneas.",
+      "title": "Líneas de la petición (correlation_id, todos los servicios)",
+      "description": "Con un UUID en Id de petición (cabecera X-Correlation-Id): las líneas de cualquier servicio y severidad cuyo campo correlation_id es exactamente ese, sin los demás filtros. Sin id no muestra nada (la vista general es Logs filtrados). Un aggregateId (de negocio o de una notificación) no es un id de petición y aquí no encuentra nada: usar Buscar en Logs filtrados. Solo el backend escribe el id, y solo en líneas escritas dentro de una petición HTTP: que otro servicio no aparezca no prueba que no participó, y una línea del backend sin id (tarea programada, trabajo en segundo plano) no es de ninguna petición. Sin resultados: el id no existe en el rango elegido, o su retención ya pasó; no indica un fallo del servicio.",
       "id": 6,
       "datasource": {
         "type": "loki",
@@ -724,7 +726,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{service=~\".+\"} |= \"$correlation_id\" | label_format correlation_query=`$correlation_id` | correlation_query != \"\" | drop correlation_query",
+          "expr": "{service=~\".+\"} |= `${correlation_id:raw}` | label_format cid_in=`${correlation_id:raw}` | label_format correlation_match=`{{ if and (ne .cid_in \"\") (eq .correlation_id .cid_in) }}1{{ end }}` | correlation_match=\"1\" | drop cid_in, correlation_match",
           "refId": "A",
           "queryType": "range",
           "editorMode": "code"

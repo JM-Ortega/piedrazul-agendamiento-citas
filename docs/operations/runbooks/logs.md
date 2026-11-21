@@ -243,7 +243,8 @@ sudo grep -E '^OBS_LOG_(PROJECT|SERVICES)=' /opt/piedrazul-obs/.env
 |---|---|
 | un servicio | `{service="postgres"}` |
 | errores de todos | `{service=~".+", level=~"error\|fatal"}` |
-| una petición en todos los servicios | `{service=~".+"} \|= "<correlation_id>"` o `{service="backend"} \| correlation_id="<id>"` |
+| una petición (id de petición) | `{service=~".+"} \| correlation_id="<id>"` (coincidencia exacta con el metadato; el dashboard Logs la usa) |
+| un valor cualquiera (p. ej. un `aggregateId`) | `{service=~".+"} \|= "<valor>"`: líneas que lo mencionan, no una petición |
 | errores de SQL de la aplicación | `{service="postgres", level="error"} \|= "piedrazul_app@"` |
 | inicios de sesión fallidos | `{service="keycloak"} \|= "LOGIN_ERROR"` |
 | por tiempo | el selector de rango de Grafana; en API, `start`/`end` |
@@ -585,13 +586,30 @@ Dashboard **Logs** (carpeta Piedra Azul), de arriba abajo:
   `piedrazul-logs` en los últimos 2 min; si no, **SIN DATOS**).
 - **Volumen y búsqueda de logs**: líneas por servicio (con todos los filtros), errores y avisos
   por servicio (solo con el filtro de servicio) y **Logs filtrados**, la vista general: filtros de
-  servicio, severidad (*All* incluye líneas sin severidad), id de correlación (vacío: sin filtrar)
-  y búsqueda (expresión regular, sin mayúsculas). Cada línea muestra su servicio y severidad; el
-  detalle, todas sus etiquetas y metadatos.
-- **Líneas con el id de correlación**: con un id, todas las líneas de cualquier servicio que lo
-  contienen (cabecera `X-Correlation-Id`); sin id no muestra nada. En el detalle de una línea del
-  backend, el campo `correlation_id` enlaza a la misma búsqueda. Solo el backend escribe el id:
-  que otro servicio no aparezca no prueba que no participó.
+  servicio, severidad (*All* incluye líneas sin severidad), **Id de petición** (vacío: sin filtrar)
+  y **Buscar texto** (expresión regular sin mayúsculas sobre el texto de la línea). Cada línea
+  muestra su servicio y severidad; el detalle, todas sus etiquetas y metadatos.
+- **Líneas de la petición**: con un UUID en *Id de petición* (cabecera `X-Correlation-Id`), todas
+  las líneas de cualquier servicio cuyo `correlation_id` es **exactamente** ese; sin id no
+  muestra nada. En el detalle de una línea del backend, el campo `correlation_id` enlaza a la
+  misma búsqueda (se toma del metadato, no del texto). Solo el backend escribe el id, y solo en
+  líneas escritas dentro de una petición HTTP: que otro servicio no aparezca no prueba que no
+  participó, y una línea del backend sin id (tarea programada, trabajo en segundo plano) no es de
+  ninguna petición ni, por eso, «actividad del sistema» sin relación con nada. «Sin líneas» solo
+  dice que el id no está en el rango (o ya salió de la retención): no es un fallo del servicio ni
+  un contador en 0.
+- **`correlation_id` no es `aggregateId`.** El primero identifica una petición HTTP; el segundo
+  (p. ej. en los logs de notificaciones) un agregado de negocio, que puede aparecer en varias
+  peticiones y en tareas sin petición. Pegar un `aggregateId` en *Id de petición* no encuentra
+  nada (no es un id de petición); para seguirlo, pegarlo en *Buscar texto*, que encuentra las
+  líneas que lo mencionan sin implicar que sean de la misma petición. Para el ciclo completo,
+  buscar el `aggregateId`, tomar el `correlation_id` de una línea de petición y usarlo en *Id de
+  petición*. Los valores de ambos campos se interpolan escapados (comillas, barras y llaves no
+  rompen la consulta); una expresión regular mal formada en *Buscar texto* sí da error de Loki.
+- **Navegación entre dashboards.** Los enlaces de la barra superior conservan el rango de tiempo.
+  Backend y varios paneles de Plataforma (Traefik, Backend, Keycloak) enlazan a Logs con el
+  servicio ya elegido (`var-service`) y el mismo rango; Plataforma 19 y 20 enlazan al detalle por
+  ruta de Backend. Ningún enlace fija severidad, id ni búsqueda.
 - **Diagnóstico de la canalización (Alloy → Loki)**: entradas leídas del journal (todas las
   unidades, antes de la selección), seleccionadas, descartadas, última retención, flujo,
   reintentos y rechazos (solo resultados con problema; los envíos correctos están en el flujo) y
