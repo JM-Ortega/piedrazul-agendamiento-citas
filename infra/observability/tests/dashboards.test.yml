@@ -10,7 +10,11 @@
 #   Plataforma 15 Latencia p95 por servicio (peticiones HTTP)
 #   Plataforma 20 Backend: latencia p95 de la API
 #   Plataforma 22 Heap usado / máximo de cada JVM
-#   Backend 24    Latencia p95 por ruta de la API (top 10 por tráfico)
+#   Plataforma 19 Backend: peticiones de la API por estado (sin /actuator)
+#   Backend 22    Peticiones por ruta (top 10 del rango; $__range = 1h en las pruebas)
+#   Backend 24    Latencia p95 por ruta de la API (top 10 del rango)
+#   Backend 26    Peticiones sin ruta de controlador (UNKNOWN, NOT_FOUND)
+#   Backend 27    Monitoreo: peticiones a /actuator
 #   Logs 10       Componentes de Alloy sin funcionar
 #   Logs 11, 12   Entradas leídas del journal / Seleccionadas para Loki (1 h)
 #   Logs 13       Descartadas antes de Loki (24 h)
@@ -457,6 +461,150 @@ tests:
         eval_time: 10m
         exp_samples: []
 
+  # ── Backend 22: peticiones por ruta, top 10 del rango sin /actuator ───────────────
+  # $__range = 1h en estas pruebas. El ranking usa el total del rango hasta su final (@ end()): en
+  # una consulta de rango es el mismo para todos los puntos, así que la leyenda no cambia de
+  # series punto a punto (prueba de rango real con datos retroactivos: ver docs). 11 rutas con
+  # 1…12 peticiones/min, UNKNOWN (401) con 3/min y el healthcheck con 100/min: quedan 10 series;
+  # el healthcheck no entra aunque sea lo más frecuente, UNKNOWN sí (no se suprime), y salen las
+  # dos de menos tráfico (/api/r01 con 1/min y /api/r02 con 2/min).
+  - name: "Backend 22: 12 candidatas y /actuator dominante → 10 series, sin /actuator, con UNKNOWN"
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r01"}'
+        values: '0+1x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r02"}'
+        values: '0+2x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r03"}'
+        values: '0+4x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r04"}'
+        values: '0+5x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r05"}'
+        values: '0+6x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r06"}'
+        values: '0+7x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r07"}'
+        values: '0+8x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r08"}'
+        values: '0+9x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r09"}'
+        values: '0+10x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r10"}'
+        values: '0+11x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r11"}'
+        values: '0+12x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="401", uri="UNKNOWN"}'
+        values: '0+3x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health"}'
+        values: '0+100x20'
+    promql_expr_test:
+      - expr: 'sum by (method, uri) (rate(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m])) and on (method, uri) topk(10, sum by (method, uri) (increase(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[1h] @ end())))'
+        eval_time: 20m
+        exp_samples:
+          - labels: '{method="GET", uri="/api/r03"}'
+            value: 0.06666666666666667
+          - labels: '{method="GET", uri="/api/r04"}'
+            value: 0.08333333333333333
+          - labels: '{method="GET", uri="/api/r05"}'
+            value: 0.1
+          - labels: '{method="GET", uri="/api/r06"}'
+            value: 0.11666666666666667
+          - labels: '{method="GET", uri="/api/r07"}'
+            value: 0.13333333333333333
+          - labels: '{method="GET", uri="/api/r08"}'
+            value: 0.15
+          - labels: '{method="GET", uri="/api/r09"}'
+            value: 0.16666666666666666
+          - labels: '{method="GET", uri="/api/r10"}'
+            value: 0.18333333333333332
+          - labels: '{method="GET", uri="/api/r11"}'
+            value: 0.2
+          - labels: '{method="GET", uri="UNKNOWN"}'
+            value: 0.05
+
+  - name: "Backend 22: solo /actuator → sin series (no 0)"
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health"}'
+        values: '0+100x20'
+    promql_expr_test:
+      - expr: 'sum by (method, uri) (rate(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m])) and on (method, uri) topk(10, sum by (method, uri) (increase(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[1h] @ end())))'
+        eval_time: 20m
+        exp_samples: []
+
+  # ── Backend 26: peticiones sin ruta de controlador ──────────────────────────────
+  - name: "Backend 26: UNKNOWN (401, 403) y NOT_FOUND (404) por estado; rutas y /actuator fuera"
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="401", uri="UNKNOWN"}'
+        values: '0+6x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="403", uri="UNKNOWN"}'
+        values: '0+3x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="404", uri="NOT_FOUND"}'
+        values: '0+12x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients"}'
+        values: '0+30x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health"}'
+        values: '0+100x20'
+    promql_expr_test:
+      - expr: 'sum by (uri, status) (rate(http_server_requests_seconds_count{job="backend", uri=~"UNKNOWN|NOT_FOUND"}[2m]))'
+        eval_time: 20m
+        exp_samples:
+          - labels: '{status="401", uri="UNKNOWN"}'
+            value: 0.1
+          - labels: '{status="403", uri="UNKNOWN"}'
+            value: 0.05
+          - labels: '{status="404", uri="NOT_FOUND"}'
+            value: 0.2
+
+  - name: "Backend 26: sin peticiones sin ruta → sin serie (Grafana muestra el texto de sin valor, no 0)"
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients"}'
+        values: '0+30x20'
+    promql_expr_test:
+      - expr: 'sum by (uri, status) (rate(http_server_requests_seconds_count{job="backend", uri=~"UNKNOWN|NOT_FOUND"}[2m]))'
+        eval_time: 20m
+        exp_samples: []
+
+  # ── Backend 27: monitoreo (/actuator) ───────────────────────────────────────────
+  - name: "Backend 27: /actuator por estado (200 y 503); las rutas de la API no entran"
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health"}'
+        values: '0+60x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="503", uri="/actuator/health"}'
+        values: '0+6x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients"}'
+        values: '0+30x20'
+    promql_expr_test:
+      - expr: 'sum by (uri, status) (rate(http_server_requests_seconds_count{job="backend", uri=~"/actuator.*"}[2m]))'
+        eval_time: 20m
+        exp_samples:
+          - labels: '{status="200", uri="/actuator/health"}'
+            value: 1
+          - labels: '{status="503", uri="/actuator/health"}'
+            value: 0.1
+
+  # ── Plataforma 19: peticiones de la API por estado, sin /actuator ───────────────
+  - name: "Plataforma 19: el healthcheck no domina: solo la API (30/min → 0,5 req/s)"
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/patients"}'
+        values: '0+30x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health"}'
+        values: '0+100x20'
+      - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="401", uri="UNKNOWN"}'
+        values: '0+6x20'
+    promql_expr_test:
+      - expr: 'sum by (status) (rate(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m]))'
+        eval_time: 20m
+        exp_samples:
+          - labels: '{status="200"}'
+            value: 0.5
+          - labels: '{status="401"}'
+            value: 0.1
+
   - name: "Backend 24: por ruta, solo las de la API con ≥ 20 peticiones; /actuator excluido"
     interval: 1m
     input_series:
@@ -497,7 +645,7 @@ tests:
       - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/actuator/health"}'
         values: '0+100x10'
     promql_expr_test:
-      - expr: 'histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job="backend", uri!~"/actuator.*"}[2m]))) and on (uri) topk(10, sum by (uri) (rate(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m]))) and on (uri) sum by (uri) (increase(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m])) >= 20'
+      - expr: 'histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job="backend", uri!~"/actuator.*"}[2m]))) and on (uri) topk(10, sum by (uri) (increase(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[1h] @ end()))) and on (uri) sum by (uri) (increase(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m])) >= 20'
         eval_time: 10m
         exp_samples:
           - labels: '{uri="/api/patients"}'
@@ -596,7 +744,7 @@ tests:
       - series: 'http_server_requests_seconds_count{job="backend", instance="backend:8081", method="GET", status="200", uri="/api/r11"}'
         values: '0+30x10'
     promql_expr_test:
-      - expr: 'histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job="backend", uri!~"/actuator.*"}[2m]))) and on (uri) topk(10, sum by (uri) (rate(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m]))) and on (uri) sum by (uri) (increase(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m])) >= 20'
+      - expr: 'histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job="backend", uri!~"/actuator.*"}[2m]))) and on (uri) topk(10, sum by (uri) (increase(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[1h] @ end()))) and on (uri) sum by (uri) (increase(http_server_requests_seconds_count{job="backend", uri!~"/actuator.*"}[2m])) >= 20'
         eval_time: 10m
         exp_samples:
           - labels: '{uri="/api/r02"}'

@@ -152,16 +152,17 @@ if promtool test rules /w/tests/alerts.test.yml /w/tests/notifications-alerts.te
 else
   ko "promtool: test rules"; tail -20 "${TMP}/promtool-test.log" >&2
 fi
-# Las consultas que prueba tests/dashboards.test.yml son las de los paneles ($__rate_interval = 2m).
+# Las consultas que prueba tests/dashboards.test.yml son las de los paneles ($__rate_interval = 2m,
+# $__range = 1h).
 # <archivo>:<id>[:<consulta>], con la consulta por posición (0 si se omite).
 dash_exprs_tested() {
   local t e p f id n
   t="$(yq -r '[.tests[].promql_expr_test[].expr] | unique | .[]' "${OBS}/tests/dashboards.test.yml")"
-  for p in plataforma.json:7 plataforma.json:14 plataforma.json:15 plataforma.json:20 plataforma.json:22 \
-      backend-jvm.json:24 logs.json:10 logs.json:11 logs.json:12 logs.json:13 logs.json:15:1 logs.json:17 logs.json:18; do
+  for p in plataforma.json:7 plataforma.json:14 plataforma.json:15 plataforma.json:19 plataforma.json:20 plataforma.json:22 \
+      backend-jvm.json:22 backend-jvm.json:24 backend-jvm.json:26 backend-jvm.json:27 logs.json:10 logs.json:11 logs.json:12 logs.json:13 logs.json:15:1 logs.json:17 logs.json:18; do
     IFS=: read -r f id n <<< "$p"
     e="$(jq -r --argjson id "${id}" --argjson n "${n:-0}" '[.panels[] | ., (.panels // [])[]] | map(select(.id == $id))[0].targets[$n].expr // empty' "${OBS}/grafana/dashboards/${f}")"
-    e="${e//\$__rate_interval/2m}"
+    e="${e//\$__rate_interval/2m}"; e="${e//\$__range/1h}"
     [ -n "$e" ] && grep -qxF -- "$e" <<< "$t" || { echo "panel ${p}: consulta sin probar" >&2; return 1; }
   done
 }
@@ -377,7 +378,7 @@ for uid in ["piedrazul-plataforma", "piedrazul-backend-jvm"]:
     for p in d["panels"]:
         for t in p.get("targets", []):
             q = dict(t, intervalMs=30000, maxDataPoints=200)
-            q["expr"] = q["expr"].replace("$__rate_interval", "2m")
+            q["expr"] = q["expr"].replace("$__rate_interval", "2m").replace("$__range", "15m")
             try:
                 r = call("/api/ds/query", {"from": "now-15m", "to": "now", "queries": [q]})["results"][t["refId"]]
             except urllib.error.HTTPError as e:
@@ -390,9 +391,9 @@ print(json.dumps({"errors": errors, "empty": empty}, ensure_ascii=False))
 EOF
 python3 -I "${TMP}/panels.py" "${G}" > "${TMP}/panels.json"
 check "Grafana: todas las consultas de los dashboards sin error" jq -e '.errors == []' "${TMP}/panels.json"
-# Vacías legítimas: no hay alertas, ni 5xx del backend
+# Vacías legítimas: no hay alertas, ni 5xx del backend, ni peticiones sin ruta de controlador
 check "Grafana: consultas vacías solo donde no hay datos que mostrar (alertas, 5xx del backend)" \
-  jq -e '[.empty[] | select(test("Alertas pendientes|Errores 5xx por ruta") | not)] == []' "${TMP}/panels.json"
+  jq -e '[.empty[] | select(test("Alertas pendientes|Errores 5xx por ruta|Peticiones sin ruta de controlador") | not)] == []' "${TMP}/panels.json"
 jq -r '.empty[]' "${TMP}/panels.json" | sed 's/^/      vacía: /'
 
 # ── 5. Aislamiento ───────────────────────────────────────────────────────────

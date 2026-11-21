@@ -39,6 +39,17 @@
       "title": "Piedra Azul",
       "includeVars": false,
       "keepTime": true
+    },
+    {
+      "type": "link",
+      "title": "Logs del backend",
+      "tooltip": "Abre Logs filtrado por el servicio backend, con el mismo rango de tiempo",
+      "url": "/d/piedrazul-logs?var-service=backend",
+      "icon": "doc",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
+      "asDropdown": false
     }
   ],
   "panels": [
@@ -559,15 +570,15 @@
     },
     {
       "type": "timeseries",
-      "title": "Peticiones por ruta (top 10)",
-      "description": "Peticiones por segundo de las 10 rutas con más tráfico, por método y plantilla de ruta (por ejemplo /api/patients/{id}, nunca la URL concreta). Incluye /actuator/health (healthcheck de Docker cada 30 s), que con poco tráfico real puede encabezar la lista. UNKNOWN: rechazada antes de llegar a un controlador. La lista se recalcula en cada punto, así que en rangos largos la leyenda puede tener más de 10 rutas.",
+      "title": "Peticiones por ruta (top 10 del rango, sin /actuator)",
+      "description": "Peticiones por segundo de las 10 rutas de la API con más tráfico en el rango elegido, por método y plantilla de ruta (por ejemplo /api/patients/{id}, nunca la URL concreta). El ranking se calcula una sola vez con todo el rango (peticiones totales hasta el final del rango), así que la leyenda tiene como máximo 10 series y son las mismas en todo el gráfico; el valor de cada punto sigue siendo la tasa de su ventana. Excluye /actuator (el healthcheck de Docker cada 30 s), que se ve en Monitoreo: peticiones a /actuator. UNKNOWN (sin plantilla de ruta, ni 404 ni redirección: por ejemplo un 401 o 403 de seguridad) y NOT_FOUND (404) no se excluyen: compiten por el top 10 como cualquier ruta, y Peticiones sin ruta de controlador los muestra siempre, por estado. Una ruta con poco tráfico en el rango puede quedar fuera del top 10 aunque exista.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "topk(10, sum by (method, uri) (rate(http_server_requests_seconds_count{job=\"backend\"}[$__rate_interval])))",
+          "expr": "sum by (method, uri) (rate(http_server_requests_seconds_count{job=\"backend\", uri!~\"/actuator.*\"}[$__rate_interval])) and on (method, uri) topk(10, sum by (method, uri) (increase(http_server_requests_seconds_count{job=\"backend\", uri!~\"/actuator.*\"}[$__range] @ end())))",
           "legendFormat": "{{method}} {{uri}}",
           "refId": "A",
           "range": true,
@@ -614,12 +625,19 @@
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
-      }
+      },
+      "links": [
+        {
+          "title": "Logs del backend",
+          "url": "/d/piedrazul-logs?var-service=backend&${__url_time_range}",
+          "targetBlank": false
+        }
+      ]
     },
     {
       "type": "timeseries",
       "title": "Errores 5xx por ruta",
-      "description": "Respuestas 5xx por segundo generadas por el backend, por código, método y ruta. «Sin respuestas 5xx» es lo normal mientras Métricas del backend esté en OK; si está CAÍDO o SIN DATOS, el vacío no prueba nada. No incluye los 502 o 504 que Traefik devuelve cuando el backend no responde (ver Plataforma).",
+      "description": "Respuestas 5xx por segundo generadas por el backend, por código, método y ruta (incluye /actuator: un health en 503 se ve aquí). «Sin respuestas 5xx» es lo normal mientras Métricas del backend esté en OK; si está CAÍDO o SIN DATOS, el vacío no prueba nada. No incluye los 502 o 504 que Traefik devuelve cuando el backend no responde (ver Plataforma).",
       "targets": [
         {
           "datasource": {
@@ -674,19 +692,26 @@
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
-      }
+      },
+      "links": [
+        {
+          "title": "Logs del backend",
+          "url": "/d/piedrazul-logs?var-service=backend&${__url_time_range}",
+          "targetBlank": false
+        }
+      ]
     },
     {
       "type": "timeseries",
-      "title": "Latencia p95 por ruta de la API (top 10 por tráfico)",
-      "description": "p95 del tiempo de respuesta de cada plantilla de ruta, para las 10 rutas de la API con más tráfico (sin /actuator). El p95 no es la petición más lenta: el 5 % tardó más. Una ruta solo se dibuja con al menos 20 peticiones en la ventana: con poco tráfico la mayoría no tendrá línea, y eso no significa que sea rápida. Mismos buckets fijos que la latencia general (50 ms … 5 s): el valor se interpola dentro del bucket y 5 s significa 5 s o más.",
+      "title": "Latencia p95 por ruta de la API (top 10 del rango)",
+      "description": "p95 del tiempo de respuesta de cada plantilla de ruta, para las 10 rutas de la API con más tráfico en el rango elegido (sin /actuator; mismo ranking único por rango que Peticiones por ruta, calculado por plantilla sin distinguir método). El p95 no es la petición más lenta: el 5 % tardó más. Una ruta solo se dibuja con al menos 20 peticiones en la ventana: con poco tráfico la mayoría no tendrá línea, y eso no significa que sea rápida. Mismos buckets fijos que la latencia general (50 ms … 5 s): el valor se interpola dentro del bucket y 5 s significa 5 s o más.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job=\"backend\", uri!~\"/actuator.*\"}[$__rate_interval]))) and on (uri) topk(10, sum by (uri) (rate(http_server_requests_seconds_count{job=\"backend\", uri!~\"/actuator.*\"}[$__rate_interval]))) and on (uri) sum by (uri) (increase(http_server_requests_seconds_count{job=\"backend\", uri!~\"/actuator.*\"}[$__rate_interval])) >= 20",
+          "expr": "histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job=\"backend\", uri!~\"/actuator.*\"}[$__rate_interval]))) and on (uri) topk(10, sum by (uri) (increase(http_server_requests_seconds_count{job=\"backend\", uri!~\"/actuator.*\"}[$__range] @ end()))) and on (uri) sum by (uri) (increase(http_server_requests_seconds_count{job=\"backend\", uri!~\"/actuator.*\"}[$__rate_interval])) >= 20",
           "legendFormat": "{{uri}}",
           "refId": "A",
           "range": true,
@@ -834,7 +859,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 30
       },
       "panels": []
     },
@@ -1030,7 +1055,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 23
+        "y": 31
       },
       "datasource": {
         "type": "prometheus",
@@ -1089,7 +1114,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 23
+        "y": 31
       },
       "datasource": {
         "type": "prometheus",
@@ -1105,7 +1130,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 39
       },
       "panels": []
     },
@@ -1220,7 +1245,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 32
+        "y": 40
       },
       "datasource": {
         "type": "prometheus",
@@ -1306,7 +1331,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 32
+        "y": 40
       },
       "datasource": {
         "type": "prometheus",
@@ -1399,7 +1424,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 40
+        "y": 48
       },
       "datasource": {
         "type": "prometheus",
@@ -1458,7 +1483,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 40
+        "y": 48
       },
       "datasource": {
         "type": "prometheus",
@@ -1530,7 +1555,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 40
+        "y": 48
       },
       "datasource": {
         "type": "prometheus",
@@ -1546,7 +1571,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 48
+        "y": 56
       },
       "panels": []
     },
@@ -1615,7 +1640,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 49
+        "y": 57
       },
       "datasource": {
         "type": "prometheus",
@@ -1735,7 +1760,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 49
+        "y": 57
       },
       "datasource": {
         "type": "prometheus",
@@ -1838,7 +1863,127 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 49
+        "y": 57
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Peticiones sin ruta de controlador (UNKNOWN, NOT_FOUND)",
+      "description": "Peticiones por segundo que no llegaron a una ruta de la API, por estado. UNKNOWN: Spring no tiene plantilla de ruta y la respuesta no es 404 ni redirección (por ejemplo un 401 o 403 de seguridad, o un 400/405 rechazado antes del controlador). NOT_FOUND: 404 sin ruta. Un 401 o 403 aquí es tráfico rechazado, no un fallo del backend; un aumento repentino merece mirar los logs. «Sin peticiones sin ruta» es normal mientras Métricas del backend esté en OK; si está CAÍDO o SIN DATOS, el vacío no prueba nada.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (uri, status) (rate(http_server_requests_seconds_count{job=\"backend\", uri=~\"UNKNOWN|NOT_FOUND\"}[$__rate_interval]))",
+          "legendFormat": "{{status}} {{uri}}",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "noValue": "Sin peticiones sin ruta"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 26,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 22
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Monitoreo: peticiones a /actuator",
+      "description": "Peticiones por segundo del backend a /actuator (healthcheck de Docker cada 30 s, comprobaciones externas y lectura de métricas), por estado. Es el tráfico de monitoreo que Peticiones por ruta excluye: un 503 en /actuator/health significa que el backend se declara no sano. Sin datos aquí con Métricas del backend en OK: nadie consultó /actuator en el rango.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (uri, status) (rate(http_server_requests_seconds_count{job=\"backend\", uri=~\"/actuator.*\"}[$__rate_interval]))",
+          "legendFormat": "{{status}} {{uri}}",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "noValue": "Sin peticiones a /actuator"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 27,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 22
       },
       "datasource": {
         "type": "prometheus",
