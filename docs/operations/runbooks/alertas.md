@@ -6,13 +6,13 @@ Llevar a Discord, sin cambiar su semántica, las alertas que Prometheus ya eval�
 (`prometheus/rules/alerts.yml` y `logs.yml`), con disparo, recordatorio y resolución, y hacer
 visible al mantenedor cuándo la entrega falla.
 
-**Estado.** El repositorio implementa y prueba en local la entrega con un receptor sintético con la
-interfaz de Discord. Fuera del repositorio, el operador **preparó** (informado el 2026-11-04): el
-servidor de Discord `Piedra Azul`, el canal `#alertas` y el webhook `Piedra Azul Monitoring`, cuya
-URL guarda en 1Password (nunca en el repositorio ni en el inventario). **No integrado**: el webhook
-no está instalado en ningún host, el receptor sigue en `none` (Alertmanager recibe y no envía) y
-ninguna notificación real se envió. Es un registro de lo preparado, no una garantía del
-repositorio: confirmarlo en Discord antes de activar.
+**Estado.** En producción el receptor es `discord` (inventario) y el webhook `Piedra Azul Monitoring`
+del canal `#alertas` está instalado. Se observó la entrega real de un `[FIRING]` de
+`PiedrazulTargetDown` en Discord (2026-11-13). **No está verificado** en producción un mensaje
+`[RESUELTA]` real ni la fiabilidad de la entrega en general: esas garantías dependen de la
+configuración descrita abajo y de las pruebas locales con un receptor sintético, no de una
+observación en vivo. Una observación puntual no garantiza la entrega futura; el paso 3 de
+[Activación](#activación) sigue siendo la prueba de extremo a extremo.
 
 ## Decisión
 
@@ -135,8 +135,8 @@ errores; probado con la red caída).
    Alertmanager con `discord.yml` y verifica que corre con ese receptor y que Prometheus lleva la
    etiqueta de ese entorno. Después, `observability.yml` sin `-e` ni la variable conserva el
    receptor, el entorno y el webhook ([estado deseado](grafana-acceso.md#estado-deseado)).
-3. **Verificación en vivo** (pendiente; también tras rotar el webhook y en cada verificación del
-   entorno): prueba manual de extremo a extremo, disparo y resolución, sin tocar ninguna regla:
+3. **Verificación en vivo** (el `[FIRING]` real está observado, la `[RESUELTA]` no; repetirla también
+   tras rotar el webhook y en cada verificación del entorno): prueba manual de extremo a extremo, disparo y resolución, sin tocar ninguna regla:
 
    ```bash
    cd /opt/piedrazul-obs

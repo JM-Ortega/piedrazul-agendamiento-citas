@@ -239,6 +239,16 @@ posterior). La automatización no toma respaldos de la base de Keycloak: volver 
 anterior a una migración solo es posible restaurando un respaldo tomado antes, fuera de esta
 cadena.
 
+**Estado de los respaldos de PostgreSQL (producción).** La base (aplicación y Keycloak, en la misma
+instancia) persiste en un volumen de Docker, que **no es un respaldo**. Existen puntos de recuperación
+tomados a mano con `pg_dump` en formato custom, copiados fuera del servidor, verificados y
+restaurados con éxito en entornos aislados (el más reciente con PostgreSQL 16.16, comprobando
+datos, esquema, privilegios, restricciones, Flyway e información de Keycloak). Límites: no hay
+respaldos periódicos automáticos ni un procedimiento de restauración documentado aquí; un volcado en
+línea no da pérdida de datos cero (se pierde lo escrito después); y no está demostrada la custodia
+independiente de todas las credenciales necesarias para recuperar. Una restauración aislada
+exitosa no garantiza otros escenarios de recuperación.
+
 **Si Keycloak no arranca o no migra**: converge falla en `Levantar Keycloak sobre la base ya
 inicializada` (espera hasta `kc_start_timeout`, 600 s) y el workflow no llega a la verificación
 ni al registro. Revisar `docker logs keycloak`. La migración pudo quedar aplicada en parte:
