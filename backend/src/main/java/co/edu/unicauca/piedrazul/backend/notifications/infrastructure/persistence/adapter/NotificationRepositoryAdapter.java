@@ -50,6 +50,20 @@ public class NotificationRepositoryAdapter implements NotificationRepository {
     }
 
     @Override
+    public Optional<Notification> findByAggregateAndType(
+            AggregateReference aggregate,
+            NotificationType type
+    ) {
+        return repository
+                .findFirstByAggregateTypeAndAggregateIdAndType(
+                        aggregate.type(),
+                        aggregate.id(),
+                        type
+                )
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<Notification> findActiveByAggregateAndType(
             AggregateReference aggregate,
             NotificationType type

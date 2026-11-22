@@ -51,6 +51,8 @@ class RescheduleAppointmentUseCaseImplTest {
     private AppointmentSchedulingService appointmentSchedulingService;
     @Mock
     private PatientResolutionStrategy patientByIdStrategy;
+    @Mock
+    private AppointmentChangeEvents changeEvents;
 
     private RescheduleAppointmentUseCaseImpl useCase;
 
@@ -67,7 +69,8 @@ class RescheduleAppointmentUseCaseImplTest {
     @BeforeEach
     void setUp() {
         useCase = new RescheduleAppointmentUseCaseImpl(
-                appointmentRepository, cancelAppointmentUseCase, appointmentSchedulingService, patientByIdStrategy);
+                appointmentRepository, cancelAppointmentUseCase, appointmentSchedulingService, patientByIdStrategy,
+                changeEvents);
         original = Appointment.reconstruct(appointmentId, originalDoctorId, patientId, SpecialtyCode.TERAPIA_NEURAL,
                 AppointmentState.AGENDADA, LocalDate.now().plusDays(1), new AppointmentTime(LocalTime.of(9, 0)),
                 SchedulingOrigin.AUTONOMO);
@@ -92,12 +95,15 @@ class RescheduleAppointmentUseCaseImplTest {
         InOrder order = inOrder(appointmentRepository, cancelAppointmentUseCase, appointmentSchedulingService);
         order.verify(appointmentRepository).findByIdForUpdate(appointmentId);
         // Personal de la clínica: sin chequeo de propiedad de paciente
-        order.verify(cancelAppointmentUseCase).cancel(appointmentId, null);
+        order.verify(cancelAppointmentUseCase).cancelForReschedule(appointmentId);
         ArgumentCaptor<PatientSchedulingContext> context = ArgumentCaptor.forClass(PatientSchedulingContext.class);
         order.verify(appointmentSchedulingService).scheduleManual(context.capture(), eq(newDoctorId),
                 eq(SpecialtyCode.FISIOTERAPIA), eq(newDate), eq(newTime), eq(performedBy), eq(patientByIdStrategy));
         // El paciente sale de la cita original
         assertThat(context.getValue().idPatient()).isEqualTo(patientId);
+        // Un solo aviso, con la cita original y la nueva; nunca la cancelación ordinaria
+        verify(changeEvents).rescheduled(original, created);
+        verify(cancelAppointmentUseCase, never()).cancel(any(), any());
     }
 
     @Test
@@ -116,7 +122,7 @@ class RescheduleAppointmentUseCaseImplTest {
 
         reschedule(originalDoctorId);
 
-        verify(cancelAppointmentUseCase).cancel(appointmentId, null);
+        verify(cancelAppointmentUseCase).cancelForReschedule(appointmentId);
         verify(appointmentSchedulingService).scheduleManual(any(), eq(newDoctorId), any(), any(), any(), any(), any());
     }
 
@@ -134,24 +140,24 @@ class RescheduleAppointmentUseCaseImplTest {
     void shouldTranslateAStateConflictIntoCancelNotAllowedAndNotSchedule() {
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(original);
         doThrow(new AppointmentStateConflictException("Solo las citas AGENDADAS pueden cancelarse"))
-                .when(cancelAppointmentUseCase).cancel(appointmentId, null);
+                .when(cancelAppointmentUseCase).cancelForReschedule(appointmentId);
 
         assertThatThrownBy(() -> reschedule(null))
                 .isInstanceOf(CancelAppointmentNotAllowedException.class);
 
-        verifyNoInteractions(appointmentSchedulingService);
+        verifyNoInteractions(appointmentSchedulingService, changeEvents);
     }
 
     @Test
     void shouldPropagateCancelNotAllowedForPastAppointmentsAndNotSchedule() {
         when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(original);
         doThrow(new CancelAppointmentNotAllowedException("No se puede cancelar una cita de una fecha pasada"))
-                .when(cancelAppointmentUseCase).cancel(appointmentId, null);
+                .when(cancelAppointmentUseCase).cancelForReschedule(appointmentId);
 
         assertThatThrownBy(() -> reschedule(null))
                 .isInstanceOf(CancelAppointmentNotAllowedException.class);
 
-        verifyNoInteractions(appointmentSchedulingService);
+        verifyNoInteractions(appointmentSchedulingService, changeEvents);
     }
 
     @Test
@@ -162,5 +168,7 @@ class RescheduleAppointmentUseCaseImplTest {
 
         assertThatThrownBy(() -> reschedule(null))
                 .isInstanceOf(SlotNotAvailableException.class);
+
+        verifyNoInteractions(changeEvents);
     }
 }

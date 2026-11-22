@@ -21,7 +21,7 @@ import java.util.UUID;
  *
  * <p>Se cancela primero para que las reglas del agendamiento vean la original como CANCELADA
  * (libera su slot y el horario del paciente). Si agendar falla, el rollback deshace la cancelación,
- * y los eventos de la cita nueva (auditoría y notificaciones) solo se consumen tras el commit.
+ * y los eventos (de la cita nueva y el aviso de reagendamiento) solo se consumen tras el commit.
  */
 public class RescheduleAppointmentUseCaseImpl implements RescheduleAppointmentUseCase {
 
@@ -29,16 +29,19 @@ public class RescheduleAppointmentUseCaseImpl implements RescheduleAppointmentUs
     private final CancelAppointmentUseCase cancelAppointmentUseCase;
     private final AppointmentSchedulingService appointmentSchedulingService;
     private final PatientResolutionStrategy patientByIdResolutionStrategy;
+    private final AppointmentChangeEvents changeEvents;
 
     public RescheduleAppointmentUseCaseImpl(
             AppointmentRepository appointmentRepository,
             CancelAppointmentUseCase cancelAppointmentUseCase,
             AppointmentSchedulingService appointmentSchedulingService,
-            PatientResolutionStrategy patientByIdResolutionStrategy) {
+            PatientResolutionStrategy patientByIdResolutionStrategy,
+            AppointmentChangeEvents changeEvents) {
         this.appointmentRepository = appointmentRepository;
         this.cancelAppointmentUseCase = cancelAppointmentUseCase;
         this.appointmentSchedulingService = appointmentSchedulingService;
         this.patientByIdResolutionStrategy = patientByIdResolutionStrategy;
+        this.changeEvents = changeEvents;
     }
 
     @Override
@@ -61,13 +64,13 @@ public class RescheduleAppointmentUseCaseImpl implements RescheduleAppointmentUs
         }
 
         try {
-            cancelAppointmentUseCase.cancel(appointmentId, null);
+            cancelAppointmentUseCase.cancelForReschedule(appointmentId);
         } catch (AppointmentStateConflictException ex) {
             throw new CancelAppointmentNotAllowedException(
                     "Solo se pueden reagendar citas AGENDADAS. Estado actual: " + original.getAppointmentState());
         }
 
-        return appointmentSchedulingService.scheduleManual(
+        Appointment replacement = appointmentSchedulingService.scheduleManual(
                 PatientSchedulingContext.autonomous(original.getIdPatient()),
                 newDoctorId,
                 specialty,
@@ -75,5 +78,9 @@ public class RescheduleAppointmentUseCaseImpl implements RescheduleAppointmentUs
                 startTime,
                 performedBy,
                 patientByIdResolutionStrategy);
+
+        // Último paso: un solo aviso de reagendamiento (la cancelación interna no publica el suyo)
+        changeEvents.rescheduled(original, replacement);
+        return replacement;
     }
 }

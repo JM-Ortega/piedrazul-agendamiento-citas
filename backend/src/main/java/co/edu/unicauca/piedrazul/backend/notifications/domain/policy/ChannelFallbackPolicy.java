@@ -17,6 +17,14 @@ public class ChannelFallbackPolicy {
                     NotificationChannel.CONSOLE
             );
 
+            // Solo correo (entrega real) y consola (diagnóstico, nunca entrega): no hay SMS ni
+            // WhatsApp aprobados para estos avisos.
+            case APPOINTMENT_CANCELLED,
+                 APPOINTMENT_RESCHEDULED -> List.of(
+                    NotificationChannel.EMAIL,
+                    NotificationChannel.CONSOLE
+            );
+
             case OTP_CODE -> List.of(
                     NotificationChannel.WHATSAPP,
                     NotificationChannel.SMS,

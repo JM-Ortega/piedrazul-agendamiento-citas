@@ -15,6 +15,11 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.CancelApp
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.RescheduleAppointmentUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
+import co.edu.unicauca.piedrazul.backend.appointment.application.AppointmentChangeEvents;
+import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentCancelledByStaffEvent;
+import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentRescheduledEvent;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentStateConflictException;
 import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentScheduledEvent;
 import co.edu.unicauca.piedrazul.backend.appointment.events.ScheduledAppointmentEvent;
 import co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentAccessDeniedException;
@@ -102,8 +107,17 @@ class RescheduleAppointmentIT extends PostgresIntegrationSupport {
     static class RescheduleBeans {
 
         @Bean
-        CancelAppointmentUseCase cancelAppointmentUseCase(AppointmentRepository appointmentRepository) {
-            return new CancelAppointmentUseCaseImpl(appointmentRepository);
+        AppointmentChangeEvents appointmentChangeEvents(
+                org.springframework.context.ApplicationEventPublisher eventPublisher,
+                PatientConsultPort patientConsultPort,
+                DoctorConfigConsultPort doctorConfigConsultPort) {
+            return new AppointmentChangeEvents(eventPublisher, patientConsultPort, doctorConfigConsultPort);
+        }
+
+        @Bean
+        CancelAppointmentUseCase cancelAppointmentUseCase(
+                AppointmentRepository appointmentRepository, AppointmentChangeEvents changeEvents) {
+            return new CancelAppointmentUseCaseImpl(appointmentRepository, changeEvents);
         }
 
         @Bean
@@ -111,9 +125,10 @@ class RescheduleAppointmentIT extends PostgresIntegrationSupport {
                 AppointmentRepository appointmentRepository,
                 CancelAppointmentUseCase cancelAppointmentUseCase,
                 AppointmentSchedulingService appointmentSchedulingService,
-                AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy) {
+                AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy,
+                AppointmentChangeEvents changeEvents) {
             return new RescheduleAppointmentUseCaseImpl(appointmentRepository, cancelAppointmentUseCase,
-                    appointmentSchedulingService, autonomousPatientResolutionStrategy);
+                    appointmentSchedulingService, autonomousPatientResolutionStrategy, changeEvents);
         }
 
         @Bean
@@ -133,6 +148,16 @@ class RescheduleAppointmentIT extends PostgresIntegrationSupport {
 
         @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
         void on(AppointmentScheduledEvent event) {
+            received.add(event);
+        }
+
+        @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+        void on(AppointmentCancelledByStaffEvent event) {
+            received.add(event);
+        }
+
+        @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+        void on(AppointmentRescheduledEvent event) {
             received.add(event);
         }
     }
@@ -234,8 +259,10 @@ class RescheduleAppointmentIT extends PostgresIntegrationSupport {
         assertThat(saved.getSpecialty()).isEqualTo(SpecialtyCode.QUIROPRAXIA);
         assertThat(saved.getSchedulingOrigin()).isEqualTo(SchedulingOrigin.MANUAL);
 
-        // Tras el commit salen los eventos de la cita nueva (auditoría y notificación), una vez cada uno
-        assertThat(afterCommitEvents.received).hasSize(2);
+        // Tras el commit salen los eventos de la cita nueva (auditoría y notificación) y el aviso de
+        // reagendamiento, una vez cada uno, y ninguno de cancelación
+        assertThat(afterCommitEvents.received).hasSize(3);
+        assertThat(afterCommitEvents.received).noneMatch(AppointmentCancelledByStaffEvent.class::isInstance);
         assertThat(afterCommitEvents.received).filteredOn(ScheduledAppointmentEvent.class::isInstance)
                 .singleElement()
                 .extracting(e -> ((ScheduledAppointmentEvent) e).citaId())
@@ -244,6 +271,73 @@ class RescheduleAppointmentIT extends PostgresIntegrationSupport {
                 .singleElement()
                 .extracting(e -> ((AppointmentScheduledEvent) e).appointmentId())
                 .isEqualTo(created.getIdAppointment());
+    }
+
+    @Test
+    void shouldPublishOneRescheduledEventWithThePreviousAndNewDetails() {
+        when(doctorConfigConsultPort.getDoctorName(doctorId)).thenReturn("Dr. Anterior");
+        when(doctorConfigConsultPort.getDoctorName(otherDoctorId)).thenReturn("Dra. Nueva");
+
+        Appointment created = reschedule(null, otherDoctorId, LocalTime.of(10, 0));
+
+        assertThat(afterCommitEvents.received).filteredOn(AppointmentRescheduledEvent.class::isInstance)
+                .singleElement()
+                .isEqualTo(new AppointmentRescheduledEvent(
+                        original.getIdAppointment(), created.getIdAppointment(), original.getIdPatient(),
+                        "Ana Ruiz", "3001234567", "ana@example.com",
+                        "Dr. Anterior", date, ORIGINAL_TIME, "FISIOTERAPIA",
+                        "Dra. Nueva", date, LocalTime.of(10, 0), "QUIROPRAXIA"));
+    }
+
+    @Test
+    void aMissingDoctorNameOmitsTheRescheduledEventButNotTheReschedule() {
+        when(doctorConfigConsultPort.getDoctorName(otherDoctorId)).thenReturn(null);
+
+        Appointment created = reschedule(null, otherDoctorId, LocalTime.of(10, 0));
+
+        assertThat(reload(created.getIdAppointment()).getAppointmentState()).isEqualTo(AppointmentState.AGENDADA);
+        assertThat(reload(original.getIdAppointment()).getAppointmentState()).isEqualTo(AppointmentState.CANCELADA);
+        assertThat(afterCommitEvents.received).noneMatch(AppointmentRescheduledEvent.class::isInstance);
+    }
+
+    @Test
+    void staffCancellationPublishesOneEventAfterCommit() {
+        cancelUseCase.cancel(original.getIdAppointment(), null);
+
+        assertThat(afterCommitEvents.received).singleElement()
+                .isEqualTo(new AppointmentCancelledByStaffEvent(
+                        original.getIdAppointment(), original.getIdPatient(), "Ana Ruiz", "3001234567",
+                        "ana@example.com", "Dra. Prueba", date, ORIGINAL_TIME, "FISIOTERAPIA"));
+    }
+
+    @Test
+    void patientSelfCancellationPublishesNothing() {
+        cancelUseCase.cancel(original.getIdAppointment(), original.getIdPatient());
+
+        assertThat(reload(original.getIdAppointment()).getAppointmentState()).isEqualTo(AppointmentState.CANCELADA);
+        assertThat(afterCommitEvents.received).isEmpty();
+    }
+
+    @Test
+    void aFailedOrRepeatedStaffCancellationPublishesNothingMore() {
+        cancelUseCase.cancel(original.getIdAppointment(), null);
+        afterCommitEvents.received.clear();
+
+        assertThatThrownBy(() -> cancelUseCase.cancel(original.getIdAppointment(), null))
+                .isInstanceOf(AppointmentStateConflictException.class);
+
+        assertThat(afterCommitEvents.received).isEmpty();
+    }
+
+    @Test
+    void aRolledBackStaffCancellationDeliversNoEvent() {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            cancelUseCase.cancel(original.getIdAppointment(), null);
+            status.setRollbackOnly();
+        });
+
+        assertThat(reload(original.getIdAppointment()).getAppointmentState()).isEqualTo(AppointmentState.AGENDADA);
+        assertThat(afterCommitEvents.received).isEmpty();
     }
 
     /**

@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.config.security;
 
+import co.edu.unicauca.piedrazul.backend.appointment.application.AppointmentChangeEvents;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.appointment.application.AppointmentSchedulingService;
 import co.edu.unicauca.piedrazul.backend.appointment.application.CancelAppointmentUseCaseImpl;
@@ -180,7 +181,7 @@ class ErrorDiagnosticsBoundaryTest {
 
         @Bean
         CancelAppointmentUseCase cancelAppointmentUseCase(AppointmentRepository repository) {
-            return new CancelAppointmentUseCaseImpl(repository);
+            return new CancelAppointmentUseCaseImpl(repository, org.mockito.Mockito.mock(AppointmentChangeEvents.class));
         }
 
         @Bean

@@ -123,7 +123,7 @@ notifications:
       username: ${SES_SMTP_USERNAME:}
       password: ${SES_SMTP_PASSWORD:}
       from-email: ${NOTIFICATIONS_EMAIL_FROM:}
-      from-name: ${NOTIFICATIONS_EMAIL_FROM_NAME:Piedrazul}
+      from-name: ${NOTIFICATIONS_EMAIL_FROM_NAME:Piedra Azul Salud}
       # Por operación de socket; connect, lectura y escritura pueden repetirse en cada etapa, así
       # que su suma no acota el envío: eso lo hace total-deadline.
       connect-timeout: ${SES_SMTP_CONNECT_TIMEOUT:5s}

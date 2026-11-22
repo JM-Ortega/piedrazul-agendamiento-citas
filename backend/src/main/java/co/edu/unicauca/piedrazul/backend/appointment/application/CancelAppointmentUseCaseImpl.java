@@ -13,14 +13,33 @@ import java.util.UUID;
 public class CancelAppointmentUseCaseImpl implements CancelAppointmentUseCase {
 
     private final AppointmentRepository appointmentRepository;
+    private final AppointmentChangeEvents changeEvents;
 
-    public CancelAppointmentUseCaseImpl(AppointmentRepository appointmentRepository) {
+    public CancelAppointmentUseCaseImpl(
+            AppointmentRepository appointmentRepository,
+            AppointmentChangeEvents changeEvents) {
         this.appointmentRepository = appointmentRepository;
+        this.changeEvents = changeEvents;
     }
 
     @Override
     @Transactional
-    public void cancel(UUID  appointmentId, UUID patientId) {
+    public void cancel(UUID appointmentId, UUID patientId) {
+        Appointment cancelled = cancelAppointment(appointmentId, patientId);
+
+        // patientId != null es la autocancelación del paciente autenticado: no genera aviso
+        if (patientId == null) {
+            changeEvents.staffCancelled(cancelled);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void cancelForReschedule(UUID appointmentId) {
+        cancelAppointment(appointmentId, null);
+    }
+
+    private Appointment cancelAppointment(UUID appointmentId, UUID patientId) {
 
         // Carga con bloqueo de fila: cargar, validar y guardar son una sola unidad transaccional
         Appointment appointment = appointmentRepository.findByIdForUpdate(appointmentId);
@@ -41,5 +60,6 @@ public class CancelAppointmentUseCaseImpl implements CancelAppointmentUseCase {
 
         appointment.cancel();
         appointmentRepository.save(appointment);
+        return appointment;
     }
 }

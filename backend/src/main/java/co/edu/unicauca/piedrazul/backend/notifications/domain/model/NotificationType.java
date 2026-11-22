@@ -6,11 +6,13 @@ public enum NotificationType {
     /** Confirmación de cita: ya no se genera; se conserva para leer las filas históricas. */
     APPOINTMENT_SCHEDULED,
     APPOINTMENT_REMINDER_2_DAYS,
+    /** Aviso al paciente de que el personal canceló su cita. Solo correo; no exige cita AGENDADA. */
+    APPOINTMENT_CANCELLED,
+    /** Aviso al paciente de que su cita se reprogramó. Solo correo; no exige cita AGENDADA. */
+    APPOINTMENT_RESCHEDULED,
     OTP_CODE;
 
     // Futuros:
-    // APPOINTMENT_CANCELLED,
-    // APPOINTMENT_RESCHEDULED,
     // APPOINTMENT_CONFIRMED,
     // APPOINTMENT_NO_SHOW,
     // DOCTOR_DELAYED
@@ -37,7 +39,10 @@ public enum NotificationType {
      * consola solo pueden mostrarse con el diagnóstico sintético explícito.
      */
     public boolean containsIdentifiableContent() {
-        return this == APPOINTMENT_SCHEDULED || this == APPOINTMENT_REMINDER_2_DAYS;
+        return this == APPOINTMENT_SCHEDULED
+                || this == APPOINTMENT_REMINDER_2_DAYS
+                || this == APPOINTMENT_CANCELLED
+                || this == APPOINTMENT_RESCHEDULED;
     }
 
     /** Variables secretas que no deben quedar guardadas una vez terminado el despacho. */

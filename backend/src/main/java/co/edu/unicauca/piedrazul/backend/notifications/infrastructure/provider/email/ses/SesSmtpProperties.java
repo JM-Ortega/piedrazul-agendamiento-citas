@@ -22,7 +22,7 @@ public record SesSmtpProperties(
         String username,
         String password,
         String fromEmail,
-        @DefaultValue("Piedrazul") String fromName,
+        @DefaultValue("Piedra Azul Salud") String fromName,
         @DefaultValue("5s") Duration connectTimeout,
         @DefaultValue("15s") Duration readTimeout,
         @DefaultValue("15s") Duration writeTimeout,

@@ -41,6 +41,8 @@ ON CONFLICT (code) DO NOTHING;
 INSERT INTO piedrazul.notification_type (code, name) VALUES
     ('APPOINTMENT_SCHEDULED', 'Cita Agendada'),
     ('APPOINTMENT_REMINDER_2_DAYS', 'Recordatorio de Cita (2 días antes)'),
+    ('APPOINTMENT_CANCELLED', 'Cita Cancelada por el Personal'),
+    ('APPOINTMENT_RESCHEDULED', 'Cita Reprogramada'),
     ('OTP_CODE', 'Código de Verificación (OTP)')
 ON CONFLICT (code) DO NOTHING;
 

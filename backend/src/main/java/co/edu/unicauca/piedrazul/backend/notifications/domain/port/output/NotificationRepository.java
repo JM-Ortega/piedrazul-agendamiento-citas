@@ -13,6 +13,15 @@ public interface NotificationRepository {
 
     Optional<Notification> findById(UUID id);
 
+    /**
+     * Notificación del agregado y tipo en cualquier estado, incluso terminal: la clave de
+     * idempotencia es única sin importar el estado.
+     */
+    Optional<Notification> findByAggregateAndType(
+            AggregateReference aggregate,
+            NotificationType type
+    );
+
     Optional<Notification> findActiveByAggregateAndType(
             AggregateReference aggregate,
             NotificationType type
