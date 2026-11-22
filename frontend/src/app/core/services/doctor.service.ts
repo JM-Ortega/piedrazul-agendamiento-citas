@@ -124,18 +124,26 @@ export class DoctorService {
    * @param filters.patientId - Filtra además por un paciente específico (opcional).
    * @param filters.date - Filtra por fecha, formato `YYYY-MM-DD` (opcional).
    * @param filters.state - Filtra por estado de cita (opcional).
+   * @param filters.sortDirection - Orden por fecha; si se omite, aplica el del backend (ascendente).
    * @returns Observable con la respuesta paginada completa (content + metadata).
    */
   getAppointmentsByDoctor(
     doctorId: string,
     pageNumber = 0,
     pageSize = 4,
-    filters?: { patientId?: string; date?: string; state?: string }
+    filters?: {
+      patientId?: string;
+      date?: string;
+      state?: string;
+      sortDirection?: 'asc' | 'desc';
+    }
   ): Observable<PageResponse<AppointmentsPatient>> {
     let params = new HttpParams().set('idDoctor', doctorId);
     if (filters?.patientId) params = params.set('idPatient', filters.patientId);
     if (filters?.date) params = params.set('date', filters.date);
     if (filters?.state) params = params.set('state', filters.state);
+    if (filters?.sortDirection)
+      params = params.set('sortDirection', filters.sortDirection.toUpperCase());
     params = withPagination(params, pageNumber, pageSize);
 
     return this.http.get<PageResponse<AppointmentsPatient>>(

@@ -1,0 +1,116 @@
+<div class="min-h-screen bg-blue-50 px-4 py-6 sm:px-8">
+  <article
+    class="mx-auto w-full max-w-3xl rounded-2xl bg-white p-5 shadow-xl sm:p-8"
+  >
+    <header class="mb-6 border-b border-[#d9e9f8] pb-4">
+      <h1 class="text-2xl font-bold leading-tight text-[#163c63] sm:text-3xl">
+        {{ title }}
+      </h1>
+      @if (intro) {
+        <p class="mt-3 text-sm leading-relaxed text-gray-600 sm:text-base">
+          @for (part of segments(intro); track $index) {
+            @if (part.isPlaceholder) {
+              <mark class="rounded bg-amber-100 px-1 text-amber-800">{{
+                part.text
+              }}</mark>
+            } @else {
+              {{ part.text }}
+            }
+          }
+        </p>
+      }
+    </header>
+
+    <div class="space-y-6">
+      @for (section of sections; track section.number) {
+        <section [attr.aria-labelledby]="'policy-section-' + section.number">
+          <h2
+            [id]="'policy-section-' + section.number"
+            class="text-lg font-semibold text-[#215c98] sm:text-xl"
+          >
+            {{ section.number }}. {{ section.title }}
+          </h2>
+
+          @for (paragraph of section.paragraphs; track $index) {
+            <p class="mt-2 text-sm leading-relaxed text-gray-700 sm:text-base">
+              @for (part of segments(paragraph); track $index) {
+                @if (part.isPlaceholder) {
+                  <mark class="rounded bg-amber-100 px-1 text-amber-800">{{
+                    part.text
+                  }}</mark>
+                } @else {
+                  {{ part.text }}
+                }
+              }
+            </p>
+          }
+
+          @if (section.items; as items) {
+            <ul
+              class="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-gray-700 sm:text-base"
+            >
+              @for (item of items; track $index) {
+                <li>
+                  @for (part of segments(item); track $index) {
+                    @if (part.isPlaceholder) {
+                      <mark class="rounded bg-amber-100 px-1 text-amber-800">{{
+                        part.text
+                      }}</mark>
+                    } @else {
+                      {{ part.text }}
+                    }
+                  }
+                </li>
+              }
+            </ul>
+          }
+
+          @for (sub of section.subsections ?? []; track $index) {
+            <h3 class="mt-4 text-base font-semibold text-[#163c63] sm:text-lg">
+              {{ sub.title }}
+            </h3>
+            @if (sub.ordered) {
+              <ol
+                class="mt-2 list-decimal space-y-1 pl-5 text-sm leading-relaxed text-gray-700 sm:text-base"
+              >
+                @for (item of sub.items; track $index) {
+                  <li>
+                    @for (part of segments(item); track $index) {
+                      @if (part.isPlaceholder) {
+                        <mark
+                          class="rounded bg-amber-100 px-1 text-amber-800"
+                          >{{ part.text }}</mark
+                        >
+                      } @else {
+                        {{ part.text }}
+                      }
+                    }
+                  </li>
+                }
+              </ol>
+            } @else {
+              <ul
+                class="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-gray-700 sm:text-base"
+              >
+                @for (item of sub.items; track $index) {
+                  <li>
+                    @for (part of segments(item); track $index) {
+                      @if (part.isPlaceholder) {
+                        <mark
+                          class="rounded bg-amber-100 px-1 text-amber-800"
+                          >{{ part.text }}</mark
+                        >
+                      } @else {
+                        {{ part.text }}
+                      }
+                    }
+                  </li>
+                }
+              </ul>
+            }
+          }
+        </section>
+      }
+    </div>
+  </article>
+</div>
