@@ -85,13 +85,20 @@
         </a>
 
         <a
-          [href]="phoneUrl"
-          class="flex items-center justify-center gap-2 flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-xl transition-all active:scale-95 text-left"
+          [href]="whatsappUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="flex items-center justify-center gap-2 flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-xl transition-all active:scale-95 text-left"
         >
-          <svg lucidePhone [size]="18" class="shrink-0"></svg>
+          <svg
+            lucideMessageCircle
+            [size]="18"
+            color="white"
+            class="shrink-0"
+          ></svg>
           <div>
             <div class="text-sm font-medium">{{ phoneDisplay }}</div>
-            <div class="text-gray-400 text-xs">Llámanos</div>
+            <div class="text-green-100 text-xs">Escríbenos</div>
           </div>
         </a>
       </div>
