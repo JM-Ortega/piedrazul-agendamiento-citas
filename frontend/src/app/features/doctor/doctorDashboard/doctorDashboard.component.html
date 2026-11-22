@@ -56,9 +56,11 @@
     </div>
 
     <!-- Panel principal: Lista de Citas -->
-    <div class="bg-white rounded-2xl shadow-lg border-2 border-blue-100 p-6">
-      <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <h2 class="text-[#163c63] text-2xl">Citas de Hoy</h2>
+    <div
+      class="bg-white rounded-2xl shadow-lg border-2 border-blue-100 p-4 lg:p-5"
+    >
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-3">
+        <h2 class="text-[#163c63] text-xl">Citas de Hoy</h2>
         <app-pagination
           [pagination]="pagination()"
           (pageChange)="onPageChange($event)"
@@ -77,141 +79,127 @@
           </p>
         </div>
       } @else {
-        <div class="space-y-3">
+        <div
+          class="border-2 border-blue-100 rounded-xl divide-y divide-blue-100"
+        >
           @for (apt of todaysAppointments(); track apt.idAppointment) {
             <div
-              class="border-2 border-blue-100 rounded-xl p-4 hover:shadow-lg transition-shadow bg-blue-50/30"
+              class="flex flex-wrap sm:flex-nowrap items-center gap-x-4 gap-y-2 px-4 py-1.5 hover:bg-blue-50/50 transition-colors"
             >
+              <!-- Hora -->
               <div
-                class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+                class="flex items-center justify-center gap-1 bg-[#4e92d9] text-white rounded-lg w-20 py-1 shrink-0"
               >
-                <!-- Lado izquierdo: hora + estado + datos paciente -->
-                <div class="flex-1">
-                  <div class="flex items-center gap-4">
-                    <div class="flex flex-col items-start gap-2">
-                      <!--Estado-->
-                      <span
-                        class="px-3 py-1.5 rounded-lg border-2 text-sm font-medium"
-                        [class]="statusColor(apt.appointmentState)"
-                      >
-                        {{ statusLabel(apt.appointmentState) }}
-                      </span>
+                <svg lucideClock [size]="14"></svg>
+                <span class="text-sm font-semibold tabular-nums">{{
+                  apt.startTime.slice(0, 5)
+                }}</span>
+              </div>
 
-                      <!-- Hora -->
-                      <div
-                        class="bg-[#4e92d9] text-white rounded-xl px-3 py-2 text-center min-w-16"
-                      >
-                        <div class="flex items-center gap-1 justify-center">
-                          <svg lucideClock [size]="16"></svg>
-                          <span class="text-lg">{{
-                            apt.startTime.slice(0, 5)
-                          }}</span>
-                        </div>
-                      </div>
-                    </div>
+              <!-- Paciente -->
+              <div class="flex-1 min-w-0">
+                <p
+                  class="text-blue-900 truncate leading-tight"
+                  [title]="apt.patientFirstName + ' ' + apt.patientLastName"
+                >
+                  {{ apt.patientFirstName }} {{ apt.patientLastName }}
+                </p>
+                <p class="flex items-center gap-1 text-xs text-gray-600">
+                  <svg lucideUser [size]="12" class="text-[#163c63]"></svg>
+                  Doc: {{ apt.documentNumber }}
+                </p>
+              </div>
 
-                    <!-- Datos del paciente -->
-                    <div class="flex-1">
-                      <h3 class="text-blue-900 text-lg mb-1">
-                        {{ apt.patientFirstName }} {{ apt.patientLastName }}
-                      </h3>
-                      <div class="flex items-center gap-2 text-gray-700">
-                        <svg
-                          lucideUser
-                          [size]="16"
-                          class="text-[#163c63]"
-                        ></svg>
-                        <span class="text-sm"
-                          >Doc: {{ apt.documentNumber }}</span
-                        >
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <!-- Estado -->
+              <span
+                class="px-2.5 py-1 rounded-lg border-2 text-xs font-medium shrink-0 w-24 text-center"
+                [class]="statusColor(apt.appointmentState)"
+              >
+                {{ statusLabel(apt.appointmentState) }}
+              </span>
 
-                <!-- Lado derecho: botones según estado -->
-                <div class="flex flex-col gap-2 lg:items-end">
-                  <!-- Dropdown inline "Actualizar estado": solo cuando la cita está AGENDADA -->
-                  @if (apt.appointmentState === 'AGENDADA') {
-                    <div class="relative">
-                      <app-button
-                        variant="success"
-                        extraClass="!px-4 !py-2"
-                        (buttonClick)="toggleCardDropdown(apt.idAppointment)"
-                      >
-                        <svg lucideClipboardList [size]="16"></svg>
-                        <span>Estado</span>
-                        <svg
-                          lucideChevronDown
-                          [size]="14"
-                          class="transition-transform"
-                          [style.transform]="
-                            openCardDropdownId() === apt.idAppointment
-                              ? 'rotate(180deg)'
-                              : 'rotate(0deg)'
-                          "
-                        ></svg>
-                      </app-button>
-
-                      @if (openCardDropdownId() === apt.idAppointment) {
-                        <div
-                          class="absolute right-0 mt-2 w-44 bg-white border-2 border-blue-100 rounded-xl shadow-xl z-10 overflow-hidden"
-                        >
-                          <button
-                            (click)="
-                              selectCardOutcome(apt.idAppointment, 'ATENDIDA')
-                            "
-                            class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-emerald-50 text-emerald-700 transition-colors"
-                          >
-                            <svg lucideCheck [size]="16"></svg>
-                            Atender
-                          </button>
-
-                          <div class="border-t border-gray-100"></div>
-                          <button
-                            (click)="
-                              selectCardOutcome(apt.idAppointment, 'NO_ASISTIO')
-                            "
-                            class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-red-50 text-red-600 transition-colors"
-                          >
-                            <svg lucideUserX [size]="16"></svg>
-                            No asistió
-                          </button>
-                        </div>
-                      }
-                    </div>
-                  }
-
-                  <!-- Acciones cuando la cita ya fue ATENDIDA: ver/editar historial + nueva cita -->
-                  @if (apt.appointmentState === 'ATENDIDA') {
-                    <div class="flex items-center gap-6">
-                      <app-button
-                        variant="plain"
-                        extraClass="!flex !items-center !gap-1.5 !text-base !px-0"
-                        [appTooltip]="'Ver el historial clínico y editar la observación de esta cita'"
-                        (buttonClick)="goToControlMedico(apt.idAppointment)"
-                      >
-                        <svg lucideFileText [size]="16"></svg>
-                        Ver y editar
-                      </app-button>
-                      <app-button
-                        variant="primary"
-                        extraClass="!px-4 !py-2 !text-base"
-                        [appTooltip]="'Agendar una nueva cita para este paciente'"
-                        (buttonClick)="
-                          scheduleNewAppointment(
-                            apt.documentNumber,
-                            apt.specialty,
-                            currentDoctor()?.id
-                          )
+              <!-- Acciones según estado -->
+              <div class="flex justify-end shrink-0 sm:w-56">
+                <!-- Dropdown inline "Actualizar estado": solo cuando la cita está AGENDADA -->
+                @if (apt.appointmentState === 'AGENDADA') {
+                  <div class="relative">
+                    <app-button
+                      variant="success"
+                      extraClass="!px-3 !py-1.5 !text-sm"
+                      (buttonClick)="toggleCardDropdown(apt.idAppointment)"
+                    >
+                      <svg lucideClipboardList [size]="14"></svg>
+                      <span>Estado</span>
+                      <svg
+                        lucideChevronDown
+                        [size]="14"
+                        class="transition-transform"
+                        [style.transform]="
+                          openCardDropdownId() === apt.idAppointment
+                            ? 'rotate(180deg)'
+                            : 'rotate(0deg)'
                         "
+                      ></svg>
+                    </app-button>
+
+                    @if (openCardDropdownId() === apt.idAppointment) {
+                      <div
+                        class="absolute right-0 mt-2 w-44 bg-white border-2 border-blue-100 rounded-xl shadow-xl z-10 overflow-hidden"
                       >
-                        <svg lucideCalendar [size]="16"></svg>
-                        Nueva cita
-                      </app-button>
-                    </div>
-                  }
-                </div>
+                        <button
+                          (click)="
+                            selectCardOutcome(apt.idAppointment, 'ATENDIDA')
+                          "
+                          class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-emerald-50 text-emerald-700 transition-colors"
+                        >
+                          <svg lucideCheck [size]="16"></svg>
+                          Atender
+                        </button>
+
+                        <div class="border-t border-gray-100"></div>
+                        <button
+                          (click)="
+                            selectCardOutcome(apt.idAppointment, 'NO_ASISTIO')
+                          "
+                          class="w-full flex items-center gap-3 px-4 py-3 text-left text-sm hover:bg-red-50 text-red-600 transition-colors"
+                        >
+                          <svg lucideUserX [size]="16"></svg>
+                          No asistió
+                        </button>
+                      </div>
+                    }
+                  </div>
+                }
+
+                <!-- Acciones cuando la cita ya fue ATENDIDA: ver/editar historial + nueva cita -->
+                @if (apt.appointmentState === 'ATENDIDA') {
+                  <div class="flex items-center gap-4">
+                    <app-button
+                      variant="plain"
+                      extraClass="!flex !items-center !gap-1.5 !text-sm !px-0"
+                      [appTooltip]="'Ver el historial clínico y editar la observación de esta cita'"
+                      (buttonClick)="goToControlMedico(apt.idAppointment)"
+                    >
+                      <svg lucideFileText [size]="14"></svg>
+                      Ver y editar
+                    </app-button>
+                    <app-button
+                      variant="primary"
+                      extraClass="!px-3 !py-1.5 !text-sm"
+                      [appTooltip]="'Agendar una nueva cita para este paciente'"
+                      (buttonClick)="
+                        scheduleNewAppointment(
+                          apt.documentNumber,
+                          apt.specialty,
+                          currentDoctor()?.id
+                        )
+                      "
+                    >
+                      <svg lucideCalendar [size]="14"></svg>
+                      Nueva cita
+                    </app-button>
+                  </div>
+                }
               </div>
             </div>
           }
