@@ -244,7 +244,7 @@ operador y login local en su navegador con el acceso público habilitado; una op
   creado antes conserva `admin@localhost`, igual protegido porque el rol rechaza ese correo en las
   listas.
 - **Archivo de configuración de Grafana.** `GF_PATHS_CONFIG` apunta al archivo de acceso: la
-  configuración de la imagen (`/etc/grafana/grafana.ini`) no se carga. En Grafana 13.3.0 ese archivo
+  configuración de la imagen (`/etc/grafana/grafana.ini`) no se carga. En Grafana 13.3.1 ese archivo
   solo fija valores de alerting unificado y reglas de grabación, deshabilitados o por defecto aquí
   (comprobado al fijar la versión); revisarlo al cambiar de imagen.
 

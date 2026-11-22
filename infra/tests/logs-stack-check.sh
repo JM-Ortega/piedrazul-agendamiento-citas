@@ -217,8 +217,8 @@ check "Compose: selección por defecto proyecto piedrazul, servicio traefik" \
   jq -e '.services.alloy.environment.OBS_LOG_PROJECT == "piedrazul" and .services.alloy.environment.OBS_LOG_SERVICES == "traefik"' "${C}"
 check "Compose: solo prometheus en la red de la aplicación" \
   test "$(jq -r '[.services | to_entries[] | select(.value.networks | has("app_net")) | .key] | join(",")' "${C}")" = prometheus
-check "Compose: métricas intactas (retención de Prometheus 30d/2GB, Grafana 13.3.0 por digest)" \
-  bash -c "jq -r '.services.prometheus.command[]' '${C}' | grep -qx -- '--storage.tsdb.retention.time=30d' && jq -r '.services.grafana.image' '${C}' | grep -q '^grafana/grafana:13.3.0@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205\$'"
+check "Compose: métricas intactas (retención de Prometheus 30d/2GB, Grafana 13.3.1 por digest)" \
+  bash -c "jq -r '.services.prometheus.command[]' '${C}' | grep -qx -- '--storage.tsdb.retention.time=30d' && jq -r '.services.grafana.image' '${C}' | grep -q '^grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf\$'"
 
 check "Loki: la configuración se valida (-verify-config)" \
   docker run --rm --network none -v "${OBS}/loki:/etc/loki:ro" "${LOKI_IMAGE}" -config.file=/etc/loki/config.yaml -verify-config
