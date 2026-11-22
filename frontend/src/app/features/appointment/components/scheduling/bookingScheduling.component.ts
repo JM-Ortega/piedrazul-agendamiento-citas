@@ -12,7 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { MatNativeDateModule, MAT_DATE_LOCALE } from '@angular/material/core';
 import { DateAdapter } from '@angular/material/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
-import { LucideCalendar } from '@lucide/angular';
+import { LucideCalendar, LucideInfo } from '@lucide/angular';
 import { ButtonComponent } from '../../../../designSystem/atoms/button/button.component';
 import { CustomDateAdapter } from '../../../../designSystem/molecules/datepicker/customDateAdapter';
 import {
@@ -37,6 +37,7 @@ import { AppError } from '../../../../shared/models/interfaces/apiError.model';
     CommonModule,
     FormsModule,
     LucideCalendar,
+    LucideInfo,
     MatDatepickerModule,
     MatNativeDateModule,
     ButtonComponent,

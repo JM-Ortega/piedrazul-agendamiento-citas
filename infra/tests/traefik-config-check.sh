@@ -31,6 +31,10 @@
 #   5. ciclo de vida: upstream recreado con otra IP → enrutado sin API de Docker;
 #      upstream detenido → 502 visible y vuelve al arrancar; reinicio de Traefik conserva
 #      las rutas; cambio de rutas recargado sin reinicio
+#   5b. normalización de rutas (GHSA-cp28-5662-543f): con el router grafana real y un upstream
+#      que devuelve lo que recibe, `..`, `.`, `//` y parámetros de ruta (`..;x`) se resuelven
+#      antes de enrutar: lo que acaba en /login da 404 de Traefik sin llegar al upstream, lo
+#      permitido llega con la ruta ya resuelta y sin Authorization ni Cookie
 #   6. fallo visible: un archivo dinámico malformado se registra como error; Traefik
 #      conserva la última configuración válida y, si arranca con él, no enruta (404)
 # Salida: 0 si todo pasa; 1 si algo falla.
@@ -322,6 +326,12 @@ EOF
       echo "    command: [\"--port\", \"${svc##*:}\", \"--name\", \"${svc%%:*}\"]"
       echo "    networks: [piedrazul_net]"
     done
+    # Upstream sintético de Grafana (solo en la red de entrada, puerto 3000 como en la ruta real);
+    # whoami devuelve la línea de petición y las cabeceras que recibió
+    echo "  grafana:"
+    echo "    image: ${WHOAMI_IMAGE}"
+    echo "    command: [\"--port\", \"3000\", \"--name\", \"grafana\"]"
+    echo "    networks: [obs_edge]"
   } > "${W}/compose/check.yml"
   compose() { docker compose --project-name "${PROJECT}" --project-directory "${W}/compose" --file "${W}/compose/check.yml" --env-file "${W}/.env" --env-file "${W}/image.env" "$@"; }
 
@@ -423,6 +433,73 @@ EOF
   check "runtime: cambio de rutas por Ansible recargado sin reiniciar (${T_API2} 200, ${T_API} 404)" \
     bash -c "$(declare -f req wait_code code); HTTPS_PORT='${HTTPS_PORT}'; as_origin=(--cert '${TMP}/pki/origin-client.pem' --key '${TMP}/pki/origin-client.key'); wait_code 200 '${T_API2}' && wait_code 404 '${T_API}'"
   render_routes "${W}" -e "api_public_domain=${T_API}" -e "kc_hostname=${T_AUTH}" >/dev/null 2>&1 || true
+  wait_code 200 "${T_API}" || true
+
+  # 5b. Normalización de rutas (GHSA-cp28-5662-543f, corregido en v3.7.18): Traefik resuelve
+  # `..`, `.` y segmentos vacíos —también con parámetros de ruta (`..;x`)— ANTES de evaluar
+  # routers y middlewares, y reenvía la ruta ya resuelta. Sin eso, `/a/..;x/login` esquivaba
+  # `!PathPrefix(/login)` y llegaba sin resolver a un upstream que sí quita los parámetros.
+  # Router grafana real (plantilla de Ansible) con un upstream sintético que devuelve lo que
+  # recibe: el rechazo se atribuye a la ruta ya normalizada (404 de Traefik, el upstream no ve
+  # nada) y lo permitido se demuestra con la ruta exacta que llega al upstream.
+  T_GRAF=grafana.traefik-check.test
+  render_routes "${W}" -e "api_public_domain=${T_API}" -e "kc_hostname=${T_AUTH}" -e "grafana_public_domain=${T_GRAF}" >/dev/null 2>&1 || true
+  greq() { # <ruta> [curl args...] → cuerpo + código; la ruta se envía tal cual (sin que curl la normalice)
+    local p="$1"; shift
+    curl -sk --max-time 10 --path-as-is --resolve "${T_GRAF}:${HTTPS_PORT}:127.0.0.1" -w '\n%{http_code}' "${as_origin[@]}" \
+      -H 'Cookie: grafana_session=local' -H 'Authorization: Basic YWRtaW46c2ludGV0aWNv' "$@" "https://${T_GRAF}:${HTTPS_PORT}${p}" | tr -d '\r'
+  }
+  wait_graf() { local i; for i in $(seq 1 30); do [ "$(code "$(greq /api/health 2>/dev/null || true)")" = "$1" ] && return 0; sleep 1; done; return 1; }
+  reaches() { # <ruta enviada> <ruta que ve el upstream> → 200, ruta exacta y sin Authorization ni Cookie
+    local out; out="$(greq "$1" || true)"
+    [ "$(code "${out}")" = 200 ] && grep -qx "GET $2 HTTP/1.1" <<< "${out}" && grep -q '^Name: grafana' <<< "${out}" \
+      && ! grep -qiE '^(cookie|authorization):' <<< "${out}"
+  }
+  blocked() { # <ruta enviada> → 404 de Traefik y ningún upstream recibió la petición
+    local out; out="$(greq "$1" || true)"
+    [ "$(code "${out}")" = 404 ] && grep -qx '404 page not found' <<< "${out}" && ! grep -q '^Hostname:' <<< "${out}"
+  }
+  if wait_graf 200; then ok "runtime: router grafana (plantilla de Ansible) recargado → upstream de Grafana"; else ko "runtime: router grafana recargado"; fi
+  check "ruta Grafana: ordinaria /api/health llega con su ruta sin cambios; Traefik quita Authorization y Cookie" reaches /api/health /api/health
+  check "ruta Grafana: /login no se enruta (404 de Traefik)" blocked /login
+  for p in /login/ '/login;x' '/login?next=/'; do
+    check "ruta Grafana: ${p} no se enruta (404 de Traefik)" blocked "${p}"
+  done
+  # Segmentos con punto, vacíos y con parámetros: Traefik los resuelve antes de enrutar. El
+  # destino no permitido (/login) se rechaza por la regla; el permitido llega ya resuelto.
+  for p in '/a/../login' '//login' '/a/..//login' '/a/..;x/login' '/..;x/login' '/.;x/login' '/a/.;x/../login' '/a/..;/login' \
+           '/a/%2e%2e/login' '/a/%2e%2e;x/login' '/%2e%2e;x/login' '/a/;/..;x/login' '/a/..;x/b/..;y/login'; do
+    check "ruta Grafana: ${p} se normaliza a /login → 404 de Traefik, el upstream no la recibe" blocked "${p}"
+  done
+  check "ruta Grafana: /a/..;x/b llega al upstream como /b (parámetro de ruta resuelto)" reaches '/a/..;x/b' /b
+  check "ruta Grafana: /a/%2e%2e;x/b llega al upstream como /b" reaches '/a/%2e%2e;x/b' /b
+  check "ruta Grafana: /public/..;x/admin llega al upstream como /admin (la ruta normalizada, no la cruda)" reaches '/public/..;x/admin' /admin
+  check "ruta Grafana: /a/b/..;x/ llega al upstream como /a/" reaches '/a/b/..;x/' /a/
+  check "ruta Grafana: /a/./b llega como /a/b" reaches /a/./b /a/b
+  check "ruta Grafana: /a//b llega como /a/b" reaches /a//b /a/b
+  check "ruta Grafana: /a/.;x/b llega como /a/b" reaches '/a/.;x/b' /a/b
+  check "ruta Grafana: /a;x/b (parámetro sin segmento de puntos) se reenvía sin cambios" reaches '/a;x/b' '/a;x/b'
+  # Traefik quita Authorization y Cookie también con rutas manipuladas que sí llegan al upstream
+  # (reaches ya lo exige); aquí con otra forma y varios valores
+  OUT="$(greq '/a/..;x/b' -H 'Cookie: a=1' -H 'Cookie: b=2' -H 'Authorization: Bearer abc' || true)"
+  check "ruta Grafana: con ruta manipulada, varias Cookie y Authorization Bearer no se reenvían al upstream" \
+    bash -c "[ '$(code "${OUT}")' = 200 ] && ! grep -qiE '^(cookie|authorization):' <<< \"\$1\" && grep -qx 'GET /b HTTP/1.1' <<< \"\$1\"" _ "${OUT}"
+  # Las variantes con codificación de ';' (%3B) o '/' (%2F) no son segmentos con parámetros para
+  # Traefik: se reenvían tal cual y la defensa es la de Grafana (grafana-access-check.sh las
+  # prueba contra Grafana real); aquí solo se exige que conserven el descarte de cabeceras.
+  for p in '/a/..%3bx/login' '/a/..%2flogin' '/a%2f..%2flogin'; do
+    OUT="$(greq "${p}" || true)"
+    check "ruta Grafana: ${p} se reenvía sin normalizar pero Traefik quita Authorization y Cookie ($(code "${OUT}"))" \
+      bash -c "! grep -qiE '^(cookie|authorization):' <<< \"\$1\" && [[ '$(code "${OUT}")' =~ ^(200|400|404)\$ ]]" _ "${OUT}"
+  done
+  # Mismo mecanismo en un router solo por host: el upstream recibe la ruta resuelta
+  OUT="$(curl -sk --max-time 10 --path-as-is "${as_origin[@]}" --resolve "${T_API}:${HTTPS_PORT}:127.0.0.1" -w '\n%{http_code}' \
+    "https://${T_API}:${HTTPS_PORT}/public/..;x/admin" | tr -d '\r' || true)"
+  check "ruta backend: /public/..;x/admin llega al backend como /admin (resuelta)" \
+    bash -c "[ '$(code "${OUT}")' = 200 ] && grep -q '^Name: backend' <<< \"\$1\" && grep -qx 'GET /admin HTTP/1.1' <<< \"\$1\"" _ "${OUT}"
+  # Sin grafana_public_domain el router desaparece (sin reiniciar) y el host no se enruta
+  render_routes "${W}" -e "api_public_domain=${T_API}" -e "kc_hostname=${T_AUTH}" >/dev/null 2>&1 || true
+  if wait_graf 404; then ok "runtime: sin grafana_public_domain el host de Grafana vuelve a 404 sin reiniciar"; else ko "runtime: sin grafana_public_domain el host de Grafana vuelve a 404"; fi
   wait_code 200 "${T_API}" || true
 
   # 6. Configuración dinámica malformada

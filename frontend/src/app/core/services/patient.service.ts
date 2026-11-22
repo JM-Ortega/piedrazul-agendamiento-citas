@@ -56,6 +56,30 @@ export class PatientAppointmentService {
   }
 
   /**
+   * Consulta las citas en estado `AGENDADA` de un paciente, ordenadas de la
+   * más próxima a la más lejana.
+   *
+   * No guarda el resultado en el estado compartido del servicio (`appointments` / `pagination`),
+   * para no pisar el listado que usan otras vistas (p. ej. el dashboard del paciente).
+   *
+   * @param idPatient - Id del paciente a consultar.
+   * @param pageSize - Cantidad máxima de citas a traer .
+   * @returns Observable con la primera página de citas agendadas del paciente.
+   */
+  getScheduledAppointments(
+    idPatient: string,
+    pageSize = 5
+  ): Observable<PageResponse<AppointmentsPatient>> {
+    return this.getAppointments({
+      idPatient,
+      state: 'AGENDADA',
+      pageNumber: 0,
+      pageSize,
+      sortDirection: 'asc',
+    });
+  }
+
+  /**
    * Realiza la petición HTTP GET paginada de citas al backend.
    *
    * @param params filtros y parámetros de paginación

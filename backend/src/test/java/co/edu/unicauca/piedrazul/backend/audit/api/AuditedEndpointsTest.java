@@ -54,6 +54,8 @@ class AuditedEndpointsTest {
 
         TreeMap<String, String> agreed = new TreeMap<>();
         agreed.put("AppointmentController.scheduleAppointment", "CITA_AGENDADA · " + ONLY_DENIED);
+        // Reagendar agenda una cita nueva: su éxito lo audita ScheduledAppointmentEvent (CITA_AGENDADA).
+        agreed.put("AppointmentController.rescheduleAppointment", "CITA_AGENDADA · " + ONLY_DENIED);
         agreed.put("AppointmentController.registerUnscheduledAttention", "CONTROL_MEDICO_CREADO · " + ONLY_DENIED);
         agreed.put("AppointmentController.markAppointmentAsAttended", "CONTROL_MEDICO_CREADO · " + ONLY_DENIED);
         agreed.put("PatientController.update", "PACIENTE_MODIFICADO · " + ONLY_DENIED);

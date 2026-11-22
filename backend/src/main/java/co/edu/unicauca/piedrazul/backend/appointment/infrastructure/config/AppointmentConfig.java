@@ -135,6 +135,21 @@ public class AppointmentConfig {
     }
 
     @Bean
+    public RescheduleAppointmentUseCase rescheduleAppointmentUseCase(
+            AppointmentRepository appointmentRepository,
+            CancelAppointmentUseCase cancelAppointmentUseCase,
+            AppointmentSchedulingService appointmentSchedulingService,
+            AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy) {
+        // La estrategia "autónoma" solo resuelve el paciente por id (el de la cita original);
+        // el flujo de agendamiento es el manual.
+        return new RescheduleAppointmentUseCaseImpl(
+                appointmentRepository,
+                cancelAppointmentUseCase,
+                appointmentSchedulingService,
+                autonomousPatientResolutionStrategy);
+    }
+
+    @Bean
     public UpdateExpiredAppointmentsUseCaseImpl  updateExpiredAppointmentsUseCase(
             AppointmentRepository appointmentRepository){
         return new UpdateExpiredAppointmentsUseCaseImpl(appointmentRepository);

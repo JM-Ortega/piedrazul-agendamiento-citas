@@ -7,10 +7,10 @@ export const environment = {
     clientId: 'piedrazul-frontend',
   },
   contact: {
-    whatsapp: '573173803813',
-    whatsappDisplay: '317 300 3813',
-    phone: '6013891234',
-    phoneDisplay: '601 389 1234',
+    whatsapp: '3206597038',
+    whatsappDisplay: '320 659 7038',
+    phone: '3126069041',
+    phoneDisplay: '312 606 9041',
   },
   session: {
     /** Minutos de inactividad permitidos por rol.

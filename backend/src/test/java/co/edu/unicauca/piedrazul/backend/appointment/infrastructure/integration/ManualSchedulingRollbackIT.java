@@ -9,17 +9,20 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.*;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.AppointmentService;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.service.BusySlotService;
-import co.edu.unicauca.piedrazul.backend.appointment.exception.FirstAppointmentMustBeNeuralTerapyException;
+import co.edu.unicauca.piedrazul.backend.appointment.exception.SlotNotAvailableException;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.internal.PatientSchedulingContext;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.mappers.AppointmentMapper;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentConfigJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentConfigRepositoryImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentRepositoryImpl;
+import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
+import co.edu.unicauca.piedrazul.backend.doctors.infrastructure.persistence.DoctorRepository;
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientLinkFinalizer;
 import co.edu.unicauca.piedrazul.backend.patients.application.PatientService;
 import co.edu.unicauca.piedrazul.backend.patients.infrastructure.persistence.PatientRepository;
 import co.edu.unicauca.piedrazul.backend.shared.audit.SecurityContextExtractor;
+import co.edu.unicauca.piedrazul.backend.shared.enums.IdentificationType;
 import co.edu.unicauca.piedrazul.backend.shared.enums.SpecialtyCode;
 import co.edu.unicauca.piedrazul.backend.support.PostgresIntegrationSupport;
 import co.edu.unicauca.piedrazul.backend.user.PersonExternalService;
@@ -163,27 +166,39 @@ class ManualSchedulingRollbackIT extends PostgresIntegrationSupport {
     private PatientRepository patientRepository;
     @Autowired
     private AppointmentJpaRepository appointmentJpaRepository;
+    @Autowired
+    private DoctorRepository doctorRepository;
+
+    private final java.util.concurrent.atomic.AtomicLong documentSequence =
+            new java.util.concurrent.atomic.AtomicLong(System.nanoTime());
 
     private String document;
-    private final UUID doctorId = UUID.randomUUID();
+    private UUID doctorId;
+
+    private String uniqueDocument() {
+        return String.valueOf(1_000_000_000L + (Math.abs(documentSequence.incrementAndGet()) % 900_000_000L));
+    }
 
     @BeforeEach
     void setUp() {
-        document = String.valueOf(System.nanoTime()).substring(0, 10);
+        document = uniqueDocument();
+        doctorId = personExternalService.createPerson(
+                IdentificationType.CEDULA, uniqueDocument(), "Dra", "Prueba", "3000000001", null, null).id();
+        doctorRepository.save(new Doctor(doctorId, LocalDate.now(), LocalDate.now().plusYears(1), 4, true, 30));
 
         when(doctorConfigConsultPort.getIntervalMinutesByDoctor(any())).thenReturn(30);
         when(doctorConfigConsultPort.getDoctorName(any())).thenReturn("Dra. Prueba");
     }
 
-    private PatientSchedulingContext manualContext() {
+    private PatientSchedulingContext manualContext(String documentNumber) {
         return PatientSchedulingContext.manual(
-                DocumentType.CEDULA, document, "Ana", "Ruiz", "3001234567",
+                DocumentType.CEDULA, documentNumber, "Ana", "Ruiz", "3001234567",
                 Gender.FEMENINO, BIRTH_DATE, "ana@example.com", null);
     }
 
-    private void scheduleWith(SpecialtyCode specialty) {
+    private void scheduleAtNine(String documentNumber) {
         schedulingService.scheduleManual(
-                manualContext(), doctorId, specialty,
+                manualContext(documentNumber), doctorId, SpecialtyCode.FISIOTERAPIA,
                 LocalDate.now().plusDays(1), new AppointmentTime(LocalTime.of(9, 0)),
                 UUID.randomUUID(), manualStrategy);
     }
@@ -193,18 +208,21 @@ class ManualSchedulingRollbackIT extends PostgresIntegrationSupport {
         assertTrue(personExternalService.findByIdentification(document).isEmpty(),
                 "precondición: el documento no debe existir todavía");
 
+        // Otro paciente ya ocupa el slot: el agendamiento falla (slot ocupado) después de resolver
+        // (y crear) al paciente nuevo.
+        scheduleAtNine(uniqueDocument());
+
         // Patient no expone el documento; se compara el conteo antes y después.
         long patientCountBefore = patientRepository.count();
 
-        assertThrows(FirstAppointmentMustBeNeuralTerapyException.class,
-                () -> scheduleWith(SpecialtyCode.FISIOTERAPIA));
+        assertThrows(SlotNotAvailableException.class, () -> scheduleAtNine(document));
 
         assertTrue(personRepository.findByIdentification(document).isEmpty(),
                 "la persona creada durante el agendamiento debe revertirse");
         assertEquals(patientCountBefore, patientRepository.count(),
                 "el paciente creado durante el agendamiento debe revertirse");
-        assertTrue(appointmentJpaRepository.findAll().stream()
-                        .noneMatch(appointment -> doctorId.equals(appointment.getIdDoctor())),
-                "no debe quedar ninguna cita");
+        assertEquals(1, appointmentJpaRepository.findAll().stream()
+                        .filter(appointment -> doctorId.equals(appointment.getIdDoctor())).count(),
+                "solo debe quedar la cita que ya ocupaba el slot");
     }
 }

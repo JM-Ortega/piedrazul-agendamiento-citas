@@ -334,8 +334,27 @@ por ruta de la API** (Backend) siguen el mismo criterio con las métricas de Spr
 `/actuator` (el healthcheck de Docker cada 30 s, rápido, que con poco tráfico real sería casi todo
 lo medido) y solo dibujan una ventana con al menos 20 peticiones de la API (en total, o por ruta).
 Con el tráfico actual es normal que no haya línea. Los buckets del backend son 50 ms, 100 ms,
-250 ms, 500 ms, 1 s, 2,5 s y 5 s. Los conteos de peticiones (**Backend: peticiones por estado**,
-**Peticiones por ruta**) sí incluyen `/actuator`.
+250 ms, 500 ms, 1 s, 2,5 s y 5 s.
+
+**Peticiones HTTP del backend.** Las vistas de actividad de la API excluyen `/actuator`
+(**Backend: peticiones de la API por estado** en Plataforma; **Peticiones por ruta** en Backend),
+para que el healthcheck no domine con poco tráfico real. El monitoreo no se pierde: el panel
+**Monitoreo: peticiones a /actuator** (Backend) lo muestra por estado (un 503 en
+`/actuator/health` significa que el backend se declara no sano) y **Errores 5xx por ruta** sigue
+incluyendo `/actuator`.
+
+- **Top 10 del rango.** **Peticiones por ruta** y **Latencia p95 por ruta de la API** dibujan las
+  10 rutas con más peticiones *en todo el rango elegido* (ranking único, hasta el final del
+  rango: `topk(10, increase(...[$__range] @ end()))`), no las 10 de cada punto: la leyenda tiene
+  como máximo 10 series y son las mismas en todo el gráfico, y cada punto sigue siendo la tasa de
+  su ventana. Una ruta con poco tráfico puede quedar fuera aunque exista. Cambiar el rango o la
+  hora final puede cambiar el ranking.
+- **`uri="UNKNOWN"`.** Spring lo asigna cuando la petición no tiene plantilla de ruta y la
+  respuesta no es 404 (`NOT_FOUND`) ni redirección (`REDIRECTION`): por ejemplo un 401 o 403 de
+  seguridad, o un 400/405 rechazado antes del controlador. Es tráfico rechazado, no un fallo del
+  backend, y es evidencia útil (un pico de 401/403 puede ser un escaneo o un cliente con el token
+  vencido), así que no se oculta: compite por el top 10 y **Peticiones sin ruta de controlador**
+  (Backend) lo muestra siempre, por estado, junto con `NOT_FOUND`.
 
 Las reglas de la canalización de logs (`prometheus/rules/logs.yml`) están en
 [Logs](logs.md#operación-y-diagnóstico).

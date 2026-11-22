@@ -193,13 +193,12 @@ public class DoctorService implements DoctorProvisioningApi {
             throw new NoAvailableDoctorsException("No hay médicos activos disponibles");
         }
 
-        // Si no se envia el id del paciente es porque es nuevo
-        boolean isNewPatient = patientId == null || appointmentExternalService.isNewPatient(patientId);
+        // Solo el agendamiento manual (personal de la clínica) ofrece todas las especialidades, aunque
+        // el paciente sea nuevo. Cualquier otro origen (autónomo o ausente) queda restringido a terapia
+        // neural. patientId ya no interviene: se conserva en la firma por compatibilidad del contrato.
+        boolean onlyNeuralTherapy = schedulingOrigin != SchedulingOrigin.MANUAL;
 
-        // Por si entro por el origen de agendamiento
-        boolean onlyNeuralTherapy = isNewPatient || schedulingOrigin == SchedulingOrigin.AUTONOMO;
-
-        // Si el paciente es nuevo solo retorna los medicos de terapia neural
+        // Si es restrictivo solo retorna los medicos de terapia neural
         if (onlyNeuralTherapy) {
             activeDoctors = activeDoctors.stream()
                     .filter(d -> d.getSpecialties().stream()

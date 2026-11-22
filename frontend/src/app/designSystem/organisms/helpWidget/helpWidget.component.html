@@ -46,75 +46,81 @@
     >
       <svg lucideCircleHelp class="size-[18px]"></svg>
 
-      <span
-        class="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-300 group-hover:max-w-40 group-hover:opacity-100"
-      >
-        ¿Necesitas ayuda?
-      </span>
+      <span class="whitespace-nowrap">¿Necesitas ayuda?</span>
     </app-button>
   </div>
 }
 
-@if (showVideo() && videoUrl(); as url) {
-  @if (!expanded()) {
+<!--
+  Un solo reproductor para los dos modos (flotante / ampliado): solo cambian
+  las clases, así el video no se reinicia al ampliar o minimizar.
+-->
+@if (showVideo() && videoId()) {
+  <div
+    [class]="
+      expanded()
+        ? 'fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-6'
+        : 'contents'
+    "
+    [attr.role]="expanded() ? 'dialog' : null"
+    [attr.aria-modal]="expanded() ? 'true' : null"
+    [attr.aria-label]="title()"
+  >
     <div
       #player
-      class="fixed right-4 top-20 z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-gray-200 bg-black shadow-2xl"
+      [class]="
+        expanded()
+          ? 'flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-gray-900 shadow-2xl'
+          : autoOpened()
+            ? 'fixed right-4 top-24 z-50 w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-2xl bg-black shadow-2xl animate-fade-in'
+            : 'fixed right-4 top-20 z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl bg-black shadow-2xl'
+      "
       [style.transform]="
-        'translate(' + offset().x + 'px, ' + offset().y + 'px)'
+        expanded()
+          ? null
+          : 'translate(' + offset().x + 'px, ' + offset().y + 'px)'
       "
     >
+      <!-- Encabezado (arrastrable solo en modo flotante) -->
       <div
-        class="flex cursor-grab touch-none select-none items-center justify-between bg-gray-900 px-3 py-2 active:cursor-grabbing"
-        title="Arrastrar para mover"
+        [class]="
+          expanded()
+            ? 'flex items-start justify-between gap-4 bg-gray-900 px-4 py-3'
+            : 'flex cursor-grab touch-none select-none items-center justify-between bg-gray-900 px-3 py-2 active:cursor-grabbing'
+        "
+        [attr.title]="expanded() ? null : 'Arrastrar para mover'"
         (pointerdown)="startDrag($event, player)"
         (pointermove)="onDrag($event)"
         (pointerup)="endDrag()"
         (pointercancel)="endDrag()"
       >
-        <span class="truncate text-xs font-semibold text-white"
-          >Video de ayuda</span
-        >
-        <div class="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            title="Ampliar"
-            class="rounded p-1 text-gray-400 transition-colors hover:text-white cursor-pointer"
-            (click)="expanded.set(true)"
+        <div class="min-w-0">
+          <span
+            [class]="
+              expanded()
+                ? 'block text-base font-semibold text-white'
+                : autoOpened()
+                  ? 'block text-sm font-semibold text-white'
+                  : 'block truncate text-xs font-semibold text-white'
+            "
           >
-            <svg lucideMaximize2 class="size-3.5"></svg>
-          </button>
-          <button
-            type="button"
-            title="Cerrar"
-            class="rounded p-1 text-gray-400 transition-colors hover:text-red-400 cursor-pointer"
-            (click)="closeVideo()"
-          >
-            <svg lucideX class="size-3.5"></svg>
-          </button>
+            {{ title() }}
+          </span>
+          @if (autoOpened() && message()) {
+            <p
+              [class]="
+                expanded()
+                  ? 'mt-1 text-sm leading-relaxed text-gray-300'
+                  : 'mt-1 text-xs leading-snug text-gray-300'
+              "
+            >
+              {{ message() }}
+            </p>
+          }
         </div>
-      </div>
-      <iframe
-        class="block aspect-video w-full"
-        [src]="url"
-        title="Video de ayuda"
-        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-        allowfullscreen
-      ></iframe>
-    </div>
-  } @else {
-    <div
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Video de ayuda"
-    >
-      <div
-        class="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl shadow-2xl"
-      >
-        <div class="flex items-center justify-between bg-gray-900 px-4 py-3">
-          <span class="text-sm font-semibold text-white">Video de ayuda</span>
-          <div class="flex items-center gap-2">
+
+        <div class="flex shrink-0 items-center gap-1">
+          @if (expanded()) {
             <button
               type="button"
               class="flex items-center gap-1.5 rounded px-2 py-1 text-xs text-gray-400 transition-colors hover:text-white cursor-pointer"
@@ -129,16 +135,71 @@
             >
               <svg lucideX class="size-3.5"></svg> Cerrar
             </button>
-          </div>
+          } @else {
+            <button
+              type="button"
+              title="Ampliar"
+              class="rounded p-1 text-gray-400 transition-colors hover:text-white cursor-pointer"
+              (click)="expanded.set(true)"
+            >
+              <svg lucideMaximize2 class="size-3.5"></svg>
+            </button>
+            <button
+              type="button"
+              title="Cerrar"
+              class="rounded p-1 text-gray-400 transition-colors hover:text-red-400 cursor-pointer"
+              (click)="closeVideo()"
+            >
+              <svg lucideX class="size-3.5"></svg>
+            </button>
+          }
         </div>
-        <iframe
-          class="aspect-video w-full"
-          [src]="url"
-          title="Video de ayuda"
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-          allowfullscreen
-        ></iframe>
       </div>
+
+      <!-- Video -->
+      <div class="relative aspect-video w-full bg-black">
+        @if (loadError()) {
+          <div
+            class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 text-center text-white"
+          >
+            <p class="text-sm">No pudimos cargar el video en esta página.</p>
+            <a
+              [href]="watchUrl()"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="rounded-lg bg-[#215c98] px-4 py-2 text-sm transition-colors hover:bg-[#163c63]"
+            >
+              Ver en YouTube
+            </a>
+          </div>
+        }
+        <!-- YouTube reemplaza este div por el iframe -->
+        <div
+          class="h-full w-full [&_iframe]:block [&_iframe]:h-full [&_iframe]:w-full"
+          [class.invisible]="loadError()"
+        >
+          <div #playerHost></div>
+        </div>
+      </div>
+
+      <!-- Pie: solo en rutas con apertura automática y si aún no lo ha visto -->
+      @if (autoOpenRoute() && !completed()) {
+        <div
+          [class]="
+            expanded()
+              ? 'flex items-center justify-end bg-gray-900 px-4 py-3 text-sm'
+              : 'flex items-center justify-end bg-gray-900 px-3 py-2 text-xs'
+          "
+        >
+          <button
+            type="button"
+            class="text-gray-300 underline underline-offset-2 transition-colors hover:text-white cursor-pointer"
+            (click)="dontShowAgain()"
+          >
+            No volver a mostrar al inicio
+          </button>
+        </div>
+      }
     </div>
-  }
+  </div>
 }

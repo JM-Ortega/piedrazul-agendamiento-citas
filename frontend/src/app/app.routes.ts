@@ -25,7 +25,15 @@ import { AuditComponent } from './features/audit/pages/audit/audit.component';
 import { EditProfileComponent } from './features/patient/PatientEditProfile/editProfile.component';
 
 export const routes: Routes = [
-  { path: '', component: HomeComponent },
+  {
+    path: '',
+    component: HomeComponent,
+    data: {
+      helpVideoId: '72Z0reqsPAU',
+      helpVideoAutoOpen: true,
+      helpVideoTitle: 'Video tutorial: ¿cómo crear su cuenta?',
+    },
+  },
 
   {
     path: 'agendador',

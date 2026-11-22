@@ -34,12 +34,11 @@ import java.time.LocalDate;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Integración real de {@link PatientProvisioningPortImpl} contra el módulo patients: el
  * registro efectivo de un paciente nuevo, la conservación de datos canónicos cuando el
- * documento ya existe, y el caso de negocio real de {@code Gender.OTRO} (ya no soportado).
+ * documento ya existe, y el registro de pacientes con {@code Gender.OTRO}.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -115,12 +114,14 @@ class PatientProvisioningPortImplIT extends PostgresIntegrationSupport {
     }
 
     @Test
-    void resolveOrRegisterShouldThrowWhenGenderIsOtro() {
+    void resolveOrRegisterShouldRegisterWhenGenderIsOtro() {
         PatientRegistrationData data = new PatientRegistrationData(
                 DocumentType.CEDULA, uniqueDocument(), "Ana", "Ruiz", "3001234567",
                 "ana@example.com", Gender.OTRO, LocalDate.of(1990, 6, 15), null);
 
-        assertThatThrownBy(() -> patientProvisioningPort.resolveOrRegister(data))
-                .isInstanceOf(IllegalArgumentException.class);
+        PatientSnapshot snapshot = patientProvisioningPort.resolveOrRegister(data);
+
+        assertThat(snapshot.patientInfo().getGender()).isEqualTo(Gender.OTRO);
+        assertThat(patientModuleApi.existsById(snapshot.idPatient())).isTrue();
     }
 }

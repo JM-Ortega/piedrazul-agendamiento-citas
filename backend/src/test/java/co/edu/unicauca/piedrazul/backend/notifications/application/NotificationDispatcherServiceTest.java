@@ -365,6 +365,55 @@ class NotificationDispatcherServiceTest {
         }
 
         @Test
+        void localRecipientRejectionKeepsItsReasonAndIsNotAttributedToTheProvider() {
+            ConsoleCounter consoleCounter = new ConsoleCounter();
+            StubProvider email = StubProvider.email(() -> outcome(DeliveryOutcome.ACCEPTED));
+
+            run(appointment("sintetico@example.invalid"), email, consoleCounter);
+
+            // La persistencia no cambia: el intento conserva el nombre y el código local.
+            assertThat(store.attempts().get(0).getErrorCode()).isEqualTo("RECIPIENT_EMAIL_INVALID");
+
+            String rejected = logLine("NOTIFICATION_ATTEMPT_FAILED", "channel=EMAIL");
+            assertThat(rejected).contains("reason=RECIPIENT_EMAIL_INVALID", "providerInvoked=false")
+                    .doesNotContain("providerName=");
+
+            // El cierre conserva la causa local aunque el último error sea el de la consola.
+            String terminal = logLine("NOTIFICATION_FAILED", "channelsTried=");
+            assertThat(terminal).contains("EMAIL:RECIPIENT_EMAIL_INVALID(local)",
+                            "CONSOLE:CONSOLE_DIAGNOSTIC_ONLY(diagnóstico)")
+                    .doesNotContain("stub-email", "CONSOLE_DIAGNOSTIC_ONLY(proveedor)");
+            // lastError no lo oculta la consola: es la causa del último canal de entrega real.
+            assertThat(terminal).contains("lastError=RECIPIENT_EMAIL_INVALID")
+                    .doesNotContain("lastError=CONSOLE_DIAGNOSTIC_ONLY");
+            assertThat(logs()).noneMatch(line -> line.contains("sintetico@") || line.contains("example.invalid"));
+        }
+
+        @Test
+        void realProviderFailureStaysAttributedToTheProvider() {
+            ConsoleCounter consoleCounter = new ConsoleCounter();
+            StubProvider email = StubProvider.email(() -> outcome(DeliveryOutcome.REJECTED));
+
+            run(appointment(), email, consoleCounter);
+
+            String rejected = logLine("NOTIFICATION_ATTEMPT_FAILED", "channel=EMAIL");
+            assertThat(rejected).contains("providerName=stub-email")
+                    .doesNotContain("providerInvoked=false");
+            assertThat(logLine("NOTIFICATION_FAILED", "channelsTried="))
+                    .contains("lastError=SYNTHETIC_PERMANENT", "EMAIL:SYNTHETIC_PERMANENT(proveedor)",
+                            "CONSOLE:CONSOLE_DIAGNOSTIC_ONLY(diagnóstico)")
+                    .doesNotContain("(local)");
+        }
+
+        @Test
+        void consoleAloneKeepsItsOwnCodeAsLastError() {
+            run(appointment(), new ConsoleCounter());
+
+            assertThat(logLine("NOTIFICATION_FAILED", "channelsTried=[CONSOLE]"))
+                    .contains("lastError=CONSOLE_DIAGNOSTIC_ONLY", "CONSOLE:CONSOLE_DIAGNOSTIC_ONLY(diagnóstico)");
+        }
+
+        @Test
         void noEligibleChannelFinishesWithoutAttempts() {
             Notification notification = otp();
 
@@ -866,6 +915,13 @@ class NotificationDispatcherServiceTest {
     private NotificationAttempt single() {
         assertThat(store.attempts()).hasSize(1);
         return store.attempts().get(0);
+    }
+
+    private String logLine(String event, String fragment) {
+        return logs().stream()
+                .filter(line -> line.startsWith(event) && line.contains(fragment))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Sin log " + event + " con " + fragment + ": " + logs()));
     }
 
     private List<String> logs() {

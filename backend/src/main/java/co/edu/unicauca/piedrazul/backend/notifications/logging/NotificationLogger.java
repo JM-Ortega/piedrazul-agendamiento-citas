@@ -77,12 +77,26 @@ public final class NotificationLogger {
             FailureType failureType,
             String reason
     ) {
+        attemptFailed(ctx, failureType, reason, true);
+    }
+
+    /**
+     * @param providerInvoked {@code false} si el intento se rechazó localmente (destinatario,
+     *        contenido): el contexto no debe nombrar a un proveedor que nunca se contactó.
+     */
+    public static void attemptFailed(
+            NotificationLogContext ctx,
+            FailureType failureType,
+            String reason,
+            boolean providerInvoked
+    ) {
         log.warn(
-                "{} {} failureType={} reason={}",
+                "{} {} failureType={} reason={}{}",
                 ATTEMPT_FAILED,
                 base(ctx),
                 failureType,
-                reason
+                reason,
+                providerInvoked ? "" : " providerInvoked=false"
         );
     }
 
@@ -252,12 +266,28 @@ public final class NotificationLogger {
             List<NotificationChannel> triedChannels,
             String lastError
     ) {
+        failed(ctx, triedChannels, lastError, List.of());
+    }
+
+    /**
+     * @param lastError causa del último canal de entrega real (no la consola, que es solo
+     *        diagnóstico); la de la consola solo si no hubo otro canal.
+     * @param channelFailures causa por canal ({@code CANAL:CÓDIGO(local|proveedor|diagnóstico)}):
+     *        conserva los demás canales, p. ej. un rechazo local previo a la consola.
+     */
+    public static void failed(
+            NotificationLogContext ctx,
+            List<NotificationChannel> triedChannels,
+            String lastError,
+            List<String> channelFailures
+    ) {
         log.error(
-                "{} {} channelsTried={} lastError={}",
+                "{} {} channelsTried={} lastError={}{}",
                 FAILED,
                 base(ctx),
                 triedChannels,
-                lastError
+                lastError,
+                channelFailures.isEmpty() ? "" : " channelFailures=" + channelFailures
         );
     }
 

@@ -1,5 +1,5 @@
 # ── Build stage ────────────────────────────────────────────
-FROM eclipse-temurin:21-jdk-alpine@sha256:0bfc69a4758a86710e5c474032d28400a8bd00874766f9e8b1642ac2fd293159 AS builder
+FROM eclipse-temurin:21-jdk-alpine@sha256:c07bb82e004a166b5d3d63b84ad70e2e822f228505e2e0c0b8dfdc2890d22f13 AS builder
 
 WORKDIR /app
 
@@ -24,7 +24,7 @@ RUN --mount=type=cache,target=/root/.m2,id=maven-$TARGETARCH \
     ./mvnw -q -B package -Dmaven.test.skip=true
 
 # ── Runtime stage ──────────────────────────────────────────
-FROM eclipse-temurin:21-jre-alpine@sha256:b48e02e0ea88d7bfb305335df94923bdef394905f4147dccd52e873cf17b1088
+FROM eclipse-temurin:21-jre-alpine@sha256:5d7689f47d670aca766b9503a70bccc2d73b4eb9221ae8f714ae958313c4ce70
 
 # Contrato del bootstrap del primer administrador que implementa esta imagen (create-only,
 # fail-closed). El despliegue solo entrega IDENTITY_SEED_* habilitado a una imagen con esta

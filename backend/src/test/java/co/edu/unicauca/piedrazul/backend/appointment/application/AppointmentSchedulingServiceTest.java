@@ -102,13 +102,15 @@ class AppointmentSchedulingServiceTest {
                 UUID.randomUUID(), idDoctor, idPatient, specialty, state, appointmentDate, time, origin);
     }
 
-    /** Stubs comunes al camino feliz, sin fijar el flujo (manual/autónomo). */
+    /**
+     * Stubs comunes al camino feliz, sin fijar el flujo (manual/autónomo). No incluye
+     * {@code isNewPatient}: solo lo consulta el flujo autónomo, que lo stubea aparte.
+     */
     private void stubHappyPathCollaborators() {
         when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor)).thenReturn(30);
         when(doctorConfigConsultPort.getDoctorName(idDoctor)).thenReturn("Dra. Prueba");
         when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
         when(patientResolutionStrategy.resolve(any())).thenReturn(new ResolvedPatient(idPatient, patientInfo()));
-        when(isNewPatientUseCase.isNewPatient(idPatient)).thenReturn(false);
         when(appointmentRepository.findByPatientIdAndDate(idPatient, date)).thenReturn(List.of());
         when(securityExtractor.currentActorId()).thenReturn("actor-1");
         when(securityExtractor.currentActorRoles()).thenReturn("[ADMIN]");
@@ -160,21 +162,27 @@ class AppointmentSchedulingServiceTest {
             assertThat(audit.citaId()).isEqualTo(saved.getIdAppointment());
         }
 
+        /**
+         * En el agendamiento manual el personal puede dar a un paciente nuevo una primera cita de
+         * cualquier especialidad: ni siquiera se consulta si es nuevo.
+         */
         @Test
-        void shouldThrowWhenNewPatientBooksNonNeuralSpecialty() {
+        void shouldScheduleNonNeuralSpecialtyForNewPatientInManualFlow() {
             SpecialtyCode specialty = SpecialtyCode.FISIOTERAPIA;
-            when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor)).thenReturn(30);
-            when(doctorConfigConsultPort.getDoctorName(idDoctor)).thenReturn("Dra. Prueba");
-            when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
-            when(patientResolutionStrategy.resolve(any())).thenReturn(new ResolvedPatient(idPatient, patientInfo()));
-            when(isNewPatientUseCase.isNewPatient(idPatient)).thenReturn(true);
+            stubHappyPathCollaborators();
+            AppointmentSchedulingRequest request = expectedRequest(specialty);
+            Appointment returned = Appointment.scheduleManual(request);
+            Appointment saved = buildAppointment(specialty, AppointmentState.AGENDADA, SchedulingOrigin.MANUAL,
+                    date, startTime);
+            when(appointmentService.scheduleManual(request, 30, List.of())).thenReturn(returned);
+            when(appointmentRepository.save(returned)).thenReturn(saved);
 
-            assertThatThrownBy(() -> service.scheduleManual(manualContext(), idDoctor, specialty, date, startTime,
-                    performedBy, patientResolutionStrategy))
-                    .isInstanceOf(FirstAppointmentMustBeNeuralTerapyException.class);
+            Appointment result = service.scheduleManual(manualContext(), idDoctor, specialty, date, startTime,
+                    performedBy, patientResolutionStrategy);
 
-            verify(appointmentRepository, never()).save(any());
-            verifyNoInteractions(eventPublisher);
+            assertThat(result).isSameAs(saved);
+            verify(appointmentRepository).save(returned);
+            verifyNoInteractions(isNewPatientUseCase);
         }
 
         @Test
@@ -204,7 +212,6 @@ class AppointmentSchedulingServiceTest {
             when(doctorConfigConsultPort.getDoctorName(idDoctor)).thenReturn("Dra. Prueba");
             when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
             when(patientResolutionStrategy.resolve(any())).thenReturn(new ResolvedPatient(idPatient, patientInfo()));
-            when(isNewPatientUseCase.isNewPatient(idPatient)).thenReturn(false);
             Appointment conflicting = buildAppointment(SpecialtyCode.QUIROPRAXIA, AppointmentState.AGENDADA,
                     SchedulingOrigin.MANUAL, date, new AppointmentTime(LocalTime.of(9, 0)));
             when(appointmentRepository.findByPatientIdAndDate(idPatient, date)).thenReturn(List.of(conflicting));
@@ -226,6 +233,7 @@ class AppointmentSchedulingServiceTest {
             SpecialtyCode specialty = SpecialtyCode.FISIOTERAPIA;
             when(appointmentConfigRepository.isAutonomousSchedulingEnabled()).thenReturn(true);
             stubHappyPathCollaborators();
+            when(isNewPatientUseCase.isNewPatient(idPatient)).thenReturn(false);
             when(appointmentRepository.findByPatientId(idPatient)).thenReturn(List.of());
             AppointmentSchedulingRequest request = expectedRequest(specialty);
             Appointment returned = Appointment.scheduleAutonomous(request);
@@ -256,6 +264,25 @@ class AppointmentSchedulingServiceTest {
                     eventPublisher, isNewPatientUseCase, securityExtractor);
         }
 
+        /** El agendamiento autónomo conserva la regla de la primera cita con terapia neural. */
+        @Test
+        void shouldThrowWhenNewPatientBooksNonNeuralSpecialty() {
+            SpecialtyCode specialty = SpecialtyCode.FISIOTERAPIA;
+            when(appointmentConfigRepository.isAutonomousSchedulingEnabled()).thenReturn(true);
+            when(doctorConfigConsultPort.getIntervalMinutesByDoctor(idDoctor)).thenReturn(30);
+            when(doctorConfigConsultPort.getDoctorName(idDoctor)).thenReturn("Dra. Prueba");
+            when(appointmentRepository.findByDoctorIdAndDate(idDoctor, date)).thenReturn(List.of());
+            when(patientResolutionStrategy.resolve(any())).thenReturn(new ResolvedPatient(idPatient, patientInfo()));
+            when(isNewPatientUseCase.isNewPatient(idPatient)).thenReturn(true);
+
+            assertThatThrownBy(() -> service.scheduleAutonomous(PatientSchedulingContext.autonomous(idPatient),
+                    idDoctor, specialty, date, startTime, performedBy, patientResolutionStrategy))
+                    .isInstanceOf(FirstAppointmentMustBeNeuralTerapyException.class);
+
+            verify(appointmentRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
+        }
+
         @Test
         void shouldThrowWhenPatientAlreadyHasAnAutonomousAppointmentThisMonth() {
             SpecialtyCode specialty = SpecialtyCode.FISIOTERAPIA;
@@ -284,6 +311,7 @@ class AppointmentSchedulingServiceTest {
             SpecialtyCode specialty = SpecialtyCode.FISIOTERAPIA;
             when(appointmentConfigRepository.isAutonomousSchedulingEnabled()).thenReturn(true);
             stubHappyPathCollaborators();
+            when(isNewPatientUseCase.isNewPatient(idPatient)).thenReturn(false);
             List<Appointment> nonBlockingAppointments = List.of(
                     buildAppointment(SpecialtyCode.QUIROPRAXIA, AppointmentState.REPROGRAMADA,
                             SchedulingOrigin.AUTONOMO, LocalDate.now(), new AppointmentTime(LocalTime.of(8, 0))),
